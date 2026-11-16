@@ -53,3 +53,20 @@
   min-height: 52px;
   font-size: 15px;
 }
+
+/* Explicit, touch-friendly enquiry controls: keep every field visibly rendered. */
+#form{display:grid!important;grid-template-columns:1fr!important;gap:15px!important}
+#form label{display:flex!important;flex-direction:column!important;align-items:stretch!important;gap:8px!important;width:100%!important;color:#c7d5ec!important;font-size:13px!important}
+#form input,#form select,#form textarea{
+ display:block!important;visibility:visible!important;opacity:1!important;
+ width:100%!important;min-width:0!important;min-height:50px!important;
+ margin:0!important;padding:13px 14px!important;
+ border:1px solid #587bb5!important;border-radius:10px!important;
+ background:#080f21!important;color:#f5f8ff!important;
+ font:400 14px 'DM Sans',sans-serif!important;line-height:1.4!important;
+ box-shadow:inset 0 0 12px #1b4b8a22!important;
+}
+#form textarea{min-height:105px!important;resize:vertical!important}
+#form input::placeholder,#form textarea::placeholder{color:#8192b0!important;opacity:1!important}
+#form select option{background:#101a35;color:#fff}
+#form button{width:100%;min-height:52px}
