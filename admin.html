@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#070b19"><title>ZENURA Admin | Enquiries</title>
+  <link rel="stylesheet" href="admin.css">
+</head>
+<body>
+  <header class="top"><a href="index.html">← ZENURA IGNITE TECHNOLOGIES</a><span>PRIVATE ADMIN</span></header>
+  <main class="shell">
+    <section class="intro"><p class="eyebrow">ZENURA / CONTROL CENTER</p><h1>Client <em>Enquiries.</em></h1><p>Review incoming project requests and manage their progress.</p></section>
+    <section id="login-panel" class="panel login">
+      <h2>Administrator sign in</h2><p>Only the authorized administrator can access client enquiries.</p>
+      <button id="login" class="primary">Continue with Google</button>
+      <small>Authorized account: sharerohit111@gmail.com</small>
+      <p id="login-error" class="error" role="alert"></p>
+    </section>
+    <section id="dashboard" hidden>
+      <div class="toolbar"><div><p id="identity"></p><h2>Enquiry inbox</h2></div><button id="logout" class="secondary">Sign out</button></div>
+      <div class="stats"><article><small>Total</small><b id="total">0</b></article><article><small>New</small><b id="new-count">0</b></article><article><small>In progress</small><b id="progress-count">0</b></article><article><small>Completed</small><b id="done-count">0</b></article></div>
+      <div class="filters"><input id="search" type="search" placeholder="Search name, contact or service"><select id="status-filter"><option value="all">All statuses</option><option value="new">New</option><option value="in-progress">In progress</option><option value="completed">Completed</option></select></div>
+      <div id="enquiries" class="inbox"><p class="muted">Loading enquiries…</p></div>
+      <p id="dashboard-error" class="error" role="alert"></p>
+    </section>
+    <p class="foot">ZENURA IGNITE TECHNOLOGIES · Developed by Rohit Kumar</p>
+  </main>
+  <script type="module" src="admin.js"></script>
+</body></html>
