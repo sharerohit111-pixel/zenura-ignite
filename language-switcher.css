@@ -1,0 +1,6 @@
+/* Persistent global language control */
+.language-toggle{position:fixed;right:18px;bottom:18px;z-index:9999;display:flex;align-items:center;gap:9px;padding:11px 17px;border:1px solid #55e8ff;border-radius:999px;color:#f5fbff;background:linear-gradient(120deg,#10294cF2,#21164aF2);box-shadow:0 0 18px #35e4ff66,0 8px 28px #0009,inset 0 0 12px #35e4ff22;backdrop-filter:blur(14px);font:700 12px 'DM Sans',sans-serif;cursor:pointer;transition:transform .2s,box-shadow .2s}
+.language-toggle:hover{transform:translateY(-3px);box-shadow:0 0 25px #35e4ff99,0 10px 32px #000a}
+.language-globe{font-size:16px;color:#6beaff}
+.language-label{letter-spacing:.3px}
+@media(max-width:600px){.language-toggle{right:13px;bottom:13px;padding:10px 14px;font-size:11px;box-shadow:0 0 14px #35e4ff66,0 6px 20px #0009}}
