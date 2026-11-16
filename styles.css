@@ -70,3 +70,11 @@
 #form input::placeholder,#form textarea::placeholder{color:#8192b0!important;opacity:1!important}
 #form select option{background:#101a35;color:#fff}
 #form button{width:100%;min-height:52px}
+
+
+/* Floating back-to-top arrow */
+.back-to-top{position:fixed;right:20px;bottom:92px;z-index:30;width:48px;height:48px;display:grid;place-items:center;border:1px solid #55eaff;border-radius:50%;background:linear-gradient(145deg,#122b55ee,#17143fee);color:#45eaff;font-size:27px;font-weight:800;line-height:1;box-shadow:0 0 18px #35e4ff66,inset 0 0 12px #438cff33;opacity:0;visibility:hidden;pointer-events:none;transform:translateY(12px);transition:opacity .22s ease,transform .22s ease,visibility .22s ease;cursor:pointer}
+.back-to-top.visible{opacity:1;visibility:visible;pointer-events:auto;transform:translateY(0)}
+.back-to-top:active{transform:scale(.94)}
+@media(max-width:600px){.back-to-top{right:16px;bottom:82px;width:46px;height:46px;font-size:25px}}
+@media(prefers-reduced-motion:reduce){.back-to-top{transition:none}}
