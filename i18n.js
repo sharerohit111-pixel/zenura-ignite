@@ -5,7 +5,7 @@
   const translations = {
     'Home':'होम','About':'परिचय','Services':'सेवाएँ','Our Approach':'हमारा तरीका','Portfolio':'पोर्टफोलियो','Pricing':'कीमत','Contact':'संपर्क',
     'NEXT-GENERATION DIGITAL STUDIO':'नई पीढ़ी का डिजिटल स्टूडियो',
-    'Ideas that':'ऐसे विचार जो','shape the ':'भविष्य को ','future.':'आकार दें।',
+    'Ideas that':'ऐसे विचार जो','shape the':'भविष्य को','future.':'आकार दें।',
     'We design and build powerful digital experiences — from high-performance websites to mobile apps and custom software.':'हम प्रभावशाली डिजिटल अनुभव डिज़ाइन और विकसित करते हैं — आधुनिक वेबसाइटों से लेकर मोबाइल ऐप और कस्टम सॉफ्टवेयर तक।',
     '↗ Start a Project':'↗ प्रोजेक्ट शुरू करें','Explore Services ↓':'सेवाएँ देखें ↓',
     'Digital ideas, engineered with purpose.':'उद्देश्य के साथ तैयार किए गए डिजिटल समाधान।',
