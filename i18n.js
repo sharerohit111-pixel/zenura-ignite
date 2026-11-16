@@ -42,10 +42,11 @@
     'Contact form currently prepares an email draft. Confirm your official business email before launch.':'संपर्क फ़ॉर्म अभी ईमेल ड्राफ्ट तैयार करता है। लॉन्च से पहले आधिकारिक बिज़नेस ईमेल की पुष्टि करें।',
     'Igniting innovation. Building the future.':'नवाचार को ऊर्जा देना। भविष्य का निर्माण करना।','BACK TO TOP ↑':'ऊपर जाएँ ↑'
   };
+  const originalTextNodes=new WeakMap();
   const attrMap={'placeholder':{'Name':'नाम','you@example.com':'आपका ईमेल या फ़ोन','Tell us about your idea...':'अपने विचार के बारे में बताएँ...'}};
   function lang(){return localStorage.getItem(STORAGE_KEY)==='hi'?'hi':'en'}
   function translateNode(node,language){
-    if(node.nodeType===Node.TEXT_NODE){const raw=node.nodeValue,trim=raw.trim();if(translations[trim])node.nodeValue=raw.replace(trim,language==='hi'?translations[trim]:node.parentElement?.dataset?.originalText||trim);return;}
+    if(node.nodeType===Node.TEXT_NODE){if(!originalTextNodes.has(node))originalTextNodes.set(node,node.nodeValue);const raw=originalTextNodes.get(node),trim=raw.trim();if(translations[trim])node.nodeValue=language==='hi'?raw.replace(trim,translations[trim]):raw;return;}
     if(node.nodeType!==Node.ELEMENT_NODE)return;
     if(node.matches('script,style, noscript, textarea'))return;
     if(node.hasAttribute('data-i18n')){const key=node.getAttribute('data-i18n');if(!node.dataset.i18nOriginal)node.dataset.i18nOriginal=node.textContent;node.textContent=language==='hi'?(translations[key]||key):node.dataset.i18nOriginal;}
