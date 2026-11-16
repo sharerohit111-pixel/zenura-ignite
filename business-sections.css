@@ -1,0 +1,37 @@
+/* ZENURA IGNITE — standalone business sections module */
+.business-section{padding-top:95px;padding-bottom:35px}
+.business-heading{display:grid;grid-template-columns:1fr .8fr;gap:55px;align-items:end;margin-top:18px}
+.business-heading h2{font:700 clamp(44px,5.5vw,64px)/1.04 'Space Grotesk';letter-spacing:-2.5px;margin:20px 0}
+.business-heading h2 em{font-style:normal;color:var(--cyan);text-shadow:0 0 24px #35e4ff55}
+.business-heading>p{color:var(--muted);line-height:1.85;font-size:14px;margin-bottom:26px}
+.portfolio-grid,.pricing-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin-top:30px}
+.portfolio-card,.price-card{border:1px solid #426eb688;border-radius:19px;overflow:hidden;background:linear-gradient(145deg,#111f40dd,#0a1024);box-shadow:inset 0 0 25px #2d6dff12}
+.portfolio-visual{height:215px;padding:24px;display:flex;flex-direction:column;justify-content:space-between;position:relative;overflow:hidden;background:radial-gradient(circle at 75% 20%,#2866aa88,transparent 42%),linear-gradient(135deg,#0d2143,#080e20)}
+.portfolio-visual:after{content:"";position:absolute;width:180px;height:180px;border:1px solid #45dcff77;border-radius:50%;right:-55px;bottom:-100px;box-shadow:0 0 35px #35e4ff22}
+.portfolio-visual>span,.portfolio-visual>i{font:700 9px 'Space Grotesk';letter-spacing:2px;color:#91eaff;font-style:normal}
+.portfolio-visual>b{font:700 29px/1.05 'Space Grotesk';letter-spacing:-1px;z-index:1}
+.visual-mobile{align-items:center;background:radial-gradient(circle at center,#203e78,#090f20 70%)}
+.phone-frame{height:190px;width:105px;border:2px solid #60dcff;border-radius:18px;padding:17px 10px;display:flex;flex-direction:column;justify-content:space-between;background:linear-gradient(160deg,#193d70,#090f20);box-shadow:0 0 25px #35e4ff55;transform:rotate(-7deg)}
+.phone-frame span{font:700 7px 'Space Grotesk';color:#8beaff;letter-spacing:1px}
+.phone-frame b{font:700 15px/1.1 'Space Grotesk'}
+.phone-frame i{font-style:normal;color:var(--cyan);font-size:10px}
+.visual-dashboard{background:radial-gradient(circle at 80% 20%,#4a2c9277,transparent 45%),linear-gradient(135deg,#111d3c,#080e20)}
+.mini-bars{display:flex;align-items:end;gap:8px;height:52px;width:145px;z-index:1}
+.mini-bars i{display:block;flex:1;border-radius:5px 5px 0 0;background:linear-gradient(#39e7ff,#536dff);height:40%}
+.mini-bars i:nth-child(2){height:72%}.mini-bars i:nth-child(3){height:55%}.mini-bars i:nth-child(4){height:95%}.mini-bars i:nth-child(5){height:78%}
+.portfolio-meta{padding:20px}
+.portfolio-meta>span,.price-kicker{font:700 9px 'Space Grotesk';letter-spacing:1.7px;color:var(--cyan)}
+.portfolio-meta h3,.price-card h3{font:700 20px 'Space Grotesk';margin:11px 0}
+.portfolio-meta p,.price-desc{font-size:12px;line-height:1.7;color:var(--muted);margin:0}
+.pricing-section{padding-top:90px;padding-bottom:80px}
+.price-card{padding:25px;display:flex;flex-direction:column;min-height:390px}
+.price-card h3{font-size:27px;margin:14px 0 8px}
+.price-desc{min-height:62px}
+.price-card ul{list-style:none;padding:18px 0 22px;margin:15px 0 20px;border-top:1px solid var(--line);display:grid;gap:12px}
+.price-card li{font-size:12px;color:#c4d2e9}
+.price-card li:before{content:"✦";color:var(--cyan);margin-right:9px}
+.price-card .primary,.price-card .secondary{margin-top:auto;text-align:center}
+.price-featured{border-color:#35e4ff;box-shadow:0 0 30px #258dff22,inset 0 0 25px #2d6dff16;transform:translateY(-8px)}
+.pricing-note{font-size:11px;color:#8f9fbd;text-align:center;margin:22px auto 0;max-width:700px;line-height:1.7}
+@media(max-width:800px){.business-heading{gap:20px}.portfolio-grid,.pricing-grid{gap:11px}.price-card{padding:19px}}
+@media(max-width:600px){.business-section{padding-top:68px;padding-bottom:22px}.business-heading{grid-template-columns:1fr;gap:0}.business-heading h2{font-size:44px;margin:17px 0}.business-heading>p{font-size:12px;margin:0}.portfolio-grid,.pricing-grid{grid-template-columns:1fr;gap:13px;margin-top:23px}.portfolio-visual{height:190px}.portfolio-meta{padding:17px}.price-card{min-height:0;padding:21px}.price-desc{min-height:0}.price-card ul{gap:10px}.price-featured{transform:none}.pricing-section{padding-bottom:55px}}
