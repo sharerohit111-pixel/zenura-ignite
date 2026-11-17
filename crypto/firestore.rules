@@ -1,0 +1,45 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+    function isAdmin() {
+      return signedIn()
+        && request.auth.token.email == 'sharerohit111@gmail.com'
+        && request.auth.token.email_verified == true;
+    }
+    function validPlan(data) {
+      return (
+        (data.planKey == 'monthly' && data.amount == 99 && data.months == 1) ||
+        (data.planKey == 'quarterly' && data.amount == 199 && data.months == 3) ||
+        (data.planKey == 'halfyear' && data.amount == 399 && data.months == 6) ||
+        (data.planKey == 'yearly' && data.amount == 799 && data.months == 12)
+      );
+    }
+
+    match /payments/{paymentId} {
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly([
+          'uid', 'email', 'planKey', 'planLabel', 'amount', 'months',
+          'upiId', 'utr', 'status', 'createdAt'
+        ])
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.email == request.auth.token.email
+        && request.resource.data.upiId == '9756591106-4@ybl'
+        && request.resource.data.status == 'pending'
+        && request.resource.data.utr is string
+        && request.resource.data.utr.size() >= 8
+        && request.resource.data.utr.size() <= 40
+        && validPlan(request.resource.data);
+      allow read: if signedIn()
+        && (isAdmin() || resource.data.uid == request.auth.uid);
+      allow update, delete: if isAdmin();
+    }
+
+    match /users/{uid}/private/entitlement {
+      allow read: if signedIn() && (request.auth.uid == uid || isAdmin());
+      allow create, update, delete: if isAdmin();
+    }
+  }
+}
