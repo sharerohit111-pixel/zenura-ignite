@@ -92,7 +92,7 @@
     finally { busy(false); }
   };
 
-  const openModal = () => { authShade.classList.add('open'); message('Sign in or create your ZENURA account.'); };
+  const openModal = () => { const drawer = byId('drawer'), shade = byId('drawerShade'); if (drawer) drawer.classList.remove('open'); if (shade) shade.classList.remove('open'); authShade.classList.add('open'); message('Sign in or create your ZENURA account.'); };
   const signIn = byId('signInBtn');
   const profile = byId('drawerProfile');
   const profileBtn = byId('profileBtn');
