@@ -89,17 +89,26 @@ exports.razorpayWebhook=onRequest(
     const eventRef=db.collection("razorpayEvents").doc(key);
     try{
       await db.runTransaction(async tx=>{
-        const prior=await tx.get(eventRef); if(prior.exists) return;
+        const prior=await tx.get(eventRef);
+        if(prior.exists) return;
+        let orderRef=null, order=null, entRef=null, current={};
+        const payment=event.event==="payment.captured"?event.payload?.payment?.entity:null;
+        if(payment?.order_id&&payment.currency==="INR"&&payment.status==="captured"){
+          orderRef=db.collection("paymentOrders").doc(payment.order_id);
+          const orderSnap=await tx.get(orderRef);
+          if(orderSnap.exists){
+            order=orderSnap.data();
+            if(order.status!=="captured"&&payment.amount===order.amount&&PLANS[order.planId]){
+              entRef=db.collection("entitlements").doc(order.uid);
+              const entSnap=await tx.get(entRef);
+              current=entSnap.exists?entSnap.data():{};
+            }else order=null;
+          }
+        }
+        // Firestore requires every transaction read to happen before its first write.
         tx.create(eventRef,{event:event.event||"unknown",receivedAt:FieldValue.serverTimestamp(),processed:false});
-        if(event.event!=="payment.captured") return;
-        const payment=event.payload?.payment?.entity;
-        if(!payment?.order_id||payment.currency!=="INR"||payment.status!=="captured") return;
-        const orderRef=db.collection("paymentOrders").doc(payment.order_id), orderSnap=await tx.get(orderRef);
-        if(!orderSnap.exists) return;
-        const order=orderSnap.data();
-        if(order.status==="captured"||payment.amount!==order.amount) return;
-        const entRef=db.collection("entitlements").doc(order.uid), entSnap=await tx.get(entRef);
-        const current=entSnap.exists?entSnap.data():{}, now=Timestamp.now();
+        if(!order) return;
+        const now=Timestamp.now();
         const base=current.currentPeriodEnd&&current.currentPeriodEnd.toMillis()>now.toMillis()
           ?current.currentPeriodEnd.toMillis():now.toMillis();
         const end=Timestamp.fromMillis(base+PLANS[order.planId].days*86400000);
