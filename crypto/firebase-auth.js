@@ -29,7 +29,7 @@
     <button class="submit" id="zenuraEmailAction" type="button">Sign in with email</button>
     <button class="googleBtn" id="zenuraGoogleAction" type="button">Continue with Google</button>
     <button class="googleBtn" id="zenuraCreateAction" type="button">Create an account</button>
-    <p class="footnote">Your paper-trading portfolio remains stored locally on this device. Premium access is not activated by signing in.</p>
+    <p class="footnote">Paper portfolios are kept separately on this device for each signed-in account. Guest trades stay in the Guest profile. Premium access is not activated by signing in.</p>
   `;
 
   const message = text => { byId('zenuraAuthMessage').textContent = text; };
@@ -123,5 +123,6 @@
     const state = document.querySelector('.account-state');
     if (state) state.textContent = user ? 'Signed in · ' + email : 'Guest paper account · saved on this device';
     if (signOut) signOut.textContent = user ? 'Sign out' : 'Not signed in';
+    window.dispatchEvent(new CustomEvent('zenura-auth-changed',{detail:{uid:user?user.uid:null,email:user?user.email:null}}));
   });
 })();
