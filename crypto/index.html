@@ -104,8 +104,12 @@ $('fullscreen').onclick=()=>{const el=$('chart');if(el.classList.contains('fulls
 $('signInBtn').onclick=()=>{$('authShade').classList.add('open');drawer(false)};$('closeAuth').onclick=()=>$('authShade').classList.remove('open');$('authShade').onclick=e=>{if(e.target===$('authShade'))$('authShade').classList.remove('open')};$('signOutBtn').onclick=()=>toast('No cloud session is active. Your local paper account remains available.');$('saveRisk').onclick=()=>{const p=price,sl=Number($('stopLoss').value)||0,tp=Number($('takeProfit').value)||0;if(!account.positions[selected.s]){toast('Open a paper position first, then save its SL and target.');return}if(sl<0||tp<0||sl&&sl>=p||tp&&tp<=p){toast('For a long position, SL must be below and target above market price.');return}if(!sl&&!tp){delete risk[selected.s]}else risk[selected.s]={sl:sl||null,tp:tp||null};save();portfolio();toast('Stop loss / target saved for '+selected.base)};
 $('exitSymbol').addEventListener('change',()=>renderExitControls());$('exitType').addEventListener('change',()=>renderExitControls());$('exitNow').onclick=exitAtMarket;$('placeExitLimit').onclick=placeLimitExit;$('exitOrders').addEventListener('click',e=>{const b=e.target.closest('[data-cancel-exit]');if(!b)return;exitOrders=exitOrders.filter(o=>o.id!==b.dataset.cancelExit);save();renderExitControls();toast('Pending exit order cancelled.')});
 initChart();watch();portfolio();history();renderAnalytics();estimate();renderExitControls();connect();candlesLoad();snapshot();fxRate();page('watch');setInterval(()=>{if(!hidden)snapshot()},60000);setInterval(()=>{if(!hidden)fxRate()},1800000);
-// Future integrations are deliberately disabled: Google identity via Firebase, server-verified Premium entitlements/Razorpay, and consent-aware Google Ads. Never trust client-side subscription flags.
+// Future integrations still pending: server-verified Premium entitlements/payment processing and consent-aware Google Ads. Never trust client-side subscription flags.
 })();
 </script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script src="./firebase-config.js"></script>
+<script src="./firebase-auth.js"></script>
 <script>if('serviceWorker' in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));</script>
 </body></html>
