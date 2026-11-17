@@ -111,7 +111,7 @@ body.day .exit-panel{background:#fff;border-color:#d4dfeb}body.day .exit-limit{b
 <script>
 (function(){
 'use strict';
-const $=id=>document.getElementById(id), FEE=.001, START=1000000, KEY='zenura-ignite-paper-v2';
+const $=id=>document.getElementById(id), FEE=.001, START=1000000, BASE_KEY='zenura-ignite-paper-v2'; let KEY=BASE_KEY;
 const COINS=[['BTCUSDT','BTC','Bitcoin','₿'],['ETHUSDT','ETH','Ethereum','◆'],['BNBUSDT','BNB','BNB','◆'],['SOLUSDT','SOL','Solana','◎'],['XRPUSDT','XRP','XRP','✕'],['ADAUSDT','ADA','Cardano','₳'],['DOGEUSDT','DOGE','Dogecoin','Ð'],['AVAXUSDT','AVAX','Avalanche','▲']].map(x=>({s:x[0],base:x[1],name:x[2],icon:x[3]}));
 let selected=COINS[0],tf='1m',side='BUY',socket=null,retry=0,reconnect=null,generation=0,candleRequest=0,hidden=document.hidden,chart=null,candles=null,volume=null,prices={},changes={},fx=null,price=null,toastTimer=null;
 let account=load(),risk={},exitOrders=[];try{risk=JSON.parse(localStorage.getItem(KEY+'-risk'))||{}}catch(e){risk={}}try{exitOrders=JSON.parse(localStorage.getItem(KEY+'-exit-orders'))||[]}catch(e){exitOrders=[]}if(!Array.isArray(exitOrders))exitOrders=[];exitOrders=exitOrders.filter(o=>o&&COINS.some(c=>c.s===o.symbol)&&Number.isFinite(o.limit)&&o.limit>0&&Number.isFinite(o.qty)&&o.qty>0);
@@ -119,6 +119,25 @@ const fmt=(n,d=2)=>Number.isFinite(n)?n.toLocaleString('en-IN',{minimumFractionD
 const pf=n=>!Number.isFinite(n)?'—':fmt(n,n>=1000?2:n>=1?4:6);
 function load(){try{const a=JSON.parse(localStorage.getItem(KEY));if(a&&Number.isFinite(a.cash)&&a.cash>=0&&a.positions&&typeof a.positions==='object'&&Array.isArray(a.history)){const positions={};for(const [s,p] of Object.entries(a.positions))if(COINS.some(c=>c.s===s)&&p&&Number.isFinite(p.qty)&&p.qty>0&&Number.isFinite(p.avg)&&p.avg>=0)positions[s]={qty:p.qty,avg:p.avg};return{cash:a.cash,initial:Number.isFinite(a.initial)&&a.initial>0?a.initial:START,realized:Number.isFinite(a.realized)?a.realized:0,positions,history:a.history.filter(t=>t&&['BUY','SELL'].includes(t.side)&&COINS.some(c=>c.s===t.symbol)&&Number.isFinite(t.price)&&Number.isFinite(t.qty)&&Number.isFinite(t.total)&&Number.isFinite(t.time)).slice(0,250)}}}catch(e){}return{cash:START,initial:START,realized:0,positions:{},history:[]}}
 function save(){try{localStorage.setItem(KEY,JSON.stringify(account));localStorage.setItem(KEY+'-risk',JSON.stringify(risk));localStorage.setItem(KEY+'-exit-orders',JSON.stringify(exitOrders))}catch(e){toast('Local storage is full. Export your trade history.')}}
+function loadScopedState(uid){
+  const guestKey=BASE_KEY+':guest';
+  // Preserve the old shared device portfolio as Guest data; never assign it to a signed-in account.
+  if(!localStorage.getItem(guestKey)){
+    for(const suffix of ['', '-risk', '-exit-orders']){
+      const legacy=localStorage.getItem(BASE_KEY+suffix);
+      if(legacy!==null)localStorage.setItem(guestKey+suffix,legacy);
+    }
+  }
+  KEY=uid?BASE_KEY+':user:'+uid:guestKey;
+  account=load();
+  try{risk=JSON.parse(localStorage.getItem(KEY+'-risk'))||{}}catch(e){risk={}}
+  try{exitOrders=JSON.parse(localStorage.getItem(KEY+'-exit-orders'))||[]}catch(e){exitOrders=[]}
+  if(!Array.isArray(exitOrders))exitOrders=[];
+  exitOrders=exitOrders.filter(o=>o&&COINS.some(c=>c.s===o.symbol)&&Number.isFinite(o.limit)&&o.limit>0&&Number.isFinite(o.qty)&&o.qty>0);
+  portfolio();history();renderAnalytics();estimate();renderExitControls();
+  toast(uid?'Loaded this account’s separate paper portfolio.':'Loaded the Guest paper portfolio.');
+}
+window.addEventListener('zenura-auth-changed',event=>loadScopedState(event.detail&&event.detail.uid||null));
 function toast(s){$('toast').textContent=s;$('toast').classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('toast').classList.remove('show'),2600)}
 function coin(s){return COINS.find(c=>c.s===s)||COINS[0]}
 function connection(ok,s){$('dot').classList.toggle('live',ok);$('connection').textContent=s;$('feed').textContent=s}
