@@ -32,3 +32,32 @@
 ## Go-live prerequisites
 - Owner must create/verify the Razorpay merchant account, complete KYC, link settlement bank account, enable applicable payment methods and recurring mandates, and provide configured Firebase project/auth domains.
 - Keep checkout disabled until backend endpoints, webhook verification, auth, entitlement enforcement and sandbox tests pass.
+
+
+## Repository implementation status (2026-11-18)
+The repository now includes a Firebase Functions starter under `/functions`, a `firebase.json` deployment config, and deny-by-default `firestore.rules`.
+Implemented as starter code:
+- Fixed-price Razorpay INR order creation for the four plans.
+- Server-side checkout signature validation.
+- Raw-body Razorpay webhook signature validation and duplicate event protection.
+- Server-side 72-hour trial initialization and entitlement lookup.
+- A server-side entitlement authorization callable for paper-order integration.
+
+Not yet production-complete:
+- The app's actual paper-order mutation still runs in the browser unless it is migrated behind a trusted backend. Calling an authorization endpoint alone is not enforcement because a modified client can skip it.
+- Auto-renewal/mandate creation, mandate cancellation, subscription lifecycle webhooks, refunds/disputes, admin audit tooling, and full reconciliation are not implemented yet. Auto-renewal remains OFF.
+- No Firebase project is linked, no Firebase Auth providers are configured, no secrets are installed, and no functions have been deployed or sandbox-tested.
+- Do not enable checkout or represent Premium as live until the production checklist below passes.
+
+## Owner setup checklist
+1. Create a Firebase project in the Firebase Console and register the web app. Enable Google and/or email sign-in in Authentication.
+2. Add the Firebase web app configuration to the app through a separate public config module. Firebase web config is not a private key, but restrict its API key to the correct domains/APIs.
+3. Install Firebase CLI, run `firebase login`, then `firebase use --add` from the repository root.
+4. Set backend secrets with Firebase Secret Manager (never in GitHub files):
+   - `firebase functions:secrets:set RAZORPAY_KEY_ID`
+   - `firebase functions:secrets:set RAZORPAY_KEY_SECRET`
+   - `firebase functions:secrets:set RAZORPAY_WEBHOOK_SECRET`
+5. Use Razorpay Test Mode first. Configure the webhook endpoint to the deployed `razorpayWebhook` function URL and subscribe to `payment.captured`. Copy the webhook secret only into Secret Manager.
+6. Deploy with `firebase deploy --only functions,firestore:rules`. Cloud Functions deployment may require the Firebase project's Blaze billing plan; review budget alerts and current pricing before enabling it.
+7. Run sandbox tests for successful, failed, pending, duplicate, wrong-signature, wrong-amount, refunded and delayed webhook cases. Verify that entitlement is granted only once after captured payment.
+8. Before live launch, migrate actual paper-order placement to trusted server-side code and test it end-to-end. Then implement recurring mandate consent/cancellation separately. Do not ask the owner to paste private keys, webhook secrets, service-account JSON or bank credentials into chat.
