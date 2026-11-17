@@ -7,6 +7,22 @@ service cloud.firestore {
         && request.auth.token.email_verified == true;
     }
 
+    // ZENURA IGNITE Premium records are server-managed; clients cannot write them.
+    match /entitlements/{uid} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow write: if false;
+    }
+    match /paymentOrders/{orderId} {
+      allow read, write: if false;
+    }
+    match /razorpayEvents/{eventId} {
+      allow read, write: if false;
+    }
+    match /users/{uid} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow write: if false;
+    }
+
     match /enquiries/{enquiryId} {
       // Public website visitors may submit a validated enquiry only.
       allow create: if
