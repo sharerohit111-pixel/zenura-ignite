@@ -22,6 +22,16 @@ This is an isolated app folder deployed alongside (not replacing) the ZENURA IGN
 - GitHub Pages hosts the static PWA only. The optional Node.js market gateway must be hosted separately; do not run it on GitHub Pages.
 - A live price feed is not guaranteed if the provider, ISP, browser or region blocks public market endpoints.
 
+## UPI payments and manual Premium approval
+- The Premium plans use the UPI ID `9756591106-4@ybl` and payee label `Rohit Kumar`. The app generates a plan-specific UPI QR and UPI intent.
+- Customers must sign in, pay the exact plan amount, enter the UPI transaction reference (UTR), and submit a payment request.
+- Requests are stored in Firestore `payments` with status `pending`. The signed-in admin `sharerohit111@gmail.com` sees an **Admin Payment Approvals** entry in the side menu.
+- The admin must independently match the UTR and amount against the actual bank/UPI account credit before choosing **Approve & activate**. Rejected requests do not grant access.
+- Approval writes an entitlement to `users/{uid}/private/entitlement` with an expiry date. The Firestore rules restrict approval and entitlement writes to the verified admin email; customers can only create/read their own payment requests.
+- **Required Firebase step:** In Firebase Console → Firestore Database → Rules, copy and publish the complete contents of `crypto/firestore.rules`. Until these rules are published, payment requests and approvals will fail closed.
+- This is manual bank reconciliation, not automatic payment verification. A QR payment or entered UTR is not proof of receipt. Never approve from a screenshot alone. For automated confirmation, add a compliant payment provider/bank integration with server-side verification and webhooks.
+- Firebase Web API keys are public app identifiers; never add service-account JSON, private keys, or admin passwords to this repository.
+
 ## Future platform architecture
 - Google Sign-In: Firebase Authentication; add account-scoped cloud storage and security rules before enabling multi-user access.
 - Premium: Razorpay order creation, signature verification and subscription webhooks must run server-side. Premium feature access must come from verified server entitlements.
