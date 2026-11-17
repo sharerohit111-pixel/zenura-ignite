@@ -71,6 +71,13 @@ body.day .exit-panel{background:#fff;border-color:#d4dfeb}body.day .exit-limit{b
 
 /* Keep live-feed status hooks available to app logic without showing them in header */
 .runtime-status{display:none!important}
+
+/* Persistent PWA install action: shown until the app is installed */
+.install-app-btn{position:fixed;right:max(16px,env(safe-area-inset-right));bottom:calc(22px + env(safe-area-inset-bottom));z-index:1000;display:flex;align-items:center;gap:9px;padding:12px 16px;border:1px solid #56c5ff;border-radius:999px;background:linear-gradient(110deg,#0755a3,#087eaa);color:#fff;font:700 12px "DM Sans",sans-serif;letter-spacing:.25px;box-shadow:0 8px 28px #0077ff55,0 0 0 3px #168bff20;cursor:pointer}
+.install-app-btn svg{width:18px;height:18px;flex:none}
+.install-app-btn:active{transform:scale(.97)}
+.install-app-btn[hidden]{display:none!important}
+@media(min-width:721px){.install-app-btn{bottom:26px;right:26px}}
 </style>
 </head>
 <body>
@@ -182,5 +189,22 @@ initChart();watch();portfolio();history();renderAnalytics();estimate();renderExi
 <script src="./firebase-config.js"></script>
 <script src="./firebase-auth.js"></script>
 <script src="./payment-admin.js"></script>
+<button class="install-app-btn" id="installAppBtn" type="button" aria-label="Install ZENURA IGNITE app">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12m-5-5 5 5 5-5"/><path d="M5 17v3h14v-3"/></svg><span>Install App</span></button>
+<script>
+(()=>{const btn=document.getElementById('installAppBtn');if(!btn)return;let deferredPrompt=null;
+const isInstalled=()=>window.matchMedia('(display-mode: standalone)').matches||window.navigator.standalone===true;
+const hide=()=>{btn.hidden=true;};
+if(isInstalled())hide();
+window.addEventListener('beforeinstallprompt',event=>{event.preventDefault();deferredPrompt=event;if(!isInstalled())btn.hidden=false;});
+window.addEventListener('appinstalled',()=>{deferredPrompt=null;hide();});
+btn.addEventListener('click',async()=>{
+ if(isInstalled()){hide();return;}
+ if(deferredPrompt){const promptEvent=deferredPrompt;deferredPrompt=null;try{await promptEvent.prompt();const choice=await promptEvent.userChoice;if(choice&&choice.outcome==='accepted')btn.hidden=true;}catch(error){alert('Install prompt could not open. Chrome menu se “Install app” chunein.');}return;}
+ alert('ZENURA IGNITE install karne ke liye Chrome ke ⋮ menu ko kholein aur “Install app” ya “Add to Home screen” chunein. Agar option na dikhe, page ko Chrome mein kholkar thodi der baad dobara try karein.');
+});
+document.addEventListener('visibilitychange',()=>{if(isInstalled())hide();});
+})();
+</script>
 <script>if('serviceWorker' in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));</script>
 </body></html>
