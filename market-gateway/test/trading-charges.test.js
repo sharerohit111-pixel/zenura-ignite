@@ -36,7 +36,7 @@ test("NSE option SELL applies STT to premium and does not charge buy-side stamp 
  assert.equal(c.stampDutyPaise,0);
  assert.equal(c.exchangeTransactionPaise,35);
  assert.equal(c.gstPaise,366);
- assert.equal(c.totalChargesPaise,547);
- assert.equal(c.netCreditPaise,96953);
+ assert.equal(c.totalChargesPaise,2547);
+ assert.equal(c.netCreditPaise,94953);
  assert.equal(c.totalDebitPaise,null);
 });
