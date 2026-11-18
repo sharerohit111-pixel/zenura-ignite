@@ -255,7 +255,7 @@ app.post("/paper/orders",async(req,res)=>{
       result={orderId:orderRef.id,...order,cashPaise:cash,realizedPnlTotalPaise:realizedPnlPaise};
     });
     res.set("Cache-Control","private, no-store");
-    res.status(201).json(result);
+    res.status(result.idempotentReplay?200:201).json(result);
   }catch(error){res.status(error.status||500).json({error:error.status?error.message:"Paper order could not be completed."});}
 });
 
