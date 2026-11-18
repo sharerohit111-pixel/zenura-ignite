@@ -259,7 +259,7 @@
       const componentText=[['SPAN',components.spanPaise],['Exposure',components.exposurePaise],['Option premium',components.optionPremiumPaise],['Net buy premium',components.netBuyPremiumPaise],['Tender',components.tenderPaise],['Delivery',components.deliveryPaise],['Total margin',components.totalMarginPaise]]
         .filter(([,value])=>Number.isSafeInteger(value)).map(([label,value])=>label+' '+inrPaise(value)).join(' · ');
       futuresMarginStatus.textContent='PREVIEW ONLY · '+data.tradingSymbol+' · '+side+' '+lots+' lot(s) / '+data.quantity+' qty · '+(product==='I'?'Intraday':'Delivery')+' margin'+quoteText+' · Required margin '+required+finalText+(componentText?' · '+componentText:'')+' · Virtual cash '+cash+' · Shortfall '+shortfall+'. No order placed; no funds reserved.';
-    }catch(error){futuresMarginStatus.textContent=error.message||'Futures margin preview failed.';}
+    }catch(error){if(selected?.instrument_key===instrumentKey)futuresMarginStatus.textContent=error.message||'Futures margin preview failed.';}
     finally{updateFuturesMarginButton();}
   }
   futuresMarginButton?.addEventListener('click',requestFuturesMarginPreview);
@@ -379,7 +379,7 @@
   async function select(item,isReconnect=false){
     clearFeedTimers();
     if(streamAbort){streamAbort.abort();streamAbort=null;}
-    selected=item;updateFuturesMarginButton();chartRequest++;lastQuoteText='';if(!isReconnect)reconnectAttempt=0;title.textContent=item.trading_symbol||item.name;symbol.textContent=item.instrument_key;price.textContent='—';
+    selected=item;if(futuresMarginStatus)futuresMarginStatus.textContent=item.instrument_type==='FUT'?'Selected '+(item.trading_symbol||'futures contract')+'. Request a fresh broker margin preview.':'Select a verified futures contract from the Futures watchlist.';updateFuturesMarginButton();chartRequest++;lastQuoteText='';if(!isReconnect)reconnectAttempt=0;title.textContent=item.trading_symbol||item.name;symbol.textContent=item.instrument_key;price.textContent='—';
     setFeedStatus('Waiting for verified live quote','Connecting to Upstox V3 feed. Prices will appear only when received from the provider.');
     render(items);updatePaperButtons();renderSavedWatchlist();loadCandles();
     const connector=window.ZENURA_MARKET_CONNECTOR;
