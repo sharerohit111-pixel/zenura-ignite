@@ -289,7 +289,8 @@
   function setFeedStatus(heading,message){const h=document.querySelector('.chart-placeholder b'),s=document.querySelector('.chart-placeholder span');if(h)h.textContent=heading;if(s)s.textContent=message;}
   function scheduleReconnect(item){
     if(selected?.instrument_key!==item.instrument_key||reconnectTimer)return;
-    const delay=Math.min(30000,1000*Math.pow(2,Math.min(reconnectAttempt,5)));reconnectAttempt++;
+    const retry=window.ZenuraReconnectPolicy.nextReconnectDelay(reconnectAttempt);reconnectAttempt=retry.nextAttempt;
+    const delay=retry.delayMs;
     setFeedStatus('Live feed disconnected','Reconnecting in '+Math.round(delay/1000)+'s…');
     reconnectTimer=setTimeout(()=>{reconnectTimer=null;if(selected?.instrument_key===item.instrument_key)select(item,true);},delay);
   }
@@ -320,7 +321,7 @@
             if(eventName==='error'){if(staleTimer){clearTimeout(staleTimer);staleTimer=null;}price.textContent=lastQuoteText?'STALE · '+lastQuoteText:'—';setFeedStatus('Live feed error',data.message||'The provider stream reported an error.');return;}
             const feed=data.feeds?.[item.instrument_key],quote=window.ZenuraLiveQuote?.extractFreshQuote(feed);
             if(quote){
-              lastQuoteText='₹'+(quote.pricePaise/100).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});price.textContent=lastQuoteText;reconnectAttempt=0;
+              lastQuoteText='₹'+(quote.pricePaise/100).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});price.textContent=lastQuoteText;
               if(staleTimer)clearTimeout(staleTimer);
               staleTimer=setTimeout(()=>{if(selected?.instrument_key===item.instrument_key){price.textContent='STALE · '+lastQuoteText;setFeedStatus('Live quote is stale','No fresh provider quote received for 15 seconds. Do not use this price for paper orders.');scheduleReconnect(item);}},15000);
               setFeedStatus('Live quote connected','Last traded price received from Upstox V3. Chart history is a separate integration.');
