@@ -94,6 +94,22 @@ exports.upstoxOAuthCallback = onRequest(
     }
   }
 );
+exports.disconnectUpstoxAccount = onCall(
+  {region:REGION},
+  async req=>{
+    const uid=uidOf(req);
+    const connectionRef=db.collection("upstoxConnections").doc(uid);
+    const leaseRef=db.collection("indianMarketStreamLeases").doc(uid);
+    const now=Date.now();
+    await db.runTransaction(async tx=>{
+      const connectionSnap=await tx.get(connectionRef);
+      const leaseSnap=await tx.get(leaseRef);
+      if(connectionSnap.exists) tx.delete(connectionRef);
+      if(leaseSnap.exists) tx.set(leaseRef,{...leaseSnap.data(),revoked:true,updatedAtMs:now});
+    });
+    return {disconnected:true,activeFeedTermination:"requested"};
+  }
+);
 exports.getIndianMarketConnectionStatus = onCall(
   {region:REGION},
   async req=>{
