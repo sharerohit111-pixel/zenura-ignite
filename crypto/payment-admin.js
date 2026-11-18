@@ -21,14 +21,14 @@
   }
   const auth = firebase.auth();
   const db = firebase.firestore();
-  let selectedPlan = null;
+  let selectedPlan = null;\n  let paymentLanguage = (() => { try { return localStorage.getItem('zenura-crypto-payment-language') === 'hi' ? 'hi' : 'en'; } catch (_) { return 'en'; } })();\n  const words = {en:['UPI Payment','Plan:','Amount:','Your payment details are not displayed here. Tap below to open a UPI app with the plan amount and payee details pre-filled. Confirm the payee name and amount inside your UPI app before paying.','Continue to UPI app','UPI transaction ID / UTR','Enter UTR after successful payment','After paying, enter the UTR and submit. Premium stays pending until the admin checks the actual bank/UPI credit and approves it. Do not submit a UPI PIN or OTP.','I have paid — Submit for review','Cancel','Payment is not verified yet.'],hi:['UPI भुगतान','प्लान:','राशि:','आपके भुगतान का विवरण यहाँ नहीं दिखाया जाएगा। नीचे टैप करके UPI ऐप खोलें; प्लान की राशि और भुगतान पाने वाले का विवरण पहले से भरा होगा। भुगतान से पहले UPI ऐप में प्राप्तकर्ता का नाम और राशि जाँच लें।','UPI ऐप पर जाएँ','UPI ट्रांज़ैक्शन ID / UTR','सफल भुगतान के बाद UTR दर्ज करें','भुगतान करने के बाद UTR दर्ज करके सबमिट करें। एडमिन द्वारा बैंक/UPI में वास्तविक राशि की जाँच और मंज़ूरी के बाद ही Premium सक्रिय होगा। UPI PIN या OTP यहाँ दर्ज न करें।','भुगतान कर दिया — जाँच के लिए भेजें','रद्द करें','भुगतान की अभी पुष्टि नहीं हुई है।']};\n  const t = i => words[paymentLanguage][i];\n  function setPaymentLanguage(lang, utr) { paymentLanguage=lang; try { localStorage.setItem('zenura-crypto-payment-language',lang); } catch (_) {} $('zpayTitle').textContent=t(0); $('zpayLanguage').textContent=lang==='en'?'हिंदी':'English'; if(selectedPlan) openPayment(selectedPlan.key,utr||''); }
 
   const style = document.createElement('style');
   style.textContent = `
     .zpay-shade{position:fixed;inset:0;background:#000c;z-index:80;display:none;overflow:auto;padding:18px}
     .zpay-shade.open{display:grid;place-items:center}
     .zpay-box{width:min(520px,100%);max-height:92vh;overflow:auto;background:#0d1d30;border:1px solid #31516c;border-radius:18px;padding:18px;color:#eaf2fa}
-    .zpay-box h2{font:700 21px 'Space Grotesk';margin:5px 0 12px}
+    .zpay-box h2{font:700 21px 'Space Grotesk';margin:5px 0 12px}\n    .zpay-head-actions{display:flex;align-items:center;gap:8px}\n    .zpay-lang{border:1px solid #287b76;border-radius:9px;padding:8px 11px;background:#123c42;color:#63e5c2;font:700 11px 'Space Grotesk';cursor:pointer;white-space:nowrap}
     .zpay-muted{font-size:11px;color:#91a7bb;line-height:1.55}
     .zpay-input{width:100%;margin:7px 0 12px;padding:12px;border-radius:9px;border:1px solid #34516c;background:#071522;color:#fff}
     .zpay-actions{display:flex;gap:9px;flex-wrap:wrap;margin-top:12px}
@@ -48,7 +48,7 @@
   shade.className = 'zpay-shade';
   shade.id = 'zpayShade';
   shade.innerHTML = `<section class="zpay-box" role="dialog" aria-modal="true" aria-labelledby="zpayTitle">
-    <div class="head"><h2 id="zpayTitle">UPI Payment</h2><button class="reset" id="zpayClose" type="button">✕</button></div>
+    <div class="head"><h2 id="zpayTitle">UPI Payment</h2><div class="zpay-head-actions"><button class="zpay-lang" id="zpayLanguage" type="button">हिंदी</button><button class="reset" id="zpayClose" type="button">✕</button></div></div>
     <div id="zpayBody"></div><p class="zadmin-status" id="zpayStatus" aria-live="polite"></p>
   </section>`;
   document.body.appendChild(shade);
@@ -57,7 +57,7 @@
   const say = t => { status.textContent = t; };
   const open = () => shade.classList.add('open');
   const close = () => shade.classList.remove('open');
-  $('zpayClose').onclick = close;
+  $('zpayClose').onclick = close;\n  $('zpayLanguage').onclick = () => setPaymentLanguage(paymentLanguage==='en'?'hi':'en',$('zpayUtr')?.value||'');\n  setPaymentLanguage(paymentLanguage);
   shade.addEventListener('click', e => { if (e.target === shade) close(); });
 
   function requireUser() {
@@ -70,7 +70,7 @@
     }
     return user;
   }
-  function openPayment(planKey) {
+  function openPayment(planKey, keepUtr = '') {
     const user = requireUser();
     if (!user) return;
     const plan = PLANS[planKey];
@@ -82,14 +82,14 @@
       '&am=' + encodeURIComponent(String(plan.amount)) +
       '&cu=INR&tn=' + encodeURIComponent(note);
     body.innerHTML = `
-      <p class="zpay-muted">Plan: <b>${plan.label}</b> · Amount: <b>₹${plan.amount}</b></p>
-      <p class="zpay-muted">Your payment details are not displayed here. Tap below to open a UPI app with the plan amount and payee details pre-filled. Confirm the payee name and amount inside your UPI app before paying.</p>
-      <div class="zpay-actions"><button type="button" id="zpayOpenUpi">Continue to UPI app</button></div>
-      <label class="label" for="zpayUtr">UPI transaction ID / UTR</label>
-      <input class="zpay-input" id="zpayUtr" maxlength="40" autocomplete="off" placeholder="Enter UTR after successful payment">
-      <p class="zpay-muted">After paying, enter the UTR and submit. Premium stays pending until the admin checks the actual bank/UPI credit and approves it. Do not submit a UPI PIN or OTP.</p>
-      <div class="zpay-actions"><button type="button" id="zpaySubmit">I have paid — Submit for review</button><button class="secondary" type="button" id="zpayCancel">Cancel</button></div>`;
-    say('Payment is not verified yet.');
+      <p class="zpay-muted">${t(1)} <b>${paymentLanguage==='hi'?({monthly:'1 महीना',quarterly:'3 महीने',halfyear:'6 महीने',yearly:'1 साल'}[planKey]):plan.label}</b> · ${t(2)} <b>₹${plan.amount}</b></p>
+      <p class="zpay-muted">${t(3)}</p>
+      <div class="zpay-actions"><button type="button" id="zpayOpenUpi">${t(4)}</button></div>
+      <label class="label" for="zpayUtr">${t(5)}</label>
+      <input class="zpay-input" id="zpayUtr" maxlength="40" autocomplete="off" placeholder="${t(6)}" value="${String(keepUtr).replace(/[&<>"]/g, '')}">
+      <p class="zpay-muted">${t(7)}</p>
+      <div class="zpay-actions"><button type="button" id="zpaySubmit">${t(8)}</button><button class="secondary" type="button" id="zpay${t(9)}">Cancel</button></div>`;
+    say(t(10));
     $('zpayOpenUpi').onclick = () => { window.location.href = upi; };
     $('zpayCancel').onclick = close;
     $('zpaySubmit').onclick = async () => {
