@@ -260,39 +260,59 @@
     }catch(error){if(request!==chartRequest)return;chart.textContent='';const b=document.createElement('b');b.textContent='Chart data unavailable';const span=document.createElement('span');span.textContent=error.message||'Could not load historical candles.';chart.append(b,span);chartStatus.textContent='Not connected';}
   }
   timeframeButtons.forEach(button=>button.addEventListener('click',()=>{activeTimeframe=button.dataset.timeframe;timeframeButtons.forEach(x=>x.classList.toggle('active',x===button));loadCandles();}));
+  function setFeedStatus(heading,message){const h=document.querySelector('.chart-placeholder b'),s=document.querySelector('.chart-placeholder span');if(h)h.textContent=heading;if(s)s.textContent=message;}
+  function scheduleReconnect(item){
+    if(selected?.instrument_key!==item.instrument_key||reconnectTimer)return;
+    const delay=Math.min(30000,1000*Math.pow(2,Math.min(reconnectAttempt,5)));reconnectAttempt++;
+    setFeedStatus('Live feed disconnected','Reconnecting in '+Math.round(delay/1000)+'s…');
+    reconnectTimer=setTimeout(()=>{reconnectTimer=null;if(selected?.instrument_key===item.instrument_key)select(item);},delay);
+  }
   async function select(item){
     clearFeedTimers();
     if(streamAbort){streamAbort.abort();streamAbort=null;}
     selected=item;chartRequest++;lastQuoteText='';reconnectAttempt=0;title.textContent=item.trading_symbol||item.name;symbol.textContent=item.instrument_key;price.textContent='—';
-    document.querySelector('.chart-placeholder b').textContent='Waiting for verified live quote';
-    document.querySelector('.chart-placeholder span').textContent='Connecting to Upstox V3 feed. Prices will appear only when received from the provider.';
-    render(items);
-    updatePaperButtons();
-    renderSavedWatchlist();
-    loadCandles();
+    setFeedStatus('Waiting for verified live quote','Connecting to Upstox V3 feed. Prices will appear only when received from the provider.');
+    render(items);updatePaperButtons();renderSavedWatchlist();loadCandles();
     const connector=window.ZENURA_MARKET_CONNECTOR;
-    if(!gateway||!connector?.getIdToken){document.querySelector('.chart-placeholder span').textContent='Sign in and configure the deployed market gateway to start live quotes.';return;}
+    if(!gateway||!connector?.getIdToken){setFeedStatus('Market gateway not configured','Sign in and configure the deployed market gateway to start live quotes.');return;}
     const controller=new AbortController();streamAbort=controller;
+    let reader=null;
     try{
       const token=await connector.getIdToken();
+      if(controller.signal.aborted||selected?.instrument_key!==item.instrument_key)return;
       const response=await fetch(gateway+'/stream',{method:'POST',signal:controller.signal,headers:{Authorization:'Bearer '+token,'Content-Type':'application/json',Accept:'text/event-stream'},body:JSON.stringify({instrumentKeys:[item.instrument_key],mode:'ltpc'})});
       if(!response.ok)throw new Error('Live feed unavailable ('+response.status+').');
-      const reader=response.body.getReader(),decoder=new TextDecoder();let buffer='';
+      if(!response.body)throw new Error('Live feed stream is not supported by this browser.');
+      reader=response.body.getReader();const decoder=new TextDecoder();let buffer='';
       while(true){
         const {value,done}=await reader.read();if(done)break;
+        if(controller.signal.aborted||selected?.instrument_key!==item.instrument_key)break;
         buffer+=decoder.decode(value,{stream:true});
         const events=buffer.split(/\r?\n\r?\n/);buffer=events.pop()||'';
         for(const event of events){
-          const line=event.split(/\r?\n/).find(x=>x.startsWith('data: '));if(!line)continue;
+          const lines=event.split(/\r?\n/),eventName=lines.find(x=>x.startsWith('event: '))?.slice(7)||'message';
+          const line=lines.find(x=>x.startsWith('data: '));if(!line)continue;
           try{
             const data=JSON.parse(line.slice(6));
-            const feed=data.feeds?.[item.instrument_key];const quote=feed?.ltpc||feed?.fullFeed?.marketFF?.ltpc||feed?.fullFeed?.indexFF?.ltpc;
-            if(quote&&Number.isFinite(Number(quote.ltp))){lastQuoteText='₹'+Number(quote.ltp).toLocaleString('en-IN',{maximumFractionDigits:2});price.textContent=lastQuoteText;reconnectAttempt=0;if(staleTimer)clearTimeout(staleTimer);staleTimer=setTimeout(()=>{if(selected?.instrument_key===item.instrument_key){price.textContent='STALE · '+lastQuoteText;document.querySelector('.chart-placeholder b').textContent='Live quote is stale';document.querySelector('.chart-placeholder span').textContent='No fresh provider quote received for 15 seconds. Do not use this price for paper orders.';}},15000);document.querySelector('.chart-placeholder b').textContent='Live quote connected';document.querySelector('.chart-placeholder span').textContent='Last traded price received from Upstox V3. Chart history is a separate integration.';}
+            if(eventName==='status'&&data.connected===false){setFeedStatus('Live feed disconnected','The Upstox stream closed. Reconnecting automatically.');continue;}
+            if(eventName==='error'){setFeedStatus('Live feed error',data.message||'The provider stream reported an error.');continue;}
+            const feed=data.feeds?.[item.instrument_key],quote=feed?.ltpc||feed?.fullFeed?.marketFF?.ltpc||feed?.fullFeed?.indexFF?.ltpc;
+            if(quote&&Number.isFinite(Number(quote.ltp))){
+              lastQuoteText='₹'+Number(quote.ltp).toLocaleString('en-IN',{maximumFractionDigits:2});price.textContent=lastQuoteText;reconnectAttempt=0;
+              if(staleTimer)clearTimeout(staleTimer);
+              staleTimer=setTimeout(()=>{if(selected?.instrument_key===item.instrument_key){price.textContent='STALE · '+lastQuoteText;setFeedStatus('Live quote is stale','No fresh provider quote received for 15 seconds. Do not use this price for paper orders.');}},15000);
+              setFeedStatus('Live quote connected','Last traded price received from Upstox V3. Chart history is a separate integration.');
+            }
           }catch(_){}
         }
       }
       if(selected?.instrument_key===item.instrument_key&&!controller.signal.aborted)scheduleReconnect(item);
-    }catch(error){if(error.name!=='AbortError'){document.querySelector('.chart-placeholder span').textContent=error.message||'Live feed connection failed.';scheduleReconnect(item);}}
+    }catch(error){
+      if(error.name!=='AbortError'&&selected?.instrument_key===item.instrument_key){setFeedStatus('Live feed unavailable',error.message||'Live feed connection failed.');scheduleReconnect(item);}
+    }finally{
+      if(reader){try{await reader.cancel();}catch(_){}}
+      if(streamAbort===controller)streamAbort=null;
+    }
   }
   tabs.forEach(tab=>tab.addEventListener('click',()=>{
     clearFeedTimers();if(streamAbort){streamAbort.abort();streamAbort=null;}
