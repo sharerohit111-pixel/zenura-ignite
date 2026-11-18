@@ -244,7 +244,6 @@ app.post("/paper/orders",async(req,res)=>{
       const fill=calculatePaperFill({side,quantity,pricePaise,cashPaise:cash,realizedPnlPaise,position});
       cash=fill.cashPaise;realizedPnlPaise=fill.realizedPnlPaise;orderRealizedPnlPaise=fill.orderRealizedPnlPaise;
       if(fill.position.quantity===0)delete positions[instrumentKey];else positions[instrumentKey]=fill.position;
-      if(side==="BUY")positions[instrumentKey]=position;
       const order={uid:decoded.uid,instrumentKey,tradingSymbol:instrument.trading_symbol||instrument.name,exchange:instrument.exchange,side,quantity,executionPricePaise:pricePaise,grossPaise:fill.grossPaise,quoteTimestampMs:tradeTime,quoteAgeMs:quoteAge,realizedPnlPaise:orderRealizedPnlPaise,orderType:"MARKET",status:"FILLED",simulationOnly:true,createdAt:admin.firestore.FieldValue.serverTimestamp()};
       tx.create(orderRef,order);
       tx.update(accountRef,{cashPaise:cash,positions,realizedPnlPaise,updatedAt:admin.firestore.FieldValue.serverTimestamp(),version:(account.version||1)+1});
