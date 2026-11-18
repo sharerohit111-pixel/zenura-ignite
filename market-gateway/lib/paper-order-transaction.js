@@ -3,7 +3,7 @@ const {buildPaperOrderUpdate,assertIdempotentReplay}=require("./order-idempotenc
 
 /** Shared production transaction used by the HTTP route and emulator tests. */
 async function executePaperOrderTransaction({db,accountRef,orderRef,uid,requestFingerprint,order,pricePaise,publicPaperOrder,serverTimestamp}){
-  if(!db||typeof db.runTransaction!=="function"||!accountRef||!orderRef||typeof uid!=="string"||!uid||typeof requestFingerprint!=="string"||!requestFingerprint||!order||order.uid!==uid||order.requestFingerprint!==requestFingerprint||typeof publicPaperOrder!=="function"||typeof serverTimestamp!=="function") throw new TypeError("Paper order transaction identity or dependencies are invalid.");
+  if(!db||typeof db.runTransaction!=="function"||!accountRef||accountRef.id!==uid||!orderRef||typeof uid!=="string"||!uid||typeof requestFingerprint!=="string"||!requestFingerprint||!order||order.uid!==uid||order.requestFingerprint!==requestFingerprint||typeof publicPaperOrder!=="function"||typeof serverTimestamp!=="function") throw new TypeError("Paper order transaction identity or dependencies are invalid.");
   let result;
   await db.runTransaction(async tx=>{
     const [accountSnap,existingOrder]=await Promise.all([tx.get(accountRef),tx.get(orderRef)]);
