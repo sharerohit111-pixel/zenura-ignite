@@ -11,6 +11,7 @@ const { isOAuthStateUsable } = require("./lib/upstox-oauth-state");
 const { nextUpstoxTokenExpiry } = require("./lib/upstox-token-expiry");
 const { isUsableUpstoxTokenResponse } = require("./lib/upstox-token-response");
 const { isUsableUpstoxOAuthCallback } = require("./lib/upstox-oauth-callback-input");
+const { decodeUpstoxEncryptionKey } = require("./lib/upstox-encryption-key");
 const db = getFirestore();
 const CLIENT_ID = defineSecret("UPSTOX_CLIENT_ID");
 const CLIENT_SECRET = defineSecret("UPSTOX_CLIENT_SECRET");
@@ -22,8 +23,7 @@ function uidOf(req) {
   return req.auth.uid;
 }
 function encryptToken(value) {
-  const key = Buffer.from(TOKEN_ENCRYPTION_KEY.value(), "base64");
-  if (key.length !== 32) throw new Error("UPSTOX_TOKEN_ENCRYPTION_KEY must be a base64-encoded 32-byte key.");
+  const key = decodeUpstoxEncryptionKey(TOKEN_ENCRYPTION_KEY.value());
   const iv = crypto.randomBytes(12), cipher = crypto.createCipheriv("aes-256-gcm", key, iv);
   const encrypted = Buffer.concat([cipher.update(value, "utf8"), cipher.final()]);
   return {v:1,iv:iv.toString("base64"),tag:cipher.getAuthTag().toString("base64"),data:encrypted.toString("base64")};
