@@ -7,6 +7,7 @@ const crypto=require("node:crypto");
 const path=require("node:path");
 const {gunzipSync}=require("node:zlib");
 const {calculatePaperFill}=require("./lib/paper-math");
+const {WATCHLIST_NAMES,normalizeWatchlists}=require("./lib/watchlists");
 admin.initializeApp();
 const db=admin.firestore();
 const app=express();
@@ -304,17 +305,7 @@ app.get("/paper/orders",async(req,res)=>{
   }catch(error){res.status(error.status||500).json({error:error.status?error.message:"Paper order history could not be loaded."});}
 });
 
-// Per-user named Indian-market watchlists. The legacy single list is migrated as "My Stocks".
-const WATCHLIST_NAMES=["My Stocks","Banking","NIFTY","F&O"];
-function normalizeWatchlists(data){
-  const source=data&&data.watchlists&&typeof data.watchlists==="object"?data.watchlists:{};
-  const result={};
-  for(const name of WATCHLIST_NAMES){
-    const keys=Array.isArray(source[name])?source[name]:(name==="My Stocks"&&Array.isArray(data?.instrumentKeys)?data.instrumentKeys:[]);
-    result[name]=[...new Set(keys.filter(k=>typeof k==="string"))].slice(0,50);
-  }
-  return result;
-}
+// Per-user named Indian-market watchlists. Legacy data is normalized by the tested helper.
 function requestedWatchlist(req){
   const name=String(req.query?.name||req.body?.name||"My Stocks");
   if(!WATCHLIST_NAMES.includes(name)){const error=new Error("Choose a valid watchlist name.");error.status=400;throw error;}
