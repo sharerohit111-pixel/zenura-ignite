@@ -58,7 +58,6 @@ app.post("/stream",async(req,res)=>{
     upstream=new WebSocket(authData.data.authorized_redirect_uri,{followRedirects:true,headers:{Authorization:"Bearer "+accessToken,Accept:"*/*"}});
     let closed=false;
     const close=()=>{if(closed)return;closed=true;try{upstream?.close();}catch(_){}};
-    req.on("close",close);
     upstream.on("open",()=>{
       upstream.send(Buffer.from(JSON.stringify({guid:crypto.randomUUID(),method:"sub",data:{mode,instrumentKeys:keys}})));
     });
@@ -72,7 +71,8 @@ app.post("/stream",async(req,res)=>{
     });
     upstream.on("error",()=>{if(!closed)res.write("event: error\ndata: "+JSON.stringify({message:"Upstream market feed connection failed"})+"\n\n");});
     upstream.on("close",()=>{if(!closed){res.write("event: status\ndata: "+JSON.stringify({connected:false})+"\n\n");res.end();}});
-    res.on("close",close);
+    const heartbeat=setInterval(()=>{if(!closed&&!res.writableEnded)res.write(": keep-alive\\n\\n");},20000);
+    res.on("close",()=>{clearInterval(heartbeat);close();});
   }catch(error){
     if(!res.headersSent) res.status(error.status||500).json({error:error.status?error.message:"Market feed could not be started."});
     else {res.write("event: error\ndata: "+JSON.stringify({message:"Market feed stopped unexpectedly"})+"\n\n");res.end();}
