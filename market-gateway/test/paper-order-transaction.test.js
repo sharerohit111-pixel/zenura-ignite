@@ -7,7 +7,7 @@ function setup(existingOrder){
  const writes=[];
  const snapshots={account:{exists:true,data:()=>({...account})},order:{exists:Boolean(existingOrder),data:()=>existingOrder}};
  const db={runTransaction:async callback=>callback({get:async ref=>snapshots[ref.id],create:(ref,data)=>writes.push(["create",ref.id,data]),update:(ref,data)=>writes.push(["update",ref.id,data])})};
- const common={db,accountRef:{id:"account"},orderRef:{id:"order"},uid:"user-1",requestFingerprint:"fingerprint",order:{instrumentKey:"NSE_EQ|AAA",side:"BUY",quantity:2},pricePaise:1000,publicPaperOrder:(order,meta)=>({order,meta}),serverTimestamp:()=>"server-time"};
+ const common={db,accountRef:{id:"account"},orderRef:{id:"order"},uid:"user-1",requestFingerprint:"fingerprint",order:{requestFingerprint:"fingerprint",instrumentKey:"NSE_EQ|AAA",side:"BUY",quantity:2},pricePaise:1000,publicPaperOrder:(order,meta)=>({order,meta}),serverTimestamp:()=>"server-time"};
  return {common,writes};
 }
 test("shared transaction writes the order and account update atomically",async()=>{
@@ -75,7 +75,7 @@ test("concurrent identical submissions create one fill and replay the same order
 });
 test("concurrent different orders serialize against latest cash and cannot overspend",async()=>{
  const {db,state}=createSerializableStore({...account,cashPaise:10000});
- const make=key=>({db,accountRef:{id:"account"},orderRef:{id:key},uid:"user-1",requestFingerprint:key,order:{instrumentKey:"NSE_EQ|"+key,side:"BUY",quantity:1},pricePaise:7000,publicPaperOrder:(order,meta)=>({order,meta}),serverTimestamp:()=>"server-time"});
+ const make=key=>({db,accountRef:{id:"account"},orderRef:{id:key},uid:"user-1",requestFingerprint:key,order:{requestFingerprint:key,instrumentKey:"NSE_EQ|"+key,side:"BUY",quantity:1},pricePaise:7000,publicPaperOrder:(order,meta)=>({order,meta}),serverTimestamp:()=>"server-time"});
  const results=await Promise.allSettled([executePaperOrderTransaction(make("order-a")),executePaperOrderTransaction(make("order-b"))]);
  assert.equal(results.filter(x=>x.status==="fulfilled").length,1);
  assert.equal(results.filter(x=>x.status==="rejected"&&x.reason.status===409).length,1);
