@@ -222,6 +222,15 @@ app.post("/paper/orders",async(req,res)=>{
     if(!instrumentCache.length||Date.now()-instrumentCacheUpdatedAt>6*60*60*1000)await refreshInstrumentCache();
     const instrument=instrumentCache.find(x=>x.instrument_key===instrumentKey&&x.instrument_type==="EQ"&&["NSE_EQ","BSE_EQ"].includes(x.segment));
     if(!instrument)return res.status(400).json({error:"Phase 1 paper orders support verified NSE/BSE cash equities only."});
+    const orderId=makeOrderId(decoded.uid,idempotencyKey),requestFingerprint=makeOrderFingerprint({instrumentKey,side,quantity});
+    const orderRef=db.collection("indianPaperOrders").doc(orderId);
+    const priorOrder=await orderRef.get();
+    if(priorOrder.exists){
+      const prior=priorOrder.data();assertIdempotentReplay(prior,requestFingerprint);
+      const currentAccount=await paperAccountRef(decoded.uid).get(),current=currentAccount.exists?currentAccount.data():{};
+      res.set("Cache-Control","private, no-store");
+      return res.status(200).json({...prior,orderId:orderRef.id,executionPricePaise:prior.executionPricePaise,grossPaise:prior.grossPaise,cashPaise:Number.isSafeInteger(current.cashPaise)?current.cashPaise:null,realizedPnlTotalPaise:Number.isSafeInteger(current.realizedPnlPaise)?current.realizedPnlPaise:0,idempotentReplay:true});
+    }
     const connection=await db.collection("upstoxConnections").doc(decoded.uid).get();
     if(!connection.exists)return res.status(403).json({error:"Connect your Upstox account before placing a paper order."});
     const connectionData=connection.data();
@@ -239,8 +248,6 @@ app.post("/paper/orders",async(req,res)=>{
     const pricePaise=Math.round(ltp*100),grossPaise=pricePaise*quantity;
     if(!Number.isSafeInteger(grossPaise)||grossPaise<=0)return res.status(400).json({error:"Order value exceeds supported calculation limits."});
     const accountRef=paperAccountRef(decoded.uid);
-    const orderId=makeOrderId(decoded.uid,idempotencyKey),requestFingerprint=makeOrderFingerprint({instrumentKey,side,quantity});
-    const orderRef=db.collection("indianPaperOrders").doc(orderId);
     let result;
     await db.runTransaction(async tx=>{
       const [accountSnap,existingOrder]=await Promise.all([tx.get(accountRef),tx.get(orderRef)]);
