@@ -228,6 +228,36 @@
   paperBuy.addEventListener('click',()=>submitPaperOrder('BUY'));
   paperSell.addEventListener('click',()=>submitPaperOrder('SELL'));
 
+  const futuresMarginButton=document.getElementById('futures-margin-preview');
+  const futuresMarginLots=document.getElementById('futures-margin-lots');
+  const futuresMarginSide=document.getElementById('futures-margin-side');
+  const futuresMarginStatus=document.getElementById('futures-margin-status');
+  function updateFuturesMarginButton(){
+    if(futuresMarginButton)futuresMarginButton.disabled=!selected||selected.instrument_type!=='FUT';
+    if(futuresMarginStatus&&(!selected||selected.instrument_type!=='FUT'))futuresMarginStatus.textContent='Select a verified futures contract from the Futures watchlist.';
+  }
+  async function requestFuturesMarginPreview(){
+    if(!selected||selected.instrument_type!=='FUT'){futuresMarginStatus.textContent='Choose a futures contract first.';return;}
+    const lots=Number(futuresMarginLots.value),side=futuresMarginSide.value;
+    if(!Number.isSafeInteger(lots)||lots<1||lots>10000){futuresMarginStatus.textContent='Enter whole lots from 1 to 10,000.';return;}
+    const connector=window.ZENURA_MARKET_CONNECTOR;
+    if(!gateway||!connector?.getIdToken){futuresMarginStatus.textContent='Sign in and connect Upstox to request broker margin.';return;}
+    const instrumentKey=selected.instrument_key;
+    futuresMarginButton.disabled=true;futuresMarginStatus.textContent='Fetching fresh futures quote and Upstox margin estimate…';
+    try{
+      const token=await connector.getIdToken();
+      if(selected?.instrument_key!==instrumentKey)return;
+      const response=await fetch(gateway+'/paper/derivative/margin-preview',{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json',Accept:'application/json'},body:JSON.stringify({instrument_key:instrumentKey,lots,side})});
+      const data=await response.json();
+      if(!response.ok)throw new Error(data.error||'Broker margin preview failed.');
+      if(selected?.instrument_key!==instrumentKey)return;
+      const required=inrPaise(data.requiredMarginPaise),cash=inrPaise(data.availableVirtualCashPaise),shortfall=inrPaise(data.shortfallPaise);
+      const finalText=data.finalMarginPaise===null?'':' · Final margin '+inrPaise(data.finalMarginPaise);
+      futuresMarginStatus.textContent='PREVIEW ONLY · '+data.tradingSymbol+' · '+side+' '+lots+' lot(s) / '+data.quantity+' qty · Required margin '+required+finalText+' · Virtual cash '+cash+' · Shortfall '+shortfall+'. No order placed; no funds reserved.';
+    }catch(error){futuresMarginStatus.textContent=error.message||'Futures margin preview failed.';}
+    finally{updateFuturesMarginButton();}
+  }
+  futuresMarginButton?.addEventListener('click',requestFuturesMarginPreview);
   const optionExpiry=document.getElementById('option-expiry');
   const optionButton=document.getElementById('load-option-chain');
   const optionStatus=document.getElementById('option-status');
@@ -344,7 +374,7 @@
   async function select(item,isReconnect=false){
     clearFeedTimers();
     if(streamAbort){streamAbort.abort();streamAbort=null;}
-    selected=item;chartRequest++;lastQuoteText='';if(!isReconnect)reconnectAttempt=0;title.textContent=item.trading_symbol||item.name;symbol.textContent=item.instrument_key;price.textContent='—';
+    selected=item;updateFuturesMarginButton();chartRequest++;lastQuoteText='';if(!isReconnect)reconnectAttempt=0;title.textContent=item.trading_symbol||item.name;symbol.textContent=item.instrument_key;price.textContent='—';
     setFeedStatus('Waiting for verified live quote','Connecting to Upstox V3 feed. Prices will appear only when received from the provider.');
     render(items);updatePaperButtons();renderSavedWatchlist();loadCandles();
     const connector=window.ZENURA_MARKET_CONNECTOR;
@@ -393,7 +423,7 @@
   }
   tabs.forEach(tab=>tab.addEventListener('click',()=>{
     clearFeedTimers();if(streamAbort){streamAbort.abort();streamAbort=null;}
-    tabs.forEach(x=>x.classList.toggle('active',x===tab));activeList=tab.dataset.list;selected=null;chartRequest++;
+    tabs.forEach(x=>x.classList.toggle('active',x===tab));activeList=tab.dataset.list;selected=null;updateFuturesMarginButton();chartRequest++;
     title.textContent='No instrument selected';symbol.textContent='Choose an instrument';price.textContent='—';updatePaperButtons();renderSavedWatchlist();loadInstruments();
   }));
   search.addEventListener('input',()=>{clearTimeout(debounce);debounce=setTimeout(loadInstruments,250);});
