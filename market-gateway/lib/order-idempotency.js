@@ -17,7 +17,8 @@ function buildPaperOrderUpdate(account,{instrumentKey,side,quantity,pricePaise})
  const positions={...account.positions},position={...(positions[instrumentKey]||{quantity:0,averagePricePaise:0})};
  const fill=calculatePaperFill({side,quantity,pricePaise,cashPaise:account.cashPaise,realizedPnlPaise:account.realizedPnlPaise??0,position});
  if(fill.position.quantity===0)delete positions[instrumentKey];else positions[instrumentKey]=fill.position;
- return {cashPaise:fill.cashPaise,realizedPnlPaise:fill.realizedPnlPaise,positions,orderRealizedPnlPaise:fill.orderRealizedPnlPaise,grossPaise:fill.grossPaise,version:(Number.isSafeInteger(account.version)&&account.version>0?account.version:1)+1};
+ const currentVersion=account.version===undefined?1:account.version;if(!Number.isSafeInteger(currentVersion)||currentVersion<1||currentVersion>=Number.MAX_SAFE_INTEGER)throw Object.assign(new Error("Invalid paper account version."),{status:409});
+ return {cashPaise:fill.cashPaise,realizedPnlPaise:fill.realizedPnlPaise,positions,orderRealizedPnlPaise:fill.orderRealizedPnlPaise,grossPaise:fill.grossPaise,version:currentVersion+1};
 }
 function assertIdempotentReplay(existingOrder,requestFingerprint){
  if(!existingOrder||existingOrder.requestFingerprint!==requestFingerprint)
