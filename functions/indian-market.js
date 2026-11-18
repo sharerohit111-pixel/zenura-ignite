@@ -7,7 +7,7 @@ const { defineSecret } = require("firebase-functions/params");
 const { onCall, onRequest, HttpsError } = require("firebase-functions/v2/https");
 const logger = require("firebase-functions/logger");
 const { connectionStatus } = require("./lib/upstox-connection-status");
-const { disconnectUpstoxAccount, isOAuthGenerationCurrent, connectionGeneration } = require("./lib/upstox-disconnect");
+const { disconnectUpstoxAccount: disconnectUpstoxAccountForUser, isOAuthGenerationCurrent, connectionGeneration } = require("./lib/upstox-disconnect");
 const { isOAuthStateUsable } = require("./lib/upstox-oauth-state");
 const { nextUpstoxTokenExpiry } = require("./lib/upstox-token-expiry");
 const { isUsableUpstoxTokenResponse } = require("./lib/upstox-token-response");
@@ -109,7 +109,7 @@ exports.disconnectUpstoxAccount = onCall(
   {region:REGION},
   async req=>{
     const uid=uidOf(req);
-    return disconnectUpstoxAccount(db,uid,Date.now());
+    return disconnectUpstoxAccountForUser(db,uid,Date.now());
   }
 );
 exports.getIndianMarketConnectionStatus = onCall(
