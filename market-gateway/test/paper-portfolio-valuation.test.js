@@ -1,7 +1,7 @@
 "use strict";
 const test=require("node:test");
 const assert=require("node:assert/strict");
-const {buildPortfolioValuation}=require("../lib/paper-portfolio-valuation");
+const {buildPortfolioValuation,readStoredPaperPositions}=require("../lib/paper-portfolio-valuation");
 const now=1_800_000_000_000;
 const pos=[["NSE_EQ|ABC",{quantity:10,averagePricePaise:10000}],["NSE_EQ|XYZ",{quantity:2,averagePricePaise:5000}]];
 test("values fresh holdings in paise and computes equity and unrealized P&L",()=>{
@@ -32,4 +32,13 @@ test("supports empty portfolios without a provider quote",()=>{
  const result=buildPortfolioValuation({positions:[],quotes:[],cashPaise:100000,now});
  assert.equal(result.valuationStatus,"no_open_positions");
  assert.equal(result.equityPaise,100000);
+});
+
+test("rejects missing, null, array, or malformed cash-equity positions storage",()=>{
+ for(const account of [null,{}, {positions:null},{positions:[]},{positions:"invalid"}])
+  assert.throws(()=>readStoredPaperPositions(account),{status:409});
+});
+test("reads valid legacy and current cash-equity position maps",()=>{
+ assert.deepEqual(readStoredPaperPositions({positions:undefined}),[]);
+ assert.deepEqual(readStoredPaperPositions({positions:{"NSE_EQ|ABC":{quantity:1,averagePricePaise:100}}}),[["NSE_EQ|ABC",{quantity:1,averagePricePaise:100}]]);
 });
