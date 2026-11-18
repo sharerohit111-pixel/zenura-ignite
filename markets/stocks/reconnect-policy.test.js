@@ -1,7 +1,7 @@
 "use strict";
 const test=require("node:test");
 const assert=require("node:assert/strict");
-const {nextReconnectDelay,shouldRetryFeedStatus}=require("./reconnect-policy");
+const {nextReconnectDelay,shouldRetryFeedStatus,shouldReconnectAfterFeedError}=require("./reconnect-policy");
 
 test("uses exponential reconnect delays",()=>{
   assert.deepEqual([0,1,2,3,4,5].map(nextReconnectDelay),[
@@ -33,4 +33,9 @@ test("does not retry permanent client errors",()=>{
 test("rejects invalid status values from retry classification",()=>{
   assert.equal(shouldRetryFeedStatus("500"),false);
   assert.equal(shouldRetryFeedStatus(null),false);
+});
+
+test("reconnects after provider error events but not ordinary feed events",()=>{
+  assert.equal(shouldReconnectAfterFeedError("error"),true);
+  for(const event of ["status","market","message",undefined])assert.equal(shouldReconnectAfterFeedError(event),false);
 });
