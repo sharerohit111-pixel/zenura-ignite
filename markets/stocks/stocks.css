@@ -33,3 +33,15 @@
 .paper-table td{color:#d0dfeb}
 .history-heading{padding-top:8px;border-top:1px solid #203b54}
 @media(max-width:600px){.portfolio-metrics{grid-template-columns:1fr 1fr}.portfolio-metrics>div:last-child{grid-column:1/-1}}
+
+/* Private per-user watchlist */
+.watchlist-tools{margin-top:14px;padding-top:12px;border-top:1px solid #203b54}
+.watchlist-title{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.watchlist-title b{font-size:8px;letter-spacing:1px;color:#8fa8bc}
+.watchlist-title button,.saved-watch-remove{border:1px solid #287e70;background:#123c37;color:#70e8c8;border-radius:7px;padding:7px 8px;font-size:8px;font-weight:900;cursor:pointer}
+.watchlist-title button:disabled{opacity:.4;cursor:not-allowed}
+#watchlist-status{font-size:9px;color:#829bb0;line-height:1.5;margin:8px 0}
+.saved-watchlist{display:grid;gap:5px}
+.saved-watch-row{display:flex;align-items:center;gap:6px;padding:6px 7px;background:#0a1928;border:1px solid #203b54;border-radius:8px}
+.saved-watch-pick{flex:1;min-width:0;text-align:left;border:0;background:transparent;color:#dce9f3;font-size:10px;font-weight:800;overflow:hidden;text-overflow:ellipsis;cursor:pointer}
+.saved-watch-remove{padding:5px 6px;border-color:#68464a;background:#301d26;color:#f2a0a0}
