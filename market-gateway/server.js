@@ -225,12 +225,19 @@ function paperStartingCashPaise(){
 function paperAccountRef(uid){return db.collection("indianPaperAccounts").doc(uid);}
 app.get("/paper/account",async(req,res)=>{
   try{
-    const decoded=await authenticate(req),startingCash=paperStartingCashPaise();
-    if(!startingCash)return res.status(503).json({error:"Indian paper-trading starting balance is not configured by the administrator."});
+    const decoded=await authenticate(req);
     const ref=paperAccountRef(decoded.uid);
     await db.runTransaction(async tx=>{
       const snap=await tx.get(ref);
-      if(!snap.exists)tx.create(ref,{currency:"INR",startingCashPaise:startingCash,cashPaise:startingCash,positions:{},derivativePositions:{},reservedMarginPaise:0,realizedPnlPaise:0,createdAt:admin.firestore.FieldValue.serverTimestamp(),updatedAt:admin.firestore.FieldValue.serverTimestamp(),version:1});else if(snap.data().derivativePositions===undefined){const patch={derivativePositions:{},updatedAt:admin.firestore.FieldValue.serverTimestamp()};if(snap.data().reservedMarginPaise===undefined)patch.reservedMarginPaise=0;tx.update(ref,patch);}
+      if(!snap.exists){
+        const startingCash=paperStartingCashPaise();
+        if(!startingCash)throw Object.assign(new Error("Indian paper-trading starting balance is not configured by the administrator."),{status:503});
+        tx.create(ref,{currency:"INR",startingCashPaise:startingCash,cashPaise:startingCash,positions:{},derivativePositions:{},reservedMarginPaise:0,realizedPnlPaise:0,createdAt:admin.firestore.FieldValue.serverTimestamp(),updatedAt:admin.firestore.FieldValue.serverTimestamp(),version:1});
+      }else if(snap.data().derivativePositions===undefined){
+        const patch={derivativePositions:{},updatedAt:admin.firestore.FieldValue.serverTimestamp()};
+        if(snap.data().reservedMarginPaise===undefined)patch.reservedMarginPaise=0;
+        tx.update(ref,patch);
+      }
     });
     const snap=await ref.get(),data=normalizePaperAccountState(snap.data());
     if(!data)return res.status(409).json({error:"Indian paper account data is invalid; account access was stopped to protect its balance."});
