@@ -307,10 +307,21 @@ app.get("/paper/portfolio",async(req,res)=>{
 
 app.get("/paper/orders",async(req,res)=>{
   try{
-    const decoded=await authenticate(req),limit=Math.min(Math.max(Number.parseInt(req.query.limit||"50",10)||50,1),100);
-    const snap=await db.collection("indianPaperOrders").where("uid","==",decoded.uid).orderBy("createdAt","desc").limit(limit).get();
+    const decoded=await authenticate(req),rawLimit=req.query.limit===undefined?"50":String(req.query.limit);
+    if(!/^\\d+$/.test(rawLimit)||Number(rawLimit)<1)return res.status(400).json({error:"Order history limit must be a whole number from 1 to 100."});
+    const limit=Math.min(Number(rawLimit),100),cursor=typeof req.query.cursor==="string"?req.query.cursor:"";
+    if(cursor.length>150||/[\\r\\n]/.test(cursor))return res.status(400).json({error:"Invalid order history cursor."});
+    const collection=db.collection("indianPaperOrders");
+    let query=collection.where("uid","==",decoded.uid).orderBy("createdAt","desc");
+    if(cursor){
+      const cursorSnap=await collection.doc(cursor).get();
+      if(!cursorSnap.exists||cursorSnap.data()?.uid!==decoded.uid)return res.status(400).json({error:"Order history cursor is invalid."});
+      query=query.startAfter(cursorSnap);
+    }
+    const snap=await query.limit(limit+1).get(),hasMore=snap.docs.length>limit,docs=snap.docs.slice(0,limit);
+    const orders=docs.map(doc=>({id:doc.id,...doc.data(),createdAt:doc.data().createdAt?.toMillis?.()||null}));
     res.set("Cache-Control","private, no-store");
-    res.json({orders:snap.docs.map(doc=>({id:doc.id,...doc.data(),createdAt:doc.data().createdAt?.toMillis?.()||null})),simulationOnly:true});
+    res.json({orders,hasMore,nextCursor:hasMore?docs[docs.length-1].id:null,simulationOnly:true});
   }catch(error){res.status(error.status||500).json({error:error.status?error.message:"Paper order history could not be loaded."});}
 });
 
