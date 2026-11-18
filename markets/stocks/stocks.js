@@ -428,6 +428,9 @@
             if(eventName==='error'){if(staleTimer){clearTimeout(staleTimer);staleTimer=null;}price.textContent=lastQuoteText?'STALE · '+lastQuoteText:'—';setFeedStatus('Live feed error',data.message||'The provider stream reported an error.');return;}
             const feed=data.feeds?.[item.instrument_key],quote=window.ZenuraLiveQuote?.extractFreshQuote(feed);
             if(quote){
+              // A fresh quote proves the existing stream recovered; cancel any pending reconnect.
+              if(reconnectTimer){clearTimeout(reconnectTimer);reconnectTimer=null;}
+              reconnectAttempt=0;
               lastQuoteText='₹'+(quote.pricePaise/100).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});price.textContent=lastQuoteText;
               if(staleTimer)clearTimeout(staleTimer);
               staleTimer=setTimeout(()=>{if(selected?.instrument_key===item.instrument_key){price.textContent='STALE · '+lastQuoteText;setFeedStatus('Live quote is stale','No fresh provider quote received for 15 seconds. Do not use this price for paper orders.');scheduleReconnect(item);}},15000);
