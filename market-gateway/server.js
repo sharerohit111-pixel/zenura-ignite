@@ -24,6 +24,7 @@ const {filterFreshMarketFeeds}=require("./lib/market-feed-validation");
 const {buildPortfolioValuation}=require("./lib/paper-portfolio-valuation");
 const {createLeaseHeartbeat}=require("./lib/lease-heartbeat");
 const {isUpstoxTokenUsable}=require("./lib/upstox-token");
+const {decryptUpstoxToken}=require("./lib/upstox-token-crypto");
 const {executeLongOptionTransaction}=require("./lib/derivative-order-transaction");
 const {parseMarginPreviewInput}=require("./lib/margin-preview-input");
 const {consumeMarginPreviewSlot}=require("./lib/margin-preview-rate-limit");
@@ -76,11 +77,7 @@ async function loadProto(){
   FeedResponse=root.lookupType("com.upstox.marketdatafeederv3udapi.rpc.proto.FeedResponse");
 }
 function decryptToken(box){
-  const key=Buffer.from(ENC_KEY||"","base64");
-  if(key.length!==32||box?.v!==1) throw new Error("Token encryption configuration invalid");
-  const decipher=crypto.createDecipheriv("aes-256-gcm",key,Buffer.from(box.iv,"base64"));
-  decipher.setAuthTag(Buffer.from(box.tag,"base64"));
-  return Buffer.concat([decipher.update(Buffer.from(box.data,"base64")),decipher.final()]).toString("utf8");
+  return decryptUpstoxToken(box,ENC_KEY);
 }
 async function authenticate(req){
   const header=req.get("authorization")||"";
