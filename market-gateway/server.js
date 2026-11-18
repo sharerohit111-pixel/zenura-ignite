@@ -300,10 +300,10 @@ app.get("/paper/portfolio",async(req,res)=>{
     for(const [instrumentKey,position] of positions){
       const instrument=instrumentCache.find(x=>x.instrument_key===instrumentKey);
       const quote=quotes.find(x=>x?.instrument_token===instrumentKey);
-      const ltp=Number(quote?.last_price),tradeTime=Number(quote?.last_trade_time||0),age=quoteAgeMs(tradeTime,now);
-      const fresh=Number.isFinite(ltp)&&ltp>0&&isFreshQuote(tradeTime,60000,now);
-      if(!fresh){staleCount++;valued.push({instrumentKey,tradingSymbol:instrument?.trading_symbol||instrumentKey,quantity:position.quantity,averagePricePaise:position.averagePricePaise,lastPricePaise:null,marketValuePaise:null,unrealizedPnlPaise:null,quoteAgeMs:Number.isFinite(age)?age:null,valuationStatus:"stale_or_unavailable"});continue;}
-      const lastPricePaise=Math.round(ltp*100),value=lastPricePaise*position.quantity,pnl=(lastPricePaise-position.averagePricePaise)*position.quantity;
+      let normalizedQuote=null;
+      try{normalizedQuote=normalizeProviderQuote(quote,instrumentKey,{now,maxAgeMs:60000});}catch(_){}
+      if(!normalizedQuote){const age=quoteAgeMs(quote?.last_trade_time,now);staleCount++;valued.push({instrumentKey,tradingSymbol:instrument?.trading_symbol||instrumentKey,quantity:position.quantity,averagePricePaise:position.averagePricePaise,lastPricePaise:null,marketValuePaise:null,unrealizedPnlPaise:null,quoteAgeMs:Number.isFinite(age)?age:null,valuationStatus:"stale_or_unavailable"});continue;}
+      const {pricePaise:lastPricePaise,quoteAgeMs:age}=normalizedQuote,value=lastPricePaise*position.quantity,pnl=(lastPricePaise-position.averagePricePaise)*position.quantity;
       if(!Number.isSafeInteger(lastPricePaise)||lastPricePaise<1||!Number.isSafeInteger(value)||!Number.isSafeInteger(pnl)||!Number.isSafeInteger(marketValuePaise+value)||!Number.isSafeInteger(unrealizedPnlPaise+pnl))return res.status(409).json({error:"Portfolio valuation exceeds safe calculation limits."});
       marketValuePaise+=value;unrealizedPnlPaise+=pnl;
       valued.push({instrumentKey,tradingSymbol:instrument?.trading_symbol||quote.symbol||instrumentKey,quantity:position.quantity,averagePricePaise:position.averagePricePaise,lastPricePaise,marketValuePaise:value,unrealizedPnlPaise:pnl,quoteAgeMs:age,valuationStatus:"fresh"});
