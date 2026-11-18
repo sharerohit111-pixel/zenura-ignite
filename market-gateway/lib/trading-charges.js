@@ -34,7 +34,7 @@ function calculateLongOptionTradeCharges({grossPaise,exchange,side="BUY",brokera
   if(!Number.isSafeInteger(totalChargesPaise)||!Number.isSafeInteger(grossPaise+totalChargesPaise))
     throw Object.assign(new Error("Total order debit exceeds supported calculation limits."),{status:400});
   return {
-    brokeragePaise,exchangeTransactionPaise:exchangePaise,ipftPaise,sebiPaise,
+    grossPaise,brokeragePaise,exchangeTransactionPaise:exchangePaise,ipftPaise,sebiPaise,
     stampDutyPaise,gstPaise,sttPaise,totalChargesPaise,
     totalDebitPaise:side==="BUY"?grossPaise+totalChargesPaise:null,
     netCreditPaise:side==="SELL"?grossPaise-totalChargesPaise:null,
