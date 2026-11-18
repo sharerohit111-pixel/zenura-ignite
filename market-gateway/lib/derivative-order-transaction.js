@@ -14,7 +14,7 @@ const MAX_QUOTE_AGE_MS=15_000;
  * instrument and quote must be loaded by trusted server code from verified
  * provider data. Never pass client-supplied instrument metadata or prices here.
  */
-async function executeLongOptionBuyTransaction({
+async function executeLongOptionTransaction({
   db,accountRef,orderRef,uid,idempotencyKey,instrument,quote,lots,side="BUY",
   serverTimestamp,now=Date.now()
 }){
@@ -24,7 +24,7 @@ async function executeLongOptionBuyTransaction({
     throw new TypeError("Derivative transaction identity or dependencies are invalid.");
   if(!["BUY","SELL"].includes(side))fail("Option order side must be BUY or SELL.",400);
   if(!["CE","PE"].includes(instrument?.instrument_type))
-    fail("Only long CE/PE option BUY transactions are enabled in this phase.",400);
+    fail("Only long CE/PE BUY and SELL-to-close transactions are enabled in this phase.",400);
   if(!Number.isSafeInteger(now)||now<0)fail("Current time is invalid.",400);
   if(!quote||quote.instrumentKey!==instrument.instrument_key||
      !Number.isSafeInteger(quote.pricePaise)||quote.pricePaise<1||
@@ -113,4 +113,4 @@ async function executeLongOptionBuyTransaction({
   return result;
 }
 
-module.exports={executeLongOptionBuyTransaction,MAX_QUOTE_AGE_MS};
+module.exports={executeLongOptionTransaction,executeLongOptionBuyTransaction:executeLongOptionTransaction,MAX_QUOTE_AGE_MS};
