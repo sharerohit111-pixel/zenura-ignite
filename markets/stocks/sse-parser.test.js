@@ -1,7 +1,7 @@
 "use strict";
 const test=require("node:test");
 const assert=require("node:assert/strict");
-const {parseSseChunk}=require("../markets/stocks/sse-parser");
+const {parseSseChunk}=require("./sse-parser");
 test("parses an event split across arbitrary chunks",()=>{
  let state=parseSseChunk("","event: market\r");
  state=parseSseChunk(state.buffer,"\ndata: {\"ltp\":12}\r\n\r");
