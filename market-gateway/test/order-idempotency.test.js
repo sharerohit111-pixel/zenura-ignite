@@ -46,3 +46,9 @@ test("simulated transaction retry from fresh account snapshot applies the order 
  assert.equal(retriedFromCommittedSnapshot.cashPaise,7000);
  assert.equal(retriedFromCommittedSnapshot.positions["NSE_EQ|AAA"].quantity,3);
 });
+
+test("rejects an exhausted or malformed account version instead of overflowing",()=>{
+ const base={cashPaise:10000,realizedPnlPaise:0,positions:{},version:Number.MAX_SAFE_INTEGER};
+ assert.throws(()=>buildPaperOrderUpdate(base,{instrumentKey:"NSE_EQ|AAA",side:"BUY",quantity:1,pricePaise:100}),{status:409});
+ assert.throws(()=>buildPaperOrderUpdate({...base,version:0},{instrumentKey:"NSE_EQ|AAA",side:"BUY",quantity:1,pricePaise:100}),{status:409});
+});
