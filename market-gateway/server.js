@@ -309,6 +309,35 @@ app.get("/paper/orders",async(req,res)=>{
   }catch(error){res.status(error.status||500).json({error:error.status?error.message:"Paper order history could not be loaded."});}
 });
 
+// Per-user Indian-market watchlist; symbols are validated against the official instrument master.
+app.get("/watchlist",async(req,res)=>{
+  try{
+    const decoded=await authenticate(req);
+    if(!instrumentCache.length||Date.now()-instrumentCacheUpdatedAt>6*60*60*1000)await refreshInstrumentCache();
+    const snap=await db.collection("indianMarketWatchlists").doc(decoded.uid).get();
+    const keys=snap.exists&&Array.isArray(snap.data().instrumentKeys)?snap.data().instrumentKeys:[];
+    const items=keys.map(key=>instrumentCache.find(x=>x.instrument_key===key)).filter(Boolean).map(x=>({instrument_key:x.instrument_key,segment:x.segment,exchange:x.exchange,trading_symbol:x.trading_symbol,name:x.name,instrument_type:x.instrument_type,expiry:x.expiry??null}));
+    res.set("Cache-Control","private, no-store");
+    res.json({items,updatedAt:snap.data()?.updatedAt?.toMillis?.()||null,maxItems:50});
+  }catch(error){res.status(error.status||500).json({error:error.status?error.message:"Watchlist could not be loaded."});}
+});
+app.put("/watchlist",async(req,res)=>{
+  try{
+    const decoded=await authenticate(req);
+    const raw=req.body?.instrumentKeys;
+    if(!Array.isArray(raw)||raw.length>50||raw.some(x=>typeof x!=="string"||!x||x.length>100||/[\\r\\n]/.test(x)))
+      return res.status(400).json({error:"Provide up to 50 valid instrument keys."});
+    const keys=[...new Set(raw)];
+    if(!instrumentCache.length||Date.now()-instrumentCacheUpdatedAt>6*60*60*1000)await refreshInstrumentCache();
+    const valid=new Set(instrumentCache.map(x=>x.instrument_key));
+    if(keys.some(key=>!valid.has(key)))return res.status(400).json({error:"Watchlist contains an instrument not present in the official instrument master."});
+    const ref=db.collection("indianMarketWatchlists").doc(decoded.uid);
+    await ref.set({uid:decoded.uid,instrumentKeys:keys,updatedAt:admin.firestore.FieldValue.serverTimestamp()});
+    res.set("Cache-Control","private, no-store");
+    res.json({saved:true,count:keys.length,maxItems:50});
+  }catch(error){res.status(error.status||500).json({error:error.status?error.message:"Watchlist could not be saved."});}
+});
+
 app.post("/stream",async(req,res)=>{
   let upstream;
   let heartbeat;
