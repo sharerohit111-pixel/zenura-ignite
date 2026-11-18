@@ -10,6 +10,7 @@ const { connectionStatus } = require("./lib/upstox-connection-status");
 const { isOAuthStateUsable } = require("./lib/upstox-oauth-state");
 const { nextUpstoxTokenExpiry } = require("./lib/upstox-token-expiry");
 const { isUsableUpstoxTokenResponse } = require("./lib/upstox-token-response");
+const { isUsableUpstoxOAuthCallback } = require("./lib/upstox-oauth-callback-input");
 const db = getFirestore();
 const CLIENT_ID = defineSecret("UPSTOX_CLIENT_ID");
 const CLIENT_SECRET = defineSecret("UPSTOX_CLIENT_SECRET");
@@ -49,7 +50,7 @@ exports.upstoxOAuthCallback = onRequest(
     if(req.method!=="GET") return res.status(405).send("Method not allowed");
     const code=typeof req.query.code==="string"?req.query.code:"";
     const state=typeof req.query.state==="string"?req.query.state:"";
-    if(!code||!state||!/^[a-f0-9]{64}$/.test(state)) return res.status(400).send("Invalid authorization response.");
+    if(!isUsableUpstoxOAuthCallback(code,state)) return res.status(400).send("Invalid authorization response.");
     const stateRef=db.collection("upstoxOAuthStates").doc(state);
     try {
       const snap=await stateRef.get();
