@@ -150,3 +150,15 @@ test("rejects an account document that does not match the authenticated UID",asy
  await assert.rejects(executePaperOrderTransaction(common),TypeError);
  assert.equal(writes.length,0);
 });
+
+test("existing idempotent order is not replayed when its paper account is missing",async()=>{
+ const {common,writes}=setup({requestFingerprint:"fingerprint",status:"FILLED"});
+ common.db.runTransaction=async callback=>callback({get:async ref=>ref.id==="user-1"?{exists:false}:{exists:true,data:()=>({requestFingerprint:"fingerprint",status:"FILLED"})},create:(...args)=>writes.push(args),update:(...args)=>writes.push(args)});
+ await assert.rejects(executePaperOrderTransaction(common),{status:409});
+ assert.equal(writes.length,0);
+});
+test("existing idempotent order rejects malformed current account balances",async()=>{
+ const {common,writes}=setup({requestFingerprint:"fingerprint",status:"FILLED"},{cashPaise:-1,realizedPnlPaise:0,positions:{},version:1});
+ await assert.rejects(executePaperOrderTransaction(common),{status:409});
+ assert.equal(writes.length,0);
+});
