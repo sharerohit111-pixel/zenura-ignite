@@ -306,3 +306,44 @@ test("accepts a valid legacy option position without optional contract metadata"
  assert.equal(writes.length,2);
  assert.deepEqual(writes[1][2].derivativePositions,{});
 });
+
+
+test("rejects malformed derivative position containers and stored records",async()=>{
+ const malformedContainers=[null,[], "invalid", 7];
+ for(const derivativePositions of malformedContainers){
+  const {common,writes}=setup({account:{...initial,derivativePositions}});
+  await assert.rejects(executeLongOptionBuyTransaction(common),{status:409});
+  assert.equal(writes.length,0);
+ }
+ for(const storedPosition of [null,[], "invalid", 7]){
+  const {common,writes}=setup({account:{...initial,
+   derivativePositions:{[instrument.instrument_key]:storedPosition}
+  }});
+  await assert.rejects(executeLongOptionBuyTransaction(common),{status:409});
+  assert.equal(writes.length,0);
+ }
+});
+
+test("rejects SELL when cash credit would overflow safe paise arithmetic",async()=>{
+ const account={...initial,cashPaise:Number.MAX_SAFE_INTEGER-1,
+  derivativePositions:{[instrument.instrument_key]:{
+   instrumentType:"CE",netQuantity:65,averagePricePaise:1,costBasisPaise:65
+  }}};
+ const {common,writes}=setup({account});
+ common.side="SELL";
+ common.quote={...quote,pricePaise:1500};
+ await assert.rejects(executeLongOptionBuyTransaction(common),{status:409});
+ assert.equal(writes.length,0);
+});
+
+test("rejects SELL when cumulative realized P&L would overflow safe paise arithmetic",async()=>{
+ const account={...initial,realizedPnlPaise:Number.MAX_SAFE_INTEGER-1,
+  derivativePositions:{[instrument.instrument_key]:{
+   instrumentType:"CE",netQuantity:65,averagePricePaise:1,costBasisPaise:65
+  }}};
+ const {common,writes}=setup({account});
+ common.side="SELL";
+ common.quote={...quote,pricePaise:1500};
+ await assert.rejects(executeLongOptionBuyTransaction(common),{status:409});
+ assert.equal(writes.length,0);
+});
