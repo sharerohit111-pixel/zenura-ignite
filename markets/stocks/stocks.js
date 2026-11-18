@@ -254,7 +254,7 @@
       if(selected?.instrument_key!==instrumentKey)return;
       const required=inrPaise(data.requiredMarginPaise),cash=inrPaise(data.availableVirtualCashPaise),shortfall=inrPaise(data.shortfallPaise);
       const finalText=data.finalMarginPaise===null?'':' · Final margin '+inrPaise(data.finalMarginPaise);
-      futuresMarginStatus.textContent='PREVIEW ONLY · '+data.tradingSymbol+' · '+side+' '+lots+' lot(s) / '+data.quantity+' qty · Required margin '+required+finalText+' · Virtual cash '+cash+' · Shortfall '+shortfall+'. No order placed; no funds reserved.';
+      futuresMarginStatus.textContent='PREVIEW ONLY · '+data.tradingSymbol+' · '+side+' '+lots+' lot(s) / '+data.quantity+' qty · '+(product==='I'?'Intraday':'Delivery')+' margin · Required margin '+required+finalText+' · Virtual cash '+cash+' · Shortfall '+shortfall+'. No order placed; no funds reserved.';
     }catch(error){futuresMarginStatus.textContent=error.message||'Futures margin preview failed.';}
     finally{updateFuturesMarginButton();}
   }
