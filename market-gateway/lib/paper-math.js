@@ -4,7 +4,7 @@ function calculatePaperFill({side,quantity,pricePaise,cashPaise,realizedPnlPaise
   if(!["BUY","SELL"].includes(side))throw Object.assign(new Error("Only BUY and SELL are supported."),{status:400});
   if(!Number.isSafeInteger(quantity)||quantity<1||quantity>1000000)throw Object.assign(new Error("Invalid quantity."),{status:400});
   if(!Number.isSafeInteger(pricePaise)||pricePaise<1)throw Object.assign(new Error("Invalid execution price."),{status:400});
-  if(!Number.isSafeInteger(cashPaise)||cashPaise<0||!Number.isSafeInteger(realizedPnlPaise)||realizedPnlPaise<0)throw Object.assign(new Error("Invalid account balance."),{status:409});
+  if(!Number.isSafeInteger(cashPaise)||cashPaise<0||!Number.isSafeInteger(realizedPnlPaise))throw Object.assign(new Error("Invalid account balance."),{status:409});
   const current={quantity:position.quantity,averagePricePaise:position.averagePricePaise};
   if(!Number.isSafeInteger(current.quantity)||current.quantity<0||current.quantity>1000000||!Number.isSafeInteger(current.averagePricePaise)||current.averagePricePaise<0)
     throw Object.assign(new Error("Invalid existing position."),{status:409});
