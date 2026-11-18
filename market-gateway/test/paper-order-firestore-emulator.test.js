@@ -172,3 +172,55 @@ integrationTest("Firestore emulator prevents concurrent different option orders 
   assert.equal(orders.filter(x=>x.exists).length,1);
  }finally{await clean([first.accountRef,first.orderRef,second.orderRef]);}
 });
+integrationTest("Firestore emulator serializes concurrent option SELL-to-close orders without overselling",async()=>{
+ const uid="derivative-sell-user-"+crypto.randomUUID();
+ const make=(key)=>makeDerivativeOrder({uid,idempotencyKey:key});
+ const first=make("123e4567-e89b-42d3-a456-426614174004");
+ const second=make("123e4567-e89b-42d3-a456-426614174005");
+ const sellQuote={...derivativeQuote,pricePaise:1500};
+ first.quote=sellQuote;second.quote=sellQuote;
+ const initialCostBasis=167292;
+ const sellCharges=require("../lib/trading-charges").calculateLongOptionTradeCharges({grossPaise:1500*65,exchange:"NSE",side:"SELL"});
+ await first.accountRef.set({
+  cashPaise:1000000,realizedPnlPaise:0,reservedMarginPaise:0,positions:{},
+  derivativePositions:{[derivativeInstrument.instrument_key]:{
+   instrumentType:"CE",netQuantity:130,averagePricePaise:1287,costBasisPaise:initialCostBasis,
+   exchange:"NSE",segment:"NSE_FO",expiry:"2026-11-26",lotSize:65
+  }},version:1
+ });
+ try{
+  const results=await Promise.all([
+   executeLongOptionBuyTransaction({...first,side:"SELL"}),
+   executeLongOptionBuyTransaction({...second,side:"SELL"})
+  ]);
+  const [account,orders]=await Promise.all([first.accountRef.get(),Promise.all([first.orderRef.get(),second.orderRef.get()])]);
+  assert.equal(results.length,2);
+  assert.equal(account.data().cashPaise,1000000+2*(97500-sellCharges.totalChargesPaise));
+  assert.equal(account.data().realizedPnlPaise,2*(97500-83646-sellCharges.totalChargesPaise));
+  assert.equal(account.data().derivativePositions[derivativeInstrument.instrument_key],undefined);
+  assert.equal(orders.filter(x=>x.exists).length,2);
+ }finally{await clean([first.accountRef,first.orderRef,second.orderRef]);}
+});
+integrationTest("Firestore emulator prevents concurrent option SELL orders from opening a short position",async()=>{
+ const uid="derivative-oversell-user-"+crypto.randomUUID();
+ const first=makeDerivativeOrder({uid,idempotencyKey:"123e4567-e89b-42d3-a456-426614174006"});
+ const second=makeDerivativeOrder({uid,idempotencyKey:"123e4567-e89b-42d3-a456-426614174007"});
+ await first.accountRef.set({
+  cashPaise:1000000,realizedPnlPaise:0,reservedMarginPaise:0,positions:{},
+  derivativePositions:{[derivativeInstrument.instrument_key]:{
+   instrumentType:"CE",netQuantity:65,averagePricePaise:1287,costBasisPaise:83646,
+   exchange:"NSE",segment:"NSE_FO",expiry:"2026-11-26",lotSize:65
+  }},version:1
+ });
+ try{
+  const results=await Promise.allSettled([
+   executeLongOptionBuyTransaction({...first,side:"SELL"}),
+   executeLongOptionBuyTransaction({...second,side:"SELL"})
+  ]);
+  const [account,orders]=await Promise.all([first.accountRef.get(),Promise.all([first.orderRef.get(),second.orderRef.get()])]);
+  assert.equal(results.filter(x=>x.status==="fulfilled").length,1);
+  assert.equal(results.filter(x=>x.status==="rejected"&&x.reason.status===409).length,1);
+  assert.equal(account.data().derivativePositions[derivativeInstrument.instrument_key],undefined);
+  assert.equal(orders.filter(x=>x.exists).length,1);
+ }finally{await clean([first.accountRef,first.orderRef,second.orderRef]);}
+});
