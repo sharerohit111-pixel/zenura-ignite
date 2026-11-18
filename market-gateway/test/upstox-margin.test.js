@@ -21,3 +21,10 @@ test("rejects failed, missing, malformed and unsafe margin responses",()=>{
 test("rejects malformed component values rather than silently displaying them",()=>{
  assert.throws(()=>normalizeUpstoxMarginResponse({status:"success",data:{required_margin:100,margins:[{span:"100"}]}},key),/component/);
 });
+
+test("rejects margin components for a different instrument",()=>{
+ assert.throws(()=>normalizeUpstoxMarginResponse({status:"success",data:{required_margin:100,margins:[{instrument_key:"NSE_FO|OTHER",span:100}]}},key),/different instrument/);
+});
+test("rejects malformed margin components collection",()=>{
+ assert.throws(()=>normalizeUpstoxMarginResponse({status:"success",data:{required_margin:100,margins:{span:100}}},key),/components list/);
+});
