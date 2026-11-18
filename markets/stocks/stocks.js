@@ -218,8 +218,10 @@
       const response=await fetch(gateway+'/paper/orders',{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json',Accept:'application/json'},body:JSON.stringify({instrument_key:instrumentKey,side,quantity:qty,idempotency_key:pendingPaperOrderKey})});
       const data=await response.json();if(!response.ok)throw new Error(data.error||'Paper order rejected');
       pendingPaperOrderKey=null;pendingPaperOrderFingerprint='';
-      paperOrderStatus.textContent=side+' '+qty+' '+(data.tradingSymbol||tradingSymbol)+' filled at '+inrPaise(data.executionPricePaise)+' · Simulated only';
-      await loadPaperAccount();await refreshPaperViews();
+      const fillMessage=side+' '+qty+' '+(data.tradingSymbol||tradingSymbol)+' filled at '+inrPaise(data.executionPricePaise)+' · Simulated only';
+      paperOrderStatus.textContent=fillMessage;
+      try{await loadPaperAccount();await refreshPaperViews();}
+      catch(refreshError){paperOrderStatus.textContent=fillMessage+' Portfolio refresh failed; use Refresh to reload balances.';}
     }catch(error){paperOrderStatus.textContent=error.message||'Paper order failed.';}
     finally{paperOrderSubmitting=false;updatePaperButtons();}
   }
