@@ -143,3 +143,10 @@ test("replayed order reports the current account balance without applying a seco
  assert.equal(result.meta.realizedPnlTotalPaise,250);
  assert.equal(result.meta.idempotentReplay,true);
 });
+
+test("rejects an account document that does not match the authenticated UID",async()=>{
+ const {common,writes}=setup();
+ common.accountRef={id:"another-user"};
+ await assert.rejects(executePaperOrderTransaction(common),TypeError);
+ assert.equal(writes.length,0);
+});
