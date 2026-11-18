@@ -264,12 +264,12 @@
     if(selected?.instrument_key!==item.instrument_key||reconnectTimer)return;
     const delay=Math.min(30000,1000*Math.pow(2,Math.min(reconnectAttempt,5)));reconnectAttempt++;
     setFeedStatus('Live feed disconnected','Reconnecting in '+Math.round(delay/1000)+'s…');
-    reconnectTimer=setTimeout(()=>{reconnectTimer=null;if(selected?.instrument_key===item.instrument_key)select(item);},delay);
+    reconnectTimer=setTimeout(()=>{reconnectTimer=null;if(selected?.instrument_key===item.instrument_key)select(item,true);},delay);
   }
-  async function select(item){
+  async function select(item,isReconnect=false){
     clearFeedTimers();
     if(streamAbort){streamAbort.abort();streamAbort=null;}
-    selected=item;chartRequest++;lastQuoteText='';reconnectAttempt=0;title.textContent=item.trading_symbol||item.name;symbol.textContent=item.instrument_key;price.textContent='—';
+    selected=item;chartRequest++;lastQuoteText='';if(!isReconnect)reconnectAttempt=0;title.textContent=item.trading_symbol||item.name;symbol.textContent=item.instrument_key;price.textContent='—';
     setFeedStatus('Waiting for verified live quote','Connecting to Upstox V3 feed. Prices will appear only when received from the provider.');
     render(items);updatePaperButtons();renderSavedWatchlist();loadCandles();
     const connector=window.ZENURA_MARKET_CONNECTOR;
