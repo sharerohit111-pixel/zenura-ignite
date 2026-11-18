@@ -89,6 +89,67 @@ app.get("/instruments",async(req,res)=>{
     res.status(503).json({error:"Official instrument master is temporarily unavailable."});
   }
 });
+
+// Historical OHLC candles — authenticated, token remains server-side.
+function validDate(value){
+  if(typeof value!=="string"||!/^\\d{4}-\\d{2}-\\d{2}$/.test(value))return false;
+  const d=new Date(value+"T00:00:00Z");
+  return !Number.isNaN(d.getTime())&&d.toISOString().slice(0,10)===value;
+}
+app.get("/candles",async(req,res)=>{
+  try{
+    const decoded=await authenticate(req);
+    const instrumentKey=String(req.query.instrument_key||"");
+    const unit=String(req.query.unit||"");
+    const intervalText=String(req.query.interval||"");
+    const interval=Number(intervalText);
+    const toDate=String(req.query.to_date||"");
+    const fromDate=String(req.query.from_date||"");
+    if(!instrumentKey||instrumentKey.length>100||/[\\r\\n]/.test(instrumentKey))
+      return res.status(400).json({error:"A valid instrument_key is required."});
+    const validUnit=["minutes","hours","days","weeks","months"].includes(unit);
+    const validInterval=Number.isInteger(interval)&&(
+      (unit==="minutes"&&interval>=1&&interval<=300)||
+      (unit==="hours"&&interval>=1&&interval<=5)||
+      (["days","weeks","months"].includes(unit)&&interval===1)
+    );
+    if(!validUnit||!validInterval)return res.status(400).json({error:"Unsupported candle unit or interval."});
+    if(!validDate(toDate)|| (fromDate&&!validDate(fromDate)))
+      return res.status(400).json({error:"Dates must use YYYY-MM-DD format."});
+    if(fromDate&&fromDate>toDate)return res.status(400).json({error:"from_date must not be after to_date."});
+    const from=fromDate?new Date(fromDate+"T00:00:00Z"):null;
+    const to=new Date(toDate+"T00:00:00Z");
+    if(from){
+      const days=(to-from)/86400000;
+      const maxDays=unit==="minutes"?(interval<=15?31:92):unit==="hours"?92:unit==="days"?3653:unit==="weeks"?36525:36525;
+      if(days>maxDays)return res.status(400).json({error:"Requested date range exceeds the documented historical retrieval window for this interval."});
+    }
+    if(!instrumentCache.length||Date.now()-instrumentCacheUpdatedAt>6*60*60*1000)await refreshInstrumentCache();
+    if(!instrumentCache.some(item=>item.instrument_key===instrumentKey))
+      return res.status(400).json({error:"Instrument key is not present in the current official instrument master."});
+    const connection=await db.collection("upstoxConnections").doc(decoded.uid).get();
+    if(!connection.exists)return res.status(403).json({error:"Upstox account is not connected."});
+    const data=connection.data();
+    if(data.status!=="connected"||!data.expiresAt||data.expiresAt.toMillis()<=Date.now())
+      return res.status(403).json({error:"Upstox token expired. Reconnect your account."});
+    const accessToken=decryptToken(data.tokenCiphertext);
+    const encodedKey=encodeURIComponent(instrumentKey);
+    const pathParts=[encodedKey,unit,String(interval),encodeURIComponent(toDate)];
+    if(fromDate)pathParts.push(encodeURIComponent(fromDate));
+    const providerUrl="https://api.upstox.com/v3/historical-candle/"+pathParts.join("/");
+    const upstream=await fetch(providerUrl,{headers:{Authorization:"Bearer "+accessToken,Accept:"application/json"}});
+    const payload=await upstream.json().catch(()=>null);
+    if(!upstream.ok){
+      console.warn("Historical candle provider returned",upstream.status);
+      return res.status(upstream.status===401?403:502).json({error:"Upstox historical candle request failed.",providerStatus:upstream.status});
+    }
+    res.set("Cache-Control","private, no-store");
+    res.json(payload);
+  }catch(error){
+    if(!res.headersSent)res.status(error.status||500).json({error:error.status?error.message:"Historical candles could not be loaded."});
+  }
+});
+
 app.post("/stream",async(req,res)=>{
   let upstream;
   let heartbeat;
