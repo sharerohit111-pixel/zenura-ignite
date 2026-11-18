@@ -5,7 +5,7 @@ function isUsableUpstoxTokenResponse(payload) {
   if (typeof payload.access_token !== "string"
     || payload.access_token.length === 0
     || payload.access_token.length > 16384
-    || /[\\u0000-\\u001f\\u007f]/.test(payload.access_token)) return false;
+    || /[\u0000-\u001f\u007f]/.test(payload.access_token)) return false;
   if (payload.token_type !== undefined
     && (typeof payload.token_type !== "string"
       || payload.token_type.length === 0
