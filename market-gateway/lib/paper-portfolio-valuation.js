@@ -2,6 +2,12 @@
 const {normalizeProviderQuote}=require("./provider-quote");
 const {quoteAgeMs}=require("./quote-freshness");
 
+function readStoredPaperPositions(account){
+  if(!account||typeof account!=="object"||Array.isArray(account)||!account.positions||typeof account.positions!=="object"||Array.isArray(account.positions))
+    throw Object.assign(new Error("Paper account contains an invalid cash-equity positions map."),{status:409});
+  return Object.entries(account.positions);
+}
+
 function buildPortfolioValuation({positions,quotes,cashPaise,realizedPnlPaise=0,instruments=[],now=Date.now(),maxAgeMs=60000}){
   if(!Array.isArray(positions)||!Array.isArray(quotes)||!Array.isArray(instruments)||!Number.isSafeInteger(cashPaise)||cashPaise<0||!Number.isSafeInteger(realizedPnlPaise)||!Number.isSafeInteger(now)||now<0||!Number.isSafeInteger(maxAgeMs)||maxAgeMs<0)
     throw Object.assign(new Error("Invalid portfolio valuation input."),{status:409});
@@ -32,4 +38,4 @@ function buildPortfolioValuation({positions,quotes,cashPaise,realizedPnlPaise=0,
   if(!Number.isSafeInteger(equityPaise))throw Object.assign(new Error("Portfolio equity exceeds safe calculation limits."),{status:409});
   return {positions:valued,cashPaise,marketValuePaise,unrealizedPnlPaise,equityPaise,realizedPnlPaise,valuationStatus:staleCount?"partial_stale":positions.length?"fresh":"no_open_positions",stalePositions:staleCount,simulationOnly:true};
 }
-module.exports={buildPortfolioValuation};
+module.exports={buildPortfolioValuation,readStoredPaperPositions};
