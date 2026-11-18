@@ -71,7 +71,7 @@ app.post("/stream",async(req,res)=>{
     });
     upstream.on("error",()=>{if(!closed)res.write("event: error\ndata: "+JSON.stringify({message:"Upstream market feed connection failed"})+"\n\n");});
     upstream.on("close",()=>{if(!closed){res.write("event: status\ndata: "+JSON.stringify({connected:false})+"\n\n");res.end();}});
-    const heartbeat=setInterval(()=>{if(!closed&&!res.writableEnded)res.write(": keep-alive\\n\\n");},20000);
+    const heartbeat=setInterval(()=>{if(!closed&&!res.writableEnded)res.write(": keep-alive\n\n");},20000);
     res.on("close",()=>{clearInterval(heartbeat);close();});
   }catch(error){
     if(!res.headersSent) res.status(error.status||500).json({error:error.status?error.message:"Market feed could not be started."});
