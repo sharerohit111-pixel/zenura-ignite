@@ -75,7 +75,7 @@ test("concurrent identical submissions create one fill and replay the same order
 });
 test("concurrent different orders serialize against latest cash and cannot overspend",async()=>{
  const {db,state}=createSerializableStore({...account,cashPaise:10000});
- const make=key=>({db,accountRef:{id:"account"},orderRef:{id:key},uid:"user-1",requestFingerprint:key,order:{uid:"user-1",requestFingerprint:key,instrumentKey:"NSE_EQ|"+key,side:"BUY",quantity:1},pricePaise:7000,publicPaperOrder:(order,meta)=>({order,meta}),serverTimestamp:()=>"server-time"});
+ const make=key=>({db,accountRef:{id:"user-1"},orderRef:{id:key},uid:"user-1",requestFingerprint:key,order:{uid:"user-1",requestFingerprint:key,instrumentKey:"NSE_EQ|"+key,side:"BUY",quantity:1},pricePaise:7000,publicPaperOrder:(order,meta)=>({order,meta}),serverTimestamp:()=>"server-time"});
  const results=await Promise.allSettled([executePaperOrderTransaction(make("order-a")),executePaperOrderTransaction(make("order-b"))]);
  assert.equal(results.filter(x=>x.status==="fulfilled").length,1);
  assert.equal(results.filter(x=>x.status==="rejected"&&x.reason.status===409).length,1);
