@@ -397,11 +397,22 @@ app.put("/watchlist",async(req,res)=>{
 app.post("/stream",async(req,res)=>{
   let upstream;
   let heartbeat;
+  let closed=false;
+  const writeEvent=(event,payload)=>{
+    if(closed||res.destroyed||res.writableEnded)return false;
+    return res.write("event: "+event+"\\ndata: "+JSON.stringify(payload)+"\\n\\n");
+  };
+  const stop=()=>{
+    if(closed)return;
+    closed=true;
+    if(heartbeat)clearInterval(heartbeat);
+    if(upstream&&upstream.readyState<WebSocket.CLOSING)upstream.close();
+  };
   try{
     const decoded=await authenticate(req);
     const keys=[...new Set(Array.isArray(req.body?.instrumentKeys)?req.body.instrumentKeys:[])];
     const mode=req.body?.mode||"ltpc";
-    if(!keys.length||keys.length>MAX_KEYS||keys.some(k=>typeof k!=="string"||!k||k.length>100||/[\u0000-\u001F]/.test(k)))
+    if(!keys.length||keys.length>MAX_KEYS||keys.some(k=>typeof k!=="string"||!k||k.length>100||/[\\u0000-\\u001F]/.test(k)))
       return res.status(400).json({error:"Provide a valid instrumentKeys list within the configured per-session limit."});
     if(!["ltpc","full","option_greeks"].includes(mode)) return res.status(400).json({error:"Unsupported feed mode."});
     const connection=await db.collection("upstoxConnections").doc(decoded.uid).get();
@@ -416,42 +427,50 @@ app.post("/stream",async(req,res)=>{
     const authData=await authResponse.json().catch(()=>({}));
     if(!authResponse.ok||!authData.data?.authorized_redirect_uri)
       return res.status(502).json({error:"Upstox could not authorize the live market feed."});
+    if(res.destroyed||res.writableEnded)return;
     res.status(200);
     res.set({"Content-Type":"text/event-stream","Cache-Control":"no-cache, no-transform","Connection":"keep-alive","X-Accel-Buffering":"no"});
     res.flushHeaders?.();
-    res.write("event: status\ndata: "+JSON.stringify({connected:true,mode,keys:keys.length})+"\n\n");
-    upstream=new WebSocket(authData.data.authorized_redirect_uri,{followRedirects:true,headers:{Authorization:"Bearer "+accessToken,Accept:"*/*"}});
-    let closed=false;
-    const close=()=>{if(closed)return;closed=true;try{upstream?.close();}catch(_){}};
+    writeEvent("status",{connected:true,mode,keys:keys.length});
+    upstream=new WebSocket(authData.data.authorized_redirect_uri,{
+      followRedirects:true,handshakeTimeout:15000,
+      headers:{Authorization:"Bearer "+accessToken,Accept:"*/*"}
+    });
     upstream.on("open",()=>{
-      upstream.send(Buffer.from(JSON.stringify({guid:crypto.randomUUID(),method:"sub",data:{mode,instrumentKeys:keys}})));
+      if(closed||res.destroyed||res.writableEnded){stop();return;}
+      upstream.send(Buffer.from(JSON.stringify({guid:crypto.randomUUID(),method:"sub",data:{mode,instrumentKeys:keys}})),error=>{
+        if(error){writeEvent("error",{message:"Market feed subscription could not be sent"});stop();if(!res.writableEnded)res.end();}
+      });
     });
     upstream.on("message",(bytes,isBinary)=>{
-      if(!isBinary){res.write("event: upstream\ndata: "+JSON.stringify({message:String(bytes).slice(0,500)})+"\n\n");return;}
+      if(closed||res.destroyed||res.writableEnded)return;
+      if(!isBinary){writeEvent("upstream",{message:String(bytes).slice(0,500)});return;}
       try{
         const message=FeedResponse.decode(bytes);
         const object=FeedResponse.toObject(message,{longs:String,enums:String,defaults:false,oneofs:true});
-        res.write("event: market\ndata: "+JSON.stringify(object)+"\n\n");
+        writeEvent("market",object);
       }catch(error){
-        res.write("event: error\ndata: "+JSON.stringify({message:"Market feed decode failed"})+"\n\n");
+        writeEvent("error",{message:"Market feed decode failed"});
       }
     });
     upstream.on("error",()=>{
-      if(!closed&&!res.writableEnded)res.write("event: error\ndata: "+JSON.stringify({message:"Upstream market feed connection failed"})+"\n\n");
+      writeEvent("error",{message:"Upstream market feed connection failed"});
+      stop();
+      if(!res.destroyed&&!res.writableEnded)res.end();
     });
     upstream.on("close",()=>{
-      if(!closed&&!res.writableEnded){
-        res.write("event: status\ndata: "+JSON.stringify({connected:false})+"\n\n");
-        res.end();
+      if(!closed){
+        writeEvent("status",{connected:false});
+        stop();
+        if(!res.destroyed&&!res.writableEnded)res.end();
       }
     });
-    heartbeat=setInterval(()=>{if(!closed&&!res.writableEnded)res.write(": keep-alive\n\n");},20000);
-    res.on("close",()=>{clearInterval(heartbeat);close();});
+    heartbeat=setInterval(()=>{if(!closed&&!res.destroyed&&!res.writableEnded)res.write(": keep-alive\\n\\n");},20000);
+    res.on("close",stop);
   }catch(error){
     if(!res.headersSent)res.status(errorStatus(error)).json({error:error.status?error.message:"Market feed could not be started."});
-    else{res.write("event: error\ndata: "+JSON.stringify({message:"Market feed stopped unexpectedly"})+"\n\n");res.end();}
-    clearInterval(heartbeat);
-    try{upstream?.close();}catch(_){}
+    else{writeEvent("error",{message:"Market feed stopped unexpectedly"});if(!res.writableEnded)res.end();}
+    stop();
   }
 });
 loadProto().then(()=>{
