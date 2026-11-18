@@ -8,7 +8,7 @@ const path=require("node:path");
 const {gunzipSync}=require("node:zlib");
 const {calculatePaperFill}=require("./lib/paper-math");
 const {WATCHLIST_NAMES,normalizeWatchlists,mergeWatchlistUpdate}=require("./lib/watchlists");
-const {isUuid,makeOrderId,makeOrderFingerprint,buildPaperOrderUpdate,assertIdempotentReplay}=require("./lib/order-idempotency");
+const {isUuid,makeOrderId,makeOrderFingerprint}=require("./lib/order-idempotency");
 const {publicPaperOrder}=require("./lib/paper-order-response");
 const {formatSseEvent,formatSseComment}=require("./lib/sse");
 admin.initializeApp();
