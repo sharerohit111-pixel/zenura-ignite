@@ -320,7 +320,7 @@ app.get("/paper/orders",async(req,res)=>{
       query=query.startAfter(cursorSnap);
     }
     const snap=await query.limit(limit+1).get(),hasMore=snap.docs.length>limit,docs=snap.docs.slice(0,limit);
-    const orders=docs.map(doc=>({id:doc.id,...doc.data(),createdAt:doc.data().createdAt?.toMillis?.()||null}));
+    const orders=docs.map(doc=>{const order=doc.data();return {id:doc.id,tradingSymbol:order.tradingSymbol,exchange:order.exchange,side:order.side,quantity:order.quantity,executionPricePaise:order.executionPricePaise,grossPaise:order.grossPaise,realizedPnlPaise:order.realizedPnlPaise,orderType:order.orderType,status:order.status,simulationOnly:order.simulationOnly,createdAt:order.createdAt?.toMillis?.()||null};});
     res.set("Cache-Control","private, no-store");
     res.json({orders,hasMore,nextCursor:hasMore?docs[docs.length-1].id:null,simulationOnly:true});
   }catch(error){res.status(error.status||500).json({error:error.status?error.message:"Paper order history could not be loaded."});}
