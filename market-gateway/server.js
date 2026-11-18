@@ -24,6 +24,7 @@ const {filterFreshMarketFeeds}=require("./lib/market-feed-validation");
 const {buildPortfolioValuation}=require("./lib/paper-portfolio-valuation");
 const {createLeaseHeartbeat}=require("./lib/lease-heartbeat");
 const {isUpstoxTokenUsable}=require("./lib/upstox-token");
+const {executeLongOptionBuyTransaction}=require("./lib/derivative-order-transaction");
 admin.initializeApp();
 const db=admin.firestore();
 const app=express();
@@ -230,7 +231,7 @@ app.get("/paper/account",async(req,res)=>{
     });
     const snap=await ref.get(),data=snap.data();
     res.set("Cache-Control","private, no-store");
-    res.json({currency:"INR",startingCashPaise:data.startingCashPaise,cashPaise:data.cashPaise,positions:data.positions||{},realizedPnlPaise:data.realizedPnlPaise||0,updatedAt:data.updatedAt?.toMillis?.()||null,simulationOnly:true});
+    res.json({currency:"INR",startingCashPaise:data.startingCashPaise,cashPaise:data.cashPaise,positions:data.positions||{},derivativePositions:data.derivativePositions||{},reservedMarginPaise:data.reservedMarginPaise||0,realizedPnlPaise:data.realizedPnlPaise||0,updatedAt:data.updatedAt?.toMillis?.()||null,simulationOnly:true});
   }catch(error){res.status(errorStatus(error)).json({error:error.status?error.message:"Paper account could not be loaded."});}
 });
 app.post("/paper/orders",async(req,res)=>{
@@ -282,6 +283,56 @@ app.post("/paper/orders",async(req,res)=>{
     res.set("Cache-Control","private, no-store");
     res.status(result.idempotentReplay?200:201).json(result);
   }catch(error){res.status(errorStatus(error)).json({error:error.status?error.message:"Paper order could not be completed."});}
+});
+
+app.post("/paper/derivative/orders",async(req,res)=>{
+  try{
+    const decoded=await authenticate(req);
+    const instrumentKey=typeof req.body?.instrument_key==="string"?req.body.instrument_key:"";
+    const lots=Number(req.body?.lots);
+    const side=String(req.body?.side||"").toUpperCase();
+    const idempotencyKey=typeof req.body?.idempotency_key==="string"?req.body.idempotency_key:"";
+    if(!isUuid(idempotencyKey))return res.status(400).json({error:"A valid UUID idempotency_key is required."});
+    if(!instrumentKey||instrumentKey.length>100||/[\\r\\n]/.test(instrumentKey))return res.status(400).json({error:"A valid instrument_key is required."});
+    if(side!=="BUY")return res.status(400).json({error:"This phase enables long CE/PE BUY only. Short options and futures remain disabled until margin lifecycle integration is complete."});
+    if(!Number.isSafeInteger(lots)||lots<1||lots>10000)return res.status(400).json({error:"Lots must be a whole number between 1 and 10,000."});
+    if(!instrumentCache.length||Date.now()-instrumentCacheUpdatedAt>6*60*60*1000)await refreshInstrumentCache();
+    const instrument=instrumentCache.find(x=>x.instrument_key===instrumentKey&&["CE","PE"].includes(x.instrument_type)&&["NSE_FO","BSE_FO"].includes(x.segment));
+    if(!instrument)return res.status(400).json({error:"Select a verified NSE/BSE CE/PE option contract from the official instrument master."});
+    const accountRef=paperAccountRef(decoded.uid),accountSnap=await accountRef.get();
+    if(!accountSnap.exists)return res.status(409).json({error:"Initialize your shared Indian paper account before placing a derivative order."});
+    const account=accountSnap.data();
+    if(!Number.isSafeInteger(account.cashPaise)||account.cashPaise<0||!Number.isSafeInteger(account.version)||account.version<1)
+      return res.status(409).json({error:"Shared paper account balance is invalid; derivative order rejected."});
+    const connection=await db.collection("upstoxConnections").doc(decoded.uid).get();
+    if(!connection.exists)return res.status(403).json({error:"Connect your Upstox account before placing a derivative paper order."});
+    const connectionData=connection.data();
+    if(!isUpstoxTokenUsable(connectionData))return res.status(403).json({error:"Upstox token expired. Reconnect your account."});
+    const accessToken=decryptToken(connectionData.tokenCiphertext);
+    const quoteUrl="https://api.upstox.com/v3/market-quote/quotes?"+new URLSearchParams({instrument_key:instrumentKey});
+    const quoteResponse=await fetchProvider(quoteUrl,{headers:{Authorization:"Bearer "+accessToken,Accept:"application/json"}});
+    const quotePayload=await quoteResponse.json().catch(()=>null);
+    if(!quoteResponse.ok)return res.status(502).json({error:"A current Upstox full quote could not be verified for this option.",providerStatus:quoteResponse.status});
+    const quoteEntry=Object.values(quotePayload?.data||{}).find(x=>x&&x.instrument_token===instrumentKey);
+    let normalizedQuote;
+    try{normalizedQuote=normalizeProviderQuote(quoteEntry,instrumentKey);}
+    catch(error){return res.status(error.status||409).json({error:error.message,quoteAgeMs:Number.isFinite(error.quoteAgeMs)?error.quoteAgeMs:null});}
+    const orderId=makeOrderId(decoded.uid,idempotencyKey);
+    const orderRef=db.collection("indianDerivativeOrders").doc(orderId);
+    const result=await executeLongOptionBuyTransaction({
+      db,accountRef,orderRef,uid:decoded.uid,idempotencyKey,instrument,lots,
+      quote:{instrumentKey,pricePaise:normalizedQuote.pricePaise,observedAtMs:normalizedQuote.tradeTimeMs},
+      serverTimestamp:()=>admin.firestore.FieldValue.serverTimestamp()
+    });
+    res.set("Cache-Control","private, no-store");
+    res.status(result.idempotentReplay?200:201).json({
+      orderId:result.orderId,tradingSymbol:result.order.tradingSymbol,side:result.order.side,
+      quantity:result.order.quantity,lots:result.order.lots,executionPricePaise:result.order.executionPricePaise,
+      grossPaise:result.order.grossPaise,cashPaise:result.cashPaise,
+      realizedPnlPaise:result.realizedPnlPaise,idempotentReplay:result.idempotentReplay,
+      simulationOnly:true,excludesCharges:true
+    });
+  }catch(error){res.status(errorStatus(error)).json({error:error.status?error.message:"Derivative paper order could not be completed."});}
 });
 
 app.get("/paper/portfolio",async(req,res)=>{
