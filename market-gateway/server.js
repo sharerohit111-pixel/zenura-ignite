@@ -293,15 +293,15 @@ app.post("/paper/derivative/margin-preview",async(req,res)=>{
   try{
     const decoded=await authenticate(req);
     const {instrumentKey,lots,side,product}=parseMarginPreviewInput(req.body);
-    await consumeMarginPreviewSlot(db,decoded.uid);
-    if(!instrumentCache.length||Date.now()-instrumentCacheUpdatedAt>6*60*60*1000)await refreshInstrumentCache();
-    const instrument=instrumentCache.find(x=>x.instrument_key===instrumentKey&&x.instrument_type==="FUT"&&["NSE_FO","BSE_FO"].includes(x.segment));
-    if(!instrument)return res.status(400).json({error:"Select a verified NSE/BSE futures contract from the official instrument master."});
     const connection=await db.collection("upstoxConnections").doc(decoded.uid).get();
     if(!connection.exists)return res.status(403).json({error:"Connect your Upstox account to request a broker margin preview."});
     const connectionData=connection.data();
     if(!isUpstoxTokenUsable(connectionData))return res.status(403).json({error:"Upstox token expired. Reconnect your account."});
     const accessToken=decryptToken(connectionData.tokenCiphertext);
+    await consumeMarginPreviewSlot(db,decoded.uid);
+    if(!instrumentCache.length||Date.now()-instrumentCacheUpdatedAt>6*60*60*1000)await refreshInstrumentCache();
+    const instrument=instrumentCache.find(x=>x.instrument_key===instrumentKey&&x.instrument_type==="FUT"&&["NSE_FO","BSE_FO"].includes(x.segment));
+    if(!instrument)return res.status(400).json({error:"Select a verified NSE/BSE futures contract from the official instrument master."});
     const quoteUrl="https://api.upstox.com/v3/market-quote/quotes?"+new URLSearchParams({instrument_key:instrumentKey});
     const quoteResponse=await fetchProvider(quoteUrl,{headers:{Authorization:"Bearer "+accessToken,Accept:"application/json"}});
     const quotePayload=await quoteResponse.json().catch(()=>null);
