@@ -304,6 +304,24 @@ app.post("/paper/derivative/orders",async(req,res)=>{
     const account=accountSnap.data();
     if(!Number.isSafeInteger(account.cashPaise)||account.cashPaise<0||!Number.isSafeInteger(account.version)||account.version<1)
       return res.status(409).json({error:"Shared paper account balance is invalid; derivative order rejected."});
+    const quantity=lots*instrument.lot_size;
+    if(!Number.isSafeInteger(quantity)||quantity<1||quantity>1000000)return res.status(400).json({error:"Contract quantity exceeds supported limits."});
+    const orderId=makeOrderId(decoded.uid,idempotencyKey);
+    const orderRef=db.collection("indianDerivativeOrders").doc(orderId);
+    const requestFingerprint=makeOrderFingerprint({instrumentKey,side:"BUY",quantity});
+    const priorOrder=await orderRef.get();
+    if(priorOrder.exists){
+      const prior=priorOrder.data();
+      assertIdempotentReplay(prior,requestFingerprint);
+      const current=await accountRef.get(),currentData=current.exists?current.data():{};
+      res.set("Cache-Control","private, no-store");
+      return res.status(200).json({
+        orderId,tradingSymbol:prior.tradingSymbol,side:prior.side,quantity:prior.quantity,
+        lots:prior.lots,executionPricePaise:prior.executionPricePaise,grossPaise:prior.grossPaise,
+        cashPaise:currentData.cashPaise,realizedPnlPaise:currentData.realizedPnlPaise||0,
+        idempotentReplay:true,simulationOnly:true,excludesCharges:true
+      });
+    }
     const connection=await db.collection("upstoxConnections").doc(decoded.uid).get();
     if(!connection.exists)return res.status(403).json({error:"Connect your Upstox account before placing a derivative paper order."});
     const connectionData=connection.data();
@@ -317,8 +335,6 @@ app.post("/paper/derivative/orders",async(req,res)=>{
     let normalizedQuote;
     try{normalizedQuote=normalizeProviderQuote(quoteEntry,instrumentKey);}
     catch(error){return res.status(error.status||409).json({error:error.message,quoteAgeMs:Number.isFinite(error.quoteAgeMs)?error.quoteAgeMs:null});}
-    const orderId=makeOrderId(decoded.uid,idempotencyKey);
-    const orderRef=db.collection("indianDerivativeOrders").doc(orderId);
     const result=await executeLongOptionBuyTransaction({
       db,accountRef,orderRef,uid:decoded.uid,idempotencyKey,instrument,lots,
       quote:{instrumentKey,pricePaise:normalizedQuote.pricePaise,observedAtMs:normalizedQuote.tradeTimeMs},
