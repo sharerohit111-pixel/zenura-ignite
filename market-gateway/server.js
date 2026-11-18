@@ -355,7 +355,7 @@ app.post("/paper/derivative/orders",async(req,res)=>{
     const side=String(req.body?.side||"").toUpperCase();
     const idempotencyKey=typeof req.body?.idempotency_key==="string"?req.body.idempotency_key:"";
     if(!isUuid(idempotencyKey))return res.status(400).json({error:"A valid UUID idempotency_key is required."});
-    if(!instrumentKey||instrumentKey.length>100||/[\\r\\n]/.test(instrumentKey))return res.status(400).json({error:"A valid instrument_key is required."});
+    if(!instrumentKey||instrumentKey.length>100||/[\r\n]/.test(instrumentKey))return res.status(400).json({error:"A valid instrument_key is required."});
     if(!["BUY","SELL"].includes(side))return res.status(400).json({error:"Only BUY and SELL to close existing long CE/PE positions are supported. Opening shorts and futures remain disabled."});
     if(!Number.isSafeInteger(lots)||lots<1||lots>10000)return res.status(400).json({error:"Lots must be a whole number between 1 and 10,000."});
     if(!instrumentCache.length||Date.now()-instrumentCacheUpdatedAt>6*60*60*1000)await refreshInstrumentCache();
