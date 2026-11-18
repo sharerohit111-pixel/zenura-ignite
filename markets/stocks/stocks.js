@@ -176,7 +176,25 @@
     }finally{if(seq===paperHistoryLoadSeq){paperHistoryLoading=false;paperHistoryMore.disabled=!paperHistoryHasMore;}}
   }
   paperHistoryMore?.addEventListener('click',()=>loadPaperHistory({append:true}));
-  async function refreshPaperViews(){await Promise.all([loadPaperPortfolio(),loadPaperHistory()]);}
+  async function loadDerivativePortfolio(){
+    const body=document.getElementById('derivative-positions'),status=document.getElementById('derivative-portfolio-status');
+    if(!body||!status||!gateway||!window.ZENURA_MARKET_CONNECTOR?.getIdToken)return;
+    status.textContent='Refreshing verified option quotes…';
+    try{
+      const token=await window.ZENURA_MARKET_CONNECTOR.getIdToken();
+      const response=await fetch(gateway+'/paper/derivatives/portfolio',{headers:{Authorization:'Bearer '+token,Accept:'application/json'}});
+      const data=await response.json();if(!response.ok)throw new Error(data.error||'Derivative portfolio unavailable');
+      body.textContent='';
+      if(!data.positions?.length)tableMessage(body,6,'No open derivative positions.');
+      else data.positions.forEach(p=>{
+        const tr=document.createElement('tr');
+        [p.instrumentKey,p.netQuantity,inrPaise(p.averagePricePaise),inrPaise(p.marketPricePaise),inrPaise(Math.abs(p.marketValuePaise)),signedMoney(p.unrealizedPnlPaise)].forEach(v=>{const td=document.createElement('td');td.textContent=String(v);tr.append(td);});
+        body.append(tr);
+      });
+      status.textContent=data.valuationStatus==='fresh'?'Long CE/PE positions · Fresh Upstox quotes · Charges excluded':'No open derivative positions';
+    }catch(error){status.textContent=error.message||'Derivative valuation unavailable';}
+  }
+  async function refreshPaperViews(){await Promise.all([loadPaperPortfolio(),loadPaperHistory(),loadDerivativePortfolio()]);}
   paperRefresh.addEventListener('click',refreshPaperViews);
 
   let paperOrderSubmitting=false;
