@@ -6,6 +6,7 @@ const admin=require("firebase-admin");
 const crypto=require("node:crypto");
 const path=require("node:path");
 const {downloadInstrumentMaster}=require("./lib/instrument-master-download");
+const {validateUpstoxFeedUrl}=require("./lib/upstox-feed-url");
 const {calculatePaperFill}=require("./lib/paper-math");
 const {WATCHLIST_NAMES,normalizeWatchlists,mergeWatchlistUpdate}=require("./lib/watchlists");
 const {isUuid,makeOrderId,makeOrderFingerprint}=require("./lib/order-idempotency");
@@ -643,13 +644,16 @@ app.post("/stream",async(req,res)=>{
     const authData=await authResponse.json().catch(()=>({}));
     if(!authResponse.ok||!authData.data?.authorized_redirect_uri)
       return res.status(502).json({error:"Upstox could not authorize the live market feed."});
+    let feedUrl;
+    try{feedUrl=validateUpstoxFeedUrl(authData.data.authorized_redirect_uri);}
+    catch{return res.status(502).json({error:"Upstox returned an invalid live market feed endpoint."});}
     if(res.destroyed||res.writableEnded)return;
     res.status(200);
     res.set({"Content-Type":"text/event-stream","Cache-Control":"no-cache, no-transform","Connection":"keep-alive","X-Accel-Buffering":"no"});
     res.on("drain",onDrain);
     res.flushHeaders?.();
     writeEvent("status",{connected:false,connecting:true,mode,keys:keys.length});
-    upstream=new WebSocket(authData.data.authorized_redirect_uri,{
+    upstream=new WebSocket(feedUrl,{
       followRedirects:true,handshakeTimeout:15000,
       headers:{Authorization:"Bearer "+accessToken,Accept:"*/*"}
     });
