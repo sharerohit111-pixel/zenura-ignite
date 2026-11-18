@@ -325,7 +325,7 @@
             if(eventName==='status'&&data.connected===false){if(staleTimer){clearTimeout(staleTimer);staleTimer=null;}price.textContent=lastQuoteText?'STALE · '+lastQuoteText:'—';setFeedStatus('Live feed disconnected','The Upstox stream closed. Reconnecting automatically.');continue;}
             if(eventName==='error'){if(staleTimer){clearTimeout(staleTimer);staleTimer=null;}price.textContent=lastQuoteText?'STALE · '+lastQuoteText:'—';setFeedStatus('Live feed error',data.message||'The provider stream reported an error.');continue;}
             const feed=data.feeds?.[item.instrument_key],quote=feed?.ltpc||feed?.fullFeed?.marketFF?.ltpc||feed?.fullFeed?.indexFF?.ltpc;
-            if(quote&&Number.isFinite(Number(quote.ltp))){
+            if(quote&&Number.isFinite(Number(quote.ltp))&&Number(quote.ltp)>0){
               lastQuoteText='₹'+Number(quote.ltp).toLocaleString('en-IN',{maximumFractionDigits:2});price.textContent=lastQuoteText;reconnectAttempt=0;
               if(staleTimer)clearTimeout(staleTimer);
               staleTimer=setTimeout(()=>{if(selected?.instrument_key===item.instrument_key){price.textContent='STALE · '+lastQuoteText;setFeedStatus('Live quote is stale','No fresh provider quote received for 15 seconds. Do not use this price for paper orders.');scheduleReconnect(item);}},15000);
