@@ -151,16 +151,16 @@
   }
   let paperHistoryCursor=null,paperHistoryHasMore=false,paperHistoryLoading=false,paperHistoryLoadSeq=0;
   async function loadPaperHistory({append=false}={}){
-    if(!gateway||!window.ZENURA_MARKET_CONNECTOR?.getIdToken||paperHistoryLoading)return;
-    if(append&&(!paperHistoryHasMore||!paperHistoryCursor))return;
-    const seq=++paperHistoryLoadSeq;paperHistoryLoading=true;paperHistoryMore.disabled=true;
+    if(!gateway||!window.ZENURA_MARKET_CONNECTOR?.getIdToken)return;
+    if(append&&(paperHistoryLoading||!paperHistoryHasMore||!paperHistoryCursor))return;
+    const seq=++paperHistoryLoadSeq,cursor=paperHistoryCursor;paperHistoryLoading=true;paperHistoryMore.disabled=true;
     if(paperHistoryStatus)paperHistoryStatus.textContent=append?'Loading older orders…':'Loading latest orders…';
     try{
-      const token=await window.ZENURA_MARKET_CONNECTOR.getIdToken(),params=new URLSearchParams({limit:'50'});
-      if(append)params.set('cursor',paperHistoryCursor);
+      const token=await window.ZENURA_MARKET_CONNECTOR.getIdToken();if(seq!==paperHistoryLoadSeq)return;
+      const params=new URLSearchParams({limit:'50'});
+      if(append)params.set('cursor',cursor);
       const response=await fetch(gateway+'/paper/orders?'+params.toString(),{headers:{Authorization:'Bearer '+token,Accept:'application/json'}});
-      const data=await response.json();if(!response.ok)throw new Error(data.error||'Order history unavailable');
-      if(seq!==paperHistoryLoadSeq)return;
+      const data=await response.json();if(seq!==paperHistoryLoadSeq)return;if(!response.ok)throw new Error(data.error||'Order history unavailable');
       if(!append)paperHistory.textContent='';
       if(!data.orders?.length&&!append)tableMessage(paperHistory,6,'No paper orders yet.');
       else data.orders.forEach(order=>{
