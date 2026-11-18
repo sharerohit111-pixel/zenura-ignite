@@ -9,7 +9,9 @@
   const list=document.getElementById('instrument-list');
   const gateway=(document.querySelector('meta[name="market-gateway-url"]')?.content||'').trim().replace(/\/+$/,'');
   const labels={indices:'Indices',equities:'Equities',futures:'Futures',options:'Options'};
-  let activeList='indices',items=[],selected=null,streamAbort=null,debounce=null;
+  let activeList='indices',items=[],selected=null,streamAbort=null,debounce=null,reconnectTimer=null,staleTimer=null,reconnectAttempt=0,lastQuoteText='';
+  function clearFeedTimers(){if(reconnectTimer){clearTimeout(reconnectTimer);reconnectTimer=null;}if(staleTimer){clearTimeout(staleTimer);staleTimer=null;}}
+  function scheduleReconnect(item){if(selected?.instrument_key!==item.instrument_key||reconnectTimer)return;const delay=Math.min(30000,1000*Math.pow(2,Math.min(reconnectAttempt,5)));reconnectAttempt++;document.querySelector('.chart-placeholder span').textContent='Live feed disconnected. Reconnecting in '+Math.round(delay/1000)+'s…';reconnectTimer=setTimeout(()=>{reconnectTimer=null;if(selected?.instrument_key===item.instrument_key)select(item);},delay);}
   function message(text){list.textContent='';const el=document.createElement('div');el.className='empty';el.textContent=text;list.append(el);}
   function escapeText(v){return String(v??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
   function render(rows){
@@ -107,12 +109,13 @@
   }
   timeframeButtons.forEach(button=>button.addEventListener('click',()=>{activeTimeframe=button.dataset.timeframe;timeframeButtons.forEach(x=>x.classList.toggle('active',x===button));loadCandles();}));
   async function select(item){
-    selected=item;chartRequest++;title.textContent=item.trading_symbol||item.name;symbol.textContent=item.instrument_key;price.textContent='—';
+    clearFeedTimers();
+    if(streamAbort){streamAbort.abort();streamAbort=null;}
+    selected=item;chartRequest++;lastQuoteText='';reconnectAttempt=0;title.textContent=item.trading_symbol||item.name;symbol.textContent=item.instrument_key;price.textContent='—';
     document.querySelector('.chart-placeholder b').textContent='Waiting for verified live quote';
     document.querySelector('.chart-placeholder span').textContent='Connecting to Upstox V3 feed. Prices will appear only when received from the provider.';
     render(items);
     loadCandles();
-    if(streamAbort)streamAbort.abort();
     const connector=window.ZENURA_MARKET_CONNECTOR;
     if(!gateway||!connector?.getIdToken){document.querySelector('.chart-placeholder span').textContent='Sign in and configure the deployed market gateway to start live quotes.';return;}
     const controller=new AbortController();streamAbort=controller;
@@ -130,14 +133,15 @@
           try{
             const data=JSON.parse(line.slice(6));
             const feed=data.feeds?.[item.instrument_key];const quote=feed?.ltpc||feed?.fullFeed?.marketFF?.ltpc||feed?.fullFeed?.indexFF?.ltpc;
-            if(quote&&Number.isFinite(Number(quote.ltp))){price.textContent='₹'+Number(quote.ltp).toLocaleString('en-IN',{maximumFractionDigits:2});document.querySelector('.chart-placeholder b').textContent='Live quote connected';document.querySelector('.chart-placeholder span').textContent='Last traded price received from Upstox V3. Chart history is a separate integration.';}
+            if(quote&&Number.isFinite(Number(quote.ltp))){lastQuoteText='₹'+Number(quote.ltp).toLocaleString('en-IN',{maximumFractionDigits:2});price.textContent=lastQuoteText;reconnectAttempt=0;if(staleTimer)clearTimeout(staleTimer);staleTimer=setTimeout(()=>{if(selected?.instrument_key===item.instrument_key){price.textContent='STALE · '+lastQuoteText;document.querySelector('.chart-placeholder b').textContent='Live quote is stale';document.querySelector('.chart-placeholder span').textContent='No fresh provider quote received for 15 seconds. Do not use this price for paper orders.';}},15000);document.querySelector('.chart-placeholder b').textContent='Live quote connected';document.querySelector('.chart-placeholder span').textContent='Last traded price received from Upstox V3. Chart history is a separate integration.';}
           }catch(_){}
         }
       }
-    }catch(error){if(error.name!=='AbortError')document.querySelector('.chart-placeholder span').textContent=error.message||'Live feed connection failed.';}
+      if(selected?.instrument_key===item.instrument_key&&!controller.signal.aborted)scheduleReconnect(item);
+    }catch(error){if(error.name!=='AbortError'){document.querySelector('.chart-placeholder span').textContent=error.message||'Live feed connection failed.';scheduleReconnect(item);}}
   }
   tabs.forEach(tab=>tab.addEventListener('click',()=>{
-    if(streamAbort){streamAbort.abort();streamAbort=null;}
+    clearFeedTimers();if(streamAbort){streamAbort.abort();streamAbort=null;}
     tabs.forEach(x=>x.classList.toggle('active',x===tab));activeList=tab.dataset.list;selected=null;chartRequest++;
     title.textContent='No instrument selected';symbol.textContent='Choose an instrument';price.textContent='—';loadInstruments();
   }));
