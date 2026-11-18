@@ -10,7 +10,11 @@ async function executePaperOrderTransaction({db,accountRef,orderRef,uid,requestF
     if(existingOrder.exists){
       const prior=existingOrder.data();
       assertIdempotentReplay(prior,requestFingerprint);
-      result=publicPaperOrder(prior,{orderId:orderRef.id,cashPaise:accountSnap.data()?.cashPaise,realizedPnlTotalPaise:accountSnap.data()?.realizedPnlPaise,idempotentReplay:true});
+      if(!accountSnap.exists)throw Object.assign(new Error("Paper account is not initialized."),{status:409});
+      const current=accountSnap.data();
+      if(!Number.isSafeInteger(current.cashPaise)||current.cashPaise<0||!Number.isSafeInteger(current.realizedPnlPaise??0))
+        throw Object.assign(new Error("Paper account contains invalid balance data."),{status:409});
+      result=publicPaperOrder(prior,{orderId:orderRef.id,cashPaise:current.cashPaise,realizedPnlTotalPaise:current.realizedPnlPaise??0,idempotentReplay:true});
       return;
     }
     if(!accountSnap.exists) throw Object.assign(new Error("Paper account is not initialized."),{status:409});
