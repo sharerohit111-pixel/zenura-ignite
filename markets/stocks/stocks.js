@@ -328,7 +328,7 @@
             if(quote&&Number.isFinite(Number(quote.ltp))){
               lastQuoteText='₹'+Number(quote.ltp).toLocaleString('en-IN',{maximumFractionDigits:2});price.textContent=lastQuoteText;reconnectAttempt=0;
               if(staleTimer)clearTimeout(staleTimer);
-              staleTimer=setTimeout(()=>{if(selected?.instrument_key===item.instrument_key){price.textContent='STALE · '+lastQuoteText;setFeedStatus('Live quote is stale','No fresh provider quote received for 15 seconds. Do not use this price for paper orders.');}},15000);
+              staleTimer=setTimeout(()=>{if(selected?.instrument_key===item.instrument_key){price.textContent='STALE · '+lastQuoteText;setFeedStatus('Live quote is stale','No fresh provider quote received for 15 seconds. Do not use this price for paper orders.');scheduleReconnect(item);}},15000);
               setFeedStatus('Live quote connected','Last traded price received from Upstox V3. Chart history is a separate integration.');
             }
           }catch(_){}
