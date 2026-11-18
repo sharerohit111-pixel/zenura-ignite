@@ -18,6 +18,10 @@ service cloud.firestore {
     match /razorpayEvents/{eventId} {
       allow read, write: if false;
     }
+    // Indian paper-trading balances and orders are server-only; clients use authenticated gateway APIs.
+    match /indianPaperAccounts/{uid} { allow read, write: if false; }
+    match /indianPaperOrders/{orderId} { allow read, write: if false; }
+
     match /users/{uid} {
       allow read: if request.auth != null && request.auth.uid == uid;
       allow write: if false;
