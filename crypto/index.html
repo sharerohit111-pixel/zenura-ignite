@@ -112,6 +112,24 @@ header.top a.brand > span:last-child > small{
   overflow-x:hidden!important;
 }
 
+
+/* Mobile header collision fix: keep the brand unobstructed; founder credit remains in page footer */
+@media(max-width:720px){
+  .top{display:flex!important;justify-content:space-between!important;gap:10px!important;min-width:0!important;overflow:visible!important}
+  .brand{flex:1 1 auto!important;min-width:0!important;max-width:calc(100% - 104px)!important;gap:8px!important}
+  .brand>span:last-child{min-width:0!important;overflow:hidden!important}
+  .brand b,.brand small{white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important}
+  .founder-signature{display:none!important}
+  .topright{flex:0 0 auto!important;min-width:0!important;gap:7px!important}
+  .share-app-btn{flex:0 0 36px!important}
+  .menuBtn{flex:0 0 44px!important}
+}
+@media(max-width:390px){
+  .brand{max-width:calc(100% - 96px)!important}
+  .brand b{font-size:12px!important;letter-spacing:.25px!important}
+  .brand small{font-size:6px!important;letter-spacing:.7px!important}
+  .mark{width:48px!important;height:42px!important;flex:0 0 48px!important}
+}
 </style>
 </head>
 <body>
