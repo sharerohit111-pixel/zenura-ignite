@@ -11,7 +11,7 @@ async function acquireStreamLease(db,uid,leaseId,{now=Date.now(),leaseMs=60000,c
  const ref=db.collection(collection).doc(uid);
  return db.runTransaction(async tx=>{
   const snap=await tx.get(ref),current=snap.exists?snap.data():null;
-  if(current&&Number.isSafeInteger(current.expiresAtMs)&&current.expiresAtMs>now&&current.leaseId!==leaseId)return false;
+  if(current&&Number.isSafeInteger(current.expiresAtMs)&&current.expiresAtMs>now&&current.leaseId!==leaseId&&current.revoked!==true)return false;
   tx.set(ref,{uid,leaseId,expiresAtMs:now+leaseMs,updatedAtMs:now});
   return true;
  });
@@ -21,7 +21,7 @@ async function renewStreamLease(db,uid,leaseId,{now=Date.now(),leaseMs=60000,col
  const ref=db.collection(collection).doc(uid);
  return db.runTransaction(async tx=>{
   const snap=await tx.get(ref),current=snap.exists?snap.data():null;
-  if(!isActiveLease(current,uid,leaseId,now))return false;
+  if(current?.revoked===true||!isActiveLease(current,uid,leaseId,now))return false;
   tx.set(ref,{...current,expiresAtMs:now+leaseMs,updatedAtMs:now});
   return true;
  });
