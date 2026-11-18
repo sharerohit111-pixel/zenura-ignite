@@ -11,10 +11,12 @@ function makeOrderFingerprint({instrumentKey,side,quantity}){
  return crypto.createHash("sha256").update(JSON.stringify({instrumentKey,side,quantity})).digest("hex");
 }
 function buildPaperOrderUpdate(account,{instrumentKey,side,quantity,pricePaise}){
- if(!account||typeof account!=="object"||!account.positions||typeof account.positions!=="object"||Array.isArray(account.positions))
+ if(!account||typeof account!=="object"||
+    (account.positions!==undefined&&(!account.positions||typeof account.positions!=="object"||Array.isArray(account.positions))))
   throw Object.assign(new Error("Invalid paper account state."),{status:409});
  const {calculatePaperFill}=require("./paper-math");
- const positions={...account.positions};
+ // The portfolio reader treats a missing legacy positions map as an empty portfolio.
+ const positions={...(account.positions||{})};
  let openPositionCount=0;
  // Validate all persisted records and count only open holdings, matching portfolio valuation.
  for(const [storedKey,stored] of Object.entries(positions)){
