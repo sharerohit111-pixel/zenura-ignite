@@ -317,9 +317,9 @@ app.post("/paper/derivative/orders",async(req,res)=>{
       res.set("Cache-Control","private, no-store");
       return res.status(200).json({
         orderId,tradingSymbol:prior.tradingSymbol,side:prior.side,quantity:prior.quantity,
-        lots:prior.lots,executionPricePaise:prior.executionPricePaise,grossPaise:prior.grossPaise,
+        lots:prior.lots,executionPricePaise:prior.executionPricePaise,grossPaise:prior.grossPaise,charges:prior.charges||null,chargesPaise:prior.chargesPaise||0,totalDebitPaise:prior.totalDebitPaise||prior.grossPaise,
         cashPaise:currentData.cashPaise,realizedPnlPaise:currentData.realizedPnlPaise||0,
-        idempotentReplay:true,simulationOnly:true,excludesCharges:true
+        idempotentReplay:true,simulationOnly:true,excludesCharges:false
       });
     }
     const connection=await db.collection("upstoxConnections").doc(decoded.uid).get();
@@ -344,9 +344,9 @@ app.post("/paper/derivative/orders",async(req,res)=>{
     res.status(result.idempotentReplay?200:201).json({
       orderId:result.orderId,tradingSymbol:result.order.tradingSymbol,side:result.order.side,
       quantity:result.order.quantity,lots:result.order.lots,executionPricePaise:result.order.executionPricePaise,
-      grossPaise:result.order.grossPaise,cashPaise:result.cashPaise,
+      grossPaise:result.order.grossPaise,charges:result.order.charges,chargesPaise:result.order.chargesPaise,totalDebitPaise:result.order.totalDebitPaise,cashPaise:result.cashPaise,
       realizedPnlPaise:result.realizedPnlPaise,idempotentReplay:result.idempotentReplay,
-      simulationOnly:true,excludesCharges:true
+      simulationOnly:true,excludesCharges:false
     });
   }catch(error){res.status(errorStatus(error)).json({error:error.status?error.message:"Derivative paper order could not be completed."});}
 });
