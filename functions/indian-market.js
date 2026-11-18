@@ -89,7 +89,7 @@ exports.upstoxOAuthCallback = onRequest(
       });
       return res.redirect(303,"https://zenuraignite.com/markets/stocks/?upstox=connected");
     } catch(error) {
-      logger.error("Upstox OAuth callback failed",{message:error.message});
+      logger.error("Upstox OAuth callback failed",{errorName:error.name||"Error"});
       return res.status(500).send("Authorization could not be saved securely. Please retry.");
     }
   }
