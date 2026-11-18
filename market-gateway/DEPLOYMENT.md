@@ -42,7 +42,7 @@ The standard OAuth access token expires at **03:30 AM Asia/Kolkata time** (the s
 Upstox also documents a separate one-year Analytics Token, but it is strictly read-only and limited to supported GET APIs. It cannot be used for trading operations. Do not substitute it for a user's OAuth token or distribute it to app users; follow Upstox's credential and exchange-data terms.
 ## 3. Indian paper-account starting balance
 
-The existing product specification sets a ₹10,00,000 virtual starting capital. Set this server-side before enabling accounts:
+The existing product specification sets a ₹10,00,000 virtual starting capital. Cash equities and long-option paper orders share the same `indianPaperAccounts/{uid}` document and `cashPaise` balance; equity holdings remain in `positions`, while derivative holdings are isolated in `derivativePositions`. The authenticated `GET /paper/account` endpoint initializes this shared account once. Derivative orders are stored separately in `indianDerivativeOrders`. No second derivative starting balance is created. Set the starting capital server-side before enabling accounts:
 
 ```sh
 INDIAN_PAPER_STARTING_CASH_PAISE=100000000
@@ -56,7 +56,7 @@ Deploy `market-gateway/` as a separate Cloud Run service with Node.js 20. Config
 - `UPSTOX_TOKEN_ENCRYPTION_KEY`: the same Secret Manager value as the Firebase Function.
 - `ALLOWED_ORIGINS=https://zenuraignite.com` (use the exact production origin, no wildcard).
 - `INDIAN_PAPER_STARTING_CASH_PAISE=100000000`.
-- A dedicated service account with only the required Firestore access to `upstoxConnections`, `indianMarketWatchlists`, `indianPaperAccounts`, and `indianPaperOrders`.
+- A dedicated service account with only the required Firestore access to `upstoxConnections`, `indianMarketWatchlists`, `indianPaperAccounts`, `indianPaperOrders`, and `indianDerivativeOrders`.
 - Public HTTPS ingress so browser requests can reach the service; the gateway itself validates Firebase ID tokens on protected endpoints. Do not disable application authentication.
 
 After deployment, set the exact Cloud Run HTTPS URL in the `market-gateway-url` meta tag in `markets/stocks/index.html`. Do not point the frontend at a placeholder or unverified URL.

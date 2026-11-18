@@ -54,9 +54,8 @@ async function executeLongOptionBuyTransaction({
        account.version>=Number.MAX_SAFE_INTEGER||
        (account.reservedMarginPaise!==undefined&&account.reservedMarginPaise!==0))
       fail("Derivative paper account contains invalid or unsupported balance data.",409);
-    const positions=account.positions&&typeof account.positions==="object"&&!Array.isArray(account.positions)?{...account.positions}:null;
-    if(!positions)fail("Derivative paper account positions are invalid.",409);
-    const priorPosition=positions[contract.instrumentKey]||{netQuantity:0,averagePricePaise:0};
+    const derivativePositions=account.derivativePositions&&typeof account.derivativePositions==="object"&&!Array.isArray(account.derivativePositions)?{...account.derivativePositions}:{};
+    const priorPosition=derivativePositions[contract.instrumentKey]||{netQuantity:0,averagePricePaise:0};
     if(priorPosition.instrumentType&&priorPosition.instrumentType!==contract.instrumentType)
       fail("Stored derivative position type does not match the verified contract.",409);
     const fill=applyDerivativeFill({
@@ -66,12 +65,12 @@ async function executeLongOptionBuyTransaction({
     const cashPaise=account.cashPaise+fill.cashDeltaPaise;
     if(!Number.isSafeInteger(cashPaise)||cashPaise<0)
       fail("Insufficient derivative paper cash for this option premium.",409);
-    if(fill.netQuantity>0)positions[contract.instrumentKey]={
+    if(fill.netQuantity>0)derivativePositions[contract.instrumentKey]={
       instrumentType:contract.instrumentType,netQuantity:fill.netQuantity,
       averagePricePaise:fill.averagePricePaise,exchange:contract.exchange,
       segment:contract.segment,expiry:contract.expiry,lotSize:contract.lotSize
     };
-    else delete positions[contract.instrumentKey];
+    else delete derivativePositions[contract.instrumentKey];
     const realizedPnlPaise=(account.realizedPnlPaise??0)+fill.realizedPnlPaise;
     if(!Number.isSafeInteger(realizedPnlPaise))fail("Derivative realized P&L exceeds safe calculation limits.",409);
     const storedOrder={
@@ -88,7 +87,7 @@ async function executeLongOptionBuyTransaction({
     };
     tx.create(orderRef,storedOrder);
     tx.update(accountRef,{
-      cashPaise,positions,realizedPnlPaise,reservedMarginPaise:0,
+      cashPaise,derivativePositions,realizedPnlPaise,reservedMarginPaise:0,
       updatedAt:serverTimestamp(),version:account.version+1
     });
     result={orderId,order:storedOrder,cashPaise,realizedPnlPaise,idempotentReplay:false,simulationOnly:true};

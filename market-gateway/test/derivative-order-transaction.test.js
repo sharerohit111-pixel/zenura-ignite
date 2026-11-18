@@ -15,7 +15,7 @@ const instrument={
  strike_price:25000,lot_size:65,tick_size:0.05
 };
 const quote={instrumentKey:instrument.instrument_key,pricePaise:1250,observedAtMs:now-1000};
-const initial={cashPaise:1000000,realizedPnlPaise:0,reservedMarginPaise:0,positions:{},version:1};
+const initial={cashPaise:1000000,realizedPnlPaise:0,reservedMarginPaise:0,positions:{},derivativePositions:{},version:1};
 function setup({account=initial,priorOrder=null,accountExists=true}={}){
  const writes=[];
  const snaps={
@@ -40,10 +40,18 @@ test("atomically records a long option BUY and debits premium",async()=>{
  assert.equal(writes[0][2].grossPaise,81250);
  assert.equal(writes[1][0],"update");
  assert.equal(writes[1][2].cashPaise,918750);
- assert.equal(writes[1][2].positions[instrument.instrument_key].netQuantity,65);
+ assert.equal(writes[1][2].derivativePositions[instrument.instrument_key].netQuantity,65);
  assert.equal(writes[1][2].version,2);
  assert.equal(r.simulationOnly,true);
  assert.equal(r.idempotentReplay,false);
+});
+test("shares the equity account cash while keeping equity and derivative holdings separate",async()=>{
+ const equityPosition={"NSE_EQ|RELIANCE":{quantity:3,averagePricePaise:250000}};
+ const {common,writes}=setup({account:{...initial,positions:equityPosition}});
+ await executeLongOptionBuyTransaction(common);
+ assert.deepEqual(writes[1][2].positions,equityPosition);
+ assert.equal(writes[1][2].cashPaise,918750);
+ assert.equal(writes[1][2].derivativePositions[instrument.instrument_key].netQuantity,65);
 });
 test("replays matching idempotency key without a second debit",async()=>{
  const prior={requestFingerprint:require("../lib/order-idempotency").makeOrderFingerprint({
