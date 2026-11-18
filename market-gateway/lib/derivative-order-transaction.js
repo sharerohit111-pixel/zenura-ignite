@@ -4,6 +4,7 @@ const {validateDerivativeContract}=require("./derivative-contract");
 const {applyDerivativeFill}=require("./derivative-position");
 const {makeOrderId,makeOrderFingerprint,assertIdempotentReplay}=require("./order-idempotency");
 const {calculateLongOptionTradeCharges}=require("./trading-charges");
+const {readReplayAccountState}=require("./paper-replay-account");
 
 const MAX_QUOTE_AGE_MS=15_000;
 
@@ -44,8 +45,8 @@ async function executeLongOptionTransaction({
     if(existingOrder.exists){
       const prior=existingOrder.data();
       assertIdempotentReplay(prior,requestFingerprint);
-      const current=accountSnap.exists?accountSnap.data():{};
-      result={orderId,order:prior,cashPaise:current.cashPaise,realizedPnlPaise:current.realizedPnlPaise??0,idempotentReplay:true,simulationOnly:true};
+      const current=readReplayAccountState(accountSnap);
+      result={orderId,order:prior,cashPaise:current.cashPaise,realizedPnlPaise:current.realizedPnlPaise,idempotentReplay:true,simulationOnly:true};
       return;
     }
     if(!accountSnap.exists)fail("Derivative paper account is not initialized.",409);
