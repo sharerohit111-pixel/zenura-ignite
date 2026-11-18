@@ -23,7 +23,7 @@ async function clean(refs){
 }
 integrationTest("Firestore emulator serializes concurrent duplicate orders into one fill",async()=>{
  const id=crypto.randomUUID(),uid="emulator-user-"+id;
- const common=makeOrder({uid,accountId:"acct-"+id,orderId:"order-"+id,fingerprint:"same-fingerprint"});
+ const common=makeOrder({uid,accountId:uid,orderId:"order-"+id,fingerprint:"same-fingerprint"});
  await seedAccount(common.accountRef,10000);
  try{
   const results=await Promise.all([executePaperOrderTransaction(common),executePaperOrderTransaction(common)]);
@@ -37,8 +37,8 @@ integrationTest("Firestore emulator serializes concurrent duplicate orders into 
 
 integrationTest("Firestore emulator prevents concurrent orders from overspending one account",async()=>{
  const id=crypto.randomUUID(),uid="emulator-user-"+id,accountId="acct-"+id;
- const first=makeOrder({uid,accountId,orderId:"order-a-"+id,fingerprint:"fingerprint-a",instrumentKey:"NSE_EQ|AAA",pricePaise:7000});
- const second=makeOrder({uid,accountId,orderId:"order-b-"+id,fingerprint:"fingerprint-b",instrumentKey:"NSE_EQ|BBB",pricePaise:7000});
+ const first=makeOrder({uid,accountId:uid,orderId:"order-a-"+id,fingerprint:"fingerprint-a",instrumentKey:"NSE_EQ|AAA",pricePaise:7000});
+ const second=makeOrder({uid,accountId:uid,orderId:"order-b-"+id,fingerprint:"fingerprint-b",instrumentKey:"NSE_EQ|BBB",pricePaise:7000});
  await seedAccount(first.accountRef,10000);
  try{
   const results=await Promise.allSettled([executePaperOrderTransaction(first),executePaperOrderTransaction(second)]);
@@ -53,8 +53,8 @@ integrationTest("Firestore emulator prevents concurrent orders from overspending
 
 integrationTest("Firestore emulator keeps paper accounts isolated by user document",async()=>{
  const id=crypto.randomUUID();
- const a=makeOrder({uid:"user-a-"+id,accountId:"account-a-"+id,orderId:"order-a-"+id,fingerprint:"fingerprint-a",pricePaise:2500});
- const b=makeOrder({uid:"user-b-"+id,accountId:"account-b-"+id,orderId:"order-b-"+id,fingerprint:"fingerprint-b",pricePaise:4000});
+ const a=makeOrder({uid:"user-a-"+id,accountId:"user-a-"+id,orderId:"order-a-"+id,fingerprint:"fingerprint-a",pricePaise:2500});
+ const b=makeOrder({uid:"user-b-"+id,accountId:"user-b-"+id,orderId:"order-b-"+id,fingerprint:"fingerprint-b",pricePaise:4000});
  await Promise.all([seedAccount(a.accountRef,10000),seedAccount(b.accountRef,10000)]);
  try{
   await Promise.all([executePaperOrderTransaction(a),executePaperOrderTransaction(b)]);
