@@ -9,7 +9,7 @@
   const list=document.getElementById('instrument-list');
   const gateway=(document.querySelector('meta[name="market-gateway-url"]')?.content||'').trim().replace(/\/+$/,'');
   const labels={indices:'Indices',equities:'Equities',futures:'Futures',options:'Options'};
-  let activeList='indices',items=[],selected=null,streamAbort=null,debounce=null,reconnectTimer=null,staleTimer=null,reconnectAttempt=0,lastQuoteText='';
+  let activeList='indices',items=[],selected=null,streamAbort=null,debounce=null,reconnectTimer=null,staleTimer=null,reconnectAttempt=0,lastQuoteText='',instrumentLoadSeq=0;
   function clearFeedTimers(){if(reconnectTimer){clearTimeout(reconnectTimer);reconnectTimer=null;}if(staleTimer){clearTimeout(staleTimer);staleTimer=null;}}
   function message(text){list.textContent='';const el=document.createElement('div');el.className='empty';el.textContent=text;list.append(el);}
   function escapeText(v){return String(v??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
@@ -24,15 +24,18 @@
     });
   }
   async function loadInstruments(){
+    const request=++instrumentLoadSeq,requestedList=activeList,requestedQuery=search.value.trim();
     if(!gateway){message('Market gateway URL is not configured yet. Deploy Cloud Run and set the market-gateway-url meta value.');return;}
     message('Loading official Upstox instrument master…');
-    const params=new URLSearchParams({kind:activeList,limit:'100'});
-    if(search.value.trim())params.set('q',search.value.trim());
+    const params=new URLSearchParams({kind:requestedList,limit:'100'});
+    if(requestedQuery)params.set('q',requestedQuery);
     try{
       const response=await fetch(gateway+'/instruments?'+params.toString(),{headers:{Accept:'application/json'}});
       if(!response.ok)throw new Error('Instrument service unavailable ('+response.status+').');
-      const data=await response.json();items=data.results||[];render(items);
-    }catch(error){message(error.message||'Could not load instruments.');}
+      const data=await response.json();
+      if(request!==instrumentLoadSeq||requestedList!==activeList||requestedQuery!==search.value.trim())return;
+      items=data.results||[];render(items);
+    }catch(error){if(request===instrumentLoadSeq&&requestedList===activeList&&requestedQuery===search.value.trim())message(error.message||'Could not load instruments.');}
   }
   const watchAdd=document.getElementById('watchlist-add'),watchStatus=document.getElementById('watchlist-status'),watchBody=document.getElementById('saved-watchlist'),watchSelect=document.getElementById('watchlist-select');
   let savedWatchlist=[],watchQuotes=new Map(),activeWatchlist=watchSelect.value,watchlistLoadSeq=0,watchQuoteSeq=0;
