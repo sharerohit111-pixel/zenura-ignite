@@ -4,11 +4,11 @@ const assert=require("node:assert/strict");
 const {calculateOptionExpiryPayoff}=require("../lib/option-expiry-payoff");
 test("long call computes expiry intrinsic value, premium and break-even",()=>{
  const r=calculateOptionExpiryPayoff({optionType:"CE",strikePricePaise:2500000,premiumPaise:10000,underlyingPricePaise:2530000,lots:2,lotSize:65});
- assert.equal(r.quantity,130);assert.equal(r.intrinsicTotalPaise,390000);assert.equal(r.premiumTotalPaise,130000);assert.equal(r.grossPnlPaise,260000);assert.equal(r.breakEvenPricePaise,2510000);
+ assert.equal(r.quantity,130);assert.equal(r.intrinsicTotalPaise,3900000);assert.equal(r.premiumTotalPaise,1300000);assert.equal(r.grossPnlPaise,2600000);assert.equal(r.breakEvenPricePaise,2510000);
 });
 test("long put computes expiry intrinsic value and break-even",()=>{
  const r=calculateOptionExpiryPayoff({optionType:"PE",strikePricePaise:2500000,premiumPaise:12000,underlyingPricePaise:2470000,lots:1,lotSize:65});
- assert.equal(r.intrinsicTotalPaise,195000);assert.equal(r.premiumTotalPaise,78000);assert.equal(r.grossPnlPaise,117000);assert.equal(r.breakEvenPricePaise,2488000);
+ assert.equal(r.intrinsicTotalPaise,1950000);assert.equal(r.premiumTotalPaise,780000);assert.equal(r.grossPnlPaise,1170000);assert.equal(r.breakEvenPricePaise,2488000);
 });
 test("out-of-money options expire with zero intrinsic value",()=>{
  for(const [optionType,underlyingPricePaise] of [["CE",2490000],["PE",2510000]]){
