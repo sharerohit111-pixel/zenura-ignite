@@ -33,6 +33,37 @@
       const data=await response.json();items=data.results||[];render(items);
     }catch(error){message(error.message||'Could not load instruments.');}
   }
+  const optionExpiry=document.getElementById('option-expiry');
+  const optionButton=document.getElementById('load-option-chain');
+  const optionStatus=document.getElementById('option-status');
+  const optionBody=document.getElementById('option-chain-body');
+  function cellValue(value){return value===null||value===undefined?'—':Number.isFinite(Number(value))?Number(value).toLocaleString('en-IN',{maximumFractionDigits:2}):String(value);}
+  function renderOptionChain(rows){
+    optionBody.textContent='';
+    if(!rows.length){const tr=document.createElement('tr'),td=document.createElement('td');td.colSpan=11;td.className='option-empty';td.textContent='No option contracts returned for this expiry.';tr.append(td);optionBody.append(tr);return;}
+    rows.forEach(row=>{
+      const ce=row.call_options||{},pe=row.put_options||{},cm=ce.market_data||{},pm=pe.market_data||{},cg=ce.option_greeks||{},pg=pe.option_greeks||{};
+      const tr=document.createElement('tr');
+      [cm.ltp,cm.oi,cm.volume,cg.iv,cg.delta,row.strike_price,pg.delta,pg.iv,pm.volume,pm.oi,pm.ltp].forEach((v,i)=>{const td=document.createElement('td');td.textContent=cellValue(v);if(i===5)td.className='strike-cell';tr.append(td);});
+      optionBody.append(tr);
+    });
+  }
+  async function loadOptionChain(){
+    if(!selected){optionStatus.textContent='Select an underlying instrument first';return;}
+    if(!gateway||!window.ZENURA_MARKET_CONNECTOR?.getIdToken){optionStatus.textContent='Sign in and configure the market gateway first';return;}
+    optionButton.disabled=true;optionStatus.textContent='Loading official Upstox option chain…';
+    try{
+      const token=await window.ZENURA_MARKET_CONNECTOR.getIdToken();
+      const params=new URLSearchParams({instrument_key:selected.instrument_key,expiry_date:optionExpiry.value});
+      const response=await fetch(gateway+'/option-chain?'+params,{headers:{Authorization:'Bearer '+token,Accept:'application/json'}});
+      if(!response.ok)throw new Error('Option chain unavailable ('+response.status+').');
+      const payload=await response.json();renderOptionChain(payload.data||[]);
+      optionStatus.textContent='Provider response · '+(payload.data?.length||0)+' strikes · '+optionExpiry.value;
+    }catch(error){optionStatus.textContent=error.message||'Option chain request failed.';}
+    finally{optionButton.disabled=false;}
+  }
+  optionButton.addEventListener('click',loadOptionChain);
+
   const chart=document.getElementById('market-chart');
   const chartStatus=document.getElementById('chart-status');
   const timeframeButtons=[...document.querySelectorAll('[data-timeframe]')];
