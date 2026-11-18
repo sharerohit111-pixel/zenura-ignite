@@ -124,3 +124,22 @@ test("SELL beyond available holdings rejects transaction before any database wri
  await assert.rejects(executePaperOrderTransaction(common),{status:409});
  assert.equal(writes.length,0);
 });
+
+test("closing the full position removes its instrument entry",async()=>{
+ const initial={cashPaise:10000,realizedPnlPaise:0,positions:{"NSE_EQ|AAA":{quantity:2,averagePricePaise:1000}},version:7};
+ const {common,writes}=setup(undefined,initial);
+ common.order.side="SELL";common.order.quantity=2;common.pricePaise=1100;
+ await executePaperOrderTransaction(common);
+ assert.equal(Object.hasOwn(writes[1][2].positions,"NSE_EQ|AAA"),false);
+ assert.equal(writes[1][2].cashPaise,12200);
+ assert.equal(writes[1][2].realizedPnlPaise,200);
+});
+test("replayed order reports the current account balance without applying a second fill",async()=>{
+ const prior={requestFingerprint:"fingerprint",status:"FILLED",grossPaise:2000};
+ const {common,writes}=setup(prior,{cashPaise:6500,realizedPnlPaise:250,positions:{},version:3});
+ const result=await executePaperOrderTransaction(common);
+ assert.equal(writes.length,0);
+ assert.equal(result.meta.cashPaise,6500);
+ assert.equal(result.meta.realizedPnlTotalPaise,250);
+ assert.equal(result.meta.idempotentReplay,true);
+});
