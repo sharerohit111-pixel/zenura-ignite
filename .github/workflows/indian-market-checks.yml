@@ -37,6 +37,8 @@ jobs:
           node-version: "20"
       - name: Check browser module syntax
         run: node --check markets/stocks/stocks.js
+      - name: Check email authentication module syntax
+        run: node --input-type=module --check < markets/stocks/email-auth.js
       - name: Check gateway syntax
         run: node --check market-gateway/server.js
       - name: Validate gateway package manifest
