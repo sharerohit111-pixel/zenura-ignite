@@ -66,3 +66,45 @@ integrationTest("Firestore emulator keeps paper accounts isolated by user docume
  }finally{await clean([a.accountRef,a.orderRef,b.accountRef,b.orderRef]);}
 });
 
+
+
+integrationTest("Firestore emulator serializes concurrent SELL orders and prevents overselling",async()=>{
+ const id=crypto.randomUUID(),uid="emulator-user-"+id;
+ const first=makeOrder({uid,accountId:uid,orderId:"sell-a-"+id,fingerprint:"sell-fingerprint-a",side:"SELL",pricePaise:1000});
+ const second=makeOrder({uid,accountId:uid,orderId:"sell-b-"+id,fingerprint:"sell-fingerprint-b",side:"SELL",pricePaise:1000});
+ await seedAccount(first.accountRef,10000,{"NSE_EQ|AAA":{quantity:1,averagePricePaise:800}});
+ try{
+  const results=await Promise.allSettled([executePaperOrderTransaction(first),executePaperOrderTransaction(second)]);
+  const account=await first.accountRef.get();
+  const orders=await Promise.all([first.orderRef.get(),second.orderRef.get()]);
+  assert.equal(results.filter(x=>x.status==="fulfilled").length,1);
+  assert.equal(results.filter(x=>x.status==="rejected"&&x.reason.status===409).length,1);
+  assert.equal(account.data().cashPaise,11000);
+  assert.equal(account.data().realizedPnlPaise,200);
+  assert.equal(account.data().positions["NSE_EQ|AAA"],undefined);
+  assert.equal(orders.filter(x=>x.exists).length,1);
+ }finally{await clean([first.accountRef,first.orderRef,second.orderRef]);}
+});
+
+integrationTest("Firestore emulator rejects a reused order key with a different fingerprint",async()=>{
+ const id=crypto.randomUUID(),uid="emulator-user-"+id;
+ const original=makeOrder({uid,accountId:uid,orderId:"fingerprint-"+id,fingerprint:"original-fingerprint"});
+ await seedAccount(original.accountRef,10000);
+ try{
+  await executePaperOrderTransaction(original);
+  const replay={...original,requestFingerprint:"different-fingerprint",order:{...original.order,requestFingerprint:"different-fingerprint"}};
+  await assert.rejects(executePaperOrderTransaction(replay),error=>error.status===409);
+  const account=await original.accountRef.get();
+  assert.equal(account.data().cashPaise,9000);
+ }finally{await clean([original.accountRef,original.orderRef]);}
+});
+
+integrationTest("Firestore emulator rejects paper orders when the UID account is missing",async()=>{
+ const id=crypto.randomUUID(),uid="emulator-user-"+id;
+ const order=makeOrder({uid,accountId:uid,orderId:"missing-"+id,fingerprint:"missing-account-fingerprint"});
+ try{
+  await assert.rejects(executePaperOrderTransaction(order),error=>error.status===409);
+  const stored=await order.orderRef.get();
+  assert.equal(stored.exists,false);
+ }finally{await clean([order.accountRef,order.orderRef]);}
+});
