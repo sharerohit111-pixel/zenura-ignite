@@ -18,6 +18,10 @@ const PORT=process.env.PORT||8080;
 const ENC_KEY=process.env.UPSTOX_TOKEN_ENCRYPTION_KEY;
 const MAX_KEYS=Number(process.env.MAX_INSTRUMENT_KEYS||100);
 const ALLOWED_ORIGINS=(process.env.ALLOWED_ORIGINS||"").split(",").map(x=>x.trim()).filter(Boolean);
+// Bound one-shot provider calls so stalled upstream requests cannot pin a Cloud Run request indefinitely.
+function fetchProvider(url,options={},timeoutMs=15000){
+  return fetch(url,{...options,signal:AbortSignal.timeout(timeoutMs)});
+}
 app.use((req,res,next)=>{
   const origin=req.get("origin");
   if(origin&&ALLOWED_ORIGINS.includes(origin)){
@@ -34,7 +38,7 @@ let FeedResponse;
 let instrumentCache=[];
 let instrumentCacheUpdatedAt=0;
 async function refreshInstrumentCache(){
-  const response=await fetch(INSTRUMENTS_URL,{headers:{Accept:"application/gzip"}});
+  const response=await fetchProvider(INSTRUMENTS_URL,{headers:{Accept:"application/gzip"}});
   if(!response.ok) throw new Error("Upstox instrument master download failed: "+response.status);
   const compressed=Buffer.from(await response.arrayBuffer());
   const parsed=JSON.parse(gunzipSync(compressed).toString("utf8"));
@@ -141,7 +145,7 @@ app.get("/candles",async(req,res)=>{
     const pathParts=[encodedKey,unit,String(interval),encodeURIComponent(toDate)];
     if(fromDate)pathParts.push(encodeURIComponent(fromDate));
     const providerUrl="https://api.upstox.com/v3/historical-candle/"+pathParts.join("/");
-    const upstream=await fetch(providerUrl,{headers:{Authorization:"Bearer "+accessToken,Accept:"application/json"}});
+    const upstream=await fetchProvider(providerUrl,{headers:{Authorization:"Bearer "+accessToken,Accept:"application/json"}});
     const payload=await upstream.json().catch(()=>null);
     if(!upstream.ok){
       console.warn("Historical candle provider returned",upstream.status);
@@ -176,7 +180,7 @@ app.get("/option-chain",async(req,res)=>{
       return res.status(403).json({error:"Upstox token expired. Reconnect your account."});
     const accessToken=decryptToken(data.tokenCiphertext);
     const params=new URLSearchParams({instrument_key:instrumentKey,expiry_date:expiry});
-    const upstream=await fetch("https://api.upstox.com/v2/option/chain?"+params.toString(),{headers:{Authorization:"Bearer "+accessToken,Accept:"application/json"}});
+    const upstream=await fetchProvider("https://api.upstox.com/v2/option/chain?"+params.toString(),{headers:{Authorization:"Bearer "+accessToken,Accept:"application/json"}});
     const payload=await upstream.json().catch(()=>null);
     if(!upstream.ok){
       console.warn("Option chain provider returned",upstream.status);
@@ -238,7 +242,7 @@ app.post("/paper/orders",async(req,res)=>{
     if(connectionData.status!=="connected"||!connectionData.expiresAt||connectionData.expiresAt.toMillis()<=Date.now())return res.status(403).json({error:"Upstox token expired. Reconnect your account."});
     const accessToken=decryptToken(connectionData.tokenCiphertext);
     const quoteUrl="https://api.upstox.com/v3/market-quote/quotes?"+new URLSearchParams({instrument_key:instrumentKey});
-    const quoteResponse=await fetch(quoteUrl,{headers:{Authorization:"Bearer "+accessToken,Accept:"application/json"}});
+    const quoteResponse=await fetchProvider(quoteUrl,{headers:{Authorization:"Bearer "+accessToken,Accept:"application/json"}});
     const quotePayload=await quoteResponse.json().catch(()=>null);
     if(!quoteResponse.ok)return res.status(502).json({error:"A current Upstox full quote could not be verified.",providerStatus:quoteResponse.status});
     const quoteEntry=Object.values(quotePayload?.data||{}).find(x=>x&&x.instrument_token===instrumentKey);
@@ -284,7 +288,7 @@ app.get("/paper/portfolio",async(req,res)=>{
     if(connectionData.status!=="connected"||!connectionData.expiresAt||connectionData.expiresAt.toMillis()<=Date.now())return res.status(403).json({error:"Upstox token expired. Reconnect your account."});
     const accessToken=decryptToken(connectionData.tokenCiphertext),keys=positions.map(([key])=>key);
     const quoteUrl="https://api.upstox.com/v3/market-quote/quotes?"+new URLSearchParams({instrument_key:keys.join(",")});
-    const quoteResponse=await fetch(quoteUrl,{headers:{Authorization:"Bearer "+accessToken,Accept:"application/json"}});
+    const quoteResponse=await fetchProvider(quoteUrl,{headers:{Authorization:"Bearer "+accessToken,Accept:"application/json"}});
     const quotePayload=await quoteResponse.json().catch(()=>null);
     if(!quoteResponse.ok)return res.status(502).json({error:"Portfolio market valuation could not be retrieved.",providerStatus:quoteResponse.status});
     const quotes=Object.values(quotePayload?.data||{}),now=Date.now(),valued=[];
@@ -360,7 +364,7 @@ app.get("/watchlist/quotes",async(req,res)=>{
     const data=connection.data();
     if(data.status!=="connected"||!data.expiresAt||data.expiresAt.toMillis()<=Date.now())return res.status(403).json({error:"Upstox token expired. Reconnect your account."});
     const accessToken=decryptToken(data.tokenCiphertext),quoteUrl="https://api.upstox.com/v3/market-quote/quotes?"+new URLSearchParams({instrument_key:keys.join(",")});
-    const upstream=await fetch(quoteUrl,{headers:{Authorization:"Bearer "+accessToken,Accept:"application/json"}}),payload=await upstream.json().catch(()=>null);
+    const upstream=await fetchProvider(quoteUrl,{headers:{Authorization:"Bearer "+accessToken,Accept:"application/json"}}),payload=await upstream.json().catch(()=>null);
     if(!upstream.ok)return res.status(502).json({error:"Watchlist quotes could not be retrieved.",providerStatus:upstream.status});
     const byKey=new Map(Object.values(payload?.data||{}).filter(q=>q&&typeof q.instrument_token==="string").map(q=>[q.instrument_token,q])),now=Date.now();
     const quotes=keys.map(instrumentKey=>{
@@ -401,7 +405,7 @@ app.post("/stream",async(req,res)=>{
     if(data.status!=="connected"||!data.expiresAt||data.expiresAt.toMillis()<=Date.now())
       return res.status(403).json({error:"Upstox token expired. Reconnect your account."});
     const accessToken=decryptToken(data.tokenCiphertext);
-    const authResponse=await fetch("https://api.upstox.com/v3/feed/market-data-feed/authorize",{
+    const authResponse=await fetchProvider("https://api.upstox.com/v3/feed/market-data-feed/authorize",{
       headers:{Authorization:"Bearer "+accessToken,Accept:"application/json"}
     });
     const authData=await authResponse.json().catch(()=>({}));
