@@ -20,13 +20,13 @@ Use Upstox OAuth 2.0 and Market Data Feed V3. The official V3 feed is WebSocket 
 1. Create an Upstox Developer application and configure the exact OAuth redirect URL.
 2. Store client secret and access/refresh tokens only in Firebase Secret Manager / server-side storage. Never put them in GitHub Pages JavaScript, HTML, localStorage, or public Firebase documents.
 3. Add server-side OAuth start/callback endpoints with state + PKCE/CSRF validation and token expiry/refresh handling.
-4. Add an authenticated market gateway that owns the Upstox WebSocket connection, decodes the V3 Protobuf messages, applies subscription limits, and streams only authorized data to signed-in app sessions.
+4. Add an authenticated market gateway (prefer a persistent Cloud Run service for long-lived WebSocket sessions; do not rely on short-lived request handlers as the socket owner) that owns the Upstox WebSocket connection, decodes the V3 Protobuf messages, applies subscription limits, and streams only authorized data to signed-in app sessions.
 5. Implement instrument-master ingestion, quote snapshots, historical candles, and option-chain retrieval.
 6. Build the independent paper-trading ledger using verified provider quotes, lot sizes, tick sizes, expiry and market-session metadata. Reject orders when quote freshness or contract metadata cannot be verified.
 7. Verify provider account entitlements and any required exchange/display/redistribution permissions before exposing market data to other users.
 
 ## Current implementation status
-This branch adds the mode selector and a non-misleading Indian-market UI shell only. It does not claim to provide live NSE/BSE data or executable paper orders yet. The current repository is GitHub Pages for static files; GitHub Pages cannot host the secure OAuth callback or WebSocket market gateway. Firebase Functions / another server runtime must host those endpoints. Upstox app credentials and account authorization have not been provided, so live feed integration cannot be activated yet.
+This branch adds the mode selector, Indian-market UI shell, and a Google sign-in → Firebase callable → Upstox OAuth launch flow on `/markets/stocks/connect.js`. The market page deliberately uses the root Firebase web config (`zenura-ignite-technologies`) rather than the legacy Crypto app's separate Firebase project. It does not claim to provide live NSE/BSE data or executable paper orders yet. The current repository is GitHub Pages for static files; GitHub Pages cannot host the secure OAuth callback or WebSocket market gateway. Firebase Functions / another server runtime must host those endpoints. Upstox app credentials and account authorization have not been provided, so live feed integration cannot be activated yet.
 
 ## OAuth backend added on this branch
 The Functions module `functions/indian-market.js` adds:
@@ -48,4 +48,4 @@ Before deploying these functions, configure all four secrets:
 Set the Upstox Developer app's redirect URI to the exact deployed callback URL. Then deploy Functions. Do not paste secrets into GitHub, browser JavaScript, or chat. The OAuth callback redirects to the app's stock-market page after successful authorization.
 
 ### Not yet implemented
-OAuth token exchange and encrypted storage are the first backend slice only. The V3 WebSocket gateway, Protobuf decoder, instrument-master ingestion, live quote fan-out, historical candles, option-chain proxy, and verified-quote paper order engine remain subsequent tasks. The status callable intentionally returns `feedReady:false` until those components are built and tested.
+The frontend sign-in/authorization launcher and OAuth token exchange/encrypted storage are the first integration slice only. The V3 WebSocket gateway, Protobuf decoder, instrument-master ingestion, live quote fan-out, historical candles, option-chain proxy, and verified-quote paper order engine remain subsequent tasks. The status callable intentionally returns `feedReady:false` until those components are built and tested.
