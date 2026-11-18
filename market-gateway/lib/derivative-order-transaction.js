@@ -62,10 +62,27 @@ async function executeLongOptionTransaction({
         Array.isArray(account.derivativePositions)))
       fail("Derivative paper account contains malformed position data.",409);
     const derivativePositions=account.derivativePositions===undefined?{}:{...account.derivativePositions};
+    let openPositionCount=0;
+    // Validate the entire stored map: the portfolio endpoint rejects malformed
+    // records, so an order must never preserve one and create an unvaluatable account.
+    for(const [storedKey,stored] of Object.entries(derivativePositions)){
+      if(!storedKey||!stored||typeof stored!=="object"||Array.isArray(stored)||
+         !["CE","PE"].includes(stored.instrumentType)||
+         !Number.isSafeInteger(stored.netQuantity)||stored.netQuantity<0||stored.netQuantity>1000000||
+         !Number.isSafeInteger(stored.averagePricePaise)||stored.averagePricePaise<0||
+         (stored.netQuantity>0&&stored.averagePricePaise<1)||
+         (stored.netQuantity===0&&stored.averagePricePaise!==0))
+        fail("Stored derivative position map contains a malformed record.",409);
+      const storedCostBasis=stored.costBasisPaise===undefined
+        ?stored.netQuantity*stored.averagePricePaise:stored.costBasisPaise;
+      if(!Number.isSafeInteger(storedCostBasis)||storedCostBasis<0||
+         (stored.netQuantity>0&&storedCostBasis<1)||
+         (stored.netQuantity===0&&storedCostBasis!==0)||
+         (stored.netQuantity>0&&Math.round(storedCostBasis/stored.netQuantity)!==stored.averagePricePaise))
+        fail("Stored derivative position map contains an invalid cost basis.",409);
+      openPositionCount+=stored.netQuantity>0?1:0;
+    }
     const hasStoredPosition=Object.prototype.hasOwnProperty.call(derivativePositions,contract.instrumentKey);
-    const openPositionCount=Object.values(derivativePositions).filter(position=>
-      position&&Number.isSafeInteger(position.netQuantity)&&position.netQuantity>0
-    ).length;
     // Match the derivative portfolio's 50-open-position valuation limit at order entry.
     if(side==="BUY"&&!hasStoredPosition&&openPositionCount>=50)
       fail("Derivative portfolio is limited to 50 open positions. Close an existing position before opening another.",409);
