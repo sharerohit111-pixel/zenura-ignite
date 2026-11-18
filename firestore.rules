@@ -23,6 +23,7 @@ service cloud.firestore {
     match /upstoxConnections/{uid} { allow read, write: if false; }
 
     // Indian paper-trading balances and orders are server-only; clients use authenticated gateway APIs.
+    match /indianMarketWatchlists/{uid} { allow read, write: if false; }
     match /indianPaperAccounts/{uid} { allow read, write: if false; }
     match /indianPaperOrders/{orderId} { allow read, write: if false; }
 
