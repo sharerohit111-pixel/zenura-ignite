@@ -5,7 +5,7 @@ const protobuf=require("protobufjs");
 const admin=require("firebase-admin");
 const crypto=require("node:crypto");
 const path=require("node:path");
-const {gunzipSync}=require("node:zlib");
+const {downloadInstrumentMaster}=require("./lib/instrument-master-download");
 const {calculatePaperFill}=require("./lib/paper-math");
 const {WATCHLIST_NAMES,normalizeWatchlists,mergeWatchlistUpdate}=require("./lib/watchlists");
 const {isUuid,makeOrderId,makeOrderFingerprint}=require("./lib/order-idempotency");
@@ -66,8 +66,7 @@ const activeUserStreams=new Map();
 async function refreshInstrumentCache(){
   const response=await fetchProvider(INSTRUMENTS_URL,{headers:{Accept:"application/gzip"}});
   if(!response.ok) throw new Error("Upstox instrument master download failed: "+response.status);
-  const compressed=Buffer.from(await response.arrayBuffer());
-  const parsed=JSON.parse(gunzipSync(compressed).toString("utf8"));
+  const parsed=await downloadInstrumentMaster(response);
   if(!Array.isArray(parsed)||!parsed.length||!parsed.every(x=>x&&typeof x.instrument_key==="string"&&typeof x.segment==="string")) throw new Error("Unexpected Upstox instrument master format");
   instrumentCache=parsed;
   instrumentCacheUpdatedAt=Date.now();
