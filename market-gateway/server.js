@@ -227,7 +227,7 @@ app.get("/paper/account",async(req,res)=>{
     const ref=paperAccountRef(decoded.uid);
     await db.runTransaction(async tx=>{
       const snap=await tx.get(ref);
-      if(!snap.exists)tx.create(ref,{currency:"INR",startingCashPaise:startingCash,cashPaise:startingCash,positions:{},derivativePositions:{},reservedMarginPaise:0,realizedPnlPaise:0,createdAt:admin.firestore.FieldValue.serverTimestamp(),updatedAt:admin.firestore.FieldValue.serverTimestamp(),version:1});else if(snap.data().derivativePositions===undefined)tx.update(ref,{derivativePositions:{},reservedMarginPaise:0,updatedAt:admin.firestore.FieldValue.serverTimestamp()});
+      if(!snap.exists)tx.create(ref,{currency:"INR",startingCashPaise:startingCash,cashPaise:startingCash,positions:{},derivativePositions:{},reservedMarginPaise:0,realizedPnlPaise:0,createdAt:admin.firestore.FieldValue.serverTimestamp(),updatedAt:admin.firestore.FieldValue.serverTimestamp(),version:1});else if(snap.data().derivativePositions===undefined){const patch={derivativePositions:{},updatedAt:admin.firestore.FieldValue.serverTimestamp()};if(snap.data().reservedMarginPaise===undefined)patch.reservedMarginPaise=0;tx.update(ref,patch);}
     });
     const snap=await ref.get(),data=snap.data();
     res.set("Cache-Control","private, no-store");
