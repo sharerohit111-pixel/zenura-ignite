@@ -630,6 +630,15 @@ app.post("/stream",async(req,res)=>{
     streamLeaseId=crypto.randomUUID();
     streamLeaseAcquired=await acquireStreamLease(db,streamUid,streamLeaseId);
     if(!streamLeaseAcquired)return res.status(429).json({error:"A live market stream is already active for this account. Close it before reconnecting."});
+    // The browser may disconnect while Firestore is acquiring the lease. In that
+    // case the close handler ran before streamLeaseAcquired became true, so it
+    // could not release the lease. Release it explicitly instead of leaving a
+    // stale reservation until its TTL expires.
+    if(lifecycle.closed||res.destroyed||res.writableEnded){
+      await releaseStreamLease(db,streamUid,streamLeaseId).catch(()=>{});
+      streamLeaseAcquired=false;
+      return;
+    }
     leaseHeartbeat=createLeaseHeartbeat({
       renew:()=>renewStreamLease(db,streamUid,streamLeaseId),
       onRenewed:()=>{if(res.headersSent&&!lifecycle.closed&&!res.destroyed&&!res.writableEnded)writeSseFrame(res,upstream,formatSseComment("keep-alive"));},
