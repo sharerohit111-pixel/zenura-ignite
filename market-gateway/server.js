@@ -400,7 +400,7 @@ app.post("/stream",async(req,res)=>{
   let closed=false;
   const writeEvent=(event,payload)=>{
     if(closed||res.destroyed||res.writableEnded)return false;
-    return res.write("event: "+event+"\\ndata: "+JSON.stringify(payload)+"\\n\\n");
+    return res.write("event: "+event+"\ndata: "+JSON.stringify(payload)+"\n\n");
   };
   const stop=()=>{
     if(closed)return;
@@ -465,7 +465,7 @@ app.post("/stream",async(req,res)=>{
         if(!res.destroyed&&!res.writableEnded)res.end();
       }
     });
-    heartbeat=setInterval(()=>{if(!closed&&!res.destroyed&&!res.writableEnded)res.write(": keep-alive\\n\\n");},20000);
+    heartbeat=setInterval(()=>{if(!closed&&!res.destroyed&&!res.writableEnded)res.write(": keep-alive\n\n");},20000);
     res.on("close",stop);
   }catch(error){
     if(!res.headersSent)res.status(errorStatus(error)).json({error:error.status?error.message:"Market feed could not be started."});
