@@ -50,6 +50,7 @@
   }
   async function loadOptionChain(){
     if(!selected){optionStatus.textContent='Select an underlying instrument first';return;}
+    if(!['NSE_INDEX','BSE_INDEX','NSE_EQ','BSE_EQ'].includes(selected.segment)){optionStatus.textContent='Option chain requires an NSE/BSE index or cash-equity underlying, not an option or futures contract.';return;}
     if(!gateway||!window.ZENURA_MARKET_CONNECTOR?.getIdToken){optionStatus.textContent='Sign in and configure the market gateway first';return;}
     optionButton.disabled=true;optionStatus.textContent='Loading official Upstox option chain…';
     try{
@@ -106,7 +107,7 @@
   }
   timeframeButtons.forEach(button=>button.addEventListener('click',()=>{activeTimeframe=button.dataset.timeframe;timeframeButtons.forEach(x=>x.classList.toggle('active',x===button));loadCandles();}));
   async function select(item){
-    selected=item;title.textContent=item.trading_symbol||item.name;symbol.textContent=item.instrument_key;price.textContent='—';
+    selected=item;chartRequest++;title.textContent=item.trading_symbol||item.name;symbol.textContent=item.instrument_key;price.textContent='—';
     document.querySelector('.chart-placeholder b').textContent='Waiting for verified live quote';
     document.querySelector('.chart-placeholder span').textContent='Connecting to Upstox V3 feed. Prices will appear only when received from the provider.';
     render(items);
@@ -137,7 +138,7 @@
   }
   tabs.forEach(tab=>tab.addEventListener('click',()=>{
     if(streamAbort){streamAbort.abort();streamAbort=null;}
-    tabs.forEach(x=>x.classList.toggle('active',x===tab));activeList=tab.dataset.list;selected=null;
+    tabs.forEach(x=>x.classList.toggle('active',x===tab));activeList=tab.dataset.list;selected=null;chartRequest++;
     title.textContent='No instrument selected';symbol.textContent='Choose an instrument';price.textContent='—';loadInstruments();
   }));
   search.addEventListener('input',()=>{clearTimeout(debounce);debounce=setTimeout(loadInstruments,250);});
