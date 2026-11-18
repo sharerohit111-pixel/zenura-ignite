@@ -27,3 +27,22 @@ Use Upstox OAuth 2.0 and Market Data Feed V3. The official V3 feed is WebSocket 
 
 ## Current implementation status
 This branch adds the mode selector and a non-misleading Indian-market UI shell only. It does not claim to provide live NSE/BSE data or executable paper orders yet. The current repository is GitHub Pages for static files; GitHub Pages cannot host the secure OAuth callback or WebSocket market gateway. Firebase Functions / another server runtime must host those endpoints. Upstox app credentials and account authorization have not been provided, so live feed integration cannot be activated yet.
+
+## OAuth backend added on this branch
+The Functions module `functions/indian-market.js` adds:
+- Authenticated callable `startUpstoxAuthorization` (creates a short-lived, single-use random OAuth state).
+- HTTPS callback `upstoxOAuthCallback` (exchanges the authorization code server-side and encrypts the access token with AES-256-GCM before storing it in a server-only Firestore collection).
+- Authenticated callable `getIndianMarketConnectionStatus` (reports whether the user's Upstox token is currently valid; it does not claim that the live feed is running).
+- The existing `functions/index.js` exports these functions without changing the existing payment functions.
+
+### Required Firebase Secret Manager setup
+Before deploying these functions, configure all four secrets:
+- `UPSTOX_CLIENT_ID`: client ID from the Upstox Developer app.
+- `UPSTOX_CLIENT_SECRET`: client secret from the same app.
+- `UPSTOX_REDIRECT_URI`: exact registered callback URL for the deployed `upstoxOAuthCallback` function.
+- `UPSTOX_TOKEN_ENCRYPTION_KEY`: base64-encoded 32-byte random key (generate securely; do not commit it).
+
+Set the Upstox Developer app's redirect URI to the exact deployed callback URL. Then deploy Functions. Do not paste secrets into GitHub, browser JavaScript, or chat. The OAuth callback redirects to the app's stock-market page after successful authorization.
+
+### Not yet implemented
+OAuth token exchange and encrypted storage are the first backend slice only. The V3 WebSocket gateway, Protobuf decoder, instrument-master ingestion, live quote fan-out, historical candles, option-chain proxy, and verified-quote paper order engine remain subsequent tasks. The status callable intentionally returns `feedReady:false` until those components are built and tested.
