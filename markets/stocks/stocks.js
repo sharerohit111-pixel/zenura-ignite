@@ -394,7 +394,7 @@
   async function select(item,isReconnect=false){
     clearFeedTimers();
     if(streamAbort){streamAbort.abort();streamAbort=null;}
-    selected=item;resetOptionChain('Underlying changed. Load the option chain for the selected instrument.');if(futuresMarginStatus)futuresMarginStatus.textContent=item.instrument_type==='FUT'?'Selected '+(item.trading_symbol||'futures contract')+'. Request a fresh broker margin preview.':'Select a verified futures contract from the Futures watchlist.';updateFuturesMarginButton();chartRequest++;lastQuoteText='';if(!isReconnect)reconnectAttempt=0;title.textContent=item.trading_symbol||item.name;symbol.textContent=item.instrument_key;price.textContent='—';
+    selected=item;if(!isReconnect)resetOptionChain('Underlying changed. Load the option chain for the selected instrument.');if(futuresMarginStatus)futuresMarginStatus.textContent=item.instrument_type==='FUT'?'Selected '+(item.trading_symbol||'futures contract')+'. Request a fresh broker margin preview.':'Select a verified futures contract from the Futures watchlist.';updateFuturesMarginButton();chartRequest++;lastQuoteText='';if(!isReconnect)reconnectAttempt=0;title.textContent=item.trading_symbol||item.name;symbol.textContent=item.instrument_key;price.textContent='—';
     setFeedStatus('Waiting for verified live quote','Connecting to Upstox V3 feed. Prices will appear only when received from the provider.');
     render(items);updatePaperButtons();renderSavedWatchlist();loadCandles();
     const connector=window.ZENURA_MARKET_CONNECTOR;
