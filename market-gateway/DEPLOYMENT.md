@@ -1,0 +1,71 @@
+# Indian Market deployment runbook
+
+The checked-in Firebase Web App config in `firebase-config.js` identifies the dedicated Indian-market Firebase project as `zenura-ignite-technologies`. The root `.firebaserc` now pins Firebase CLI deployments to that project. The Crypto app's separate Firebase project is not selected by this branch.
+
+## 1. Firebase project and Authentication
+
+1. Confirm the Firebase Console project ID is exactly `zenura-ignite-technologies`.
+2. In Authentication → Sign-in method, enable **Google** and **Email/Password**.
+3. In Authentication → Settings → Authorized domains, add the production website host (for example `zenuraignite.com`) and any deliberate preview host.
+4. Confirm the web app in this project matches the public config in `firebase-config.js`.
+5. Install Firebase CLI, authenticate as a project administrator, then run from repository root:
+
+```sh
+firebase use default
+firebase deploy --only firestore:rules,firestore:indexes,functions
+```
+
+This deploys the repository's existing Premium/Razorpay Functions as well as the new Indian-market callable and callback functions to this project. Review existing production Functions and secrets before deploying; do not deploy if this is not the intended project.
+
+## 2. Upstox OAuth secrets
+
+Create a fresh 32-byte encryption key locally and store it only in Secret Manager:
+
+```sh
+openssl rand -base64 32
+firebase functions:secrets:set UPSTOX_CLIENT_ID
+firebase functions:secrets:set UPSTOX_CLIENT_SECRET
+firebase functions:secrets:set UPSTOX_REDIRECT_URI
+firebase functions:secrets:set UPSTOX_TOKEN_ENCRYPTION_KEY
+```
+
+Set `UPSTOX_REDIRECT_URI` to the exact deployed callback URL:
+
+`https://asia-south1-zenura-ignite-technologies.cloudfunctions.net/upstoxOAuthCallback`
+
+Register that exact URL in the Upstox Developer app. Use the same generated encryption key in the gateway's Secret Manager environment variable. Never commit the key or paste it into browser configuration.
+
+## 3. Indian paper-account starting balance
+
+The existing product specification sets a ₹10,00,000 virtual starting capital. Set this server-side before enabling accounts:
+
+```sh
+INDIAN_PAPER_STARTING_CASH_PAISE=100000000
+```
+
+Do not put this value in client-side code. The gateway deliberately refuses to initialize accounts until the value is explicitly configured.
+
+## 4. Cloud Run gateway
+
+Deploy `market-gateway/` as a separate Cloud Run service with Node.js 20. Configure:
+- `UPSTOX_TOKEN_ENCRYPTION_KEY`: the same Secret Manager value as the Firebase Function.
+- `ALLOWED_ORIGINS=https://zenuraignite.com` (use the exact production origin, no wildcard).
+- `INDIAN_PAPER_STARTING_CASH_PAISE=100000000`.
+- A dedicated service account with only the required Firestore access to `upstoxConnections`, `indianMarketWatchlists`, `indianPaperAccounts`, and `indianPaperOrders`.
+- Public HTTPS ingress so browser requests can reach the service; the gateway itself validates Firebase ID tokens on protected endpoints. Do not disable application authentication.
+
+After deployment, set the exact Cloud Run HTTPS URL in the `market-gateway-url` meta tag in `markets/stocks/index.html`. Do not point the frontend at a placeholder or unverified URL.
+
+## 5. Verification before production
+
+1. Run `npm test` and `npm run check` in `market-gateway/`, plus the GitHub Actions workflow.
+2. Verify Google and Email/Password sign-in against the intended Firebase project.
+3. Complete Upstox OAuth and confirm the encrypted token is stored server-side only.
+4. Verify `/health`, official instrument search, candles, option chain, watchlist quotes and streaming using an authorized account.
+5. Test cash-equity BUY/SELL with fresh quotes, idempotent retry, insufficient cash, insufficient holdings, stale quote and cross-user access denial.
+6. Confirm balances and data remain separate from Crypto.
+7. Obtain confirmation that the Upstox account has the required API/data entitlements and that the intended exchange data display complies with provider/exchange terms.
+
+## Current product boundary
+
+This release simulates market BUY/SELL for NSE/BSE cash equities only. Option-chain data is a read-only display; F&O paper execution, limit/stop orders, brokerage/taxes, dividends and corporate actions are not implemented. Do not describe these as available until built and tested. Keep PR #11 in draft until all deployment and provider-account checks pass.
