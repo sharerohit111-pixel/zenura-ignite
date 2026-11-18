@@ -9,4 +9,13 @@ function normalizeWatchlists(data){
   }
   return result;
 }
-module.exports={WATCHLIST_NAMES,normalizeWatchlists};
+
+function mergeWatchlistUpdate(currentData,name,keys){
+  if(!WATCHLIST_NAMES.includes(name))throw Object.assign(new Error("Choose a valid watchlist name."),{status:400});
+  if(!Array.isArray(keys)||keys.length>50||keys.some(x=>typeof x!=="string"||!x||x.length>100||/[\\u0000-\\u001F]/.test(x)))
+    throw Object.assign(new Error("Provide up to 50 valid instrument keys."),{status:400});
+  const watchlists=normalizeWatchlists(currentData);
+  watchlists[name]=[...new Set(keys)];
+  return watchlists;
+}
+module.exports={WATCHLIST_NAMES,normalizeWatchlists,mergeWatchlistUpdate};
