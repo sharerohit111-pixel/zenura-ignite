@@ -292,6 +292,8 @@ app.post("/paper/derivative/margin-preview",async(req,res)=>{
     const instrumentKey=typeof req.body?.instrument_key==="string"?req.body.instrument_key:"";
     const lots=Number(req.body?.lots);
     const side=String(req.body?.side||"").toUpperCase();
+    const product=String(req.body?.product||"D").toUpperCase();
+    if(!["I","D"].includes(product))return res.status(400).json({error:"Margin preview product must be I (Intraday) or D (Delivery)."});
     if(!instrumentKey||instrumentKey.length>100||/[\\r\\n]/.test(instrumentKey))
       return res.status(400).json({error:"A valid instrument_key is required."});
     if(!Number.isSafeInteger(lots)||lots<1||lots>10000)
@@ -315,7 +317,7 @@ app.post("/paper/derivative/margin-preview",async(req,res)=>{
     const {validateDerivativeContract}=require("./lib/derivative-contract");
     const contract=validateDerivativeContract(instrument,{lots,pricePaise:normalizedQuote.pricePaise,now:Date.now()});
     const marginRequest={instruments:[{
-      instrument_key:instrumentKey,quantity:contract.quantity,product:"D",
+      instrument_key:instrumentKey,quantity:contract.quantity,product,
       transaction_type:side,price:normalizedQuote.pricePaise/100
     }]};
     const upstream=await fetchProvider("https://api.upstox.com/v2/charges/margin",{
@@ -336,7 +338,7 @@ app.post("/paper/derivative/margin-preview",async(req,res)=>{
     res.set("Cache-Control","private, no-store");
     res.json({
       status:"PREVIEW_ONLY",tradingSymbol:instrument.trading_symbol,instrumentKey,
-      exchange:instrument.exchange,expiry:instrument.expiry,side,product:"D",
+      exchange:instrument.exchange,expiry:instrument.expiry,side,product,
       lots,lotSize:contract.lotSize,quantity:contract.quantity,
       quote:{pricePaise:normalizedQuote.pricePaise,observedAtMs:normalizedQuote.tradeTimeMs},
       requiredMarginPaise:margin.requiredMarginPaise,finalMarginPaise:margin.finalMarginPaise,
