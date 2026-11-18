@@ -259,16 +259,11 @@ app.post("/paper/orders",async(req,res)=>{
     const pricePaise=Math.round(ltp*100),grossPaise=pricePaise*quantity;
     if(!Number.isSafeInteger(grossPaise)||grossPaise<=0)return res.status(400).json({error:"Order value exceeds supported calculation limits."});
     const accountRef=paperAccountRef(decoded.uid);
-    let result;
-    await db.runTransaction(async tx=>{
-      const [accountSnap,existingOrder]=await Promise.all([tx.get(accountRef),tx.get(orderRef)]);
-      if(existingOrder.exists){const prior=existingOrder.data();assertIdempotentReplay(prior,requestFingerprint);result=publicPaperOrder(prior,{orderId:orderRef.id,cashPaise:accountSnap.data()?.cashPaise,realizedPnlTotalPaise:accountSnap.data()?.realizedPnlPaise,idempotentReplay:true});return;}
-      if(!accountSnap.exists)throw Object.assign(new Error("Paper account is not initialized."),{status:409});
-      const account=accountSnap.data(),next=buildPaperOrderUpdate(account,{instrumentKey,side,quantity,pricePaise});
-      const order={uid:decoded.uid,requestFingerprint,instrumentKey,tradingSymbol:instrument.trading_symbol||instrument.name,exchange:instrument.exchange,side,quantity,executionPricePaise:pricePaise,grossPaise:next.grossPaise,quoteTimestampMs:tradeTime,quoteAgeMs:quoteAge,realizedPnlPaise:next.orderRealizedPnlPaise,orderType:"MARKET",status:"FILLED",simulationOnly:true,createdAt:admin.firestore.FieldValue.serverTimestamp()};
-      tx.create(orderRef,order);
-      tx.update(accountRef,{cashPaise:next.cashPaise,positions:next.positions,realizedPnlPaise:next.realizedPnlPaise,updatedAt:admin.firestore.FieldValue.serverTimestamp(),version:next.version});
-      result=publicPaperOrder(order,{orderId:orderRef.id,cashPaise:next.cashPaise,realizedPnlTotalPaise:next.realizedPnlPaise});
+    const {executePaperOrderTransaction}=require("./lib/paper-order-transaction");
+    const result=await executePaperOrderTransaction({
+      db,accountRef,orderRef,uid:decoded.uid,requestFingerprint,
+      order:{uid:decoded.uid,requestFingerprint,instrumentKey,tradingSymbol:instrument.trading_symbol||instrument.name,exchange:instrument.exchange,side,quantity,executionPricePaise:pricePaise,quoteTimestampMs:tradeTime,quoteAgeMs:quoteAge,orderType:"MARKET",status:"FILLED",simulationOnly:true},
+      pricePaise,publicPaperOrder,serverTimestamp:()=>admin.firestore.FieldValue.serverTimestamp()
     });
     res.set("Cache-Control","private, no-store");
     res.status(result.idempotentReplay?200:201).json(result);
