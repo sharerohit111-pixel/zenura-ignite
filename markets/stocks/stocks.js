@@ -280,8 +280,10 @@
       const token=await connector.getIdToken(),response=await fetch(gateway+'/paper/derivative/orders',{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json',Accept:'application/json'},body:JSON.stringify({instrument_key:instrumentKey,side,lots,idempotency_key:pendingDerivativeOrder.key})});
       const data=await response.json();if(!response.ok){if(response.status>=400&&response.status<500)pendingDerivativeOrder=null;throw new Error(data.error||'Derivative paper order rejected.');}
       pendingDerivativeOrder=null;
-      optionStatus.textContent='SIMULATED '+side+' FILLED · '+data.tradingSymbol+' · '+data.quantity+' units · Premium '+inrPaise(data.grossPaise)+' · Estimated charges '+inrPaise(data.chargesPaise)+' · '+(side==='BUY'?'Total debit '+inrPaise(data.totalDebitPaise):'Net proceeds '+inrPaise(data.netCreditPaise))+'.';
-      await loadPaperAccount();await refreshPaperViews();
+      const fillMessage='SIMULATED '+side+' FILLED · '+data.tradingSymbol+' · '+data.quantity+' units · Premium '+inrPaise(data.grossPaise)+' · Estimated charges '+inrPaise(data.chargesPaise)+' · '+(side==='BUY'?'Total debit '+inrPaise(data.totalDebitPaise):'Net proceeds '+inrPaise(data.netCreditPaise))+'.';
+      optionStatus.textContent=fillMessage;
+      try{await loadPaperAccount();await refreshPaperViews();}
+      catch(refreshError){optionStatus.textContent=fillMessage+' Portfolio refresh failed; use Refresh to reload balances.';}
     }catch(error){optionStatus.textContent=error.message||'Derivative paper order failed.';}
     finally{derivativeOrderSubmitting=false;optionButton.disabled=false;}
   }
