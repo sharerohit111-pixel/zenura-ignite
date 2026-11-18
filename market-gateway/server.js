@@ -222,12 +222,12 @@ app.post("/paper/orders",async(req,res)=>{
     const connectionData=connection.data();
     if(connectionData.status!=="connected"||!connectionData.expiresAt||connectionData.expiresAt.toMillis()<=Date.now())return res.status(403).json({error:"Upstox token expired. Reconnect your account."});
     const accessToken=decryptToken(connectionData.tokenCiphertext);
-    const quoteUrl="https://api.upstox.com/v3/market-quote/ltp?"+new URLSearchParams({instrument_key:instrumentKey});
+    const quoteUrl="https://api.upstox.com/v3/market-quote/quotes?"+new URLSearchParams({instrument_key:instrumentKey});
     const quoteResponse=await fetch(quoteUrl,{headers:{Authorization:"Bearer "+accessToken,Accept:"application/json"}});
     const quotePayload=await quoteResponse.json().catch(()=>null);
-    if(!quoteResponse.ok)return res.status(502).json({error:"A current Upstox quote could not be verified.",providerStatus:quoteResponse.status});
+    if(!quoteResponse.ok)return res.status(502).json({error:"A current Upstox full quote could not be verified.",providerStatus:quoteResponse.status});
     const quoteEntry=Object.values(quotePayload?.data||{}).find(x=>x&&x.instrument_token===instrumentKey)||Object.values(quotePayload?.data||{})[0];
-    const ltp=Number(quoteEntry?.last_price),tradeTime=Number(quoteEntry?.ltt||quoteEntry?.last_trade_time||0);
+    const ltp=Number(quoteEntry?.last_price),tradeTime=Number(quoteEntry?.last_trade_time||0);
     const quoteAge=tradeTime?Date.now()-tradeTime:Infinity;
     if(!Number.isFinite(ltp)||ltp<=0||!Number.isFinite(tradeTime)||quoteAge< -5000||quoteAge>15000)
       return res.status(409).json({error:"No sufficiently fresh provider quote is available. Paper order rejected.",quoteAgeMs:Number.isFinite(quoteAge)?quoteAge:null});
@@ -261,6 +261,43 @@ app.post("/paper/orders",async(req,res)=>{
     res.status(201).json(result);
   }catch(error){res.status(error.status||500).json({error:error.status?error.message:"Paper order could not be completed."});}
 });
+
+app.get("/paper/portfolio",async(req,res)=>{
+  try{
+    const decoded=await authenticate(req),accountSnap=await paperAccountRef(decoded.uid).get();
+    if(!accountSnap.exists)return res.status(404).json({error:"Indian paper account has not been initialized."});
+    const account=accountSnap.data(),positions=Object.entries(account.positions||{}).filter(([,p])=>p&&Number.isSafeInteger(p.quantity)&&p.quantity>0);
+    if(positions.length>50)return res.status(409).json({error:"Portfolio contains more than 50 open positions; contact support before refreshing valuation."});
+    if(!positions.length){
+      res.set("Cache-Control","private, no-store");
+      return res.json({positions:[],cashPaise:account.cashPaise,marketValuePaise:0,unrealizedPnlPaise:0,equityPaise:account.cashPaise,realizedPnlPaise:account.realizedPnlPaise||0,valuationStatus:"no_open_positions"});
+    }
+    const connection=await db.collection("upstoxConnections").doc(decoded.uid).get();
+    if(!connection.exists)return res.status(403).json({error:"Upstox account is not connected."});
+    const connectionData=connection.data();
+    if(connectionData.status!=="connected"||!connectionData.expiresAt||connectionData.expiresAt.toMillis()<=Date.now())return res.status(403).json({error:"Upstox token expired. Reconnect your account."});
+    const accessToken=decryptToken(connectionData.tokenCiphertext),keys=positions.map(([key])=>key);
+    const quoteUrl="https://api.upstox.com/v3/market-quote/quotes?"+new URLSearchParams({instrument_key:keys.join(",")});
+    const quoteResponse=await fetch(quoteUrl,{headers:{Authorization:"Bearer "+accessToken,Accept:"application/json"}});
+    const quotePayload=await quoteResponse.json().catch(()=>null);
+    if(!quoteResponse.ok)return res.status(502).json({error:"Portfolio market valuation could not be retrieved.",providerStatus:quoteResponse.status});
+    const quotes=Object.values(quotePayload?.data||{}),now=Date.now(),valued=[];
+    let marketValuePaise=0,unrealizedPnlPaise=0,staleCount=0;
+    for(const [instrumentKey,position] of positions){
+      const instrument=instrumentCache.find(x=>x.instrument_key===instrumentKey);
+      const quote=quotes.find(x=>x?.instrument_token===instrumentKey);
+      const ltp=Number(quote?.last_price),tradeTime=Number(quote?.last_trade_time||0),age=tradeTime?now-tradeTime:Infinity;
+      const fresh=Number.isFinite(ltp)&&ltp>0&&Number.isFinite(age)&&age>=-5000&&age<=60000;
+      if(!fresh){staleCount++;valued.push({instrumentKey,tradingSymbol:instrument?.trading_symbol||instrumentKey,quantity:position.quantity,averagePricePaise:position.averagePricePaise,lastPricePaise:null,marketValuePaise:null,unrealizedPnlPaise:null,quoteAgeMs:Number.isFinite(age)?age:null,valuationStatus:"stale_or_unavailable"});continue;}
+      const lastPricePaise=Math.round(ltp*100),value=lastPricePaise*position.quantity,pnl=(lastPricePaise-position.averagePricePaise)*position.quantity;
+      marketValuePaise+=value;unrealizedPnlPaise+=pnl;
+      valued.push({instrumentKey,tradingSymbol:instrument?.trading_symbol||quote.symbol||instrumentKey,quantity:position.quantity,averagePricePaise:position.averagePricePaise,lastPricePaise,marketValuePaise:value,unrealizedPnlPaise:pnl,quoteAgeMs:age,valuationStatus:"fresh"});
+    }
+    res.set("Cache-Control","private, no-store");
+    res.json({positions:valued,cashPaise:account.cashPaise,marketValuePaise,unrealizedPnlPaise,equityPaise:account.cashPaise+marketValuePaise,realizedPnlPaise:account.realizedPnlPaise||0,valuationStatus:staleCount?"partial_stale":"fresh",stalePositions:staleCount,simulationOnly:true});
+  }catch(error){res.status(error.status||500).json({error:error.status?error.message:"Portfolio valuation could not be loaded."});}
+});
+
 app.get("/paper/orders",async(req,res)=>{
   try{
     const decoded=await authenticate(req),limit=Math.min(Math.max(Number.parseInt(req.query.limit||"50",10)||50,1),100);
