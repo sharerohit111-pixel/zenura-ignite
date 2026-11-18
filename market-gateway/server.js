@@ -33,6 +33,7 @@ const {executeLongOptionTransaction}=require("./lib/derivative-order-transaction
 const {parseMarginPreviewInput}=require("./lib/margin-preview-input");
 const {consumeMarginPreviewSlot}=require("./lib/margin-preview-rate-limit");
 const {authenticateFirebaseRequest}=require("./lib/firebase-auth");
+const {normalizePaperAccountState}=require("./lib/paper-account-state");
 admin.initializeApp();
 const db=admin.firestore();
 const app=express();
@@ -231,9 +232,10 @@ app.get("/paper/account",async(req,res)=>{
       const snap=await tx.get(ref);
       if(!snap.exists)tx.create(ref,{currency:"INR",startingCashPaise:startingCash,cashPaise:startingCash,positions:{},derivativePositions:{},reservedMarginPaise:0,realizedPnlPaise:0,createdAt:admin.firestore.FieldValue.serverTimestamp(),updatedAt:admin.firestore.FieldValue.serverTimestamp(),version:1});else if(snap.data().derivativePositions===undefined){const patch={derivativePositions:{},updatedAt:admin.firestore.FieldValue.serverTimestamp()};if(snap.data().reservedMarginPaise===undefined)patch.reservedMarginPaise=0;tx.update(ref,patch);}
     });
-    const snap=await ref.get(),data=snap.data();
+    const snap=await ref.get(),data=normalizePaperAccountState(snap.data());
+    if(!data)return res.status(409).json({error:"Indian paper account data is invalid; account access was stopped to protect its balance."});
     res.set("Cache-Control","private, no-store");
-    res.json({currency:"INR",startingCashPaise:data.startingCashPaise,cashPaise:data.cashPaise,positions:data.positions||{},derivativePositions:data.derivativePositions||{},reservedMarginPaise:data.reservedMarginPaise||0,realizedPnlPaise:data.realizedPnlPaise||0,updatedAt:data.updatedAt?.toMillis?.()||null,simulationOnly:true});
+    res.json({...data,simulationOnly:true});
   }catch(error){res.status(errorStatus(error)).json({error:error.status?error.message:"Paper account could not be loaded."});}
 });
 app.post("/paper/orders",async(req,res)=>{
