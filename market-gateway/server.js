@@ -354,7 +354,7 @@ app.put("/watchlist",async(req,res)=>{
   try{
     const decoded=await authenticate(req),name=requestedWatchlist(req),raw=req.body?.instrumentKeys;
     let keys;
-    try{keys=[...new Set(raw)];mergeWatchlistUpdate({},name,raw);}catch(error){return res.status(error.status||400).json({error:error.message});}
+    try{mergeWatchlistUpdate({},name,raw);keys=[...new Set(raw)];}catch(error){return res.status(error.status||400).json({error:error.message});}
     if(!instrumentCache.length||Date.now()-instrumentCacheUpdatedAt>6*60*60*1000)await refreshInstrumentCache();
     const valid=new Set(instrumentCache.map(x=>x.instrument_key));
     if(keys.some(key=>!valid.has(key)))return res.status(400).json({error:"Watchlist contains an instrument not present in the official instrument master."});
