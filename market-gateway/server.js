@@ -21,6 +21,7 @@ const {createStreamLifecycle}=require("./lib/stream-lifecycle");
 const {sendUpstoxSubscription}=require("./lib/upstox-subscription");
 const {decodeFeedResponse}=require("./lib/upstox-feed-decoder");
 const {filterFreshMarketFeeds}=require("./lib/market-feed-validation");
+const {buildPortfolioValuation}=require("./lib/paper-portfolio-valuation");
 admin.initializeApp();
 const db=admin.firestore();
 const app=express();
@@ -303,22 +304,10 @@ app.get("/paper/portfolio",async(req,res)=>{
     const quoteResponse=await fetchProvider(quoteUrl,{headers:{Authorization:"Bearer "+accessToken,Accept:"application/json"}});
     const quotePayload=await quoteResponse.json().catch(()=>null);
     if(!quoteResponse.ok)return res.status(502).json({error:"Portfolio market valuation could not be retrieved.",providerStatus:quoteResponse.status});
-    const quotes=Object.values(quotePayload?.data||{}),now=Date.now(),valued=[];
-    let marketValuePaise=0,unrealizedPnlPaise=0,staleCount=0;
-    for(const [instrumentKey,position] of positions){
-      const instrument=instrumentCache.find(x=>x.instrument_key===instrumentKey);
-      const quote=quotes.find(x=>x?.instrument_token===instrumentKey);
-      let normalizedQuote=null;
-      try{normalizedQuote=normalizeProviderQuote(quote,instrumentKey,{now,maxAgeMs:60000});}catch(_){}
-      if(!normalizedQuote){const age=quoteAgeMs(quote?.last_trade_time,now);staleCount++;valued.push({instrumentKey,tradingSymbol:instrument?.trading_symbol||instrumentKey,quantity:position.quantity,averagePricePaise:position.averagePricePaise,lastPricePaise:null,marketValuePaise:null,unrealizedPnlPaise:null,quoteAgeMs:Number.isFinite(age)?age:null,valuationStatus:"stale_or_unavailable"});continue;}
-      const {pricePaise:lastPricePaise,quoteAgeMs:age}=normalizedQuote,value=lastPricePaise*position.quantity,pnl=(lastPricePaise-position.averagePricePaise)*position.quantity;
-      if(!Number.isSafeInteger(lastPricePaise)||lastPricePaise<1||!Number.isSafeInteger(value)||!Number.isSafeInteger(pnl)||!Number.isSafeInteger(marketValuePaise+value)||!Number.isSafeInteger(unrealizedPnlPaise+pnl))return res.status(409).json({error:"Portfolio valuation exceeds safe calculation limits."});
-      marketValuePaise+=value;unrealizedPnlPaise+=pnl;
-      valued.push({instrumentKey,tradingSymbol:instrument?.trading_symbol||quote.symbol||instrumentKey,quantity:position.quantity,averagePricePaise:position.averagePricePaise,lastPricePaise,marketValuePaise:value,unrealizedPnlPaise:pnl,quoteAgeMs:age,valuationStatus:"fresh"});
-    }
+    const quotes=Object.values(quotePayload?.data||{});
+    const valuation=buildPortfolioValuation({positions,quotes,cashPaise:account.cashPaise,realizedPnlPaise:account.realizedPnlPaise??0,instruments:instrumentCache,now:Date.now(),maxAgeMs:60000});
     res.set("Cache-Control","private, no-store");
-    const equityPaise=account.cashPaise+marketValuePaise;if(!Number.isSafeInteger(equityPaise))return res.status(409).json({error:"Portfolio equity exceeds safe calculation limits."});
-    res.json({positions:valued,cashPaise:account.cashPaise,marketValuePaise,unrealizedPnlPaise,equityPaise,realizedPnlPaise:account.realizedPnlPaise??0,valuationStatus:staleCount?"partial_stale":"fresh",stalePositions:staleCount,simulationOnly:true});
+    res.json(valuation);
   }catch(error){res.status(errorStatus(error)).json({error:error.status?error.message:"Portfolio valuation could not be loaded."});}
 });
 
