@@ -19,7 +19,7 @@ test("rejects coerced, fractional, unsafe and out-of-range lot counts",()=>{
   assert.throws(()=>parseMarginPreviewInput({instrument_key:"NSE_FO|NIFTY26NOVFUT",lots,side:"BUY"}),/Lots/);
 });
 test("rejects invalid instrument keys",()=>{
- for(const instrument_key of ["", "  ", "x".repeat(101), "NSE_FO|BAD\\nKEY", 123, null])
+ for(const instrument_key of ["", "  ", "x".repeat(101), "NSE_FO|BAD\nKEY", 123, null])
   assert.throws(()=>parseMarginPreviewInput({instrument_key,lots:1,side:"BUY"}),/instrument_key/);
 });
 test("rejects invalid sides and product types",()=>{
