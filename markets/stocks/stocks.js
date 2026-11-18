@@ -182,8 +182,8 @@
     status.textContent='Refreshing verified option quotes…';
     try{
       const token=await window.ZENURA_MARKET_CONNECTOR.getIdToken();
-      const response=await fetch(gateway+'/paper/derivatives/portfolio',{headers:{Authorization:'Bearer '+token,Accept:'application/json'}});
-      const data=await response.json();if(!response.ok)throw new Error(data.error||'Derivative portfolio unavailable');
+      const [response,historyResponse]=await Promise.all([fetch(gateway+'/paper/derivatives/portfolio',{headers:{Authorization:'Bearer '+token,Accept:'application/json'}}),fetch(gateway+'/paper/derivative/orders?limit=50',{headers:{Authorization:'Bearer '+token,Accept:'application/json'}})]);
+      const data=await response.json(),history=await historyResponse.json();if(!response.ok)throw new Error(data.error||'Derivative portfolio unavailable');if(!historyResponse.ok)throw new Error(history.error||'Derivative order history unavailable');
       body.textContent='';
       if(!data.positions?.length)tableMessage(body,6,'No open derivative positions.');
       else data.positions.forEach(p=>{
@@ -192,6 +192,7 @@
         body.append(tr);
       });
       status.textContent=data.valuationStatus==='fresh'?'Long CE/PE positions · Fresh Upstox quotes · Charges excluded':'No open derivative positions';
+      const historyBody=document.getElementById('derivative-history');if(historyBody){historyBody.textContent='';if(!history.orders?.length)tableMessage(historyBody,6,'No derivative orders yet.');else history.orders.forEach(order=>{const tr=document.createElement('tr'),date=order.createdAt?new Date(order.createdAt).toLocaleString('en-IN'):'—';[date,order.tradingSymbol,order.side,order.lots,inrPaise(order.executionPricePaise),order.status+' · SIM'].forEach(v=>{const td=document.createElement('td');td.textContent=String(v);tr.append(td);});historyBody.append(tr);});}
     }catch(error){status.textContent=error.message||'Derivative valuation unavailable';}
   }
   async function refreshPaperViews(){await Promise.all([loadPaperPortfolio(),loadPaperHistory(),loadDerivativePortfolio()]);}
