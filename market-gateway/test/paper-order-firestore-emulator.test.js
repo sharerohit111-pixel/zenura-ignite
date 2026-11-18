@@ -127,3 +127,48 @@ integrationTest("Firestore emulator serializes simultaneous margin preview coold
   assert.equal(Number.isSafeInteger(stored.data().lastRequestAtMs),true);
  }finally{await ref.delete().catch(()=>{});}
 });
+
+const {executeLongOptionBuyTransaction}=require("../lib/derivative-order-transaction");
+const {makeOrderId}=require("../lib/order-idempotency");
+const derivativeNow=Date.UTC(2026,10,18,10);
+const derivativeInstrument={
+ instrument_key:"NSE_FO|NIFTY26NOV25000CE",
+ trading_symbol:"NIFTY 26 NOV 25000 CE",
+ segment:"NSE_FO",exchange:"NSE",instrument_type:"CE",
+ expiry:"2026-11-26",strike_price:25000,lot_size:65,tick_size:0.05
+};
+const derivativeQuote={instrumentKey:derivativeInstrument.instrument_key,pricePaise:1250,observedAtMs:derivativeNow-1000};
+function makeDerivativeOrder({uid,idempotencyKey,lots=1}){
+ const accountRef=db.collection("emulatorPaperAccounts").doc(uid);
+ const orderRef=db.collection("emulatorDerivativeOrders").doc(makeOrderId(uid,idempotencyKey));
+ return {db,accountRef,orderRef,uid,idempotencyKey,instrument:derivativeInstrument,quote:derivativeQuote,lots,serverTimestamp:()=>FieldValue.serverTimestamp(),now:derivativeNow};
+}
+integrationTest("Firestore emulator serializes concurrent duplicate long-option orders into one debit",async()=>{
+ const uid="derivative-user-"+crypto.randomUUID();
+ const key="123e4567-e89b-42d3-a456-426614174001";
+ const common=makeDerivativeOrder({uid,idempotencyKey:key});
+ await common.accountRef.set({cashPaise:1000000,realizedPnlPaise:0,reservedMarginPaise:0,positions:{},derivativePositions:{},version:1});
+ try{
+  const results=await Promise.all([executeLongOptionBuyTransaction(common),executeLongOptionBuyTransaction(common)]);
+  const [account,order]=await Promise.all([common.accountRef.get(),common.orderRef.get()]);
+  assert.equal(account.data().cashPaise,916354);
+  assert.equal(account.data().derivativePositions[derivativeInstrument.instrument_key].netQuantity,65);
+  assert.equal(order.exists,true);
+  assert.equal(results.filter(x=>x.idempotentReplay===true).length,1);
+ }finally{await clean([common.accountRef,common.orderRef]);}
+});
+integrationTest("Firestore emulator prevents concurrent different option orders from overspending shared cash",async()=>{
+ const uid="derivative-user-"+crypto.randomUUID();
+ const first=makeDerivativeOrder({uid,idempotencyKey:"123e4567-e89b-42d3-a456-426614174002"});
+ const second=makeDerivativeOrder({uid,idempotencyKey:"123e4567-e89b-42d3-a456-426614174003"});
+ await first.accountRef.set({cashPaise:100000,realizedPnlPaise:0,reservedMarginPaise:0,positions:{},derivativePositions:{},version:1});
+ try{
+  const results=await Promise.allSettled([executeLongOptionBuyTransaction(first),executeLongOptionBuyTransaction(second)]);
+  const [account,orders]=await Promise.all([first.accountRef.get(),Promise.all([first.orderRef.get(),second.orderRef.get()])]);
+  assert.equal(results.filter(x=>x.status==="fulfilled").length,1);
+  assert.equal(results.filter(x=>x.status==="rejected"&&x.reason.status===409).length,1);
+  assert.equal(account.data().cashPaise,16354);
+  assert.equal(account.data().derivativePositions[derivativeInstrument.instrument_key].netQuantity,65);
+  assert.equal(orders.filter(x=>x.exists).length,1);
+ }finally{await clean([first.accountRef,first.orderRef,second.orderRef]);}
+});
