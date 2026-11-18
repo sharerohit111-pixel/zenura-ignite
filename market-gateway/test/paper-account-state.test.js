@@ -73,3 +73,14 @@ test("legacy account migration adds missing fields without replacing balances or
  assert.equal(account.positions["NSE_EQ|ABC"].quantity,7);
  assert.equal(account.realizedPnlPaise,-1200);
 });
+
+test("legacy account migration restores a missing cash-equity positions map",async()=>{
+ const account={currency:"INR",startingCashPaise:100000000,cashPaise:76543210,realizedPnlPaise:0};
+ const {db,writes}=transactionDb(account);
+ await ensurePaperAccount({db,ref:{id:"user-5"},startingCashPaise:null,serverTimestamp:()=>"migration-time"});
+ assert.equal(writes.length,1);
+ assert.deepEqual(writes[0].data.positions,{});
+ assert.deepEqual(writes[0].data.derivativePositions,{});
+ assert.equal(writes[0].data.reservedMarginPaise,0);
+ assert.equal(account.cashPaise,76543210);
+});
