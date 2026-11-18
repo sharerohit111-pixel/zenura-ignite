@@ -40,7 +40,7 @@ test("rejects tampered ciphertext and authentication tags", () => {
 
 test("rejects authenticated empty, control-character, and invalid UTF-8 plaintext", () => {
   const key = crypto.randomBytes(32);
-  for (const value of [Buffer.alloc(0), Buffer.from("\\nforged", "utf8"), Buffer.from([0xff, 0xfe])]) {
+  for (const value of [Buffer.alloc(0), Buffer.from("\nforged", "utf8"), Buffer.from([0xff, 0xfe])]) {
     assert.throws(() => decryptUpstoxToken(encrypt(value, key), key.toString("base64")));
   }
 });
