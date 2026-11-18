@@ -1,7 +1,7 @@
 "use strict";
 const test=require("node:test");
 const assert=require("node:assert/strict");
-const {WATCHLIST_NAMES,normalizeWatchlists}=require("../lib/watchlists");
+const {WATCHLIST_NAMES,normalizeWatchlists,mergeWatchlistUpdate}=require("../lib/watchlists");
 
 test("creates all named lists when no saved data exists",()=>{
  assert.deepEqual(normalizeWatchlists({}),{"My Stocks":[],"Banking":[],"NIFTY":[],"F&O":[]});
@@ -30,4 +30,17 @@ test("ignores unknown list names and malformed watchlists containers",()=>{
  const result=normalizeWatchlists({watchlists:{Other:["X"],Banking:"bad"}});
  assert.deepEqual(result.Banking,[]);
  assert.deepEqual(Object.keys(result),["My Stocks","Banking","NIFTY","F&O"]);
+});
+
+test("merging one list preserves other concurrent named-list data",()=>{
+ const current={watchlists:{"My Stocks":["A"],Banking:["B"],NIFTY:["C"]}};
+ const result=mergeWatchlistUpdate(current,"Banking",["D","D","E"]);
+ assert.deepEqual(result["My Stocks"],["A"]);
+ assert.deepEqual(result.Banking,["D","E"]);
+ assert.deepEqual(result.NIFTY,["C"]);
+});
+test("watchlist update rejects unknown names and malformed keys",()=>{
+ assert.throws(()=>mergeWatchlistUpdate({}, "Unknown", []),/valid watchlist/);
+ assert.throws(()=>mergeWatchlistUpdate({}, "NIFTY", [""]),/valid instrument keys/);
+ assert.throws(()=>mergeWatchlistUpdate({}, "F&O", Array.from({length:51},(_,i)=>"K"+i)),/valid instrument keys/);
 });
