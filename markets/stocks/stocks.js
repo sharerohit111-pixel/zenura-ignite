@@ -111,7 +111,7 @@
       updatePaperButtons();
     }catch(error){paperAccountStatus.textContent=error.message||'Paper account not ready';}
   }
-  const paperMarketValue=document.getElementById('paper-market-value'),paperUnrealized=document.getElementById('paper-unrealized'),paperEquity=document.getElementById('paper-equity'),paperPortfolioStatus=document.getElementById('paper-portfolio-status'),paperPositions=document.getElementById('paper-positions'),paperHistory=document.getElementById('paper-history'),paperRefresh=document.getElementById('refresh-paper-portfolio');
+  const paperMarketValue=document.getElementById('paper-market-value'),paperUnrealized=document.getElementById('paper-unrealized'),paperEquity=document.getElementById('paper-equity'),paperPortfolioStatus=document.getElementById('paper-portfolio-status'),paperPositions=document.getElementById('paper-positions'),paperHistory=document.getElementById('paper-history'),paperRefresh=document.getElementById('refresh-paper-portfolio'),paperHistoryMore=document.getElementById('paper-history-more'),paperHistoryStatus=document.getElementById('paper-history-status');
   function tableMessage(body,columns,message){body.textContent='';const tr=document.createElement('tr'),td=document.createElement('td');td.colSpan=columns;td.textContent=message;tr.append(td);body.append(tr);}
   function signedMoney(value){const n=Number(value||0);return (n>0?'+':n<0?'−':'')+inrPaise(Math.abs(n));}
   async function loadPaperPortfolio(){
@@ -131,20 +131,34 @@
       });
     }catch(error){paperPortfolioStatus.textContent=error.message||'Portfolio refresh failed.';}
   }
-  async function loadPaperHistory(){
-    if(!gateway||!window.ZENURA_MARKET_CONNECTOR?.getIdToken)return;
+  let paperHistoryCursor=null,paperHistoryHasMore=false,paperHistoryLoading=false,paperHistoryLoadSeq=0;
+  async function loadPaperHistory({append=false}={}){
+    if(!gateway||!window.ZENURA_MARKET_CONNECTOR?.getIdToken||paperHistoryLoading)return;
+    if(append&&(!paperHistoryHasMore||!paperHistoryCursor))return;
+    const seq=++paperHistoryLoadSeq;paperHistoryLoading=true;paperHistoryMore.disabled=true;
+    if(paperHistoryStatus)paperHistoryStatus.textContent=append?'Loading older orders…':'Loading latest orders…';
     try{
-      const token=await window.ZENURA_MARKET_CONNECTOR.getIdToken(),response=await fetch(gateway+'/paper/orders?limit=50',{headers:{Authorization:'Bearer '+token,Accept:'application/json'}});
+      const token=await window.ZENURA_MARKET_CONNECTOR.getIdToken(),params=new URLSearchParams({limit:'50'});
+      if(append)params.set('cursor',paperHistoryCursor);
+      const response=await fetch(gateway+'/paper/orders?'+params.toString(),{headers:{Authorization:'Bearer '+token,Accept:'application/json'}});
       const data=await response.json();if(!response.ok)throw new Error(data.error||'Order history unavailable');
-      paperHistory.textContent='';
-      if(!data.orders?.length){tableMessage(paperHistory,6,'No paper orders yet.');return;}
-      data.orders.forEach(order=>{
+      if(seq!==paperHistoryLoadSeq)return;
+      if(!append)paperHistory.textContent='';
+      if(!data.orders?.length&&!append)tableMessage(paperHistory,6,'No paper orders yet.');
+      else data.orders.forEach(order=>{
         const tr=document.createElement('tr'),date=order.createdAt?new Date(order.createdAt).toLocaleString('en-IN'):'—';
         [date,order.tradingSymbol,order.side,order.quantity,inrPaise(order.executionPricePaise),order.status+' · SIM'].forEach(v=>{const td=document.createElement('td');td.textContent=String(v);tr.append(td);});
         paperHistory.append(tr);
       });
-    }catch(error){tableMessage(paperHistory,6,error.message||'Could not load order history.');}
+      paperHistoryCursor=data.nextCursor||null;paperHistoryHasMore===true;
+      paperHistoryHasMore=!!data.hasMore&&!!paperHistoryCursor;
+      if(paperHistoryStatus)paperHistoryStatus.textContent=paperHistoryHasMore?'Showing '+paperHistory.children.length+' orders':'All available orders loaded';
+      paperHistoryMore.disabled=!paperHistoryHasMore;
+    }catch(error){
+      if(seq===paperHistoryLoadSeq){if(paperHistoryStatus)paperHistoryStatus.textContent='Could not load order history';if(!append)tableMessage(paperHistory,6,error.message||'Could not load order history.');}
+    }finally{if(seq===paperHistoryLoadSeq){paperHistoryLoading=false;paperHistoryMore.disabled=!paperHistoryHasMore;}}
   }
+  paperHistoryMore?.addEventListener('click',()=>loadPaperHistory({append:true}));
   async function refreshPaperViews(){await Promise.all([loadPaperPortfolio(),loadPaperHistory()]);}
   paperRefresh.addEventListener('click',refreshPaperViews);
 
