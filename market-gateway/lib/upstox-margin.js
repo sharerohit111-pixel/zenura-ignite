@@ -18,6 +18,8 @@ function normalizeUpstoxMarginResponse(payload,instrumentKey){
  const rows=Array.isArray(payload.data.margins)?payload.data.margins:[];
  if(payload.data.margins!==undefined&&!Array.isArray(payload.data.margins))
   fail("Upstox returned an invalid margin components list.");
+ if(rows.some(row=>!row||typeof row!=="object"||Array.isArray(row)))
+  fail("Upstox returned a malformed margin component row.");
  if(rows.some(row=>row&&typeof row==="object"&&typeof row.instrument_key==="string"&&row.instrument_key!==instrumentKey))
   fail("Upstox margin response contains a different instrument.");
  const matching=rows.filter(row=>row&&typeof row==="object"&&(!row.instrument_key||row.instrument_key===instrumentKey));
