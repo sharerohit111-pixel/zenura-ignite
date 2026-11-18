@@ -1,0 +1,10 @@
+"use strict";
+const test=require("node:test");
+const assert=require("node:assert/strict");
+const {isUuid,makeOrderId,makeOrderFingerprint,assertIdempotentReplay}=require("../lib/order-idempotency");
+const key="550e8400-e29b-41d4-a716-446655440000";
+const request={instrumentKey:"NSE_EQ|INE009A01021",side:"BUY",quantity:3};
+test("accepts UUID v4 and rejects malformed identifiers",()=>{assert.equal(isUuid(key),true);assert.equal(isUuid("not-a-uuid"),false);assert.equal(isUuid("00000000-0000-0000-0000-000000000000"),false);});
+test("order document IDs are stable and user scoped",()=>{assert.equal(makeOrderId("user-a",key),makeOrderId("user-a",key));assert.notEqual(makeOrderId("user-a",key),makeOrderId("user-b",key));});
+test("fingerprint is stable and changes with any order field",()=>{const fp=makeOrderFingerprint(request);assert.equal(fp,makeOrderFingerprint({...request}));assert.notEqual(fp,makeOrderFingerprint({...request,quantity:4}));assert.notEqual(fp,makeOrderFingerprint({...request,side:"SELL"}));assert.notEqual(fp,makeOrderFingerprint({...request,instrumentKey:"NSE_EQ|OTHER"}));});
+test("same idempotency key replay is accepted only for identical order",()=>{const fp=makeOrderFingerprint(request);assert.equal(assertIdempotentReplay({requestFingerprint:fp},fp),true);assert.throws(()=>assertIdempotentReplay({requestFingerprint:fp},makeOrderFingerprint({...request,quantity:4})),{status:409});});
