@@ -256,7 +256,7 @@
       const finalText=data.finalMarginPaise===null?'':' · Final margin '+inrPaise(data.finalMarginPaise);
       const quoteText=data.quote?.pricePaise?' · Quote '+inrPaise(data.quote.pricePaise):'';
       const components=data.marginComponents?.[0]||{};
-      const componentText=[['SPAN',components.spanPaise],['Exposure',components.exposurePaise],['Option premium',components.option_premiumPaise],['Tender',components.tenderPaise],['Delivery',components.deliveryPaise],['Total margin',components.total_marginPaise]]
+      const componentText=[['SPAN',components.spanPaise],['Exposure',components.exposurePaise],['Option premium',components.option_premiumPaise],['Net buy premium',components.net_buy_premiumPaise],['Tender',components.tenderPaise],['Delivery',components.deliveryPaise],['Total margin',components.total_marginPaise]]
         .filter(([,value])=>Number.isSafeInteger(value)).map(([label,value])=>label+' '+inrPaise(value)).join(' · ');
       futuresMarginStatus.textContent='PREVIEW ONLY · '+data.tradingSymbol+' · '+side+' '+lots+' lot(s) / '+data.quantity+' qty · '+(product==='I'?'Intraday':'Delivery')+' margin'+quoteText+' · Required margin '+required+finalText+(componentText?' · '+componentText:'')+' · Virtual cash '+cash+' · Shortfall '+shortfall+'. No order placed; no funds reserved.';
     }catch(error){futuresMarginStatus.textContent=error.message||'Futures margin preview failed.';}
