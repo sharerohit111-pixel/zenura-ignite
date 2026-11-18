@@ -415,6 +415,7 @@ app.post("/stream",async(req,res)=>{
   res.on("close",stop);
   try{
     const decoded=await authenticate(req);
+    if(closed||res.destroyed||res.writableEnded)return;
     streamUid=decoded.uid;
     streamReservation=reserveUserStream(activeUserStreams,streamUid);
     if(!streamReservation)return res.status(429).json({error:"A live market stream is already active for this account. Close it before reconnecting."});
