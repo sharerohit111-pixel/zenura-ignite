@@ -68,16 +68,28 @@ async function executeLongOptionBuyTransaction({
       instrumentType:contract.instrumentType,side,quantity:contract.quantity,
       pricePaise:quote.pricePaise,position:priorPosition,now
     });
+    let averagePricePaise=fill.averagePricePaise;
+    let orderRealizedPnlPaise=fill.realizedPnlPaise;
+    if(side==="BUY"){
+      const priorCostPaise=priorPosition.netQuantity*priorPosition.averagePricePaise;
+      const totalCostPaise=priorCostPaise+contract.contractValuePaise+charges.totalChargesPaise;
+      if(!Number.isSafeInteger(priorCostPaise)||!Number.isSafeInteger(totalCostPaise)||fill.netQuantity<1)
+        fail("Option position cost basis exceeds supported calculation limits.",409);
+      averagePricePaise=Math.round(totalCostPaise/fill.netQuantity);
+    }else{
+      orderRealizedPnlPaise=fill.realizedPnlPaise-charges.totalChargesPaise;
+    }
+    if(!Number.isSafeInteger(orderRealizedPnlPaise))fail("Net realized option P&L exceeds supported calculation limits.",409);
     const cashPaise=account.cashPaise+fill.cashDeltaPaise-charges.totalChargesPaise;
     if(!Number.isSafeInteger(cashPaise)||cashPaise<0)
       fail("Insufficient derivative paper cash for this option premium.",409);
     if(fill.netQuantity>0)derivativePositions[contract.instrumentKey]={
       instrumentType:contract.instrumentType,netQuantity:fill.netQuantity,
-      averagePricePaise:fill.averagePricePaise,exchange:contract.exchange,
+      averagePricePaise,exchange:contract.exchange,
       segment:contract.segment,expiry:contract.expiry,lotSize:contract.lotSize
     };
     else delete derivativePositions[contract.instrumentKey];
-    const realizedPnlPaise=(account.realizedPnlPaise??0)+fill.realizedPnlPaise;
+    const realizedPnlPaise=(account.realizedPnlPaise??0)+orderRealizedPnlPaise;
     if(!Number.isSafeInteger(realizedPnlPaise))fail("Derivative realized P&L exceeds safe calculation limits.",409);
     const storedOrder={
       uid,requestFingerprint,instrumentKey:contract.instrumentKey,
@@ -87,7 +99,7 @@ async function executeLongOptionBuyTransaction({
       lotSize:contract.lotSize,executionPricePaise:quote.pricePaise,
       quoteTimestampMs:quote.observedAtMs,quoteAgeMs:now-quote.observedAtMs,
       grossPaise:contract.contractValuePaise,charges,chargesPaise:charges.totalChargesPaise,totalDebitPaise:charges.totalDebitPaise,netCreditPaise:charges.netCreditPaise,orderType:"MARKET",
-      status:"FILLED",realizedPnlPaise:fill.realizedPnlPaise,
+      status:"FILLED",realizedPnlPaise:orderRealizedPnlPaise,
       cashDeltaPaise:fill.cashDeltaPaise,simulationOnly:true,
       excludesCharges:false,createdAt:serverTimestamp()
     };
