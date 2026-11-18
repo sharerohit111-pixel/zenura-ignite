@@ -460,8 +460,8 @@ app.get("/paper/derivatives/portfolio",async(req,res)=>{
          (p.netQuantity>0&&p.averagePricePaise<1)||
          (p.costBasisPaise!==undefined&&(!Number.isSafeInteger(p.costBasisPaise)||p.costBasisPaise<0))||
          (p.netQuantity===0&&(p.averagePricePaise!==0||(p.costBasisPaise??0)!==0))||
-         (p.netQuantity>0&&Math.round((p.costBasisPaise??(p.netQuantity*p.averagePricePaise))/p.netQuantity)!==p.averagePricePaise)||
-         (p.netQuantity>0&&!Number.isSafeInteger(p.costBasisPaise??(p.netQuantity*p.averagePricePaise))))
+         (p.netQuantity>0&&Math.round((p.costBasisPaise??(Math.abs(p.netQuantity)*p.averagePricePaise))/p.netQuantity)!==p.averagePricePaise)||
+         (p.netQuantity>0&&!Number.isSafeInteger(p.costBasisPaise??(Math.abs(p.netQuantity)*p.averagePricePaise))))
         return res.status(409).json({error:"A stored derivative position is malformed; valuation stopped to protect account totals."});
       if(p.netQuantity>0)positions.push({instrumentKey,instrumentType:p.instrumentType,netQuantity:p.netQuantity,averagePricePaise:p.averagePricePaise,costBasisPaise:p.costBasisPaise});
     }
