@@ -8,10 +8,10 @@ test("converts rupees to exact paise safely",()=>{
  for(const value of [-1,NaN,Infinity,"10",1.001,Number.MAX_SAFE_INTEGER])assert.equal(rupeesToPaise(value),null);
 });
 test("normalizes official Upstox margin response",()=>{
- const result=normalizeUpstoxMarginResponse({status:"success",data:{required_margin:12500.5,final_margin:12000,margins:[{instrument_key:key,span:9000,exposure:3500,total_margin:12500.5}]}},key);
+ const result=normalizeUpstoxMarginResponse({status:"success",data:{required_margin:12500.5,final_margin:12000,margins:[{instrument_key:key,span:9000,exposure:3500,net_buy_premium:250,total_margin:12500.5}]}},key);
  assert.equal(result.requiredMarginPaise,1250050);
  assert.equal(result.finalMarginPaise,1200000);
- assert.deepEqual(result.components,[{spanPaise:900000,exposurePaise:350000,total_marginPaise:1250050}]);
+ assert.deepEqual(result.components,[{spanPaise:900000,exposurePaise:350000,net_buy_premiumPaise:25000,total_marginPaise:1250050}]);
  assert.equal(result.source,"upstox_v2_charges_margin");
 });
 test("rejects failed, missing, malformed and unsafe margin responses",()=>{
