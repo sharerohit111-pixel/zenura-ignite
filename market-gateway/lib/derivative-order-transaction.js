@@ -56,8 +56,15 @@ async function executeLongOptionTransaction({
        account.version>=Number.MAX_SAFE_INTEGER||
        (account.reservedMarginPaise!==undefined&&account.reservedMarginPaise!==0))
       fail("Derivative paper account contains invalid or unsupported balance data.",409);
-    const derivativePositions=account.derivativePositions&&typeof account.derivativePositions==="object"&&!Array.isArray(account.derivativePositions)?{...account.derivativePositions}:{};
-    const priorPosition=derivativePositions[contract.instrumentKey]||{netQuantity:0,averagePricePaise:0};
+    if(account.derivativePositions!==undefined&&
+       (!account.derivativePositions||typeof account.derivativePositions!=="object"||
+        Array.isArray(account.derivativePositions)))
+      fail("Derivative paper account contains malformed position data.",409);
+    const derivativePositions=account.derivativePositions===undefined?{}:{...account.derivativePositions};
+    const hasStoredPosition=Object.prototype.hasOwnProperty.call(derivativePositions,contract.instrumentKey);
+    const priorPosition=hasStoredPosition?derivativePositions[contract.instrumentKey]:{netQuantity:0,averagePricePaise:0};
+    if(!priorPosition||typeof priorPosition!=="object"||Array.isArray(priorPosition))
+      fail("Stored option position record is malformed.",409);
     if(!Number.isSafeInteger(priorPosition.netQuantity)||priorPosition.netQuantity<0||
        priorPosition.netQuantity>1_000_000||
        !Number.isSafeInteger(priorPosition.averagePricePaise)||priorPosition.averagePricePaise<0||
