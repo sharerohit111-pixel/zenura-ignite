@@ -84,6 +84,21 @@ body.day .exit-panel{background:#fff;border-color:#d4dfeb}body.day .exit-limit{b
 .brand b i{color:transparent;background:inherit;-webkit-background-clip:text;background-clip:text}
 .brand small{background:linear-gradient(100deg,#35e6a8 0%,#20c9d8 48%,#548dff 100%);-webkit-background-clip:text;background-clip:text;color:transparent;font-weight:800;letter-spacing:1.6px}
 @media(max-width:720px){.brand small{font-size:8px;letter-spacing:1.35px}}
+
+/* FINAL brand color override: green-to-blue, overriding legacy white !important rules */
+header.top a.brand > span:last-child > b,
+header.top a.brand > span:last-child > b i{
+  background:linear-gradient(100deg,#35e6a8 0%,#20c9d8 48%,#548dff 100%)!important;
+  -webkit-background-clip:text!important;background-clip:text!important;
+  -webkit-text-fill-color:transparent!important;color:transparent!important;
+  text-shadow:0 0 12px #25d7b044!important;
+}
+header.top a.brand > span:last-child > small{
+  background:linear-gradient(100deg,#35e6a8 0%,#20c9d8 48%,#548dff 100%)!important;
+  -webkit-background-clip:text!important;background-clip:text!important;
+  -webkit-text-fill-color:transparent!important;color:transparent!important;
+  text-shadow:0 0 10px #25d7b033!important;
+}
 </style>
 </head>
 <body>
