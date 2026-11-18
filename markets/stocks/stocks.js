@@ -275,7 +275,7 @@
     const fingerprint=instrumentKey+'|'+side+'|'+lots;
     if(pendingDerivativeOrder&&pendingDerivativeOrder.fingerprint!==fingerprint){optionStatus.textContent='A previous order response is uncertain. Retry the same contract and lot quantity first.';return;}
     if(!pendingDerivativeOrder)pendingDerivativeOrder={fingerprint,key:window.crypto.randomUUID()};
-    derivativeOrderSubmitting=true;optionButton.disabled=true;optionStatus.textContent='Verifying live option quote and placing simulated '+type+' BUY…';
+    derivativeOrderSubmitting=true;optionButton.disabled=true;optionStatus.textContent='Verifying live option quote and placing simulated '+type+' '+side+'…';
     try{
       const token=await connector.getIdToken(),response=await fetch(gateway+'/paper/derivative/orders',{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json',Accept:'application/json'},body:JSON.stringify({instrument_key:instrumentKey,side,lots,idempotency_key:pendingDerivativeOrder.key})});
       const data=await response.json();if(!response.ok){if(response.status>=400&&response.status<500)pendingDerivativeOrder=null;throw new Error(data.error||'Derivative paper order rejected.');}
