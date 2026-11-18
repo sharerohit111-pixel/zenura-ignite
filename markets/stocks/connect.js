@@ -1,0 +1,73 @@
+/* Indian Market account connection — uses the root ZENURA Firebase project,
+ * intentionally separate from the legacy Crypto Firebase auth project. */
+import { auth } from "../../firebase-client.js";
+import { GoogleAuthProvider, signInWithPopup, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-auth.js";
+import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-functions.js";
+
+const REGION = "asia-south1";
+const functions = getFunctions(auth.app, REGION);
+const startAuthorization = httpsCallable(functions, "startUpstoxAuthorization");
+const getConnectionStatus = httpsCallable(functions, "getIndianMarketConnectionStatus");
+const button = document.getElementById("upstox-connect");
+const card = document.getElementById("connection");
+const heading = document.getElementById("connection-title");
+const detail = document.getElementById("connection-sub");
+
+function setState(title, message, connected = false) {
+  heading.textContent = title;
+  detail.textContent = message;
+  card.classList.toggle("connected", connected);
+  button.textContent = connected ? "RECONNECT UPSTOX" : (auth.currentUser ? "CONNECT UPSTOX" : "SIGN IN / CONNECT");
+}
+function explainError(error) {
+  const code = error?.code || "";
+  if (code.includes("unauthenticated")) return "Sign-in required. Please sign in and retry.";
+  if (code.includes("permission-denied")) return "This account is not allowed to start authorization.";
+  if (code.includes("not-found") || code.includes("unavailable")) return "Backend functions are not deployed to the configured Firebase project yet.";
+  if (code.includes("unauthorized-domain")) return "Add this website domain in Firebase Authentication → Settings → Authorized domains.";
+  return error?.message || "Could not connect. Please retry.";
+}
+async function refreshStatus() {
+  if (!auth.currentUser) {
+    setState("SIGN IN REQUIRED", "Sign in with Google to securely connect your Upstox account.");
+    return;
+  }
+  try {
+    const result = await getConnectionStatus();
+    const data = result.data || {};
+    if (data.connected) {
+      setState("UPSTOX AUTHORIZED", data.feedReady
+        ? "Market feed gateway is ready."
+        : "Account authorized. Live feed gateway is not deployed yet.", true);
+    } else if (data.status === "token_expired") {
+      setState("UPSTOX TOKEN EXPIRED", "Reconnect your Upstox account to continue.");
+    } else {
+      setState("UPSTOX NOT CONNECTED", "Authorize Upstox to link your trading account.");
+    }
+  } catch (error) {
+    setState("BACKEND NOT READY", explainError(error));
+  }
+}
+button.addEventListener("click", async () => {
+  button.disabled = true;
+  try {
+    if (!auth.currentUser) {
+      setState("SIGNING IN", "Complete Google sign-in in the popup.");
+      await signInWithPopup(auth, new GoogleAuthProvider());
+    }
+    setState("STARTING UPSTOX", "Preparing secure authorization…");
+    const result = await startAuthorization();
+    const url = result.data?.authorizationUrl;
+    if (!url || !url.startsWith("https://api.upstox.com/")) {
+      throw new Error("The server did not return a valid Upstox authorization URL.");
+    }
+    window.location.assign(url);
+  } catch (error) {
+    setState("CONNECTION NOT COMPLETED", explainError(error));
+    button.disabled = false;
+  }
+});
+onAuthStateChanged(auth, refreshStatus);
+if (new URLSearchParams(location.search).get("upstox") === "connected") {
+  history.replaceState({}, "", location.pathname);
+}
