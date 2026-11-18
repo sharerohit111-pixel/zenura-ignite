@@ -178,3 +178,18 @@ test("adding to an existing position remains allowed at the 50-position limit",a
  assert.equal(writes.length,2);
  assert.equal(writes[1][2].positions["NSE_EQ|STOCK0"].quantity,2);
 });
+
+test("closed legacy position entries do not consume the 50 open-position limit",async()=>{
+ const positions=Object.fromEntries(Array.from({length:50},(_,i)=>[`NSE_EQ|CLOSED${i}`,{quantity:0,averagePricePaise:0}]));
+ const {common,writes}=setup(undefined,{cashPaise:100000,realizedPnlPaise:0,positions,version:2});
+ common.order.instrumentKey="NSE_EQ|NEW";common.order.quantity=1;common.pricePaise=100;
+ await executePaperOrderTransaction(common);
+ assert.equal(writes.length,2);
+ assert.equal(writes[1][2].positions["NSE_EQ|NEW"].quantity,1);
+});
+test("malformed unrelated cash-equity position rejects order before writes",async()=>{
+ const positions={"NSE_EQ|BAD":{quantity:1,averagePricePaise:-1}};
+ const {common,writes}=setup(undefined,{cashPaise:100000,realizedPnlPaise:0,positions,version:2});
+ await assert.rejects(executePaperOrderTransaction(common),error=>error.status===409&&/malformed cash-equity position/.test(error.message));
+ assert.equal(writes.length,0);
+});
