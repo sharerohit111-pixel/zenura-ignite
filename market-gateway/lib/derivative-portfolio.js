@@ -37,7 +37,7 @@ function calculateDerivativePortfolio({positions,quotes,marginSnapshots=[],now=D
   marketValuePaise+=p.instrumentType==="FUT"?0:signedValue;
   unrealizedPnlPaise+=pnl;reservedMarginPaise+=requiredMargin;
   if(!Number.isSafeInteger(marketValuePaise)||!Number.isSafeInteger(unrealizedPnlPaise)||!Number.isSafeInteger(reservedMarginPaise))fail("Derivative portfolio totals exceed safe calculation limits.");
-  valued.push({instrumentKey:p.instrumentKey,instrumentType:p.instrumentType,netQuantity:p.netQuantity,averagePricePaise:p.averagePricePaise,costBasisPaise,marketPricePaise:q.pricePaise,unrealizedPnlPaise:pnl,requiredMarginPaise:requiredMargin,quoteAgeMs:now-q.observedAtMs,marginAgeMs});
+  valued.push({instrumentKey:p.instrumentKey,instrumentType:p.instrumentType,netQuantity:p.netQuantity,averagePricePaise:p.averagePricePaise,costBasisPaise,marketPricePaise:q.pricePaise,marketValuePaise:p.instrumentType==="FUT"?0:signedValue,unrealizedPnlPaise:pnl,requiredMarginPaise:requiredMargin,quoteAgeMs:now-q.observedAtMs,marginAgeMs});
  }
  return {positions:valued,marketValuePaise,unrealizedPnlPaise,reservedMarginPaise,valuationStatus:"fresh",simulationOnly:true,includesEntryCharges:true,excludesEstimatedExitCharges:true};
 }
