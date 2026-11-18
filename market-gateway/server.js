@@ -25,6 +25,7 @@ const {buildPortfolioValuation}=require("./lib/paper-portfolio-valuation");
 const {createLeaseHeartbeat}=require("./lib/lease-heartbeat");
 const {isUpstoxTokenUsable}=require("./lib/upstox-token");
 const {executeLongOptionTransaction}=require("./lib/derivative-order-transaction");
+const {parseMarginPreviewInput}=require("./lib/margin-preview-input");
 admin.initializeApp();
 const db=admin.firestore();
 const app=express();
@@ -289,17 +290,7 @@ app.post("/paper/orders",async(req,res)=>{
 app.post("/paper/derivative/margin-preview",async(req,res)=>{
   try{
     const decoded=await authenticate(req);
-    const instrumentKey=typeof req.body?.instrument_key==="string"?req.body.instrument_key:"";
-    const lots=Number(req.body?.lots);
-    const side=String(req.body?.side||"").toUpperCase();
-    const product=String(req.body?.product||"D").toUpperCase();
-    if(!["I","D"].includes(product))return res.status(400).json({error:"Margin preview product must be I (Intraday) or D (Delivery)."});
-    if(!instrumentKey||instrumentKey.length>100||/[\\r\\n]/.test(instrumentKey))
-      return res.status(400).json({error:"A valid instrument_key is required."});
-    if(!Number.isSafeInteger(lots)||lots<1||lots>10000)
-      return res.status(400).json({error:"Lots must be a whole number between 1 and 10,000."});
-    if(!["BUY","SELL"].includes(side))
-      return res.status(400).json({error:"Margin preview side must be BUY or SELL."});
+    const {instrumentKey,lots,side,product}=parseMarginPreviewInput(req.body);
     if(!instrumentCache.length||Date.now()-instrumentCacheUpdatedAt>6*60*60*1000)await refreshInstrumentCache();
     const instrument=instrumentCache.find(x=>x.instrument_key===instrumentKey&&x.instrument_type==="FUT"&&["NSE_FO","BSE_FO"].includes(x.segment));
     if(!instrument)return res.status(400).json({error:"Select a verified NSE/BSE futures contract from the official instrument master."});
