@@ -41,6 +41,7 @@ Set `ALLOWED_ORIGINS` to the exact deployed frontend origin. The service intenti
 ### Futures margin preview (preview only)
 
 - The authenticated `POST /paper/derivative/margin-preview` endpoint accepts only an official NSE/BSE futures instrument key, whole lots, and BUY/SELL side.
+- Broker margin previews are limited to one request per authenticated Firebase UID every five seconds using a Firestore transaction (`indianMarginPreviewLimits`), so the cooldown is shared across Cloud Run instances. Rejected requests return HTTP 429 with `Retry-After`; the limiter is server-managed and does not reserve virtual cash.
 - The gateway obtains a fresh Upstox V3 quote, validates the contract against the current official instrument master, then calls Upstox V2 `POST /v2/charges/margin` with the selected product `D` (Delivery) or `I` (Intraday) and the verified quantity/price.
 - The response is validated and returned as a rupee-to-paise margin estimate alongside the user's virtual cash and shortfall.
 - The Stocks UI exposes this only when a futures contract is selected. It is explicitly preview-only: no Firestore write, virtual cash reservation, paper fill, or real broker order occurs.
