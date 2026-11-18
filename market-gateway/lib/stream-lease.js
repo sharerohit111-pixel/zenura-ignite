@@ -1,6 +1,10 @@
 "use strict";
+function validLeaseOptions(now,leaseMs,collection){
+ return Number.isSafeInteger(now)&&now>=0&&Number.isSafeInteger(leaseMs)&&leaseMs>=1000&&Number.isSafeInteger(now+leaseMs)&&typeof collection==="string"&&collection.length>0;
+}
 async function acquireStreamLease(db,uid,leaseId,{now=Date.now(),leaseMs=60000,collection="indianMarketStreamLeases"}={}){
- if(!db||typeof uid!=="string"||!uid||typeof leaseId!=="string"||!leaseId||!Number.isFinite(now)||!Number.isSafeInteger(leaseMs)||leaseMs<1000)return false;
+ if(!validLeaseOptions(now,leaseMs,collection))return false;
+ if(!db||typeof uid!=="string"||!uid||typeof leaseId!=="string"||!leaseId )return false;
  const ref=db.collection(collection).doc(uid);
  return db.runTransaction(async tx=>{
   const snap=await tx.get(ref),current=snap.exists?snap.data():null;
@@ -10,7 +14,7 @@ async function acquireStreamLease(db,uid,leaseId,{now=Date.now(),leaseMs=60000,c
  });
 }
 async function renewStreamLease(db,uid,leaseId,{now=Date.now(),leaseMs=60000,collection="indianMarketStreamLeases"}={}){
- if(!db||typeof uid!=="string"||!uid||typeof leaseId!=="string"||!leaseId)return false;
+ if(!db||typeof uid!=="string"||!uid||typeof leaseId!=="string"||!leaseId||!validLeaseOptions(now,leaseMs,collection))return false;
  const ref=db.collection(collection).doc(uid);
  return db.runTransaction(async tx=>{
   const snap=await tx.get(ref),current=snap.exists?snap.data():null;
@@ -20,7 +24,7 @@ async function renewStreamLease(db,uid,leaseId,{now=Date.now(),leaseMs=60000,col
  });
 }
 async function releaseStreamLease(db,uid,leaseId,{collection="indianMarketStreamLeases"}={}){
- if(!db||typeof uid!=="string"||!uid||typeof leaseId!=="string"||!leaseId)return false;
+ if(!db||typeof uid!=="string"||!uid||typeof leaseId!=="string"||!leaseId||typeof collection!=="string"||!collection)return false;
  const ref=db.collection(collection).doc(uid);
  return db.runTransaction(async tx=>{
   const snap=await tx.get(ref),current=snap.exists?snap.data():null;
