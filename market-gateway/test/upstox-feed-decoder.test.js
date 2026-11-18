@@ -51,3 +51,35 @@ test("rejects malformed protobuf bytes",async()=>{
  const Type=root.lookupType("com.upstox.marketdatafeederv3udapi.rpc.proto.FeedResponse");
  assert.throws(()=>decodeFeedResponse(Type,Buffer.from([0xff,0xff,0xff])));
 });
+
+test("receives and decodes a binary feed frame over a local WebSocket server",async(t)=>{
+ const WebSocket=require("ws");
+ const root=await protobuf.load(path.join(__dirname,"..","proto","MarketDataFeedV3.proto"));
+ const Type=root.lookupType("com.upstox.marketdatafeederv3udapi.rpc.proto.FeedResponse");
+ const expected={type:1,currentTs:"1731931200123",feeds:{"NSE_EQ|INE001A01036":{ltpc:{ltp:250.25,ltt:"1731931200000",ltq:"8",cp:249.5}}}};
+ const frame=Type.encode(Type.create(expected)).finish();
+ const server=new WebSocket.WebSocketServer({host:"127.0.0.1",port:0});
+ await new Promise((resolve,reject)=>{server.once("listening",resolve);server.once("error",reject);});
+ const address=server.address();
+ const received=new Promise((resolve,reject)=>{
+  server.once("connection",socket=>socket.send(frame,{binary:true},error=>{if(error)reject(error);}));
+ });
+ const client=new WebSocket("ws://127.0.0.1:"+address.port);
+ const decoded=new Promise((resolve,reject)=>{
+  client.once("message",(bytes,isBinary)=>{
+   try{
+    assert.equal(isBinary,true);
+    resolve(decodeFeedResponse(Type,bytes));
+   }catch(error){reject(error);}
+  });
+  client.once("error",reject);
+ });
+ t.after(async()=>{
+  if(client.readyState===WebSocket.OPEN||client.readyState===WebSocket.CONNECTING)client.close();
+  await new Promise(resolve=>server.close(resolve));
+ });
+ await received;
+ const result=await decoded;
+ assert.equal(result.feeds["NSE_EQ|INE001A01036"].ltpc.ltp,250.25);
+ assert.equal(result.currentTs,"1731931200123");
+});
