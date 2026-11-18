@@ -33,6 +33,6 @@ function calculateDerivativePortfolio({positions,quotes,marginSnapshots=[],now=D
   if(!Number.isSafeInteger(marketValuePaise)||!Number.isSafeInteger(unrealizedPnlPaise)||!Number.isSafeInteger(reservedMarginPaise))fail("Derivative portfolio totals exceed safe calculation limits.");
   valued.push({instrumentKey:p.instrumentKey,instrumentType:p.instrumentType,netQuantity:p.netQuantity,averagePricePaise:p.averagePricePaise,marketPricePaise:q.pricePaise,unrealizedPnlPaise:pnl,requiredMarginPaise:requiredMargin,quoteAgeMs:now-q.observedAtMs,marginAgeMs});
  }
- return {positions:valued,marketValuePaise,unrealizedPnlPaise,reservedMarginPaise,valuationStatus:"fresh",simulationOnly:true,excludesCharges:true};
+ return {positions:valued,marketValuePaise,unrealizedPnlPaise,reservedMarginPaise,valuationStatus:"fresh",simulationOnly:true,includesEntryCharges:true,excludesEstimatedExitCharges:true};
 }
 module.exports={calculateDerivativePortfolio,MAX_QUOTE_AGE_MS,MAX_MARGIN_AGE_MS};
