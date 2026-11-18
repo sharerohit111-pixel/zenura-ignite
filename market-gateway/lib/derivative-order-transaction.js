@@ -68,24 +68,37 @@ async function executeLongOptionTransaction({
       instrumentType:contract.instrumentType,side,quantity:contract.quantity,
       pricePaise:quote.pricePaise,position:priorPosition,now
     });
+    const priorCostBasisPaise=priorPosition.costBasisPaise===undefined
+      ?priorPosition.netQuantity*priorPosition.averagePricePaise
+      :priorPosition.costBasisPaise;
+    if(!Number.isSafeInteger(priorCostBasisPaise)||priorCostBasisPaise<0||
+       (priorPosition.netQuantity>0&&priorCostBasisPaise<1))
+      fail("Stored option cost basis is invalid.",409);
     let averagePricePaise=fill.averagePricePaise;
-    let orderRealizedPnlPaise=fill.realizedPnlPaise;
+    let costBasisPaise=0;
+    let orderRealizedPnlPaise=0;
     if(side==="BUY"){
-      const priorCostPaise=priorPosition.netQuantity*priorPosition.averagePricePaise;
-      const totalCostPaise=priorCostPaise+contract.contractValuePaise+charges.totalChargesPaise;
-      if(!Number.isSafeInteger(priorCostPaise)||!Number.isSafeInteger(totalCostPaise)||fill.netQuantity<1)
+      costBasisPaise=priorCostBasisPaise+contract.contractValuePaise+charges.totalChargesPaise;
+      if(!Number.isSafeInteger(costBasisPaise)||fill.netQuantity<1)
         fail("Option position cost basis exceeds supported calculation limits.",409);
-      averagePricePaise=Math.round(totalCostPaise/fill.netQuantity);
+      averagePricePaise=Math.round(costBasisPaise/fill.netQuantity);
     }else{
-      orderRealizedPnlPaise=fill.realizedPnlPaise-charges.totalChargesPaise;
+      const closedCostBasisPaise=contract.quantity===priorPosition.netQuantity
+        ?priorCostBasisPaise
+        :Math.round(priorCostBasisPaise*contract.quantity/priorPosition.netQuantity);
+      costBasisPaise=priorCostBasisPaise-closedCostBasisPaise;
+      orderRealizedPnlPaise=contract.contractValuePaise-closedCostBasisPaise-charges.totalChargesPaise;
+      if(fill.netQuantity>0)averagePricePaise=Math.round(costBasisPaise/fill.netQuantity);
     }
-    if(!Number.isSafeInteger(orderRealizedPnlPaise))fail("Net realized option P&L exceeds supported calculation limits.",409);
+    if(!Number.isSafeInteger(costBasisPaise)||costBasisPaise<0||
+       !Number.isSafeInteger(orderRealizedPnlPaise))
+      fail("Net realized option P&L or cost basis exceeds supported calculation limits.",409);
     const cashPaise=account.cashPaise+fill.cashDeltaPaise-charges.totalChargesPaise;
     if(!Number.isSafeInteger(cashPaise)||cashPaise<0)
       fail("Insufficient derivative paper cash for this option premium.",409);
     if(fill.netQuantity>0)derivativePositions[contract.instrumentKey]={
       instrumentType:contract.instrumentType,netQuantity:fill.netQuantity,
-      averagePricePaise,exchange:contract.exchange,
+      averagePricePaise,costBasisPaise,exchange:contract.exchange,
       segment:contract.segment,expiry:contract.expiry,lotSize:contract.lotSize
     };
     else delete derivativePositions[contract.instrumentKey];
