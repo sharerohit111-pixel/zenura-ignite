@@ -81,17 +81,19 @@ async function executeLongOptionTransaction({
     }
     if(side==="SELL"&&priorPosition.netQuantity<contract.quantity)
       fail("SELL is allowed only to close an existing long option position; short options are disabled.",409);
-    const fill=applyDerivativeFill({
-      instrumentType:contract.instrumentType,side,quantity:contract.quantity,
-      pricePaise:quote.pricePaise,position:priorPosition,now
-    });
     const priorCostBasisPaise=priorPosition.costBasisPaise===undefined
       ?priorPosition.netQuantity*priorPosition.averagePricePaise
       :priorPosition.costBasisPaise;
     if(!Number.isSafeInteger(priorCostBasisPaise)||priorCostBasisPaise<0||
        (priorPosition.netQuantity>0&&priorCostBasisPaise<1)||
-       (priorPosition.netQuantity===0&&priorCostBasisPaise!==0))
-      fail("Stored option cost basis is invalid.",409);
+       (priorPosition.netQuantity===0&&priorCostBasisPaise!==0)||
+       (priorPosition.netQuantity>0&&
+        Math.round(priorCostBasisPaise/priorPosition.netQuantity)!==priorPosition.averagePricePaise))
+      fail("Stored option cost basis is invalid or inconsistent with its average price.",409);
+    const fill=applyDerivativeFill({
+      instrumentType:contract.instrumentType,side,quantity:contract.quantity,
+      pricePaise:quote.pricePaise,position:priorPosition,now
+    });
     let averagePricePaise=fill.averagePricePaise;
     let costBasisPaise=0;
     let orderRealizedPnlPaise=0;
