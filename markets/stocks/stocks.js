@@ -397,7 +397,7 @@
       if(controller.signal.aborted||selected?.instrument_key!==item.instrument_key)return;
       const response=await fetch(gateway+'/stream',{method:'POST',signal:controller.signal,headers:{Authorization:'Bearer '+token,'Content-Type':'application/json',Accept:'text/event-stream'},body:JSON.stringify({instrumentKeys:[item.instrument_key],mode:'ltpc'})});
       if(!response.ok){
-        if(response.status===401||response.status===403){
+        if(!window.ZenuraReconnectPolicy.shouldRetryFeedStatus(response.status)){
           setFeedStatus('Upstox authorization required','Your sign-in or broker token is no longer valid. Reconnect Upstox, then select this instrument again.');
           return;
         }
