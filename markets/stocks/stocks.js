@@ -258,15 +258,16 @@
     if(!selected||!gateway)return;
     const connector=window.ZENURA_MARKET_CONNECTOR;
     if(!connector?.getIdToken){chartStatus.textContent='Sign in to load historical candles';return;}
-    const request=++chartRequest,[unit,interval,days]=frames[activeTimeframe];
+    const request=++chartRequest,instrumentKey=selected.instrument_key,timeframe=activeTimeframe,[unit,interval,days]=frames[activeTimeframe];
     chart.textContent='';const loading=document.createElement('b');loading.textContent='Loading verified historical candles…';chart.append(loading);chartStatus.textContent='Requesting Upstox V3';
     try{
       const token=await connector.getIdToken(),to=localDate(),from=localDate(-days);
-      const params=new URLSearchParams({instrument_key:selected.instrument_key,unit,interval:String(interval),to_date:to,from_date:from});
+      if(request!==chartRequest||selected?.instrument_key!==instrumentKey)return;
+      const params=new URLSearchParams({instrument_key:instrumentKey,unit,interval:String(interval),to_date:to,from_date:from});
       const response=await fetch(gateway+'/candles?'+params,{headers:{Authorization:'Bearer '+token,Accept:'application/json'}});
       if(!response.ok)throw new Error('Historical candles unavailable ('+response.status+').');
-      const payload=await response.json();if(request!==chartRequest)return;
-      renderChart(payload.data?.candles||[]);chartStatus.textContent='Historical candles · Upstox V3 · '+activeTimeframe;
+      const payload=await response.json();if(request!==chartRequest||selected?.instrument_key!==instrumentKey)return;
+      renderChart(payload.data?.candles||[]);chartStatus.textContent='Historical candles · Upstox V3 · '+timeframe;
     }catch(error){if(request!==chartRequest)return;chart.textContent='';const b=document.createElement('b');b.textContent='Chart data unavailable';const span=document.createElement('span');span.textContent=error.message||'Could not load historical candles.';chart.append(b,span);chartStatus.textContent='Not connected';}
   }
   timeframeButtons.forEach(button=>button.addEventListener('click',()=>{activeTimeframe=button.dataset.timeframe;timeframeButtons.forEach(x=>x.classList.toggle('active',x===button));loadCandles();}));
