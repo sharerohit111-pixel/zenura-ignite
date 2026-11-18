@@ -7,7 +7,7 @@ function setup(existingOrder,initialAccount=account){
  const writes=[];
  const snapshots={account:{exists:true,data:()=>({...initialAccount,positions:{...initialAccount.positions}})},order:{exists:Boolean(existingOrder),data:()=>existingOrder}};
  const db={runTransaction:async callback=>callback({get:async ref=>snapshots[ref.id],create:(ref,data)=>writes.push(["create",ref.id,data]),update:(ref,data)=>writes.push(["update",ref.id,data])})};
- const common={db,accountRef:{id:"account"},orderRef:{id:"order"},uid:"user-1",requestFingerprint:"fingerprint",order:{uid:"user-1",requestFingerprint:"fingerprint",instrumentKey:"NSE_EQ|AAA",side:"BUY",quantity:2},pricePaise:1000,publicPaperOrder:(order,meta)=>({order,meta}),serverTimestamp:()=>"server-time"};
+ const common={db,accountRef:{id:"user-1"},orderRef:{id:"order"},uid:"user-1",requestFingerprint:"fingerprint",order:{uid:"user-1",requestFingerprint:"fingerprint",instrumentKey:"NSE_EQ|AAA",side:"BUY",quantity:2},pricePaise:1000,publicPaperOrder:(order,meta)=>({order,meta}),serverTimestamp:()=>"server-time"};
  return {common,writes};
 }
 test("shared transaction writes the order and account update atomically",async()=>{
