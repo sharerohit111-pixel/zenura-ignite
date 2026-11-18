@@ -18,3 +18,18 @@
 .paper-actions button:disabled{opacity:.38;cursor:not-allowed}
 .paper-actions .secondary{background:rgba(220,80,90,.16);color:#ff9b9f;border:1px solid rgba(220,80,90,.3)}
 #paper-order-status{margin-top:12px;line-height:1.5;overflow-wrap:anywhere}
+
+.portfolio-panel{margin-top:14px}
+.portfolio-panel>.panel-head>button{border:1px solid #287e70;background:#123c37;color:#70e8c8;border-radius:8px;padding:9px 12px;font-size:9px;font-weight:900;cursor:pointer}
+.portfolio-metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:14px 0}
+.portfolio-metrics>div{display:grid;gap:7px;padding:13px;border:1px solid #203b54;border-radius:11px;background:#0a1928;min-width:0}
+.portfolio-metrics small{font-size:8px;letter-spacing:.8px;color:#829bb0}
+.portfolio-metrics b{font-size:clamp(14px,2vw,20px);overflow-wrap:anywhere}
+.portfolio-status{font-size:10px;color:#8fa8bc;line-height:1.5}
+.table-scroll{width:100%;overflow-x:auto;margin:10px 0 18px}
+.paper-table{width:100%;min-width:650px;border-collapse:collapse;font-size:9px}
+.paper-table th,.paper-table td{padding:10px 9px;border-bottom:1px solid #203b54;text-align:left;white-space:nowrap}
+.paper-table th{font-size:8px;letter-spacing:.6px;color:#829bb0}
+.paper-table td{color:#d0dfeb}
+.history-heading{padding-top:8px;border-top:1px solid #203b54}
+@media(max-width:600px){.portfolio-metrics{grid-template-columns:1fr 1fr}.portfolio-metrics>div:last-child{grid-column:1/-1}}
