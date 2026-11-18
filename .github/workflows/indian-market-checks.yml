@@ -20,7 +20,7 @@ permissions:
 
 jobs:
   syntax-and-unit-tests:
-    name: Syntax and paper trading unit tests
+    name: Syntax and gateway unit tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -33,5 +33,5 @@ jobs:
         run: node --check market-gateway/server.js
       - name: Validate gateway package manifest
         run: node -e "JSON.parse(require('node:fs').readFileSync('market-gateway/package.json','utf8'))"
-      - name: Run paper trading unit tests
+      - name: Run gateway unit tests
         run: node --test market-gateway/test/*.test.js
