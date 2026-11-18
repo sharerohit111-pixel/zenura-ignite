@@ -431,13 +431,14 @@ app.post("/stream",async(req,res)=>{
     res.status(200);
     res.set({"Content-Type":"text/event-stream","Cache-Control":"no-cache, no-transform","Connection":"keep-alive","X-Accel-Buffering":"no"});
     res.flushHeaders?.();
-    writeEvent("status",{connected:true,mode,keys:keys.length});
+    writeEvent("status",{connected:false,connecting:true,mode,keys:keys.length});
     upstream=new WebSocket(authData.data.authorized_redirect_uri,{
       followRedirects:true,handshakeTimeout:15000,
       headers:{Authorization:"Bearer "+accessToken,Accept:"*/*"}
     });
     upstream.on("open",()=>{
       if(closed||res.destroyed||res.writableEnded){stop();return;}
+      writeEvent("status",{connected:true,mode,keys:keys.length});
       upstream.send(Buffer.from(JSON.stringify({guid:crypto.randomUUID(),method:"sub",data:{mode,instrumentKeys:keys}})),error=>{
         if(error){writeEvent("error",{message:"Market feed subscription could not be sent"});stop();if(!res.writableEnded)res.end();}
       });
