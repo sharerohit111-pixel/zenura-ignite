@@ -4,6 +4,7 @@ const test=require("node:test");
 const assert=require("node:assert/strict");
 const {Firestore,FieldValue}=require("@google-cloud/firestore");
 const {executePaperOrderTransaction}=require("../lib/paper-order-transaction");
+const {consumeMarginPreviewSlot}=require("../lib/margin-preview-rate-limit");
 
 const emulatorHost=process.env.FIRESTORE_EMULATOR_HOST;
 const integrationTest=emulatorHost?test:test.skip;
@@ -107,4 +108,22 @@ integrationTest("Firestore emulator rejects paper orders when the UID account is
   const stored=await order.orderRef.get();
   assert.equal(stored.exists,false);
  }finally{await clean([order.accountRef,order.orderRef]);}
+});
+
+integrationTest("Firestore emulator serializes simultaneous margin preview cooldown requests per UID",async()=>{
+ const uid="margin-preview-user-"+crypto.randomUUID();
+ const ref=db.collection("indianMarginPreviewLimits").doc(uid);
+ try{
+  const results=await Promise.allSettled([
+   consumeMarginPreviewSlot(db,uid),
+   consumeMarginPreviewSlot(db,uid)
+  ]);
+  assert.equal(results.filter(x=>x.status==="fulfilled").length,1);
+  const rejected=results.find(x=>x.status==="rejected");
+  assert.equal(rejected.reason.status,429);
+  assert.equal(rejected.reason.retryAfterSeconds,5);
+  const stored=await ref.get();
+  assert.equal(stored.exists,true);
+  assert.equal(Number.isSafeInteger(stored.data().lastRequestAtMs),true);
+ }finally{await ref.delete().catch(()=>{});}
 });
