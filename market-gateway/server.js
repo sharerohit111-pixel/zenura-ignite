@@ -15,6 +15,7 @@ const {formatSseEvent,formatSseComment}=require("./lib/sse");
 const {quoteAgeMs,isFreshQuote}=require("./lib/quote-freshness");
 const {normalizeProviderQuote}=require("./lib/provider-quote");
 const {fetchProviderWithTimeout}=require("./lib/provider-fetch");
+const {createSingleFlight}=require("./lib/single-flight");
 const {validateStreamInstrumentKeys}=require("./lib/stream-subscription");
 const {reserveUserStream,releaseUserStream}=require("./lib/stream-registry");
 const {acquireStreamLease,renewStreamLease,releaseStreamLease}=require("./lib/stream-lease");
@@ -66,7 +67,7 @@ let FeedResponse;
 let instrumentCache=[];
 let instrumentCacheUpdatedAt=0;
 const activeUserStreams=new Map();
-async function refreshInstrumentCache(){
+const refreshInstrumentCache=createSingleFlight(async()=>{
   const response=await fetchProvider(INSTRUMENTS_URL,{headers:{Accept:"application/gzip"}});
   if(!response.ok) throw new Error("Upstox instrument master download failed: "+response.status);
   const parsed=await downloadInstrumentMaster(response);
@@ -74,7 +75,7 @@ async function refreshInstrumentCache(){
   instrumentCache=parsed;
   instrumentCacheUpdatedAt=Date.now();
   return instrumentCache.length;
-}
+});
 async function loadProto(){
   const root=await protobuf.load(path.join(__dirname,"proto","MarketDataFeedV3.proto"));
   FeedResponse=root.lookupType("com.upstox.marketdatafeederv3udapi.rpc.proto.FeedResponse");
