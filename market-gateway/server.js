@@ -228,7 +228,7 @@ app.get("/paper/account",async(req,res)=>{
     const decoded=await authenticate(req);
     const ref=paperAccountRef(decoded.uid);
     await ensurePaperAccount({
-      db,ref,startingCashPaise:paperStartingCashPaise,
+      db,ref,startingCashPaise:paperStartingCashPaise(),
       serverTimestamp:()=>admin.firestore.FieldValue.serverTimestamp()
     });
     const snap=await ref.get(),data=normalizePaperAccountState(snap.data());
