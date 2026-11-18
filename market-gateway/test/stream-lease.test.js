@@ -69,3 +69,14 @@ test("lease renewal requires matching owner and a safe future expiry",async()=>{
  db.docs.set(ref,{uid:"u1",leaseId:"lease-a",expiresAtMs:Number.MAX_SAFE_INTEGER+1});
  assert.equal(await renewStreamLease(db,"u1","lease-a",{now:1000}),false);
 });
+
+test("revoked lease cannot renew and a new stream can replace it",async()=>{
+ const db=fakeDb();
+ await acquireStreamLease(db,"u1","old",{now:1000,leaseMs:60000});
+ const ref="indianMarketStreamLeases/u1";
+ db.docs.set(ref,{...db.docs.get(ref),revoked:true,updatedAtMs:2000});
+ assert.equal(await renewStreamLease(db,"u1","old",{now:3000}),false);
+ assert.equal(await acquireStreamLease(db,"u1","new",{now:3000}),true);
+ assert.equal(db.docs.get(ref).leaseId,"new");
+ assert.equal(db.docs.get(ref).revoked,undefined);
+});
