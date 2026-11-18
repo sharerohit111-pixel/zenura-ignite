@@ -193,3 +193,16 @@ test("malformed unrelated cash-equity position rejects order before writes",asyn
  await assert.rejects(executePaperOrderTransaction(common),error=>error.status===409&&/malformed cash-equity position/.test(error.message));
  assert.equal(writes.length,0);
 });
+
+test("legacy account without a positions map can open its first equity position",()=>{
+ const {buildPaperOrderUpdate}=require("../lib/order-idempotency");
+ const result=buildPaperOrderUpdate({cashPaise:10000,realizedPnlPaise:0,version:1},{instrumentKey:"NSE_EQ|AAA",side:"BUY",quantity:1,pricePaise:1000});
+ assert.equal(result.cashPaise,9000);
+ assert.equal(result.positions["NSE_EQ|AAA"].quantity,1);
+});
+test("null or array positions maps remain invalid account state",()=>{
+ const {buildPaperOrderUpdate}=require("../lib/order-idempotency");
+ for(const positions of [null,[],"invalid"]){
+  assert.throws(()=>buildPaperOrderUpdate({cashPaise:10000,positions},{instrumentKey:"NSE_EQ|AAA",side:"BUY",quantity:1,pricePaise:1000}),{status:409});
+ }
+});
