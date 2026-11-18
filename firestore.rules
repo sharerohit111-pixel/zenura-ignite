@@ -21,6 +21,8 @@ service cloud.firestore {
     // OAuth states and encrypted broker credentials are server-only; never expose them to browser clients.
     match /upstoxOAuthStates/{stateId} { allow read, write: if false; }
     match /upstoxConnections/{uid} { allow read, write: if false; }
+    match /upstoxConnectionControls/{uid} { allow read, write: if false; }
+    match /indianMarketStreamLeases/{uid} { allow read, write: if false; }
 
     // Indian paper-trading balances and orders are server-only; clients use authenticated gateway APIs.
     match /indianMarketWatchlists/{uid} { allow read, write: if false; }
