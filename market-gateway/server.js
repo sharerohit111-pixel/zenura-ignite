@@ -24,6 +24,7 @@ const {decodeFeedResponse}=require("./lib/upstox-feed-decoder");
 const {filterFreshMarketFeeds}=require("./lib/market-feed-validation");
 const {buildPortfolioValuation}=require("./lib/paper-portfolio-valuation");
 const {createLeaseHeartbeat}=require("./lib/lease-heartbeat");
+const {readProviderJson}=require("./lib/provider-json");
 const {isUpstoxTokenUsable}=require("./lib/upstox-token");
 const {decryptUpstoxToken}=require("./lib/upstox-token-crypto");
 const {executeLongOptionTransaction}=require("./lib/derivative-order-transaction");
@@ -166,7 +167,7 @@ app.get("/candles",async(req,res)=>{
     if(fromDate)pathParts.push(encodeURIComponent(fromDate));
     const providerUrl="https://api.upstox.com/v3/historical-candle/"+pathParts.join("/");
     const upstream=await fetchProvider(providerUrl,{headers:{Authorization:"Bearer "+accessToken,Accept:"application/json"}});
-    const payload=await upstream.json().catch(()=>null);
+    const payload=await readProviderJson(upstream);
     if(!upstream.ok){
       console.warn("Historical candle provider returned",upstream.status);
       return res.status(upstream.status===401?403:502).json({error:"Upstox historical candle request failed.",providerStatus:upstream.status});
@@ -201,7 +202,7 @@ app.get("/option-chain",async(req,res)=>{
     const accessToken=decryptToken(data.tokenCiphertext);
     const params=new URLSearchParams({instrument_key:instrumentKey,expiry_date:expiry});
     const upstream=await fetchProvider("https://api.upstox.com/v2/option/chain?"+params.toString(),{headers:{Authorization:"Bearer "+accessToken,Accept:"application/json"}});
-    const payload=await upstream.json().catch(()=>null);
+    const payload=await readProviderJson(upstream);
     if(!upstream.ok){
       console.warn("Option chain provider returned",upstream.status);
       return res.status(upstream.status===401?403:502).json({error:"Upstox option-chain request failed.",providerStatus:upstream.status});
@@ -263,7 +264,7 @@ app.post("/paper/orders",async(req,res)=>{
     const accessToken=decryptToken(connectionData.tokenCiphertext);
     const quoteUrl="https://api.upstox.com/v3/market-quote/quotes?"+new URLSearchParams({instrument_key:instrumentKey});
     const quoteResponse=await fetchProvider(quoteUrl,{headers:{Authorization:"Bearer "+accessToken,Accept:"application/json"}});
-    const quotePayload=await quoteResponse.json().catch(()=>null);
+    const quotePayload=await readProviderJson(quoteResponse);
     if(!quoteResponse.ok)return res.status(502).json({error:"A current Upstox full quote could not be verified.",providerStatus:quoteResponse.status});
     const quoteEntry=Object.values(quotePayload?.data||{}).find(x=>x&&x.instrument_token===instrumentKey);
     let normalizedQuote;
@@ -299,7 +300,7 @@ app.post("/paper/derivative/margin-preview",async(req,res)=>{
     if(!instrument)return res.status(400).json({error:"Select a verified NSE/BSE futures contract from the official instrument master."});
     const quoteUrl="https://api.upstox.com/v3/market-quote/quotes?"+new URLSearchParams({instrument_key:instrumentKey});
     const quoteResponse=await fetchProvider(quoteUrl,{headers:{Authorization:"Bearer "+accessToken,Accept:"application/json"}});
-    const quotePayload=await quoteResponse.json().catch(()=>null);
+    const quotePayload=await readProviderJson(quoteResponse);
     if(!quoteResponse.ok)return res.status(502).json({error:"A current Upstox futures quote could not be verified.",providerStatus:quoteResponse.status});
     const quoteEntry=Object.values(quotePayload?.data||{}).find(x=>x&&x.instrument_token===instrumentKey);
     const normalizedQuote=normalizeProviderQuote(quoteEntry,instrumentKey,{maxAgeMs:15000});
@@ -314,7 +315,7 @@ app.post("/paper/derivative/margin-preview",async(req,res)=>{
       method:"POST",headers:{Authorization:"Bearer "+accessToken,Accept:"application/json","Content-Type":"application/json"},
       body:JSON.stringify(marginRequest)
     });
-    const payload=await upstream.json().catch(()=>null);
+    const payload=await readProviderJson(upstream);
     if(!upstream.ok){
       console.warn("Upstox margin preview returned",upstream.status);
       return res.status(502).json({error:"Upstox broker margin preview failed.",providerStatus:upstream.status});
@@ -390,7 +391,7 @@ app.post("/paper/derivative/orders",async(req,res)=>{
     const accessToken=decryptToken(connectionData.tokenCiphertext);
     const quoteUrl="https://api.upstox.com/v3/market-quote/quotes?"+new URLSearchParams({instrument_key:instrumentKey});
     const quoteResponse=await fetchProvider(quoteUrl,{headers:{Authorization:"Bearer "+accessToken,Accept:"application/json"}});
-    const quotePayload=await quoteResponse.json().catch(()=>null);
+    const quotePayload=await readProviderJson(quoteResponse);
     if(!quoteResponse.ok)return res.status(502).json({error:"A current Upstox full quote could not be verified for this option.",providerStatus:quoteResponse.status});
     const quoteEntry=Object.values(quotePayload?.data||{}).find(x=>x&&x.instrument_token===instrumentKey);
     let normalizedQuote;
@@ -432,7 +433,7 @@ app.get("/paper/portfolio",async(req,res)=>{
     const accessToken=decryptToken(connectionData.tokenCiphertext),keys=positions.map(([key])=>key);
     const quoteUrl="https://api.upstox.com/v3/market-quote/quotes?"+new URLSearchParams({instrument_key:keys.join(",")});
     const quoteResponse=await fetchProvider(quoteUrl,{headers:{Authorization:"Bearer "+accessToken,Accept:"application/json"}});
-    const quotePayload=await quoteResponse.json().catch(()=>null);
+    const quotePayload=await readProviderJson(quoteResponse);
     if(!quoteResponse.ok)return res.status(502).json({error:"Portfolio market valuation could not be retrieved.",providerStatus:quoteResponse.status});
     const quotes=Object.values(quotePayload?.data||{});
     const valuation=buildPortfolioValuation({positions,quotes,cashPaise:account.cashPaise,realizedPnlPaise:account.realizedPnlPaise??0,instruments:instrumentCache,now:Date.now(),maxAgeMs:60000});
@@ -476,7 +477,7 @@ app.get("/paper/derivatives/portfolio",async(req,res)=>{
     const accessToken=decryptToken(connectionData.tokenCiphertext);
     const quoteUrl="https://api.upstox.com/v3/market-quote/quotes?"+new URLSearchParams({instrument_key:positions.map(p=>p.instrumentKey).join(",")});
     const upstream=await fetchProvider(quoteUrl,{headers:{Authorization:"Bearer "+accessToken,Accept:"application/json"}});
-    const payload=await upstream.json().catch(()=>null);
+    const payload=await readProviderJson(upstream);
     if(!upstream.ok)return res.status(502).json({error:"Derivative portfolio quotes could not be retrieved.",providerStatus:upstream.status});
     const quoteEntries=Object.values(payload?.data||{}),quotes=[];
     for(const p of positions){
@@ -557,7 +558,7 @@ app.get("/watchlist/quotes",async(req,res)=>{
     const data=connection.data();
     if(!isUpstoxTokenUsable(data))return res.status(403).json({error:"Upstox token expired. Reconnect your account."});
     const accessToken=decryptToken(data.tokenCiphertext),quoteUrl="https://api.upstox.com/v3/market-quote/quotes?"+new URLSearchParams({instrument_key:keys.join(",")});
-    const upstream=await fetchProvider(quoteUrl,{headers:{Authorization:"Bearer "+accessToken,Accept:"application/json"}}),payload=await upstream.json().catch(()=>null);
+    const upstream=await fetchProvider(quoteUrl,{headers:{Authorization:"Bearer "+accessToken,Accept:"application/json"}}),payload=await readProviderJson(upstream);
     if(!upstream.ok)return res.status(502).json({error:"Watchlist quotes could not be retrieved.",providerStatus:upstream.status});
     const byKey=new Map(Object.values(payload?.data||{}).filter(q=>q&&typeof q.instrument_token==="string").map(q=>[q.instrument_token,q])),now=Date.now();
     const quotes=keys.map(instrumentKey=>{
