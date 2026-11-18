@@ -254,7 +254,11 @@
       if(selected?.instrument_key!==instrumentKey)return;
       const required=inrPaise(data.requiredMarginPaise),cash=inrPaise(data.availableVirtualCashPaise),shortfall=inrPaise(data.shortfallPaise);
       const finalText=data.finalMarginPaise===null?'':' · Final margin '+inrPaise(data.finalMarginPaise);
-      futuresMarginStatus.textContent='PREVIEW ONLY · '+data.tradingSymbol+' · '+side+' '+lots+' lot(s) / '+data.quantity+' qty · '+(product==='I'?'Intraday':'Delivery')+' margin · Required margin '+required+finalText+' · Virtual cash '+cash+' · Shortfall '+shortfall+'. No order placed; no funds reserved.';
+      const quoteText=data.quote?.pricePaise?' · Quote '+inrPaise(data.quote.pricePaise):'';
+      const components=data.marginComponents?.[0]||{};
+      const componentText=[['SPAN',components.spanPaise],['Exposure',components.exposurePaise],['Tender',components.tenderPaise],['Delivery',components.deliveryPaise]]
+        .filter(([,value])=>Number.isSafeInteger(value)).map(([label,value])=>label+' '+inrPaise(value)).join(' · ');
+      futuresMarginStatus.textContent='PREVIEW ONLY · '+data.tradingSymbol+' · '+side+' '+lots+' lot(s) / '+data.quantity+' qty · '+(product==='I'?'Intraday':'Delivery')+' margin'+quoteText+' · Required margin '+required+finalText+(componentText?' · '+componentText:'')+' · Virtual cash '+cash+' · Shortfall '+shortfall+'. No order placed; no funds reserved.';
     }catch(error){futuresMarginStatus.textContent=error.message||'Futures margin preview failed.';}
     finally{updateFuturesMarginButton();}
   }
