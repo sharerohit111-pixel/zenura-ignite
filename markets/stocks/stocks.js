@@ -238,7 +238,7 @@
       const ce=row.call_options||{},pe=row.put_options||{},cm=ce.market_data||{},pm=pe.market_data||{},cg=ce.option_greeks||{},pg=pe.option_greeks||{};
       const tr=document.createElement('tr');
       [cm.ltp,cm.oi,cm.volume,cg.iv,cg.delta,row.strike_price,pg.delta,pg.iv,pm.volume,pm.oi,pm.ltp].forEach((v,i)=>{const td=document.createElement('td');td.textContent=cellValue(v);if(i===5)td.className='strike-cell';tr.append(td);});
-      [[0,ce,'CE'],[10,pe,'PE']].forEach(([index,contract,type])=>{if(typeof contract.instrument_key!=='string'||!contract.instrument_key)return;const td=tr.children[index],button=document.createElement('button');button.type='button';button.className='option-buy-button';button.textContent='BUY '+type;button.addEventListener('click',()=>submitDerivativeOrder(contract.instrument_key,type,row.strike_price));td.append(document.createTextNode(' '),button);});
+      [[0,ce,'CE'],[10,pe,'PE']].forEach(([index,contract,type])=>{if(typeof contract.instrument_key!=='string'||!contract.instrument_key)return;const td=tr.children[index];['BUY','SELL'].forEach(side=>{const button=document.createElement('button');button.type='button';button.className='option-buy-button '+(side==='SELL'?'option-sell-button':'');button.textContent=side+' '+type;button.addEventListener('click',()=>submitDerivativeOrder(contract.instrument_key,type,row.strike_price,side));td.append(document.createTextNode(' '),button);});});
       optionBody.append(tr);
     });
   }
@@ -263,24 +263,24 @@
     finally{if(request===optionChainRequest)optionButton.disabled=false;}
   }
   let pendingDerivativeOrder=null,derivativeOrderSubmitting=false;
-  async function submitDerivativeOrder(instrumentKey,type,strike){
+  async function submitDerivativeOrder(instrumentKey,type,strike,side='BUY'){
     if(derivativeOrderSubmitting)return;
     const connector=window.ZENURA_MARKET_CONNECTOR;
     if(!gateway||!connector?.getIdToken){optionStatus.textContent='Sign in and connect Upstox before placing a paper order.';return;}
-    const lotsRaw=window.prompt('Number of '+type+' lots to buy (market paper order):','1');
+    const lotsRaw=window.prompt('Number of '+type+' lots to '+side.toLowerCase()+' (market paper order):','1');
     if(lotsRaw===null)return;
     const lots=Number(lotsRaw);
     if(!Number.isSafeInteger(lots)||lots<1||lots>10000){optionStatus.textContent='Enter a whole number of lots from 1 to 10,000.';return;}
     if(!window.crypto?.randomUUID){optionStatus.textContent='A secure order request ID could not be created in this browser.';return;}
-    const fingerprint=instrumentKey+'|BUY|'+lots;
+    const fingerprint=instrumentKey+'|'+side+'|'+lots;
     if(pendingDerivativeOrder&&pendingDerivativeOrder.fingerprint!==fingerprint){optionStatus.textContent='A previous order response is uncertain. Retry the same contract and lot quantity first.';return;}
     if(!pendingDerivativeOrder)pendingDerivativeOrder={fingerprint,key:window.crypto.randomUUID()};
     derivativeOrderSubmitting=true;optionButton.disabled=true;optionStatus.textContent='Verifying live option quote and placing simulated '+type+' BUY…';
     try{
-      const token=await connector.getIdToken(),response=await fetch(gateway+'/paper/derivative/orders',{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json',Accept:'application/json'},body:JSON.stringify({instrument_key:instrumentKey,side:'BUY',lots,idempotency_key:pendingDerivativeOrder.key})});
+      const token=await connector.getIdToken(),response=await fetch(gateway+'/paper/derivative/orders',{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json',Accept:'application/json'},body:JSON.stringify({instrument_key:instrumentKey,side,lots,idempotency_key:pendingDerivativeOrder.key})});
       const data=await response.json();if(!response.ok){if(response.status>=400&&response.status<500)pendingDerivativeOrder=null;throw new Error(data.error||'Derivative paper order rejected.');}
       pendingDerivativeOrder=null;
-      optionStatus.textContent='SIMULATED BUY FILLED · '+data.tradingSymbol+' · '+data.quantity+' units · Premium '+inrPaise(data.grossPaise)+' · Estimated charges '+inrPaise(data.chargesPaise)+' · Total debit '+inrPaise(data.totalDebitPaise)+'.';
+      optionStatus.textContent='SIMULATED '+side+' FILLED · '+data.tradingSymbol+' · '+data.quantity+' units · Premium '+inrPaise(data.grossPaise)+' · Estimated charges '+inrPaise(data.chargesPaise)+' · '+(side==='BUY'?'Total debit '+inrPaise(data.totalDebitPaise):'Net credit '+inrPaise(data.netCreditPaise))+'.';
       await loadPaperAccount();await refreshPaperViews();
     }catch(error){optionStatus.textContent=error.message||'Derivative paper order failed.';}
     finally{derivativeOrderSubmitting=false;optionButton.disabled=false;}
