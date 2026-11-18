@@ -8,6 +8,7 @@ const { onCall, onRequest, HttpsError } = require("firebase-functions/v2/https")
 const logger = require("firebase-functions/logger");
 const { connectionStatus } = require("./lib/upstox-connection-status");
 const { isOAuthStateUsable } = require("./lib/upstox-oauth-state");
+const { nextUpstoxTokenExpiry } = require("./lib/upstox-token-expiry");
 const db = getFirestore();
 const CLIENT_ID = defineSecret("UPSTOX_CLIENT_ID");
 const CLIENT_SECRET = defineSecret("UPSTOX_CLIENT_SECRET");
@@ -76,7 +77,7 @@ exports.upstoxOAuthCallback = onRequest(
         const accountRef=db.collection("upstoxConnections").doc(stateData.uid);
         tx.set(accountRef,{
           tokenCiphertext:encrypted,tokenType:payload.token_type||"Bearer",
-          expiresAt:Timestamp.fromMillis(Date.now()+Number(payload.expires_in||86400)*1000),
+          expiresAt:Timestamp.fromMillis(nextUpstoxTokenExpiry()),
           authorizedAt:FieldValue.serverTimestamp(),provider:"upstox",status:"connected"
         });
         tx.update(stateRef,{used:true,usedAt:FieldValue.serverTimestamp()});
