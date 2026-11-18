@@ -3,7 +3,7 @@
 const {validateDerivativeContract}=require("./derivative-contract");
 const {applyDerivativeFill}=require("./derivative-position");
 const {makeOrderId,makeOrderFingerprint,assertIdempotentReplay}=require("./order-idempotency");
-const {calculateLongOptionBuyCharges}=require("./trading-charges");
+const {calculateLongOptionTradeCharges}=require("./trading-charges");
 
 const MAX_QUOTE_AGE_MS=15_000;
 
@@ -16,13 +16,14 @@ const MAX_QUOTE_AGE_MS=15_000;
  * provider data. Never pass client-supplied instrument metadata or prices here.
  */
 async function executeLongOptionBuyTransaction({
-  db,accountRef,orderRef,uid,idempotencyKey,instrument,quote,lots,
+  db,accountRef,orderRef,uid,idempotencyKey,instrument,quote,lots,side="BUY",
   serverTimestamp,now=Date.now()
 }){
   const fail=(message,status=409)=>{throw Object.assign(new Error(message),{status});};
   if(!db||typeof db.runTransaction!=="function"||!accountRef||accountRef.id!==uid||
      !orderRef||typeof uid!=="string"||!uid||typeof serverTimestamp!=="function")
     throw new TypeError("Derivative transaction identity or dependencies are invalid.");
+  if(!["BUY","SELL"].includes(side))fail("Option order side must be BUY or SELL.",400);
   if(!["CE","PE"].includes(instrument?.instrument_type))
     fail("Only long CE/PE option BUY transactions are enabled in this phase.",400);
   if(!Number.isSafeInteger(now)||now<0)fail("Current time is invalid.",400);
@@ -35,9 +36,9 @@ async function executeLongOptionBuyTransaction({
   const orderId=makeOrderId(uid,idempotencyKey);
   if(orderRef.id!==orderId)fail("Derivative order reference does not match the idempotency key.",400);
   const requestFingerprint=makeOrderFingerprint({
-    instrumentKey:contract.instrumentKey,side:"BUY",quantity:contract.quantity
+    instrumentKey:contract.instrumentKey,side,quantity:contract.quantity
   });
-  const charges=calculateLongOptionBuyCharges({grossPaise:contract.contractValuePaise,exchange:contract.exchange});
+  const charges=calculateLongOptionTradeCharges({grossPaise:contract.contractValuePaise,exchange:contract.exchange,side});
   let result;
   await db.runTransaction(async tx=>{
     const [accountSnap,existingOrder]=await Promise.all([tx.get(accountRef),tx.get(orderRef)]);
@@ -60,8 +61,10 @@ async function executeLongOptionBuyTransaction({
     const priorPosition=derivativePositions[contract.instrumentKey]||{netQuantity:0,averagePricePaise:0};
     if(priorPosition.instrumentType&&priorPosition.instrumentType!==contract.instrumentType)
       fail("Stored derivative position type does not match the verified contract.",409);
+    if(side==="SELL"&&(!Number.isSafeInteger(priorPosition.netQuantity)||priorPosition.netQuantity<contract.quantity))
+      fail("SELL is allowed only to close an existing long option position; short options are disabled.",409);
     const fill=applyDerivativeFill({
-      instrumentType:contract.instrumentType,side:"BUY",quantity:contract.quantity,
+      instrumentType:contract.instrumentType,side,quantity:contract.quantity,
       pricePaise:quote.pricePaise,position:priorPosition,now
     });
     const cashPaise=account.cashPaise+fill.cashDeltaPaise-charges.totalChargesPaise;
@@ -79,10 +82,10 @@ async function executeLongOptionBuyTransaction({
       uid,requestFingerprint,instrumentKey:contract.instrumentKey,
       tradingSymbol:instrument.trading_symbol,exchange:contract.exchange,
       segment:contract.segment,instrumentType:contract.instrumentType,
-      expiry:contract.expiry,side:"BUY",quantity:contract.quantity,lots,
+      expiry:contract.expiry,side,quantity:contract.quantity,lots,
       lotSize:contract.lotSize,executionPricePaise:quote.pricePaise,
       quoteTimestampMs:quote.observedAtMs,quoteAgeMs:now-quote.observedAtMs,
-      grossPaise:contract.contractValuePaise,charges,chargesPaise:charges.totalChargesPaise,totalDebitPaise:charges.totalDebitPaise,orderType:"MARKET",
+      grossPaise:contract.contractValuePaise,charges,chargesPaise:charges.totalChargesPaise,totalDebitPaise:charges.totalDebitPaise,netCreditPaise:charges.netCreditPaise,orderType:"MARKET",
       status:"FILLED",realizedPnlPaise:fill.realizedPnlPaise,
       cashDeltaPaise:fill.cashDeltaPaise,simulationOnly:true,
       excludesCharges:false,createdAt:serverTimestamp()
