@@ -226,7 +226,7 @@ app.post("/paper/orders",async(req,res)=>{
     const quoteResponse=await fetch(quoteUrl,{headers:{Authorization:"Bearer "+accessToken,Accept:"application/json"}});
     const quotePayload=await quoteResponse.json().catch(()=>null);
     if(!quoteResponse.ok)return res.status(502).json({error:"A current Upstox full quote could not be verified.",providerStatus:quoteResponse.status});
-    const quoteEntry=Object.values(quotePayload?.data||{}).find(x=>x&&x.instrument_token===instrumentKey)||Object.values(quotePayload?.data||{})[0];
+    const quoteEntry=Object.values(quotePayload?.data||{}).find(x=>x&&x.instrument_token===instrumentKey);
     const ltp=Number(quoteEntry?.last_price),tradeTime=Number(quoteEntry?.last_trade_time||0);
     const quoteAge=tradeTime?Date.now()-tradeTime:Infinity;
     if(!Number.isFinite(ltp)||ltp<=0||!Number.isFinite(tradeTime)||quoteAge< -5000||quoteAge>15000)
@@ -240,9 +240,11 @@ app.post("/paper/orders",async(req,res)=>{
       if(!accountSnap.exists)throw Object.assign(new Error("Paper account is not initialized."),{status:409});
       const account=accountSnap.data(),positions={...(account.positions||{})},position={...(positions[instrumentKey]||{quantity:0,averagePricePaise:0})};
       let cash=account.cashPaise,realizedPnlPaise=account.realizedPnlPaise||0,orderRealizedPnlPaise=0;
+      if(!Number.isSafeInteger(cash)||cash<0||!Number.isSafeInteger(realizedPnlPaise))throw Object.assign(new Error("Paper account balance is invalid; contact support."),{status:409});
       if(side==="BUY"){
         if(cash<grossPaise)throw Object.assign(new Error("Insufficient virtual cash balance."),{status:409});
         const nextQty=position.quantity+quantity;
+        if(!Number.isSafeInteger(position.quantity)||position.quantity<0||!Number.isSafeInteger(nextQty)||nextQty>1000000||!Number.isSafeInteger(position.averagePricePaise)||position.averagePricePaise<0)throw Object.assign(new Error("Position quantity or cost is outside supported limits."),{status:409});
         position.averagePricePaise=Math.round((position.quantity*position.averagePricePaise+grossPaise)/nextQty);
         position.quantity=nextQty;cash-=grossPaise;
       }else{
