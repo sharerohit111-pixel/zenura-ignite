@@ -14,6 +14,7 @@ const {publicPaperOrder}=require("./lib/paper-order-response");
 const {formatSseEvent,formatSseComment}=require("./lib/sse");
 const {quoteAgeMs,isFreshQuote}=require("./lib/quote-freshness");
 const {normalizeProviderQuote}=require("./lib/provider-quote");
+const {fetchProviderWithTimeout}=require("./lib/provider-fetch");
 const {validateStreamInstrumentKeys}=require("./lib/stream-subscription");
 const {reserveUserStream,releaseUserStream}=require("./lib/stream-registry");
 const {acquireStreamLease,renewStreamLease,releaseStreamLease}=require("./lib/stream-lease");
@@ -41,7 +42,7 @@ const MAX_KEYS=Number(process.env.MAX_INSTRUMENT_KEYS||100);
 const ALLOWED_ORIGINS=(process.env.ALLOWED_ORIGINS||"").split(",").map(x=>x.trim()).filter(Boolean);
 // Bound one-shot provider calls so stalled upstream requests cannot pin a Cloud Run request indefinitely.
 function fetchProvider(url,options={},timeoutMs=15000){
-  return fetch(url,{...options,signal:AbortSignal.timeout(timeoutMs)});
+  return fetchProviderWithTimeout(fetch,url,options,timeoutMs);
 }
 function errorStatus(error){
   if(Number.isInteger(error?.status))return error.status;
