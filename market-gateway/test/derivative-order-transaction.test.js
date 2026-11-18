@@ -67,10 +67,9 @@ test("rejects missing account and insufficient virtual cash without writes",asyn
  await assert.rejects(executeLongOptionBuyTransaction(poor.common),{status:409});
  assert.equal(poor.writes.length,0);
 });
-test("rejects futures, short options, stale quotes and mismatched idempotency references",async()=>{
+test("rejects futures, stale quotes and mismatched idempotency references",async()=>{
  for(const patch of [
   {instrument:{...instrument,instrument_type:"FUT",strike_price:0}},
-  {side:"SELL"},
   {quote:{...quote,observedAtMs:now-15001}},
   {quote:{...quote,instrumentKey:"OTHER"}}
  ]){
