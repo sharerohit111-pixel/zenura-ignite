@@ -22,12 +22,15 @@ test("paper account transitions compose without losing earlier concurrent state"
  assert.equal(third.realizedPnlPaise,1000);
  assert.equal(third.version,4);
 });
-test("two concurrent BUY calculations from same account both remain individually valid",()=>{
+test("independent stale-snapshot calculations are not a concurrency guarantee",()=>{
  const start={cashPaise:10000,realizedPnlPaise:0,positions:{},version:7};
  const a=buildPaperOrderUpdate(start,{instrumentKey:"NSE_EQ|AAA",side:"BUY",quantity:1,pricePaise:6000});
  const b=buildPaperOrderUpdate(start,{instrumentKey:"NSE_EQ|BBB",side:"BUY",quantity:1,pricePaise:6000});
  assert.equal(a.cashPaise,4000);assert.equal(b.cashPaise,4000);
+ assert.equal(a.version,8);assert.equal(b.version,8);
  assert.notDeepEqual(a.positions,b.positions);
+ // Both calculations start at version 7; only the Firestore transaction can
+ // serialize competing writes and force the losing transaction to re-read.
 });
 test("rejects malformed paper account positions map",()=>assert.throws(()=>buildPaperOrderUpdate({cashPaise:1000,realizedPnlPaise:0,positions:[]},{instrumentKey:"NSE_EQ|AAA",side:"BUY",quantity:1,pricePaise:100}),{status:409}));
 
@@ -37,14 +40,15 @@ test("two order transitions composed sequentially cannot overspend shared cash",
  assert.throws(()=>buildPaperOrderUpdate(first,{instrumentKey:"NSE_EQ|BBB",side:"BUY",quantity:1,pricePaise:7000}),{status:409});
  assert.equal(first.cashPaise,3000);
 });
-test("simulated transaction retry from fresh account snapshot applies the order once",()=>{
+test("a subsequent calculation uses the latest committed account snapshot",()=>{
  const account={cashPaise:10000,realizedPnlPaise:0,positions:{},version:1};
  const request={instrumentKey:"NSE_EQ|AAA",side:"BUY",quantity:2,pricePaise:1000};
  const first=buildPaperOrderUpdate(account,request);
- const retriedFromCommittedSnapshot=buildPaperOrderUpdate(first,{...request,quantity:1});
+ const nextOrderFromFreshSnapshot=buildPaperOrderUpdate(first,{...request,quantity:1});
  assert.equal(first.cashPaise,8000);
- assert.equal(retriedFromCommittedSnapshot.cashPaise,7000);
- assert.equal(retriedFromCommittedSnapshot.positions["NSE_EQ|AAA"].quantity,3);
+ assert.equal(nextOrderFromFreshSnapshot.cashPaise,7000);
+ assert.equal(nextOrderFromFreshSnapshot.positions["NSE_EQ|AAA"].quantity,3);
+ assert.equal(nextOrderFromFreshSnapshot.version,3);
 });
 
 test("rejects an exhausted or malformed account version instead of overflowing",()=>{
