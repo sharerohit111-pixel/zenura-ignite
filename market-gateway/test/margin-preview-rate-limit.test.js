@@ -23,6 +23,10 @@ test("rejects requests inside the cooldown with retry guidance",async()=>{
  await assert.rejects(consumeMarginPreviewSlot(db,"user-1",5999),error=>error.status===429&&error.retryAfterSeconds===1);
  assert.equal(db.state.lastRequestAtMs,1000);
 });
+test("does not extend retry guidance when a transaction observes a slightly future timestamp",async()=>{
+ const db=fakeDb({lastRequestAtMs:1001,updatedAtMs:1001});
+ await assert.rejects(consumeMarginPreviewSlot(db,"user-1",1000),error=>error.status===429&&error.retryAfterSeconds===5);
+});
 test("allows a request at the exact cooldown boundary",async()=>{
  const db=fakeDb({lastRequestAtMs:1000,updatedAtMs:1000});
  assert.deepEqual(await consumeMarginPreviewSlot(db,"user-1",1000+DEFAULT_COOLDOWN_MS),{allowed:true});
