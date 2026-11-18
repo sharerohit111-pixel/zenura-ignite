@@ -7,7 +7,7 @@ const crypto=require("node:crypto");
 const path=require("node:path");
 const {gunzipSync}=require("node:zlib");
 const {calculatePaperFill}=require("./lib/paper-math");
-const {WATCHLIST_NAMES,normalizeWatchlists}=require("./lib/watchlists");
+const {WATCHLIST_NAMES,normalizeWatchlists,mergeWatchlistUpdate}=require("./lib/watchlists");
 admin.initializeApp();
 const db=admin.firestore();
 const app=express();
@@ -353,13 +353,13 @@ app.get("/watchlist/quotes",async(req,res)=>{
 app.put("/watchlist",async(req,res)=>{
   try{
     const decoded=await authenticate(req),name=requestedWatchlist(req),raw=req.body?.instrumentKeys;
-    if(!Array.isArray(raw)||raw.length>50||raw.some(x=>typeof x!=="string"||!x||x.length>100||/[\u0000-\u001F]/.test(x)))return res.status(400).json({error:"Provide up to 50 valid instrument keys."});
-    const keys=[...new Set(raw)];
+    let keys;
+    try{keys=[...new Set(raw)];mergeWatchlistUpdate({},name,raw);}catch(error){return res.status(error.status||400).json({error:error.message});}
     if(!instrumentCache.length||Date.now()-instrumentCacheUpdatedAt>6*60*60*1000)await refreshInstrumentCache();
     const valid=new Set(instrumentCache.map(x=>x.instrument_key));
     if(keys.some(key=>!valid.has(key)))return res.status(400).json({error:"Watchlist contains an instrument not present in the official instrument master."});
     const ref=db.collection("indianMarketWatchlists").doc(decoded.uid);
-    await db.runTransaction(async tx=>{const snap=await tx.get(ref),data=snap.exists?snap.data():{},watchlists=normalizeWatchlists(data);watchlists[name]=keys;tx.set(ref,{uid:decoded.uid,watchlists,updatedAt:admin.firestore.FieldValue.serverTimestamp()},{merge:true});});
+    await db.runTransaction(async tx=>{const snap=await tx.get(ref),data=snap.exists?snap.data():{},watchlists=mergeWatchlistUpdate(data,name,keys);tx.set(ref,{uid:decoded.uid,watchlists,updatedAt:admin.firestore.FieldValue.serverTimestamp()},{merge:true});});
     res.set("Cache-Control","private, no-store");res.json({saved:true,name,count:keys.length,maxItems:50});
   }catch(error){res.status(error.status||500).json({error:error.status?error.message:"Watchlist could not be saved."});}
 });
