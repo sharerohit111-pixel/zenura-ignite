@@ -418,7 +418,7 @@ app.get("/paper/derivatives/portfolio",async(req,res)=>{
     const {calculateDerivativePortfolio}=require("./lib/derivative-portfolio");
     const valuation=calculateDerivativePortfolio({positions,quotes,now:Date.now()});
     res.set("Cache-Control","private, no-store");
-    res.json({...valuation,cashPaise:account.cashPaise,realizedPnlPaise:account.realizedPnlPaise||0,simulationOnly:true,excludesCharges:true});
+    res.json({...valuation,cashPaise:account.cashPaise,realizedPnlPaise:account.realizedPnlPaise||0,simulationOnly:true,includesEntryCharges:true,excludesEstimatedExitCharges:true});
   }catch(error){res.status(errorStatus(error)).json({error:error.status?error.message:"Derivative portfolio valuation could not be loaded."});}
 });
 
@@ -430,7 +430,7 @@ app.get("/paper/derivative/orders",async(req,res)=>{
     const snap=await db.collection("indianDerivativeOrders").where("uid","==",decoded.uid).orderBy("createdAt","desc").limit(limit).get();
     const orders=snap.docs.map(doc=>{const o=doc.data();return {id:doc.id,tradingSymbol:o.tradingSymbol,instrumentKey:o.instrumentKey,instrumentType:o.instrumentType,expiry:o.expiry,side:o.side,quantity:o.quantity,lots:o.lots,executionPricePaise:o.executionPricePaise,grossPaise:o.grossPaise,chargesPaise:o.chargesPaise||0,totalDebitPaise:o.totalDebitPaise??null,netCreditPaise:o.netCreditPaise??null,status:o.status,orderType:o.orderType,simulationOnly:true,createdAt:o.createdAt?.toMillis?.()||null};});
     res.set("Cache-Control","private, no-store");
-    res.json({orders,simulationOnly:true,excludesCharges:true});
+    res.json({orders,simulationOnly:true,excludesCharges:false});
   }catch(error){res.status(errorStatus(error)).json({error:error.status?error.message:"Derivative order history could not be loaded."});}
 });
 
