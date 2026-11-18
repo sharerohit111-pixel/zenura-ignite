@@ -45,3 +45,20 @@ test("rejects duplicate positions, duplicate quotes and unsafe totals",()=>{
  assert.throws(()=>calculateDerivativePortfolio({positions:[p],quotes:[quote(),quote()],now}),/duplicate/);
  assert.throws(()=>calculateDerivativePortfolio({positions:[p],quotes:[quote({pricePaise:Number.MAX_SAFE_INTEGER})],now}),/safe calculation/);
 });
+
+test("rejects derivative positions with inconsistent or unsafe cost basis",()=>{
+ const p=pos();
+ for(const malformed of [
+  {...p,costBasisPaise:1},
+  {...p,costBasisPaise:Number.MAX_SAFE_INTEGER+1},
+  {...p,netQuantity:1_000_000,averagePricePaise:Number.MAX_SAFE_INTEGER}
+ ]){
+  assert.throws(()=>calculateDerivativePortfolio({positions:[malformed],quotes:[quote()],now}),/cost basis|safe calculation/);
+ }
+});
+test("accepts valid short legacy position without explicit cost basis",()=>{
+ const p=pos({netQuantity:-25});
+ const r=calculateDerivativePortfolio({positions:[p],quotes:[quote()],marginSnapshots:[margin()],now});
+ assert.equal(r.positions[0].costBasisPaise,125000);
+ assert.equal(r.unrealizedPnlPaise,-50000);
+});
