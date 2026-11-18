@@ -8,7 +8,9 @@ const REGION = "asia-south1";
 const functions = getFunctions(auth.app, REGION);
 const startAuthorization = httpsCallable(functions, "startUpstoxAuthorization");
 const getConnectionStatus = httpsCallable(functions, "getIndianMarketConnectionStatus");
+const disconnectAccount = httpsCallable(functions, "disconnectUpstoxAccount");
 const button = document.getElementById("upstox-connect");
+const disconnectButton = document.getElementById("upstox-disconnect");
 const card = document.getElementById("connection");
 const heading = document.getElementById("connection-title");
 const detail = document.getElementById("connection-sub");
@@ -18,6 +20,7 @@ function setState(title, message, connected = false) {
   detail.textContent = message;
   card.classList.toggle("connected", connected);
   button.textContent = connected ? "RECONNECT UPSTOX" : (auth.currentUser ? "CONNECT UPSTOX" : "SIGN IN / CONNECT");
+  disconnectButton.hidden = !connected;
 }
 function explainError(error) {
   const code = error?.code || "";
@@ -52,6 +55,18 @@ async function refreshStatus() {
     setState("BACKEND NOT READY", explainError(error));
   }
 }
+disconnectButton.addEventListener("click", async () => {
+  disconnectButton.disabled = true;
+  try {
+    setState("DISCONNECTING UPSTOX", "Revoking the saved connection and stopping its live feed…");
+    await disconnectAccount();
+  } catch (error) {
+    setState("DISCONNECT FAILED", explainError(error));
+  } finally {
+    disconnectButton.disabled = false;
+    await refreshStatus();
+  }
+});
 button.addEventListener("click", async () => {
   button.disabled = true;
   try {
