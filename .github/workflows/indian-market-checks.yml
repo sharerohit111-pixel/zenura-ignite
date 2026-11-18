@@ -40,7 +40,9 @@ jobs:
         with:
           node-version: "20"
       - name: Check browser module syntax
-        run: node --check markets/stocks/stocks.js\n      - name: Check SSE parser syntax\n        run: node --check markets/stocks/sse-parser.js
+        run: node --check markets/stocks/stocks.js
+      - name: Check SSE parser syntax
+        run: node --check markets/stocks/sse-parser.js
       - name: Check email authentication module syntax
         run: node --input-type=module --check < markets/stocks/email-auth.js
       - name: Check gateway syntax
@@ -56,4 +58,5 @@ jobs:
           node -e "JSON.parse(require('node:fs').readFileSync('firestore.indexes.json','utf8'))"
       - name: Install gateway test dependencies
         run: npm install --prefix market-gateway --ignore-scripts --no-audit --no-fund
-      - name: Run gateway and browser parser unit tests\n        run: node --test market-gateway/test/*.test.js markets/stocks/*.test.js
+      - name: Run gateway and browser parser unit tests
+        run: node --test market-gateway/test/*.test.js markets/stocks/*.test.js
