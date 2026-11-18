@@ -53,16 +53,27 @@
       watchStatus.textContent=fresh+' of '+savedWatchlist.length+' watchlist prices are fresh provider quotes. '+(fresh<savedWatchlist.length?'Some prices are stale or unavailable.':'');
     }catch(error){if(request!==watchQuoteSeq||name!==activeWatchlist)return;watchStatus.textContent=error.message||'Watchlist quotes unavailable.';renderSavedWatchlist();}
   }
-  async function saveWatchlist(){
-    const connector=window.ZENURA_MARKET_CONNECTOR,name=activeWatchlist,keys=savedWatchlist.map(x=>x.instrument_key);
-    if(!gateway||!connector?.getIdToken){watchStatus.textContent='Sign in and configure the gateway to save your watchlist.';return;}
-    try{
-      watchStatus.textContent='Saving your private watchlist…';
-      const token=await connector.getIdToken(),response=await fetch(gateway+'/watchlist',{method:'PUT',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json',Accept:'application/json'},body:JSON.stringify({name,instrumentKeys:keys})});
-      const data=await response.json();if(!response.ok)throw new Error(data.error||'Watchlist save failed.');
-      if(name===activeWatchlist)watchStatus.textContent=data.count+' of 50 instruments saved to your account.';
-      return true;
-    }catch(error){if(name===activeWatchlist)watchStatus.textContent=error.message||'Watchlist save failed.';return false;}
+  let watchlistSaveQueue=Promise.resolve(),watchlistEditSeq=0;
+  function saveWatchlist(){
+    const name=activeWatchlist,keys=savedWatchlist.map(x=>x.instrument_key),edit=watchlistEditSeq;
+    if(!gateway||!window.ZENURA_MARKET_CONNECTOR?.getIdToken){watchStatus.textContent='Sign in and configure the gateway to save your watchlist.';return Promise.resolve(false);}
+    const write=async()=>{
+      if(name!==activeWatchlist)return false;
+      try{
+        const connector=window.ZENURA_MARKET_CONNECTOR;
+        if(!connector?.getIdToken)throw new Error('Sign in to save your watchlist.');
+        watchStatus.textContent='Saving your private watchlist…';
+        const token=await connector.getIdToken();
+        if(name!==activeWatchlist)return false;
+        const response=await fetch(gateway+'/watchlist',{method:'PUT',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json',Accept:'application/json'},body:JSON.stringify({name,instrumentKeys:keys})});
+        const data=await response.json();if(!response.ok)throw new Error(data.error||'Watchlist save failed.');
+        if(name===activeWatchlist&&edit===watchlistEditSeq)watchStatus.textContent=data.count+' of 50 instruments saved to your account.';
+        return true;
+      }catch(error){if(name===activeWatchlist&&edit===watchlistEditSeq)watchStatus.textContent=error.message||'Watchlist save failed.';return false;}
+    };
+    const result=watchlistSaveQueue.then(write,write);
+    watchlistSaveQueue=result.then(()=>undefined,()=>undefined);
+    return result;
   }
   function renderSavedWatchlist(){
     watchBody.textContent='';
@@ -78,7 +89,7 @@
         detail.classList.add(change>0?'positive':change<0?'negative':'neutral');
       }else detail.textContent=quote?'STALE / UNAVAILABLE':'Price not refreshed';
       info.append(pick,detail);
-      const remove=document.createElement('button');remove.type='button';remove.className='saved-watch-remove';remove.textContent='REMOVE';remove.setAttribute('aria-label','Remove '+(item.trading_symbol||item.instrument_key)+' from watchlist');remove.addEventListener('click',async()=>{const previous=savedWatchlist;savedWatchlist=savedWatchlist.filter(x=>x.instrument_key!==item.instrument_key);renderSavedWatchlist();if(!await saveWatchlist()){savedWatchlist=previous;renderSavedWatchlist();}});
+      const remove=document.createElement('button');remove.type='button';remove.className='saved-watch-remove';remove.textContent='REMOVE';remove.setAttribute('aria-label','Remove '+(item.trading_symbol||item.instrument_key)+' from watchlist');remove.addEventListener('click',async()=>{const previous=savedWatchlist;savedWatchlist=savedWatchlist.filter(x=>x.instrument_key!==item.instrument_key);const edit=++watchlistEditSeq;renderSavedWatchlist();if(!await saveWatchlist()&&edit===watchlistEditSeq){savedWatchlist=previous;watchlistEditSeq++;renderSavedWatchlist();}});
       row.append(info,remove);watchBody.append(row);
     });
     watchAdd.disabled=!selected||savedWatchlist.some(x=>x.instrument_key===selected.instrument_key)||savedWatchlist.length>=50||!window.ZENURA_MARKET_CONNECTOR?.getIdToken;
@@ -95,7 +106,7 @@
   watchSelect.addEventListener('change',async()=>{activeWatchlist=watchSelect.value;watchlistLoadSeq++;watchQuoteSeq++;savedWatchlist=[];watchQuotes.clear();renderSavedWatchlist();await loadSavedWatchlist();});
   watchAdd.addEventListener('click',async()=>{
     if(!selected||savedWatchlist.some(x=>x.instrument_key===selected.instrument_key)||savedWatchlist.length>=50)return;
-    const previous=savedWatchlist;savedWatchlist=[...savedWatchlist,selected];renderSavedWatchlist();if(!await saveWatchlist()){savedWatchlist=previous;renderSavedWatchlist();}else await loadWatchlistQuotes();
+    const previous=savedWatchlist;savedWatchlist=[...savedWatchlist,selected];const edit=++watchlistEditSeq;renderSavedWatchlist();if(!await saveWatchlist()){if(edit===watchlistEditSeq){savedWatchlist=previous;watchlistEditSeq++;renderSavedWatchlist();}}else if(edit===watchlistEditSeq)await loadWatchlistQuotes();
   });
   const watchRefresh=document.getElementById('watchlist-refresh');
   watchRefresh.addEventListener('click',loadWatchlistQuotes);
