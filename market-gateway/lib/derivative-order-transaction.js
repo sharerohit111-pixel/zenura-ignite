@@ -3,6 +3,7 @@
 const {validateDerivativeContract}=require("./derivative-contract");
 const {applyDerivativeFill}=require("./derivative-position");
 const {makeOrderId,makeOrderFingerprint,assertIdempotentReplay}=require("./order-idempotency");
+const {calculateLongOptionBuyCharges}=require("./trading-charges");
 
 const MAX_QUOTE_AGE_MS=15_000;
 
@@ -36,6 +37,7 @@ async function executeLongOptionBuyTransaction({
   const requestFingerprint=makeOrderFingerprint({
     instrumentKey:contract.instrumentKey,side:"BUY",quantity:contract.quantity
   });
+  const charges=calculateLongOptionBuyCharges({grossPaise:contract.contractValuePaise,exchange:contract.exchange});
   let result;
   await db.runTransaction(async tx=>{
     const [accountSnap,existingOrder]=await Promise.all([tx.get(accountRef),tx.get(orderRef)]);
@@ -62,7 +64,7 @@ async function executeLongOptionBuyTransaction({
       instrumentType:contract.instrumentType,side:"BUY",quantity:contract.quantity,
       pricePaise:quote.pricePaise,position:priorPosition,now
     });
-    const cashPaise=account.cashPaise+fill.cashDeltaPaise;
+    const cashPaise=account.cashPaise+fill.cashDeltaPaise-charges.totalChargesPaise;
     if(!Number.isSafeInteger(cashPaise)||cashPaise<0)
       fail("Insufficient derivative paper cash for this option premium.",409);
     if(fill.netQuantity>0)derivativePositions[contract.instrumentKey]={
@@ -80,7 +82,7 @@ async function executeLongOptionBuyTransaction({
       expiry:contract.expiry,side:"BUY",quantity:contract.quantity,lots,
       lotSize:contract.lotSize,executionPricePaise:quote.pricePaise,
       quoteTimestampMs:quote.observedAtMs,quoteAgeMs:now-quote.observedAtMs,
-      grossPaise:contract.contractValuePaise,orderType:"MARKET",
+      grossPaise:contract.contractValuePaise,charges,chargesPaise:charges.totalChargesPaise,totalDebitPaise:charges.totalDebitPaise,orderType:"MARKET",
       status:"FILLED",realizedPnlPaise:fill.realizedPnlPaise,
       cashDeltaPaise:fill.cashDeltaPaise,simulationOnly:true,
       excludesCharges:true,createdAt:serverTimestamp()
@@ -90,7 +92,7 @@ async function executeLongOptionBuyTransaction({
       cashPaise,derivativePositions,realizedPnlPaise,reservedMarginPaise:0,
       updatedAt:serverTimestamp(),version:account.version+1
     });
-    result={orderId,order:storedOrder,cashPaise,realizedPnlPaise,idempotentReplay:false,simulationOnly:true};
+    result={orderId,order:storedOrder,cashPaise,realizedPnlPaise,charges,idempotentReplay:false,simulationOnly:true};
   });
   return result;
 }
