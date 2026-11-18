@@ -8,9 +8,8 @@ const {calculateLongOptionTradeCharges}=require("./trading-charges");
 const MAX_QUOTE_AGE_MS=15_000;
 
 /**
- * Atomically records a LONG option BUY in the separate derivative paper account.
- * Only CE/PE BUY is enabled here. Futures, shorts, margin borrowing and live orders
- * are intentionally excluded until their margin lifecycle is implemented.
+ * Atomically records a long CE/PE BUY or SELL-to-close in the shared Indian paper account.
+ * Opening shorts, futures, margin borrowing and live orders remain disabled.
  *
  * instrument and quote must be loaded by trusted server code from verified
  * provider data. Never pass client-supplied instrument metadata or prices here.
