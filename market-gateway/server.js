@@ -309,63 +309,72 @@ app.get("/paper/orders",async(req,res)=>{
   }catch(error){res.status(error.status||500).json({error:error.status?error.message:"Paper order history could not be loaded."});}
 });
 
-// Per-user Indian-market watchlist; symbols are validated against the official instrument master.
+// Per-user named Indian-market watchlists. The legacy single list is migrated as "My Stocks".
+const WATCHLIST_NAMES=["My Stocks","Banking","NIFTY","F&O"];
+function normalizeWatchlists(data){
+  const source=data&&data.watchlists&&typeof data.watchlists==="object"?data.watchlists:{};
+  const result={};
+  for(const name of WATCHLIST_NAMES){
+    const keys=Array.isArray(source[name])?source[name]:(name==="My Stocks"&&Array.isArray(data?.instrumentKeys)?data.instrumentKeys:[]);
+    result[name]=[...new Set(keys.filter(k=>typeof k==="string"))].slice(0,50);
+  }
+  return result;
+}
+function requestedWatchlist(req){
+  const name=String(req.query?.name||req.body?.name||"My Stocks");
+  if(!WATCHLIST_NAMES.includes(name)){const error=new Error("Choose a valid watchlist name.");error.status=400;throw error;}
+  return name;
+}
+app.get("/watchlists",async(req,res)=>{
+  try{
+    const decoded=await authenticate(req),snap=await db.collection("indianMarketWatchlists").doc(decoded.uid).get(),data=snap.exists?snap.data():{};
+    const watchlists=normalizeWatchlists(data);
+    if(!instrumentCache.length||Date.now()-instrumentCacheUpdatedAt>6*60*60*1000)await refreshInstrumentCache();
+    const result={};
+    for(const name of WATCHLIST_NAMES)result[name]=watchlists[name].map(key=>instrumentCache.find(x=>x.instrument_key===key)).filter(Boolean).map(x=>({instrument_key:x.instrument_key,segment:x.segment,exchange:x.exchange,trading_symbol:x.trading_symbol,name:x.name,instrument_type:x.instrument_type,expiry:x.expiry??null}));
+    res.set("Cache-Control","private, no-store");
+    res.json({watchlists:result,names:WATCHLIST_NAMES,updatedAt:data.updatedAt?.toMillis?.()||null,maxItemsPerList:50});
+  }catch(error){res.status(error.status||500).json({error:error.status?error.message:"Watchlists could not be loaded."});}
+});
 app.get("/watchlist",async(req,res)=>{
   try{
-    const decoded=await authenticate(req);
+    const decoded=await authenticate(req),snap=await db.collection("indianMarketWatchlists").doc(decoded.uid).get(),data=snap.exists?snap.data():{},name=requestedWatchlist(req),keys=normalizeWatchlists(data)[name];
     if(!instrumentCache.length||Date.now()-instrumentCacheUpdatedAt>6*60*60*1000)await refreshInstrumentCache();
-    const snap=await db.collection("indianMarketWatchlists").doc(decoded.uid).get();
-    const keys=snap.exists&&Array.isArray(snap.data().instrumentKeys)?snap.data().instrumentKeys:[];
     const items=keys.map(key=>instrumentCache.find(x=>x.instrument_key===key)).filter(Boolean).map(x=>({instrument_key:x.instrument_key,segment:x.segment,exchange:x.exchange,trading_symbol:x.trading_symbol,name:x.name,instrument_type:x.instrument_type,expiry:x.expiry??null}));
-    res.set("Cache-Control","private, no-store");
-    res.json({items,updatedAt:snap.data()?.updatedAt?.toMillis?.()||null,maxItems:50});
+    res.set("Cache-Control","private, no-store");res.json({name,items,updatedAt:data.updatedAt?.toMillis?.()||null,maxItems:50});
   }catch(error){res.status(error.status||500).json({error:error.status?error.message:"Watchlist could not be loaded."});}
 });
 app.get("/watchlist/quotes",async(req,res)=>{
   try{
-    const decoded=await authenticate(req);
-    const snap=await db.collection("indianMarketWatchlists").doc(decoded.uid).get();
-    const keys=snap.exists&&Array.isArray(snap.data().instrumentKeys)?snap.data().instrumentKeys:[];
-    if(!keys.length){res.set("Cache-Control","private, no-store");return res.json({quotes:[],status:"empty"});}
-    if(keys.length>50)return res.status(409).json({error:"Watchlist exceeds the supported quote batch size."});
+    const decoded=await authenticate(req),name=requestedWatchlist(req),snap=await db.collection("indianMarketWatchlists").doc(decoded.uid).get(),keys=normalizeWatchlists(snap.exists?snap.data():{})[name];
+    if(!keys.length){res.set("Cache-Control","private, no-store");return res.json({name,quotes:[],status:"empty"});}
     const connection=await db.collection("upstoxConnections").doc(decoded.uid).get();
     if(!connection.exists)return res.status(403).json({error:"Upstox account is not connected."});
     const data=connection.data();
-    if(data.status!=="connected"||!data.expiresAt||data.expiresAt.toMillis()<=Date.now())
-      return res.status(403).json({error:"Upstox token expired. Reconnect your account."});
-    const accessToken=decryptToken(data.tokenCiphertext);
-    const quoteUrl="https://api.upstox.com/v3/market-quote/quotes?"+new URLSearchParams({instrument_key:keys.join(",")});
-    const upstream=await fetch(quoteUrl,{headers:{Authorization:"Bearer "+accessToken,Accept:"application/json"}});
-    const payload=await upstream.json().catch(()=>null);
+    if(data.status!=="connected"||!data.expiresAt||data.expiresAt.toMillis()<=Date.now())return res.status(403).json({error:"Upstox token expired. Reconnect your account."});
+    const accessToken=decryptToken(data.tokenCiphertext),quoteUrl="https://api.upstox.com/v3/market-quote/quotes?"+new URLSearchParams({instrument_key:keys.join(",")});
+    const upstream=await fetch(quoteUrl,{headers:{Authorization:"Bearer "+accessToken,Accept:"application/json"}}),payload=await upstream.json().catch(()=>null);
     if(!upstream.ok)return res.status(502).json({error:"Watchlist quotes could not be retrieved.",providerStatus:upstream.status});
-    const byKey=new Map(Object.values(payload?.data||{}).filter(q=>q&&typeof q.instrument_token==="string").map(q=>[q.instrument_token,q]));
-    const now=Date.now();
+    const byKey=new Map(Object.values(payload?.data||{}).filter(q=>q&&typeof q.instrument_token==="string").map(q=>[q.instrument_token,q])),now=Date.now();
     const quotes=keys.map(instrumentKey=>{
       const q=byKey.get(instrumentKey),last=Number(q?.last_price),change=Number(q?.net_change),tradeTime=Number(q?.last_trade_time||0),age=tradeTime?now-tradeTime:Infinity;
-      const fresh=Number.isFinite(last)&&last>0&&Number.isFinite(age)&&age>=-5000&&age<=60000;
-      const previous=last-change,percent=Number.isFinite(change)&&previous>0?(change/previous)*100:null;
-      const instrument=instrumentCache.find(x=>x.instrument_key===instrumentKey);
+      const fresh=Number.isFinite(last)&&last>0&&Number.isFinite(age)&&age>=-5000&&age<=60000,previous=last-change,percent=Number.isFinite(change)&&previous>0?(change/previous)*100:null,instrument=instrumentCache.find(x=>x.instrument_key===instrumentKey);
       return {instrumentKey,tradingSymbol:instrument?.trading_symbol||q?.symbol||instrumentKey,lastPrice:fresh?last:null,netChange:fresh&&Number.isFinite(change)?change:null,changePercent:fresh&&Number.isFinite(percent)?percent:null,quoteAgeMs:Number.isFinite(age)?age:null,status:fresh?"fresh":"stale_or_unavailable"};
     });
-    res.set("Cache-Control","private, no-store");
-    res.json({quotes,asOf:now,status:quotes.every(q=>q.status==="fresh")?"fresh":"partial_stale"});
+    res.set("Cache-Control","private, no-store");res.json({name,quotes,asOf:now,status:quotes.every(q=>q.status==="fresh")?"fresh":"partial_stale"});
   }catch(error){res.status(error.status||500).json({error:error.status?error.message:"Watchlist quotes could not be loaded."});}
 });
-
 app.put("/watchlist",async(req,res)=>{
   try{
-    const decoded=await authenticate(req);
-    const raw=req.body?.instrumentKeys;
-    if(!Array.isArray(raw)||raw.length>50||raw.some(x=>typeof x!=="string"||!x||x.length>100||/[\u0000-\u001F]/.test(x)))
-      return res.status(400).json({error:"Provide up to 50 valid instrument keys."});
+    const decoded=await authenticate(req),name=requestedWatchlist(req),raw=req.body?.instrumentKeys;
+    if(!Array.isArray(raw)||raw.length>50||raw.some(x=>typeof x!=="string"||!x||x.length>100||/[\\u0000-\\u001F]/.test(x)))return res.status(400).json({error:"Provide up to 50 valid instrument keys."});
     const keys=[...new Set(raw)];
     if(!instrumentCache.length||Date.now()-instrumentCacheUpdatedAt>6*60*60*1000)await refreshInstrumentCache();
     const valid=new Set(instrumentCache.map(x=>x.instrument_key));
     if(keys.some(key=>!valid.has(key)))return res.status(400).json({error:"Watchlist contains an instrument not present in the official instrument master."});
     const ref=db.collection("indianMarketWatchlists").doc(decoded.uid);
-    await ref.set({uid:decoded.uid,instrumentKeys:keys,updatedAt:admin.firestore.FieldValue.serverTimestamp()});
-    res.set("Cache-Control","private, no-store");
-    res.json({saved:true,count:keys.length,maxItems:50});
+    await db.runTransaction(async tx=>{const snap=await tx.get(ref),data=snap.exists?snap.data():{},watchlists=normalizeWatchlists(data);watchlists[name]=keys;tx.set(ref,{uid:decoded.uid,watchlists,updatedAt:admin.firestore.FieldValue.serverTimestamp()},{merge:true});});
+    res.set("Cache-Control","private, no-store");res.json({saved:true,name,count:keys.length,maxItems:50});
   }catch(error){res.status(error.status||500).json({error:error.status?error.message:"Watchlist could not be saved."});}
 });
 
