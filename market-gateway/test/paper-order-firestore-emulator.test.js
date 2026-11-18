@@ -1,4 +1,5 @@
 "use strict";
+const crypto=require("node:crypto");
 const test=require("node:test");
 const assert=require("node:assert/strict");
 const {Firestore,FieldValue}=require("@google-cloud/firestore");
