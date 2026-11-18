@@ -396,7 +396,13 @@
       const token=await connector.getIdToken();
       if(controller.signal.aborted||selected?.instrument_key!==item.instrument_key)return;
       const response=await fetch(gateway+'/stream',{method:'POST',signal:controller.signal,headers:{Authorization:'Bearer '+token,'Content-Type':'application/json',Accept:'text/event-stream'},body:JSON.stringify({instrumentKeys:[item.instrument_key],mode:'ltpc'})});
-      if(!response.ok)throw new Error('Live feed unavailable ('+response.status+').');
+      if(!response.ok){
+        if(response.status===401||response.status===403){
+          setFeedStatus('Upstox authorization required','Your sign-in or broker token is no longer valid. Reconnect Upstox, then select this instrument again.');
+          return;
+        }
+        throw new Error('Live feed unavailable ('+response.status+').');
+      }
       if(!response.body)throw new Error('Live feed stream is not supported by this browser.');
       reader=response.body.getReader();const decoder=new TextDecoder();let buffer='';
       const processEvent=event=>{
