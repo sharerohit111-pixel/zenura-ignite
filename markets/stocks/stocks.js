@@ -50,7 +50,7 @@
       while(true){
         const {value,done}=await reader.read();if(done)break;
         buffer+=decoder.decode(value,{stream:true});
-        const events=buffer.split('\\n\\n');buffer=events.pop()||'';
+        const events=buffer.split('\n\n');buffer=events.pop()||'';
         for(const event of events){
           const line=event.split('\\n').find(x=>x.startsWith('data: '));if(!line)continue;
           try{
