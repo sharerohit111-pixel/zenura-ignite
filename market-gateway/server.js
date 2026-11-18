@@ -185,6 +185,91 @@ app.get("/option-chain",async(req,res)=>{
   }
 });
 
+
+function paperStartingCashPaise(){
+  const value=Number(process.env.INDIAN_PAPER_STARTING_CASH_PAISE||"");
+  return Number.isSafeInteger(value)&&value>0?value:null;
+}
+function paperAccountRef(uid){return db.collection("indianPaperAccounts").doc(uid);}
+app.get("/paper/account",async(req,res)=>{
+  try{
+    const decoded=await authenticate(req),startingCash=paperStartingCashPaise();
+    if(!startingCash)return res.status(503).json({error:"Indian paper-trading starting balance is not configured by the administrator."});
+    const ref=paperAccountRef(decoded.uid);
+    await db.runTransaction(async tx=>{
+      const snap=await tx.get(ref);
+      if(!snap.exists)tx.create(ref,{currency:"INR",startingCashPaise:startingCash,cashPaise:startingCash,positions:{},createdAt:admin.firestore.FieldValue.serverTimestamp(),updatedAt:admin.firestore.FieldValue.serverTimestamp(),version:1});
+    });
+    const snap=await ref.get(),data=snap.data();
+    res.set("Cache-Control","private, no-store");
+    res.json({currency:"INR",startingCashPaise:data.startingCashPaise,cashPaise:data.cashPaise,positions:data.positions||{},updatedAt:data.updatedAt?.toMillis?.()||null,simulationOnly:true});
+  }catch(error){res.status(error.status||500).json({error:error.status?error.message:"Paper account could not be loaded."});}
+});
+app.post("/paper/orders",async(req,res)=>{
+  try{
+    const decoded=await authenticate(req);
+    const instrumentKey=typeof req.body?.instrument_key==="string"?req.body.instrument_key:"";
+    const side=String(req.body?.side||"").toUpperCase();
+    const quantity=Number(req.body?.quantity);
+    if(!instrumentKey||instrumentKey.length>100||/[\\r\\n]/.test(instrumentKey))return res.status(400).json({error:"A valid instrument_key is required."});
+    if(!["BUY","SELL"].includes(side))return res.status(400).json({error:"Only BUY and SELL paper orders are supported."});
+    if(!Number.isSafeInteger(quantity)||quantity<1||quantity>1000000)return res.status(400).json({error:"Quantity must be a whole number between 1 and 1,000,000."});
+    if(!instrumentCache.length||Date.now()-instrumentCacheUpdatedAt>6*60*60*1000)await refreshInstrumentCache();
+    const instrument=instrumentCache.find(x=>x.instrument_key===instrumentKey&&x.instrument_type==="EQ"&&["NSE_EQ","BSE_EQ"].includes(x.segment));
+    if(!instrument)return res.status(400).json({error:"Phase 1 paper orders support verified NSE/BSE cash equities only."});
+    const connection=await db.collection("upstoxConnections").doc(decoded.uid).get();
+    if(!connection.exists)return res.status(403).json({error:"Connect your Upstox account before placing a paper order."});
+    const connectionData=connection.data();
+    if(connectionData.status!=="connected"||!connectionData.expiresAt||connectionData.expiresAt.toMillis()<=Date.now())return res.status(403).json({error:"Upstox token expired. Reconnect your account."});
+    const accessToken=decryptToken(connectionData.tokenCiphertext);
+    const quoteUrl="https://api.upstox.com/v3/market-quote/ltp?"+new URLSearchParams({instrument_key:instrumentKey});
+    const quoteResponse=await fetch(quoteUrl,{headers:{Authorization:"Bearer "+accessToken,Accept:"application/json"}});
+    const quotePayload=await quoteResponse.json().catch(()=>null);
+    if(!quoteResponse.ok)return res.status(502).json({error:"A current Upstox quote could not be verified.",providerStatus:quoteResponse.status});
+    const quoteEntry=Object.values(quotePayload?.data||{}).find(x=>x&&x.instrument_token===instrumentKey)||Object.values(quotePayload?.data||{})[0];
+    const ltp=Number(quoteEntry?.last_price),tradeTime=Number(quoteEntry?.ltt||quoteEntry?.last_trade_time||0);
+    const quoteAge=tradeTime?Date.now()-tradeTime:Infinity;
+    if(!Number.isFinite(ltp)||ltp<=0||!Number.isFinite(tradeTime)||quoteAge< -5000||quoteAge>15000)
+      return res.status(409).json({error:"No sufficiently fresh provider quote is available. Paper order rejected.",quoteAgeMs:Number.isFinite(quoteAge)?quoteAge:null});
+    const pricePaise=Math.round(ltp*100),grossPaise=pricePaise*quantity;
+    if(!Number.isSafeInteger(grossPaise)||grossPaise<=0)return res.status(400).json({error:"Order value exceeds supported calculation limits."});
+    const accountRef=paperAccountRef(decoded.uid),orderRef=db.collection("indianPaperOrders").doc(crypto.randomUUID());
+    let result;
+    await db.runTransaction(async tx=>{
+      const accountSnap=await tx.get(accountRef);
+      if(!accountSnap.exists)throw Object.assign(new Error("Paper account is not initialized."),{status:409});
+      const account=accountSnap.data(),positions={...(account.positions||{})},position={...(positions[instrumentKey]||{quantity:0,averagePricePaise:0})};
+      let cash=account.cashPaise;
+      if(side==="BUY"){
+        if(cash<grossPaise)throw Object.assign(new Error("Insufficient virtual cash balance."),{status:409});
+        const nextQty=position.quantity+quantity;
+        position.averagePricePaise=Math.round((position.quantity*position.averagePricePaise+grossPaise)/nextQty);
+        position.quantity=nextQty;cash-=grossPaise;
+      }else{
+        if(position.quantity<quantity)throw Object.assign(new Error("Not enough shares in the virtual portfolio to sell."),{status:409});
+        position.quantity-=quantity;cash+=grossPaise;
+        if(position.quantity===0)delete positions[instrumentKey];
+        else positions[instrumentKey]=position;
+      }
+      if(side==="BUY")positions[instrumentKey]=position;
+      const order={uid:decoded.uid,instrumentKey,tradingSymbol:instrument.trading_symbol||instrument.name,exchange:instrument.exchange,side,quantity,executionPricePaise:pricePaise,grossPaise,quoteTimestampMs:tradeTime,quoteAgeMs:quoteAge,orderType:"MARKET",status:"FILLED",simulationOnly:true,createdAt:admin.firestore.FieldValue.serverTimestamp()};
+      tx.create(orderRef,order);
+      tx.update(accountRef,{cashPaise:cash,positions,updatedAt:admin.firestore.FieldValue.serverTimestamp(),version:(account.version||1)+1});
+      result={orderId:orderRef.id,...order,cashPaise:cash};
+    });
+    res.set("Cache-Control","private, no-store");
+    res.status(201).json(result);
+  }catch(error){res.status(error.status||500).json({error:error.status?error.message:"Paper order could not be completed."});}
+});
+app.get("/paper/orders",async(req,res)=>{
+  try{
+    const decoded=await authenticate(req),limit=Math.min(Math.max(Number.parseInt(req.query.limit||"50",10)||50,1),100);
+    const snap=await db.collection("indianPaperOrders").where("uid","==",decoded.uid).orderBy("createdAt","desc").limit(limit).get();
+    res.set("Cache-Control","private, no-store");
+    res.json({orders:snap.docs.map(doc=>({id:doc.id,...doc.data(),createdAt:doc.data().createdAt?.toMillis?.()||null})),simulationOnly:true});
+  }catch(error){res.status(error.status||500).json({error:error.status?error.message:"Paper order history could not be loaded."});}
+});
+
 app.post("/stream",async(req,res)=>{
   let upstream;
   let heartbeat;
