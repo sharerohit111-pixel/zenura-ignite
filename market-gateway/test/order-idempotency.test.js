@@ -30,3 +30,19 @@ test("two concurrent BUY calculations from same account both remain individually
  assert.notDeepEqual(a.positions,b.positions);
 });
 test("rejects malformed paper account positions map",()=>assert.throws(()=>buildPaperOrderUpdate({cashPaise:1000,realizedPnlPaise:0,positions:[]},{instrumentKey:"NSE_EQ|AAA",side:"BUY",quantity:1,pricePaise:100}),{status:409}));
+
+test("two order transitions composed sequentially cannot overspend shared cash",()=>{
+ const start={cashPaise:10000,realizedPnlPaise:0,positions:{},version:1};
+ const first=buildPaperOrderUpdate(start,{instrumentKey:"NSE_EQ|AAA",side:"BUY",quantity:1,pricePaise:7000});
+ assert.throws(()=>buildPaperOrderUpdate(first,{instrumentKey:"NSE_EQ|BBB",side:"BUY",quantity:1,pricePaise:7000}),{status:409});
+ assert.equal(first.cashPaise,3000);
+});
+test("simulated transaction retry from fresh account snapshot applies the order once",()=>{
+ const account={cashPaise:10000,realizedPnlPaise:0,positions:{},version:1};
+ const request={instrumentKey:"NSE_EQ|AAA",side:"BUY",quantity:2,pricePaise:1000};
+ const first=buildPaperOrderUpdate(account,request);
+ const retriedFromCommittedSnapshot=buildPaperOrderUpdate(first,{...request,quantity:1});
+ assert.equal(first.cashPaise,8000);
+ assert.equal(retriedFromCommittedSnapshot.cashPaise,7000);
+ assert.equal(retriedFromCommittedSnapshot.positions["NSE_EQ|AAA"].quantity,3);
+});
