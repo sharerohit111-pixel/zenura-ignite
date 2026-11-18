@@ -67,7 +67,16 @@ button.addEventListener("click", async () => {
     button.disabled = false;
   }
 });
-onAuthStateChanged(auth, refreshStatus);
+window.ZENURA_MARKET_CONNECTOR = {
+  getIdToken: async () => {
+    if (!auth.currentUser) throw new Error("Sign in to connect the live market feed.");
+    return auth.currentUser.getIdToken();
+  }
+};
+onAuthStateChanged(auth, async () => {
+  await refreshStatus();
+  window.dispatchEvent(new Event("zenura-market-auth-ready"));
+});
 if (new URLSearchParams(location.search).get("upstox") === "connected") {
   history.replaceState({}, "", location.pathname);
 }
