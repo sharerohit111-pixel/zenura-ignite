@@ -16,9 +16,10 @@ function roundPaise(value){
     throw Object.assign(new Error("Trading charge exceeds supported calculation limits."),{status:400});
   return Math.round(value);
 }
-function calculateLongOptionBuyCharges({grossPaise,exchange,brokeragePaise=DEFAULT_BROKERAGE_PAISE}){
+function calculateLongOptionTradeCharges({grossPaise,exchange,side="BUY",brokeragePaise=DEFAULT_BROKERAGE_PAISE}){
   if(!Number.isSafeInteger(grossPaise)||grossPaise<1)
     throw Object.assign(new Error("A valid option premium turnover is required."),{status:400});
+  if(!["BUY","SELL"].includes(side))throw Object.assign(new Error("Option trade side must be BUY or SELL."),{status:400});
   const rates=RATES[String(exchange||"").toUpperCase()];
   if(!rates)throw Object.assign(new Error("Only NSE and BSE option charge schedules are supported."),{status:400});
   if(!Number.isSafeInteger(brokeragePaise)||brokeragePaise<0)
@@ -26,17 +27,19 @@ function calculateLongOptionBuyCharges({grossPaise,exchange,brokeragePaise=DEFAU
   const exchangePaise=roundPaise(grossPaise*rates.exchangeTransaction);
   const ipftPaise=roundPaise(grossPaise*rates.ipft);
   const sebiPaise=roundPaise(grossPaise*SEBI_TURNOVER);
-  const stampDutyPaise=roundPaise(grossPaise*STAMP_DUTY_BUY);
+  const stampDutyPaise=side==="BUY"?roundPaise(grossPaise*STAMP_DUTY_BUY):0;
+  const sttPaise=side==="SELL"?roundPaise(grossPaise*0.0015):0;
   const gstPaise=roundPaise((brokeragePaise+exchangePaise+ipftPaise)*GST);
-  const totalChargesPaise=brokeragePaise+exchangePaise+ipftPaise+sebiPaise+stampDutyPaise+gstPaise;
+  const totalChargesPaise=brokeragePaise+exchangePaise+ipftPaise+sebiPaise+stampDutyPaise+gstPaise+sttPaise;
   if(!Number.isSafeInteger(totalChargesPaise)||!Number.isSafeInteger(grossPaise+totalChargesPaise))
     throw Object.assign(new Error("Total order debit exceeds supported calculation limits."),{status:400});
   return {
     brokeragePaise,exchangeTransactionPaise:exchangePaise,ipftPaise,sebiPaise,
-    stampDutyPaise,gstPaise,sttPaise:0,totalChargesPaise,
-    totalDebitPaise:grossPaise+totalChargesPaise,
-    exchange:String(exchange).toUpperCase(),side:"BUY",segment:"EQUITY_OPTIONS",
+    stampDutyPaise,gstPaise,sttPaise,totalChargesPaise,
+    totalDebitPaise:side==="BUY"?grossPaise+totalChargesPaise:null,
+    netCreditPaise:side==="SELL"?Math.max(grossPaise-totalChargesPaise,0):null,
+    exchange:String(exchange).toUpperCase(),side,segment:"EQUITY_OPTIONS",
     indicative:true,simulationOnly:true
   };
 }
-module.exports={calculateLongOptionBuyCharges,DEFAULT_BROKERAGE_PAISE};
+module.exports={calculateLongOptionTradeCharges,calculateLongOptionBuyCharges:args=>calculateLongOptionTradeCharges({...args,side:"BUY"}),DEFAULT_BROKERAGE_PAISE};
