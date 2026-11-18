@@ -1,9 +1,9 @@
 "use strict";
 const test=require("node:test");
 const assert=require("node:assert/strict");
-const {validateDerivativeContract,toPaiseFromRupees}=require("../lib/derivative-contract");
+const {validateDerivativeContract,normalizeTickSizePaise,normalizeExpiryDate}=require("../lib/derivative-contract");
 const now=Date.UTC(2026,10,18,10);
-const option=()=>({instrument_key:"NSE_FO|NIFTY26NOV25000CE",trading_symbol:"NIFTY 26 NOV 25000 CE",segment:"NSE_FO",exchange:"NSE",instrument_type:"CE",expiry:"2026-11-26",strike_price:25000,lot_size:65,tick_size:0.05});
+const option=()=>({instrument_key:"NSE_FO|NIFTY26NOV25000CE",trading_symbol:"NIFTY 26 NOV 25000 CE",segment:"NSE_FO",exchange:"NSE",instrument_type:"CE",expiry:"2026-11-26",strike_price:25000,lot_size:65,tick_size:5});
 test("validates an option contract and converts lots to units",()=>{
  const result=validateDerivativeContract(option(),{lots:2,pricePaise:1250,now});
  assert.equal(result.quantity,130);assert.equal(result.lotSize,65);assert.equal(result.tickSizePaise,5);assert.equal(result.contractValuePaise,162500);
@@ -36,5 +36,12 @@ test("requires valid option strike and clean futures strike",()=>{
  assert.throws(()=>validateDerivativeContract({...option(),instrument_type:"FUT",strike_price:25000},{lots:1,pricePaise:1250,now}),/futures contract/);
 });
 test("converts only exact rupee tick sizes to paise",()=>{
- assert.equal(toPaiseFromRupees(0.05),5);assert.equal(toPaiseFromRupees(0.1),10);assert.equal(toPaiseFromRupees(0),null);assert.equal(toPaiseFromRupees(0.005),null);
+ assert.equal(normalizeTickSizePaise(5),5);assert.equal(normalizeTickSizePaise(0.05),5);assert.equal(normalizeTickSizePaise(10),10);assert.equal(normalizeTickSizePaise(0),null);assert.equal(normalizeTickSizePaise(0.005),null);
+});
+
+test("normalizes Upstox BOD millisecond expiry to India-local date",()=>{
+ const expiryMs=Date.UTC(2026,10,26,18,29,59);
+ assert.equal(normalizeExpiryDate(expiryMs),"2026-11-26");
+ const raw={...option(),expiry:expiryMs,tick_size:5};
+ assert.equal(validateDerivativeContract(raw,{lots:1,pricePaise:1250,now:Date.UTC(2026,10,18,10)}).expiry,"2026-11-26");
 });
