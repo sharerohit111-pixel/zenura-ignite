@@ -41,7 +41,7 @@ async function refreshStatus() {
         : "03:30 AM IST daily cutoff";
       setState("UPSTOX AUTHORIZED", (data.feedReady
         ? "Market feed gateway is ready."
-        : "Account authorized. Live feed gateway is not deployed yet.")
+        : "Account authorized. Select an instrument to check live feed availability.")
         + " Access token expires at " + expiry + "; reconnect after expiry.", true);
     } else if (data.status === "token_expired") {
       setState("UPSTOX TOKEN EXPIRED", "Upstox standard access tokens expire at 03:30 AM IST. Reconnect your account to continue.");
