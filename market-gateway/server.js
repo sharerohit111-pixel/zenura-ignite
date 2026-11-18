@@ -22,6 +22,7 @@ const {sendUpstoxSubscription}=require("./lib/upstox-subscription");
 const {decodeFeedResponse}=require("./lib/upstox-feed-decoder");
 const {filterFreshMarketFeeds}=require("./lib/market-feed-validation");
 const {buildPortfolioValuation}=require("./lib/paper-portfolio-valuation");
+const {isUpstoxTokenUsable}=require("./lib/upstox-token");
 admin.initializeApp();
 const db=admin.firestore();
 const app=express();
@@ -156,7 +157,7 @@ app.get("/candles",async(req,res)=>{
     const connection=await db.collection("upstoxConnections").doc(decoded.uid).get();
     if(!connection.exists)return res.status(403).json({error:"Upstox account is not connected."});
     const data=connection.data();
-    if(data.status!=="connected"||!data.expiresAt||data.expiresAt.toMillis()<=Date.now())
+    if(!isUpstoxTokenUsable(data))
       return res.status(403).json({error:"Upstox token expired. Reconnect your account."});
     const accessToken=decryptToken(data.tokenCiphertext);
     const encodedKey=encodeURIComponent(instrumentKey);
@@ -194,7 +195,7 @@ app.get("/option-chain",async(req,res)=>{
     const connection=await db.collection("upstoxConnections").doc(decoded.uid).get();
     if(!connection.exists)return res.status(403).json({error:"Upstox account is not connected."});
     const data=connection.data();
-    if(data.status!=="connected"||!data.expiresAt||data.expiresAt.toMillis()<=Date.now())
+    if(!isUpstoxTokenUsable(data))
       return res.status(403).json({error:"Upstox token expired. Reconnect your account."});
     const accessToken=decryptToken(data.tokenCiphertext);
     const params=new URLSearchParams({instrument_key:instrumentKey,expiry_date:expiry});
@@ -257,7 +258,7 @@ app.post("/paper/orders",async(req,res)=>{
     const connection=await db.collection("upstoxConnections").doc(decoded.uid).get();
     if(!connection.exists)return res.status(403).json({error:"Connect your Upstox account before placing a paper order."});
     const connectionData=connection.data();
-    if(connectionData.status!=="connected"||!connectionData.expiresAt||connectionData.expiresAt.toMillis()<=Date.now())return res.status(403).json({error:"Upstox token expired. Reconnect your account."});
+    if(!isUpstoxTokenUsable(connectionData))return res.status(403).json({error:"Upstox token expired. Reconnect your account."});
     const accessToken=decryptToken(connectionData.tokenCiphertext);
     const quoteUrl="https://api.upstox.com/v3/market-quote/quotes?"+new URLSearchParams({instrument_key:instrumentKey});
     const quoteResponse=await fetchProvider(quoteUrl,{headers:{Authorization:"Bearer "+accessToken,Accept:"application/json"}});
@@ -298,7 +299,7 @@ app.get("/paper/portfolio",async(req,res)=>{
     const connection=await db.collection("upstoxConnections").doc(decoded.uid).get();
     if(!connection.exists)return res.status(403).json({error:"Upstox account is not connected."});
     const connectionData=connection.data();
-    if(connectionData.status!=="connected"||!connectionData.expiresAt||connectionData.expiresAt.toMillis()<=Date.now())return res.status(403).json({error:"Upstox token expired. Reconnect your account."});
+    if(!isUpstoxTokenUsable(connectionData))return res.status(403).json({error:"Upstox token expired. Reconnect your account."});
     const accessToken=decryptToken(connectionData.tokenCiphertext),keys=positions.map(([key])=>key);
     const quoteUrl="https://api.upstox.com/v3/market-quote/quotes?"+new URLSearchParams({instrument_key:keys.join(",")});
     const quoteResponse=await fetchProvider(quoteUrl,{headers:{Authorization:"Bearer "+accessToken,Accept:"application/json"}});
@@ -363,7 +364,7 @@ app.get("/watchlist/quotes",async(req,res)=>{
     const connection=await db.collection("upstoxConnections").doc(decoded.uid).get();
     if(!connection.exists)return res.status(403).json({error:"Upstox account is not connected."});
     const data=connection.data();
-    if(data.status!=="connected"||!data.expiresAt||data.expiresAt.toMillis()<=Date.now())return res.status(403).json({error:"Upstox token expired. Reconnect your account."});
+    if(!isUpstoxTokenUsable(data))return res.status(403).json({error:"Upstox token expired. Reconnect your account."});
     const accessToken=decryptToken(data.tokenCiphertext),quoteUrl="https://api.upstox.com/v3/market-quote/quotes?"+new URLSearchParams({instrument_key:keys.join(",")});
     const upstream=await fetchProvider(quoteUrl,{headers:{Authorization:"Bearer "+accessToken,Accept:"application/json"}}),payload=await upstream.json().catch(()=>null);
     if(!upstream.ok)return res.status(502).json({error:"Watchlist quotes could not be retrieved.",providerStatus:upstream.status});
@@ -437,7 +438,7 @@ app.post("/stream",async(req,res)=>{
     const connection=await db.collection("upstoxConnections").doc(decoded.uid).get();
     if(!connection.exists) return res.status(403).json({error:"Upstox account is not connected."});
     const data=connection.data();
-    if(data.status!=="connected"||!data.expiresAt||data.expiresAt.toMillis()<=Date.now())
+    if(!isUpstoxTokenUsable(data))
       return res.status(403).json({error:"Upstox token expired. Reconnect your account."});
     const accessToken=decryptToken(data.tokenCiphertext);
     const authResponse=await fetchProvider("https://api.upstox.com/v3/feed/market-data-feed/authorize",{
