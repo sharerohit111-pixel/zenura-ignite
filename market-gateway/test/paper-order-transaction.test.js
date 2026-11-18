@@ -84,4 +84,15 @@ test("concurrent different orders serialize against latest cash and cannot overs
  assert.equal(state.account.version,2);
 });
 
-test("rejects a transaction whose order belongs to another user",async()=>{\n const {common,writes}=setup();\n common.order.uid="different-user";\n await assert.rejects(executePaperOrderTransaction(common),TypeError);\n assert.equal(writes.length,0);\n});\ntest("rejects a transaction fingerprint that differs from the stored order",async()=>{\n const {common,writes}=setup();\n common.order.requestFingerprint="different";\n await assert.rejects(executePaperOrderTransaction(common),TypeError);\n assert.equal(writes.length,0);\n});\n
+test("rejects a transaction whose order belongs to another user",async()=>{
+ const {common,writes}=setup();
+ common.order.uid="different-user";
+ await assert.rejects(executePaperOrderTransaction(common),TypeError);
+ assert.equal(writes.length,0);
+});
+test("rejects a transaction fingerprint that differs from the stored order",async()=>{
+ const {common,writes}=setup();
+ common.order.requestFingerprint="different";
+ await assert.rejects(executePaperOrderTransaction(common),TypeError);
+ assert.equal(writes.length,0);
+});
