@@ -66,7 +66,7 @@ function createSerializableStore(initialAccount){
 }
 test("concurrent identical submissions create one fill and replay the same order",async()=>{
  const {db,state}=createSerializableStore(account);
- const common={db,accountRef:{id:"account"},orderRef:{id:"same-order"},uid:"user-1",requestFingerprint:"fingerprint",order:{instrumentKey:"NSE_EQ|AAA",side:"BUY",quantity:2},pricePaise:1000,publicPaperOrder:(order,meta)=>({order,meta}),serverTimestamp:()=>"server-time"};
+ const common={db,accountRef:{id:"account"},orderRef:{id:"same-order"},uid:"user-1",requestFingerprint:"fingerprint",order:{requestFingerprint:"fingerprint",instrumentKey:"NSE_EQ|AAA",side:"BUY",quantity:2},pricePaise:1000,publicPaperOrder:(order,meta)=>({order,meta}),serverTimestamp:()=>"server-time"};
  const [a,b]=await Promise.all([executePaperOrderTransaction(common),executePaperOrderTransaction(common)]);
  assert.equal(state.orders.size,1);
  assert.equal(state.account.cashPaise,8000);
