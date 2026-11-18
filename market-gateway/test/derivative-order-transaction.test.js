@@ -237,5 +237,5 @@ test("Firestore transaction retry re-reads a competing committed order before re
  assert.equal(attempts,2);
  assert.equal(result.idempotentReplay,true);
  assert.equal(result.cashPaise,916354);
- assert.equal(result.order.orderId,undefined);
+ assert.deepEqual(result.order,competingOrder);
 });
