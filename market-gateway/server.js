@@ -16,6 +16,7 @@ const {normalizeProviderQuote}=require("./lib/provider-quote");
 const {validateStreamInstrumentKeys}=require("./lib/stream-subscription");
 const {reserveUserStream,releaseUserStream}=require("./lib/stream-registry");
 const {acquireStreamLease,renewStreamLease,releaseStreamLease}=require("./lib/stream-lease");
+const {writeSseFrame,resumeUpstream}=require("./lib/stream-backpressure");
 admin.initializeApp();
 const db=admin.firestore();
 const app=express();
@@ -404,14 +405,23 @@ app.post("/stream",async(req,res)=>{
   let streamReservation=null;
   let streamLeaseId=null;
   let streamLeaseAcquired=false;
+  const onDrain=()=>resumeUpstream(upstream,closed);
   const writeEvent=(event,payload)=>{
     if(closed||res.destroyed||res.writableEnded)return false;
-    return res.write(formatSseEvent(event,payload));
+    try{return writeSseFrame(res,upstream,formatSseEvent(event,payload));}
+    catch(error){
+      if(error.status!==413)throw error;
+      writeSseFrame(res,upstream,formatSseEvent("error",{message:"Market feed frame exceeded the safe size limit. Stream closed."}));
+      stop();
+      if(!res.destroyed&&!res.writableEnded)res.end();
+      return false;
+    }
   };
   const stop=()=>{
     if(closed)return;
     closed=true;
     if(heartbeat)clearInterval(heartbeat);
+    res.removeListener("drain",onDrain);
     if(streamUid&&streamReservation)releaseUserStream(activeUserStreams,streamUid,streamReservation);
     if(streamLeaseAcquired&&streamUid&&streamLeaseId)releaseStreamLease(db,streamUid,streamLeaseId).catch(()=>{});
     if(upstream&&upstream.readyState<WebSocket.CLOSING)upstream.close();
@@ -448,6 +458,7 @@ app.post("/stream",async(req,res)=>{
     if(res.destroyed||res.writableEnded)return;
     res.status(200);
     res.set({"Content-Type":"text/event-stream","Cache-Control":"no-cache, no-transform","Connection":"keep-alive","X-Accel-Buffering":"no"});
+    res.on("drain",onDrain);
     res.flushHeaders?.();
     writeEvent("status",{connected:false,connecting:true,mode,keys:keys.length});
     upstream=new WebSocket(authData.data.authorized_redirect_uri,{
@@ -489,7 +500,7 @@ app.post("/stream",async(req,res)=>{
       try{
         const renewed=await renewStreamLease(db,streamUid,streamLeaseId);
         if(!renewed){writeEvent("error",{message:"Live market stream lease expired. Reconnect to continue."});stop();if(!res.destroyed&&!res.writableEnded)res.end();return;}
-        if(!closed&&!res.destroyed&&!res.writableEnded)res.write(formatSseComment("keep-alive"));
+        if(!closed&&!res.destroyed&&!res.writableEnded)writeSseFrame(res,upstream,formatSseComment("keep-alive"));
       }catch(error){
         writeEvent("error",{message:"Live market stream lease could not be renewed."});stop();if(!res.destroyed&&!res.writableEnded)res.end();
       }
