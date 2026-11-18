@@ -50,6 +50,7 @@ app.use((req,res,next)=>{
     res.set("Access-Control-Allow-Origin",origin);
     res.set("Vary","Origin");
     res.set("Access-Control-Allow-Headers","Authorization, Content-Type, Accept");
+    res.set("Access-Control-Expose-Headers","Retry-After");
     res.set("Access-Control-Allow-Methods","GET, POST, PUT, OPTIONS");
   }
   if(req.method==="OPTIONS")return res.sendStatus(origin&&ALLOWED_ORIGINS.includes(origin)?204:403);
