@@ -393,9 +393,10 @@ app.get("/paper/derivatives/portfolio",async(req,res)=>{
       if(!instrumentKey||!p||typeof p!=="object"||!["CE","PE"].includes(p.instrumentType)||
          !Number.isSafeInteger(p.netQuantity)||p.netQuantity<0||p.netQuantity>1000000||
          !Number.isSafeInteger(p.averagePricePaise)||p.averagePricePaise<0||
-         (p.netQuantity>0&&p.averagePricePaise<1)||(p.netQuantity===0&&p.averagePricePaise!==0))
+         (p.netQuantity>0&&p.averagePricePaise<1)||
+         (p.costBasisPaise!==undefined&&(!Number.isSafeInteger(p.costBasisPaise)||p.costBasisPaise<0))||(p.netQuantity===0&&p.averagePricePaise!==0))
         return res.status(409).json({error:"A stored derivative position is malformed; valuation stopped to protect account totals."});
-      if(p.netQuantity>0)positions.push({instrumentKey,instrumentType:p.instrumentType,netQuantity:p.netQuantity,averagePricePaise:p.averagePricePaise});
+      if(p.netQuantity>0)positions.push({instrumentKey,instrumentType:p.instrumentType,netQuantity:p.netQuantity,averagePricePaise:p.averagePricePaise,costBasisPaise:p.costBasisPaise});
     }
     if(positions.length>50)return res.status(409).json({error:"More than 50 open derivative positions; valuation stopped."});
     if(!positions.length){
