@@ -310,16 +310,10 @@
       if(!response.ok)throw new Error('Live feed unavailable ('+response.status+').');
       if(!response.body)throw new Error('Live feed stream is not supported by this browser.');
       reader=response.body.getReader();const decoder=new TextDecoder();let buffer='';
-      while(true){
-        const {value,done}=await reader.read();if(done)break;
-        if(controller.signal.aborted||selected?.instrument_key!==item.instrument_key)break;
-        buffer+=decoder.decode(value,{stream:true});
-        const events=buffer.split(/\r?\n\r?\n/);buffer=events.pop()||'';
-        for(const event of events){
-          const lines=event.split(/\r?\n/),eventName=lines.find(x=>x.startsWith('event: '))?.slice(7)||'message';
-          const line=lines.find(x=>x.startsWith('data: '));if(!line)continue;
+      const processEvent=event=>{
+          const eventName=event.event,dataText=event.data;
           try{
-            const data=JSON.parse(line.slice(6));
+            const data=JSON.parse(dataText);
             if(eventName==='status'&&data.connecting){setFeedStatus('Connecting to live feed','Waiting for the Upstox websocket handshake.');continue;}
             if(eventName==='status'&&data.connected===true){setFeedStatus('Live feed connected','Upstox websocket is open. Waiting for the first market quote.');continue;}
             if(eventName==='status'&&data.connected===false){if(staleTimer){clearTimeout(staleTimer);staleTimer=null;}price.textContent=lastQuoteText?'STALE · '+lastQuoteText:'—';setFeedStatus('Live feed disconnected','The Upstox stream closed. Reconnecting automatically.');continue;}
@@ -332,7 +326,14 @@
               setFeedStatus('Live quote connected','Last traded price received from Upstox V3. Chart history is a separate integration.');
             }
           }catch(_){}
-        }
+      };
+      while(true){
+        const {value,done}=await reader.read();
+        if(controller.signal.aborted||selected?.instrument_key!==item.instrument_key)break;
+        const chunk=decoder.decode(value||new Uint8Array(),{stream:!done});
+        const parsed=window.ZenuraSseParser.parseSseChunk(buffer,chunk,{final:done});
+        buffer=parsed.buffer;parsed.events.forEach(processEvent);
+        if(done)break;
       }
       if(selected?.instrument_key===item.instrument_key&&!controller.signal.aborted)scheduleReconnect(item);
     }catch(error){
