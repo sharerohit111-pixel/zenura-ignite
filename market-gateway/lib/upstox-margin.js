@@ -25,7 +25,7 @@ function normalizeUpstoxMarginResponse(payload,instrumentKey){
  const matching=rows.filter(row=>row&&typeof row==="object"&&(!row.instrument_key||row.instrument_key===instrumentKey));
  const components=matching.slice(0,10).map(row=>{
   const out={};
-  for(const key of ["span","exposure","option_premium","total_margin","tender","delivery"])
+  for(const key of ["span","exposure","option_premium","net_buy_premium","total_margin","tender","delivery"])
    if(row[key]!==undefined){const amount=rupeesToPaise(row[key]);if(amount===null)fail("Upstox returned an invalid margin component.");out[key+"Paise"]=amount;}
   return out;
  });
