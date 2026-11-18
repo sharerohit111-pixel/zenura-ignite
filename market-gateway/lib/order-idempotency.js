@@ -14,7 +14,11 @@ function buildPaperOrderUpdate(account,{instrumentKey,side,quantity,pricePaise})
  if(!account||typeof account!=="object"||!account.positions||typeof account.positions!=="object"||Array.isArray(account.positions))
   throw Object.assign(new Error("Invalid paper account state."),{status:409});
  const {calculatePaperFill}=require("./paper-math");
- const positions={...account.positions},position={...(positions[instrumentKey]||{quantity:0,averagePricePaise:0})};
+ const positions={...account.positions};
+ // Keep order execution within the same 50-open-position limit enforced by portfolio valuation.
+ if(side==="BUY"&&!Object.prototype.hasOwnProperty.call(positions,instrumentKey)&&Object.keys(positions).length>=50)
+  throw Object.assign(new Error("Paper portfolio is limited to 50 open positions. Close an existing position before opening another."),{status:409});
+ const position={...(positions[instrumentKey]||{quantity:0,averagePricePaise:0})};
  const fill=calculatePaperFill({side,quantity,pricePaise,cashPaise:account.cashPaise,realizedPnlPaise:account.realizedPnlPaise??0,position});
  if(fill.position.quantity===0)delete positions[instrumentKey];else positions[instrumentKey]=fill.position;
  const currentVersion=account.version===undefined?1:account.version;if(!Number.isSafeInteger(currentVersion)||currentVersion<1||currentVersion>=Number.MAX_SAFE_INTEGER)throw Object.assign(new Error("Invalid paper account version."),{status:409});
