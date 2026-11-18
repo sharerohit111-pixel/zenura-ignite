@@ -152,3 +152,57 @@ test("partial option SELL allocates exact entry cost basis and retains the remai
  assert.equal(remaining.averagePricePaise,1287);
  assert.equal(writes[1][2].realizedPnlPaise,11307);
 });
+
+function createSerializableDerivativeStore(initialAccount){
+ const state={account:{...initialAccount,derivativePositions:{...(initialAccount.derivativePositions||{})}},orders:new Map()};
+ let tail=Promise.resolve();
+ const db={runTransaction(callback){
+  const run=tail.then(async()=>{
+   const writes=[];
+   const tx={
+    get:async ref=>{
+     if(ref.id===uid)return {exists:true,data:()=>({...state.account,derivativePositions:{...state.account.derivativePositions}})};
+     const value=state.orders.get(ref.id);
+     return {exists:!!value,data:()=>value};
+    },
+    create:(ref,data)=>writes.push(()=>{if(state.orders.has(ref.id))throw new Error("duplicate order create");state.orders.set(ref.id,data);}),
+    update:(ref,data)=>writes.push(()=>{state.account={...state.account,...data};})
+   };
+   const result=await callback(tx);
+   for(const write of writes)write();
+   return result;
+  });
+  tail=run.catch(()=>{});
+  return run;
+ }};
+ return {db,state};
+}
+
+test("concurrent identical option submissions create one fill and one premium debit",async()=>{
+ const {db,state}=createSerializableDerivativeStore(initial);
+ const common={db,accountRef:{id:uid},orderRef:{id:orderId},uid,idempotencyKey,instrument,quote,lots:1,serverTimestamp:()=>"server-time",now};
+ const results=await Promise.all([
+  executeLongOptionBuyTransaction(common),
+  executeLongOptionBuyTransaction(common)
+ ]);
+ assert.equal(state.orders.size,1);
+ assert.equal(state.account.cashPaise,916354);
+ assert.equal(state.account.derivativePositions[instrument.instrument_key].netQuantity,65);
+ assert.deepEqual(results.map(x=>x.idempotentReplay).sort(),[false,true]);
+});
+
+test("concurrent different option BUY orders cannot overspend shared virtual cash",async()=>{
+ const poorAccount={...initial,cashPaise:100000};
+ const {db,state}=createSerializableDerivativeStore(poorAccount);
+ const make=(key)=>({
+  db,accountRef:{id:uid},orderRef:{id:makeOrderId(uid,key)},uid,idempotencyKey:key,
+  instrument,quote,lots:1,serverTimestamp:()=>"server-time",now
+ });
+ const keys=["123e4567-e89b-42d3-a456-426614174001","123e4567-e89b-42d3-a456-426614174002"];
+ const results=await Promise.allSettled(keys.map(key=>executeLongOptionBuyTransaction(make(key))));
+ assert.equal(results.filter(x=>x.status==="fulfilled").length,1);
+ assert.equal(results.filter(x=>x.status==="rejected"&&x.reason.status===409).length,1);
+ assert.equal(state.orders.size,1);
+ assert.equal(state.account.cashPaise,16354);
+ assert.equal(state.account.derivativePositions[instrument.instrument_key].netQuantity,65);
+});
