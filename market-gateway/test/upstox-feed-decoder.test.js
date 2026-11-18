@@ -62,7 +62,7 @@ test("receives and decodes a binary feed frame over a local WebSocket server",as
  await new Promise((resolve,reject)=>{server.once("listening",resolve);server.once("error",reject);});
  const address=server.address();
  const received=new Promise((resolve,reject)=>{
-  server.once("connection",socket=>socket.send(frame,{binary:true},error=>{if(error)reject(error);}));
+  server.once("connection",socket=>socket.send(frame,{binary:true},error=>{if(error)reject(error);else resolve();}));
  });
  const client=new WebSocket("ws://127.0.0.1:"+address.port);
  const decoded=new Promise((resolve,reject)=>{
