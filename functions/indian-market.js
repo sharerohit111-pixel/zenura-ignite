@@ -91,8 +91,9 @@ exports.getIndianMarketConnectionStatus = onCall(
   async req=>{
     const uid=uidOf(req), snap=await db.collection("upstoxConnections").doc(uid).get();
     if(!snap.exists) return {connected:false,feedReady:false,status:"not_connected"};
-    const data=snap.data(), valid=!!data.expiresAt&&data.expiresAt.toMillis()>Date.now();
-    return {connected:valid,feedReady:false,status:valid?"authorized_feed_not_configured":"token_expired",
+    const data=snap.data(), valid=data.status==="connected"&&!!data.expiresAt&&data.expiresAt.toMillis()>Date.now();
+    const status=valid?"authorized_feed_not_configured":data.status==="connected"?"token_expired":"not_connected";
+    return {connected:valid,feedReady:false,status,
       expiresAt:data.expiresAt?.toMillis()||null};
   }
 );
