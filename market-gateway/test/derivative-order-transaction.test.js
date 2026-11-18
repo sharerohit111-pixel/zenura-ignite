@@ -239,3 +239,35 @@ test("Firestore transaction retry re-reads a competing committed order before re
  assert.equal(result.cashPaise,916354);
  assert.deepEqual(result.order,competingOrder);
 });
+
+
+test("repeated partial option closes conserve the original paise cost basis",async()=>{
+ const originalCostBasisPaise=100001;
+ const account={...initial,derivativePositions:{[instrument.instrument_key]:{
+  instrumentType:"CE",netQuantity:195,averagePricePaise:513,
+  costBasisPaise:originalCostBasisPaise,exchange:"NSE",segment:"NSE_FO",
+  expiry:"2026-11-26",lotSize:65
+ }}};
+ const {db,state}=createSerializableDerivativeStore(account);
+ const keys=[
+  "123e4567-e89b-42d3-a456-426614174008",
+  "123e4567-e89b-42d3-a456-426614174009",
+  "123e4567-e89b-42d3-a456-426614174010"
+ ];
+ const results=[];
+ for(const key of keys){
+  const common={
+   db,accountRef:{id:uid},orderRef:{id:makeOrderId(uid,key)},uid,
+   idempotencyKey:key,instrument,quote:{...quote,pricePaise:1500},
+   lots:1,side:"SELL",serverTimestamp:()=>"server-time",now
+  };
+  results.push(await executeLongOptionBuyTransaction(common));
+ }
+ assert.equal(state.account.derivativePositions[instrument.instrument_key],undefined);
+ assert.equal(state.account.realizedPnlPaise,
+  results.reduce((sum,result)=>sum+result.order.realizedPnlPaise,0));
+ const totalAllocatedCostBasis=results.reduce((sum,result)=>sum+
+  (result.order.grossPaise-result.order.chargesPaise-result.order.realizedPnlPaise),0);
+ assert.equal(totalAllocatedCostBasis,originalCostBasisPaise);
+ assert.equal(state.orders.size,3);
+});
