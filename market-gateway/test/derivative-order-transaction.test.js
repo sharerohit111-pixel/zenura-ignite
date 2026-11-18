@@ -378,7 +378,7 @@ test("rejects opening a 51st distinct derivative position before any database wr
  assert.equal(writes.length,0);
 });
 test("allows adding to an existing derivative position at the 50-position limit",async()=>{
- const derivativePositions=Object.fromEntries(Array.from({length:50},(_,i)=>[
+ const derivativePositions=Object.fromEntries(Array.from({length:49},(_,i)=>[
   `NSE_FO|OPTION${i}`,{instrumentType:"CE",netQuantity:65,averagePricePaise:100,costBasisPaise:6500}
  ]));
  derivativePositions[instrument.instrument_key]={instrumentType:"CE",netQuantity:65,averagePricePaise:1287,costBasisPaise:83646,
