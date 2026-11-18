@@ -654,7 +654,7 @@ app.post("/stream",async(req,res)=>{
     res.flushHeaders?.();
     writeEvent("status",{connected:false,connecting:true,mode,keys:keys.length});
     upstream=new WebSocket(feedUrl,{
-      followRedirects:true,handshakeTimeout:15000,
+      followRedirects:false,handshakeTimeout:15000,
       headers:{Authorization:"Bearer "+accessToken,Accept:"*/*"}
     });
     upstream.on("open",()=>{
