@@ -3,14 +3,18 @@ const test=require("node:test");
 const assert=require("node:assert/strict");
 const {isUpstoxTokenUsable}=require("../lib/upstox-token");
 const stamp=ms=>({toMillis:()=>ms});
-const valid=()=>({status:"connected",tokenCiphertext:"encrypted-token",expiresAt:stamp(2000)});
+const encrypted=()=>({v:1,iv:"a".repeat(16),tag:"b".repeat(24),data:"YQ=="});
+const valid=()=>({status:"connected",tokenCiphertext:encrypted(),expiresAt:stamp(2000)});
 
-test("accepts a connected encrypted token before expiry",()=>{
+test("accepts a connected encrypted token envelope before expiry",()=>{
  assert.equal(isUpstoxTokenUsable(valid(),1000),true);
 });
-test("rejects disconnected, missing, or empty encrypted tokens",()=>{
+test("rejects disconnected, missing, or malformed encrypted tokens",()=>{
  assert.equal(isUpstoxTokenUsable({...valid(),status:"revoked"},1000),false);
- assert.equal(isUpstoxTokenUsable({...valid(),tokenCiphertext:""},1000),false);
+ assert.equal(isUpstoxTokenUsable({...valid(),tokenCiphertext:null},1000),false);
+ assert.equal(isUpstoxTokenUsable({...valid(),tokenCiphertext:"encrypted-token"},1000),false);
+ assert.equal(isUpstoxTokenUsable({...valid(),tokenCiphertext:{...encrypted(),v:2}},1000),false);
+ assert.equal(isUpstoxTokenUsable({...valid(),tokenCiphertext:{...encrypted(),data:""}},1000),false);
  assert.equal(isUpstoxTokenUsable(null,1000),false);
 });
 test("rejects expired tokens including exact expiry",()=>{
