@@ -274,7 +274,7 @@
     try{
       const token=await connector.getIdToken(),response=await fetch(gateway+'/paper/derivative/orders',{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json',Accept:'application/json'},body:JSON.stringify({instrument_key:instrumentKey,side:'BUY',lots,idempotency_key:window.crypto.randomUUID()})});
       const data=await response.json();if(!response.ok)throw new Error(data.error||'Derivative paper order rejected.');
-      optionStatus.textContent='SIMULATED BUY FILLED · '+data.tradingSymbol+' · '+data.quantity+' units · '+inrPaise(data.grossPaise)+' premium debited. Charges excluded.';
+      optionStatus.textContent='SIMULATED BUY FILLED · '+data.tradingSymbol+' · '+data.quantity+' units · Premium '+inrPaise(data.grossPaise)+' · Estimated charges '+inrPaise(data.chargesPaise)+' · Total debit '+inrPaise(data.totalDebitPaise)+'.';
       await loadPaperAccount();await refreshPaperViews();
     }catch(error){optionStatus.textContent=error.message||'Derivative paper order failed.';}
     finally{optionButton.disabled=false;}
