@@ -150,7 +150,7 @@
         [date,order.tradingSymbol,order.side,order.quantity,inrPaise(order.executionPricePaise),order.status+' · SIM'].forEach(v=>{const td=document.createElement('td');td.textContent=String(v);tr.append(td);});
         paperHistory.append(tr);
       });
-      paperHistoryCursor=data.nextCursor||null;paperHistoryHasMore===true;
+      paperHistoryCursor=data.nextCursor||null;
       paperHistoryHasMore=!!data.hasMore&&!!paperHistoryCursor;
       if(paperHistoryStatus)paperHistoryStatus.textContent=paperHistoryHasMore?'Showing '+paperHistory.children.length+' orders':'All available orders loaded';
       paperHistoryMore.disabled=!paperHistoryHasMore;
