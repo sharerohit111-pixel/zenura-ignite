@@ -3,9 +3,9 @@ const test=require("node:test");
 const assert=require("node:assert/strict");
 const {executePaperOrderTransaction}=require("../lib/paper-order-transaction");
 const account={cashPaise:10000,realizedPnlPaise:0,positions:{},version:1};
-function setup(existingOrder){
+function setup(existingOrder,initialAccount=account){
  const writes=[];
- const snapshots={account:{exists:true,data:()=>({...account})},order:{exists:Boolean(existingOrder),data:()=>existingOrder}};
+ const snapshots={account:{exists:true,data:()=>({...initialAccount,positions:{...initialAccount.positions}})},order:{exists:Boolean(existingOrder),data:()=>existingOrder}};
  const db={runTransaction:async callback=>callback({get:async ref=>snapshots[ref.id],create:(ref,data)=>writes.push(["create",ref.id,data]),update:(ref,data)=>writes.push(["update",ref.id,data])})};
  const common={db,accountRef:{id:"account"},orderRef:{id:"order"},uid:"user-1",requestFingerprint:"fingerprint",order:{uid:"user-1",requestFingerprint:"fingerprint",instrumentKey:"NSE_EQ|AAA",side:"BUY",quantity:2},pricePaise:1000,publicPaperOrder:(order,meta)=>({order,meta}),serverTimestamp:()=>"server-time"};
  return {common,writes};
@@ -94,5 +94,33 @@ test("rejects a transaction fingerprint that differs from the stored order",asyn
  const {common,writes}=setup();
  common.order.requestFingerprint="different";
  await assert.rejects(executePaperOrderTransaction(common),TypeError);
+ assert.equal(writes.length,0);
+});
+
+test("SELL transaction credits proceeds and records realized P&L atomically",async()=>{
+ const initial={cashPaise:10000,realizedPnlPaise:0,positions:{"NSE_EQ|AAA":{quantity:2,averagePricePaise:1000}},version:4};
+ const {common,writes}=setup(undefined,initial);
+ common.order.side="SELL";common.order.quantity=1;common.pricePaise=1200;
+ const result=await executePaperOrderTransaction(common);
+ assert.equal(writes.length,2);
+ assert.equal(writes[0][2].grossPaise,1200);
+ assert.equal(writes[0][2].realizedPnlPaise,200);
+ assert.equal(writes[1][2].cashPaise,11200);
+ assert.equal(writes[1][2].realizedPnlPaise,200);
+ assert.equal(writes[1][2].positions["NSE_EQ|AAA"].quantity,1);
+ assert.equal(writes[1][2].version,5);
+ assert.equal(result.meta.cashPaise,11200);
+});
+test("insufficient virtual cash rejects transaction before any database write",async()=>{
+ const {common,writes}=setup();
+ common.order.quantity=2;common.pricePaise=6000;
+ await assert.rejects(executePaperOrderTransaction(common),{status:409});
+ assert.equal(writes.length,0);
+});
+test("SELL beyond available holdings rejects transaction before any database write",async()=>{
+ const initial={cashPaise:10000,realizedPnlPaise:0,positions:{"NSE_EQ|AAA":{quantity:1,averagePricePaise:1000}},version:2};
+ const {common,writes}=setup(undefined,initial);
+ common.order.side="SELL";common.order.quantity=2;
+ await assert.rejects(executePaperOrderTransaction(common),{status:409});
  assert.equal(writes.length,0);
 });
