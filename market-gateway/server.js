@@ -253,9 +253,12 @@ app.post("/paper/orders",async(req,res)=>{
     const priorOrder=await orderRef.get();
     if(priorOrder.exists){
       const prior=priorOrder.data();assertIdempotentReplay(prior,requestFingerprint);
-      const currentAccount=await paperAccountRef(decoded.uid).get(),current=currentAccount.exists?currentAccount.data():{};
+      const currentAccount=await paperAccountRef(decoded.uid).get();
+      if(!currentAccount.exists)return res.status(409).json({error:"Paper account is not initialized."});
+      const current=currentAccount.data();
+      if(!Number.isSafeInteger(current.cashPaise)||current.cashPaise<0||!Number.isSafeInteger(current.realizedPnlPaise??0))return res.status(409).json({error:"Paper account contains invalid balance data."});
       res.set("Cache-Control","private, no-store");
-      return res.status(200).json(publicPaperOrder(prior,{orderId:orderRef.id,cashPaise:current.cashPaise,realizedPnlTotalPaise:current.realizedPnlPaise,idempotentReplay:true}));
+      return res.status(200).json(publicPaperOrder(prior,{orderId:orderRef.id,cashPaise:current.cashPaise,realizedPnlTotalPaise:current.realizedPnlPaise??0,idempotentReplay:true}));
     }
     if(!instrumentCache.length||Date.now()-instrumentCacheUpdatedAt>6*60*60*1000)await refreshInstrumentCache();
     const instrument=instrumentCache.find(x=>x.instrument_key===instrumentKey&&x.instrument_type==="EQ"&&["NSE_EQ","BSE_EQ"].includes(x.segment));
