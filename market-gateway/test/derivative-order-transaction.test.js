@@ -388,3 +388,10 @@ test("allows adding to an existing derivative position at the 50-position limit"
  assert.equal(writes.length,2);
  assert.equal(writes[1][2].derivativePositions[instrument.instrument_key].netQuantity,130);
 });
+
+test("rejects a new option order when another stored derivative position is malformed",async()=>{
+ const derivativePositions={["NSE_FO|BROKEN"]:{instrumentType:"CE",netQuantity:65,averagePricePaise:100,costBasisPaise:1}};
+ const {common,writes}=setup({account:{...initial,derivativePositions}});
+ await assert.rejects(executeLongOptionBuyTransaction(common),error=>error.status===409&&/invalid cost basis/.test(error.message));
+ assert.equal(writes.length,0);
+});
