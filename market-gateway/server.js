@@ -310,7 +310,7 @@ app.get("/paper/orders",async(req,res)=>{
     const decoded=await authenticate(req),rawLimit=req.query.limit===undefined?"50":String(req.query.limit);
     if(!/^\d+$/.test(rawLimit)||Number(rawLimit)<1)return res.status(400).json({error:"Order history limit must be a whole number from 1 to 100."});
     const limit=Math.min(Number(rawLimit),100),cursor=typeof req.query.cursor==="string"?req.query.cursor:"";
-    if(cursor.length>150||/[\\r\\n]/.test(cursor))return res.status(400).json({error:"Invalid order history cursor."});
+    if(cursor&&!/^[a-f0-9]{64}$/.test(cursor))return res.status(400).json({error:"Invalid order history cursor."});
     const collection=db.collection("indianPaperOrders");
     let query=collection.where("uid","==",decoded.uid).orderBy("createdAt","desc");
     if(cursor){
