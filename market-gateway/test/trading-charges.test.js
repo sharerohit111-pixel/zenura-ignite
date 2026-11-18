@@ -28,3 +28,15 @@ test("rejects invalid turnover, exchange and brokerage",()=>{
  assert.throws(()=>calculateLongOptionBuyCharges({grossPaise:10000,exchange:"MCX"}),/Only NSE and BSE/);
  assert.throws(()=>calculateLongOptionBuyCharges({grossPaise:10000,exchange:"NSE",brokeragePaise:-1}),/Brokerage/);
 });
+
+test("NSE option SELL applies STT to premium and does not charge buy-side stamp duty",()=>{
+ const {calculateLongOptionTradeCharges}=require("../lib/trading-charges");
+ const c=calculateLongOptionTradeCharges({grossPaise:97500,exchange:"NSE",side:"SELL"});
+ assert.equal(c.sttPaise,146);
+ assert.equal(c.stampDutyPaise,0);
+ assert.equal(c.exchangeTransactionPaise,35);
+ assert.equal(c.gstPaise,366);
+ assert.equal(c.totalChargesPaise,547);
+ assert.equal(c.netCreditPaise,96953);
+ assert.equal(c.totalDebitPaise,null);
+});
