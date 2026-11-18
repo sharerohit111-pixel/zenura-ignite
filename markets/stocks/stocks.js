@@ -207,20 +207,25 @@
       optionBody.append(tr);
     });
   }
+  let optionChainRequest=0;
   async function loadOptionChain(){
     if(!selected){optionStatus.textContent='Select an underlying instrument first';return;}
     if(!['NSE_INDEX','BSE_INDEX','NSE_EQ','BSE_EQ'].includes(selected.segment)){optionStatus.textContent='Option chain requires an NSE/BSE index or cash-equity underlying, not an option or futures contract.';return;}
     if(!gateway||!window.ZENURA_MARKET_CONNECTOR?.getIdToken){optionStatus.textContent='Sign in and configure the market gateway first';return;}
+    const request=++optionChainRequest,instrumentKey=selected.instrument_key,expiry=optionExpiry.value;
     optionButton.disabled=true;optionStatus.textContent='Loading official Upstox option chain…';
     try{
       const token=await window.ZENURA_MARKET_CONNECTOR.getIdToken();
-      const params=new URLSearchParams({instrument_key:selected.instrument_key,expiry_date:optionExpiry.value});
+      if(request!==optionChainRequest||selected?.instrument_key!==instrumentKey||optionExpiry.value!==expiry)return;
+      const params=new URLSearchParams({instrument_key:instrumentKey,expiry_date:expiry});
       const response=await fetch(gateway+'/option-chain?'+params,{headers:{Authorization:'Bearer '+token,Accept:'application/json'}});
       if(!response.ok)throw new Error('Option chain unavailable ('+response.status+').');
-      const payload=await response.json();renderOptionChain(payload.data||[]);
-      optionStatus.textContent='Provider response · '+(payload.data?.length||0)+' strikes · '+optionExpiry.value;
-    }catch(error){optionStatus.textContent=error.message||'Option chain request failed.';}
-    finally{optionButton.disabled=false;}
+      const payload=await response.json();
+      if(request!==optionChainRequest||selected?.instrument_key!==instrumentKey||optionExpiry.value!==expiry)return;
+      renderOptionChain(payload.data||[]);
+      optionStatus.textContent='Provider response · '+(payload.data?.length||0)+' strikes · '+expiry;
+    }catch(error){if(request===optionChainRequest&&selected?.instrument_key===instrumentKey&&optionExpiry.value===expiry)optionStatus.textContent=error.message||'Option chain request failed.';}
+    finally{if(request===optionChainRequest)optionButton.disabled=false;}
   }
   optionButton.addEventListener('click',loadOptionChain);
 
