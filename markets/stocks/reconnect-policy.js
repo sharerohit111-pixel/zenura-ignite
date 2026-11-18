@@ -8,6 +8,10 @@ function nextReconnectDelay(attempt) {
   };
 }
 
+function shouldReconnectAfterFeedError(eventName) {
+  return eventName === "error";
+}
+
 function shouldRetryFeedStatus(status) {
   return Number.isInteger(status) && (
     status === 0 || status === 408 || status === 429 ||
@@ -15,4 +19,4 @@ function shouldRetryFeedStatus(status) {
   );
 }
 
-module.exports = {nextReconnectDelay, shouldRetryFeedStatus};
+module.exports = {nextReconnectDelay, shouldRetryFeedStatus, shouldReconnectAfterFeedError};
