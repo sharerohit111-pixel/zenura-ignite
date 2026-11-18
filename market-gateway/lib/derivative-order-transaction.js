@@ -63,6 +63,12 @@ async function executeLongOptionTransaction({
       fail("Derivative paper account contains malformed position data.",409);
     const derivativePositions=account.derivativePositions===undefined?{}:{...account.derivativePositions};
     const hasStoredPosition=Object.prototype.hasOwnProperty.call(derivativePositions,contract.instrumentKey);
+    const openPositionCount=Object.values(derivativePositions).filter(position=>
+      position&&Number.isSafeInteger(position.netQuantity)&&position.netQuantity>0
+    ).length;
+    // Match the derivative portfolio's 50-open-position valuation limit at order entry.
+    if(side==="BUY"&&!hasStoredPosition&&openPositionCount>=50)
+      fail("Derivative portfolio is limited to 50 open positions. Close an existing position before opening another.",409);
     const priorPosition=hasStoredPosition?derivativePositions[contract.instrumentKey]:{netQuantity:0,averagePricePaise:0};
     if(!priorPosition||typeof priorPosition!=="object"||Array.isArray(priorPosition))
       fail("Stored option position record is malformed.",409);
