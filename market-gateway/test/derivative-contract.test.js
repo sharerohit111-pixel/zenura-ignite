@@ -1,0 +1,37 @@
+"use strict";
+const test=require("node:test");
+const assert=require("node:assert/strict");
+const {validateDerivativeContract,toPaiseFromRupees}=require("../lib/derivative-contract");
+const now=Date.UTC(2026,10,18,10);
+const option=()=>({instrument_key:"NSE_FO|NIFTY26NOV25000CE",trading_symbol:"NIFTY 26 NOV 25000 CE",segment:"NSE_FO",exchange:"NSE",instrument_type:"CE",expiry:"2026-11-26",strike_price:25000,lot_size:65,tick_size:0.05});
+test("validates an option contract and converts lots to units",()=>{
+ const result=validateDerivativeContract(option(),{lots:2,pricePaise:1250,now});
+ assert.equal(result.quantity,130);assert.equal(result.lotSize,65);assert.equal(result.tickSizePaise,5);assert.equal(result.contractValuePaise,162500);
+});
+test("accepts valid futures contract metadata",()=>{
+ const f={...option(),instrument_key:"NSE_FO|NIFTY26NOVFUT",trading_symbol:"NIFTY FUT",instrument_type:"FUT",strike_price:0};
+ assert.equal(validateDerivativeContract(f,{lots:1,pricePaise:2500000,now}).quantity,65);
+});
+test("rejects non-derivative, wrong segment and unknown types",()=>{
+ for(const patch of [{segment:"NSE_EQ"},{segment:"MCX_FO"},{instrument_type:"EQ"}])assert.throws(()=>validateDerivativeContract({...option(),...patch},{lots:1,pricePaise:1250,now}),/Only verified/);
+});
+test("rejects invalid lot sizes, lot counts and overflow",()=>{
+ for(const patch of [{lot_size:0},{lot_size:1.5},{lot_size:1000001}])assert.throws(()=>validateDerivativeContract({...option(),...patch},{lots:1,pricePaise:1250,now}));
+ assert.throws(()=>validateDerivativeContract(option(),{lots:0,pricePaise:1250,now}));
+ assert.throws(()=>validateDerivativeContract({...option(),lot_size:1000000},{lots:2,pricePaise:1250,now}));
+});
+test("rejects missing tick and off-tick execution prices",()=>{
+ assert.throws(()=>validateDerivativeContract({...option(),tick_size:null},{lots:1,pricePaise:1250,now}),/tick size/);
+ assert.throws(()=>validateDerivativeContract(option(),{lots:1,pricePaise:1251,now}),/tick size/);
+});
+test("rejects expired or malformed contracts",()=>{
+ assert.throws(()=>validateDerivativeContract({...option(),expiry:"2026-11-17"},{lots:1,pricePaise:1250,now}),/Expired/);
+ assert.throws(()=>validateDerivativeContract({...option(),expiry:"2026-02-30"},{lots:1,pricePaise:1250,now}));
+});
+test("requires valid option strike and clean futures strike",()=>{
+ assert.throws(()=>validateDerivativeContract({...option(),strike_price:0},{lots:1,pricePaise:1250,now}),/strike/);
+ assert.throws(()=>validateDerivativeContract({...option(),instrument_type:"FUT",strike_price:25000},{lots:1,pricePaise:1250,now}),/futures contract/);
+});
+test("converts only exact rupee tick sizes to paise",()=>{
+ assert.equal(toPaiseFromRupees(0.05),5);assert.equal(toPaiseFromRupees(0.1),10);assert.equal(toPaiseFromRupees(0),null);assert.equal(toPaiseFromRupees(0.005),null);
+});
