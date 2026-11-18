@@ -37,7 +37,7 @@ function calculateLongOptionTradeCharges({grossPaise,exchange,side="BUY",brokera
     brokeragePaise,exchangeTransactionPaise:exchangePaise,ipftPaise,sebiPaise,
     stampDutyPaise,gstPaise,sttPaise,totalChargesPaise,
     totalDebitPaise:side==="BUY"?grossPaise+totalChargesPaise:null,
-    netCreditPaise:side==="SELL"?Math.max(grossPaise-totalChargesPaise,0):null,
+    netCreditPaise:side==="SELL"?grossPaise-totalChargesPaise:null,
     exchange:String(exchange).toUpperCase(),side,segment:"EQUITY_OPTIONS",
     indicative:true,simulationOnly:true
   };
