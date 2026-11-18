@@ -45,11 +45,13 @@ if (card && connectButton) {
   const signOutButton = form.querySelector("#email-sign-out");
   let creating = false;
   create.addEventListener("click", () => {
-    creating = true;
-    password.autocomplete = "new-password";
-    signIn.textContent = "CREATE ACCOUNT";
-    create.textContent = "USE EXISTING ACCOUNT";
-    message.textContent = "Create a new account with this email and password.";
+    creating = !creating;
+    password.autocomplete = creating ? "new-password" : "current-password";
+    signIn.textContent = creating ? "CREATE ACCOUNT" : "SIGN IN WITH EMAIL";
+    create.textContent = creating ? "USE EXISTING ACCOUNT" : "CREATE ACCOUNT";
+    message.textContent = creating
+      ? "Create a new account with this email and password."
+      : "Sign in with your existing email and password.";
   });
   form.addEventListener("submit", async event => {
     event.preventDefault();
