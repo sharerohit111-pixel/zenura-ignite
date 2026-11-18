@@ -10,12 +10,12 @@ test("accepts a non-empty access token and valid optional token type", () => {
 });
 test("rejects missing, empty, malformed, oversized, or control-character token values", () => {
   for (const value of [null, undefined, [], {}, {access_token:""}, {access_token:42},
-    {access_token:"x".repeat(16385)}, {access_token:"bad\\ntoken"}]) {
+    {access_token:"x".repeat(16385)}, {access_token:"bad\ntoken"}]) {
     assert.equal(isUsableUpstoxTokenResponse(value), false);
   }
 });
 test("rejects malformed optional token type without requiring it", () => {
-  for (const token_type of ["", 42, "x".repeat(65), "Bearer\\nInjected", "bad type"]) {
+  for (const token_type of ["", 42, "x".repeat(65), "Bearer\nInjected", "bad type"]) {
     assert.equal(isUsableUpstoxTokenResponse({access_token:"opaque-token",token_type}), false);
   }
 });
