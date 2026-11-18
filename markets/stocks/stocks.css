@@ -45,3 +45,10 @@
 .saved-watch-row{display:flex;align-items:center;gap:6px;padding:6px 7px;background:#0a1928;border:1px solid #203b54;border-radius:8px}
 .saved-watch-pick{flex:1;min-width:0;text-align:left;border:0;background:transparent;color:#dce9f3;font-size:10px;font-weight:800;overflow:hidden;text-overflow:ellipsis;cursor:pointer}
 .saved-watch-remove{padding:5px 6px;border-color:#68464a;background:#301d26;color:#f2a0a0}
+
+.saved-watch-info{display:flex;flex-direction:column;align-items:flex-start;min-width:0;gap:3px}
+.saved-watch-quote{font-size:.72rem;color:var(--muted);font-variant-numeric:tabular-nums}
+.saved-watch-quote.positive{color:#35d49a}
+.saved-watch-quote.negative{color:#ff7185}
+.saved-watch-quote.neutral{color:var(--muted)}
+.watchlist-title>div{display:flex;gap:6px;flex-wrap:wrap}
