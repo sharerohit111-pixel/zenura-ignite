@@ -55,3 +55,9 @@
 
 .watchlist-select-label{display:flex;flex-direction:column;gap:6px;margin:10px 0;color:var(--muted);font-size:.68rem;letter-spacing:.08em}
 .watchlist-select-label select{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:rgba(7,17,31,.8);color:var(--text);font:inherit}
+
+.history-controls{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.history-controls span{font-size:8px;color:#829bb0}
+.history-controls button{border:1px solid #287e70;background:#123c37;color:#70e8c8;border-radius:8px;padding:9px 12px;font-size:8px;font-weight:900;letter-spacing:.6px;cursor:pointer}
+.history-controls button:disabled{opacity:.4;cursor:not-allowed}
+@media(max-width:520px){.history-heading{align-items:flex-start;gap:8px;flex-direction:column}.history-controls{width:100%;justify-content:space-between}}
