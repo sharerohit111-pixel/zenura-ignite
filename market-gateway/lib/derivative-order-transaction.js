@@ -58,11 +58,21 @@ async function executeLongOptionTransaction({
       fail("Derivative paper account contains invalid or unsupported balance data.",409);
     const derivativePositions=account.derivativePositions&&typeof account.derivativePositions==="object"&&!Array.isArray(account.derivativePositions)?{...account.derivativePositions}:{};
     const priorPosition=derivativePositions[contract.instrumentKey]||{netQuantity:0,averagePricePaise:0};
-    if(!Number.isSafeInteger(priorPosition.netQuantity)||priorPosition.netQuantity<0)
-      fail("Stored short or malformed option positions are not supported by this paper simulator.",409);
-    if(priorPosition.instrumentType&&priorPosition.instrumentType!==contract.instrumentType)
+    if(!Number.isSafeInteger(priorPosition.netQuantity)||priorPosition.netQuantity<0||
+       priorPosition.netQuantity>1_000_000||
+       !Number.isSafeInteger(priorPosition.averagePricePaise)||priorPosition.averagePricePaise<0||
+       (priorPosition.netQuantity>0&&priorPosition.averagePricePaise<1)||
+       (priorPosition.netQuantity===0&&priorPosition.averagePricePaise!==0))
+      fail("Stored option position quantity or average price is invalid.",409);
+    if(priorPosition.instrumentType!==undefined&&priorPosition.instrumentType!==contract.instrumentType)
       fail("Stored derivative position type does not match the verified contract.",409);
-    if(side==="SELL"&&(!Number.isSafeInteger(priorPosition.netQuantity)||priorPosition.netQuantity<contract.quantity))
+    for(const [field,expected] of Object.entries({
+      exchange:contract.exchange,segment:contract.segment,expiry:contract.expiry,lotSize:contract.lotSize
+    })){
+      if(priorPosition[field]!==undefined&&priorPosition[field]!==expected)
+        fail("Stored derivative position metadata does not match the verified contract.",409);
+    }
+    if(side==="SELL"&&priorPosition.netQuantity<contract.quantity)
       fail("SELL is allowed only to close an existing long option position; short options are disabled.",409);
     const fill=applyDerivativeFill({
       instrumentType:contract.instrumentType,side,quantity:contract.quantity,
@@ -72,7 +82,8 @@ async function executeLongOptionTransaction({
       ?priorPosition.netQuantity*priorPosition.averagePricePaise
       :priorPosition.costBasisPaise;
     if(!Number.isSafeInteger(priorCostBasisPaise)||priorCostBasisPaise<0||
-       (priorPosition.netQuantity>0&&priorCostBasisPaise<1))
+       (priorPosition.netQuantity>0&&priorCostBasisPaise<1)||
+       (priorPosition.netQuantity===0&&priorCostBasisPaise!==0))
       fail("Stored option cost basis is invalid.",409);
     let averagePricePaise=fill.averagePricePaise;
     let costBasisPaise=0;
