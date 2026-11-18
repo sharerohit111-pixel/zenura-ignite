@@ -261,7 +261,10 @@ app.get("/paper/portfolio",async(req,res)=>{
   try{
     const decoded=await authenticate(req),accountSnap=await paperAccountRef(decoded.uid).get();
     if(!accountSnap.exists)return res.status(404).json({error:"Indian paper account has not been initialized."});
-    const account=accountSnap.data(),positions=Object.entries(account.positions||{}).filter(([,p])=>p&&Number.isSafeInteger(p.quantity)&&p.quantity>0);
+    const account=accountSnap.data(),allPositions=Object.entries(account.positions||{});
+    if(!Number.isSafeInteger(account.cashPaise)||account.cashPaise<0||!Number.isSafeInteger(account.realizedPnlPaise??0))return res.status(409).json({error:"Paper account contains invalid balance data."});
+    if(allPositions.some(([,p])=>!p||!Number.isSafeInteger(p.quantity)||p.quantity<0||p.quantity>1000000||!Number.isSafeInteger(p.averagePricePaise)||p.averagePricePaise<0||(p.quantity>0&&p.averagePricePaise<1)))return res.status(409).json({error:"Paper portfolio contains an invalid position; valuation stopped to protect account totals."});
+    const positions=allPositions.filter(([,p])=>p.quantity>0);
     if(positions.length>50)return res.status(409).json({error:"Portfolio contains more than 50 open positions; contact support before refreshing valuation."});
     if(!positions.length){
       res.set("Cache-Control","private, no-store");
@@ -285,11 +288,13 @@ app.get("/paper/portfolio",async(req,res)=>{
       const fresh=Number.isFinite(ltp)&&ltp>0&&Number.isFinite(age)&&age>=-5000&&age<=60000;
       if(!fresh){staleCount++;valued.push({instrumentKey,tradingSymbol:instrument?.trading_symbol||instrumentKey,quantity:position.quantity,averagePricePaise:position.averagePricePaise,lastPricePaise:null,marketValuePaise:null,unrealizedPnlPaise:null,quoteAgeMs:Number.isFinite(age)?age:null,valuationStatus:"stale_or_unavailable"});continue;}
       const lastPricePaise=Math.round(ltp*100),value=lastPricePaise*position.quantity,pnl=(lastPricePaise-position.averagePricePaise)*position.quantity;
+      if(!Number.isSafeInteger(lastPricePaise)||lastPricePaise<1||!Number.isSafeInteger(value)||!Number.isSafeInteger(pnl)||!Number.isSafeInteger(marketValuePaise+value)||!Number.isSafeInteger(unrealizedPnlPaise+pnl))return res.status(409).json({error:"Portfolio valuation exceeds safe calculation limits."});
       marketValuePaise+=value;unrealizedPnlPaise+=pnl;
       valued.push({instrumentKey,tradingSymbol:instrument?.trading_symbol||quote.symbol||instrumentKey,quantity:position.quantity,averagePricePaise:position.averagePricePaise,lastPricePaise,marketValuePaise:value,unrealizedPnlPaise:pnl,quoteAgeMs:age,valuationStatus:"fresh"});
     }
     res.set("Cache-Control","private, no-store");
-    res.json({positions:valued,cashPaise:account.cashPaise,marketValuePaise,unrealizedPnlPaise,equityPaise:account.cashPaise+marketValuePaise,realizedPnlPaise:account.realizedPnlPaise||0,valuationStatus:staleCount?"partial_stale":"fresh",stalePositions:staleCount,simulationOnly:true});
+    const equityPaise=account.cashPaise+marketValuePaise;if(!Number.isSafeInteger(equityPaise))return res.status(409).json({error:"Portfolio equity exceeds safe calculation limits."});
+    res.json({positions:valued,cashPaise:account.cashPaise,marketValuePaise,unrealizedPnlPaise,equityPaise,realizedPnlPaise:account.realizedPnlPaise??0,valuationStatus:staleCount?"partial_stale":"fresh",stalePositions:staleCount,simulationOnly:true});
   }catch(error){res.status(error.status||500).json({error:error.status?error.message:"Portfolio valuation could not be loaded."});}
 });
 
