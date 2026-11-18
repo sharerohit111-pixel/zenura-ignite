@@ -321,6 +321,37 @@ app.get("/watchlist",async(req,res)=>{
     res.json({items,updatedAt:snap.data()?.updatedAt?.toMillis?.()||null,maxItems:50});
   }catch(error){res.status(error.status||500).json({error:error.status?error.message:"Watchlist could not be loaded."});}
 });
+app.get("/watchlist/quotes",async(req,res)=>{
+  try{
+    const decoded=await authenticate(req);
+    const snap=await db.collection("indianMarketWatchlists").doc(decoded.uid).get();
+    const keys=snap.exists&&Array.isArray(snap.data().instrumentKeys)?snap.data().instrumentKeys:[];
+    if(!keys.length){res.set("Cache-Control","private, no-store");return res.json({quotes:[],status:"empty"});}
+    if(keys.length>50)return res.status(409).json({error:"Watchlist exceeds the supported quote batch size."});
+    const connection=await db.collection("upstoxConnections").doc(decoded.uid).get();
+    if(!connection.exists)return res.status(403).json({error:"Upstox account is not connected."});
+    const data=connection.data();
+    if(data.status!=="connected"||!data.expiresAt||data.expiresAt.toMillis()<=Date.now())
+      return res.status(403).json({error:"Upstox token expired. Reconnect your account."});
+    const accessToken=decryptToken(data.tokenCiphertext);
+    const quoteUrl="https://api.upstox.com/v3/market-quote/quotes?"+new URLSearchParams({instrument_key:keys.join(",")});
+    const upstream=await fetch(quoteUrl,{headers:{Authorization:"Bearer "+accessToken,Accept:"application/json"}});
+    const payload=await upstream.json().catch(()=>null);
+    if(!upstream.ok)return res.status(502).json({error:"Watchlist quotes could not be retrieved.",providerStatus:upstream.status});
+    const byKey=new Map(Object.values(payload?.data||{}).filter(q=>q&&typeof q.instrument_token==="string").map(q=>[q.instrument_token,q]));
+    const now=Date.now();
+    const quotes=keys.map(instrumentKey=>{
+      const q=byKey.get(instrumentKey),last=Number(q?.last_price),change=Number(q?.net_change),tradeTime=Number(q?.last_trade_time||0),age=tradeTime?now-tradeTime:Infinity;
+      const fresh=Number.isFinite(last)&&last>0&&Number.isFinite(age)&&age>=-5000&&age<=60000;
+      const previous=last-change,percent=Number.isFinite(change)&&previous>0?(change/previous)*100:null;
+      const instrument=instrumentCache.find(x=>x.instrument_key===instrumentKey);
+      return {instrumentKey,tradingSymbol:instrument?.trading_symbol||q?.symbol||instrumentKey,lastPrice:fresh?last:null,netChange:fresh&&Number.isFinite(change)?change:null,changePercent:fresh&&Number.isFinite(percent)?percent:null,quoteAgeMs:Number.isFinite(age)?age:null,status:fresh?"fresh":"stale_or_unavailable"};
+    });
+    res.set("Cache-Control","private, no-store");
+    res.json({quotes,asOf:now,status:quotes.every(q=>q.status==="fresh")?"fresh":"partial_stale"});
+  }catch(error){res.status(error.status||500).json({error:error.status?error.message:"Watchlist quotes could not be loaded."});}
+});
+
 app.put("/watchlist",async(req,res)=>{
   try{
     const decoded=await authenticate(req);
