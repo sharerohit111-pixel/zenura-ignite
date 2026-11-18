@@ -23,3 +23,12 @@ test("rejects missing or malformed expiry", () => {
   assert.equal(isOAuthStateUsable({uid:"user-1",used:false},1000),false);
   assert.equal(isOAuthStateUsable({uid:"user-1",used:false,expiresAt:{toMillis:()=>NaN}},1000),false);
 });
+
+test("rejects timestamp accessors that throw instead of failing the callback", () => {
+  assert.equal(isOAuthStateUsable({uid:"user-1",used:false,expiresAt:{toMillis:()=>{throw Error("corrupt timestamp");}}},1000),false);
+});
+test("rejects unsafe clocks and non-integer expiry values", () => {
+  const state={uid:"user-1",used:false,expiresAt:stamp(2000)};
+  for (const now of [-1,1.5,Number.MAX_SAFE_INTEGER+1,NaN]) assert.equal(isOAuthStateUsable(state,now),false);
+  assert.equal(isOAuthStateUsable({...state,expiresAt:stamp(2000.5)},1000),false);
+});
