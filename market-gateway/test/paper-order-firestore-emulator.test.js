@@ -250,3 +250,40 @@ integrationTest("Firestore emulator serializes competing stream leases and enfor
   assert.equal((await ref.get()).data().leaseId,"lease-reconnected");
  }finally{await ref.delete().catch(()=>{});}
 });
+
+
+integrationTest("Firestore emulator rejects a 51st distinct derivative position atomically",async()=>{
+ const uid="derivative-limit-user-"+crypto.randomUUID();
+ const common=makeDerivativeOrder({uid,idempotencyKey:crypto.randomUUID()});
+ const derivativePositions=Object.fromEntries(Array.from({length:50},(_,i)=>[
+  `NSE_FO|EXISTING${i}`,{instrumentType:"CE",netQuantity:65,averagePricePaise:100,costBasisPaise:6500}
+ ]));
+ await common.accountRef.set({cashPaise:1000000,realizedPnlPaise:0,reservedMarginPaise:0,positions:{},derivativePositions,version:1});
+ try{
+  await assert.rejects(executeLongOptionBuyTransaction(common),error=>error.status===409&&/50 open positions/.test(error.message));
+  const [account,order]=await Promise.all([common.accountRef.get(),common.orderRef.get()]);
+  assert.equal(account.data().cashPaise,1000000);
+  assert.equal(Object.keys(account.data().derivativePositions).length,50);
+  assert.equal(order.exists,false);
+ }finally{await clean([common.accountRef,common.orderRef]);}
+});
+
+integrationTest("Firestore emulator allows adding to an existing derivative position at 50 open positions",async()=>{
+ const uid="derivative-limit-add-user-"+crypto.randomUUID();
+ const common=makeDerivativeOrder({uid,idempotencyKey:crypto.randomUUID()});
+ const derivativePositions=Object.fromEntries(Array.from({length:49},(_,i)=>[
+  `NSE_FO|EXISTING${i}`,{instrumentType:"CE",netQuantity:65,averagePricePaise:100,costBasisPaise:6500}
+ ]));
+ derivativePositions[derivativeInstrument.instrument_key]={
+  instrumentType:"CE",netQuantity:65,averagePricePaise:1287,costBasisPaise:83646,
+  exchange:"NSE",segment:"NSE_FO",expiry:"2026-11-26",lotSize:65
+ };
+ await common.accountRef.set({cashPaise:1000000,realizedPnlPaise:0,reservedMarginPaise:0,positions:{},derivativePositions,version:1});
+ try{
+  await executeLongOptionBuyTransaction(common);
+  const account=await common.accountRef.get();
+  assert.equal(account.data().cashPaise,916354);
+  assert.equal(Object.keys(account.data().derivativePositions).length,50);
+  assert.equal(account.data().derivativePositions[derivativeInstrument.instrument_key].netQuantity,130);
+ }finally{await clean([common.accountRef,common.orderRef]);}
+});
