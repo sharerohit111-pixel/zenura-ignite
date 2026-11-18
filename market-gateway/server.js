@@ -448,7 +448,7 @@ app.get("/paper/derivatives/portfolio",async(req,res)=>{
   try{
     const decoded=await authenticate(req),accountSnap=await paperAccountRef(decoded.uid).get();
     if(!accountSnap.exists)return res.status(404).json({error:"Indian paper account has not been initialized."});
-    const account=accountSnap.data(),raw=account.derivativePositions||{};
+    const account=accountSnap.data(),raw=account.derivativePositions===undefined?{}:account.derivativePositions;
     if(!Number.isSafeInteger(account.cashPaise)||account.cashPaise<0||!Number.isSafeInteger(account.realizedPnlPaise??0))
       return res.status(409).json({error:"Shared paper account contains invalid balance data."});
     if(!raw||typeof raw!=="object"||Array.isArray(raw))return res.status(409).json({error:"Derivative position storage is invalid."});
@@ -458,7 +458,10 @@ app.get("/paper/derivatives/portfolio",async(req,res)=>{
          !Number.isSafeInteger(p.netQuantity)||p.netQuantity<0||p.netQuantity>1000000||
          !Number.isSafeInteger(p.averagePricePaise)||p.averagePricePaise<0||
          (p.netQuantity>0&&p.averagePricePaise<1)||
-         (p.costBasisPaise!==undefined&&(!Number.isSafeInteger(p.costBasisPaise)||p.costBasisPaise<0))||(p.netQuantity===0&&p.averagePricePaise!==0))
+         (p.costBasisPaise!==undefined&&(!Number.isSafeInteger(p.costBasisPaise)||p.costBasisPaise<0))||
+         (p.netQuantity===0&&(p.averagePricePaise!==0||(p.costBasisPaise??0)!==0))||
+         (p.netQuantity>0&&Math.round((p.costBasisPaise??(p.netQuantity*p.averagePricePaise))/p.netQuantity)!==p.averagePricePaise)||
+         (p.netQuantity>0&&!Number.isSafeInteger(p.costBasisPaise??(p.netQuantity*p.averagePricePaise))))
         return res.status(409).json({error:"A stored derivative position is malformed; valuation stopped to protect account totals."});
       if(p.netQuantity>0)positions.push({instrumentKey,instrumentType:p.instrumentType,netQuantity:p.netQuantity,averagePricePaise:p.averagePricePaise,costBasisPaise:p.costBasisPaise});
     }
