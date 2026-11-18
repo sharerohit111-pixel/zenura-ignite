@@ -1,10 +1,26 @@
 "use strict";
 const DERIVATIVE_SEGMENTS=new Set(["NSE_FO","BSE_FO"]);
 const DERIVATIVE_TYPES=new Set(["FUT","CE","PE"]);
-function toPaiseFromRupees(value){
+function normalizeTickSizePaise(value){
  if(typeof value!=="number"||!Number.isFinite(value)||value<=0)return null;
- const paise=Math.round(value*100);
- return Number.isSafeInteger(paise)&&paise>0&&Math.abs(value*100-paise)<1e-7?paise:null;
+ // Upstox BOD JSON publishes tick_size in paise (e.g. 5); retain
+ // compatibility with legacy decimal-rupee fixtures such as 0.05.
+ const paise=value<1?value*100:value;
+ return Number.isSafeInteger(Math.round(paise))&&Math.abs(paise-Math.round(paise))<1e-7&&paise>0?Math.round(paise):null;
+}
+function normalizeExpiryDate(value){
+ if(typeof value==="string"&&/^\\d{4}-\\d{2}-\\d{2}$/.test(value)){
+  const d=new Date(value+"T00:00:00.000Z");
+  return Number.isFinite(d.getTime())&&d.toISOString().slice(0,10)===value?value:null;
+ }
+ if(typeof value==="number"&&Number.isSafeInteger(value)&&value>0){
+  const d=new Date(value);
+  if(!Number.isFinite(d.getTime()))return null;
+  const parts=new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Kolkata",year:"numeric",month:"2-digit",day:"2-digit"}).formatToParts(d);
+  const p=Object.fromEntries(parts.map(x=>[x.type,x.value]));
+  return p.year+"-"+p.month+"-"+p.day;
+ }
+ return null;
 }
 function validateDerivativeContract(instrument,{lots,pricePaise,now=Date.now()}={}){
  const fail=message=>{throw Object.assign(new Error(message),{status:400});};
@@ -16,14 +32,14 @@ function validateDerivativeContract(instrument,{lots,pricePaise,now=Date.now()}=
  if(!Number.isSafeInteger(lots)||lots<1||lots>10000)fail("Lots must be a whole number between 1 and 10,000.");
  const quantity=lots*lotSize;
  if(!Number.isSafeInteger(quantity)||quantity<1||quantity>1000000)fail("Contract quantity exceeds supported limits.");
- const tickSizePaise=toPaiseFromRupees(instrument.tick_size);
+ const tickSizePaise=normalizeTickSizePaise(instrument.tick_size);
  if(tickSizePaise===null)fail("Contract tick size is missing or invalid in the official instrument master.");
  if(!Number.isSafeInteger(pricePaise)||pricePaise<1||pricePaise%tickSizePaise!==0)fail("Execution price is invalid or does not align with the contract tick size.");
  if(typeof instrument.expiry!=="string"||! /^\d{4}-\d{2}-\d{2}$/.test(instrument.expiry))fail("Contract expiry is missing or invalid.");
  const expiryDate=new Date(instrument.expiry+"T00:00:00.000Z");
  if(!Number.isFinite(expiryDate.getTime())||expiryDate.toISOString().slice(0,10)!==instrument.expiry)fail("Contract expiry is not a valid calendar date.");
  if(!Number.isSafeInteger(now)||now<0)fail("Current time is invalid.");
- const [year,month,day]=instrument.expiry.split("-").map(Number);
+ const [year,month,day]=expiry.split("-").map(Number);
  const expiryCutoffUtc=Date.UTC(year,month-1,day,15,30)-330*60*1000;
  if(now>expiryCutoffUtc)fail("Expired derivative contracts cannot be traded.");
  if(instrument.instrument_type==="CE"||instrument.instrument_type==="PE"){
@@ -33,6 +49,6 @@ function validateDerivativeContract(instrument,{lots,pricePaise,now=Date.now()}=
  }
  const contractValuePaise=pricePaise*quantity;
  if(!Number.isSafeInteger(contractValuePaise)||contractValuePaise<=0)fail("Derivative contract value exceeds supported calculation limits.");
- return {instrumentKey:instrument.instrument_key,segment:instrument.segment,instrumentType:instrument.instrument_type,exchange:instrument.exchange,expiry:instrument.expiry,lotSize,lots,quantity,tickSizePaise,pricePaise,contractValuePaise};
+ return {instrumentKey:instrument.instrument_key,segment:instrument.segment,instrumentType:instrument.instrument_type,exchange:instrument.exchange,expiry,lotSize,lots,quantity,tickSizePaise,pricePaise,contractValuePaise};
 }
-module.exports={validateDerivativeContract,toPaiseFromRupees};
+module.exports={validateDerivativeContract,normalizeTickSizePaise,normalizeExpiryDate};
