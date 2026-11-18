@@ -241,15 +241,24 @@ app.post("/paper/orders",async(req,res)=>{
       const account=accountSnap.data(),positions={...(account.positions||{})},position={...(positions[instrumentKey]||{quantity:0,averagePricePaise:0})};
       let cash=account.cashPaise,realizedPnlPaise=account.realizedPnlPaise||0,orderRealizedPnlPaise=0;
       if(!Number.isSafeInteger(cash)||cash<0||!Number.isSafeInteger(realizedPnlPaise))throw Object.assign(new Error("Paper account balance is invalid; contact support."),{status:409});
+      if(!Number.isSafeInteger(position.quantity)||position.quantity<0||position.quantity>1000000||!Number.isSafeInteger(position.averagePricePaise)||position.averagePricePaise<0)
+        throw Object.assign(new Error("Existing position quantity or cost is invalid; contact support."),{status:409});
       if(side==="BUY"){
         if(cash<grossPaise)throw Object.assign(new Error("Insufficient virtual cash balance."),{status:409});
-        const nextQty=position.quantity+quantity;
-        if(!Number.isSafeInteger(position.quantity)||position.quantity<0||!Number.isSafeInteger(nextQty)||nextQty>1000000||!Number.isSafeInteger(position.averagePricePaise)||position.averagePricePaise<0)throw Object.assign(new Error("Position quantity or cost is outside supported limits."),{status:409});
-        position.averagePricePaise=Math.round((position.quantity*position.averagePricePaise+grossPaise)/nextQty);
-        position.quantity=nextQty;cash-=grossPaise;
+        const nextQty=position.quantity+quantity,weightedCost=position.quantity*position.averagePricePaise+grossPaise;
+        if(!Number.isSafeInteger(nextQty)||nextQty>1000000||!Number.isSafeInteger(weightedCost)||weightedCost<0)
+          throw Object.assign(new Error("Position quantity or weighted cost exceeds supported calculation limits."),{status:409});
+        const nextAverage=Math.round(weightedCost/nextQty),nextCash=cash-grossPaise;
+        if(!Number.isSafeInteger(nextAverage)||!Number.isSafeInteger(nextCash)||nextCash<0)
+          throw Object.assign(new Error("BUY order exceeds safe account calculation limits."),{status:409});
+        position.averagePricePaise=nextAverage;position.quantity=nextQty;cash=nextCash;
       }else{
         if(position.quantity<quantity)throw Object.assign(new Error("Not enough shares in the virtual portfolio to sell."),{status:409});
-        position.quantity-=quantity;cash+=grossPaise;orderRealizedPnlPaise=(pricePaise-position.averagePricePaise)*quantity;realizedPnlPaise+=orderRealizedPnlPaise;
+        orderRealizedPnlPaise=(pricePaise-position.averagePricePaise)*quantity;
+        const nextCash=cash+grossPaise,nextRealized=realizedPnlPaise+orderRealizedPnlPaise;
+        if(!Number.isSafeInteger(nextCash)||!Number.isSafeInteger(orderRealizedPnlPaise)||!Number.isSafeInteger(nextRealized))
+          throw Object.assign(new Error("SELL order exceeds safe account calculation limits."),{status:409});
+        position.quantity-=quantity;cash=nextCash;realizedPnlPaise=nextRealized;
         if(position.quantity===0)delete positions[instrumentKey];
         else positions[instrumentKey]=position;
       }
