@@ -122,7 +122,6 @@
       const data=await response.json();if(request!==paperAccountRequest)return;if(!response.ok)throw new Error(data.error||'Paper account unavailable');
       paperCash.textContent=inrPaise(data.cashPaise);paperRealized.textContent=inrPaise(data.realizedPnlPaise);
       paperAccountStatus.textContent='Separate Indian-market virtual account · No real funds';
-      paperOrderStatus.textContent='Ready for simulated NSE/BSE equity market orders only.';
       updatePaperButtons();
     }catch(error){if(request===paperAccountRequest)paperAccountStatus.textContent=error.message||'Paper account not ready';}
   }
