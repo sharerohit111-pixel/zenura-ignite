@@ -8,4 +8,8 @@ function nextReconnectDelay(attempt) {
   };
 }
 
-module.exports = {nextReconnectDelay};
+function shouldRetryFeedStatus(status) {
+  return Number.isInteger(status) && status !== 401 && status !== 403;
+}
+
+module.exports = {nextReconnectDelay, shouldRetryFeedStatus};
