@@ -111,7 +111,7 @@
   const watchRefresh=document.getElementById('watchlist-refresh');
   watchRefresh.addEventListener('click',loadWatchlistQuotes);
   const paperCash=document.getElementById('paper-cash'),paperRealized=document.getElementById('paper-realized'),paperAccountStatus=document.getElementById('paper-account-status'),paperOrderStatus=document.getElementById('paper-order-status'),paperQuantity=document.getElementById('paper-quantity'),paperBuy=document.getElementById('paper-buy'),paperSell=document.getElementById('paper-sell');
-  function inrPaise(value){return '₹'+(Number(value||0)/100).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});}
+  function inrPaise(value){const amount=Number(value||0)/100,formatted=Math.abs(amount).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});return amount<0?'-₹'+formatted:'₹'+formatted;}
   let paperAccountRequest=0;
   async function loadPaperAccount(){
     const connector=window.ZENURA_MARKET_CONNECTOR,request=++paperAccountRequest;
