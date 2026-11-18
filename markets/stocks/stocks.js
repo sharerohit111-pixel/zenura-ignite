@@ -35,6 +35,41 @@
       const data=await response.json();items=data.results||[];render(items);
     }catch(error){message(error.message||'Could not load instruments.');}
   }
+  const paperCash=document.getElementById('paper-cash'),paperRealized=document.getElementById('paper-realized'),paperAccountStatus=document.getElementById('paper-account-status'),paperOrderStatus=document.getElementById('paper-order-status'),paperQuantity=document.getElementById('paper-quantity'),paperBuy=document.getElementById('paper-buy'),paperSell=document.getElementById('paper-sell');
+  function inrPaise(value){return '₹'+(Number(value||0)/100).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});}
+  async function loadPaperAccount(){
+    const connector=window.ZENURA_MARKET_CONNECTOR;
+    if(!gateway||!connector?.getIdToken)return;
+    try{
+      const token=await connector.getIdToken(),response=await fetch(gateway+'/paper/account',{headers:{Authorization:'Bearer '+token,Accept:'application/json'}});
+      const data=await response.json();if(!response.ok)throw new Error(data.error||'Paper account unavailable');
+      paperCash.textContent=inrPaise(data.cashPaise);paperRealized.textContent=inrPaise(data.realizedPnlPaise);
+      paperAccountStatus.textContent='Separate Indian-market virtual account · No real funds';
+      paperOrderStatus.textContent='Ready for simulated NSE/BSE equity market orders only.';
+      updatePaperButtons();
+    }catch(error){paperAccountStatus.textContent=error.message||'Paper account not ready';}
+  }
+  function updatePaperButtons(){
+    const allowed=!!selected&&['NSE_EQ','BSE_EQ'].includes(selected.segment)&&selected.instrument_type==='EQ'&&!!window.ZENURA_MARKET_CONNECTOR?.getIdToken&&!!gateway;
+    paperBuy.disabled=!allowed;paperSell.disabled=!allowed;
+  }
+  async function submitPaperOrder(side){
+    const qty=Number(paperQuantity.value);
+    if(!Number.isSafeInteger(qty)||qty<1||qty>1000000){paperOrderStatus.textContent='Enter a whole-number quantity between 1 and 1,000,000.';return;}
+    if(!selected||!['NSE_EQ','BSE_EQ'].includes(selected.segment)||selected.instrument_type!=='EQ'){paperOrderStatus.textContent='Select an NSE/BSE cash equity first.';return;}
+    paperBuy.disabled=true;paperSell.disabled=true;paperOrderStatus.textContent='Verifying fresh provider quote and processing simulated order…';
+    try{
+      const token=await window.ZENURA_MARKET_CONNECTOR.getIdToken();
+      const response=await fetch(gateway+'/paper/orders',{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json',Accept:'application/json'},body:JSON.stringify({instrument_key:selected.instrument_key,side,quantity:qty})});
+      const data=await response.json();if(!response.ok)throw new Error(data.error||'Paper order rejected');
+      paperOrderStatus.textContent=side+' '+qty+' '+(data.tradingSymbol||selected.trading_symbol)+' filled at '+inrPaise(data.executionPricePaise)+' · Simulated only';
+      await loadPaperAccount();
+    }catch(error){paperOrderStatus.textContent=error.message||'Paper order failed.';}
+    finally{updatePaperButtons();}
+  }
+  paperBuy.addEventListener('click',()=>submitPaperOrder('BUY'));
+  paperSell.addEventListener('click',()=>submitPaperOrder('SELL'));
+
   const optionExpiry=document.getElementById('option-expiry');
   const optionButton=document.getElementById('load-option-chain');
   const optionStatus=document.getElementById('option-status');
@@ -115,6 +150,7 @@
     document.querySelector('.chart-placeholder b').textContent='Waiting for verified live quote';
     document.querySelector('.chart-placeholder span').textContent='Connecting to Upstox V3 feed. Prices will appear only when received from the provider.';
     render(items);
+    updatePaperButtons();
     loadCandles();
     const connector=window.ZENURA_MARKET_CONNECTOR;
     if(!gateway||!connector?.getIdToken){document.querySelector('.chart-placeholder span').textContent='Sign in and configure the deployed market gateway to start live quotes.';return;}
@@ -143,10 +179,10 @@
   tabs.forEach(tab=>tab.addEventListener('click',()=>{
     clearFeedTimers();if(streamAbort){streamAbort.abort();streamAbort=null;}
     tabs.forEach(x=>x.classList.toggle('active',x===tab));activeList=tab.dataset.list;selected=null;chartRequest++;
-    title.textContent='No instrument selected';symbol.textContent='Choose an instrument';price.textContent='—';loadInstruments();
+    title.textContent='No instrument selected';symbol.textContent='Choose an instrument';price.textContent='—';updatePaperButtons();loadInstruments();
   }));
   search.addEventListener('input',()=>{clearTimeout(debounce);debounce=setTimeout(loadInstruments,250);});
-  window.addEventListener('zenura-market-auth-ready',()=>{loadInstruments();loadCandles();});
+  window.addEventListener('zenura-market-auth-ready',()=>{loadInstruments();loadCandles();loadPaperAccount();});
   window.ZENURA_INDIAN_MARKET={mode:'indian-stocks',provider:'upstox',status:'gateway-configurable',activeList:()=>activeList,refresh:loadInstruments};
   loadInstruments();
 })();
