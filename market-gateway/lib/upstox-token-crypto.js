@@ -25,7 +25,14 @@ function decryptUpstoxToken(box, keyValue) {
   const data = decodeCanonicalBase64(box.data, 1, 16384);
   const decipher = crypto.createDecipheriv("aes-256-gcm", key, iv);
   decipher.setAuthTag(tag);
-  return Buffer.concat([decipher.update(data), decipher.final()]).toString("utf8");
+  const plaintext = Buffer.concat([decipher.update(data), decipher.final()]);
+  const token = plaintext.toString("utf8");
+  if (!token.trim() || token.length > 16384
+    || /[\u0000-\u001f\u007f]/.test(token)
+    || !Buffer.from(token, "utf8").equals(plaintext)) {
+    throw new Error("Decrypted Upstox token is invalid.");
+  }
+  return token;
 }
 
 module.exports = {decryptUpstoxToken};
