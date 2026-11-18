@@ -8,7 +8,7 @@ const quote=(overrides={})=>({instrumentKey:"NSE_FO|NIFTY26NOV25000CE",pricePais
 const margin=(overrides={})=>({instrumentKey:"NSE_FO|NIFTY26NOV25000CE",requiredMarginPaise:150000,observedAtMs:now-1000,source:"broker_margin_api",...overrides});
 test("values long option market value and unrealized P&L",()=>{
  const r=calculateDerivativePortfolio({positions:[pos()],quotes:[quote()],now});
- assert.equal(r.marketValuePaise,175000);assert.equal(r.unrealizedPnlPaise,50000);assert.equal(r.reservedMarginPaise,0);
+ assert.equal(r.marketValuePaise,175000);assert.equal(r.positions[0].marketValuePaise,175000);assert.equal(r.unrealizedPnlPaise,50000);assert.equal(r.reservedMarginPaise,0);
 });
 test("values short option signed P&L and requires margin snapshot",()=>{
  const p=pos({netQuantity:-25});
@@ -19,7 +19,7 @@ test("values short option signed P&L and requires margin snapshot",()=>{
 test("futures exclude notional market value but mark P&L and margin",()=>{
  const p=pos({instrumentType:"FUT",netQuantity:50,averagePricePaise:10000});
  const r=calculateDerivativePortfolio({positions:[p],quotes:[quote({pricePaise:12000})],marginSnapshots:[margin()],now});
- assert.equal(r.marketValuePaise,0);assert.equal(r.unrealizedPnlPaise,100000);assert.equal(r.reservedMarginPaise,150000);
+ assert.equal(r.marketValuePaise,0);assert.equal(r.positions[0].marketValuePaise,0);assert.equal(r.unrealizedPnlPaise,100000);assert.equal(r.reservedMarginPaise,150000);
 });
 test("long option unrealized P&L uses exact entry cost basis including fees",()=>{
  const p=pos({instrumentType:"CE",netQuantity:65,averagePricePaise:1287,costBasisPaise:83646});
