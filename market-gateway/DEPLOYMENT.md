@@ -35,6 +35,11 @@ Set `UPSTOX_REDIRECT_URI` to the exact deployed callback URL:
 
 Register that exact URL in the Upstox Developer app. Use the same generated encryption key in the gateway's Secret Manager environment variable. Never commit the key or paste it into browser configuration.
 
+### Upstox token lifecycle
+
+The standard OAuth access token expires at **03:30 AM Asia/Kolkata time** (the same day if generated before the cutoff, otherwise the following day). Upstox does not provide a standard refresh-token flow for this OAuth grant; users must complete Upstox authorization again after expiry. The callback stores the calculated 03:30 IST cutoff, and the connection UI displays the expiry and reconnect guidance.
+
+Upstox also documents a separate one-year Analytics Token, but it is strictly read-only and limited to supported GET APIs. It cannot be used for trading operations. Do not substitute it for a user's OAuth token or distribute it to app users; follow Upstox's credential and exchange-data terms.
 ## 3. Indian paper-account starting balance
 
 The existing product specification sets a ₹10,00,000 virtual starting capital. Set this server-side before enabling accounts:
