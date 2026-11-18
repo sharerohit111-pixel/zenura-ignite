@@ -5,7 +5,7 @@ const {executePaperOrderTransaction}=require("../lib/paper-order-transaction");
 const account={cashPaise:10000,realizedPnlPaise:0,positions:{},version:1};
 function setup(existingOrder,initialAccount=account){
  const writes=[];
- const snapshots={account:{exists:true,data:()=>({...initialAccount,positions:{...initialAccount.positions}})},order:{exists:Boolean(existingOrder),data:()=>existingOrder}};
+ const snapshots={"user-1":{exists:true,data:()=>({...initialAccount,positions:{...initialAccount.positions}})},order:{exists:Boolean(existingOrder),data:()=>existingOrder}};
  const db={runTransaction:async callback=>callback({get:async ref=>snapshots[ref.id],create:(ref,data)=>writes.push(["create",ref.id,data]),update:(ref,data)=>writes.push(["update",ref.id,data])})};
  const common={db,accountRef:{id:"user-1"},orderRef:{id:"order"},uid:"user-1",requestFingerprint:"fingerprint",order:{uid:"user-1",requestFingerprint:"fingerprint",instrumentKey:"NSE_EQ|AAA",side:"BUY",quantity:2},pricePaise:1000,publicPaperOrder:(order,meta)=>({order,meta}),serverTimestamp:()=>"server-time"};
  return {common,writes};
@@ -36,7 +36,7 @@ test("reusing an order key with a different request is rejected",async()=>{
 });
 test("missing account is rejected without writing an order",async()=>{
  const {common,writes}=setup();
- common.db.runTransaction=async callback=>callback({get:async ref=>ref.id==="account"?{exists:false}:{exists:false},create:(...args)=>writes.push(args),update:(...args)=>writes.push(args)});
+ common.db.runTransaction=async callback=>callback({get:async ref=>ref.id==="user-1"?{exists:false}:{exists:false},create:(...args)=>writes.push(args),update:(...args)=>writes.push(args)});
  await assert.rejects(executePaperOrderTransaction(common),{status:409});
  assert.equal(writes.length,0);
 });
@@ -48,7 +48,7 @@ function createSerializableStore(initialAccount){
      const writes=[];
      const tx={
        get:async ref=>{
-         if(ref.id==="account")return {exists:true,data:()=>({...state.account,positions:{...state.account.positions}})};
+         if(ref.id==="user-1")return {exists:true,data:()=>({...state.account,positions:{...state.account.positions}})};
          const value=state.orders.get(ref.id);
          return {exists:!!value,data:()=>value};
        },
@@ -66,7 +66,7 @@ function createSerializableStore(initialAccount){
 }
 test("concurrent identical submissions create one fill and replay the same order",async()=>{
  const {db,state}=createSerializableStore(account);
- const common={db,accountRef:{id:"account"},orderRef:{id:"same-order"},uid:"user-1",requestFingerprint:"fingerprint",order:{uid:"user-1",requestFingerprint:"fingerprint",instrumentKey:"NSE_EQ|AAA",side:"BUY",quantity:2},pricePaise:1000,publicPaperOrder:(order,meta)=>({order,meta}),serverTimestamp:()=>"server-time"};
+ const common={db,accountRef:{id:"user-1"},orderRef:{id:"same-order"},uid:"user-1",requestFingerprint:"fingerprint",order:{uid:"user-1",requestFingerprint:"fingerprint",instrumentKey:"NSE_EQ|AAA",side:"BUY",quantity:2},pricePaise:1000,publicPaperOrder:(order,meta)=>({order,meta}),serverTimestamp:()=>"server-time"};
  const [a,b]=await Promise.all([executePaperOrderTransaction(common),executePaperOrderTransaction(common)]);
  assert.equal(state.orders.size,1);
  assert.equal(state.account.cashPaise,8000);
