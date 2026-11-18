@@ -20,6 +20,8 @@ on:
       - "market-gateway/**"
       - "functions/**"
       - "firebase.json"
+      - ".firebaserc"
+      - "market-gateway/DEPLOYMENT.md"
       - "firestore.rules"
       - "firestore.indexes.json"
       - ".github/workflows/indian-market-checks.yml"
