@@ -16,6 +16,10 @@ on:
     paths:
       - "markets/stocks/**"
       - "market-gateway/**"
+      - "functions/**"
+      - "firebase.json"
+      - "firestore.rules"
+      - "firestore.indexes.json"
       - ".github/workflows/indian-market-checks.yml"
   workflow_dispatch:
 
