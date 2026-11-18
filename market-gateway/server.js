@@ -317,7 +317,7 @@ app.post("/paper/derivative/orders",async(req,res)=>{
       res.set("Cache-Control","private, no-store");
       return res.status(200).json({
         orderId,tradingSymbol:prior.tradingSymbol,side:prior.side,quantity:prior.quantity,
-        lots:prior.lots,executionPricePaise:prior.executionPricePaise,grossPaise:prior.grossPaise,charges:prior.charges||null,chargesPaise:prior.chargesPaise||0,totalDebitPaise:prior.totalDebitPaise||null,netCreditPaise:prior.netCreditPaise||null,
+        lots:prior.lots,executionPricePaise:prior.executionPricePaise,grossPaise:prior.grossPaise,charges:prior.charges||null,chargesPaise:prior.chargesPaise||0,totalDebitPaise:prior.totalDebitPaise??null,netCreditPaise:prior.netCreditPaise??null,
         cashPaise:currentData.cashPaise,realizedPnlPaise:currentData.realizedPnlPaise||0,
         idempotentReplay:true,simulationOnly:true,excludesCharges:false
       });
