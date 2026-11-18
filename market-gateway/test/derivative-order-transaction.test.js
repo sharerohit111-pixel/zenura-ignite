@@ -39,7 +39,9 @@ test("atomically records a long option BUY and debits premium",async()=>{
  assert.equal(writes[0][2].status,"FILLED");
  assert.equal(writes[0][2].grossPaise,81250);
  assert.equal(writes[1][0],"update");
- assert.equal(writes[1][2].cashPaise,918750);
+ assert.equal(writes[1][2].cashPaise,916354);
+ assert.equal(writes[0][2].chargesPaise,2396);
+ assert.equal(writes[0][2].totalDebitPaise,83646);
  assert.equal(writes[1][2].derivativePositions[instrument.instrument_key].netQuantity,65);
  assert.equal(writes[1][2].version,2);
  assert.equal(r.simulationOnly,true);
@@ -50,7 +52,7 @@ test("shares the equity account cash while keeping equity and derivative holding
  const {common,writes}=setup({account:{...initial,positions:equityPosition}});
  await executeLongOptionBuyTransaction(common);
  assert.deepEqual(writes[1][2].positions,equityPosition);
- assert.equal(writes[1][2].cashPaise,918750);
+ assert.equal(writes[1][2].cashPaise,916354);
  assert.equal(writes[1][2].derivativePositions[instrument.instrument_key].netQuantity,65);
 });
 test("replays matching idempotency key without a second debit",async()=>{
