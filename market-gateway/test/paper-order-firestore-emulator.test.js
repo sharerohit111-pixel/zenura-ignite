@@ -224,3 +224,29 @@ integrationTest("Firestore emulator prevents concurrent option SELL orders from 
   assert.equal(orders.filter(x=>x.exists).length,1);
  }finally{await clean([first.accountRef,first.orderRef,second.orderRef]);}
 });
+
+const {acquireStreamLease,renewStreamLease,releaseStreamLease}=require("../lib/stream-lease");
+integrationTest("Firestore emulator serializes competing stream leases and enforces owner-only cleanup",async()=>{
+ const uid="stream-lease-user-"+crypto.randomUUID();
+ const ref=db.collection("indianMarketStreamLeases").doc(uid);
+ const now=Date.now();
+ try{
+  const acquisitions=await Promise.all([
+   acquireStreamLease(db,uid,"lease-a",{now,leaseMs:60000}),
+   acquireStreamLease(db,uid,"lease-b",{now,leaseMs:60000})
+  ]);
+  assert.equal(acquisitions.filter(Boolean).length,1);
+  const stored=await ref.get();
+  assert.equal(stored.exists,true);
+  const owner=stored.data().leaseId;
+  const other=owner==="lease-a"?"lease-b":"lease-a";
+  assert.equal(await renewStreamLease(db,uid,other,{now:now+1000,leaseMs:60000}),false);
+  assert.equal(await renewStreamLease(db,uid,owner,{now:now+1000,leaseMs:60000}),true);
+  assert.equal(await releaseStreamLease(db,uid,other),false);
+  assert.equal((await ref.get()).exists,true);
+  assert.equal(await releaseStreamLease(db,uid,owner),true);
+  assert.equal((await ref.get()).exists,false);
+  assert.equal(await acquireStreamLease(db,uid,"lease-reconnected",{now:now+2000,leaseMs:60000}),true);
+  assert.equal((await ref.get()).data().leaseId,"lease-reconnected");
+ }finally{await ref.delete().catch(()=>{});}
+});
