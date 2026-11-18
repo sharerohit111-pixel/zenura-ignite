@@ -92,7 +92,7 @@ app.get("/instruments",async(req,res)=>{
 
 // Historical OHLC candles — authenticated, token remains server-side.
 function validDate(value){
-  if(typeof value!=="string"||!/^\\d{4}-\\d{2}-\\d{2}$/.test(value))return false;
+  if(typeof value!=="string"||!/^\d{4}-\d{2}-\d{2}$/.test(value))return false;
   const d=new Date(value+"T00:00:00Z");
   return !Number.isNaN(d.getTime())&&d.toISOString().slice(0,10)===value;
 }
@@ -105,7 +105,7 @@ app.get("/candles",async(req,res)=>{
     const interval=Number(intervalText);
     const toDate=String(req.query.to_date||"");
     const fromDate=String(req.query.from_date||"");
-    if(!instrumentKey||instrumentKey.length>100||/[\\r\\n]/.test(instrumentKey))
+    if(!instrumentKey||instrumentKey.length>100||/[\r\n]/.test(instrumentKey))
       return res.status(400).json({error:"A valid instrument_key is required."});
     const validUnit=["minutes","hours","days","weeks","months"].includes(unit);
     const validInterval=Number.isInteger(interval)&&(
