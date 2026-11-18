@@ -212,6 +212,8 @@ app.post("/paper/orders",async(req,res)=>{
     const instrumentKey=typeof req.body?.instrument_key==="string"?req.body.instrument_key:"";
     const side=String(req.body?.side||"").toUpperCase();
     const quantity=Number(req.body?.quantity);
+    const idempotencyKey=typeof req.body?.idempotency_key==="string"?req.body.idempotency_key:"";
+    if(!/^[0-9a-f-]{36}$/i.test(idempotencyKey))return res.status(400).json({error:"A valid UUID idempotency_key is required."});
     if(!instrumentKey||instrumentKey.length>100||/[\r\n]/.test(instrumentKey))return res.status(400).json({error:"A valid instrument_key is required."});
     if(!["BUY","SELL"].includes(side))return res.status(400).json({error:"Only BUY and SELL paper orders are supported."});
     if(!Number.isSafeInteger(quantity)||quantity<1||quantity>1000000)return res.status(400).json({error:"Quantity must be a whole number between 1 and 1,000,000."});
@@ -234,10 +236,13 @@ app.post("/paper/orders",async(req,res)=>{
       return res.status(409).json({error:"No sufficiently fresh provider quote is available. Paper order rejected.",quoteAgeMs:Number.isFinite(quoteAge)?quoteAge:null});
     const pricePaise=Math.round(ltp*100),grossPaise=pricePaise*quantity;
     if(!Number.isSafeInteger(grossPaise)||grossPaise<=0)return res.status(400).json({error:"Order value exceeds supported calculation limits."});
-    const accountRef=paperAccountRef(decoded.uid),orderRef=db.collection("indianPaperOrders").doc(crypto.randomUUID());
+    const accountRef=paperAccountRef(decoded.uid);
+    const orderId=crypto.createHash("sha256").update(decoded.uid+":"+idempotencyKey).digest("hex");
+    const orderRef=db.collection("indianPaperOrders").doc(orderId);
     let result;
     await db.runTransaction(async tx=>{
-      const accountSnap=await tx.get(accountRef);
+      const [accountSnap,existingOrder]=await Promise.all([tx.get(accountRef),tx.get(orderRef)]);
+      if(existingOrder.exists){result={...existingOrder.data(),orderId:orderRef.id,cashPaise:accountSnap.data()?.cashPaise,realizedPnlTotalPaise:accountSnap.data()?.realizedPnlPaise||0,idempotentReplay:true};return;}
       if(!accountSnap.exists)throw Object.assign(new Error("Paper account is not initialized."),{status:409});
       const account=accountSnap.data(),positions={...(account.positions||{})},position={...(positions[instrumentKey]||{quantity:0,averagePricePaise:0})};
       let cash=account.cashPaise,realizedPnlPaise=account.realizedPnlPaise||0,orderRealizedPnlPaise=0;
