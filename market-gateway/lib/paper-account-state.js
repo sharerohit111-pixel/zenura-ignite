@@ -30,6 +30,7 @@ async function ensurePaperAccount({db,ref,startingCashPaise,serverTimestamp}){
   }else{
    const account=snap.data()||{};
    const patch={};
+   if(account.positions===undefined)patch.positions={};
    if(account.derivativePositions===undefined)patch.derivativePositions={};
    if(account.reservedMarginPaise===undefined)patch.reservedMarginPaise=0;
    if(Object.keys(patch).length){patch.updatedAt=serverTimestamp();tx.update(ref,patch);}
