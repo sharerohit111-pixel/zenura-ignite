@@ -24,7 +24,7 @@ const {filterFreshMarketFeeds}=require("./lib/market-feed-validation");
 const {buildPortfolioValuation}=require("./lib/paper-portfolio-valuation");
 const {createLeaseHeartbeat}=require("./lib/lease-heartbeat");
 const {isUpstoxTokenUsable}=require("./lib/upstox-token");
-const {executeLongOptionBuyTransaction}=require("./lib/derivative-order-transaction");
+const {executeLongOptionTransaction}=require("./lib/derivative-order-transaction");
 admin.initializeApp();
 const db=admin.firestore();
 const app=express();
@@ -335,7 +335,7 @@ app.post("/paper/derivative/orders",async(req,res)=>{
     let normalizedQuote;
     try{normalizedQuote=normalizeProviderQuote(quoteEntry,instrumentKey);}
     catch(error){return res.status(error.status||409).json({error:error.message,quoteAgeMs:Number.isFinite(error.quoteAgeMs)?error.quoteAgeMs:null});}
-    const result=await executeLongOptionBuyTransaction({
+    const result=await executeLongOptionTransaction({
       db,accountRef,orderRef,uid:decoded.uid,idempotencyKey,instrument,lots,
       quote:{instrumentKey,pricePaise:normalizedQuote.pricePaise,observedAtMs:normalizedQuote.tradeTimeMs},side,
       serverTimestamp:()=>admin.firestore.FieldValue.serverTimestamp()
