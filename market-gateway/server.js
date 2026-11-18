@@ -28,6 +28,7 @@ const {decryptUpstoxToken}=require("./lib/upstox-token-crypto");
 const {executeLongOptionTransaction}=require("./lib/derivative-order-transaction");
 const {parseMarginPreviewInput}=require("./lib/margin-preview-input");
 const {consumeMarginPreviewSlot}=require("./lib/margin-preview-rate-limit");
+const {authenticateFirebaseRequest}=require("./lib/firebase-auth");
 admin.initializeApp();
 const db=admin.firestore();
 const app=express();
@@ -80,9 +81,7 @@ function decryptToken(box){
   return decryptUpstoxToken(box,ENC_KEY);
 }
 async function authenticate(req){
-  const header=req.get("authorization")||"";
-  if(!header.startsWith("Bearer ")) throw Object.assign(new Error("Sign in required"),{status:401});
-  return admin.auth().verifyIdToken(header.slice(7));
+  return authenticateFirebaseRequest(req,admin.auth());
 }
 app.get("/health",(_req,res)=>res.json({
   ok:true,service:"zenura-indian-market-gateway",feedProtocol:"upstox-v3",
