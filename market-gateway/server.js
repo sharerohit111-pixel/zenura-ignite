@@ -303,6 +303,8 @@ app.post("/paper/derivative/margin-preview",async(req,res)=>{
     if(!instrumentCache.length||Date.now()-instrumentCacheUpdatedAt>6*60*60*1000)await refreshInstrumentCache();
     const instrument=instrumentCache.find(x=>x.instrument_key===instrumentKey&&x.instrument_type==="FUT"&&["NSE_FO","BSE_FO"].includes(x.segment));
     if(!instrument)return res.status(400).json({error:"Select a verified NSE/BSE futures contract from the official instrument master."});
+    // Apply the per-user cooldown before making any upstream quote or margin API calls.
+    await consumeMarginPreviewSlot(db,decoded.uid);
     const quoteUrl="https://api.upstox.com/v3/market-quote/quotes?"+new URLSearchParams({instrument_key:instrumentKey});
     const quoteResponse=await fetchProvider(quoteUrl,{headers:{Authorization:"Bearer "+accessToken,Accept:"application/json"}});
     const quotePayload=await readProviderJson(quoteResponse);
@@ -315,7 +317,6 @@ app.post("/paper/derivative/margin-preview",async(req,res)=>{
       instrument_key:instrumentKey,quantity:contract.quantity,product,
       transaction_type:side,price:normalizedQuote.pricePaise/100
     }]};
-    await consumeMarginPreviewSlot(db,decoded.uid);
     const upstream=await fetchProvider("https://api.upstox.com/v2/charges/margin",{
       method:"POST",headers:{Authorization:"Bearer "+accessToken,Accept:"application/json","Content-Type":"application/json"},
       body:JSON.stringify(marginRequest)
