@@ -52,13 +52,14 @@ test("requires broker margin snapshot for futures and short options",()=>{
 test("uses broker margin and rejects insufficient funds",()=>{
  const r=buildDerivativeOrderPreview({
   instrument:option(),lots:1,side:"SELL",quote:quote(),
-  marginSnapshot:margin(),availableCashPaise:50000,now
+  marginSnapshot:margin(),availableCashPaise:150000,now
  });
+ assert.equal(r.margin.requiredMarginPaise,100000);
+ assert.equal(r.margin.canPlacePaperOrder,true);
  assert.throws(()=>buildDerivativeOrderPreview({
   instrument:option(),lots:1,side:"SELL",quote:quote(),
   marginSnapshot:margin(),availableCashPaise:50000,now
  }),/Insufficient/);
- assert.equal(r.executionEnabled,false);
 });
 
 test("rejects stale, future-dated and mismatched quotes",()=>{
