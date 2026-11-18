@@ -231,6 +231,7 @@
   const futuresMarginButton=document.getElementById('futures-margin-preview');
   const futuresMarginLots=document.getElementById('futures-margin-lots');
   const futuresMarginSide=document.getElementById('futures-margin-side');
+  const futuresMarginProduct=document.getElementById('futures-margin-product');
   const futuresMarginStatus=document.getElementById('futures-margin-status');
   function updateFuturesMarginButton(){
     if(futuresMarginButton)futuresMarginButton.disabled=!selected||selected.instrument_type!=='FUT';
@@ -238,7 +239,7 @@
   }
   async function requestFuturesMarginPreview(){
     if(!selected||selected.instrument_type!=='FUT'){futuresMarginStatus.textContent='Choose a futures contract first.';return;}
-    const lots=Number(futuresMarginLots.value),side=futuresMarginSide.value;
+    const lots=Number(futuresMarginLots.value),side=futuresMarginSide.value,product=futuresMarginProduct.value;
     if(!Number.isSafeInteger(lots)||lots<1||lots>10000){futuresMarginStatus.textContent='Enter whole lots from 1 to 10,000.';return;}
     const connector=window.ZENURA_MARKET_CONNECTOR;
     if(!gateway||!connector?.getIdToken){futuresMarginStatus.textContent='Sign in and connect Upstox to request broker margin.';return;}
@@ -247,7 +248,7 @@
     try{
       const token=await connector.getIdToken();
       if(selected?.instrument_key!==instrumentKey)return;
-      const response=await fetch(gateway+'/paper/derivative/margin-preview',{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json',Accept:'application/json'},body:JSON.stringify({instrument_key:instrumentKey,lots,side})});
+      const response=await fetch(gateway+'/paper/derivative/margin-preview',{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json',Accept:'application/json'},body:JSON.stringify({instrument_key:instrumentKey,lots,side,product})});
       const data=await response.json();
       if(!response.ok)throw new Error(data.error||'Broker margin preview failed.');
       if(selected?.instrument_key!==instrumentKey)return;
