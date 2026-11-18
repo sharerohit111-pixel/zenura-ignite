@@ -80,3 +80,11 @@ test("revoked lease cannot renew and a new stream can replace it",async()=>{
  assert.equal(db.docs.get(ref).leaseId,"new");
  assert.equal(db.docs.get(ref).revoked,undefined);
 });
+
+test("lease release requires the matching UID as well as lease ID",async()=>{
+ const db=fakeDb();
+ const ref="indianMarketStreamLeases/u1";
+ db.docs.set(ref,{uid:"someone-else",leaseId:"shared-lease-id",expiresAtMs:5000});
+ assert.equal(await releaseStreamLease(db,"u1","shared-lease-id"),false);
+ assert.equal(db.docs.has(ref),true);
+});
