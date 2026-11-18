@@ -150,6 +150,41 @@ app.get("/candles",async(req,res)=>{
   }
 });
 
+
+app.get("/option-chain",async(req,res)=>{
+  try{
+    const decoded=await authenticate(req);
+    const instrumentKey=String(req.query.instrument_key||"");
+    const expiry=String(req.query.expiry_date||"");
+    if(!instrumentKey||instrumentKey.length>100||/[\\r\\n]/.test(instrumentKey))
+      return res.status(400).json({error:"A valid underlying instrument_key is required."});
+    const relative=["current_week","next_week","far_week","current_month","next_month","far_month"];
+    if(!relative.includes(expiry)&&!validDate(expiry))
+      return res.status(400).json({error:"expiry_date must be YYYY-MM-DD or a supported expiry keyword."});
+    if(!instrumentCache.length||Date.now()-instrumentCacheUpdatedAt>6*60*60*1000)await refreshInstrumentCache();
+    const underlying=instrumentCache.find(item=>item.instrument_key===instrumentKey);
+    if(!underlying||!["NSE_INDEX","BSE_INDEX","NSE_EQ","BSE_EQ"].includes(underlying.segment))
+      return res.status(400).json({error:"Select a verified NSE/BSE equity or index underlying."});
+    const connection=await db.collection("upstoxConnections").doc(decoded.uid).get();
+    if(!connection.exists)return res.status(403).json({error:"Upstox account is not connected."});
+    const data=connection.data();
+    if(data.status!=="connected"||!data.expiresAt||data.expiresAt.toMillis()<=Date.now())
+      return res.status(403).json({error:"Upstox token expired. Reconnect your account."});
+    const accessToken=decryptToken(data.tokenCiphertext);
+    const params=new URLSearchParams({instrument_key:instrumentKey,expiry_date:expiry});
+    const upstream=await fetch("https://api.upstox.com/v2/option/chain?"+params.toString(),{headers:{Authorization:"Bearer "+accessToken,Accept:"application/json"}});
+    const payload=await upstream.json().catch(()=>null);
+    if(!upstream.ok){
+      console.warn("Option chain provider returned",upstream.status);
+      return res.status(upstream.status===401?403:502).json({error:"Upstox option-chain request failed.",providerStatus:upstream.status});
+    }
+    res.set("Cache-Control","private, no-store");
+    res.json(payload);
+  }catch(error){
+    if(!res.headersSent)res.status(error.status||500).json({error:error.status?error.message:"Option chain could not be loaded."});
+  }
+});
+
 app.post("/stream",async(req,res)=>{
   let upstream;
   let heartbeat;
