@@ -211,12 +211,16 @@
     if(!selected||!['NSE_EQ','BSE_EQ'].includes(selected.segment)||selected.instrument_type!=='EQ'){paperOrderStatus.textContent='Select an NSE/BSE cash equity first.';return;}
     const instrumentKey=selected.instrument_key,tradingSymbol=selected.trading_symbol||selected.name||selected.instrument_key;
     const fingerprint=JSON.stringify({instrument_key:instrumentKey,side,quantity:qty});
-    if(!pendingPaperOrderKey||pendingPaperOrderFingerprint!==fingerprint){pendingPaperOrderKey=crypto.randomUUID();pendingPaperOrderFingerprint=fingerprint;}
+    if(pendingPaperOrderKey&&!window.ZenuraPaperOrderRetryPolicy.canRetryPendingPaperOrder(pendingPaperOrderFingerprint,fingerprint)){
+      paperOrderStatus.textContent='A previous order response is uncertain. Retry the same stock, side and quantity before starting another order.';return;
+    }
+    if(!pendingPaperOrderKey){pendingPaperOrderKey=crypto.randomUUID();pendingPaperOrderFingerprint=fingerprint;}
     paperOrderSubmitting=true;updatePaperButtons();paperOrderStatus.textContent='Verifying fresh provider quote and processing simulated order…';
     try{
       const token=await window.ZENURA_MARKET_CONNECTOR.getIdToken();
       const response=await fetch(gateway+'/paper/orders',{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json',Accept:'application/json'},body:JSON.stringify({instrument_key:instrumentKey,side,quantity:qty,idempotency_key:pendingPaperOrderKey})});
-      const data=await response.json();if(!response.ok)throw new Error(data.error||'Paper order rejected');
+      const data=await response.json().catch(()=>({}));
+      if(!response.ok){if(response.status>=400&&response.status<500){pendingPaperOrderKey=null;pendingPaperOrderFingerprint='';}throw new Error(data.error||'Paper order rejected');}
       pendingPaperOrderKey=null;pendingPaperOrderFingerprint='';
       const fillMessage=side+' '+qty+' '+(data.tradingSymbol||tradingSymbol)+' filled at '+inrPaise(data.executionPricePaise)+' · Simulated only';
       paperOrderStatus.textContent=fillMessage;
