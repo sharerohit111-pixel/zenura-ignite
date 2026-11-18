@@ -36,11 +36,15 @@ async function refreshStatus() {
     const result = await getConnectionStatus();
     const data = result.data || {};
     if (data.connected) {
-      setState("UPSTOX AUTHORIZED", data.feedReady
+      const expiry = Number.isFinite(data.expiresAt)
+        ? new Date(data.expiresAt).toLocaleString("en-IN", {timeZone:"Asia/Kolkata", dateStyle:"medium", timeStyle:"short"})
+        : "03:30 AM IST daily cutoff";
+      setState("UPSTOX AUTHORIZED", (data.feedReady
         ? "Market feed gateway is ready."
-        : "Account authorized. Live feed gateway is not deployed yet.", true);
+        : "Account authorized. Live feed gateway is not deployed yet.")
+        + " Access token expires at " + expiry + "; reconnect after expiry.", true);
     } else if (data.status === "token_expired") {
-      setState("UPSTOX TOKEN EXPIRED", "Reconnect your Upstox account to continue.");
+      setState("UPSTOX TOKEN EXPIRED", "Upstox standard access tokens expire at 03:30 AM IST. Reconnect your account to continue.");
     } else {
       setState("UPSTOX NOT CONNECTED", "Authorize Upstox to link your trading account.");
     }
