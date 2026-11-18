@@ -56,7 +56,7 @@ Deploy `market-gateway/` as a separate Cloud Run service with Node.js 20. Config
 - `UPSTOX_TOKEN_ENCRYPTION_KEY`: the same Secret Manager value as the Firebase Function.
 - `ALLOWED_ORIGINS=https://zenuraignite.com` (use the exact production origin, no wildcard).
 - `INDIAN_PAPER_STARTING_CASH_PAISE=100000000`.
-- A dedicated service account with only the required Firestore access to `upstoxConnections`, `indianMarketWatchlists`, `indianPaperAccounts`, `indianPaperOrders`, `indianDerivativeOrders`, `indianMarketStreamLeases` (live-feed lease coordination), and `indianMarginPreviewLimits` (per-user margin-preview cooldown).
+- A dedicated service account with least-privilege Firestore IAM permissions for the target database. **Firestore IAM is database-level, not collection-level, and Admin SDK calls bypass Firestore Security Rules.** Keep gateway code access limited to `upstoxConnections`, `indianMarketWatchlists`, `indianPaperAccounts`, `indianPaperOrders`, `indianDerivativeOrders`, `indianMarketStreamLeases` (live-feed lease coordination), and `indianMarginPreviewLimits` (per-user margin-preview cooldown).
 - Public HTTPS ingress so browser requests can reach the service; the gateway itself validates Firebase ID tokens on protected endpoints. Do not disable application authentication.
 
 After deployment, set the exact Cloud Run HTTPS URL in the `market-gateway-url` meta tag in `markets/stocks/index.html`. Do not point the frontend at a placeholder or unverified URL.
