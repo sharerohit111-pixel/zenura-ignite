@@ -30,6 +30,7 @@ const {readProviderJson}=require("./lib/provider-json");
 const {isUpstoxTokenUsable}=require("./lib/upstox-token");
 const {decryptUpstoxToken}=require("./lib/upstox-token-crypto");
 const {executeLongOptionTransaction}=require("./lib/derivative-order-transaction");
+const {readReplayAccountState}=require("./lib/paper-replay-account");
 const {parseMarginPreviewInput}=require("./lib/margin-preview-input");
 const {consumeMarginPreviewSlot}=require("./lib/margin-preview-rate-limit");
 const {authenticateFirebaseRequest}=require("./lib/firebase-auth");
@@ -254,11 +255,9 @@ app.post("/paper/orders",async(req,res)=>{
     if(priorOrder.exists){
       const prior=priorOrder.data();assertIdempotentReplay(prior,requestFingerprint);
       const currentAccount=await paperAccountRef(decoded.uid).get();
-      if(!currentAccount.exists)return res.status(409).json({error:"Paper account is not initialized."});
-      const current=currentAccount.data();
-      if(!Number.isSafeInteger(current.cashPaise)||current.cashPaise<0||!Number.isSafeInteger(current.realizedPnlPaise??0))return res.status(409).json({error:"Paper account contains invalid balance data."});
+      const current=readReplayAccountState(currentAccount);
       res.set("Cache-Control","private, no-store");
-      return res.status(200).json(publicPaperOrder(prior,{orderId:orderRef.id,cashPaise:current.cashPaise,realizedPnlTotalPaise:current.realizedPnlPaise??0,idempotentReplay:true}));
+      return res.status(200).json(publicPaperOrder(prior,{orderId:orderRef.id,cashPaise:current.cashPaise,realizedPnlTotalPaise:current.realizedPnlPaise,idempotentReplay:true}));
     }
     if(!instrumentCache.length||Date.now()-instrumentCacheUpdatedAt>6*60*60*1000)await refreshInstrumentCache();
     const instrument=instrumentCache.find(x=>x.instrument_key===instrumentKey&&x.instrument_type==="EQ"&&["NSE_EQ","BSE_EQ"].includes(x.segment));
@@ -381,12 +380,12 @@ app.post("/paper/derivative/orders",async(req,res)=>{
     if(priorOrder.exists){
       const prior=priorOrder.data();
       assertIdempotentReplay(prior,requestFingerprint);
-      const current=await accountRef.get(),currentData=current.exists?current.data():{};
+      const current=readReplayAccountState(await accountRef.get());
       res.set("Cache-Control","private, no-store");
       return res.status(200).json({
         orderId,tradingSymbol:prior.tradingSymbol,side:prior.side,quantity:prior.quantity,
         lots:prior.lots,executionPricePaise:prior.executionPricePaise,grossPaise:prior.grossPaise,charges:prior.charges||null,chargesPaise:prior.chargesPaise||0,totalDebitPaise:prior.totalDebitPaise??null,netCreditPaise:prior.netCreditPaise??null,
-        cashPaise:currentData.cashPaise,realizedPnlPaise:currentData.realizedPnlPaise||0,
+        cashPaise:current.cashPaise,realizedPnlPaise:current.realizedPnlPaise,
         idempotentReplay:true,simulationOnly:true,excludesCharges:false
       });
     }
