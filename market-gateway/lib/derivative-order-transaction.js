@@ -85,7 +85,7 @@ async function executeLongOptionBuyTransaction({
       grossPaise:contract.contractValuePaise,charges,chargesPaise:charges.totalChargesPaise,totalDebitPaise:charges.totalDebitPaise,orderType:"MARKET",
       status:"FILLED",realizedPnlPaise:fill.realizedPnlPaise,
       cashDeltaPaise:fill.cashDeltaPaise,simulationOnly:true,
-      excludesCharges:true,createdAt:serverTimestamp()
+      excludesCharges:false,createdAt:serverTimestamp()
     };
     tx.create(orderRef,storedOrder);
     tx.update(accountRef,{
