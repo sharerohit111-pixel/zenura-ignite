@@ -227,7 +227,7 @@ app.get("/paper/account",async(req,res)=>{
     const ref=paperAccountRef(decoded.uid);
     await db.runTransaction(async tx=>{
       const snap=await tx.get(ref);
-      if(!snap.exists)tx.create(ref,{currency:"INR",startingCashPaise:startingCash,cashPaise:startingCash,positions:{},realizedPnlPaise:0,createdAt:admin.firestore.FieldValue.serverTimestamp(),updatedAt:admin.firestore.FieldValue.serverTimestamp(),version:1});
+      if(!snap.exists)tx.create(ref,{currency:"INR",startingCashPaise:startingCash,cashPaise:startingCash,positions:{},derivativePositions:{},reservedMarginPaise:0,realizedPnlPaise:0,createdAt:admin.firestore.FieldValue.serverTimestamp(),updatedAt:admin.firestore.FieldValue.serverTimestamp(),version:1});else if(snap.data().derivativePositions===undefined)tx.update(ref,{derivativePositions:{},reservedMarginPaise:0,updatedAt:admin.firestore.FieldValue.serverTimestamp()});
     });
     const snap=await ref.get(),data=snap.data();
     res.set("Cache-Control","private, no-store");
@@ -378,6 +378,48 @@ app.get("/paper/portfolio",async(req,res)=>{
     res.set("Cache-Control","private, no-store");
     res.json(valuation);
   }catch(error){res.status(errorStatus(error)).json({error:error.status?error.message:"Portfolio valuation could not be loaded."});}
+});
+
+app.get("/paper/derivatives/portfolio",async(req,res)=>{
+  try{
+    const decoded=await authenticate(req),accountSnap=await paperAccountRef(decoded.uid).get();
+    if(!accountSnap.exists)return res.status(404).json({error:"Indian paper account has not been initialized."});
+    const account=accountSnap.data(),raw=account.derivativePositions||{};
+    if(!raw||typeof raw!=="object"||Array.isArray(raw))return res.status(409).json({error:"Derivative position storage is invalid."});
+    const positions=Object.entries(raw).filter(([,p])=>p&&p.netQuantity!==0).map(([instrumentKey,p])=>({
+      instrumentKey,instrumentType:p.instrumentType,netQuantity:p.netQuantity,
+      averagePricePaise:p.averagePricePaise
+    }));
+    if(positions.length>50)return res.status(409).json({error:"More than 50 open derivative positions; valuation stopped."});
+    if(!positions.length){
+      res.set("Cache-Control","private, no-store");
+      return res.json({positions:[],cashPaise:account.cashPaise,marketValuePaise:0,unrealizedPnlPaise:0,reservedMarginPaise:0,realizedPnlPaise:account.realizedPnlPaise||0,valuationStatus:"no_open_positions",simulationOnly:true,excludesCharges:true});
+    }
+    if(!instrumentCache.length||Date.now()-instrumentCacheUpdatedAt>6*60*60*1000)await refreshInstrumentCache();
+    for(const p of positions){
+      const verified=instrumentCache.find(x=>x.instrument_key===p.instrumentKey&&x.instrument_type===p.instrumentType&&["CE","PE"].includes(x.instrument_type)&&["NSE_FO","BSE_FO"].includes(x.segment));
+      if(!verified)return res.status(409).json({error:"An open derivative position is not present in the current official instrument master."});
+    }
+    const connection=await db.collection("upstoxConnections").doc(decoded.uid).get();
+    if(!connection.exists)return res.status(403).json({error:"Upstox account is not connected."});
+    const connectionData=connection.data();
+    if(!isUpstoxTokenUsable(connectionData))return res.status(403).json({error:"Upstox token expired. Reconnect your account."});
+    const accessToken=decryptToken(connectionData.tokenCiphertext);
+    const quoteUrl="https://api.upstox.com/v3/market-quote/quotes?"+new URLSearchParams({instrument_key:positions.map(p=>p.instrumentKey).join(",")});
+    const upstream=await fetchProvider(quoteUrl,{headers:{Authorization:"Bearer "+accessToken,Accept:"application/json"}});
+    const payload=await upstream.json().catch(()=>null);
+    if(!upstream.ok)return res.status(502).json({error:"Derivative portfolio quotes could not be retrieved.",providerStatus:upstream.status});
+    const quoteEntries=Object.values(payload?.data||{}),quotes=[];
+    for(const p of positions){
+      const entry=quoteEntries.find(x=>x?.instrument_token===p.instrumentKey);
+      const normalized=normalizeProviderQuote(entry,p.instrumentKey,{maxAgeMs:15000});
+      quotes.push({instrumentKey:p.instrumentKey,pricePaise:normalized.pricePaise,observedAtMs:normalized.tradeTimeMs});
+    }
+    const {calculateDerivativePortfolio}=require("./lib/derivative-portfolio");
+    const valuation=calculateDerivativePortfolio({positions,quotes,now:Date.now()});
+    res.set("Cache-Control","private, no-store");
+    res.json({...valuation,cashPaise:account.cashPaise,realizedPnlPaise:account.realizedPnlPaise||0,simulationOnly:true,excludesCharges:true});
+  }catch(error){res.status(errorStatus(error)).json({error:error.status?error.message:"Derivative portfolio valuation could not be loaded."});}
 });
 
 app.get("/paper/orders",async(req,res)=>{
