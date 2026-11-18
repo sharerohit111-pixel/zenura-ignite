@@ -45,3 +45,8 @@ Set `ALLOWED_ORIGINS` to the exact deployed frontend origin. The service intenti
 - The response is validated and returned as a rupee-to-paise margin estimate alongside the user's virtual cash and shortfall.
 - The Stocks UI exposes this only when a futures contract is selected. It is explicitly preview-only: no Firestore write, virtual cash reservation, paper fill, or real broker order occurs.
 - Futures execution remains disabled. Margin estimates are provider estimates and may change; they are not a guarantee of exchange acceptance or reserved funds.
+
+
+### Upstox instrument-master normalization
+
+The current BOD JSON examples publish derivative `expiry` as epoch milliseconds and `tick_size` as numeric values such as `5.0`. The derivative contract validator normalizes millisecond expiry to the India-local calendar date and interprets integer tick values as paise (while accepting legacy sub-₹1 decimal tick fixtures). This is required for tick-aligned quote validation; do not treat the JSON `5.0` tick value as ₹5.00.
