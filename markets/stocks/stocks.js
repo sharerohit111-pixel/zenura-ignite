@@ -294,6 +294,8 @@
           const line=lines.find(x=>x.startsWith('data: '));if(!line)continue;
           try{
             const data=JSON.parse(line.slice(6));
+            if(eventName==='status'&&data.connecting){setFeedStatus('Connecting to live feed','Waiting for the Upstox websocket handshake.');continue;}
+            if(eventName==='status'&&data.connected===true){setFeedStatus('Live feed connected','Upstox websocket is open. Waiting for the first market quote.');continue;}
             if(eventName==='status'&&data.connected===false){setFeedStatus('Live feed disconnected','The Upstox stream closed. Reconnecting automatically.');continue;}
             if(eventName==='error'){setFeedStatus('Live feed error',data.message||'The provider stream reported an error.');continue;}
             const feed=data.feeds?.[item.instrument_key],quote=feed?.ltpc||feed?.fullFeed?.marketFF?.ltpc||feed?.fullFeed?.indexFF?.ltpc;
