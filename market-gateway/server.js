@@ -10,6 +10,7 @@ const {calculatePaperFill}=require("./lib/paper-math");
 const {WATCHLIST_NAMES,normalizeWatchlists,mergeWatchlistUpdate}=require("./lib/watchlists");
 const {isUuid,makeOrderId,makeOrderFingerprint,buildPaperOrderUpdate,assertIdempotentReplay}=require("./lib/order-idempotency");
 const {publicPaperOrder}=require("./lib/paper-order-response");
+const {formatSseEvent,formatSseComment}=require("./lib/sse");
 admin.initializeApp();
 const db=admin.firestore();
 const app=express();
@@ -400,7 +401,7 @@ app.post("/stream",async(req,res)=>{
   let closed=false;
   const writeEvent=(event,payload)=>{
     if(closed||res.destroyed||res.writableEnded)return false;
-    return res.write("event: "+event+"\ndata: "+JSON.stringify(payload)+"\n\n");
+    return res.write(formatSseEvent(event,payload));
   };
   const stop=()=>{
     if(closed)return;
@@ -466,7 +467,7 @@ app.post("/stream",async(req,res)=>{
         if(!res.destroyed&&!res.writableEnded)res.end();
       }
     });
-    heartbeat=setInterval(()=>{if(!closed&&!res.destroyed&&!res.writableEnded)res.write(": keep-alive\n\n");},20000);
+    heartbeat=setInterval(()=>{if(!closed&&!res.destroyed&&!res.writableEnded)res.write(formatSseComment("keep-alive"));},20000);
     res.on("close",stop);
   }catch(error){
     if(!res.headersSent)res.status(errorStatus(error)).json({error:error.status?error.message:"Market feed could not be started."});
