@@ -336,7 +336,7 @@
       }
       if(selected?.instrument_key===item.instrument_key&&!controller.signal.aborted)scheduleReconnect(item);
     }catch(error){
-      if(error.name!=='AbortError'&&selected?.instrument_key===item.instrument_key){setFeedStatus('Live feed unavailable',error.message||'Live feed connection failed.');scheduleReconnect(item);}
+      if(!controller.signal.aborted&&error.name!=='AbortError'&&selected?.instrument_key===item.instrument_key){setFeedStatus('Live feed unavailable',error.message||'Live feed connection failed.');scheduleReconnect(item);}
     }finally{
       if(reader){try{await reader.cancel();}catch(_){}}
       if(streamAbort===controller)streamAbort=null;
