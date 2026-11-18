@@ -5,6 +5,7 @@ const protobuf=require("protobufjs");
 const admin=require("firebase-admin");
 const crypto=require("node:crypto");
 const path=require("node:path");
+const {gunzipSync}=require("node:zlib");
 admin.initializeApp();
 const db=admin.firestore();
 const app=express();
@@ -12,7 +13,7 @@ app.use(express.json({limit:"32kb"}));
 const PORT=process.env.PORT||8080;
 const ENC_KEY=process.env.UPSTOX_TOKEN_ENCRYPTION_KEY;
 const MAX_KEYS=Number(process.env.MAX_INSTRUMENT_KEYS||100);
-let FeedResponse;
+let FeedResponse;\nlet instrumentCache=[];\nlet instrumentCacheUpdatedAt=0;\nconst INSTRUMENTS_URL="https://assets.upstox.com/market-quote/instruments/exchange/complete.json.gz";\nasync function refreshInstrumentCache(){\n  const response=await fetch(INSTRUMENTS_URL,{headers:{Accept:"application/gzip"}});\n  if(!response.ok) throw new Error("Upstox instrument master download failed: "+response.status);\n  const compressed=Buffer.from(await response.arrayBuffer());\n  const parsed=JSON.parse(gunzipSync(compressed).toString("utf8"));\n  if(!Array.isArray(parsed)||!parsed.length||!parsed.every(x=>x&&typeof x.instrument_key==="string"&&typeof x.segment==="string")) throw new Error("Unexpected Upstox instrument master format");\n  instrumentCache=parsed;instrumentCacheUpdatedAt=Date.now();\n  return instrumentCache.length;\n}\nfunction ensureInstrumentCache(){\n  if(!instrumentCache.length||Date.now()-instrumentCacheUpdatedAt>6*60*60*1000){\n    refreshInstrumentCache().catch(error=>console.error("Instrument refresh failed:",error.message));\n  }\n}
 async function loadProto(){
   const root=await protobuf.load(path.join(__dirname,"proto","MarketDataFeedV3.proto"));
   FeedResponse=root.lookupType("com.upstox.marketdatafeederv3udapi.rpc.proto.FeedResponse");
@@ -29,7 +30,7 @@ async function authenticate(req){
   if(!header.startsWith("Bearer ")) throw Object.assign(new Error("Sign in required"),{status:401});
   return admin.auth().verifyIdToken(header.slice(7));
 }
-app.get("/health",(_req,res)=>res.json({ok:true,service:"zenura-indian-market-gateway",feedProtocol:"upstox-v3"}));
+app.get("/health",(_req,res)=>res.json({ok:true,service:"zenura-indian-market-gateway",feedProtocol:"upstox-v3",instrumentMasterLoaded:instrumentCache.length>0,instrumentMasterUpdatedAt:instrumentCacheUpdatedAt||null}));\napp.get("/instruments",async(req,res)=>{\n  try{\n    if(!instrumentCache.length||Date.now()-instrumentCacheUpdatedAt>6*60*60*1000) await refreshInstrumentCache();\n    const kind=String(req.query.kind||"all").toLowerCase();\n    const exchange=String(req.query.exchange||"").toUpperCase();\n    const q=String(req.query.q||"").trim().toLowerCase().slice(0,60);\n    const limit=Math.min(Math.max(Number.parseInt(req.query.limit||"50",10)||50,1),100);\n    const matches=instrumentCache.filter(item=>{\n      if(exchange&&item.exchange!==exchange)return false;\n      if(kind==="equities"&&!(item.instrument_type==="EQ"&&["NSE_EQ","BSE_EQ"].includes(item.segment)))return false;\n      if(kind==="indices"&&!(item.instrument_type==="INDEX"&&["NSE_INDEX","BSE_INDEX"].includes(item.segment)))return false;\n      if(kind==="futures"&&item.instrument_type!=="FUT")return false;\n      if(kind==="options"&&!["CE","PE"].includes(item.instrument_type))return false;\n      if(q&&!String(item.trading_symbol||"").toLowerCase().includes(q)&&!String(item.name||"").toLowerCase().includes(q)&&!String(item.underlying_symbol||"").toLowerCase().includes(q))return false;\n      return true;\n    }).slice(0,limit).map(item=>({instrument_key:item.instrument_key,segment:item.segment,exchange:item.exchange,name:item.name,trading_symbol:item.trading_symbol,instrument_type:item.instrument_type,expiry:item.expiry??null,strike_price:item.strike_price??null,lot_size:item.lot_size??null,tick_size:item.tick_size??null,underlying_symbol:item.underlying_symbol??null}));\n    res.set("Cache-Control","public, max-age=60");\n    res.json({source:"Upstox BOD instrument master",updatedAt:instrumentCacheUpdatedAt,count:matches.length,results:matches});\n  }catch(error){console.error("Instrument query failed:",error.message);res.status(503).json({error:"Official instrument master is temporarily unavailable."});}\n});
 app.post("/stream",async(req,res)=>{
   let upstream;
   try{
@@ -79,4 +80,4 @@ app.post("/stream",async(req,res)=>{
     try{upstream?.close();}catch(_){}
   }
 });
-loadProto().then(()=>app.listen(PORT,"0.0.0.0",()=>console.log("Indian market gateway listening on",PORT))).catch(error=>{console.error("Proto load failed",error);process.exit(1);});
+loadProto().then(()=>{\n  app.listen(PORT,"0.0.0.0",()=>console.log("Indian market gateway listening on",PORT));\n  ensureInstrumentCache();\n}).catch(error=>{console.error("Proto load failed",error);process.exit(1);});
