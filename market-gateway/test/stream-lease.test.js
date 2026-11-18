@@ -54,3 +54,18 @@ test("lease helpers reject invalid collection names",async()=>{
  assert.equal(await renewStreamLease(db,"u1","a",{now:1000,collection:""}),false);
  assert.equal(await releaseStreamLease(db,"u1","a",{collection:""}),false);
 });
+
+test("malformed lease expiry cannot be renewed",async()=>{
+ const db=fakeDb();
+ const ref="indianMarketStreamLeases/u1";
+ db.docs.set(ref,{uid:"u1",leaseId:"broken",expiresAtMs:"not-a-timestamp"});
+ assert.equal(await renewStreamLease(db,"u1","broken",{now:1000}),false);
+});
+test("lease renewal requires matching owner and a safe future expiry",async()=>{
+ const db=fakeDb();
+ const ref="indianMarketStreamLeases/u1";
+ db.docs.set(ref,{uid:"someone-else",leaseId:"lease-a",expiresAtMs:5000});
+ assert.equal(await renewStreamLease(db,"u1","lease-a",{now:1000}),false);
+ db.docs.set(ref,{uid:"u1",leaseId:"lease-a",expiresAtMs:Number.MAX_SAFE_INTEGER+1});
+ assert.equal(await renewStreamLease(db,"u1","lease-a",{now:1000}),false);
+});
