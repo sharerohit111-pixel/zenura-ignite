@@ -105,7 +105,7 @@ test("rejects malformed account state and future-dated quote",async()=>{
 
 test("SELL closes a long option, credits premium net of estimated charges, and realizes P&L",async()=>{
  const account={...initial,derivativePositions:{[instrument.instrument_key]:{
-  instrumentType:"CE",netQuantity:65,averagePricePaise:1250,exchange:"NSE",segment:"NSE_FO",expiry:"2026-11-26",lotSize:65
+  instrumentType:"CE",netQuantity:65,averagePricePaise:1287,exchange:"NSE",segment:"NSE_FO",expiry:"2026-11-26",lotSize:65
  }}};
  const {common,writes}=setup({account});
  common.side="SELL";
@@ -116,7 +116,7 @@ test("SELL closes a long option, credits premium net of estimated charges, and r
  assert.equal(writes[0][2].netCreditPaise,96953);
  assert.equal(writes[1][2].cashPaise,1096953);
  assert.deepEqual(writes[1][2].derivativePositions,{});
- assert.equal(writes[1][2].realizedPnlPaise,16250);
+ assert.equal(writes[1][2].realizedPnlPaise,13298);
  assert.equal(r.idempotentReplay,false);
 });
 
