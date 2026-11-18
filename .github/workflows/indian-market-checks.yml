@@ -54,5 +54,7 @@ jobs:
         run: |
           node -e "JSON.parse(require('node:fs').readFileSync('firebase.json','utf8'))"
           node -e "JSON.parse(require('node:fs').readFileSync('firestore.indexes.json','utf8'))"
+      - name: Install gateway test dependencies
+        run: npm install --prefix market-gateway --ignore-scripts --no-audit --no-fund
       - name: Run gateway unit tests
         run: node --test market-gateway/test/*.test.js
