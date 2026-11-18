@@ -250,7 +250,13 @@
       if(selected?.instrument_key!==instrumentKey)return;
       const response=await fetch(gateway+'/paper/derivative/margin-preview',{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json',Accept:'application/json'},body:JSON.stringify({instrument_key:instrumentKey,lots,side,product})});
       const data=await response.json();
-      if(!response.ok)throw new Error(data.error||'Broker margin preview failed.');
+      if(!response.ok){
+        const retryAfter=Number.parseInt(response.headers.get('Retry-After')||'',10);
+        const message=response.status===429&&Number.isSafeInteger(retryAfter)&&retryAfter>0
+          ?'Please wait '+retryAfter+' second(s) before requesting another margin preview.'
+          :(data.error||'Broker margin preview failed.');
+        throw new Error(message);
+      }
       if(selected?.instrument_key!==instrumentKey)return;
       const required=inrPaise(data.requiredMarginPaise),cash=inrPaise(data.availableVirtualCashPaise),shortfall=inrPaise(data.shortfallPaise);
       const finalText=data.finalMarginPaise===null?'':' · Final margin '+inrPaise(data.finalMarginPaise);
