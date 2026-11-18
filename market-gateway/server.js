@@ -12,6 +12,7 @@ const {isUuid,makeOrderId,makeOrderFingerprint}=require("./lib/order-idempotency
 const {publicPaperOrder}=require("./lib/paper-order-response");
 const {formatSseEvent,formatSseComment}=require("./lib/sse");
 const {quoteAgeMs,isFreshQuote}=require("./lib/quote-freshness");
+const {validateStreamInstrumentKeys}=require("./lib/stream-subscription");
 admin.initializeApp();
 const db=admin.firestore();
 const app=express();
@@ -407,10 +408,11 @@ app.post("/stream",async(req,res)=>{
   };
   try{
     const decoded=await authenticate(req);
-    const keys=[...new Set(Array.isArray(req.body?.instrumentKeys)?req.body.instrumentKeys:[])];
+    if(!instrumentCache.length||Date.now()-instrumentCacheUpdatedAt>6*60*60*1000)await refreshInstrumentCache();
+    let keys;
+    try{keys=validateStreamInstrumentKeys(req.body?.instrumentKeys,instrumentCache.map(item=>item.instrument_key),MAX_KEYS);}
+    catch(error){return res.status(error.status||400).json({error:error.message});}
     const mode=req.body?.mode||"ltpc";
-    if(!keys.length||keys.length>MAX_KEYS||keys.some(k=>typeof k!=="string"||!k||k.length>100||/[\u0000-\u001F]/.test(k)))
-      return res.status(400).json({error:"Provide a valid instrumentKeys list within the configured per-session limit."});
     if(!["ltpc","full","option_greeks"].includes(mode)) return res.status(400).json({error:"Unsupported feed mode."});
     const connection=await db.collection("upstoxConnections").doc(decoded.uid).get();
     if(!connection.exists) return res.status(403).json({error:"Upstox account is not connected."});
