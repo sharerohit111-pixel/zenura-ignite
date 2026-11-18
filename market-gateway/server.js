@@ -393,7 +393,7 @@ app.get("/paper/derivatives/portfolio",async(req,res)=>{
     if(positions.length>50)return res.status(409).json({error:"More than 50 open derivative positions; valuation stopped."});
     if(!positions.length){
       res.set("Cache-Control","private, no-store");
-      return res.json({positions:[],cashPaise:account.cashPaise,marketValuePaise:0,unrealizedPnlPaise:0,reservedMarginPaise:0,realizedPnlPaise:account.realizedPnlPaise||0,valuationStatus:"no_open_positions",simulationOnly:true,excludesCharges:true});
+      return res.json({positions:[],cashPaise:account.cashPaise,marketValuePaise:0,unrealizedPnlPaise:0,reservedMarginPaise:0,realizedPnlPaise:account.realizedPnlPaise||0,valuationStatus:"no_open_positions",simulationOnly:true,includesEntryCharges:true,excludesEstimatedExitCharges:true});
     }
     if(!instrumentCache.length||Date.now()-instrumentCacheUpdatedAt>6*60*60*1000)await refreshInstrumentCache();
     for(const p of positions){
