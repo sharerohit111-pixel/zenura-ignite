@@ -19,6 +19,7 @@ const {acquireStreamLease,renewStreamLease,releaseStreamLease}=require("./lib/st
 const {writeSseFrame,resumeUpstream}=require("./lib/stream-backpressure");
 const {createStreamLifecycle}=require("./lib/stream-lifecycle");
 const {sendUpstoxSubscription}=require("./lib/upstox-subscription");
+const {decodeFeedResponse}=require("./lib/upstox-feed-decoder");
 admin.initializeApp();
 const db=admin.firestore();
 const app=express();
@@ -476,9 +477,7 @@ app.post("/stream",async(req,res)=>{
       if(lifecycle.closed||res.destroyed||res.writableEnded)return;
       if(!isBinary){writeEvent("upstream",{message:String(bytes).slice(0,500)});return;}
       try{
-        const message=FeedResponse.decode(bytes);
-        const object=FeedResponse.toObject(message,{longs:String,enums:String,defaults:false,oneofs:true});
-        writeEvent("market",object);
+        writeEvent("market",decodeFeedResponse(FeedResponse,bytes));
       }catch(error){
         writeEvent("error",{message:"Market feed decode failed"});
       }
