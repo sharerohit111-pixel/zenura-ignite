@@ -286,6 +286,15 @@
     });
   }
   let optionChainRequest=0;
+  function resetOptionChain(message){
+    optionChainRequest++;
+    optionButton.disabled=false;
+    optionBody.textContent='';
+    const tr=document.createElement('tr'),td=document.createElement('td');
+    td.colSpan=11;td.className='option-empty';td.textContent='Choose an underlying instrument and load a real option chain.';
+    tr.append(td);optionBody.append(tr);
+    optionStatus.textContent=message;
+  }
   async function loadOptionChain(){
     if(!selected){optionStatus.textContent='Select an underlying instrument first';return;}
     if(!['NSE_INDEX','BSE_INDEX','NSE_EQ','BSE_EQ'].includes(selected.segment)){optionStatus.textContent='Option chain requires an NSE/BSE index or cash-equity underlying, not an option or futures contract.';return;}
@@ -385,7 +394,7 @@
   async function select(item,isReconnect=false){
     clearFeedTimers();
     if(streamAbort){streamAbort.abort();streamAbort=null;}
-    selected=item;if(futuresMarginStatus)futuresMarginStatus.textContent=item.instrument_type==='FUT'?'Selected '+(item.trading_symbol||'futures contract')+'. Request a fresh broker margin preview.':'Select a verified futures contract from the Futures watchlist.';updateFuturesMarginButton();chartRequest++;lastQuoteText='';if(!isReconnect)reconnectAttempt=0;title.textContent=item.trading_symbol||item.name;symbol.textContent=item.instrument_key;price.textContent='—';
+    selected=item;resetOptionChain('Underlying changed. Load the option chain for the selected instrument.');if(futuresMarginStatus)futuresMarginStatus.textContent=item.instrument_type==='FUT'?'Selected '+(item.trading_symbol||'futures contract')+'. Request a fresh broker margin preview.':'Select a verified futures contract from the Futures watchlist.';updateFuturesMarginButton();chartRequest++;lastQuoteText='';if(!isReconnect)reconnectAttempt=0;title.textContent=item.trading_symbol||item.name;symbol.textContent=item.instrument_key;price.textContent='—';
     setFeedStatus('Waiting for verified live quote','Connecting to Upstox V3 feed. Prices will appear only when received from the provider.');
     render(items);updatePaperButtons();renderSavedWatchlist();loadCandles();
     const connector=window.ZENURA_MARKET_CONNECTOR;
@@ -444,7 +453,7 @@
   }
   tabs.forEach(tab=>tab.addEventListener('click',()=>{
     clearFeedTimers();if(streamAbort){streamAbort.abort();streamAbort=null;}
-    tabs.forEach(x=>x.classList.toggle('active',x===tab));activeList=tab.dataset.list;selected=null;updateFuturesMarginButton();chartRequest++;
+    tabs.forEach(x=>x.classList.toggle('active',x===tab));activeList=tab.dataset.list;selected=null;resetOptionChain('Select an underlying instrument to load an option chain.');updateFuturesMarginButton();chartRequest++;
     title.textContent='No instrument selected';symbol.textContent='Choose an instrument';price.textContent='—';updatePaperButtons();renderSavedWatchlist();loadInstruments();
   }));
   search.addEventListener('input',()=>{clearTimeout(debounce);debounce=setTimeout(loadInstruments,250);});
