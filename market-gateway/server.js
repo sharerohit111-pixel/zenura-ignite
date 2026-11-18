@@ -15,6 +15,7 @@ const {quoteAgeMs,isFreshQuote}=require("./lib/quote-freshness");
 const {normalizeProviderQuote}=require("./lib/provider-quote");
 const {validateStreamInstrumentKeys}=require("./lib/stream-subscription");
 const {reserveUserStream,releaseUserStream}=require("./lib/stream-registry");
+const {acquireStreamLease,renewStreamLease,releaseStreamLease}=require("./lib/stream-lease");
 admin.initializeApp();
 const db=admin.firestore();
 const app=express();
@@ -401,6 +402,8 @@ app.post("/stream",async(req,res)=>{
   let closed=false;
   let streamUid=null;
   let streamReservation=null;
+  let streamLeaseId=null;
+  let streamLeaseAcquired=false;
   const writeEvent=(event,payload)=>{
     if(closed||res.destroyed||res.writableEnded)return false;
     return res.write(formatSseEvent(event,payload));
@@ -410,6 +413,7 @@ app.post("/stream",async(req,res)=>{
     closed=true;
     if(heartbeat)clearInterval(heartbeat);
     if(streamUid&&streamReservation)releaseUserStream(activeUserStreams,streamUid,streamReservation);
+    if(streamLeaseAcquired&&streamUid&&streamLeaseId)releaseStreamLease(db,streamUid,streamLeaseId).catch(()=>{});
     if(upstream&&upstream.readyState<WebSocket.CLOSING)upstream.close();
   };
   res.on("close",stop);
@@ -419,6 +423,10 @@ app.post("/stream",async(req,res)=>{
     streamUid=decoded.uid;
     streamReservation=reserveUserStream(activeUserStreams,streamUid);
     if(!streamReservation)return res.status(429).json({error:"A live market stream is already active for this account. Close it before reconnecting."});
+    streamLeaseId=crypto.randomUUID();
+    streamLeaseAcquired=await acquireStreamLease(db,streamUid,streamLeaseId);
+    if(!streamLeaseAcquired)return res.status(429).json({error:"A live market stream is already active for this account. Close it before reconnecting."});
+    if(closed||res.destroyed||res.writableEnded){await releaseStreamLease(db,streamUid,streamLeaseId);streamLeaseAcquired=false;return;}
     if(!instrumentCache.length||Date.now()-instrumentCacheUpdatedAt>6*60*60*1000)await refreshInstrumentCache();
     let keys;
     try{keys=validateStreamInstrumentKeys(req.body?.instrumentKeys,instrumentCache.map(item=>item.instrument_key),MAX_KEYS);}
@@ -476,7 +484,16 @@ app.post("/stream",async(req,res)=>{
         if(!res.destroyed&&!res.writableEnded)res.end();
       }
     });
-    heartbeat=setInterval(()=>{if(!closed&&!res.destroyed&&!res.writableEnded)res.write(formatSseComment("keep-alive"));},20000);
+    heartbeat=setInterval(async()=>{
+      if(closed||res.destroyed||res.writableEnded)return;
+      try{
+        const renewed=await renewStreamLease(db,streamUid,streamLeaseId);
+        if(!renewed){writeEvent("error",{message:"Live market stream lease expired. Reconnect to continue."});stop();if(!res.destroyed&&!res.writableEnded)res.end();return;}
+        if(!closed&&!res.destroyed&&!res.writableEnded)res.write(formatSseComment("keep-alive"));
+      }catch(error){
+        writeEvent("error",{message:"Live market stream lease could not be renewed."});stop();if(!res.destroyed&&!res.writableEnded)res.end();
+      }
+    },20000);
   }catch(error){
     if(!res.headersSent)res.status(errorStatus(error)).json({error:error.status?error.message:"Market feed could not be started."});
     else{writeEvent("error",{message:"Market feed stopped unexpectedly"});if(!res.writableEnded)res.end();}
