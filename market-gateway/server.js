@@ -6,6 +6,7 @@ const admin=require("firebase-admin");
 const crypto=require("node:crypto");
 const path=require("node:path");
 const {gunzipSync}=require("node:zlib");
+const {calculatePaperFill}=require("./lib/paper-math");
 admin.initializeApp();
 const db=admin.firestore();
 const app=express();
@@ -240,30 +241,11 @@ app.post("/paper/orders",async(req,res)=>{
       if(!accountSnap.exists)throw Object.assign(new Error("Paper account is not initialized."),{status:409});
       const account=accountSnap.data(),positions={...(account.positions||{})},position={...(positions[instrumentKey]||{quantity:0,averagePricePaise:0})};
       let cash=account.cashPaise,realizedPnlPaise=account.realizedPnlPaise||0,orderRealizedPnlPaise=0;
-      if(!Number.isSafeInteger(cash)||cash<0||!Number.isSafeInteger(realizedPnlPaise))throw Object.assign(new Error("Paper account balance is invalid; contact support."),{status:409});
-      if(!Number.isSafeInteger(position.quantity)||position.quantity<0||position.quantity>1000000||!Number.isSafeInteger(position.averagePricePaise)||position.averagePricePaise<0)
-        throw Object.assign(new Error("Existing position quantity or cost is invalid; contact support."),{status:409});
-      if(side==="BUY"){
-        if(cash<grossPaise)throw Object.assign(new Error("Insufficient virtual cash balance."),{status:409});
-        const nextQty=position.quantity+quantity,weightedCost=position.quantity*position.averagePricePaise+grossPaise;
-        if(!Number.isSafeInteger(nextQty)||nextQty>1000000||!Number.isSafeInteger(weightedCost)||weightedCost<0)
-          throw Object.assign(new Error("Position quantity or weighted cost exceeds supported calculation limits."),{status:409});
-        const nextAverage=Math.round(weightedCost/nextQty),nextCash=cash-grossPaise;
-        if(!Number.isSafeInteger(nextAverage)||!Number.isSafeInteger(nextCash)||nextCash<0)
-          throw Object.assign(new Error("BUY order exceeds safe account calculation limits."),{status:409});
-        position.averagePricePaise=nextAverage;position.quantity=nextQty;cash=nextCash;
-      }else{
-        if(position.quantity<quantity)throw Object.assign(new Error("Not enough shares in the virtual portfolio to sell."),{status:409});
-        orderRealizedPnlPaise=(pricePaise-position.averagePricePaise)*quantity;
-        const nextCash=cash+grossPaise,nextRealized=realizedPnlPaise+orderRealizedPnlPaise;
-        if(!Number.isSafeInteger(nextCash)||!Number.isSafeInteger(orderRealizedPnlPaise)||!Number.isSafeInteger(nextRealized))
-          throw Object.assign(new Error("SELL order exceeds safe account calculation limits."),{status:409});
-        position.quantity-=quantity;cash=nextCash;realizedPnlPaise=nextRealized;
-        if(position.quantity===0)delete positions[instrumentKey];
-        else positions[instrumentKey]=position;
-      }
+      const fill=calculatePaperFill({side,quantity,pricePaise,cashPaise:cash,realizedPnlPaise,position});
+      cash=fill.cashPaise;realizedPnlPaise=fill.realizedPnlPaise;orderRealizedPnlPaise=fill.orderRealizedPnlPaise;
+      if(fill.position.quantity===0)delete positions[instrumentKey];else positions[instrumentKey]=fill.position;
       if(side==="BUY")positions[instrumentKey]=position;
-      const order={uid:decoded.uid,instrumentKey,tradingSymbol:instrument.trading_symbol||instrument.name,exchange:instrument.exchange,side,quantity,executionPricePaise:pricePaise,grossPaise,quoteTimestampMs:tradeTime,quoteAgeMs:quoteAge,realizedPnlPaise:orderRealizedPnlPaise,orderType:"MARKET",status:"FILLED",simulationOnly:true,createdAt:admin.firestore.FieldValue.serverTimestamp()};
+      const order={uid:decoded.uid,instrumentKey,tradingSymbol:instrument.trading_symbol||instrument.name,exchange:instrument.exchange,side,quantity,executionPricePaise:pricePaise,grossPaise:fill.grossPaise,quoteTimestampMs:tradeTime,quoteAgeMs:quoteAge,realizedPnlPaise:orderRealizedPnlPaise,orderType:"MARKET",status:"FILLED",simulationOnly:true,createdAt:admin.firestore.FieldValue.serverTimestamp()};
       tx.create(orderRef,order);
       tx.update(accountRef,{cashPaise:cash,positions,realizedPnlPaise,updatedAt:admin.firestore.FieldValue.serverTimestamp(),version:(account.version||1)+1});
       result={orderId:orderRef.id,...order,cashPaise:cash,realizedPnlTotalPaise:realizedPnlPaise};
