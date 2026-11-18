@@ -155,3 +155,6 @@ exports.authorizePaperOrder=onCall({region:"asia-south1"},async req=>{
   if(!trial&&!premium) throw new HttpsError("permission-denied","Demo ended. Activate Premium to place orders.");
   return {authorized:true};
 });
+
+// Indian Stock Market backend is isolated in its own module.
+Object.assign(exports, require("./indian-market"));
