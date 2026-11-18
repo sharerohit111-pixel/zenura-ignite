@@ -36,3 +36,21 @@ test("expired lease cannot be renewed",async()=>{
  await acquireStreamLease(db,"u1","a",{now:1000,leaseMs:1000});
  assert.equal(await renewStreamLease(db,"u1","a",{now:2000}),false);
 });
+
+test("lease acquisition and renewal reject unsafe timing bounds",async()=>{
+ const db=fakeDb();
+ assert.equal(await acquireStreamLease(db,"u1","bad-now",{now:1.5}),false);
+ assert.equal(await acquireStreamLease(db,"u1","bad-duration",{now:1000,leaseMs:999}),false);
+ assert.equal(await acquireStreamLease(db,"u1","overflow",{now:Number.MAX_SAFE_INTEGER-500,leaseMs:1000}),false);
+ await acquireStreamLease(db,"u1","valid",{now:1000,leaseMs:2000});
+ assert.equal(await renewStreamLease(db,"u1","valid",{now:1100,leaseMs:0}),false);
+ assert.equal(await renewStreamLease(db,"u1","valid",{now:1100,leaseMs:1000.5}),false);
+ assert.equal(await renewStreamLease(db,"u1","valid",{now:Number.MAX_SAFE_INTEGER-500,leaseMs:1000}),false);
+ assert.equal(db.docs.get("indianMarketStreamLeases/u1").expiresAtMs,3000);
+});
+test("lease helpers reject invalid collection names",async()=>{
+ const db=fakeDb();
+ assert.equal(await acquireStreamLease(db,"u1","a",{now:1000,collection:""}),false);
+ assert.equal(await renewStreamLease(db,"u1","a",{now:1000,collection:""}),false);
+ assert.equal(await releaseStreamLease(db,"u1","a",{collection:""}),false);
+});
