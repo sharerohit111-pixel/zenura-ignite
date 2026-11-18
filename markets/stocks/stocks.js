@@ -262,6 +262,7 @@
     }catch(error){if(request===optionChainRequest&&selected?.instrument_key===instrumentKey&&optionExpiry.value===expiry)optionStatus.textContent=error.message||'Option chain request failed.';}
     finally{if(request===optionChainRequest)optionButton.disabled=false;}
   }
+  let pendingDerivativeOrder=null;
   async function submitDerivativeOrder(instrumentKey,type,strike){
     const connector=window.ZENURA_MARKET_CONNECTOR;
     if(!gateway||!connector?.getIdToken){optionStatus.textContent='Sign in and connect Upstox before placing a paper order.';return;}
@@ -270,10 +271,13 @@
     const lots=Number(lotsRaw);
     if(!Number.isSafeInteger(lots)||lots<1||lots>10000){optionStatus.textContent='Enter a whole number of lots from 1 to 10,000.';return;}
     if(!window.crypto?.randomUUID){optionStatus.textContent='A secure order request ID could not be created in this browser.';return;}
+    const fingerprint=instrumentKey+'|BUY|'+lots;
+    if(!pendingDerivativeOrder||pendingDerivativeOrder.fingerprint!==fingerprint)pendingDerivativeOrder={fingerprint,key:window.crypto.randomUUID()};
     optionButton.disabled=true;optionStatus.textContent='Verifying live option quote and placing simulated '+type+' BUY…';
     try{
-      const token=await connector.getIdToken(),response=await fetch(gateway+'/paper/derivative/orders',{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json',Accept:'application/json'},body:JSON.stringify({instrument_key:instrumentKey,side:'BUY',lots,idempotency_key:window.crypto.randomUUID()})});
-      const data=await response.json();if(!response.ok)throw new Error(data.error||'Derivative paper order rejected.');
+      const token=await connector.getIdToken(),response=await fetch(gateway+'/paper/derivative/orders',{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json',Accept:'application/json'},body:JSON.stringify({instrument_key:instrumentKey,side:'BUY',lots,idempotency_key:pendingDerivativeOrder.key})});
+      const data=await response.json();if(!response.ok){if(response.status>=400&&response.status<500)pendingDerivativeOrder=null;throw new Error(data.error||'Derivative paper order rejected.');}
+      pendingDerivativeOrder=null;
       optionStatus.textContent='SIMULATED BUY FILLED · '+data.tradingSymbol+' · '+data.quantity+' units · Premium '+inrPaise(data.grossPaise)+' · Estimated charges '+inrPaise(data.chargesPaise)+' · Total debit '+inrPaise(data.totalDebitPaise)+'.';
       await loadPaperAccount();await refreshPaperViews();
     }catch(error){optionStatus.textContent=error.message||'Derivative paper order failed.';}
