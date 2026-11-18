@@ -27,6 +27,9 @@ test("does not automatically retry authorization failures",()=>{
 test("retries transient server, rate-limit and network-like statuses",()=>{
   for(const status of [0,408,429,500,502,503,504])assert.equal(shouldRetryFeedStatus(status),true);
 });
+test("does not retry permanent client errors",()=>{
+  for(const status of [400,401,403,404,405,409,422])assert.equal(shouldRetryFeedStatus(status),false);
+});
 test("rejects invalid status values from retry classification",()=>{
   assert.equal(shouldRetryFeedStatus("500"),false);
   assert.equal(shouldRetryFeedStatus(null),false);
