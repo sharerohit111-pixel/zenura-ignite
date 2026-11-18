@@ -18,6 +18,10 @@ service cloud.firestore {
     match /razorpayEvents/{eventId} {
       allow read, write: if false;
     }
+    // OAuth states and encrypted broker credentials are server-only; never expose them to browser clients.
+    match /upstoxOAuthStates/{stateId} { allow read, write: if false; }
+    match /upstoxConnections/{uid} { allow read, write: if false; }
+
     // Indian paper-trading balances and orders are server-only; clients use authenticated gateway APIs.
     match /indianPaperAccounts/{uid} { allow read, write: if false; }
     match /indianPaperOrders/{orderId} { allow read, write: if false; }
