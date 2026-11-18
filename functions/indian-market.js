@@ -7,6 +7,7 @@ const { defineSecret } = require("firebase-functions/params");
 const { onCall, onRequest, HttpsError } = require("firebase-functions/v2/https");
 const logger = require("firebase-functions/logger");
 const { connectionStatus } = require("./lib/upstox-connection-status");
+const { isOAuthStateUsable } = require("./lib/upstox-oauth-state");
 const db = getFirestore();
 const CLIENT_ID = defineSecret("UPSTOX_CLIENT_ID");
 const CLIENT_SECRET = defineSecret("UPSTOX_CLIENT_SECRET");
@@ -52,7 +53,7 @@ exports.upstoxOAuthCallback = onRequest(
       const snap=await stateRef.get();
       if(!snap.exists) return res.status(400).send("Authorization session not found.");
       const stateData=snap.data();
-      if(stateData.used||!stateData.expiresAt||stateData.expiresAt.toMillis()<=Date.now())
+      if(!isOAuthStateUsable(stateData))
         return res.status(400).send("Authorization session expired. Start again.");
       const form=new URLSearchParams({
         code,client_id:CLIENT_ID.value(),client_secret:CLIENT_SECRET.value(),
@@ -70,7 +71,7 @@ exports.upstoxOAuthCallback = onRequest(
       const encrypted=encryptToken(payload.access_token);
       await db.runTransaction(async tx=>{
         const fresh=await tx.get(stateRef);
-        if(!fresh.exists||fresh.data().used||fresh.data().expiresAt.toMillis()<=Date.now())
+        if(!fresh.exists||!isOAuthStateUsable(fresh.data()))
           throw new Error("OAuth state already used or expired.");
         const accountRef=db.collection("upstoxConnections").doc(stateData.uid);
         tx.set(accountRef,{
