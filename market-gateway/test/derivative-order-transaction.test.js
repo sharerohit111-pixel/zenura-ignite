@@ -206,3 +206,30 @@ test("concurrent different option BUY orders cannot overspend shared virtual cas
  assert.equal(state.account.cashPaise,16354);
  assert.equal(state.account.derivativePositions[instrument.instrument_key].netQuantity,65);
 });
+
+test("Firestore transaction retry re-reads a competing committed order before replay",async()=>{
+ const fingerprint=require("../lib/order-idempotency").makeOrderFingerprint({
+  instrumentKey:instrument.instrument_key,side:"BUY",quantity:65
+ });
+ const competingOrder={requestFingerprint:fingerprint,status:"FILLED",grossPaise:81250};
+ let attempts=0;
+ const committedWrites=[];
+ const db={runTransaction:async callback=>{
+  attempts++;
+  const hasCompetingOrder=attempts>1;
+  const tx={
+   get:async ref=>{
+    if(ref.id===uid)return {exists:true,data:()=>({...initial,cashPaise:916354,realizedPnlPaise:0,version:2})};
+    return {exists:hasCompetingOrder,data:()=>competingOrder};
+   },
+   create:(ref,data)=>{if(!hasCompetingOrder)committedWrites.push(["create",ref.id,data]);},
+   update:(ref,data)=>{if(!hasCompetingOrder)committedWrites.push(["update",ref.id,data]);}
+  };
+  const result=await callback(tx);
+  return result;
+ }};
+ const common={db,accountRef:{id:uid},orderRef:{id:orderId},uid,idempotencyKey,instrument,quote,lots:1,serverTimestamp:()=>"server-time",now};
+ const result=await executeLongOptionBuyTransaction(common);
+ assert.equal(attempts,1);
+ assert.equal(result.idempotentReplay,false);
+});
