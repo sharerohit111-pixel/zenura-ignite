@@ -48,3 +48,7 @@ test("option sell reports a negative net settlement when charges exceed tiny pre
  assert.equal(c.netCreditPaise,c.grossPaise-c.totalChargesPaise);
  assert.ok(c.netCreditPaise<0);
 });
+test("NSE option exchange charge uses the current 0.03553% premium turnover rate",()=>{
+ const c=calculateLongOptionBuyCharges({grossPaise:100000000,exchange:"NSE"});
+ assert.equal(c.exchangeTransactionPaise,35530);
+});
