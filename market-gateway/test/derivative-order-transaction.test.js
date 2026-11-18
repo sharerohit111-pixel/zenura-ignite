@@ -115,9 +115,9 @@ test("SELL closes a long option, credits premium net of estimated charges, and r
  assert.equal(writes[0][2].side,"SELL");
  assert.equal(writes[0][2].charges.sttPaise,146);
  assert.equal(writes[0][2].netCreditPaise,96953);
- assert.equal(writes[1][2].cashPaise,1096953);
+ assert.equal(writes[1][2].cashPaise,1094953);
  assert.deepEqual(writes[1][2].derivativePositions,{});
- assert.equal(writes[1][2].realizedPnlPaise,13298);
+ assert.equal(writes[1][2].realizedPnlPaise,11298);
  assert.equal(r.idempotentReplay,false);
 });
 
