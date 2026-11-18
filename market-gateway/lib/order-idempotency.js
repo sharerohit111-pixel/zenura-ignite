@@ -10,9 +10,18 @@ function makeOrderFingerprint({instrumentKey,side,quantity}){
   throw Object.assign(new Error("Invalid order request fingerprint."),{status:400});
  return crypto.createHash("sha256").update(JSON.stringify({instrumentKey,side,quantity})).digest("hex");
 }
+function buildPaperOrderUpdate(account,{instrumentKey,side,quantity,pricePaise}){
+ if(!account||typeof account!=="object"||!account.positions||typeof account.positions!=="object"||Array.isArray(account.positions))
+  throw Object.assign(new Error("Invalid paper account state."),{status:409});
+ const {calculatePaperFill}=require("./paper-math");
+ const positions={...account.positions},position={...(positions[instrumentKey]||{quantity:0,averagePricePaise:0})};
+ const fill=calculatePaperFill({side,quantity,pricePaise,cashPaise:account.cashPaise,realizedPnlPaise:account.realizedPnlPaise??0,position});
+ if(fill.position.quantity===0)delete positions[instrumentKey];else positions[instrumentKey]=fill.position;
+ return {cashPaise:fill.cashPaise,realizedPnlPaise:fill.realizedPnlPaise,positions,orderRealizedPnlPaise:fill.orderRealizedPnlPaise,grossPaise:fill.grossPaise,version:(Number.isSafeInteger(account.version)&&account.version>0?account.version:1)+1};
+}
 function assertIdempotentReplay(existingOrder,requestFingerprint){
  if(!existingOrder||existingOrder.requestFingerprint!==requestFingerprint)
   throw Object.assign(new Error("This idempotency key was already used for a different order. Submit a new order with a new key."),{status:409});
  return true;
 }
-module.exports={isUuid,makeOrderId,makeOrderFingerprint,assertIdempotentReplay};
+module.exports={isUuid,makeOrderId,makeOrderFingerprint,buildPaperOrderUpdate,assertIdempotentReplay};
