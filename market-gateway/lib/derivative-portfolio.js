@@ -24,7 +24,8 @@ function calculateDerivativePortfolio({positions,quotes,marginSnapshots=[],now=D
   const costBasisPaise=p.costBasisPaise===undefined
    ?Math.abs(p.netQuantity)*p.averagePricePaise:p.costBasisPaise;
   if(!Number.isSafeInteger(costBasisPaise)||costBasisPaise<0||
-     (p.netQuantity>0&&costBasisPaise<1))fail("Derivative position cost basis is invalid.");
+     (p.netQuantity>0&&costBasisPaise<1)||
+     (p.netQuantity>0&&Math.round(costBasisPaise/p.netQuantity)!==p.averagePricePaise))fail("Derivative position cost basis is invalid or inconsistent with its average price.");
   const pnl=p.netQuantity>0&&["CE","PE"].includes(p.instrumentType)
    ?signedValue-costBasisPaise
    :(q.pricePaise-p.averagePricePaise)*p.netQuantity;
