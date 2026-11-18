@@ -385,11 +385,18 @@ app.get("/paper/derivatives/portfolio",async(req,res)=>{
     const decoded=await authenticate(req),accountSnap=await paperAccountRef(decoded.uid).get();
     if(!accountSnap.exists)return res.status(404).json({error:"Indian paper account has not been initialized."});
     const account=accountSnap.data(),raw=account.derivativePositions||{};
+    if(!Number.isSafeInteger(account.cashPaise)||account.cashPaise<0||!Number.isSafeInteger(account.realizedPnlPaise??0))
+      return res.status(409).json({error:"Shared paper account contains invalid balance data."});
     if(!raw||typeof raw!=="object"||Array.isArray(raw))return res.status(409).json({error:"Derivative position storage is invalid."});
-    const positions=Object.entries(raw).filter(([,p])=>p&&p.netQuantity!==0).map(([instrumentKey,p])=>({
-      instrumentKey,instrumentType:p.instrumentType,netQuantity:p.netQuantity,
-      averagePricePaise:p.averagePricePaise
-    }));
+    const positions=[];
+    for(const [instrumentKey,p] of Object.entries(raw)){
+      if(!instrumentKey||!p||typeof p!=="object"||!["CE","PE"].includes(p.instrumentType)||
+         !Number.isSafeInteger(p.netQuantity)||p.netQuantity<0||p.netQuantity>1000000||
+         !Number.isSafeInteger(p.averagePricePaise)||p.averagePricePaise<0||
+         (p.netQuantity>0&&p.averagePricePaise<1)||(p.netQuantity===0&&p.averagePricePaise!==0))
+        return res.status(409).json({error:"A stored derivative position is malformed; valuation stopped to protect account totals."});
+      if(p.netQuantity>0)positions.push({instrumentKey,instrumentType:p.instrumentType,netQuantity:p.netQuantity,averagePricePaise:p.averagePricePaise});
+    }
     if(positions.length>50)return res.status(409).json({error:"More than 50 open derivative positions; valuation stopped."});
     if(!positions.length){
       res.set("Cache-Control","private, no-store");
