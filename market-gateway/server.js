@@ -413,7 +413,7 @@ app.post("/stream",async(req,res)=>{
     const decoded=await authenticate(req);
     const keys=[...new Set(Array.isArray(req.body?.instrumentKeys)?req.body.instrumentKeys:[])];
     const mode=req.body?.mode||"ltpc";
-    if(!keys.length||keys.length>MAX_KEYS||keys.some(k=>typeof k!=="string"||!k||k.length>100||/[\\u0000-\\u001F]/.test(k)))
+    if(!keys.length||keys.length>MAX_KEYS||keys.some(k=>typeof k!=="string"||!k||k.length>100||/[\u0000-\u001F]/.test(k)))
       return res.status(400).json({error:"Provide a valid instrumentKeys list within the configured per-session limit."});
     if(!["ltpc","full","option_greeks"].includes(mode)) return res.status(400).json({error:"Unsupported feed mode."});
     const connection=await db.collection("upstoxConnections").doc(decoded.uid).get();
