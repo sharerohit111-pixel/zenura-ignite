@@ -271,3 +271,38 @@ test("repeated partial option closes conserve the original paise cost basis",asy
  assert.equal(totalAllocatedCostBasis,originalCostBasisPaise);
  assert.equal(state.orders.size,3);
 });
+
+
+test("rejects malformed stored option positions before applying a fill",async()=>{
+ const valid={instrumentType:"CE",netQuantity:65,averagePricePaise:1287,costBasisPaise:83646,
+  exchange:"NSE",segment:"NSE_FO",expiry:"2026-11-26",lotSize:65};
+ const invalidPositions=[
+  {...valid,netQuantity:1_000_001},
+  {...valid,averagePricePaise:0},
+  {...valid,averagePricePaise:undefined},
+  {...valid,costBasisPaise:Number.MAX_SAFE_INTEGER+1},
+  {...valid,exchange:"BSE"},
+  {...valid,segment:"BSE_FO"},
+  {...valid,expiry:"2026-12-31"},
+  {...valid,lotSize:25},
+  {...valid,netQuantity:0,averagePricePaise:0,costBasisPaise:1}
+ ];
+ for(const position of invalidPositions){
+  const account={...initial,derivativePositions:{[instrument.instrument_key]:position}};
+  const {common,writes}=setup({account});
+  await assert.rejects(executeLongOptionBuyTransaction(common),{status:409});
+  assert.equal(writes.length,0);
+ }
+});
+
+test("accepts a valid legacy option position without optional contract metadata",async()=>{
+ const account={...initial,derivativePositions:{[instrument.instrument_key]:{
+  instrumentType:"CE",netQuantity:65,averagePricePaise:1287,costBasisPaise:83646
+ }}};
+ const {common,writes}=setup({account});
+ common.side="SELL";
+ common.quote={...quote,pricePaise:1500};
+ await executeLongOptionBuyTransaction(common);
+ assert.equal(writes.length,2);
+ assert.deepEqual(writes[1][2].derivativePositions,{});
+});
