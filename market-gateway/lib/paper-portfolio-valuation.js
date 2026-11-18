@@ -3,9 +3,9 @@ const {normalizeProviderQuote}=require("./provider-quote");
 const {quoteAgeMs}=require("./quote-freshness");
 
 function readStoredPaperPositions(account){
-  if(!account||typeof account!=="object"||Array.isArray(account)||!account.positions||typeof account.positions!=="object"||Array.isArray(account.positions))
+  if(!account||typeof account!=="object"||Array.isArray(account)||(account.positions!==undefined&&(!account.positions||typeof account.positions!=="object"||Array.isArray(account.positions))))
     throw Object.assign(new Error("Paper account contains an invalid cash-equity positions map."),{status:409});
-  return Object.entries(account.positions);
+  return Object.entries(account.positions||{});
 }
 
 function buildPortfolioValuation({positions,quotes,cashPaise,realizedPnlPaise=0,instruments=[],now=Date.now(),maxAgeMs=60000}){
