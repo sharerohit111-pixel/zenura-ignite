@@ -35,6 +35,9 @@ The Functions module `functions/indian-market.js` adds:
 - Authenticated callable `getIndianMarketConnectionStatus` (reports whether the user's Upstox token is currently valid; it does not claim that the live feed is running).
 - The existing `functions/index.js` exports these functions without changing the existing payment functions.
 
+### Firebase project alignment blocker (must resolve before frontend OAuth wiring)
+The repository currently contains two distinct Firebase project configurations: the root `firebase-config.js` / `firebase-client.js` point to `zenura-ignite-technologies`, while the existing Crypto authentication module under `/crypto/` points to `zenura-ignite`. The Functions source is present in this repository, but there is no checked-in `.firebaserc` identifying a deployment target. Do not silently switch either project or reuse Crypto authentication until the intended Firebase project, Authentication user pool, and Functions deployment target are explicitly aligned. The Indian Market frontend must call the Functions deployed to the same Firebase project in which its signed-in user is authenticated. This check is required before adding the Connect Upstox button.
+
 ### Required Firebase Secret Manager setup
 Before deploying these functions, configure all four secrets:
 - `UPSTOX_CLIENT_ID`: client ID from the Upstox Developer app.
