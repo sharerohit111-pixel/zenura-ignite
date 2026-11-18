@@ -99,7 +99,20 @@ header.top a.brand > span:last-child > small{
   -webkit-text-fill-color:transparent!important;color:transparent!important;
   text-shadow:0 0 10px #25d7b033!important;
 }
- .rsi-pane{height:190px;margin:12px 0 4px;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:#0d1a2b;position:relative}.rsi-pane[hidden]{display:none}.rsi-pane-head{height:30px;padding:7px 12px;color:var(--muted);font-size:10px;font-weight:800;letter-spacing:1.5px;border-bottom:1px solid var(--line)}#rsiChart{height:158px;width:100%}</style>
+ .rsi-pane{height:190px;margin:12px 0 4px;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:#0d1a2b;position:relative}.rsi-pane[hidden]{display:none}.rsi-pane-head{height:30px;padding:7px 12px;color:var(--muted);font-size:10px;font-weight:800;letter-spacing:1.5px;border-bottom:1px solid var(--line)}#rsiChart{height:158px;width:100%}
+/* Final drawing-toolbar size: match the user's marked height on compact and fullscreen charts */
+#chartStage #drawingTools{
+  left:0!important;
+  top:9px!important;
+  bottom:auto!important;
+  height:230px!important;
+  min-height:0!important;
+  max-height:calc(100% - 18px)!important;
+  overflow-y:auto!important;
+  overflow-x:hidden!important;
+}
+
+</style>
 </head>
 <body>
 <div class="shell">
