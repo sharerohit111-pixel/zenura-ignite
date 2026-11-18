@@ -294,7 +294,7 @@ app.post("/paper/derivative/orders",async(req,res)=>{
     const idempotencyKey=typeof req.body?.idempotency_key==="string"?req.body.idempotency_key:"";
     if(!isUuid(idempotencyKey))return res.status(400).json({error:"A valid UUID idempotency_key is required."});
     if(!instrumentKey||instrumentKey.length>100||/[\\r\\n]/.test(instrumentKey))return res.status(400).json({error:"A valid instrument_key is required."});
-    if(side!=="BUY")return res.status(400).json({error:"This phase enables long CE/PE BUY only. Short options and futures remain disabled until margin lifecycle integration is complete."});
+    if(!["BUY","SELL"].includes(side))return res.status(400).json({error:"Only BUY and SELL to close existing long CE/PE positions are supported. Opening shorts and futures remain disabled."});
     if(!Number.isSafeInteger(lots)||lots<1||lots>10000)return res.status(400).json({error:"Lots must be a whole number between 1 and 10,000."});
     if(!instrumentCache.length||Date.now()-instrumentCacheUpdatedAt>6*60*60*1000)await refreshInstrumentCache();
     const instrument=instrumentCache.find(x=>x.instrument_key===instrumentKey&&["CE","PE"].includes(x.instrument_type)&&["NSE_FO","BSE_FO"].includes(x.segment));
@@ -308,7 +308,7 @@ app.post("/paper/derivative/orders",async(req,res)=>{
     if(!Number.isSafeInteger(quantity)||quantity<1||quantity>1000000)return res.status(400).json({error:"Contract quantity exceeds supported limits."});
     const orderId=makeOrderId(decoded.uid,idempotencyKey);
     const orderRef=db.collection("indianDerivativeOrders").doc(orderId);
-    const requestFingerprint=makeOrderFingerprint({instrumentKey,side:"BUY",quantity});
+    const requestFingerprint=makeOrderFingerprint({instrumentKey,side,quantity});
     const priorOrder=await orderRef.get();
     if(priorOrder.exists){
       const prior=priorOrder.data();
@@ -317,7 +317,7 @@ app.post("/paper/derivative/orders",async(req,res)=>{
       res.set("Cache-Control","private, no-store");
       return res.status(200).json({
         orderId,tradingSymbol:prior.tradingSymbol,side:prior.side,quantity:prior.quantity,
-        lots:prior.lots,executionPricePaise:prior.executionPricePaise,grossPaise:prior.grossPaise,charges:prior.charges||null,chargesPaise:prior.chargesPaise||0,totalDebitPaise:prior.totalDebitPaise||prior.grossPaise,
+        lots:prior.lots,executionPricePaise:prior.executionPricePaise,grossPaise:prior.grossPaise,charges:prior.charges||null,chargesPaise:prior.chargesPaise||0,totalDebitPaise:prior.totalDebitPaise||null,netCreditPaise:prior.netCreditPaise||null,
         cashPaise:currentData.cashPaise,realizedPnlPaise:currentData.realizedPnlPaise||0,
         idempotentReplay:true,simulationOnly:true,excludesCharges:false
       });
@@ -337,14 +337,14 @@ app.post("/paper/derivative/orders",async(req,res)=>{
     catch(error){return res.status(error.status||409).json({error:error.message,quoteAgeMs:Number.isFinite(error.quoteAgeMs)?error.quoteAgeMs:null});}
     const result=await executeLongOptionBuyTransaction({
       db,accountRef,orderRef,uid:decoded.uid,idempotencyKey,instrument,lots,
-      quote:{instrumentKey,pricePaise:normalizedQuote.pricePaise,observedAtMs:normalizedQuote.tradeTimeMs},
+      quote:{instrumentKey,pricePaise:normalizedQuote.pricePaise,observedAtMs:normalizedQuote.tradeTimeMs},side,
       serverTimestamp:()=>admin.firestore.FieldValue.serverTimestamp()
     });
     res.set("Cache-Control","private, no-store");
     res.status(result.idempotentReplay?200:201).json({
       orderId:result.orderId,tradingSymbol:result.order.tradingSymbol,side:result.order.side,
       quantity:result.order.quantity,lots:result.order.lots,executionPricePaise:result.order.executionPricePaise,
-      grossPaise:result.order.grossPaise,charges:result.order.charges,chargesPaise:result.order.chargesPaise,totalDebitPaise:result.order.totalDebitPaise,cashPaise:result.cashPaise,
+      grossPaise:result.order.grossPaise,charges:result.order.charges,chargesPaise:result.order.chargesPaise,totalDebitPaise:result.order.totalDebitPaise,netCreditPaise:result.order.netCreditPaise,cashPaise:result.cashPaise,
       realizedPnlPaise:result.realizedPnlPaise,idempotentReplay:result.idempotentReplay,
       simulationOnly:true,excludesCharges:false
     });
