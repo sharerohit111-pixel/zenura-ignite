@@ -35,6 +35,41 @@
       const data=await response.json();items=data.results||[];render(items);
     }catch(error){message(error.message||'Could not load instruments.');}
   }
+  const watchAdd=document.getElementById('watchlist-add'),watchStatus=document.getElementById('watchlist-status'),watchBody=document.getElementById('saved-watchlist');
+  let savedWatchlist=[];
+  async function saveWatchlist(){
+    const connector=window.ZENURA_MARKET_CONNECTOR;
+    if(!gateway||!connector?.getIdToken){watchStatus.textContent='Sign in and configure the gateway to save your watchlist.';return;}
+    try{
+      watchStatus.textContent='Saving your private watchlist…';
+      const token=await connector.getIdToken(),response=await fetch(gateway+'/watchlist',{method:'PUT',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json',Accept:'application/json'},body:JSON.stringify({instrumentKeys:savedWatchlist.map(x=>x.instrument_key)})});
+      const data=await response.json();if(!response.ok)throw new Error(data.error||'Watchlist save failed.');
+      watchStatus.textContent=data.count+' of 50 instruments saved to your account.';
+    }catch(error){watchStatus.textContent=error.message||'Watchlist save failed.';}
+  }
+  function renderSavedWatchlist(){
+    watchBody.textContent='';
+    if(!savedWatchlist.length){const empty=document.createElement('div');empty.className='empty';empty.textContent='No saved instruments yet.';watchBody.append(empty);}
+    savedWatchlist.forEach(item=>{
+      const row=document.createElement('div');row.className='saved-watch-row';
+      const pick=document.createElement('button');pick.type='button';pick.className='saved-watch-pick';pick.textContent=item.trading_symbol||item.name||item.instrument_key;pick.addEventListener('click',()=>select(item));
+      const remove=document.createElement('button');remove.type='button';remove.className='saved-watch-remove';remove.textContent='REMOVE';remove.setAttribute('aria-label','Remove '+(item.trading_symbol||item.instrument_key)+' from watchlist');remove.addEventListener('click',async()=>{savedWatchlist=savedWatchlist.filter(x=>x.instrument_key!==item.instrument_key);renderSavedWatchlist();await saveWatchlist();});
+      row.append(pick,remove);watchBody.append(row);
+    });
+    watchAdd.disabled=!selected||savedWatchlist.some(x=>x.instrument_key===selected.instrument_key)||savedWatchlist.length>=50||!window.ZENURA_MARKET_CONNECTOR?.getIdToken;
+  }
+  async function loadSavedWatchlist(){
+    const connector=window.ZENURA_MARKET_CONNECTOR;if(!gateway||!connector?.getIdToken)return;
+    try{
+      const token=await connector.getIdToken(),response=await fetch(gateway+'/watchlist',{headers:{Authorization:'Bearer '+token,Accept:'application/json'}});
+      const data=await response.json();if(!response.ok)throw new Error(data.error||'Watchlist unavailable');
+      savedWatchlist=data.items||[];renderSavedWatchlist();watchStatus.textContent=savedWatchlist.length+' saved instruments · Private to your account.';
+    }catch(error){watchStatus.textContent=error.message||'Watchlist could not be loaded.';}
+  }
+  watchAdd.addEventListener('click',async()=>{
+    if(!selected||savedWatchlist.some(x=>x.instrument_key===selected.instrument_key)||savedWatchlist.length>=50)return;
+    savedWatchlist=[...savedWatchlist,selected];renderSavedWatchlist();await saveWatchlist();
+  });
   const paperCash=document.getElementById('paper-cash'),paperRealized=document.getElementById('paper-realized'),paperAccountStatus=document.getElementById('paper-account-status'),paperOrderStatus=document.getElementById('paper-order-status'),paperQuantity=document.getElementById('paper-quantity'),paperBuy=document.getElementById('paper-buy'),paperSell=document.getElementById('paper-sell');
   function inrPaise(value){return '₹'+(Number(value||0)/100).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});}
   async function loadPaperAccount(){
@@ -188,6 +223,7 @@
     document.querySelector('.chart-placeholder span').textContent='Connecting to Upstox V3 feed. Prices will appear only when received from the provider.';
     render(items);
     updatePaperButtons();
+    renderSavedWatchlist();
     loadCandles();
     const connector=window.ZENURA_MARKET_CONNECTOR;
     if(!gateway||!connector?.getIdToken){document.querySelector('.chart-placeholder span').textContent='Sign in and configure the deployed market gateway to start live quotes.';return;}
@@ -219,7 +255,8 @@
     title.textContent='No instrument selected';symbol.textContent='Choose an instrument';price.textContent='—';updatePaperButtons();loadInstruments();
   }));
   search.addEventListener('input',()=>{clearTimeout(debounce);debounce=setTimeout(loadInstruments,250);});
-  window.addEventListener('zenura-market-auth-ready',()=>{loadInstruments();loadCandles();loadPaperAccount();refreshPaperViews();});
+  window.addEventListener('zenura-market-auth-ready',()=>{loadInstruments();loadCandles();loadPaperAccount();refreshPaperViews();loadSavedWatchlist();});
   window.ZENURA_INDIAN_MARKET={mode:'indian-stocks',provider:'upstox',status:'gateway-configurable',activeList:()=>activeList,refresh:loadInstruments};
   loadInstruments();
+  renderSavedWatchlist();
 })();
