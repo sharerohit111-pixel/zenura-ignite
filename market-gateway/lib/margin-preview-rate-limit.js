@@ -12,9 +12,12 @@ async function consumeMarginPreviewSlot(db,uid,nowMs=Date.now(),cooldownMs=DEFAU
   const lastRequestAtMs=snapshot.exists?snapshot.data()?.lastRequestAtMs:null;
   if(lastRequestAtMs!==null&&(!Number.isSafeInteger(lastRequestAtMs)||lastRequestAtMs<0))
    throw Object.assign(new Error("Margin preview rate-limit state is invalid."),{status:503});
-  if(lastRequestAtMs!==null&&nowMs-lastRequestAtMs<cooldownMs){
-   const retryAfterSeconds=Math.max(1,Math.ceil((cooldownMs-(nowMs-lastRequestAtMs))/1000));
-   throw Object.assign(new Error("Please wait before requesting another broker margin preview."),{status:429,retryAfterSeconds});
+  if(lastRequestAtMs!==null){
+   const elapsedMs=Math.max(0,nowMs-lastRequestAtMs);
+   if(elapsedMs<cooldownMs){
+    const retryAfterSeconds=Math.max(1,Math.ceil((cooldownMs-elapsedMs)/1000));
+    throw Object.assign(new Error("Please wait before requesting another broker margin preview."),{status:429,retryAfterSeconds});
+   }
   }
   transaction.set(ref,{lastRequestAtMs:nowMs,updatedAtMs:nowMs});
   return {allowed:true};
