@@ -3,13 +3,13 @@ const DERIVATIVE_SEGMENTS=new Set(["NSE_FO","BSE_FO"]);
 const DERIVATIVE_TYPES=new Set(["FUT","CE","PE"]);
 function normalizeTickSizePaise(value){
  if(typeof value!=="number"||!Number.isFinite(value)||value<=0)return null;
- // Upstox BOD JSON publishes tick_size in paise (e.g. 5); retain
- // compatibility with legacy decimal-rupee fixtures such as 0.05.
+ // Upstox BOD JSON expresses tick_size in paise (e.g. 5); accept
+ // legacy decimal-rupee fixtures (e.g. 0.05) as well.
  const paise=value<1?value*100:value;
  return Number.isSafeInteger(Math.round(paise))&&Math.abs(paise-Math.round(paise))<1e-7&&paise>0?Math.round(paise):null;
 }
 function normalizeExpiryDate(value){
- if(typeof value==="string"&&/^\\d{4}-\\d{2}-\\d{2}$/.test(value)){
+ if(typeof value==="string"&&/^\d{4}-\d{2}-\d{2}$/.test(value)){
   const d=new Date(value+"T00:00:00.000Z");
   return Number.isFinite(d.getTime())&&d.toISOString().slice(0,10)===value?value:null;
  }
@@ -35,9 +35,8 @@ function validateDerivativeContract(instrument,{lots,pricePaise,now=Date.now()}=
  const tickSizePaise=normalizeTickSizePaise(instrument.tick_size);
  if(tickSizePaise===null)fail("Contract tick size is missing or invalid in the official instrument master.");
  if(!Number.isSafeInteger(pricePaise)||pricePaise<1||pricePaise%tickSizePaise!==0)fail("Execution price is invalid or does not align with the contract tick size.");
- if(typeof instrument.expiry!=="string"||! /^\d{4}-\d{2}-\d{2}$/.test(instrument.expiry))fail("Contract expiry is missing or invalid.");
- const expiryDate=new Date(instrument.expiry+"T00:00:00.000Z");
- if(!Number.isFinite(expiryDate.getTime())||expiryDate.toISOString().slice(0,10)!==instrument.expiry)fail("Contract expiry is not a valid calendar date.");
+ const expiry=normalizeExpiryDate(instrument.expiry);
+ if(!expiry)fail("Contract expiry is missing or invalid.");
  if(!Number.isSafeInteger(now)||now<0)fail("Current time is invalid.");
  const [year,month,day]=expiry.split("-").map(Number);
  const expiryCutoffUtc=Date.UTC(year,month-1,day,15,30)-330*60*1000;
