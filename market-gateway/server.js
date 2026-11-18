@@ -13,6 +13,18 @@ app.use(express.json({limit:"32kb"}));
 const PORT=process.env.PORT||8080;
 const ENC_KEY=process.env.UPSTOX_TOKEN_ENCRYPTION_KEY;
 const MAX_KEYS=Number(process.env.MAX_INSTRUMENT_KEYS||100);
+const ALLOWED_ORIGINS=(process.env.ALLOWED_ORIGINS||"").split(",").map(x=>x.trim()).filter(Boolean);
+app.use((req,res,next)=>{
+  const origin=req.get("origin");
+  if(origin&&ALLOWED_ORIGINS.includes(origin)){
+    res.set("Access-Control-Allow-Origin",origin);
+    res.set("Vary","Origin");
+    res.set("Access-Control-Allow-Headers","Authorization, Content-Type, Accept");
+    res.set("Access-Control-Allow-Methods","GET, POST, OPTIONS");
+  }
+  if(req.method==="OPTIONS")return res.sendStatus(origin&&ALLOWED_ORIGINS.includes(origin)?204:403);
+  next();
+});
 const INSTRUMENTS_URL="https://assets.upstox.com/market-quote/instruments/exchange/complete.json.gz";
 let FeedResponse;
 let instrumentCache=[];
@@ -107,8 +119,7 @@ app.post("/stream",async(req,res)=>{
     let closed=false;
     const close=()=>{if(closed)return;closed=true;try{upstream?.close();}catch(_){}};
     upstream.on("open",()=>{
-      const wireMode=mode==="full"?"full_d5":mode;
-      upstream.send(Buffer.from(JSON.stringify({guid:crypto.randomUUID(),method:"sub",data:{mode:wireMode,instrumentKeys:keys}})));
+      upstream.send(Buffer.from(JSON.stringify({guid:crypto.randomUUID(),method:"sub",data:{mode,instrumentKeys:keys}})));
     });
     upstream.on("message",(bytes,isBinary)=>{
       if(!isBinary){res.write("event: upstream\ndata: "+JSON.stringify({message:String(bytes).slice(0,500)})+"\n\n");return;}
