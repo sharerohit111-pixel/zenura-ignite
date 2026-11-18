@@ -368,3 +368,23 @@ test("rejects SELL when cumulative realized P&L would overflow safe paise arithm
  await assert.rejects(executeLongOptionBuyTransaction(common),{status:409});
  assert.equal(writes.length,0);
 });
+
+test("rejects opening a 51st distinct derivative position before any database write",async()=>{
+ const derivativePositions=Object.fromEntries(Array.from({length:50},(_,i)=>[
+  `NSE_FO|OPTION${i}`,{instrumentType:"CE",netQuantity:65,averagePricePaise:100,costBasisPaise:6500}
+ ]));
+ const {common,writes}=setup({account:{...initial,derivativePositions}});
+ await assert.rejects(executeLongOptionBuyTransaction(common),error=>error.status===409&&/50 open positions/.test(error.message));
+ assert.equal(writes.length,0);
+});
+test("allows adding to an existing derivative position at the 50-position limit",async()=>{
+ const derivativePositions=Object.fromEntries(Array.from({length:50},(_,i)=>[
+  `NSE_FO|OPTION${i}`,{instrumentType:"CE",netQuantity:65,averagePricePaise:100,costBasisPaise:6500}
+ ]));
+ derivativePositions[instrument.instrument_key]={instrumentType:"CE",netQuantity:65,averagePricePaise:1287,costBasisPaise:83646,
+  exchange:"NSE",segment:"NSE_FO",expiry:"2026-11-26",lotSize:65};
+ const {common,writes}=setup({account:{...initial,derivativePositions}});
+ await executeLongOptionBuyTransaction(common);
+ assert.equal(writes.length,2);
+ assert.equal(writes[1][2].derivativePositions[instrument.instrument_key].netQuantity,130);
+});
