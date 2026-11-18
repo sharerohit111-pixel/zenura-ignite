@@ -23,3 +23,8 @@ test("disconnected record with future expiry is not reported connected",()=>{
 test("malformed expiry is rejected",()=>{
   assert.equal(connectionStatus({status:"connected",expiresAt:{toMillis:()=>NaN}},1000).connected,false);
 });
+
+test("malformed throwing expiry and unsafe clock are handled without throwing",()=>{
+  assert.equal(connectionStatus({status:"connected",expiresAt:{toMillis:()=>{throw Error("bad");}}},1000).connected,false);
+  assert.equal(connectionStatus({status:"connected",expiresAt:stamp(2000)},-1).connected,false);
+});
