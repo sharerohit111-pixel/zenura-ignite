@@ -53,7 +53,7 @@ test("shares the equity account cash while keeping equity and derivative holding
  const equityPosition={"NSE_EQ|RELIANCE":{quantity:3,averagePricePaise:250000}};
  const {common,writes}=setup({account:{...initial,positions:equityPosition}});
  await executeLongOptionBuyTransaction(common);
- assert.deepEqual(writes[1][2].positions,equityPosition);
+ assert.equal(writes[1][2].positions,undefined,"the transaction must leave the existing cash-equity holdings field untouched");
  assert.equal(writes[1][2].cashPaise,916354);
  assert.equal(writes[1][2].derivativePositions[instrument.instrument_key].netQuantity,65);
 });
