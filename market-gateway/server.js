@@ -642,7 +642,7 @@ app.post("/stream",async(req,res)=>{
     const authResponse=await fetchProvider("https://api.upstox.com/v3/feed/market-data-feed/authorize",{
       headers:{Authorization:"Bearer "+accessToken,Accept:"application/json"}
     });
-    const authData=await authResponse.json().catch(()=>({}));
+    const authData=await readProviderJson(authResponse).catch(()=>({}));
     if(!authResponse.ok||!authData.data?.authorized_redirect_uri)
       return res.status(502).json({error:"Upstox could not authorize the live market feed."});
     let feedUrl;
