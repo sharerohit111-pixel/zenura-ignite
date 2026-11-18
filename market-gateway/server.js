@@ -26,6 +26,7 @@ const {createLeaseHeartbeat}=require("./lib/lease-heartbeat");
 const {isUpstoxTokenUsable}=require("./lib/upstox-token");
 const {executeLongOptionTransaction}=require("./lib/derivative-order-transaction");
 const {parseMarginPreviewInput}=require("./lib/margin-preview-input");
+const {consumeMarginPreviewSlot}=require("./lib/margin-preview-rate-limit");
 admin.initializeApp();
 const db=admin.firestore();
 const app=express();
@@ -263,6 +264,7 @@ app.post("/paper/orders",async(req,res)=>{
     const connectionData=connection.data();
     if(!isUpstoxTokenUsable(connectionData))return res.status(403).json({error:"Upstox token expired. Reconnect your account."});
     const accessToken=decryptToken(connectionData.tokenCiphertext);
+    await consumeMarginPreviewSlot(db,decoded.uid);
     const quoteUrl="https://api.upstox.com/v3/market-quote/quotes?"+new URLSearchParams({instrument_key:instrumentKey});
     const quoteResponse=await fetchProvider(quoteUrl,{headers:{Authorization:"Bearer "+accessToken,Accept:"application/json"}});
     const quotePayload=await quoteResponse.json().catch(()=>null);
@@ -340,7 +342,10 @@ app.post("/paper/derivative/margin-preview",async(req,res)=>{
       notice:"Indicative broker margin preview only. No virtual funds reserved and no order placed."
     });
   }catch(error){
-    if(!res.headersSent)res.status(errorStatus(error)).json({error:error.status?error.message:"Futures margin preview could not be completed."});
+    if(!res.headersSent){
+      if(error.status===429&&Number.isInteger(error.retryAfterSeconds))res.set("Retry-After",String(error.retryAfterSeconds));
+      res.status(errorStatus(error)).json({error:error.status?error.message:"Futures margin preview could not be completed."});
+    }
   }
 });
 
