@@ -33,11 +33,53 @@
       const data=await response.json();items=data.results||[];render(items);
     }catch(error){message(error.message||'Could not load instruments.');}
   }
+  const chart=document.getElementById('market-chart');
+  const chartStatus=document.getElementById('chart-status');
+  const timeframeButtons=[...document.querySelectorAll('[data-timeframe]')];
+  let activeTimeframe='1m',chartRequest=0;
+  const frames={'1m':['minutes',1,7],'5m':['minutes',5,14],'15m':['minutes',15,30],'1h':['hours',1,90],'1D':['days',1,365]};
+  function localDate(offset=0){
+    const d=new Date();d.setDate(d.getDate()+offset);
+    return new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Kolkata',year:'numeric',month:'2-digit',day:'2-digit'}).format(d);
+  }
+  function renderChart(candles){
+    chart.textContent='';
+    if(!candles.length){const b=document.createElement('b');b.textContent='No candle data returned';const span=document.createElement('span');span.textContent='Upstox returned no historical candles for this instrument and interval.';chart.append(b,span);return;}
+    const rows=candles.filter(c=>Array.isArray(c)&&c.length>=5&&[1,2,3,4].every(i=>Number.isFinite(Number(c[i]))));
+    if(!rows.length){const b=document.createElement('b');b.textContent='Candle response unavailable';chart.append(b);return;}
+    const width=900,height=300,pad=24,high=Math.max(...rows.map(c=>Number(c[2]))),low=Math.min(...rows.map(c=>Number(c[3]))),range=high-low||1;
+    const points=rows.slice().reverse().map((c,i)=>({x:pad+i*(width-2*pad)/Math.max(rows.length-1,1),y:height-pad-(Number(c[4])-low)*(height-2*pad)/range,c}));
+    const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.setAttribute('viewBox',`0 0 ${width} ${height}`);svg.setAttribute('role','img');svg.setAttribute('aria-label','Historical close price chart from Upstox');
+    for(let i=0;i<5;i++){const y=pad+i*(height-2*pad)/4;const line=document.createElementNS(svg.namespaceURI,'line');line.setAttribute('x1',pad);line.setAttribute('x2',width-pad);line.setAttribute('y1',y);line.setAttribute('y2',y);line.setAttribute('class','chart-gridline');svg.append(line);}
+    const poly=document.createElementNS(svg.namespaceURI,'polyline');poly.setAttribute('points',points.map(p=>p.x+','+p.y).join(' '));poly.setAttribute('class','chart-line');svg.append(poly);
+    const latest=rows[0],first=rows[rows.length-1],change=Number(latest[4])-Number(first[1]);
+    const summary=document.createElement('div');summary.className='candle-summary';
+    [['O',latest[1]],['H',latest[2]],['L',latest[3]],['C',latest[4]],['VOL',latest[5]??'—'],['OI',latest[6]??'—']].forEach(([k,v])=>{const cell=document.createElement('span');cell.textContent=k+' '+(typeof v==='number'?Number(v).toLocaleString('en-IN'):v);summary.append(cell);});
+    const rangeLabel=document.createElement('small');rangeLabel.className='chart-range';rangeLabel.textContent=rows.length+' candles · '+String(rows[rows.length-1][0])+' → '+String(rows[0][0])+' · Change '+(change>=0?'+':'')+change.toFixed(2);
+    chart.append(svg,summary,rangeLabel);
+  }
+  async function loadCandles(){
+    if(!selected||!gateway)return;
+    const connector=window.ZENURA_MARKET_CONNECTOR;
+    if(!connector?.getIdToken){chartStatus.textContent='Sign in to load historical candles';return;}
+    const request=++chartRequest,[unit,interval,days]=frames[activeTimeframe];
+    chart.textContent='';const loading=document.createElement('b');loading.textContent='Loading verified historical candles…';chart.append(loading);chartStatus.textContent='Requesting Upstox V3';
+    try{
+      const token=await connector.getIdToken(),to=localDate(),from=localDate(-days);
+      const params=new URLSearchParams({instrument_key:selected.instrument_key,unit,interval:String(interval),to_date:to,from_date:from});
+      const response=await fetch(gateway+'/candles?'+params,{headers:{Authorization:'Bearer '+token,Accept:'application/json'}});
+      if(!response.ok)throw new Error('Historical candles unavailable ('+response.status+').');
+      const payload=await response.json();if(request!==chartRequest)return;
+      renderChart(payload.data?.candles||[]);chartStatus.textContent='Historical candles · Upstox V3 · '+activeTimeframe;
+    }catch(error){if(request!==chartRequest)return;chart.textContent='';const b=document.createElement('b');b.textContent='Chart data unavailable';const span=document.createElement('span');span.textContent=error.message||'Could not load historical candles.';chart.append(b,span);chartStatus.textContent='Not connected';}
+  }
+  timeframeButtons.forEach(button=>button.addEventListener('click',()=>{activeTimeframe=button.dataset.timeframe;timeframeButtons.forEach(x=>x.classList.toggle('active',x===button));loadCandles();}));
   async function select(item){
     selected=item;title.textContent=item.trading_symbol||item.name;symbol.textContent=item.instrument_key;price.textContent='—';
     document.querySelector('.chart-placeholder b').textContent='Waiting for verified live quote';
     document.querySelector('.chart-placeholder span').textContent='Connecting to Upstox V3 feed. Prices will appear only when received from the provider.';
     render(items);
+    loadCandles();
     if(streamAbort)streamAbort.abort();
     const connector=window.ZENURA_MARKET_CONNECTOR;
     if(!gateway||!connector?.getIdToken){document.querySelector('.chart-placeholder span').textContent='Sign in and configure the deployed market gateway to start live quotes.';return;}
@@ -68,7 +110,7 @@
     title.textContent='No instrument selected';symbol.textContent='Choose an instrument';price.textContent='—';loadInstruments();
   }));
   search.addEventListener('input',()=>{clearTimeout(debounce);debounce=setTimeout(loadInstruments,250);});
-  window.addEventListener('zenura-market-auth-ready',loadInstruments);
+  window.addEventListener('zenura-market-auth-ready',()=>{loadInstruments();loadCandles();});
   window.ZENURA_INDIAN_MARKET={mode:'indian-stocks',provider:'upstox',status:'gateway-configurable',activeList:()=>activeList,refresh:loadInstruments};
   loadInstruments();
 })();
