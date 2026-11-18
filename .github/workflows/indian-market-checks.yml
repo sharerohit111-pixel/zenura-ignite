@@ -58,5 +58,10 @@ jobs:
           node -e "JSON.parse(require('node:fs').readFileSync('firestore.indexes.json','utf8'))"
       - name: Install gateway test dependencies
         run: npm install --prefix market-gateway --ignore-scripts --no-audit --no-fund
-      - name: Run gateway and browser parser unit tests
-        run: node --test market-gateway/test/*.test.js markets/stocks/*.test.js
+      - name: Set up Java for Firestore emulator
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - name: Run unit and Firestore emulator integration tests
+        run: npx --yes firebase-tools@14 emulators:exec --only firestore --project demo-zenura-ignite "node --test market-gateway/test/*.test.js markets/stocks/*.test.js"
