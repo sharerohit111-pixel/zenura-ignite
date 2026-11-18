@@ -74,3 +74,8 @@ After deployment, set the exact Cloud Run HTTPS URL in the `market-gateway-url` 
 ## Current product boundary
 
 This release simulates market BUY/SELL for NSE/BSE cash equities and long CE/PE option BUY plus SELL-to-close orders only. Option BUY and SELL-to-close fills use a fresh server-fetched Upstox quote and atomically debit or credit the shared Indian-market virtual cash balance after itemized indicative Upstox fee estimates. Entry charges are included in long-option average cost and realized P&L includes exit charges. The option-chain UI exposes BUY and SELL-to-close controls, and derivative portfolio/history views are separate from cash-equity holdings. Opening short options, futures, margin reservation, limit/stop orders, complete cash-equity fee simulation, dividends and corporate actions are not enabled. Charge estimates are not a broker contract note; verify current tariffs and exchange schedules before production. Do not enable the release until automated tests, Firebase/Upstox live checks, security review and provider entitlements are verified. Keep PR #11 in draft until all deployment and provider-account checks pass.
+
+
+### Futures margin preview verification
+
+The UI calls the authenticated `POST /paper/derivative/margin-preview` gateway route only for a selected official NSE/BSE futures contract. The route requires a fresh Upstox quote and calls the Upstox V2 margin endpoint with product `D`. It returns a preview and virtual-cash shortfall only. It does not reserve margin, persist an order, mutate the paper account, or submit an exchange/broker order. Verify this behavior with the gateway test suite and an authorized Upstox account before any production release. Futures execution remains disabled.
