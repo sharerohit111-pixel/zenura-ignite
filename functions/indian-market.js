@@ -7,6 +7,7 @@ const { defineSecret } = require("firebase-functions/params");
 const { onCall, onRequest, HttpsError } = require("firebase-functions/v2/https");
 const logger = require("firebase-functions/logger");
 const { connectionStatus } = require("./lib/upstox-connection-status");
+const { disconnectUpstoxAccount, isOAuthGenerationCurrent, connectionGeneration } = require("./lib/upstox-disconnect");
 const { isOAuthStateUsable } = require("./lib/upstox-oauth-state");
 const { nextUpstoxTokenExpiry } = require("./lib/upstox-token-expiry");
 const { isUsableUpstoxTokenResponse } = require("./lib/upstox-token-response");
@@ -32,8 +33,10 @@ exports.startUpstoxAuthorization = onCall(
   {region:REGION,secrets:[CLIENT_ID,REDIRECT_URI]},
   async req => {
     const uid=uidOf(req), state=crypto.randomBytes(32).toString("hex");
+    const controlSnap=await db.collection("upstoxConnectionControls").doc(uid).get();
+    const generation=connectionGeneration(controlSnap.exists?controlSnap.data():null);
     await db.collection("upstoxOAuthStates").doc(state).create({
-      uid,createdAt:FieldValue.serverTimestamp(),
+      uid,generation,createdAt:FieldValue.serverTimestamp(),
       expiresAt:Timestamp.fromMillis(Date.now()+10*60*1000),used:false
     });
     const url=new URL("https://api.upstox.com/v2/login/authorization/dialog");
@@ -82,11 +85,19 @@ exports.upstoxOAuthCallback = onRequest(
       }
       const encrypted=encryptToken(payload.access_token);
       const accountRef=db.collection("upstoxConnections").doc(stateData.uid);
-      await accountRef.set({
-        tokenCiphertext:encrypted,tokenType:payload.token_type||"Bearer",
-        expiresAt:Timestamp.fromMillis(nextUpstoxTokenExpiry()),
-        authorizedAt:FieldValue.serverTimestamp(),provider:"upstox",status:"connected"
+      const controlRef=db.collection("upstoxConnectionControls").doc(stateData.uid);
+      const saved=await db.runTransaction(async tx=>{
+        const controlSnap=await tx.get(controlRef);
+        const control=controlSnap.exists?controlSnap.data():null;
+        if(!isOAuthGenerationCurrent(control,stateData.generation)) return false;
+        tx.set(accountRef,{
+          tokenCiphertext:encrypted,tokenType:payload.token_type||"Bearer",
+          expiresAt:Timestamp.fromMillis(nextUpstoxTokenExpiry()),
+          authorizedAt:FieldValue.serverTimestamp(),provider:"upstox",status:"connected"
+        });
+        return true;
       });
+      if(!saved) return res.status(409).send("This connection attempt was cancelled. Return to the app and connect again.");
       return res.redirect(303,"https://zenuraignite.com/markets/stocks/?upstox=connected");
     } catch(error) {
       logger.error("Upstox OAuth callback failed",{errorName:error.name||"Error"});
@@ -98,16 +109,7 @@ exports.disconnectUpstoxAccount = onCall(
   {region:REGION},
   async req=>{
     const uid=uidOf(req);
-    const connectionRef=db.collection("upstoxConnections").doc(uid);
-    const leaseRef=db.collection("indianMarketStreamLeases").doc(uid);
-    const now=Date.now();
-    await db.runTransaction(async tx=>{
-      const connectionSnap=await tx.get(connectionRef);
-      const leaseSnap=await tx.get(leaseRef);
-      if(connectionSnap.exists) tx.delete(connectionRef);
-      if(leaseSnap.exists) tx.set(leaseRef,{...leaseSnap.data(),revoked:true,updatedAtMs:now});
-    });
-    return {disconnected:true,activeFeedTermination:"requested"};
+    return disconnectUpstoxAccount(db,uid,Date.now());
   }
 );
 exports.getIndianMarketConnectionStatus = onCall(
