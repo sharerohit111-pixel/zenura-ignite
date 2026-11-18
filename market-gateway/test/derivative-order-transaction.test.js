@@ -43,6 +43,7 @@ test("atomically records a long option BUY and debits premium",async()=>{
  assert.equal(writes[0][2].chargesPaise,2396);
  assert.equal(writes[0][2].totalDebitPaise,83646);
  assert.equal(writes[1][2].derivativePositions[instrument.instrument_key].netQuantity,65);
+ assert.equal(writes[1][2].derivativePositions[instrument.instrument_key].averagePricePaise,1287);
  assert.equal(writes[1][2].version,2);
  assert.equal(r.simulationOnly,true);
  assert.equal(r.idempotentReplay,false);
