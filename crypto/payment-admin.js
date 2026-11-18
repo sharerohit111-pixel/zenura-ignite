@@ -29,7 +29,6 @@
     .zpay-shade.open{display:grid;place-items:center}
     .zpay-box{width:min(520px,100%);max-height:92vh;overflow:auto;background:#0d1d30;border:1px solid #31516c;border-radius:18px;padding:18px;color:#eaf2fa}
     .zpay-box h2{font:700 21px 'Space Grotesk';margin:5px 0 12px}
-    .zpay-qr{display:block;width:220px;height:220px;max-width:100%;margin:12px auto;background:white;padding:10px;border-radius:12px}
     .zpay-muted{font-size:11px;color:#91a7bb;line-height:1.55}
     .zpay-input{width:100%;margin:7px 0 12px;padding:12px;border-radius:9px;border:1px solid #34516c;background:#071522;color:#fff}
     .zpay-actions{display:flex;gap:9px;flex-wrap:wrap;margin-top:12px}
@@ -41,7 +40,7 @@
     .zadmin-card small{color:#91a7bb;margin:5px 0;font-size:10px}
     .zadmin-row{display:flex;gap:8px;margin-top:10px}.zadmin-row button{flex:1}
     .zadmin-status{font-size:11px;color:#9bdcc8;min-height:18px}
-    @media(max-width:420px){.zpay-shade{padding:8px}.zpay-box{padding:14px}.zpay-qr{width:190px;height:190px}}
+    @media(max-width:420px){.zpay-shade{padding:8px}.zpay-box{padding:14px}}
   `;
   document.head.appendChild(style);
 
@@ -84,21 +83,14 @@
       '&cu=INR&tn=' + encodeURIComponent(note);
     body.innerHTML = `
       <p class="zpay-muted">Plan: <b>${plan.label}</b> · Amount: <b>₹${plan.amount}</b></p>
-      <canvas class="zpay-qr" id="zpayQr" aria-label="UPI payment QR code"></canvas>
-      <p class="zpay-muted" style="text-align:center">Pay to UPI ID<br><b style="color:#eaf2fa">${UPI_ID}</b></p>
-      <div class="zpay-actions"><button type="button" id="zpayOpenUpi">Open UPI app</button><button class="secondary" type="button" id="zpayCopy">Copy UPI ID</button></div>
+      <p class="zpay-muted">Your payment details are not displayed here. Tap below to open a UPI app with the plan amount and payee details pre-filled. Confirm the payee name and amount inside your UPI app before paying.</p>
+      <div class="zpay-actions"><button type="button" id="zpayOpenUpi">Continue to UPI app</button></div>
       <label class="label" for="zpayUtr">UPI transaction ID / UTR</label>
       <input class="zpay-input" id="zpayUtr" maxlength="40" autocomplete="off" placeholder="Enter UTR after successful payment">
       <p class="zpay-muted">After paying, enter the UTR and submit. Premium stays pending until the admin checks the actual bank/UPI credit and approves it. Do not submit a UPI PIN or OTP.</p>
       <div class="zpay-actions"><button type="button" id="zpaySubmit">I have paid — Submit for review</button><button class="secondary" type="button" id="zpayCancel">Cancel</button></div>`;
     say('Payment is not verified yet.');
-    if (window.QRCode) QRCode.toCanvas($('zpayQr'), upi, {width:220,margin:1,errorCorrectionLevel:'M'}, err => { if(err) say('Could not generate QR. Use the UPI ID shown above.'); });
-    else say('QR generator unavailable. Use the UPI ID shown above.');
     $('zpayOpenUpi').onclick = () => { window.location.href = upi; };
-    $('zpayCopy').onclick = async () => {
-      try { await navigator.clipboard.writeText(UPI_ID); say('UPI ID copied.'); }
-      catch (_) { say('Copy unavailable. Please copy the UPI ID manually.'); }
-    };
     $('zpayCancel').onclick = close;
     $('zpaySubmit').onclick = async () => {
       const current = requireUser();
@@ -110,7 +102,7 @@
       try {
         await db.collection('payments').add({
           uid:current.uid, email:current.email || '', planKey, planLabel:plan.label,
-          amount:plan.amount, months:plan.months, upiId:UPI_ID, utr,
+          amount:plan.amount, months:plan.months, utr,
           status:'pending', createdAt:firebase.firestore.FieldValue.serverTimestamp()
         });
         say('Request submitted. Premium will activate only after admin approval.');
