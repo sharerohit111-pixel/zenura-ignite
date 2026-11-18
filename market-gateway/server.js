@@ -24,7 +24,7 @@ const {createStreamLifecycle}=require("./lib/stream-lifecycle");
 const {sendUpstoxSubscription}=require("./lib/upstox-subscription");
 const {decodeFeedResponse}=require("./lib/upstox-feed-decoder");
 const {filterFreshMarketFeeds}=require("./lib/market-feed-validation");
-const {buildPortfolioValuation}=require("./lib/paper-portfolio-valuation");
+const {buildPortfolioValuation,readStoredPaperPositions}=require("./lib/paper-portfolio-valuation");
 const {createLeaseHeartbeat}=require("./lib/lease-heartbeat");
 const {readProviderJson}=require("./lib/provider-json");
 const {isUpstoxTokenUsable}=require("./lib/upstox-token");
@@ -420,7 +420,9 @@ app.get("/paper/portfolio",async(req,res)=>{
   try{
     const decoded=await authenticate(req),accountSnap=await paperAccountRef(decoded.uid).get();
     if(!accountSnap.exists)return res.status(404).json({error:"Indian paper account has not been initialized."});
-    const account=accountSnap.data(),allPositions=Object.entries(account.positions||{});
+    const account=accountSnap.data();
+    let allPositions;
+    try{allPositions=readStoredPaperPositions(account);}catch(error){return res.status(error.status||409).json({error:error.message});}
     if(!Number.isSafeInteger(account.cashPaise)||account.cashPaise<0||!Number.isSafeInteger(account.realizedPnlPaise??0))return res.status(409).json({error:"Paper account contains invalid balance data."});
     if(allPositions.some(([,p])=>!p||!Number.isSafeInteger(p.quantity)||p.quantity<0||p.quantity>1000000||!Number.isSafeInteger(p.averagePricePaise)||p.averagePricePaise<0||(p.quantity>0&&p.averagePricePaise<1)))return res.status(409).json({error:"Paper portfolio contains an invalid position; valuation stopped to protect account totals."});
     const positions=allPositions.filter(([,p])=>p.quantity>0);
