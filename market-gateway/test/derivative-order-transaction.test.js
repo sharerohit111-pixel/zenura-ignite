@@ -102,3 +102,35 @@ test("rejects malformed account state and future-dated quote",async()=>{
  await assert.rejects(executeLongOptionBuyTransaction(future.common));
  assert.equal(future.writes.length,0);
 });
+
+test("SELL closes a long option, credits premium net of estimated charges, and realizes P&L",async()=>{
+ const account={...initial,derivativePositions:{[instrument.instrument_key]:{
+  instrumentType:"CE",netQuantity:65,averagePricePaise:1250,exchange:"NSE",segment:"NSE_FO",expiry:"2026-11-26",lotSize:65
+ }}};
+ const {common,writes}=setup({account});
+ common.side="SELL";
+ common.quote={...quote,pricePaise:1500};
+ const r=await executeLongOptionBuyTransaction(common);
+ assert.equal(writes[0][2].side,"SELL");
+ assert.equal(writes[0][2].charges.sttPaise,146);
+ assert.equal(writes[0][2].netCreditPaise,96953);
+ assert.equal(writes[1][2].cashPaise,1096953);
+ assert.deepEqual(writes[1][2].derivativePositions,{});
+ assert.equal(writes[1][2].realizedPnlPaise,16250);
+ assert.equal(r.idempotentReplay,false);
+});
+
+test("SELL cannot open a short option or exceed an existing long position",async()=>{
+ const {common,writes}=setup();
+ common.side="SELL";
+ await assert.rejects(executeLongOptionBuyTransaction(common),{status:409});
+ assert.equal(writes.length,0);
+ const account={...initial,derivativePositions:{[instrument.instrument_key]:{
+  instrumentType:"CE",netQuantity:65,averagePricePaise:1250
+ }}};
+ const tooMany=setup({account});
+ tooMany.common.side="SELL";
+ tooMany.common.lots=2;
+ await assert.rejects(executeLongOptionBuyTransaction(tooMany.common),{status:409});
+ assert.equal(tooMany.writes.length,0);
+});
