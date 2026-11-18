@@ -198,11 +198,11 @@ app.get("/paper/account",async(req,res)=>{
     const ref=paperAccountRef(decoded.uid);
     await db.runTransaction(async tx=>{
       const snap=await tx.get(ref);
-      if(!snap.exists)tx.create(ref,{currency:"INR",startingCashPaise:startingCash,cashPaise:startingCash,positions:{},createdAt:admin.firestore.FieldValue.serverTimestamp(),updatedAt:admin.firestore.FieldValue.serverTimestamp(),version:1});
+      if(!snap.exists)tx.create(ref,{currency:"INR",startingCashPaise:startingCash,cashPaise:startingCash,positions:{},realizedPnlPaise:0,createdAt:admin.firestore.FieldValue.serverTimestamp(),updatedAt:admin.firestore.FieldValue.serverTimestamp(),version:1});
     });
     const snap=await ref.get(),data=snap.data();
     res.set("Cache-Control","private, no-store");
-    res.json({currency:"INR",startingCashPaise:data.startingCashPaise,cashPaise:data.cashPaise,positions:data.positions||{},updatedAt:data.updatedAt?.toMillis?.()||null,simulationOnly:true});
+    res.json({currency:"INR",startingCashPaise:data.startingCashPaise,cashPaise:data.cashPaise,positions:data.positions||{},realizedPnlPaise:data.realizedPnlPaise||0,updatedAt:data.updatedAt?.toMillis?.()||null,simulationOnly:true});
   }catch(error){res.status(error.status||500).json({error:error.status?error.message:"Paper account could not be loaded."});}
 });
 app.post("/paper/orders",async(req,res)=>{
@@ -239,7 +239,7 @@ app.post("/paper/orders",async(req,res)=>{
       const accountSnap=await tx.get(accountRef);
       if(!accountSnap.exists)throw Object.assign(new Error("Paper account is not initialized."),{status:409});
       const account=accountSnap.data(),positions={...(account.positions||{})},position={...(positions[instrumentKey]||{quantity:0,averagePricePaise:0})};
-      let cash=account.cashPaise;
+      let cash=account.cashPaise,realizedPnlPaise=account.realizedPnlPaise||0,orderRealizedPnlPaise=0;
       if(side==="BUY"){
         if(cash<grossPaise)throw Object.assign(new Error("Insufficient virtual cash balance."),{status:409});
         const nextQty=position.quantity+quantity;
@@ -247,15 +247,15 @@ app.post("/paper/orders",async(req,res)=>{
         position.quantity=nextQty;cash-=grossPaise;
       }else{
         if(position.quantity<quantity)throw Object.assign(new Error("Not enough shares in the virtual portfolio to sell."),{status:409});
-        position.quantity-=quantity;cash+=grossPaise;
+        position.quantity-=quantity;cash+=grossPaise;orderRealizedPnlPaise=(pricePaise-position.averagePricePaise)*quantity;realizedPnlPaise+=orderRealizedPnlPaise;
         if(position.quantity===0)delete positions[instrumentKey];
         else positions[instrumentKey]=position;
       }
       if(side==="BUY")positions[instrumentKey]=position;
-      const order={uid:decoded.uid,instrumentKey,tradingSymbol:instrument.trading_symbol||instrument.name,exchange:instrument.exchange,side,quantity,executionPricePaise:pricePaise,grossPaise,quoteTimestampMs:tradeTime,quoteAgeMs:quoteAge,orderType:"MARKET",status:"FILLED",simulationOnly:true,createdAt:admin.firestore.FieldValue.serverTimestamp()};
+      const order={uid:decoded.uid,instrumentKey,tradingSymbol:instrument.trading_symbol||instrument.name,exchange:instrument.exchange,side,quantity,executionPricePaise:pricePaise,grossPaise,quoteTimestampMs:tradeTime,quoteAgeMs:quoteAge,realizedPnlPaise:orderRealizedPnlPaise,orderType:"MARKET",status:"FILLED",simulationOnly:true,createdAt:admin.firestore.FieldValue.serverTimestamp()};
       tx.create(orderRef,order);
-      tx.update(accountRef,{cashPaise:cash,positions,updatedAt:admin.firestore.FieldValue.serverTimestamp(),version:(account.version||1)+1});
-      result={orderId:orderRef.id,...order,cashPaise:cash};
+      tx.update(accountRef,{cashPaise:cash,positions,realizedPnlPaise,updatedAt:admin.firestore.FieldValue.serverTimestamp(),version:(account.version||1)+1});
+      result={orderId:orderRef.id,...order,cashPaise:cash,realizedPnlTotalPaise:realizedPnlPaise};
     });
     res.set("Cache-Control","private, no-store");
     res.status(201).json(result);
