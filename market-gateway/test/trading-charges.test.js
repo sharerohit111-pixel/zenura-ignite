@@ -40,3 +40,11 @@ test("NSE option SELL applies STT to premium and does not charge buy-side stamp 
  assert.equal(c.netCreditPaise,94953);
  assert.equal(c.totalDebitPaise,null);
 });
+
+test("option sell reports a negative net settlement when charges exceed tiny premium",()=>{
+ const {calculateLongOptionTradeCharges}=require("../lib/trading-charges");
+ const c=calculateLongOptionTradeCharges({grossPaise:100,exchange:"NSE",side:"SELL"});
+ assert.ok(c.totalChargesPaise>c.grossPaise);
+ assert.equal(c.netCreditPaise,c.grossPaise-c.totalChargesPaise);
+ assert.ok(c.netCreditPaise<0);
+});
