@@ -85,7 +85,7 @@ async function executeLongOptionTransaction({
     }else{
       const closedCostBasisPaise=contract.quantity===priorPosition.netQuantity
         ?priorCostBasisPaise
-        :Math.round(priorCostBasisPaise*contract.quantity/priorPosition.netQuantity);
+        :Number((BigInt(priorCostBasisPaise)*BigInt(contract.quantity)+BigInt(Math.floor(priorPosition.netQuantity/2)))/BigInt(priorPosition.netQuantity));
       costBasisPaise=priorCostBasisPaise-closedCostBasisPaise;
       orderRealizedPnlPaise=contract.contractValuePaise-closedCostBasisPaise-charges.totalChargesPaise;
       if(fill.netQuantity>0)averagePricePaise=Math.round(costBasisPaise/fill.netQuantity);
