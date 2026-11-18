@@ -52,3 +52,6 @@
 .saved-watch-quote.negative{color:#ff7185}
 .saved-watch-quote.neutral{color:var(--muted)}
 .watchlist-title>div{display:flex;gap:6px;flex-wrap:wrap}
+
+.watchlist-select-label{display:flex;flex-direction:column;gap:6px;margin:10px 0;color:var(--muted);font-size:.68rem;letter-spacing:.08em}
+.watchlist-select-label select{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:rgba(7,17,31,.8);color:var(--text);font:inherit}
