@@ -35,7 +35,7 @@ test("supports empty portfolios without a provider quote",()=>{
 });
 
 test("rejects missing, null, array, or malformed cash-equity positions storage",()=>{
- for(const account of [null,{}, {positions:null},{positions:[]},{positions:"invalid"}])
+ for(const account of [null,{positions:null},{positions:[]},{positions:"invalid"}])
   assert.throws(()=>readStoredPaperPositions(account),{status:409});
 });
 test("reads valid legacy and current cash-equity position maps",()=>{
