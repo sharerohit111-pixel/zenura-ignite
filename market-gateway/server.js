@@ -8,7 +8,7 @@ const path=require("node:path");
 const {gunzipSync}=require("node:zlib");
 const {calculatePaperFill}=require("./lib/paper-math");
 const {WATCHLIST_NAMES,normalizeWatchlists,mergeWatchlistUpdate}=require("./lib/watchlists");
-const {isUuid,makeOrderId,makeOrderFingerprint,assertIdempotentReplay}=require("./lib/order-idempotency");
+const {isUuid,makeOrderId,makeOrderFingerprint,buildPaperOrderUpdate,assertIdempotentReplay}=require("./lib/order-idempotency");
 admin.initializeApp();
 const db=admin.firestore();
 const app=express();
@@ -246,15 +246,11 @@ app.post("/paper/orders",async(req,res)=>{
       const [accountSnap,existingOrder]=await Promise.all([tx.get(accountRef),tx.get(orderRef)]);
       if(existingOrder.exists){const prior=existingOrder.data();assertIdempotentReplay(prior,requestFingerprint);result={...prior,orderId:orderRef.id,cashPaise:accountSnap.data()?.cashPaise,realizedPnlTotalPaise:accountSnap.data()?.realizedPnlPaise||0,idempotentReplay:true};return;}
       if(!accountSnap.exists)throw Object.assign(new Error("Paper account is not initialized."),{status:409});
-      const account=accountSnap.data(),positions={...(account.positions||{})},position={...(positions[instrumentKey]||{quantity:0,averagePricePaise:0})};
-      let cash=account.cashPaise,realizedPnlPaise=account.realizedPnlPaise||0,orderRealizedPnlPaise=0;
-      const fill=calculatePaperFill({side,quantity,pricePaise,cashPaise:cash,realizedPnlPaise,position});
-      cash=fill.cashPaise;realizedPnlPaise=fill.realizedPnlPaise;orderRealizedPnlPaise=fill.orderRealizedPnlPaise;
-      if(fill.position.quantity===0)delete positions[instrumentKey];else positions[instrumentKey]=fill.position;
-      const order={uid:decoded.uid,requestFingerprint,instrumentKey,tradingSymbol:instrument.trading_symbol||instrument.name,exchange:instrument.exchange,side,quantity,executionPricePaise:pricePaise,grossPaise:fill.grossPaise,quoteTimestampMs:tradeTime,quoteAgeMs:quoteAge,realizedPnlPaise:orderRealizedPnlPaise,orderType:"MARKET",status:"FILLED",simulationOnly:true,createdAt:admin.firestore.FieldValue.serverTimestamp()};
+      const account=accountSnap.data(),next=buildPaperOrderUpdate(account,{instrumentKey,side,quantity,pricePaise});
+      const order={uid:decoded.uid,requestFingerprint,instrumentKey,tradingSymbol:instrument.trading_symbol||instrument.name,exchange:instrument.exchange,side,quantity,executionPricePaise:pricePaise,grossPaise:next.grossPaise,quoteTimestampMs:tradeTime,quoteAgeMs:quoteAge,realizedPnlPaise:next.orderRealizedPnlPaise,orderType:"MARKET",status:"FILLED",simulationOnly:true,createdAt:admin.firestore.FieldValue.serverTimestamp()};
       tx.create(orderRef,order);
-      tx.update(accountRef,{cashPaise:cash,positions,realizedPnlPaise,updatedAt:admin.firestore.FieldValue.serverTimestamp(),version:(account.version||1)+1});
-      result={orderId:orderRef.id,...order,cashPaise:cash,realizedPnlTotalPaise:realizedPnlPaise};
+      tx.update(accountRef,{cashPaise:next.cashPaise,positions:next.positions,realizedPnlPaise:next.realizedPnlPaise,updatedAt:admin.firestore.FieldValue.serverTimestamp(),version:next.version});
+      result={orderId:orderRef.id,...order,cashPaise:next.cashPaise,realizedPnlTotalPaise:next.realizedPnlPaise};
     });
     res.set("Cache-Control","private, no-store");
     res.status(result.idempotentReplay?200:201).json(result);
