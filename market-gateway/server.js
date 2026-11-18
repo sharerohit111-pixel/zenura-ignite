@@ -8,6 +8,7 @@ const path=require("node:path");
 const {gunzipSync}=require("node:zlib");
 const {calculatePaperFill}=require("./lib/paper-math");
 const {WATCHLIST_NAMES,normalizeWatchlists,mergeWatchlistUpdate}=require("./lib/watchlists");
+const {isUuid,makeOrderId,makeOrderFingerprint,assertIdempotentReplay}=require("./lib/order-idempotency");
 admin.initializeApp();
 const db=admin.firestore();
 const app=express();
@@ -214,7 +215,7 @@ app.post("/paper/orders",async(req,res)=>{
     const side=String(req.body?.side||"").toUpperCase();
     const quantity=Number(req.body?.quantity);
     const idempotencyKey=typeof req.body?.idempotency_key==="string"?req.body.idempotency_key:"";
-    if(!/^[0-9a-f-]{36}$/i.test(idempotencyKey))return res.status(400).json({error:"A valid UUID idempotency_key is required."});
+    if(!isUuid(idempotencyKey))return res.status(400).json({error:"A valid UUID idempotency_key is required."});
     if(!instrumentKey||instrumentKey.length>100||/[\r\n]/.test(instrumentKey))return res.status(400).json({error:"A valid instrument_key is required."});
     if(!["BUY","SELL"].includes(side))return res.status(400).json({error:"Only BUY and SELL paper orders are supported."});
     if(!Number.isSafeInteger(quantity)||quantity<1||quantity>1000000)return res.status(400).json({error:"Quantity must be a whole number between 1 and 1,000,000."});
@@ -238,19 +239,19 @@ app.post("/paper/orders",async(req,res)=>{
     const pricePaise=Math.round(ltp*100),grossPaise=pricePaise*quantity;
     if(!Number.isSafeInteger(grossPaise)||grossPaise<=0)return res.status(400).json({error:"Order value exceeds supported calculation limits."});
     const accountRef=paperAccountRef(decoded.uid);
-    const orderId=crypto.createHash("sha256").update(decoded.uid+":"+idempotencyKey).digest("hex");
+    const orderId=makeOrderId(decoded.uid,idempotencyKey),requestFingerprint=makeOrderFingerprint({instrumentKey,side,quantity});
     const orderRef=db.collection("indianPaperOrders").doc(orderId);
     let result;
     await db.runTransaction(async tx=>{
       const [accountSnap,existingOrder]=await Promise.all([tx.get(accountRef),tx.get(orderRef)]);
-      if(existingOrder.exists){result={...existingOrder.data(),orderId:orderRef.id,cashPaise:accountSnap.data()?.cashPaise,realizedPnlTotalPaise:accountSnap.data()?.realizedPnlPaise||0,idempotentReplay:true};return;}
+      if(existingOrder.exists){const prior=existingOrder.data();assertIdempotentReplay(prior,requestFingerprint);result={...prior,orderId:orderRef.id,cashPaise:accountSnap.data()?.cashPaise,realizedPnlTotalPaise:accountSnap.data()?.realizedPnlPaise||0,idempotentReplay:true};return;}
       if(!accountSnap.exists)throw Object.assign(new Error("Paper account is not initialized."),{status:409});
       const account=accountSnap.data(),positions={...(account.positions||{})},position={...(positions[instrumentKey]||{quantity:0,averagePricePaise:0})};
       let cash=account.cashPaise,realizedPnlPaise=account.realizedPnlPaise||0,orderRealizedPnlPaise=0;
       const fill=calculatePaperFill({side,quantity,pricePaise,cashPaise:cash,realizedPnlPaise,position});
       cash=fill.cashPaise;realizedPnlPaise=fill.realizedPnlPaise;orderRealizedPnlPaise=fill.orderRealizedPnlPaise;
       if(fill.position.quantity===0)delete positions[instrumentKey];else positions[instrumentKey]=fill.position;
-      const order={uid:decoded.uid,instrumentKey,tradingSymbol:instrument.trading_symbol||instrument.name,exchange:instrument.exchange,side,quantity,executionPricePaise:pricePaise,grossPaise:fill.grossPaise,quoteTimestampMs:tradeTime,quoteAgeMs:quoteAge,realizedPnlPaise:orderRealizedPnlPaise,orderType:"MARKET",status:"FILLED",simulationOnly:true,createdAt:admin.firestore.FieldValue.serverTimestamp()};
+      const order={uid:decoded.uid,requestFingerprint,instrumentKey,tradingSymbol:instrument.trading_symbol||instrument.name,exchange:instrument.exchange,side,quantity,executionPricePaise:pricePaise,grossPaise:fill.grossPaise,quoteTimestampMs:tradeTime,quoteAgeMs:quoteAge,realizedPnlPaise:orderRealizedPnlPaise,orderType:"MARKET",status:"FILLED",simulationOnly:true,createdAt:admin.firestore.FieldValue.serverTimestamp()};
       tx.create(orderRef,order);
       tx.update(accountRef,{cashPaise:cash,positions,realizedPnlPaise,updatedAt:admin.firestore.FieldValue.serverTimestamp(),version:(account.version||1)+1});
       result={orderId:orderRef.id,...order,cashPaise:cash,realizedPnlTotalPaise:realizedPnlPaise};
