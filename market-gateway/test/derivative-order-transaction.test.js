@@ -213,23 +213,29 @@ test("Firestore transaction retry re-reads a competing committed order before re
  });
  const competingOrder={requestFingerprint:fingerprint,status:"FILLED",grossPaise:81250};
  let attempts=0;
- const committedWrites=[];
  const db={runTransaction:async callback=>{
-  attempts++;
-  const hasCompetingOrder=attempts>1;
-  const tx={
-   get:async ref=>{
-    if(ref.id===uid)return {exists:true,data:()=>({...initial,cashPaise:916354,realizedPnlPaise:0,version:2})};
-    return {exists:hasCompetingOrder,data:()=>competingOrder};
-   },
-   create:(ref,data)=>{if(!hasCompetingOrder)committedWrites.push(["create",ref.id,data]);},
-   update:(ref,data)=>{if(!hasCompetingOrder)committedWrites.push(["update",ref.id,data]);}
+  const firstTx={
+   get:async ref=>ref.id===uid
+    ?{exists:true,data:()=>initial}
+    :{exists:false,data:()=>undefined},
+   create:()=>{},update:()=>{}
   };
-  const result=await callback(tx);
-  return result;
+  await callback(firstTx); // First attempt loses a Firestore write conflict; its writes are discarded.
+  attempts++;
+  const retryTx={
+   get:async ref=>ref.id===uid
+    ?{exists:true,data:()=>({...initial,cashPaise:916354,version:2})}
+    :{exists:true,data:()=>competingOrder},
+   create:()=>{throw new Error("Retry must not create a duplicate order");},
+   update:()=>{throw new Error("Retry must not debit cash again");}
+  };
+  attempts++;
+  return callback(retryTx);
  }};
  const common={db,accountRef:{id:uid},orderRef:{id:orderId},uid,idempotencyKey,instrument,quote,lots:1,serverTimestamp:()=>"server-time",now};
  const result=await executeLongOptionBuyTransaction(common);
- assert.equal(attempts,1);
- assert.equal(result.idempotentReplay,false);
+ assert.equal(attempts,2);
+ assert.equal(result.idempotentReplay,true);
+ assert.equal(result.cashPaise,916354);
+ assert.equal(result.order.orderId,undefined);
 });
