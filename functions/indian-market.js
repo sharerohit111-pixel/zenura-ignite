@@ -9,6 +9,7 @@ const logger = require("firebase-functions/logger");
 const { connectionStatus } = require("./lib/upstox-connection-status");
 const { isOAuthStateUsable } = require("./lib/upstox-oauth-state");
 const { nextUpstoxTokenExpiry } = require("./lib/upstox-token-expiry");
+const { isUsableUpstoxTokenResponse } = require("./lib/upstox-token-response");
 const db = getFirestore();
 const CLIENT_ID = defineSecret("UPSTOX_CLIENT_ID");
 const CLIENT_SECRET = defineSecret("UPSTOX_CLIENT_SECRET");
@@ -62,10 +63,11 @@ exports.upstoxOAuthCallback = onRequest(
       });
       const response=await fetch("https://api.upstox.com/v2/login/authorization/token",{
         method:"POST",headers:{"Accept":"application/json","Content-Type":"application/x-www-form-urlencoded"},
-        body:form.toString()
+        body:form.toString(),
+        signal:AbortSignal.timeout(15000)
       });
       const payload=await response.json().catch(()=>({}));
-      if(!response.ok||typeof payload.access_token!=="string") {
+      if(!response.ok||!isUsableUpstoxTokenResponse(payload)) {
         logger.warn("Upstox token exchange rejected",{status:response.status});
         return res.status(502).send("Upstox authorization could not be completed. Return to the app and retry.");
       }
