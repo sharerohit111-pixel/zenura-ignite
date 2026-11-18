@@ -41,7 +41,7 @@ Set `ALLOWED_ORIGINS` to the exact deployed frontend origin. The service intenti
 ### Futures margin preview (preview only)
 
 - The authenticated `POST /paper/derivative/margin-preview` endpoint accepts only an official NSE/BSE futures instrument key, whole lots, and BUY/SELL side.
-- The gateway obtains a fresh Upstox V3 quote, validates the contract against the current official instrument master, then calls Upstox V2 `POST /v2/charges/margin` with product `D` and the verified quantity/price.
+- The gateway obtains a fresh Upstox V3 quote, validates the contract against the current official instrument master, then calls Upstox V2 `POST /v2/charges/margin` with the selected product `D` (Delivery) or `I` (Intraday) and the verified quantity/price.
 - The response is validated and returned as a rupee-to-paise margin estimate alongside the user's virtual cash and shortfall.
 - The Stocks UI exposes this only when a futures contract is selected. It is explicitly preview-only: no Firestore write, virtual cash reservation, paper fill, or real broker order occurs.
 - Futures execution remains disabled. Margin estimates are provider estimates and may change; they are not a guarantee of exchange acceptance or reserved funds.
