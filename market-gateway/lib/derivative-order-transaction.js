@@ -59,6 +59,8 @@ async function executeLongOptionBuyTransaction({
       fail("Derivative paper account contains invalid or unsupported balance data.",409);
     const derivativePositions=account.derivativePositions&&typeof account.derivativePositions==="object"&&!Array.isArray(account.derivativePositions)?{...account.derivativePositions}:{};
     const priorPosition=derivativePositions[contract.instrumentKey]||{netQuantity:0,averagePricePaise:0};
+    if(!Number.isSafeInteger(priorPosition.netQuantity)||priorPosition.netQuantity<0)
+      fail("Stored short or malformed option positions are not supported by this paper simulator.",409);
     if(priorPosition.instrumentType&&priorPosition.instrumentType!==contract.instrumentType)
       fail("Stored derivative position type does not match the verified contract.",409);
     if(side==="SELL"&&(!Number.isSafeInteger(priorPosition.netQuantity)||priorPosition.netQuantity<contract.quantity))
