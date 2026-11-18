@@ -18,6 +18,7 @@ const {reserveUserStream,releaseUserStream}=require("./lib/stream-registry");
 const {acquireStreamLease,renewStreamLease,releaseStreamLease}=require("./lib/stream-lease");
 const {writeSseFrame,resumeUpstream}=require("./lib/stream-backpressure");
 const {createStreamLifecycle}=require("./lib/stream-lifecycle");
+const {sendUpstoxSubscription}=require("./lib/upstox-subscription");
 admin.initializeApp();
 const db=admin.firestore();
 const app=express();
@@ -467,7 +468,7 @@ app.post("/stream",async(req,res)=>{
     upstream.on("open",()=>{
       if(lifecycle.closed||res.destroyed||res.writableEnded){stop();return;}
       writeEvent("status",{connected:true,mode,keys:keys.length});
-      upstream.send(Buffer.from(JSON.stringify({guid:crypto.randomUUID(),method:"sub",data:{mode,instrumentKeys:keys}})),error=>{
+      sendUpstoxSubscription(upstream,{mode,instrumentKeys:keys}).catch(error=>{
         if(error){writeEvent("error",{message:"Market feed subscription could not be sent"});stop();if(!res.writableEnded)res.end();}
       });
     });
