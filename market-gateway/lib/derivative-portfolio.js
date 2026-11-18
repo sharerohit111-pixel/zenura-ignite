@@ -21,7 +21,13 @@ function calculateDerivativePortfolio({positions,quotes,marginSnapshots=[],now=D
   seen.add(p.instrumentKey);
   const q=quoteByKey.get(p.instrumentKey);if(!q)fail("A fresh quote is required for every open derivative position.");
   const signedValue=q.pricePaise*p.netQuantity;
-  const pnl=(q.pricePaise-p.averagePricePaise)*p.netQuantity;
+  const costBasisPaise=p.costBasisPaise===undefined
+   ?Math.abs(p.netQuantity)*p.averagePricePaise:p.costBasisPaise;
+  if(!Number.isSafeInteger(costBasisPaise)||costBasisPaise<0||
+     (p.netQuantity>0&&costBasisPaise<1))fail("Derivative position cost basis is invalid.");
+  const pnl=p.netQuantity>0&&["CE","PE"].includes(p.instrumentType)
+   ?signedValue-costBasisPaise
+   :(q.pricePaise-p.averagePricePaise)*p.netQuantity;
   if(!Number.isSafeInteger(signedValue)||!Number.isSafeInteger(pnl))fail("Derivative portfolio valuation exceeds safe calculation limits.");
   let requiredMargin=0,marginAgeMs=null;
   if(p.instrumentType==="FUT"||p.netQuantity<0){
@@ -31,7 +37,7 @@ function calculateDerivativePortfolio({positions,quotes,marginSnapshots=[],now=D
   marketValuePaise+=p.instrumentType==="FUT"?0:signedValue;
   unrealizedPnlPaise+=pnl;reservedMarginPaise+=requiredMargin;
   if(!Number.isSafeInteger(marketValuePaise)||!Number.isSafeInteger(unrealizedPnlPaise)||!Number.isSafeInteger(reservedMarginPaise))fail("Derivative portfolio totals exceed safe calculation limits.");
-  valued.push({instrumentKey:p.instrumentKey,instrumentType:p.instrumentType,netQuantity:p.netQuantity,averagePricePaise:p.averagePricePaise,marketPricePaise:q.pricePaise,unrealizedPnlPaise:pnl,requiredMarginPaise:requiredMargin,quoteAgeMs:now-q.observedAtMs,marginAgeMs});
+  valued.push({instrumentKey:p.instrumentKey,instrumentType:p.instrumentType,netQuantity:p.netQuantity,averagePricePaise:p.averagePricePaise,costBasisPaise,marketPricePaise:q.pricePaise,unrealizedPnlPaise:pnl,requiredMarginPaise:requiredMargin,quoteAgeMs:now-q.observedAtMs,marginAgeMs});
  }
  return {positions:valued,marketValuePaise,unrealizedPnlPaise,reservedMarginPaise,valuationStatus:"fresh",simulationOnly:true,includesEntryCharges:true,excludesEstimatedExitCharges:true};
 }
