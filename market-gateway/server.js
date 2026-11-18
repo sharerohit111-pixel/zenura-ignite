@@ -14,6 +14,7 @@ const {formatSseEvent,formatSseComment}=require("./lib/sse");
 const {quoteAgeMs,isFreshQuote}=require("./lib/quote-freshness");
 const {normalizeProviderQuote}=require("./lib/provider-quote");
 const {validateStreamInstrumentKeys}=require("./lib/stream-subscription");
+const {reserveUserStream,releaseUserStream}=require("./lib/stream-registry");
 admin.initializeApp();
 const db=admin.firestore();
 const app=express();
@@ -46,6 +47,7 @@ const INSTRUMENTS_URL="https://assets.upstox.com/market-quote/instruments/exchan
 let FeedResponse;
 let instrumentCache=[];
 let instrumentCacheUpdatedAt=0;
+const activeUserStreams=new Map();
 async function refreshInstrumentCache(){
   const response=await fetchProvider(INSTRUMENTS_URL,{headers:{Accept:"application/gzip"}});
   if(!response.ok) throw new Error("Upstox instrument master download failed: "+response.status);
@@ -397,6 +399,8 @@ app.post("/stream",async(req,res)=>{
   let upstream;
   let heartbeat;
   let closed=false;
+  let streamUid=null;
+  let streamReservation=null;
   const writeEvent=(event,payload)=>{
     if(closed||res.destroyed||res.writableEnded)return false;
     return res.write(formatSseEvent(event,payload));
@@ -405,10 +409,15 @@ app.post("/stream",async(req,res)=>{
     if(closed)return;
     closed=true;
     if(heartbeat)clearInterval(heartbeat);
+    if(streamUid&&streamReservation)releaseUserStream(activeUserStreams,streamUid,streamReservation);
     if(upstream&&upstream.readyState<WebSocket.CLOSING)upstream.close();
   };
+  res.on("close",stop);
   try{
     const decoded=await authenticate(req);
+    streamUid=decoded.uid;
+    streamReservation=reserveUserStream(activeUserStreams,streamUid);
+    if(!streamReservation)return res.status(429).json({error:"A live market stream is already active for this account. Close it before reconnecting."});
     if(!instrumentCache.length||Date.now()-instrumentCacheUpdatedAt>6*60*60*1000)await refreshInstrumentCache();
     let keys;
     try{keys=validateStreamInstrumentKeys(req.body?.instrumentKeys,instrumentCache.map(item=>item.instrument_key),MAX_KEYS);}
@@ -467,7 +476,6 @@ app.post("/stream",async(req,res)=>{
       }
     });
     heartbeat=setInterval(()=>{if(!closed&&!res.destroyed&&!res.writableEnded)res.write(formatSseComment("keep-alive"));},20000);
-    res.on("close",stop);
   }catch(error){
     if(!res.headersSent)res.status(errorStatus(error)).json({error:error.status?error.message:"Market feed could not be started."});
     else{writeEvent("error",{message:"Market feed stopped unexpectedly"});if(!res.writableEnded)res.end();}
