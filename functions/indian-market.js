@@ -6,6 +6,7 @@ const { getFirestore, FieldValue, Timestamp } = require("firebase-admin/firestor
 const { defineSecret } = require("firebase-functions/params");
 const { onCall, onRequest, HttpsError } = require("firebase-functions/v2/https");
 const logger = require("firebase-functions/logger");
+const { connectionStatus } = require("./lib/upstox-connection-status");
 const db = getFirestore();
 const CLIENT_ID = defineSecret("UPSTOX_CLIENT_ID");
 const CLIENT_SECRET = defineSecret("UPSTOX_CLIENT_SECRET");
@@ -91,9 +92,6 @@ exports.getIndianMarketConnectionStatus = onCall(
   async req=>{
     const uid=uidOf(req), snap=await db.collection("upstoxConnections").doc(uid).get();
     if(!snap.exists) return {connected:false,feedReady:false,status:"not_connected"};
-    const data=snap.data(), valid=data.status==="connected"&&!!data.expiresAt&&data.expiresAt.toMillis()>Date.now();
-    const status=valid?"authorized_feed_not_configured":data.status==="connected"?"token_expired":"not_connected";
-    return {connected:valid,feedReady:false,status,
-      expiresAt:data.expiresAt?.toMillis()||null};
+    return connectionStatus(snap.data());
   }
 );
