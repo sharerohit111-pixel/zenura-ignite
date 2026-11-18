@@ -45,13 +45,13 @@ exports.upstoxOAuthCallback = onRequest(
     if(req.method!=="GET") return res.status(405).send("Method not allowed");
     const code=typeof req.query.code==="string"?req.query.code:"";
     const state=typeof req.query.state==="string"?req.query.state:"";
-    if(!code||!state||state.length>128) return res.status(400).send("Invalid authorization response.");
+    if(!code||!state||!/^[a-f0-9]{64}$/.test(state)) return res.status(400).send("Invalid authorization response.");
     const stateRef=db.collection("upstoxOAuthStates").doc(state);
     try {
       const snap=await stateRef.get();
       if(!snap.exists) return res.status(400).send("Authorization session not found.");
       const stateData=snap.data();
-      if(stateData.used||!stateData.expiresAt||stateData.expiresAt.toMillis()<Date.now())
+      if(stateData.used||!stateData.expiresAt||stateData.expiresAt.toMillis()<=Date.now())
         return res.status(400).send("Authorization session expired. Start again.");
       const form=new URLSearchParams({
         code,client_id:CLIENT_ID.value(),client_secret:CLIENT_SECRET.value(),
@@ -69,7 +69,7 @@ exports.upstoxOAuthCallback = onRequest(
       const encrypted=encryptToken(payload.access_token);
       await db.runTransaction(async tx=>{
         const fresh=await tx.get(stateRef);
-        if(!fresh.exists||fresh.data().used||fresh.data().expiresAt.toMillis()<Date.now())
+        if(!fresh.exists||fresh.data().used||fresh.data().expiresAt.toMillis()<=Date.now())
           throw new Error("OAuth state already used or expired.");
         const accountRef=db.collection("upstoxConnections").doc(stateData.uid);
         tx.set(accountRef,{
