@@ -15,7 +15,7 @@ test("joins multiple data lines and ignores comments",()=>{
 });
 test("defaults missing event name to message and ignores data-less blocks",()=>{
  const result=parseSseChunk("","event: status\n\n data\n\ndata: ok\n\n");
- assert.deepEqual(result.events,[{event:"message",data:" data"},{event:"message",data:"ok"}]);
+ assert.deepEqual(result.events,[{event:"message",data:"ok"}]);
 });
 test("dispatches a final unterminated event at end of stream",()=>{
  const result=parseSseChunk("","event: status\ndata: {\"connected\":true}",{final:true});
