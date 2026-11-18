@@ -121,7 +121,7 @@ app.get("/candles",async(req,res)=>{
     const to=new Date(toDate+"T00:00:00Z");
     if(from){
       const days=(to-from)/86400000;
-      const maxDays=unit==="minutes"?(interval<=15?31:92):unit==="hours"?92:unit==="days"?3653:unit==="weeks"?36525:36525;
+      const maxDays=unit==="minutes"?(interval<=15?31:92):unit==="hours"?92:unit==="days"?3653:unit==="weeks"?Infinity:Infinity;
       if(days>maxDays)return res.status(400).json({error:"Requested date range exceeds the documented historical retrieval window for this interval."});
     }
     if(!instrumentCache.length||Date.now()-instrumentCacheUpdatedAt>6*60*60*1000)await refreshInstrumentCache();
