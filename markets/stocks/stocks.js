@@ -398,7 +398,11 @@
       const response=await fetch(gateway+'/stream',{method:'POST',signal:controller.signal,headers:{Authorization:'Bearer '+token,'Content-Type':'application/json',Accept:'text/event-stream'},body:JSON.stringify({instrumentKeys:[item.instrument_key],mode:'ltpc'})});
       if(!response.ok){
         if(!window.ZenuraReconnectPolicy.shouldRetryFeedStatus(response.status)){
-          setFeedStatus('Upstox authorization required','Your sign-in or broker token is no longer valid. Reconnect Upstox, then select this instrument again.');
+          if(response.status===401||response.status===403){
+            setFeedStatus('Upstox authorization required','Your sign-in or broker token is no longer valid. Reconnect Upstox, then select this instrument again.');
+          }else{
+            setFeedStatus('Live feed request rejected','The gateway rejected this request ('+response.status+'). Check the selected instrument and gateway configuration.');
+          }
           return;
         }
         throw new Error('Live feed unavailable ('+response.status+').');
