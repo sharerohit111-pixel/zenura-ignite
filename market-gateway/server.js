@@ -219,9 +219,6 @@ app.post("/paper/orders",async(req,res)=>{
     if(!instrumentKey||instrumentKey.length>100||/[\r\n]/.test(instrumentKey))return res.status(400).json({error:"A valid instrument_key is required."});
     if(!["BUY","SELL"].includes(side))return res.status(400).json({error:"Only BUY and SELL paper orders are supported."});
     if(!Number.isSafeInteger(quantity)||quantity<1||quantity>1000000)return res.status(400).json({error:"Quantity must be a whole number between 1 and 1,000,000."});
-    if(!instrumentCache.length||Date.now()-instrumentCacheUpdatedAt>6*60*60*1000)await refreshInstrumentCache();
-    const instrument=instrumentCache.find(x=>x.instrument_key===instrumentKey&&x.instrument_type==="EQ"&&["NSE_EQ","BSE_EQ"].includes(x.segment));
-    if(!instrument)return res.status(400).json({error:"Phase 1 paper orders support verified NSE/BSE cash equities only."});
     const orderId=makeOrderId(decoded.uid,idempotencyKey),requestFingerprint=makeOrderFingerprint({instrumentKey,side,quantity});
     const orderRef=db.collection("indianPaperOrders").doc(orderId);
     const priorOrder=await orderRef.get();
@@ -231,6 +228,9 @@ app.post("/paper/orders",async(req,res)=>{
       res.set("Cache-Control","private, no-store");
       return res.status(200).json({...prior,orderId:orderRef.id,executionPricePaise:prior.executionPricePaise,grossPaise:prior.grossPaise,cashPaise:Number.isSafeInteger(current.cashPaise)?current.cashPaise:null,realizedPnlTotalPaise:Number.isSafeInteger(current.realizedPnlPaise)?current.realizedPnlPaise:0,idempotentReplay:true});
     }
+    if(!instrumentCache.length||Date.now()-instrumentCacheUpdatedAt>6*60*60*1000)await refreshInstrumentCache();
+    const instrument=instrumentCache.find(x=>x.instrument_key===instrumentKey&&x.instrument_type==="EQ"&&["NSE_EQ","BSE_EQ"].includes(x.segment));
+    if(!instrument)return res.status(400).json({error:"Phase 1 paper orders support verified NSE/BSE cash equities only."});
     const connection=await db.collection("upstoxConnections").doc(decoded.uid).get();
     if(!connection.exists)return res.status(403).json({error:"Connect your Upstox account before placing a paper order."});
     const connectionData=connection.data();
