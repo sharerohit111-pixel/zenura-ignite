@@ -21,6 +21,12 @@ test("futures exclude notional market value but mark P&L and margin",()=>{
  const r=calculateDerivativePortfolio({positions:[p],quotes:[quote({pricePaise:12000})],marginSnapshots:[margin()],now});
  assert.equal(r.marketValuePaise,0);assert.equal(r.unrealizedPnlPaise,100000);assert.equal(r.reservedMarginPaise,150000);
 });
+test("long option unrealized P&L uses exact entry cost basis including fees",()=>{
+ const p=pos({instrumentType:"CE",netQuantity:65,averagePricePaise:1287,costBasisPaise:83646});
+ const r=calculateDerivativePortfolio({positions:[p],quotes:[quote({pricePaise:1500})],now});
+ assert.equal(r.unrealizedPnlPaise,13854);
+ assert.equal(r.positions[0].costBasisPaise,83646);
+});
 test("rejects stale, future-dated and missing quotes",()=>{
  const p=pos();
  assert.throws(()=>calculateDerivativePortfolio({positions:[p],quotes:[],now}),/fresh quote/);
