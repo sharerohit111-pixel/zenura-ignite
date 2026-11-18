@@ -36,7 +36,19 @@
     }catch(error){message(error.message||'Could not load instruments.');}
   }
   const watchAdd=document.getElementById('watchlist-add'),watchStatus=document.getElementById('watchlist-status'),watchBody=document.getElementById('saved-watchlist');
-  let savedWatchlist=[];
+  let savedWatchlist=[],watchQuotes=new Map();
+  async function loadWatchlistQuotes(){
+    const connector=window.ZENURA_MARKET_CONNECTOR;if(!gateway||!connector?.getIdToken||!savedWatchlist.length){watchQuotes.clear();renderSavedWatchlist();return;}
+    watchStatus.textContent='Refreshing verified watchlist prices…';
+    try{
+      const token=await connector.getIdToken(),response=await fetch(gateway+'/watchlist/quotes',{headers:{Authorization:'Bearer '+token,Accept:'application/json'}});
+      const data=await response.json();if(!response.ok)throw new Error(data.error||'Watchlist quotes unavailable.');
+      watchQuotes=new Map((data.quotes||[]).map(q=>[q.instrumentKey,q]));
+      renderSavedWatchlist();
+      const fresh=(data.quotes||[]).filter(q=>q.status==='fresh').length;
+      watchStatus.textContent=fresh+' of '+savedWatchlist.length+' watchlist prices are fresh provider quotes. '+(fresh<savedWatchlist.length?'Some prices are stale or unavailable.':'');
+    }catch(error){watchStatus.textContent=error.message||'Watchlist quotes unavailable.';renderSavedWatchlist();}
+  }
   async function saveWatchlist(){
     const connector=window.ZENURA_MARKET_CONNECTOR;
     if(!gateway||!connector?.getIdToken){watchStatus.textContent='Sign in and configure the gateway to save your watchlist.';return;}
@@ -53,9 +65,17 @@
     if(!savedWatchlist.length){const empty=document.createElement('div');empty.className='empty';empty.textContent='No saved instruments yet.';watchBody.append(empty);}
     savedWatchlist.forEach(item=>{
       const row=document.createElement('div');row.className='saved-watch-row';
+      const info=document.createElement('div');info.className='saved-watch-info';
       const pick=document.createElement('button');pick.type='button';pick.className='saved-watch-pick';pick.textContent=item.trading_symbol||item.name||item.instrument_key;pick.addEventListener('click',()=>select(item));
+      const quote=watchQuotes.get(item.instrument_key),detail=document.createElement('small');detail.className='saved-watch-quote';
+      if(quote?.status==='fresh'){
+        const change=Number(quote.netChange||0),pct=quote.changePercent;
+        detail.textContent='₹'+Number(quote.lastPrice).toLocaleString('en-IN',{maximumFractionDigits:2})+' · '+(change>0?'+':'')+change.toFixed(2)+(pct===null?'':' ('+(pct>0?'+':'')+pct.toFixed(2)+'%)');
+        detail.classList.add(change>0?'positive':change<0?'negative':'neutral');
+      }else detail.textContent=quote?'STALE / UNAVAILABLE':'Price not refreshed';
+      info.append(pick,detail);
       const remove=document.createElement('button');remove.type='button';remove.className='saved-watch-remove';remove.textContent='REMOVE';remove.setAttribute('aria-label','Remove '+(item.trading_symbol||item.instrument_key)+' from watchlist');remove.addEventListener('click',async()=>{const previous=savedWatchlist;savedWatchlist=savedWatchlist.filter(x=>x.instrument_key!==item.instrument_key);renderSavedWatchlist();if(!await saveWatchlist()){savedWatchlist=previous;renderSavedWatchlist();}});
-      row.append(pick,remove);watchBody.append(row);
+      row.append(info,remove);watchBody.append(row);
     });
     watchAdd.disabled=!selected||savedWatchlist.some(x=>x.instrument_key===selected.instrument_key)||savedWatchlist.length>=50||!window.ZENURA_MARKET_CONNECTOR?.getIdToken;
   }
@@ -64,13 +84,15 @@
     try{
       const token=await connector.getIdToken(),response=await fetch(gateway+'/watchlist',{headers:{Authorization:'Bearer '+token,Accept:'application/json'}});
       const data=await response.json();if(!response.ok)throw new Error(data.error||'Watchlist unavailable');
-      savedWatchlist=data.items||[];renderSavedWatchlist();watchStatus.textContent=savedWatchlist.length+' saved instruments · Private to your account.';
+      savedWatchlist=data.items||[];renderSavedWatchlist();await loadWatchlistQuotes();
     }catch(error){watchStatus.textContent=error.message||'Watchlist could not be loaded.';}
   }
   watchAdd.addEventListener('click',async()=>{
     if(!selected||savedWatchlist.some(x=>x.instrument_key===selected.instrument_key)||savedWatchlist.length>=50)return;
-    const previous=savedWatchlist;savedWatchlist=[...savedWatchlist,selected];renderSavedWatchlist();if(!await saveWatchlist()){savedWatchlist=previous;renderSavedWatchlist();}
+    const previous=savedWatchlist;savedWatchlist=[...savedWatchlist,selected];renderSavedWatchlist();if(!await saveWatchlist()){savedWatchlist=previous;renderSavedWatchlist();}else await loadWatchlistQuotes();
   });
+  const watchRefresh=document.getElementById('watchlist-refresh');
+  watchRefresh.addEventListener('click',loadWatchlistQuotes);
   const paperCash=document.getElementById('paper-cash'),paperRealized=document.getElementById('paper-realized'),paperAccountStatus=document.getElementById('paper-account-status'),paperOrderStatus=document.getElementById('paper-order-status'),paperQuantity=document.getElementById('paper-quantity'),paperBuy=document.getElementById('paper-buy'),paperSell=document.getElementById('paper-sell');
   function inrPaise(value){return '₹'+(Number(value||0)/100).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});}
   async function loadPaperAccount(){
