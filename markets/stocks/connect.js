@@ -15,12 +15,12 @@ const card = document.getElementById("connection");
 const heading = document.getElementById("connection-title");
 const detail = document.getElementById("connection-sub");
 
-function setState(title, message, connected = false) {
+function setState(title, message, connected = false, showDisconnect = connected) {
   heading.textContent = title;
   detail.textContent = message;
   card.classList.toggle("connected", connected);
   button.textContent = connected ? "RECONNECT UPSTOX" : (auth.currentUser ? "CONNECT UPSTOX" : "SIGN IN / CONNECT");
-  disconnectButton.hidden = !connected;
+  disconnectButton.hidden = !showDisconnect;
 }
 function explainError(error) {
   const code = error?.code || "";
@@ -47,7 +47,7 @@ async function refreshStatus() {
         : "Account authorized. Select an instrument to check live feed availability.")
         + " Access token expires at " + expiry + "; reconnect after expiry.", true);
     } else if (data.status === "token_expired") {
-      setState("UPSTOX TOKEN EXPIRED", "Upstox standard access tokens expire at 03:30 AM IST. Reconnect your account to continue.");
+      setState("UPSTOX TOKEN EXPIRED", "Upstox standard access tokens expire at 03:30 AM IST. Reconnect your account to continue, or disconnect the saved token.", false, true);
     } else {
       setState("UPSTOX NOT CONNECTED", "Authorize Upstox to link your trading account.");
     }
@@ -58,13 +58,14 @@ async function refreshStatus() {
 disconnectButton.addEventListener("click", async () => {
   disconnectButton.disabled = true;
   try {
-    setState("DISCONNECTING UPSTOX", "Revoking the saved connection and stopping its live feed…");
+    setState("DISCONNECTING UPSTOX", "Removing the locally saved token and ending this app's live feed…");
     await disconnectAccount();
+    await refreshStatus();
+    setState("UPSTOX DISCONNECTED", "Saved token removed and this app's feed will close on its next lease check. This does not revoke app access at Upstox; remove that permission separately in your Upstox account.");
   } catch (error) {
     setState("DISCONNECT FAILED", explainError(error));
   } finally {
     disconnectButton.disabled = false;
-    await refreshStatus();
   }
 });
 button.addEventListener("click", async () => {
