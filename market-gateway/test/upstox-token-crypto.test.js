@@ -8,7 +8,7 @@ const {decryptUpstoxToken} = require("../lib/upstox-token-crypto");
 function encrypt(value, key) {
   const iv = crypto.randomBytes(12);
   const cipher = crypto.createCipheriv("aes-256-gcm", key, iv);
-  const data = Buffer.concat([cipher.update(value, "utf8"), cipher.final()]);
+  const data = Buffer.concat([cipher.update(value), cipher.final()]);
   return {v:1,iv:iv.toString("base64"),tag:cipher.getAuthTag().toString("base64"),data:data.toString("base64")};
 }
 
@@ -36,4 +36,11 @@ test("rejects tampered ciphertext and authentication tags", () => {
   assert.throws(() => decryptUpstoxToken(changed, key.toString("base64")));
   const changedTag = {...box, tag:Buffer.alloc(16).toString("base64")};
   assert.throws(() => decryptUpstoxToken(changedTag, key.toString("base64")));
+});
+
+test("rejects authenticated empty, control-character, and invalid UTF-8 plaintext", () => {
+  const key = crypto.randomBytes(32);
+  for (const value of [Buffer.alloc(0), Buffer.from("\\nforged", "utf8"), Buffer.from([0xff, 0xfe])]) {
+    assert.throws(() => decryptUpstoxToken(encrypt(value, key), key.toString("base64")));
+  }
 });
