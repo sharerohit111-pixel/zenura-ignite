@@ -264,7 +264,6 @@ app.post("/paper/orders",async(req,res)=>{
     const connectionData=connection.data();
     if(!isUpstoxTokenUsable(connectionData))return res.status(403).json({error:"Upstox token expired. Reconnect your account."});
     const accessToken=decryptToken(connectionData.tokenCiphertext);
-    await consumeMarginPreviewSlot(db,decoded.uid);
     const quoteUrl="https://api.upstox.com/v3/market-quote/quotes?"+new URLSearchParams({instrument_key:instrumentKey});
     const quoteResponse=await fetchProvider(quoteUrl,{headers:{Authorization:"Bearer "+accessToken,Accept:"application/json"}});
     const quotePayload=await quoteResponse.json().catch(()=>null);
@@ -301,6 +300,7 @@ app.post("/paper/derivative/margin-preview",async(req,res)=>{
     const connectionData=connection.data();
     if(!isUpstoxTokenUsable(connectionData))return res.status(403).json({error:"Upstox token expired. Reconnect your account."});
     const accessToken=decryptToken(connectionData.tokenCiphertext);
+    await consumeMarginPreviewSlot(db,decoded.uid);
     const quoteUrl="https://api.upstox.com/v3/market-quote/quotes?"+new URLSearchParams({instrument_key:instrumentKey});
     const quoteResponse=await fetchProvider(quoteUrl,{headers:{Authorization:"Bearer "+accessToken,Accept:"application/json"}});
     const quotePayload=await quoteResponse.json().catch(()=>null);
