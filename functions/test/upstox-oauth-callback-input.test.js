@@ -9,7 +9,7 @@ test("accepts a bounded authorization code and 256-bit hex state", () => {
   assert.equal(isUsableUpstoxOAuthCallback("auth-code", state), true);
 });
 test("rejects missing, oversized, and control-character authorization codes", () => {
-  for (const code of ["", null, undefined, "x".repeat(4097), "code\\nforged"]) {
+  for (const code of ["", null, undefined, "x".repeat(4097), "code\nforged"]) {
     assert.equal(isUsableUpstoxOAuthCallback(code, state), false);
   }
 });
