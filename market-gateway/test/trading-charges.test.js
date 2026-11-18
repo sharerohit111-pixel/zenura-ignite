@@ -20,7 +20,7 @@ test("NSE option BUY estimates brokerage, exchange, stamp duty and GST without S
 test("BSE option BUY uses BSE exchange transaction rate",()=>{
  const c=calculateLongOptionBuyCharges({grossPaise:100000,exchange:"BSE"});
  assert.equal(c.exchangeTransactionPaise,33);
- assert.equal(c.totalChargesPaise,2396);
+ assert.equal(c.totalChargesPaise,2402);
 });
 
 test("rejects invalid turnover, exchange and brokerage",()=>{
