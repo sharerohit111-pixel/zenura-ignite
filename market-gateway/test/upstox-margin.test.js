@@ -28,3 +28,7 @@ test("rejects margin components for a different instrument",()=>{
 test("rejects malformed margin components collection",()=>{
  assert.throws(()=>normalizeUpstoxMarginResponse({status:"success",data:{required_margin:100,margins:{span:100}}},key),/components list/);
 });
+
+test("rejects malformed null and array margin component rows",()=>{
+ for(const row of [null,[], "bad"])assert.throws(()=>normalizeUpstoxMarginResponse({status:"success",data:{required_margin:100,margins:[row]}},key),/malformed margin component row/);
+});
