@@ -325,7 +325,7 @@ app.put("/watchlist",async(req,res)=>{
   try{
     const decoded=await authenticate(req);
     const raw=req.body?.instrumentKeys;
-    if(!Array.isArray(raw)||raw.length>50||raw.some(x=>typeof x!=="string"||!x||x.length>100||/[\\r\\n]/.test(x)))
+    if(!Array.isArray(raw)||raw.length>50||raw.some(x=>typeof x!=="string"||!x||x.length>100||/[\u0000-\u001F]/.test(x)))
       return res.status(400).json({error:"Provide up to 50 valid instrument keys."});
     const keys=[...new Set(raw)];
     if(!instrumentCache.length||Date.now()-instrumentCacheUpdatedAt>6*60*60*1000)await refreshInstrumentCache();
