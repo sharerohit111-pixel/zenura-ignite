@@ -21,7 +21,8 @@
   }
   const auth = firebase.auth();
   const db = firebase.firestore();
-  let selectedPlan = null;\n  let paymentLanguage = (() => { try { return localStorage.getItem('zenura-crypto-payment-language') === 'hi' ? 'hi' : 'en'; } catch (_) { return 'en'; } })();
+  let selectedPlan = null;
+  let paymentLanguage = (() => { try { return localStorage.getItem('zenura-crypto-payment-language') === 'hi' ? 'hi' : 'en'; } catch (_) { return 'en'; } })();
   const words = {en:['UPI Payment','Plan:','Amount:','Your payment details are not displayed here. Tap below to open a UPI app with the plan amount and payee details pre-filled. Confirm the payee name and amount inside your UPI app before paying.','Continue to UPI app','UPI transaction ID / UTR','Enter UTR after successful payment','After paying, enter the UTR and submit. Premium stays pending until the admin checks the actual bank/UPI credit and approves it. Do not submit a UPI PIN or OTP.','I have paid — Submit for review','Cancel','Payment is not verified yet.'],hi:['UPI भुगतान','प्लान:','राशि:','आपके भुगतान का विवरण यहाँ नहीं दिखाया जाएगा। नीचे टैप करके UPI ऐप खोलें; प्लान की राशि और भुगतान पाने वाले का विवरण पहले से भरा होगा। भुगतान से पहले UPI ऐप में प्राप्तकर्ता का नाम और राशि जाँच लें।','UPI ऐप पर जाएँ','UPI ट्रांज़ैक्शन ID / UTR','सफल भुगतान के बाद UTR दर्ज करें','भुगतान करने के बाद UTR दर्ज करके सबमिट करें। एडमिन द्वारा बैंक/UPI में वास्तविक राशि की जाँच और मंज़ूरी के बाद ही Premium सक्रिय होगा। UPI PIN या OTP यहाँ दर्ज न करें।','भुगतान कर दिया — जाँच के लिए भेजें','रद्द करें','भुगतान की अभी पुष्टि नहीं हुई है।']};
   const t = i => words[paymentLanguage][i];
   function setPaymentLanguage(lang, utr) { paymentLanguage=lang; try { localStorage.setItem('zenura-crypto-payment-language',lang); } catch (_) {} $('zpayTitle').textContent=t(0); $('zpayLanguage').textContent=lang==='en'?'हिंदी':'English'; if(selectedPlan) openPayment(selectedPlan.key,utr||''); }
@@ -60,7 +61,9 @@
   const say = t => { status.textContent = t; };
   const open = () => shade.classList.add('open');
   const close = () => shade.classList.remove('open');
-  $('zpayClose').onclick = close;\n  $('zpayLanguage').onclick = () => setPaymentLanguage(paymentLanguage==='en'?'hi':'en',$('zpayUtr')?.value||'');\n  setPaymentLanguage(paymentLanguage);
+  $('zpayClose').onclick = close;
+  $('zpayLanguage').onclick = () => setPaymentLanguage(paymentLanguage==='en'?'hi':'en',$('zpayUtr')?.value||'');
+  setPaymentLanguage(paymentLanguage);
   shade.addEventListener('click', e => { if (e.target === shade) close(); });
 
   function requireUser() {
