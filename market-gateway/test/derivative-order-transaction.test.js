@@ -281,6 +281,7 @@ test("rejects malformed stored option positions before applying a fill",async()=
   {...valid,averagePricePaise:0},
   {...valid,averagePricePaise:undefined},
   {...valid,costBasisPaise:Number.MAX_SAFE_INTEGER+1},
+  {...valid,averagePricePaise:1300},
   {...valid,exchange:"BSE"},
   {...valid,segment:"BSE_FO"},
   {...valid,expiry:"2026-12-31"},
