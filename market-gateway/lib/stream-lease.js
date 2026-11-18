@@ -31,7 +31,7 @@ async function releaseStreamLease(db,uid,leaseId,{collection="indianMarketStream
  const ref=db.collection(collection).doc(uid);
  return db.runTransaction(async tx=>{
   const snap=await tx.get(ref),current=snap.exists?snap.data():null;
-  if(!current||current.leaseId!==leaseId)return false;
+  if(!current||current.uid!==uid||current.leaseId!==leaseId)return false;
   tx.delete(ref);
   return true;
  });
