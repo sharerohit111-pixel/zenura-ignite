@@ -12,6 +12,7 @@ const {isUuid,makeOrderId,makeOrderFingerprint}=require("./lib/order-idempotency
 const {publicPaperOrder}=require("./lib/paper-order-response");
 const {formatSseEvent,formatSseComment}=require("./lib/sse");
 const {quoteAgeMs,isFreshQuote}=require("./lib/quote-freshness");
+const {normalizeProviderQuote}=require("./lib/provider-quote");
 const {validateStreamInstrumentKeys}=require("./lib/stream-subscription");
 admin.initializeApp();
 const db=admin.firestore();
@@ -254,17 +255,17 @@ app.post("/paper/orders",async(req,res)=>{
     const quotePayload=await quoteResponse.json().catch(()=>null);
     if(!quoteResponse.ok)return res.status(502).json({error:"A current Upstox full quote could not be verified.",providerStatus:quoteResponse.status});
     const quoteEntry=Object.values(quotePayload?.data||{}).find(x=>x&&x.instrument_token===instrumentKey);
-    const ltp=Number(quoteEntry?.last_price),tradeTime=Number(quoteEntry?.last_trade_time||0);
-    const quoteAge=quoteAgeMs(tradeTime);
-    if(!Number.isFinite(ltp)||ltp<=0||!isFreshQuote(tradeTime,15000))
-      return res.status(409).json({error:"No sufficiently fresh provider quote is available. Paper order rejected.",quoteAgeMs:Number.isFinite(quoteAge)?quoteAge:null});
-    const pricePaise=Math.round(ltp*100),grossPaise=pricePaise*quantity;
+    let normalizedQuote;
+    try{normalizedQuote=normalizeProviderQuote(quoteEntry,instrumentKey);}
+    catch(error){return res.status(error.status||409).json({error:error.message,quoteAgeMs:Number.isFinite(error.quoteAgeMs)?error.quoteAgeMs:null});}
+    const {pricePaise,tradeTimeMs,quoteAgeMs:quoteAge}=normalizedQuote;
+    const grossPaise=pricePaise*quantity;
     if(!Number.isSafeInteger(grossPaise)||grossPaise<=0)return res.status(400).json({error:"Order value exceeds supported calculation limits."});
     const accountRef=paperAccountRef(decoded.uid);
     const {executePaperOrderTransaction}=require("./lib/paper-order-transaction");
     const result=await executePaperOrderTransaction({
       db,accountRef,orderRef,uid:decoded.uid,requestFingerprint,
-      order:{uid:decoded.uid,requestFingerprint,instrumentKey,tradingSymbol:instrument.trading_symbol||instrument.name,exchange:instrument.exchange,side,quantity,executionPricePaise:pricePaise,quoteTimestampMs:tradeTime,quoteAgeMs:quoteAge,orderType:"MARKET",status:"FILLED",simulationOnly:true},
+      order:{uid:decoded.uid,requestFingerprint,instrumentKey,tradingSymbol:instrument.trading_symbol||instrument.name,exchange:instrument.exchange,side,quantity,executionPricePaise:pricePaise,quoteTimestampMs:tradeTimeMs,quoteAgeMs:quoteAge,orderType:"MARKET",status:"FILLED",simulationOnly:true},
       pricePaise,publicPaperOrder,serverTimestamp:()=>admin.firestore.FieldValue.serverTimestamp()
     });
     res.set("Cache-Control","private, no-store");
