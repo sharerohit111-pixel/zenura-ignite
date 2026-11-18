@@ -156,7 +156,7 @@ app.get("/option-chain",async(req,res)=>{
     const decoded=await authenticate(req);
     const instrumentKey=String(req.query.instrument_key||"");
     const expiry=String(req.query.expiry_date||"");
-    if(!instrumentKey||instrumentKey.length>100||/[\\r\\n]/.test(instrumentKey))
+    if(!instrumentKey||instrumentKey.length>100||/[\r\n]/.test(instrumentKey))
       return res.status(400).json({error:"A valid underlying instrument_key is required."});
     const relative=["current_week","next_week","far_week","current_month","next_month","far_month"];
     if(!relative.includes(expiry)&&!validDate(expiry))
@@ -211,7 +211,7 @@ app.post("/paper/orders",async(req,res)=>{
     const instrumentKey=typeof req.body?.instrument_key==="string"?req.body.instrument_key:"";
     const side=String(req.body?.side||"").toUpperCase();
     const quantity=Number(req.body?.quantity);
-    if(!instrumentKey||instrumentKey.length>100||/[\\r\\n]/.test(instrumentKey))return res.status(400).json({error:"A valid instrument_key is required."});
+    if(!instrumentKey||instrumentKey.length>100||/[\r\n]/.test(instrumentKey))return res.status(400).json({error:"A valid instrument_key is required."});
     if(!["BUY","SELL"].includes(side))return res.status(400).json({error:"Only BUY and SELL paper orders are supported."});
     if(!Number.isSafeInteger(quantity)||quantity<1||quantity>1000000)return res.status(400).json({error:"Quantity must be a whole number between 1 and 1,000,000."});
     if(!instrumentCache.length||Date.now()-instrumentCacheUpdatedAt>6*60*60*1000)await refreshInstrumentCache();
@@ -345,7 +345,7 @@ app.post("/stream",async(req,res)=>{
     const decoded=await authenticate(req);
     const keys=[...new Set(Array.isArray(req.body?.instrumentKeys)?req.body.instrumentKeys:[])];
     const mode=req.body?.mode||"ltpc";
-    if(!keys.length||keys.length>MAX_KEYS||keys.some(k=>typeof k!=="string"||k.length>100))
+    if(!keys.length||keys.length>MAX_KEYS||keys.some(k=>typeof k!=="string"||!k||k.length>100||/[\u0000-\u001F]/.test(k)))
       return res.status(400).json({error:"Provide a valid instrumentKeys list within the configured per-session limit."});
     if(!["ltpc","full","option_greeks"].includes(mode)) return res.status(400).json({error:"Unsupported feed mode."});
     const connection=await db.collection("upstoxConnections").doc(decoded.uid).get();
