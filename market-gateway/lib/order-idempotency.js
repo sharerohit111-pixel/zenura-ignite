@@ -15,8 +15,18 @@ function buildPaperOrderUpdate(account,{instrumentKey,side,quantity,pricePaise})
   throw Object.assign(new Error("Invalid paper account state."),{status:409});
  const {calculatePaperFill}=require("./paper-math");
  const positions={...account.positions};
- // Keep order execution within the same 50-open-position limit enforced by portfolio valuation.
- if(side==="BUY"&&!Object.prototype.hasOwnProperty.call(positions,instrumentKey)&&Object.keys(positions).length>=50)
+ let openPositionCount=0;
+ // Validate all persisted records and count only open holdings, matching portfolio valuation.
+ for(const [storedKey,stored] of Object.entries(positions)){
+  if(!storedKey||!stored||typeof stored!=="object"||Array.isArray(stored)||
+     !Number.isSafeInteger(stored.quantity)||stored.quantity<0||stored.quantity>1000000||
+     !Number.isSafeInteger(stored.averagePricePaise)||stored.averagePricePaise<0||
+     (stored.quantity>0&&stored.averagePricePaise<1))
+   throw Object.assign(new Error("Paper account contains a malformed cash-equity position."),{status:409});
+  if(stored.quantity>0)openPositionCount++;
+ }
+ // Closed legacy entries do not consume the 50-open-position valuation limit.
+ if(side==="BUY"&&!Object.prototype.hasOwnProperty.call(positions,instrumentKey)&&openPositionCount>=50)
   throw Object.assign(new Error("Paper portfolio is limited to 50 open positions. Close an existing position before opening another."),{status:409});
  const position={...(positions[instrumentKey]||{quantity:0,averagePricePaise:0})};
  const fill=calculatePaperFill({side,quantity,pricePaise,cashPaise:account.cashPaise,realizedPnlPaise:account.realizedPnlPaise??0,position});
