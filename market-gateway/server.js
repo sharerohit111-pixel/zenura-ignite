@@ -22,6 +22,7 @@ const {sendUpstoxSubscription}=require("./lib/upstox-subscription");
 const {decodeFeedResponse}=require("./lib/upstox-feed-decoder");
 const {filterFreshMarketFeeds}=require("./lib/market-feed-validation");
 const {buildPortfolioValuation}=require("./lib/paper-portfolio-valuation");
+const {createLeaseHeartbeat}=require("./lib/lease-heartbeat");
 const {isUpstoxTokenUsable}=require("./lib/upstox-token");
 admin.initializeApp();
 const db=admin.firestore();
@@ -393,13 +394,13 @@ app.put("/watchlist",async(req,res)=>{
 
 app.post("/stream",async(req,res)=>{
   let upstream;
-  let heartbeat;
+  let leaseHeartbeat;
   let streamUid=null;
   let streamReservation=null;
   let streamLeaseId=null;
   let streamLeaseAcquired=false;
   const lifecycle=createStreamLifecycle(()=>{
-    if(heartbeat)clearInterval(heartbeat);
+    if(leaseHeartbeat)leaseHeartbeat.stop();
     res.removeListener("drain",onDrain);
     if(streamUid&&streamReservation)releaseUserStream(activeUserStreams,streamUid,streamReservation);
     if(streamLeaseAcquired&&streamUid&&streamLeaseId)releaseStreamLease(db,streamUid,streamLeaseId).catch(()=>{});
@@ -428,7 +429,13 @@ app.post("/stream",async(req,res)=>{
     streamLeaseId=crypto.randomUUID();
     streamLeaseAcquired=await acquireStreamLease(db,streamUid,streamLeaseId);
     if(!streamLeaseAcquired)return res.status(429).json({error:"A live market stream is already active for this account. Close it before reconnecting."});
-    if(lifecycle.closed||res.destroyed||res.writableEnded){await releaseStreamLease(db,streamUid,streamLeaseId);streamLeaseAcquired=false;return;}
+    leaseHeartbeat=createLeaseHeartbeat({
+      renew:()=>renewStreamLease(db,streamUid,streamLeaseId),
+      onRenewed:()=>{if(res.headersSent&&!lifecycle.closed&&!res.destroyed&&!res.writableEnded)writeSseFrame(res,upstream,formatSseComment("keep-alive"));},
+      onLost:()=>{if(res.headersSent){writeEvent("error",{message:"Live market stream lease expired. Reconnect to continue."});if(!res.destroyed&&!res.writableEnded)res.end();}else if(!res.destroyed&&!res.writableEnded)res.status(429).json({error:"Live market stream lease expired during startup. Reconnect to continue."});stop();},
+      onError:()=>{if(res.headersSent){writeEvent("error",{message:"Live market stream lease could not be renewed."});if(!res.destroyed&&!res.writableEnded)res.end();}else if(!res.destroyed&&!res.writableEnded)res.status(503).json({error:"Live market stream lease could not be renewed."});stop();}
+    });
+    if(lifecycle.closed||res.destroyed||res.writableEnded){stop();return;}
     if(!instrumentCache.length||Date.now()-instrumentCacheUpdatedAt>6*60*60*1000)await refreshInstrumentCache();
     let keys;
     try{keys=validateStreamInstrumentKeys(req.body?.instrumentKeys,instrumentCache.map(item=>item.instrument_key),MAX_KEYS);}
@@ -487,16 +494,6 @@ app.post("/stream",async(req,res)=>{
         if(!res.destroyed&&!res.writableEnded)res.end();
       }
     });
-    heartbeat=setInterval(async()=>{
-      if(lifecycle.closed||res.destroyed||res.writableEnded)return;
-      try{
-        const renewed=await renewStreamLease(db,streamUid,streamLeaseId);
-        if(!renewed){writeEvent("error",{message:"Live market stream lease expired. Reconnect to continue."});stop();if(!res.destroyed&&!res.writableEnded)res.end();return;}
-        if(!lifecycle.closed&&!res.destroyed&&!res.writableEnded)writeSseFrame(res,upstream,formatSseComment("keep-alive"));
-      }catch(error){
-        writeEvent("error",{message:"Live market stream lease could not be renewed."});stop();if(!res.destroyed&&!res.writableEnded)res.end();
-      }
-    },20000);
   }catch(error){
     if(!res.headersSent)res.status(errorStatus(error)).json({error:error.status?error.message:"Market feed could not be started."});
     else{writeEvent("error",{message:"Market feed stopped unexpectedly"});if(!res.writableEnded)res.end();}
