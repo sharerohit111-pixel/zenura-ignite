@@ -35,13 +35,13 @@
       const data=await response.json();items=data.results||[];render(items);
     }catch(error){message(error.message||'Could not load instruments.');}
   }
-  const watchAdd=document.getElementById('watchlist-add'),watchStatus=document.getElementById('watchlist-status'),watchBody=document.getElementById('saved-watchlist');
-  let savedWatchlist=[],watchQuotes=new Map();
+  const watchAdd=document.getElementById('watchlist-add'),watchStatus=document.getElementById('watchlist-status'),watchBody=document.getElementById('saved-watchlist'),watchSelect=document.getElementById('watchlist-select');
+  let savedWatchlist=[],watchQuotes=new Map(),activeWatchlist=watchSelect.value;
   async function loadWatchlistQuotes(){
     const connector=window.ZENURA_MARKET_CONNECTOR;if(!gateway||!connector?.getIdToken||!savedWatchlist.length){watchQuotes.clear();renderSavedWatchlist();return;}
     watchStatus.textContent='Refreshing verified watchlist prices…';
     try{
-      const token=await connector.getIdToken(),response=await fetch(gateway+'/watchlist/quotes',{headers:{Authorization:'Bearer '+token,Accept:'application/json'}});
+      const token=await connector.getIdToken(),response=await fetch(gateway+'/watchlist/quotes?name='+encodeURIComponent(activeWatchlist),{headers:{Authorization:'Bearer '+token,Accept:'application/json'}});
       const data=await response.json();if(!response.ok)throw new Error(data.error||'Watchlist quotes unavailable.');
       watchQuotes=new Map((data.quotes||[]).map(q=>[q.instrumentKey,q]));
       renderSavedWatchlist();
@@ -54,7 +54,7 @@
     if(!gateway||!connector?.getIdToken){watchStatus.textContent='Sign in and configure the gateway to save your watchlist.';return;}
     try{
       watchStatus.textContent='Saving your private watchlist…';
-      const token=await connector.getIdToken(),response=await fetch(gateway+'/watchlist',{method:'PUT',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json',Accept:'application/json'},body:JSON.stringify({instrumentKeys:savedWatchlist.map(x=>x.instrument_key)})});
+      const token=await connector.getIdToken(),response=await fetch(gateway+'/watchlist',{method:'PUT',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json',Accept:'application/json'},body:JSON.stringify({name:activeWatchlist,instrumentKeys:savedWatchlist.map(x=>x.instrument_key)})});
       const data=await response.json();if(!response.ok)throw new Error(data.error||'Watchlist save failed.');
       watchStatus.textContent=data.count+' of 50 instruments saved to your account.';
       return true;
@@ -82,11 +82,12 @@
   async function loadSavedWatchlist(){
     const connector=window.ZENURA_MARKET_CONNECTOR;if(!gateway||!connector?.getIdToken)return;
     try{
-      const token=await connector.getIdToken(),response=await fetch(gateway+'/watchlist',{headers:{Authorization:'Bearer '+token,Accept:'application/json'}});
+      const token=await connector.getIdToken(),response=await fetch(gateway+'/watchlist?name='+encodeURIComponent(activeWatchlist),{headers:{Authorization:'Bearer '+token,Accept:'application/json'}});
       const data=await response.json();if(!response.ok)throw new Error(data.error||'Watchlist unavailable');
       savedWatchlist=data.items||[];renderSavedWatchlist();await loadWatchlistQuotes();
     }catch(error){watchStatus.textContent=error.message||'Watchlist could not be loaded.';}
   }
+  watchSelect.addEventListener('change',async()=>{activeWatchlist=watchSelect.value;savedWatchlist=[];watchQuotes.clear();renderSavedWatchlist();await loadSavedWatchlist();});
   watchAdd.addEventListener('click',async()=>{
     if(!selected||savedWatchlist.some(x=>x.instrument_key===selected.instrument_key)||savedWatchlist.length>=50)return;
     const previous=savedWatchlist;savedWatchlist=[...savedWatchlist,selected];renderSavedWatchlist();if(!await saveWatchlist()){savedWatchlist=previous;renderSavedWatchlist();}else await loadWatchlistQuotes();
