@@ -44,6 +44,7 @@ test("atomically records a long option BUY and debits premium",async()=>{
  assert.equal(writes[0][2].totalDebitPaise,83646);
  assert.equal(writes[1][2].derivativePositions[instrument.instrument_key].netQuantity,65);
  assert.equal(writes[1][2].derivativePositions[instrument.instrument_key].averagePricePaise,1287);
+ assert.equal(writes[1][2].derivativePositions[instrument.instrument_key].costBasisPaise,83646);
  assert.equal(writes[1][2].version,2);
  assert.equal(r.simulationOnly,true);
  assert.equal(r.idempotentReplay,false);
@@ -106,7 +107,7 @@ test("rejects malformed account state and future-dated quote",async()=>{
 
 test("SELL closes a long option, credits premium net of estimated charges, and realizes P&L",async()=>{
  const account={...initial,derivativePositions:{[instrument.instrument_key]:{
-  instrumentType:"CE",netQuantity:65,averagePricePaise:1287,exchange:"NSE",segment:"NSE_FO",expiry:"2026-11-26",lotSize:65
+  instrumentType:"CE",netQuantity:65,averagePricePaise:1287,costBasisPaise:83646,exchange:"NSE",segment:"NSE_FO",expiry:"2026-11-26",lotSize:65
  }}};
  const {common,writes}=setup({account});
  common.side="SELL";
@@ -117,7 +118,7 @@ test("SELL closes a long option, credits premium net of estimated charges, and r
  assert.equal(writes[0][2].netCreditPaise,96953);
  assert.equal(writes[1][2].cashPaise,1094953);
  assert.deepEqual(writes[1][2].derivativePositions,{});
- assert.equal(writes[1][2].realizedPnlPaise,11298);
+ assert.equal(writes[1][2].realizedPnlPaise,11307);
  assert.equal(r.idempotentReplay,false);
 });
 
@@ -134,4 +135,20 @@ test("SELL cannot open a short option or exceed an existing long position",async
  tooMany.common.lots=2;
  await assert.rejects(executeLongOptionBuyTransaction(tooMany.common),{status:409});
  assert.equal(tooMany.writes.length,0);
+});
+
+test("partial option SELL allocates exact entry cost basis and retains the remainder",async()=>{
+ const account={...initial,derivativePositions:{[instrument.instrument_key]:{
+  instrumentType:"CE",netQuantity:130,averagePricePaise:1287,costBasisPaise:167292,
+  exchange:"NSE",segment:"NSE_FO",expiry:"2026-11-26",lotSize:65
+ }}};
+ const {common,writes}=setup({account});
+ common.side="SELL";
+ common.quote={...quote,pricePaise:1500};
+ await executeLongOptionBuyTransaction(common);
+ const remaining=writes[1][2].derivativePositions[instrument.instrument_key];
+ assert.equal(remaining.netQuantity,65);
+ assert.equal(remaining.costBasisPaise,83646);
+ assert.equal(remaining.averagePricePaise,1287);
+ assert.equal(writes[1][2].realizedPnlPaise,11307);
 });
