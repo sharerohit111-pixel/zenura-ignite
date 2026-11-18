@@ -66,6 +66,26 @@ test("replays matching idempotency key without a second debit",async()=>{
  assert.equal(writes.length,0);
  assert.equal(r.idempotentReplay,true);
 });
+test("validates the current account on transaction-level idempotent replay",async()=>{
+ const prior={requestFingerprint:require("../lib/order-idempotency").makeOrderFingerprint({
+  instrumentKey:instrument.instrument_key,side:"BUY",quantity:65
+ }),status:"FILLED"};
+ for(const patch of [
+  {accountExists:false},
+  {account:{...initial,cashPaise:-1}},
+  {account:{...initial,realizedPnlPaise:1.25}}
+ ]){
+  const {common,writes}=setup({priorOrder:prior,...patch});
+  await assert.rejects(executeLongOptionBuyTransaction(common),{status:409});
+  assert.equal(writes.length,0);
+ }
+ const legacy=setup({priorOrder:prior,account:{cashPaise:25000,version:1}});
+ const replay=await executeLongOptionBuyTransaction(legacy.common);
+ assert.equal(replay.idempotentReplay,true);
+ assert.equal(replay.cashPaise,25000);
+ assert.equal(replay.realizedPnlPaise,0);
+});
+
 test("rejects reuse of idempotency key for a different order",async()=>{
  const {common,writes}=setup({priorOrder:{requestFingerprint:"different"}});
  await assert.rejects(executeLongOptionBuyTransaction(common),{status:409});
