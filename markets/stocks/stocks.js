@@ -152,15 +152,19 @@
     const allowed=!!selected&&['NSE_EQ','BSE_EQ'].includes(selected.segment)&&selected.instrument_type==='EQ'&&!!window.ZENURA_MARKET_CONNECTOR?.getIdToken&&!!gateway;
     paperBuy.disabled=!allowed;paperSell.disabled=!allowed;
   }
+  let pendingPaperOrderKey=null,pendingPaperOrderFingerprint='';
   async function submitPaperOrder(side){
     const qty=Number(paperQuantity.value);
     if(!Number.isSafeInteger(qty)||qty<1||qty>1000000){paperOrderStatus.textContent='Enter a whole-number quantity between 1 and 1,000,000.';return;}
     if(!selected||!['NSE_EQ','BSE_EQ'].includes(selected.segment)||selected.instrument_type!=='EQ'){paperOrderStatus.textContent='Select an NSE/BSE cash equity first.';return;}
+    const fingerprint=JSON.stringify({instrument_key:selected.instrument_key,side,quantity:qty});
+    if(!pendingPaperOrderKey||pendingPaperOrderFingerprint!==fingerprint){pendingPaperOrderKey=crypto.randomUUID();pendingPaperOrderFingerprint=fingerprint;}
     paperBuy.disabled=true;paperSell.disabled=true;paperOrderStatus.textContent='Verifying fresh provider quote and processing simulated order…';
     try{
       const token=await window.ZENURA_MARKET_CONNECTOR.getIdToken();
-      const response=await fetch(gateway+'/paper/orders',{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json',Accept:'application/json'},body:JSON.stringify({instrument_key:selected.instrument_key,side,quantity:qty})});
+      const response=await fetch(gateway+'/paper/orders',{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json',Accept:'application/json'},body:JSON.stringify({instrument_key:selected.instrument_key,side,quantity:qty,idempotency_key:pendingPaperOrderKey})});
       const data=await response.json();if(!response.ok)throw new Error(data.error||'Paper order rejected');
+      pendingPaperOrderKey=null;pendingPaperOrderFingerprint='';
       paperOrderStatus.textContent=side+' '+qty+' '+(data.tradingSymbol||selected.trading_symbol)+' filled at '+inrPaise(data.executionPricePaise)+' · Simulated only';
       await loadPaperAccount();await refreshPaperViews();
     }catch(error){paperOrderStatus.textContent=error.message||'Paper order failed.';}
