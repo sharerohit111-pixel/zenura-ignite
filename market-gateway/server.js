@@ -285,6 +285,72 @@ app.post("/paper/orders",async(req,res)=>{
   }catch(error){res.status(errorStatus(error)).json({error:error.status?error.message:"Paper order could not be completed."});}
 });
 
+// Futures margin preview only. This endpoint never reserves virtual cash or places an order.
+app.post("/paper/derivative/margin-preview",async(req,res)=>{
+  try{
+    const decoded=await authenticate(req);
+    const instrumentKey=typeof req.body?.instrument_key==="string"?req.body.instrument_key:"";
+    const lots=Number(req.body?.lots);
+    const side=String(req.body?.side||"").toUpperCase();
+    if(!instrumentKey||instrumentKey.length>100||/[\\r\\n]/.test(instrumentKey))
+      return res.status(400).json({error:"A valid instrument_key is required."});
+    if(!Number.isSafeInteger(lots)||lots<1||lots>10000)
+      return res.status(400).json({error:"Lots must be a whole number between 1 and 10,000."});
+    if(!["BUY","SELL"].includes(side))
+      return res.status(400).json({error:"Margin preview side must be BUY or SELL."});
+    if(!instrumentCache.length||Date.now()-instrumentCacheUpdatedAt>6*60*60*1000)await refreshInstrumentCache();
+    const instrument=instrumentCache.find(x=>x.instrument_key===instrumentKey&&x.instrument_type==="FUT"&&["NSE_FO","BSE_FO"].includes(x.segment));
+    if(!instrument)return res.status(400).json({error:"Select a verified NSE/BSE futures contract from the official instrument master."});
+    const connection=await db.collection("upstoxConnections").doc(decoded.uid).get();
+    if(!connection.exists)return res.status(403).json({error:"Connect your Upstox account to request a broker margin preview."});
+    const connectionData=connection.data();
+    if(!isUpstoxTokenUsable(connectionData))return res.status(403).json({error:"Upstox token expired. Reconnect your account."});
+    const accessToken=decryptToken(connectionData.tokenCiphertext);
+    const quoteUrl="https://api.upstox.com/v3/market-quote/quotes?"+new URLSearchParams({instrument_key:instrumentKey});
+    const quoteResponse=await fetchProvider(quoteUrl,{headers:{Authorization:"Bearer "+accessToken,Accept:"application/json"}});
+    const quotePayload=await quoteResponse.json().catch(()=>null);
+    if(!quoteResponse.ok)return res.status(502).json({error:"A current Upstox futures quote could not be verified.",providerStatus:quoteResponse.status});
+    const quoteEntry=Object.values(quotePayload?.data||{}).find(x=>x&&x.instrument_token===instrumentKey);
+    const normalizedQuote=normalizeProviderQuote(quoteEntry,instrumentKey,{maxAgeMs:15000});
+    const {validateDerivativeContract}=require("./lib/derivative-contract");
+    const contract=validateDerivativeContract(instrument,{lots,pricePaise:normalizedQuote.pricePaise,now:Date.now()});
+    const marginRequest={instruments:[{
+      instrument_key:instrumentKey,quantity:contract.quantity,product:"D",
+      transaction_type:side,price:normalizedQuote.pricePaise/100
+    }]};
+    const upstream=await fetchProvider("https://api.upstox.com/v2/charges/margin",{
+      method:"POST",headers:{Authorization:"Bearer "+accessToken,Accept:"application/json","Content-Type":"application/json"},
+      body:JSON.stringify(marginRequest)
+    });
+    const payload=await upstream.json().catch(()=>null);
+    if(!upstream.ok){
+      console.warn("Upstox margin preview returned",upstream.status);
+      return res.status(502).json({error:"Upstox broker margin preview failed.",providerStatus:upstream.status});
+    }
+    const {normalizeUpstoxMarginResponse}=require("./lib/upstox-margin");
+    const margin=normalizeUpstoxMarginResponse(payload,instrumentKey);
+    const accountSnap=await paperAccountRef(decoded.uid).get();
+    if(!accountSnap.exists)return res.status(409).json({error:"Initialize your Indian paper account to compare the margin estimate with virtual cash."});
+    const account=accountSnap.data();
+    if(!Number.isSafeInteger(account.cashPaise)||account.cashPaise<0)return res.status(409).json({error:"Shared paper account balance is invalid."});
+    res.set("Cache-Control","private, no-store");
+    res.json({
+      status:"PREVIEW_ONLY",tradingSymbol:instrument.trading_symbol,instrumentKey,
+      exchange:instrument.exchange,expiry:instrument.expiry,side,product:"D",
+      lots,lotSize:contract.lotSize,quantity:contract.quantity,
+      quote:{pricePaise:normalizedQuote.pricePaise,observedAtMs:normalizedQuote.tradeTimeMs},
+      requiredMarginPaise:margin.requiredMarginPaise,finalMarginPaise:margin.finalMarginPaise,
+      marginComponents:margin.components,availableVirtualCashPaise:account.cashPaise,
+      shortfallPaise:Math.max(margin.requiredMarginPaise-account.cashPaise,0),
+      source:margin.source,simulationOnly:true,previewOnly:true,
+      executionEnabled:false,persisted:false,marginReserved:false,
+      notice:"Indicative broker margin preview only. No virtual funds reserved and no order placed."
+    });
+  }catch(error){
+    if(!res.headersSent)res.status(errorStatus(error)).json({error:error.status?error.message:"Futures margin preview could not be completed."});
+  }
+});
+
 app.post("/paper/derivative/orders",async(req,res)=>{
   try{
     const decoded=await authenticate(req);
