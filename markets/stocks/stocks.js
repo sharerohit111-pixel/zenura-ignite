@@ -50,9 +50,9 @@
       while(true){
         const {value,done}=await reader.read();if(done)break;
         buffer+=decoder.decode(value,{stream:true});
-        const events=buffer.split('\n\n');buffer=events.pop()||'';
+        const events=buffer.split(/\r?\n\r?\n/);buffer=events.pop()||'';
         for(const event of events){
-          const line=event.split('\\n').find(x=>x.startsWith('data: '));if(!line)continue;
+          const line=event.split(/\r?\n/).find(x=>x.startsWith('data: '));if(!line)continue;
           try{
             const data=JSON.parse(line.slice(6));
             const feed=data.feeds?.[item.instrument_key];const quote=feed?.ltpc||feed?.fullFeed?.marketFF?.ltpc||feed?.fullFeed?.indexFF?.ltpc;
@@ -63,6 +63,7 @@
     }catch(error){if(error.name!=='AbortError')document.querySelector('.chart-placeholder span').textContent=error.message||'Live feed connection failed.';}
   }
   tabs.forEach(tab=>tab.addEventListener('click',()=>{
+    if(streamAbort){streamAbort.abort();streamAbort=null;}
     tabs.forEach(x=>x.classList.toggle('active',x===tab));activeList=tab.dataset.list;selected=null;
     title.textContent='No instrument selected';symbol.textContent='Choose an instrument';price.textContent='—';loadInstruments();
   }));
