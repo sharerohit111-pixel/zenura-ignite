@@ -45,7 +45,8 @@
       const token=await connector.getIdToken(),response=await fetch(gateway+'/watchlist',{method:'PUT',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json',Accept:'application/json'},body:JSON.stringify({instrumentKeys:savedWatchlist.map(x=>x.instrument_key)})});
       const data=await response.json();if(!response.ok)throw new Error(data.error||'Watchlist save failed.');
       watchStatus.textContent=data.count+' of 50 instruments saved to your account.';
-    }catch(error){watchStatus.textContent=error.message||'Watchlist save failed.';}
+      return true;
+    }catch(error){watchStatus.textContent=error.message||'Watchlist save failed.';return false;}
   }
   function renderSavedWatchlist(){
     watchBody.textContent='';
@@ -53,7 +54,7 @@
     savedWatchlist.forEach(item=>{
       const row=document.createElement('div');row.className='saved-watch-row';
       const pick=document.createElement('button');pick.type='button';pick.className='saved-watch-pick';pick.textContent=item.trading_symbol||item.name||item.instrument_key;pick.addEventListener('click',()=>select(item));
-      const remove=document.createElement('button');remove.type='button';remove.className='saved-watch-remove';remove.textContent='REMOVE';remove.setAttribute('aria-label','Remove '+(item.trading_symbol||item.instrument_key)+' from watchlist');remove.addEventListener('click',async()=>{savedWatchlist=savedWatchlist.filter(x=>x.instrument_key!==item.instrument_key);renderSavedWatchlist();await saveWatchlist();});
+      const remove=document.createElement('button');remove.type='button';remove.className='saved-watch-remove';remove.textContent='REMOVE';remove.setAttribute('aria-label','Remove '+(item.trading_symbol||item.instrument_key)+' from watchlist');remove.addEventListener('click',async()=>{const previous=savedWatchlist;savedWatchlist=savedWatchlist.filter(x=>x.instrument_key!==item.instrument_key);renderSavedWatchlist();if(!await saveWatchlist()){savedWatchlist=previous;renderSavedWatchlist();}});
       row.append(pick,remove);watchBody.append(row);
     });
     watchAdd.disabled=!selected||savedWatchlist.some(x=>x.instrument_key===selected.instrument_key)||savedWatchlist.length>=50||!window.ZENURA_MARKET_CONNECTOR?.getIdToken;
@@ -68,7 +69,7 @@
   }
   watchAdd.addEventListener('click',async()=>{
     if(!selected||savedWatchlist.some(x=>x.instrument_key===selected.instrument_key)||savedWatchlist.length>=50)return;
-    savedWatchlist=[...savedWatchlist,selected];renderSavedWatchlist();await saveWatchlist();
+    const previous=savedWatchlist;savedWatchlist=[...savedWatchlist,selected];renderSavedWatchlist();if(!await saveWatchlist()){savedWatchlist=previous;renderSavedWatchlist();}
   });
   const paperCash=document.getElementById('paper-cash'),paperRealized=document.getElementById('paper-realized'),paperAccountStatus=document.getElementById('paper-account-status'),paperOrderStatus=document.getElementById('paper-order-status'),paperQuantity=document.getElementById('paper-quantity'),paperBuy=document.getElementById('paper-buy'),paperSell=document.getElementById('paper-sell');
   function inrPaise(value){return '₹'+(Number(value||0)/100).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});}
@@ -252,7 +253,7 @@
   tabs.forEach(tab=>tab.addEventListener('click',()=>{
     clearFeedTimers();if(streamAbort){streamAbort.abort();streamAbort=null;}
     tabs.forEach(x=>x.classList.toggle('active',x===tab));activeList=tab.dataset.list;selected=null;chartRequest++;
-    title.textContent='No instrument selected';symbol.textContent='Choose an instrument';price.textContent='—';updatePaperButtons();loadInstruments();
+    title.textContent='No instrument selected';symbol.textContent='Choose an instrument';price.textContent='—';updatePaperButtons();renderSavedWatchlist();loadInstruments();
   }));
   search.addEventListener('input',()=>{clearTimeout(debounce);debounce=setTimeout(loadInstruments,250);});
   window.addEventListener('zenura-market-auth-ready',()=>{loadInstruments();loadCandles();loadPaperAccount();refreshPaperViews();loadSavedWatchlist();});
