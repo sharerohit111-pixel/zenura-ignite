@@ -425,7 +425,7 @@ app.get("/paper/derivatives/portfolio",async(req,res)=>{
 app.get("/paper/derivative/orders",async(req,res)=>{
   try{
     const decoded=await authenticate(req),rawLimit=req.query.limit===undefined?"50":String(req.query.limit);
-    if(!/^\\d+$/.test(rawLimit)||Number(rawLimit)<1)return res.status(400).json({error:"Derivative order history limit must be a whole number from 1 to 100."});
+    if(!/^\d+$/.test(rawLimit)||Number(rawLimit)<1)return res.status(400).json({error:"Derivative order history limit must be a whole number from 1 to 100."});
     const limit=Math.min(Number(rawLimit),100);
     const snap=await db.collection("indianDerivativeOrders").where("uid","==",decoded.uid).orderBy("createdAt","desc").limit(limit).get();
     const orders=snap.docs.map(doc=>{const o=doc.data();return {id:doc.id,tradingSymbol:o.tradingSymbol,instrumentKey:o.instrumentKey,instrumentType:o.instrumentType,expiry:o.expiry,side:o.side,quantity:o.quantity,lots:o.lots,executionPricePaise:o.executionPricePaise,grossPaise:o.grossPaise,status:o.status,orderType:o.orderType,simulationOnly:true,createdAt:o.createdAt?.toMillis?.()||null};});
