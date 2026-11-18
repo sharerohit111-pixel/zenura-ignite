@@ -22,6 +22,11 @@ const ALLOWED_ORIGINS=(process.env.ALLOWED_ORIGINS||"").split(",").map(x=>x.trim
 function fetchProvider(url,options={},timeoutMs=15000){
   return fetch(url,{...options,signal:AbortSignal.timeout(timeoutMs)});
 }
+function errorStatus(error){
+  if(Number.isInteger(error?.status))return error.status;
+  if(error?.name==="TimeoutError"||error?.name==="AbortError")return 504;
+  return 500;
+}
 app.use((req,res,next)=>{
   const origin=req.get("origin");
   if(origin&&ALLOWED_ORIGINS.includes(origin)){
@@ -154,7 +159,7 @@ app.get("/candles",async(req,res)=>{
     res.set("Cache-Control","private, no-store");
     res.json(payload);
   }catch(error){
-    if(!res.headersSent)res.status(error.status||500).json({error:error.status?error.message:"Historical candles could not be loaded."});
+    if(!res.headersSent)res.status(errorStatus(error)).json({error:error.status?error.message:"Historical candles could not be loaded."});
   }
 });
 
@@ -189,7 +194,7 @@ app.get("/option-chain",async(req,res)=>{
     res.set("Cache-Control","private, no-store");
     res.json(payload);
   }catch(error){
-    if(!res.headersSent)res.status(error.status||500).json({error:error.status?error.message:"Option chain could not be loaded."});
+    if(!res.headersSent)res.status(errorStatus(error)).json({error:error.status?error.message:"Option chain could not be loaded."});
   }
 });
 
@@ -211,7 +216,7 @@ app.get("/paper/account",async(req,res)=>{
     const snap=await ref.get(),data=snap.data();
     res.set("Cache-Control","private, no-store");
     res.json({currency:"INR",startingCashPaise:data.startingCashPaise,cashPaise:data.cashPaise,positions:data.positions||{},realizedPnlPaise:data.realizedPnlPaise||0,updatedAt:data.updatedAt?.toMillis?.()||null,simulationOnly:true});
-  }catch(error){res.status(error.status||500).json({error:error.status?error.message:"Paper account could not be loaded."});}
+  }catch(error){res.status(errorStatus(error)).json({error:error.status?error.message:"Paper account could not be loaded."});}
 });
 app.post("/paper/orders",async(req,res)=>{
   try{
@@ -266,7 +271,7 @@ app.post("/paper/orders",async(req,res)=>{
     });
     res.set("Cache-Control","private, no-store");
     res.status(result.idempotentReplay?200:201).json(result);
-  }catch(error){res.status(error.status||500).json({error:error.status?error.message:"Paper order could not be completed."});}
+  }catch(error){res.status(errorStatus(error)).json({error:error.status?error.message:"Paper order could not be completed."});}
 });
 
 app.get("/paper/portfolio",async(req,res)=>{
@@ -307,7 +312,7 @@ app.get("/paper/portfolio",async(req,res)=>{
     res.set("Cache-Control","private, no-store");
     const equityPaise=account.cashPaise+marketValuePaise;if(!Number.isSafeInteger(equityPaise))return res.status(409).json({error:"Portfolio equity exceeds safe calculation limits."});
     res.json({positions:valued,cashPaise:account.cashPaise,marketValuePaise,unrealizedPnlPaise,equityPaise,realizedPnlPaise:account.realizedPnlPaise??0,valuationStatus:staleCount?"partial_stale":"fresh",stalePositions:staleCount,simulationOnly:true});
-  }catch(error){res.status(error.status||500).json({error:error.status?error.message:"Portfolio valuation could not be loaded."});}
+  }catch(error){res.status(errorStatus(error)).json({error:error.status?error.message:"Portfolio valuation could not be loaded."});}
 });
 
 app.get("/paper/orders",async(req,res)=>{
@@ -327,7 +332,7 @@ app.get("/paper/orders",async(req,res)=>{
     const orders=docs.map(doc=>{const order=doc.data();return {id:doc.id,tradingSymbol:order.tradingSymbol,exchange:order.exchange,side:order.side,quantity:order.quantity,executionPricePaise:order.executionPricePaise,grossPaise:order.grossPaise,realizedPnlPaise:order.realizedPnlPaise,orderType:order.orderType,status:order.status,simulationOnly:order.simulationOnly,createdAt:order.createdAt?.toMillis?.()||null};});
     res.set("Cache-Control","private, no-store");
     res.json({orders,hasMore,nextCursor:hasMore?docs[docs.length-1].id:null,simulationOnly:true});
-  }catch(error){res.status(error.status||500).json({error:error.status?error.message:"Paper order history could not be loaded."});}
+  }catch(error){res.status(errorStatus(error)).json({error:error.status?error.message:"Paper order history could not be loaded."});}
 });
 
 // Per-user named Indian-market watchlists. Legacy data is normalized by the tested helper.
@@ -345,7 +350,7 @@ app.get("/watchlists",async(req,res)=>{
     for(const name of WATCHLIST_NAMES)result[name]=watchlists[name].map(key=>instrumentCache.find(x=>x.instrument_key===key)).filter(Boolean).map(x=>({instrument_key:x.instrument_key,segment:x.segment,exchange:x.exchange,trading_symbol:x.trading_symbol,name:x.name,instrument_type:x.instrument_type,expiry:x.expiry??null}));
     res.set("Cache-Control","private, no-store");
     res.json({watchlists:result,names:WATCHLIST_NAMES,updatedAt:data.updatedAt?.toMillis?.()||null,maxItemsPerList:50});
-  }catch(error){res.status(error.status||500).json({error:error.status?error.message:"Watchlists could not be loaded."});}
+  }catch(error){res.status(errorStatus(error)).json({error:error.status?error.message:"Watchlists could not be loaded."});}
 });
 app.get("/watchlist",async(req,res)=>{
   try{
@@ -353,7 +358,7 @@ app.get("/watchlist",async(req,res)=>{
     if(!instrumentCache.length||Date.now()-instrumentCacheUpdatedAt>6*60*60*1000)await refreshInstrumentCache();
     const items=keys.map(key=>instrumentCache.find(x=>x.instrument_key===key)).filter(Boolean).map(x=>({instrument_key:x.instrument_key,segment:x.segment,exchange:x.exchange,trading_symbol:x.trading_symbol,name:x.name,instrument_type:x.instrument_type,expiry:x.expiry??null}));
     res.set("Cache-Control","private, no-store");res.json({name,items,updatedAt:data.updatedAt?.toMillis?.()||null,maxItems:50});
-  }catch(error){res.status(error.status||500).json({error:error.status?error.message:"Watchlist could not be loaded."});}
+  }catch(error){res.status(errorStatus(error)).json({error:error.status?error.message:"Watchlist could not be loaded."});}
 });
 app.get("/watchlist/quotes",async(req,res)=>{
   try{
@@ -373,7 +378,7 @@ app.get("/watchlist/quotes",async(req,res)=>{
       return {instrumentKey,tradingSymbol:instrument?.trading_symbol||q?.symbol||instrumentKey,lastPrice:fresh?last:null,netChange:fresh&&Number.isFinite(change)?change:null,changePercent:fresh&&Number.isFinite(percent)?percent:null,quoteAgeMs:Number.isFinite(age)?age:null,status:fresh?"fresh":"stale_or_unavailable"};
     });
     res.set("Cache-Control","private, no-store");res.json({name,quotes,asOf:now,status:quotes.every(q=>q.status==="fresh")?"fresh":"partial_stale"});
-  }catch(error){res.status(error.status||500).json({error:error.status?error.message:"Watchlist quotes could not be loaded."});}
+  }catch(error){res.status(errorStatus(error)).json({error:error.status?error.message:"Watchlist quotes could not be loaded."});}
 });
 app.put("/watchlist",async(req,res)=>{
   try{
@@ -386,7 +391,7 @@ app.put("/watchlist",async(req,res)=>{
     const ref=db.collection("indianMarketWatchlists").doc(decoded.uid);
     await db.runTransaction(async tx=>{const snap=await tx.get(ref),data=snap.exists?snap.data():{},watchlists=mergeWatchlistUpdate(data,name,keys);tx.set(ref,{uid:decoded.uid,watchlists,updatedAt:admin.firestore.FieldValue.serverTimestamp()},{merge:true});});
     res.set("Cache-Control","private, no-store");res.json({saved:true,name,count:keys.length,maxItems:50});
-  }catch(error){res.status(error.status||500).json({error:error.status?error.message:"Watchlist could not be saved."});}
+  }catch(error){res.status(errorStatus(error)).json({error:error.status?error.message:"Watchlist could not be saved."});}
 });
 
 app.post("/stream",async(req,res)=>{
@@ -443,7 +448,7 @@ app.post("/stream",async(req,res)=>{
     heartbeat=setInterval(()=>{if(!closed&&!res.writableEnded)res.write(": keep-alive\n\n");},20000);
     res.on("close",()=>{clearInterval(heartbeat);close();});
   }catch(error){
-    if(!res.headersSent)res.status(error.status||500).json({error:error.status?error.message:"Market feed could not be started."});
+    if(!res.headersSent)res.status(errorStatus(error)).json({error:error.status?error.message:"Market feed could not be started."});
     else{res.write("event: error\ndata: "+JSON.stringify({message:"Market feed stopped unexpectedly"})+"\n\n");res.end();}
     clearInterval(heartbeat);
     try{upstream?.close();}catch(_){}
