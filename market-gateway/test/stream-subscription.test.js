@@ -12,7 +12,7 @@ test("rejects missing, empty and oversized subscriptions",()=>{
   }
 });
 test("rejects duplicate, malformed and unlisted instrument keys",()=>{
-  for(const value of [[allowed[0],allowed[0]],[""],["NSE_EQ|"+ "x".repeat(100)],["NSE_EQ|NOT-IN-MASTER"]]){
+  for(const value of [[allowed[0],allowed[0]],[""],["NSE_EQ|"+ "x".repeat(100)],["NSE_EQ|BAD\\nKEY"],["NSE_EQ|NOT-IN-MASTER"]]){
     assert.throws(()=>validateStreamInstrumentKeys(value,allowed,10),{status:400});
   }
 });
