@@ -11,7 +11,6 @@
   const labels={indices:'Indices',equities:'Equities',futures:'Futures',options:'Options'};
   let activeList='indices',items=[],selected=null,streamAbort=null,debounce=null,reconnectTimer=null,staleTimer=null,reconnectAttempt=0,lastQuoteText='';
   function clearFeedTimers(){if(reconnectTimer){clearTimeout(reconnectTimer);reconnectTimer=null;}if(staleTimer){clearTimeout(staleTimer);staleTimer=null;}}
-  function scheduleReconnect(item){if(selected?.instrument_key!==item.instrument_key||reconnectTimer)return;const delay=Math.min(30000,1000*Math.pow(2,Math.min(reconnectAttempt,5)));reconnectAttempt++;document.querySelector('.chart-placeholder span').textContent='Live feed disconnected. Reconnecting in '+Math.round(delay/1000)+'s…';reconnectTimer=setTimeout(()=>{reconnectTimer=null;if(selected?.instrument_key===item.instrument_key)select(item);},delay);}
   function message(text){list.textContent='';const el=document.createElement('div');el.className='empty';el.textContent=text;list.append(el);}
   function escapeText(v){return String(v??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
   function render(rows){
