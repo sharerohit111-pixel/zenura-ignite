@@ -53,11 +53,19 @@ exports.upstoxOAuthCallback = onRequest(
     if(!isUsableUpstoxOAuthCallback(code,state)) return res.status(400).send("Invalid authorization response.");
     const stateRef=db.collection("upstoxOAuthStates").doc(state);
     try {
-      const snap=await stateRef.get();
-      if(!snap.exists) return res.status(400).send("Authorization session not found.");
-      const stateData=snap.data();
-      if(!isOAuthStateUsable(stateData))
-        return res.status(400).send("Authorization session expired. Start again.");
+      // Atomically consume the state before contacting Upstox. This prevents
+      // parallel callback replays from exchanging the same authorization code.
+      let stateData;
+      const claimed=await db.runTransaction(async tx=>{
+        const snap=await tx.get(stateRef);
+        if(!snap.exists) return false;
+        const data=snap.data();
+        if(!isOAuthStateUsable(data)) return false;
+        stateData=data;
+        tx.update(stateRef,{used:true,usedAt:FieldValue.serverTimestamp()});
+        return true;
+      });
+      if(!claimed) return res.status(400).send("Authorization session expired or already used. Start again.");
       const form=new URLSearchParams({
         code,client_id:CLIENT_ID.value(),client_secret:CLIENT_SECRET.value(),
         redirect_uri:REDIRECT_URI.value(),grant_type:"authorization_code"
@@ -73,17 +81,11 @@ exports.upstoxOAuthCallback = onRequest(
         return res.status(502).send("Upstox authorization could not be completed. Return to the app and retry.");
       }
       const encrypted=encryptToken(payload.access_token);
-      await db.runTransaction(async tx=>{
-        const fresh=await tx.get(stateRef);
-        if(!fresh.exists||!isOAuthStateUsable(fresh.data()))
-          throw new Error("OAuth state already used or expired.");
-        const accountRef=db.collection("upstoxConnections").doc(stateData.uid);
-        tx.set(accountRef,{
-          tokenCiphertext:encrypted,tokenType:payload.token_type||"Bearer",
-          expiresAt:Timestamp.fromMillis(nextUpstoxTokenExpiry()),
-          authorizedAt:FieldValue.serverTimestamp(),provider:"upstox",status:"connected"
-        });
-        tx.update(stateRef,{used:true,usedAt:FieldValue.serverTimestamp()});
+      const accountRef=db.collection("upstoxConnections").doc(stateData.uid);
+      await accountRef.set({
+        tokenCiphertext:encrypted,tokenType:payload.token_type||"Bearer",
+        expiresAt:Timestamp.fromMillis(nextUpstoxTokenExpiry()),
+        authorizedAt:FieldValue.serverTimestamp(),provider:"upstox",status:"connected"
       });
       return res.redirect(303,"https://zenuraignite.com/markets/stocks/?upstox=connected");
     } catch(error) {
