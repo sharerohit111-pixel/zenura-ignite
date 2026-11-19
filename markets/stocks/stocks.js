@@ -106,7 +106,7 @@
       savedWatchlist=data.items||[];renderSavedWatchlist();await loadWatchlistQuotes();
     }catch(error){if(request===watchlistLoadSeq&&connector.getUserId()===uid&&name===activeWatchlist)watchStatus.textContent=error.message||'Watchlist could not be loaded.';}
   }
-  watchSelect.addEventListener('change',async()=>{activeWatchlist=watchSelect.value;watchlistLoadSeq++;watchQuoteSeq++;savedWatchlist=[];watchQuotes.clear();renderSavedWatchlist();await loadSavedWatchlist();});
+  watchSelect.addEventListener('change',async()=>{activeWatchlist=watchSelect.value;watchlistLoadSeq++;watchQuoteSeq++;watchlistEditSeq++;savedWatchlist=[];watchQuotes.clear();renderSavedWatchlist();await loadSavedWatchlist();});
   watchAdd.addEventListener('click',async()=>{
     if(!selected||savedWatchlist.some(x=>x.instrument_key===selected.instrument_key)||savedWatchlist.length>=50)return;
     const previous=savedWatchlist;savedWatchlist=[...savedWatchlist,selected];const edit=++watchlistEditSeq;renderSavedWatchlist();if(!await saveWatchlist()){if(edit===watchlistEditSeq){savedWatchlist=previous;watchlistEditSeq++;renderSavedWatchlist();}}else if(edit===watchlistEditSeq)await loadWatchlistQuotes();
