@@ -8,7 +8,9 @@ function makeOrderId(uid,idempotencyKey){
 function makeOrderFingerprint({instrumentKey,side,quantity,orderType="MARKET"}){
  if(typeof instrumentKey!=="string"||!instrumentKey||!["BUY","SELL"].includes(side)||!Number.isSafeInteger(quantity)||quantity<1||!["MARKET","LIMIT"].includes(orderType))
   throw Object.assign(new Error("Invalid order request fingerprint."),{status:400});
- return crypto.createHash("sha256").update(JSON.stringify({instrumentKey,side,quantity,orderType})).digest("hex");
+ // Preserve the original MARKET fingerprint so retries of pre-upgrade orders remain idempotent.
+ const payload=orderType==="MARKET"?{instrumentKey,side,quantity}:{instrumentKey,side,quantity,orderType};
+ return crypto.createHash("sha256").update(JSON.stringify(payload)).digest("hex");
 }
 function buildPaperOrderUpdate(account,{instrumentKey,side,quantity,pricePaise}){
  if(!account||typeof account!=="object"||
