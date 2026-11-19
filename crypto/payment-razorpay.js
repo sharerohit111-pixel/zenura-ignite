@@ -14,7 +14,7 @@
     halfyear: {id:'month_6',label:'6 Months',amount:399,days:180},
     yearly: {id:'year_1',label:'1 Year',amount:799,days:365}
   };
-  let db, auth, qrPromise, activePlan = null;
+  let db, auth, qrPromise, activePlan = null, adminMode = false;
   let paymentLanguage = localStorage.getItem('ziPaymentLanguage') === 'hi' ? 'hi' : 'en';
   const tr = (en, hi) => paymentLanguage === 'hi' ? hi : en;
   const PAYMENT_TEXT = {
@@ -43,7 +43,7 @@
   const paymentText = key => tr(PAYMENT_TEXT[key][0], PAYMENT_TEXT[key][1]);
   function applyPaymentLanguage() {
     const set=(id,key)=>{const el=$(id);if(el)el.textContent=paymentText(key);};
-    set('ziQrIntro','intro');set('ziQrNote','qrNote');set('ziQrUtrLabel','utrLabel');
+    set('ziQrIntro',adminMode?'adminIntro':'intro');set('ziQrNote','qrNote');set('ziQrUtrLabel','utrLabel');
     const input=$('ziQrUtr');if(input)input.placeholder=paymentText('utrPlaceholder');
     const submit=$('ziQrSubmit');if(submit&&!submit.hidden)submit.textContent=paymentText('submit');
     const toggle=$('ziQrLanguage');if(toggle){toggle.textContent=paymentLanguage==='en'?'हिंदी':'English';toggle.setAttribute('aria-label',paymentLanguage==='en'?'Switch to Hindi':'Switch to English');}
@@ -134,7 +134,7 @@
     if(!user){say('Please sign in before purchasing.');const shade=$('authShade');if(shade)shade.classList.add('open');return;}
     open();
     $('ziQrAdmin').hidden=true;$('ziQrUtr').hidden=false;$('ziQrUtr').previousElementSibling.hidden=false;$('ziQrSubmit').hidden=false;$('ziQrSubmit').textContent='I HAVE PAID — SUBMIT UTR';
-    activePlan=plan;applyPaymentLanguage();
+    adminMode=false;activePlan=plan;applyPaymentLanguage();
     $('ziQrMessage').textContent=paymentText('preparing');
     $('ziQrUtr').value=''; $('ziQrSubmit').disabled=true;
     $('ziQrCanvas').innerHTML='';
@@ -184,8 +184,8 @@
   async function openAdmin() {
     const user=auth.currentUser;
     if(!user||(user.email||'').toLowerCase()!==ADMIN_EMAIL)return say('Admin access denied.');
-    ensureModal();open();
-    $('ziQrPrice').textContent='ADMIN · UPI PAYMENT APPROVALS';
+    ensureModal();open();adminMode=true;activePlan=null;applyPaymentLanguage();
+    $('ziQrPrice').textContent=tr('ADMIN · UPI PAYMENT APPROVALS','एडमिन · UPI भुगतान मंज़ूरी');
     $('ziQrCanvas').innerHTML='';
     $('ziQrUtr').hidden=true;$('ziQrUtr').previousElementSibling.hidden=true;$('ziQrSubmit').hidden=true;
     $('ziQrIntro').textContent=paymentText('adminIntro');
