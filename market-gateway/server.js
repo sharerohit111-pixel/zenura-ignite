@@ -276,6 +276,11 @@ app.post("/paper/orders",async(req,res)=>{
     if(!instrumentCache.length||Date.now()-instrumentCacheUpdatedAt>6*60*60*1000)await refreshInstrumentCache();
     const instrument=instrumentCache.find(x=>x.instrument_key===instrumentKey&&x.instrument_type==="EQ"&&["NSE_EQ","BSE_EQ"].includes(x.segment));
     if(!instrument)return res.status(400).json({error:"Phase 1 paper orders support verified NSE/BSE cash equities only."});
+    if(orderType==="LIMIT"){
+      const tickSizePaise=Math.round(Number(instrument.tick_size)*100);
+      if(!Number.isSafeInteger(tickSizePaise)||tickSizePaise<1||limitPricePaise%tickSizePaise!==0)
+        return res.status(400).json({error:"LIMIT price must match the verified instrument tick size."});
+    }
     const connection=await db.collection("upstoxConnections").doc(decoded.uid).get();
     if(!connection.exists)return res.status(403).json({error:"Connect your Upstox account before placing a paper order."});
     const connectionData=connection.data();
