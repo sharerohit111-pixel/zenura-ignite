@@ -32,8 +32,14 @@
     .zpay-shade{position:fixed;inset:0;background:#000c;z-index:80;display:none;overflow:auto;padding:18px}
     .zpay-shade.open{display:grid;place-items:center}
     .zpay-box{width:min(520px,100%);max-height:92vh;overflow:auto;background:#0d1d30;border:1px solid #31516c;border-radius:18px;padding:18px;color:#eaf2fa}
-    .zpay-box h2{font:700 21px 'Space Grotesk';margin:5px 0 12px}\n    .zpay-head-actions{display:flex;align-items:center;gap:8px}\n    .zpay-lang{border:1px solid #287b76;border-radius:9px;padding:8px 11px;background:#123c42;color:#63e5c2;font:700 11px 'Space Grotesk';cursor:pointer;white-space:nowrap}
-    .zpay-muted{font-size:11px;color:#91a7bb;line-height:1.55}\n    .zpay-qr-wrap{display:grid;place-items:center;gap:9px;margin:14px auto;padding:14px;width:min(100%,290px);border:1px solid #34516c;border-radius:14px;background:#f8fafc;color:#142236}\n    .zpay-qr-wrap canvas{display:block;width:240px;height:240px;max-width:100%;image-rendering:pixelated}\n    .zpay-qr-caption{font-size:10px;font-weight:800;letter-spacing:.8px;color:#24364a}\n    .zpay-qr-error{font-size:11px;color:#b45309;text-align:center}
+    .zpay-box h2{font:700 21px 'Space Grotesk';margin:5px 0 12px}
+    .zpay-head-actions{display:flex;align-items:center;gap:8px}
+    .zpay-lang{border:1px solid #287b76;border-radius:9px;padding:8px 11px;background:#123c42;color:#63e5c2;font:700 11px 'Space Grotesk';cursor:pointer;white-space:nowrap}
+    .zpay-muted{font-size:11px;color:#91a7bb;line-height:1.55}
+    .zpay-qr-wrap{display:grid;place-items:center;gap:9px;margin:14px auto;padding:14px;width:min(100%,290px);border:1px solid #34516c;border-radius:14px;background:#f8fafc;color:#142236}
+    .zpay-qr-wrap canvas{display:block;width:240px;height:240px;max-width:100%;image-rendering:pixelated}
+    .zpay-qr-caption{font-size:10px;font-weight:800;letter-spacing:.8px;color:#24364a}
+    .zpay-qr-error{font-size:11px;color:#b45309;text-align:center}
     .zpay-input{width:100%;margin:7px 0 12px;padding:12px;border-radius:9px;border:1px solid #34516c;background:#071522;color:#fff}
     .zpay-actions{display:flex;gap:9px;flex-wrap:wrap;margin-top:12px}
     .zpay-actions button,.zpay-row button{border:0;border-radius:9px;padding:11px 14px;background:linear-gradient(100deg,#23cba4,#548dff);color:#061522;font-weight:800}
@@ -196,7 +202,8 @@
     const user=auth.currentUser;
     if (!user || (user.email||'').toLowerCase()!==ADMIN_EMAIL) return say('Admin access denied.');
     if (approve && (!PLANS[p.planKey] || p.amount!==PLANS[p.planKey].amount || p.months!==PLANS[p.planKey].months)) return say('Plan details do not match the approved price list. Do not approve.');
-    if (!confirm((approve?'Approve this payment and activate Premium?':'Reject this payment request?')+'\nUTR: '+(p.utr||'—'))) return;
+    if (!confirm((approve?'Approve this payment and activate Premium?':'Reject this payment request?')+'
+UTR: '+(p.utr||'—'))) return;
     yes.disabled=true; no.disabled=true;
     try {
       const batch=db.batch();
