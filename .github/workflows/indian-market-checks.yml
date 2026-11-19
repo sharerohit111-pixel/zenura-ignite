@@ -53,6 +53,8 @@ jobs:
         run: node --check markets/stocks/sse-parser.js
       - name: Check email authentication module syntax
         run: node --input-type=module --check < markets/stocks/email-auth.js
+      - name: Check Upstox connection module syntax
+        run: node --input-type=module --check < markets/stocks/connect.js
       - name: Check gateway syntax
         run: node --check market-gateway/server.js
       - name: Validate gateway package manifest
