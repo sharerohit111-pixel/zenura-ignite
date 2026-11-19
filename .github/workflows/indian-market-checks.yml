@@ -6,6 +6,15 @@ on:
     paths:
       - "markets/stocks/**"
       - "crypto/index.html"
+      - "index.html"
+      - "our-products.html"
+      - "i18n.js"
+      - "script.js"
+      - "enquiry.js"
+      - "solutions-catalogue*.js"
+      - "solutions-catalogue*.css"
+      - "styles.css"
+      - "language-switcher.css"
       - "market-gateway/**"
       - "functions/**"
       - "firebase.json"
@@ -20,6 +29,15 @@ on:
     paths:
       - "markets/stocks/**"
       - "crypto/index.html"
+      - "index.html"
+      - "our-products.html"
+      - "i18n.js"
+      - "script.js"
+      - "enquiry.js"
+      - "solutions-catalogue*.js"
+      - "solutions-catalogue*.css"
+      - "styles.css"
+      - "language-switcher.css"
       - "market-gateway/**"
       - "functions/**"
       - "firebase.json"
@@ -47,6 +65,27 @@ jobs:
       - name: Check existing Crypto app inline JavaScript syntax
         run: |
           node -e "const fs=require('node:fs'); const html=fs.readFileSync('crypto/index.html','utf8'); const scripts=[...html.matchAll(/<script(?![^>]*\\bsrc=)[^>]*>([\\s\\S]*?)<\\/script>/gi)].map(x=>x[1]); if(!scripts.length) throw new Error('No inline scripts found'); scripts.forEach((code,i)=>require('node:child_process').execFileSync(process.execPath,['--check'],{input:code,stdio:['pipe','inherit','inherit']})); console.log('Checked '+scripts.length+' inline script(s)');"
+      - name: Check website scripts used by the product catalogue
+        run: |
+          node --check i18n.js
+          node --check script.js
+          node --input-type=module --check < enquiry.js
+          node --input-type=module --check < solutions-catalogue.js
+      - name: Validate product catalogue page local assets
+        run: |
+          node -e "
+            const fs = require('node:fs');
+            for (const page of ['index.html', 'our-products.html']) {
+              const html = fs.readFileSync(page, 'utf8');
+              const refs = [...html.matchAll(/(?:src|href)=\\\"([^\\\"]+)\\\"/g)]
+                .map(match => match[1].split('?')[0])
+                .filter(ref => ref && !/^(?:https?:|mailto:|#|\\/\\/)/i.test(ref));
+              for (const ref of refs) {
+                if (!fs.existsSync(ref)) throw new Error(page + ' references missing local asset: ' + ref);
+              }
+            }
+            console.log('Product catalogue pages reference existing local assets.');
+          "
       - name: Check browser module syntax
         run: node --check markets/stocks/stocks.js
       - name: Check SSE parser syntax
