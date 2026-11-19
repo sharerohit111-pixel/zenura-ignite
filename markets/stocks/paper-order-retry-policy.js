@@ -38,11 +38,16 @@ function inspectLegacyPendingPaperOrder(storage,legacyStorageKey,userId,scopedSt
   try{
     if(storage.getItem(quarantineKey)==="1")return {state:"quarantined"};
   }catch(_){return {state:"unavailable"};}
+  const quarantineAmbiguousRecord=()=>{
+    if(typeof storage.setItem!=="function")return {state:"unavailable"};
+    try{storage.setItem(quarantineKey,"1");return {state:"ambiguous"};}
+    catch(_){return {state:"unavailable"};}
+  };
   let value;
-  try{value=JSON.parse(raw);}catch(_){return {state:"ambiguous"};}
+  try{value=JSON.parse(raw);}catch(_){return quarantineAmbiguousRecord();}
   if(!value||typeof value!=="object"||typeof value.fingerprint!=="string"||!value.fingerprint||
-     typeof value.key!=="string"||!UUID_PATTERN.test(value.key))return {state:"ambiguous"};
-  if(value.uid!==userId)return {state:"ambiguous"};
+     typeof value.key!=="string"||!UUID_PATTERN.test(value.key))return quarantineAmbiguousRecord();
+  if(value.uid!==userId)return quarantineAmbiguousRecord();
   if(!writePendingPaperOrder(storage,scopedStorageKey,{fingerprint:value.fingerprint,key:value.key}))
     return {state:"unavailable"};
   try{storage.removeItem(legacyStorageKey);}catch(_){return {state:"unavailable"};}
