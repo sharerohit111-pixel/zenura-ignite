@@ -529,6 +529,8 @@
     if(derivativeBody)tableMessage(derivativeBody,6,'Sign in to view derivative positions.');
     if(derivativeHistory)tableMessage(derivativeHistory,6,'Sign in to view derivative order history.');
     if(derivativeStatus)derivativeStatus.textContent='Sign in required';
+    paperOrderStatus.textContent='Sign in to place a private paper order.';
+    optionStatus.textContent='Sign in to load a private option chain or place an option paper order.';
     price.textContent='—';title.textContent='No instrument selected';symbol.textContent='Sign in to load market data';
     setFeedStatus('SIGN IN REQUIRED','Your private market session has ended.');
     resetOptionChain('Sign in to load a private option chain.');
