@@ -181,8 +181,43 @@
   }
   paperHistoryMore?.addEventListener('click',()=>loadPaperHistory({append:true}));
   let derivativePortfolioRequest=0;
-undefined
-  async function refreshPaperViews(){await Promise.all([loadPaperPortfolio(),loadPaperHistory(),loadDerivativePortfolio()]);}
+  async function loadDerivativePortfolio(){
+    const connector=window.ZENURA_MARKET_CONNECTOR,uid=connector?.getUserId?.(),request=++derivativePortfolioRequest;
+    const body=document.getElementById('derivative-positions'),status=document.getElementById('derivative-portfolio-status');
+    if(!body||!status||!gateway||!connector?.getIdToken||!uid)return;
+    status.textContent='Refreshing verified option quotes…';
+    try{
+      const token=await connector.getIdToken();
+      if(request!==derivativePortfolioRequest||connector.getUserId()!==uid)return;
+      const [response,historyResponse]=await Promise.all([
+        fetch(gateway+'/paper/derivatives/portfolio',{headers:{Authorization:'Bearer '+token,Accept:'application/json'}}),
+        fetch(gateway+'/paper/derivative/orders?limit=50',{headers:{Authorization:'Bearer '+token,Accept:'application/json'}})
+      ]);
+      const data=await response.json(),history=await historyResponse.json();
+      if(request!==derivativePortfolioRequest||connector.getUserId()!==uid)return;
+      if(!response.ok)throw new Error(data.error||'Derivative portfolio unavailable');
+      if(!historyResponse.ok)throw new Error(history.error||'Derivative order history unavailable');
+      body.textContent='';
+      if(!data.positions?.length)tableMessage(body,6,'No open derivative positions.');
+      else data.positions.forEach(p=>{
+        const tr=document.createElement('tr');
+        [p.instrumentKey,p.netQuantity,inrPaise(p.averagePricePaise),inrPaise(p.marketPricePaise),inrPaise(Math.abs(p.marketValuePaise)),signedMoney(p.unrealizedPnlPaise)].forEach(v=>{const td=document.createElement('td');td.textContent=String(v);tr.append(td);});
+        body.append(tr);
+      });
+      status.textContent=data.valuationStatus==='fresh'?'Long CE/PE positions · Fresh Upstox quotes · Entry charges included; exit charges excluded':'No open derivative positions';
+      const historyBody=document.getElementById('derivative-history');
+      if(historyBody){
+        historyBody.textContent='';
+        if(!history.orders?.length)tableMessage(historyBody,6,'No derivative orders yet.');
+        else history.orders.forEach(order=>{
+          const tr=document.createElement('tr'),date=order.createdAt?new Date(order.createdAt).toLocaleString('en-IN'):'—';
+          [date,order.tradingSymbol,order.side,order.lots,inrPaise(order.grossPaise),order.status+' · fees '+inrPaise(order.chargesPaise)+' · SIM'].forEach(v=>{const td=document.createElement('td');td.textContent=String(v);tr.append(td);});
+          historyBody.append(tr);
+        });
+      }
+    }catch(error){if(request===derivativePortfolioRequest&&connector.getUserId()===uid)status.textContent=error.message||'Derivative valuation unavailable';}
+  }
+  async function refreshPaperViews(){{await Promise.all([loadPaperPortfolio(),loadPaperHistory(),loadDerivativePortfolio()]);}
   paperRefresh.addEventListener('click',refreshPaperViews);
 
   let paperOrderSubmitting=false;
