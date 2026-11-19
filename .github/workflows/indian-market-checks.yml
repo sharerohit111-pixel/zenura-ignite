@@ -7,6 +7,13 @@ on:
       - "markets/stocks/**"
       - "crypto/index.html"
       - "index.html"
+      - "admin.html"
+      - "admin.js"
+      - "admin.css"
+      - "digital-products-data.js"
+      - "firebase-client.js"
+      - "firebase-config.js"
+      - "storage.rules"
       - "our-products.html"
       - "i18n.js"
       - "script.js"
@@ -30,6 +37,13 @@ on:
       - "markets/stocks/**"
       - "crypto/index.html"
       - "index.html"
+      - "admin.html"
+      - "admin.js"
+      - "admin.css"
+      - "digital-products-data.js"
+      - "firebase-client.js"
+      - "firebase-config.js"
+      - "storage.rules"
       - "our-products.html"
       - "i18n.js"
       - "script.js"
@@ -71,11 +85,12 @@ jobs:
           node --check script.js
           node --input-type=module --check < enquiry.js
           node --input-type=module --check < solutions-catalogue.js
+          node --input-type=module --check < admin.js
       - name: Validate product catalogue page local assets
         run: |
           node <<'NODE'
           const fs = require('node:fs');
-          for (const page of ['index.html', 'our-products.html']) {
+          for (const page of ['index.html', 'our-products.html', 'admin.html']) {
             const html = fs.readFileSync(page, 'utf8');
             const refs = [...html.matchAll(/(?:src|href)="([^"]+)"/g)]
               .map(match => match[1].split(/[?#]/, 1)[0])
@@ -105,6 +120,8 @@ jobs:
         run: |
           node -e "JSON.parse(require('node:fs').readFileSync('firebase.json','utf8'))"
           node -e "JSON.parse(require('node:fs').readFileSync('firestore.indexes.json','utf8'))"
+          node -e "if (JSON.parse(require('node:fs').readFileSync('firebase.json','utf8')).storage?.rules !== 'storage.rules') throw new Error('Firebase Storage rules must be configured.')"
+          test -s storage.rules
       - name: Guard Firebase deployment scope
         run: |
           node -e "
