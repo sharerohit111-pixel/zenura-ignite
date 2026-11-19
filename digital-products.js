@@ -35,8 +35,12 @@ async function load(){
  catch(e){console.warn("Product samples are using built-in defaults.",e)}
  if(!root)return;
  const cards=[...root.querySelectorAll(".product-card")],used=new Set();
- if(cataloguePublished){products.forEach((p,i)=>{const card=cards.find(x=>!used.has(x)&&((x.dataset.productId&&x.dataset.productId===p.id)||x.querySelector("h3")?.textContent.trim().toLowerCase()===String(p.name||"").trim().toLowerCase()))||cards.find(x=>!used.has(x)) ;if(card){used.add(card);updateCard(card,p);}});cards.forEach(card=>{if(!used.has(card))card.hidden=true;});}
- else cards.forEach(card=>{card.hidden=true;});
+ const source= cataloguePublished ? products : DEFAULT_DIGITAL_PRODUCTS;
+ source.forEach(p=>{
+  const card=cards.find(x=>!used.has(x)&&((x.dataset.productId&&x.dataset.productId===p.id)||x.querySelector("h3")?.textContent.trim().toLowerCase()===String(p.name||"").trim().toLowerCase()));
+  if(card){used.add(card);updateCard(card,p);}
+ });
+ if(cataloguePublished)cards.forEach(card=>{if(!used.has(card))card.hidden=true;});
  bind();
 }
 load();
