@@ -13,6 +13,7 @@ const { nextUpstoxTokenExpiry } = require("./lib/upstox-token-expiry");
 const { isUsableUpstoxTokenResponse } = require("./lib/upstox-token-response");
 const { isUsableUpstoxOAuthCallback } = require("./lib/upstox-oauth-callback-input");
 const { decodeUpstoxEncryptionKey } = require("./lib/upstox-encryption-key");
+const { isVerifiedPasswordAccount } = require("./lib/upstox-email-verification");
 const db = getFirestore();
 const CLIENT_ID = defineSecret("UPSTOX_CLIENT_ID");
 const CLIENT_SECRET = defineSecret("UPSTOX_CLIENT_SECRET");
@@ -32,7 +33,11 @@ function encryptToken(value) {
 exports.startUpstoxAuthorization = onCall(
   {region:REGION,secrets:[CLIENT_ID,REDIRECT_URI]},
   async req => {
-    const uid=uidOf(req), state=crypto.randomBytes(32).toString("hex");
+    const uid=uidOf(req);
+    if (!isVerifiedPasswordAccount(req.auth)) {
+      throw new HttpsError("failed-precondition", "Verify your email address before connecting Upstox.");
+    }
+    const state=crypto.randomBytes(32).toString("hex");
     const controlSnap=await db.collection("upstoxConnectionControls").doc(uid).get();
     const generation=connectionGeneration(controlSnap.exists?controlSnap.data():null);
     await db.collection("upstoxOAuthStates").doc(state).create({
