@@ -107,8 +107,8 @@ app.get("/instruments",async(req,res)=>{
       if(exchange&&item.exchange!==exchange)return false;
       if(kind==="equities"&&!(item.instrument_type==="EQ"&&["NSE_EQ","BSE_EQ"].includes(item.segment)))return false;
       if(kind==="indices"&&!(item.instrument_type==="INDEX"&&["NSE_INDEX","BSE_INDEX"].includes(item.segment)))return false;
-      if(kind==="futures"&&item.instrument_type!=="FUT")return false;
-      if(kind==="options"&&!["CE","PE"].includes(item.instrument_type))return false;
+      if(kind==="futures"&&!(item.instrument_type==="FUT"&&["NSE_FO","BSE_FO"].includes(item.segment)))return false;
+      if(kind==="options"&&!((["CE","PE"].includes(item.instrument_type))&&["NSE_FO","BSE_FO"].includes(item.segment)))return false;
       if(q&&!String(item.trading_symbol||"").toLowerCase().includes(q)&&!String(item.name||"").toLowerCase().includes(q)&&!String(item.underlying_symbol||"").toLowerCase().includes(q))return false;
       return true;
     }).slice(0,limit).map(item=>({
