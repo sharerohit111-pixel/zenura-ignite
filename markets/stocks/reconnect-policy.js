@@ -28,4 +28,6 @@ function shouldRetryFeedStatus(status) {
   );
 }
 
-module.exports = {nextReconnectDelay, jitteredReconnectDelay, shouldRetryFeedStatus, shouldReconnectAfterFeedError};
+const policy = {nextReconnectDelay, jitteredReconnectDelay, shouldRetryFeedStatus, shouldReconnectAfterFeedError};
+if (typeof window !== "undefined") window.ZenuraReconnectPolicy = policy;
+if (typeof module !== "undefined" && module.exports) module.exports = policy;
