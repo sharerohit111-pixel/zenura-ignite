@@ -2,7 +2,9 @@
 const express=require("express");
 const WebSocket=require("ws");
 const protobuf=require("protobufjs");
-const admin=require("firebase-admin");
+const {initializeApp}=require("firebase-admin/app");
+const {getAuth}=require("firebase-admin/auth");
+const {getFirestore,FieldValue}=require("firebase-admin/firestore");
 const crypto=require("node:crypto");
 const path=require("node:path");
 const {downloadInstrumentMaster}=require("./lib/instrument-master-download");
@@ -35,8 +37,8 @@ const {parseMarginPreviewInput}=require("./lib/margin-preview-input");
 const {consumeMarginPreviewSlot}=require("./lib/margin-preview-rate-limit");
 const {authenticateFirebaseRequest}=require("./lib/firebase-auth");
 const {normalizePaperAccountState,ensurePaperAccount}=require("./lib/paper-account-state");
-admin.initializeApp();
-const db=admin.firestore();
+initializeApp();
+const db=getFirestore();
 const app=express();
 app.use(express.json({limit:"32kb"}));
 const PORT=process.env.PORT||8080;
@@ -86,7 +88,7 @@ function decryptToken(box){
   return decryptUpstoxToken(box,ENC_KEY);
 }
 async function authenticate(req){
-  return authenticateFirebaseRequest(req,admin.auth());
+  return authenticateFirebaseRequest(req,getAuth());
 }
 app.get("/health",(_req,res)=>res.json({
   ok:true,service:"zenura-indian-market-gateway",feedProtocol:"upstox-v3",
@@ -230,7 +232,7 @@ app.get("/paper/account",async(req,res)=>{
     const ref=paperAccountRef(decoded.uid);
     await ensurePaperAccount({
       db,ref,startingCashPaise:paperStartingCashPaise(),
-      serverTimestamp:()=>admin.firestore.FieldValue.serverTimestamp()
+      serverTimestamp:()=>FieldValue.serverTimestamp()
     });
     const snap=await ref.get(),data=normalizePaperAccountState(snap.data());
     if(!data)return res.status(409).json({error:"Indian paper account data is invalid; account access was stopped to protect its balance."});
@@ -283,7 +285,7 @@ app.post("/paper/orders",async(req,res)=>{
     const result=await executePaperOrderTransaction({
       db,accountRef,orderRef,uid:decoded.uid,requestFingerprint,
       order:{uid:decoded.uid,requestFingerprint,instrumentKey,tradingSymbol:instrument.trading_symbol||instrument.name,exchange:instrument.exchange,side,quantity,executionPricePaise:pricePaise,quoteTimestampMs:tradeTimeMs,quoteAgeMs:quoteAge,orderType:"MARKET",status:"FILLED",simulationOnly:true},
-      pricePaise,publicPaperOrder,serverTimestamp:()=>admin.firestore.FieldValue.serverTimestamp()
+      pricePaise,publicPaperOrder,serverTimestamp:()=>FieldValue.serverTimestamp()
     });
     res.set("Cache-Control","private, no-store");
     res.status(result.idempotentReplay?200:201).json(result);
@@ -406,7 +408,7 @@ app.post("/paper/derivative/orders",async(req,res)=>{
     const result=await executeLongOptionTransaction({
       db,accountRef,orderRef,uid:decoded.uid,idempotencyKey,instrument,lots,
       quote:{instrumentKey,pricePaise:normalizedQuote.pricePaise,observedAtMs:normalizedQuote.tradeTimeMs},side,
-      serverTimestamp:()=>admin.firestore.FieldValue.serverTimestamp()
+      serverTimestamp:()=>FieldValue.serverTimestamp()
     });
     res.set("Cache-Control","private, no-store");
     res.status(result.idempotentReplay?200:201).json({
@@ -589,7 +591,7 @@ app.put("/watchlist",async(req,res)=>{
     const valid=new Set(instrumentCache.map(x=>x.instrument_key));
     if(keys.some(key=>!valid.has(key)))return res.status(400).json({error:"Watchlist contains an instrument not present in the official instrument master."});
     const ref=db.collection("indianMarketWatchlists").doc(decoded.uid);
-    await db.runTransaction(async tx=>{const snap=await tx.get(ref),data=snap.exists?snap.data():{},watchlists=mergeWatchlistUpdate(data,name,keys);tx.set(ref,{uid:decoded.uid,watchlists,updatedAt:admin.firestore.FieldValue.serverTimestamp()},{merge:true});});
+    await db.runTransaction(async tx=>{const snap=await tx.get(ref),data=snap.exists?snap.data():{},watchlists=mergeWatchlistUpdate(data,name,keys);tx.set(ref,{uid:decoded.uid,watchlists,updatedAt:FieldValue.serverTimestamp()},{merge:true});});
     res.set("Cache-Control","private, no-store");res.json({saved:true,name,count:keys.length,maxItems:50});
   }catch(error){res.status(errorStatus(error)).json({error:error.status?error.message:"Watchlist could not be saved."});}
 });
