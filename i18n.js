@@ -264,8 +264,15 @@
     }
   }
 
+  function toEnglish(value) {
+    const source = String(value ?? '');
+    const key = Object.keys(translations).find(k => translations[k] === source.trim());
+    return key ? source.replace(source.trim(), key) : source;
+  }
+
   window.ZenuraI18n = {
     getLanguage,
+    toEnglish,
     setLanguage: function (language) {
       try { localStorage.setItem(STORAGE_KEY, language === 'hi' ? 'hi' : 'en'); } catch (_) {}
       applyLanguage(language);
