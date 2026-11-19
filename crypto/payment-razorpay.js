@@ -145,10 +145,9 @@
       say('Sign in to view your Premium membership.');
       return;
     }
-    // Initialize the account's server-timed demo, then keep the membership UI
-    // synchronized with admin approvals across devices in real time.
-    firebase.app().functions('asia-south1').httpsCallable('getPremiumAccess')({})
-      .catch(error => console.warn('Premium access initialization failed:',error));
+    // Check canonical and older approved memberships before creating a free-demo record.
+    // This prevents a new trial document from masking an existing legacy Premium purchase.
+    let trialInitializationStarted = false;
     entitlementUnsubscribe = db.collection('entitlements').doc(user.uid).onSnapshot(
       async snapshot => {
         if (snapshot.exists) { renderMembership(normalizedEntitlement(snapshot.data())); return; }
@@ -157,6 +156,11 @@
           if (legacy.exists && legacy.data().active) { renderMembership(normalizedEntitlement(legacy.data())); return; }
         } catch (legacyError) { console.warn('Legacy entitlement lookup failed:',legacyError); }
         renderMembership(null);
+        if (!trialInitializationStarted) {
+          trialInitializationStarted = true;
+          firebase.app().functions('asia-south1').httpsCallable('getPremiumAccess')({})
+            .catch(error => console.warn('Premium access initialization failed:',error));
+        }
       },
       error => { console.warn('Premium entitlement listener failed:',error); say('Could not refresh Premium status. Please reopen this page.'); }
     );
