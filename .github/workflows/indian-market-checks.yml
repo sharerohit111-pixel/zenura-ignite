@@ -11,6 +11,8 @@ on:
       - "admin.js"
       - "admin.css"
       - "digital-products-data.js"
+      - "digital-products.js"
+      - "digital-products.css"
       - "firebase-client.js"
       - "firebase-config.js"
       - "storage.rules"
@@ -41,6 +43,8 @@ on:
       - "admin.js"
       - "admin.css"
       - "digital-products-data.js"
+      - "digital-products.js"
+      - "digital-products.css"
       - "firebase-client.js"
       - "firebase-config.js"
       - "storage.rules"
@@ -86,6 +90,7 @@ jobs:
           node --input-type=module --check < enquiry.js
           node --input-type=module --check < solutions-catalogue.js
           node --input-type=module --check < admin.js
+          node --input-type=module --check < digital-products.js
       - name: Validate product catalogue page local assets
         run: |
           node <<'NODE'
@@ -122,6 +127,8 @@ jobs:
           node -e "JSON.parse(require('node:fs').readFileSync('firestore.indexes.json','utf8'))"
           node -e "if (JSON.parse(require('node:fs').readFileSync('firebase.json','utf8')).storage?.rules !== 'storage.rules') throw new Error('Firebase Storage rules must be configured.')"
           test -s storage.rules
+          test -s digital-products-data.js
+          test -s digital-products.css
       - name: Guard Firebase deployment scope
         run: |
           node -e "
