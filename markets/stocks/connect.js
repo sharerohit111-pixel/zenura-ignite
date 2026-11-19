@@ -88,6 +88,7 @@ button.addEventListener("click", async () => {
   }
 });
 window.ZENURA_MARKET_CONNECTOR = {
+  isAuthenticated: () => !!auth.currentUser,
   getIdToken: async () => {
     if (!auth.currentUser) throw new Error("Sign in to connect the live market feed.");
     return auth.currentUser.getIdToken();
