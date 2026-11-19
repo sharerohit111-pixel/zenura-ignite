@@ -95,11 +95,11 @@
       if (!originalText.has(element)) originalText.set(element, element.nodeValue);
       const source = originalText.get(element);
       const key = source.trim();
-      if (Object.prototype.hasOwnProperty.call(translations, key)) {
-        element.nodeValue = language === 'hi' ? source.replace(key, translations[key]) : source;
-      } else if (language === 'en') {
-        const english = Object.keys(translations).find(k => translations[k] === key);
-        if (english) element.nodeValue = source.replace(key, english);
+      const englishKey = Object.prototype.hasOwnProperty.call(translations, key)
+        ? key : Object.keys(translations).find(k => translations[k] === key);
+      if (englishKey) {
+        const translated = language === 'hi' ? translations[englishKey] : englishKey;
+        element.nodeValue = source.replace(key, translated);
       }
       return;
     }
