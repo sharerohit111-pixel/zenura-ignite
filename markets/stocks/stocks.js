@@ -266,17 +266,19 @@
     if(futuresMarginButton)futuresMarginButton.disabled=!selected||selected.instrument_type!=='FUT';
     if(futuresMarginStatus&&(!selected||selected.instrument_type!=='FUT'))futuresMarginStatus.textContent='Select a verified futures contract from the Futures watchlist.';
   }
+  let futuresMarginRequest=0;
   async function requestFuturesMarginPreview(){
     if(!selected||selected.instrument_type!=='FUT'){futuresMarginStatus.textContent='Choose a futures contract first.';return;}
     const lots=Number(futuresMarginLots.value),side=futuresMarginSide.value,product=futuresMarginProduct.value;
     if(!Number.isSafeInteger(lots)||lots<1||lots>10000){futuresMarginStatus.textContent='Enter whole lots from 1 to 10,000.';return;}
     const connector=window.ZENURA_MARKET_CONNECTOR;
     if(!gateway||!connector?.getIdToken){futuresMarginStatus.textContent='Sign in and connect Upstox to request broker margin.';return;}
-    const instrumentKey=selected.instrument_key;
+    const instrumentKey=selected.instrument_key,uid=connector.getUserId?.(),request=++futuresMarginRequest;
+    if(!uid){futuresMarginStatus.textContent='Sign in before requesting broker margin.';return;}
     futuresMarginButton.disabled=true;futuresMarginStatus.textContent='Fetching fresh futures quote and Upstox margin estimate…';
     try{
       const token=await connector.getIdToken();
-      if(selected?.instrument_key!==instrumentKey)return;
+      if(request!==futuresMarginRequest||connector.getUserId()!==uid||selected?.instrument_key!==instrumentKey)return;
       const response=await fetch(gateway+'/paper/derivative/margin-preview',{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json',Accept:'application/json'},body:JSON.stringify({instrument_key:instrumentKey,lots,side,product})});
       const data=await response.json();
       if(!response.ok){
@@ -286,7 +288,7 @@
           :(data.error||'Broker margin preview failed.');
         throw new Error(message);
       }
-      if(selected?.instrument_key!==instrumentKey)return;
+      if(request!==futuresMarginRequest||connector.getUserId()!==uid||selected?.instrument_key!==instrumentKey)return;
       const required=inrPaise(data.requiredMarginPaise),cash=inrPaise(data.availableVirtualCashPaise),shortfall=inrPaise(data.shortfallPaise);
       const finalText=data.finalMarginPaise===null?'':' · Final margin '+inrPaise(data.finalMarginPaise);
       const quoteText=data.quote?.pricePaise?' · Quote '+inrPaise(data.quote.pricePaise):'';
@@ -294,8 +296,8 @@
       const componentText=[['SPAN',components.spanPaise],['Exposure',components.exposurePaise],['Option premium',components.optionPremiumPaise],['Net buy premium',components.netBuyPremiumPaise],['Tender',components.tenderPaise],['Delivery',components.deliveryPaise],['Total margin',components.totalMarginPaise]]
         .filter(([,value])=>Number.isSafeInteger(value)).map(([label,value])=>label+' '+inrPaise(value)).join(' · ');
       futuresMarginStatus.textContent='PREVIEW ONLY · '+data.tradingSymbol+' · '+side+' '+lots+' lot(s) / '+data.quantity+' qty · '+(product==='I'?'Intraday':'Delivery')+' margin'+quoteText+' · Required margin '+required+finalText+(componentText?' · '+componentText:'')+' · Virtual cash '+cash+' · Shortfall '+shortfall+'. No order placed; no funds reserved.';
-    }catch(error){if(selected?.instrument_key===instrumentKey)futuresMarginStatus.textContent=error.message||'Futures margin preview failed.';}
-    finally{updateFuturesMarginButton();}
+    }catch(error){if(request===futuresMarginRequest&&connector.getUserId()===uid&&selected?.instrument_key===instrumentKey)futuresMarginStatus.textContent=error.message||'Futures margin preview failed.';}
+    finally{if(request===futuresMarginRequest)updateFuturesMarginButton();}
   }
   futuresMarginButton?.addEventListener('click',requestFuturesMarginPreview);
   const optionExpiry=document.getElementById('option-expiry');
@@ -511,7 +513,8 @@
     if(streamAbort){streamAbort.abort();streamAbort=null;}
     selected=null;lastQuoteText='';reconnectAttempt=0;
     ++watchlistLoadSeq;++watchQuoteSeq;++paperAccountRequest;++paperPortfolioRequest;
-    ++paperHistoryLoadSeq;++derivativePortfolioRequest;++optionChainRequest;
+    ++paperHistoryLoadSeq;++derivativePortfolioRequest;++optionChainRequest;++futuresMarginRequest;
+    futuresMarginStatus.textContent='Sign in to request broker margin preview.';
     paperHistoryCursor=null;paperHistoryHasMore=false;paperHistoryLoading=false;
     savedWatchlist=[];watchQuotes.clear();renderSavedWatchlist();
     watchStatus.textContent='Sign in to view or save your private watchlists.';
