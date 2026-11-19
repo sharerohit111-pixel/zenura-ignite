@@ -12,6 +12,7 @@ on:
       - "admin.css"
       - "digital-products-data.js"
       - "digital-products.js"
+      - "digital-products-catalogue.js"
       - "digital-products.css"
       - "firebase-client.js"
       - "firebase-config.js"
@@ -45,6 +46,7 @@ on:
       - "admin.css"
       - "digital-products-data.js"
       - "digital-products.js"
+      - "digital-products-catalogue.js"
       - "digital-products.css"
       - "firebase-client.js"
       - "firebase-config.js"
@@ -93,6 +95,8 @@ jobs:
           node --input-type=module --check < solutions-catalogue.js
           node --input-type=module --check < admin.js
           node --input-type=module --check < digital-products.js
+          node --input-type=module --check < digital-products-catalogue.js
+          node --input-type=module --check < firebase-client.js
       - name: Validate product catalogue page local assets
         run: |
           node <<'NODE'
@@ -131,6 +135,7 @@ jobs:
           test -s storage.rules
           node -e "const r=require('node:fs').readFileSync('storage.rules','utf8'); for (const token of ['isZenuraAdmin()', 'request.resource.contentType.matches(\'image/.*\')', '10 * 1024 * 1024', '100 * 1024 * 1024']) if (!r.includes(token)) throw new Error('Storage rules missing required media restriction: '+token)"
           test -s digital-products-data.js
+          test -s digital-products-catalogue.js
           test -s digital-products.css
       - name: Guard Firebase deployment scope
         run: |
