@@ -5,7 +5,7 @@
 (() => {
   'use strict';
   const ADMIN_EMAIL = 'sharerohit111@gmail.com';
-  const UPI_ID = '9756591106-4@ybl';
+  const UPI_ID = '9756591106-4@axl';
   const PAYEE_NAME = 'Rohit Kumar';
   const PLANS = {
     monthly: {label:'1 Month', amount:99, months:1},
@@ -23,7 +23,7 @@
   const db = firebase.firestore();
   let selectedPlan = null;
   let paymentLanguage = (() => { try { return localStorage.getItem('zenura-crypto-payment-language') === 'hi' ? 'hi' : 'en'; } catch (_) { return 'en'; } })();
-  const words = {en:['UPI Payment','Plan:','Amount:','Your payment details are not displayed here. Tap below to open a UPI app with the plan amount and payee details pre-filled. Confirm the payee name and amount inside your UPI app before paying.','Continue to UPI app','UPI transaction ID / UTR','Enter UTR after successful payment','After paying, enter the UTR and submit. Premium stays pending until the admin checks the actual bank/UPI credit and approves it. Do not submit a UPI PIN or OTP.','I have paid — Submit for review','Cancel','Payment is not verified yet.'],hi:['UPI भुगतान','प्लान:','राशि:','आपके भुगतान का विवरण यहाँ नहीं दिखाया जाएगा। नीचे टैप करके UPI ऐप खोलें; प्लान की राशि और भुगतान पाने वाले का विवरण पहले से भरा होगा। भुगतान से पहले UPI ऐप में प्राप्तकर्ता का नाम और राशि जाँच लें।','UPI ऐप पर जाएँ','UPI ट्रांज़ैक्शन ID / UTR','सफल भुगतान के बाद UTR दर्ज करें','भुगतान करने के बाद UTR दर्ज करके सबमिट करें। एडमिन द्वारा बैंक/UPI में वास्तविक राशि की जाँच और मंज़ूरी के बाद ही Premium सक्रिय होगा। UPI PIN या OTP यहाँ दर्ज न करें।','भुगतान कर दिया — जाँच के लिए भेजें','रद्द करें','भुगतान की अभी पुष्टि नहीं हुई है।']};
+  const words = {en:['UPI Payment','Plan:','Amount:','Scan this QR with any UPI app. The selected plan amount is pre-filled. Confirm the payee name and amount in your UPI app, then authorize the payment with your UPI PIN.','Scan QR to Pay','UPI transaction ID / UTR','Enter UTR after successful payment','After paying, enter the UTR and submit. Premium stays pending until the admin checks the actual bank/UPI credit and approves it. Do not submit a UPI PIN or OTP.','I have paid — Submit for review','Cancel','Payment is not verified yet.'],hi:['UPI भुगतान','प्लान:','राशि:','इस QR को किसी भी UPI ऐप से स्कैन करें। चुने गए प्लान की राशि पहले से भरी होगी। भुगतान से पहले UPI ऐप में प्राप्तकर्ता का नाम और राशि जाँचें, फिर अपना UPI PIN डालकर भुगतान अधिकृत करें।','QR स्कैन करके भुगतान करें','UPI ट्रांज़ैक्शन ID / UTR','सफल भुगतान के बाद UTR दर्ज करें','भुगतान करने के बाद UTR दर्ज करके सबमिट करें। एडमिन द्वारा बैंक/UPI में वास्तविक राशि की जाँच और मंज़ूरी के बाद ही Premium सक्रिय होगा। UPI PIN या OTP यहाँ दर्ज न करें।','भुगतान कर दिया — जाँच के लिए भेजें','रद्द करें','भुगतान की अभी पुष्टि नहीं हुई है।']};
   const t = i => words[paymentLanguage][i];
   function setPaymentLanguage(lang, utr) { paymentLanguage=lang; try { localStorage.setItem('zenura-crypto-payment-language',lang); } catch (_) {} $('zpayTitle').textContent=t(0); $('zpayLanguage').textContent=lang==='en'?'हिंदी':'English'; if(selectedPlan) openPayment(selectedPlan.key,utr||''); }
 
@@ -33,7 +33,7 @@
     .zpay-shade.open{display:grid;place-items:center}
     .zpay-box{width:min(520px,100%);max-height:92vh;overflow:auto;background:#0d1d30;border:1px solid #31516c;border-radius:18px;padding:18px;color:#eaf2fa}
     .zpay-box h2{font:700 21px 'Space Grotesk';margin:5px 0 12px}\n    .zpay-head-actions{display:flex;align-items:center;gap:8px}\n    .zpay-lang{border:1px solid #287b76;border-radius:9px;padding:8px 11px;background:#123c42;color:#63e5c2;font:700 11px 'Space Grotesk';cursor:pointer;white-space:nowrap}
-    .zpay-muted{font-size:11px;color:#91a7bb;line-height:1.55}
+    .zpay-muted{font-size:11px;color:#91a7bb;line-height:1.55}\n    .zpay-qr-wrap{display:grid;place-items:center;gap:9px;margin:14px auto;padding:14px;width:min(100%,290px);border:1px solid #34516c;border-radius:14px;background:#f8fafc;color:#142236}\n    .zpay-qr-wrap canvas{display:block;width:240px;height:240px;max-width:100%;image-rendering:pixelated}\n    .zpay-qr-caption{font-size:10px;font-weight:800;letter-spacing:.8px;color:#24364a}\n    .zpay-qr-error{font-size:11px;color:#b45309;text-align:center}
     .zpay-input{width:100%;margin:7px 0 12px;padding:12px;border-radius:9px;border:1px solid #34516c;background:#071522;color:#fff}
     .zpay-actions{display:flex;gap:9px;flex-wrap:wrap;margin-top:12px}
     .zpay-actions button,.zpay-row button{border:0;border-radius:9px;padding:11px 14px;background:linear-gradient(100deg,#23cba4,#548dff);color:#061522;font-weight:800}
@@ -90,13 +90,26 @@
     body.innerHTML = `
       <p class="zpay-muted">${t(1)} <b>${paymentLanguage==='hi'?({monthly:'1 महीना',quarterly:'3 महीने',halfyear:'6 महीने',yearly:'1 साल'}[planKey]):plan.label}</b> · ${t(2)} <b>₹${plan.amount}</b></p>
       <p class="zpay-muted">${t(3)}</p>
-      <div class="zpay-actions"><button type="button" id="zpayOpenUpi">${t(4)}</button></div>
+      <div class="zpay-qr-wrap"><canvas id="zpayQr" width="240" height="240" aria-label="ZENURA IGNITE UPI payment QR code"></canvas><span class="zpay-qr-caption">${t(4)} · ₹${plan.amount}</span></div>
+      <p class="zpay-muted" style="text-align:center">No mobile number or UPI ID is printed on this screen. Your UPI app may show payee details after scanning.</p>
       <label class="label" for="zpayUtr">${t(5)}</label>
       <input class="zpay-input" id="zpayUtr" maxlength="40" autocomplete="off" placeholder="${t(6)}" value="${String(keepUtr).replace(/[&<>"]/g, '')}">
       <p class="zpay-muted">${t(7)}</p>
       <div class="zpay-actions"><button type="button" id="zpaySubmit">${t(8)}</button><button class="secondary" type="button" id="zpayCancel">${t(9)}</button></div>`;
     say(t(10));
-    $('zpayOpenUpi').onclick = () => { window.location.href = upi; };
+    const qrCanvas = $('zpayQr');
+    if (window.QRCode && qrCanvas) {
+      QRCode.toCanvas(qrCanvas, upi, {width:240, margin:2, errorCorrectionLevel:'M', color:{dark:'#111827',light:'#ffffff'}}, error => {
+        if (error) {
+          console.error('UPI QR generation failed', error);
+          const wrap = qrCanvas.closest('.zpay-qr-wrap');
+          if (wrap) wrap.innerHTML = '<p class="zpay-qr-error">QR could not be generated. Please refresh and try again.</p>';
+        }
+      });
+    } else {
+      const wrap = qrCanvas?.closest('.zpay-qr-wrap');
+      if (wrap) wrap.innerHTML = '<p class="zpay-qr-error">QR generator is unavailable. Please refresh and try again.</p>';
+    }
     $('zpayCancel').onclick = close;
     $('zpaySubmit').onclick = async () => {
       const current = requireUser();
