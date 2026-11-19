@@ -28,7 +28,7 @@ async function load(){
  const cards=[...root.querySelectorAll(".product-card")];
  for(const card of cards){
   const title=card.querySelector("h3")?.textContent.trim().toLowerCase();
-  const product=products.find(item=>String(item.name||"").trim().toLowerCase()===title);
+  const product=products.find(item=>(card.dataset.productId&&item.id===card.dataset.productId)||String(item.name||"").trim().toLowerCase()===title);
   if(!product)continue;
   if(product.visible===false){card.hidden=true;continue;}
   card.hidden=false;
