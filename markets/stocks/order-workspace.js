@@ -219,8 +219,8 @@
         throw new Error('LIMIT order response could not be verified. Retry the same order to safely check its result.');
       }
       clearPendingLimit(uid);
-      showMessage(status, translate('LIMIT order submitted and reservation confirmed.'), 'success');
       await refreshAll();
+      showMessage(status, translate('LIMIT order submitted and reservation confirmed.'), 'success');
     } catch (error) {
       showMessage(status, error.message || 'LIMIT order submission failed.', 'error');
     } finally {
@@ -307,7 +307,7 @@
       const reservedMargin = Number.isSafeInteger(account.reservedMarginPaise) ? account.reservedMarginPaise : 0;
       if (!Number.isSafeInteger(account.cashPaise) || account.cashPaise < reservedCash + reservedMargin) throw new Error('Account cash reservation data is invalid.');
       cashAvailable.textContent = money(account.cashPaise - reservedCash - reservedMargin);
-      cashReserved.textContent = money(reservedCash);
+      cashReserved.textContent = money(reservedCash) + (reservedMargin ? ' + ' + money(reservedMargin) + ' margin' : '');
       const positions = account.positions && typeof account.positions === 'object' ? account.positions : {};
       const reservations = account.reservedPositions && typeof account.reservedPositions === 'object' ? account.reservedPositions : {};
       let held = 0, reserved = 0;
@@ -369,8 +369,8 @@
       if (data.status !== 'CANCELLED' || data.reservationReleased !== true && data.idempotentReplay !== true) {
         throw new Error('Cancellation response could not be verified. Refresh order history before retrying.');
       }
-      showMessage(ordersStatus, translate('Order cancelled and reservation released.'), 'success');
       await refreshAll();
+      showMessage(ordersStatus, translate('Order cancelled and reservation released.'), 'success');
     } catch (error) {
       button.disabled = false;
       button.textContent = translate('Cancel');
