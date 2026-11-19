@@ -38,6 +38,7 @@ const {parseMarginPreviewInput}=require("./lib/margin-preview-input");
 const {consumeMarginPreviewSlot}=require("./lib/margin-preview-rate-limit");
 const {authenticateFirebaseRequest}=require("./lib/firebase-auth");
 const {normalizePaperAccountState,ensurePaperAccount}=require("./lib/paper-account-state");
+const {paperStartingCashPaise}=require("./lib/paper-account-config");
 initializeApp();
 const db=getFirestore();
 const app=express();
@@ -222,10 +223,6 @@ app.get("/option-chain",async(req,res)=>{
 });
 
 
-function paperStartingCashPaise(){
-  const value=Number(process.env.INDIAN_PAPER_STARTING_CASH_PAISE||"");
-  return Number.isSafeInteger(value)&&value>0?value:null;
-}
 function paperAccountRef(uid){return db.collection("indianPaperAccounts").doc(uid);}
 app.get("/paper/account",async(req,res)=>{
   try{
