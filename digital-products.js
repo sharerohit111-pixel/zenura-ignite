@@ -13,22 +13,51 @@ function productModal(p){
  document.body.append(el);
  const close=()=>el.remove();el.querySelector(".digital-product-close").addEventListener("click",close);el.addEventListener("click",e=>{if(e.target===el)close()});
 }
-function bind(){root?.querySelectorAll("[data-product-detail]").forEach(b=>b.addEventListener("click",()=>{const p=products.find(x=>x.id===b.dataset.productDetail);if(p)productModal(p)}));}
+function openProductFromCard(card){
+ const id=card?.dataset.productId;
+ const p=products.find(x=>String(x.id)===String(id));
+ if(p)productModal(p);
+}
+function bind(){
+ if(!root||root.dataset.productSamplesBound==="true")return;
+ root.dataset.productSamplesBound="true";
+ root.addEventListener("click",event=>{
+  const link=event.target.closest("[data-product-detail]");
+  const card=event.target.closest(".product-card");
+  if(link){event.preventDefault();event.stopPropagation();openProductFromCard(link.closest(".product-card"));return;}
+  if(card)openProductFromCard(card);
+ });
+ root.addEventListener("keydown",event=>{
+  if(event.key!=="Enter"&&event.key!==" ")return;
+  const card=event.target.closest(".product-card");
+  if(card&&event.target===card){event.preventDefault();openProductFromCard(card);}
+ });
+}
 function updateCard(card,p){
  const art=card.querySelector(".product-art"),content=card.querySelector(".product-content");
  if(!art||!content)return;
+ const id=String(p.id||"");
+ card.dataset.productId=id;
+ card.setAttribute("role","button");
+ card.setAttribute("tabindex","0");
+ card.setAttribute("aria-label","View "+(p.name||"product")+" details and images");
  art.querySelector(".product-card-image")?.remove();
- if(p.imageUrl){const img=document.createElement("img");img.className="product-card-image";img.src=p.imageUrl;img.alt=p.name+" product image";img.loading="lazy";img.decoding="async";art.prepend(img);art.classList.add("has-product-image");}
- const title=content.querySelector("h3");if(title)title.textContent=p.name;
+ art.classList.remove("has-product-image");
+ if(p.imageUrl){
+  const img=document.createElement("img");img.className="product-card-image";img.src=p.imageUrl;img.alt=(p.name||"Product")+" image";img.loading="eager";img.decoding="async";
+  img.addEventListener("error",()=>{img.remove();art.classList.remove("has-product-image");console.warn("Product sample image failed to load:",p.name);});
+  art.prepend(img);art.classList.add("has-product-image");
+ }
+ const title=content.querySelector("h3");if(title)title.textContent=p.name||"";
  const subtitle=content.querySelector(".product-subtitle");if(subtitle)subtitle.textContent=p.subtitle||"";
  const paragraphs=content.querySelectorAll(":scope > p:not(.product-subtitle)");if(paragraphs[0])paragraphs[0].textContent=p.description||"";
  const tags=content.querySelector(".product-tags");if(tags)tags.innerHTML=(p.tags||[]).map(x=>"<span>"+esc(x)+"</span>").join("");
- const link=content.querySelector(".product-link");if(link){link.removeAttribute("href");link.dataset.productDetail=p.id;link.textContent="View product details & images ↗";}
- card.dataset.productId=p.id;
+ const link=content.querySelector(".product-link");
+ if(link){link.removeAttribute("href");link.dataset.productDetail=id;link.textContent="View product details & images ↗";link.setAttribute("role","button");}
 }
 async function load(){
  try{const snap=await getDoc(doc(db,"publicCatalog","digitalProducts"));if(snap.exists()&&snap.data().published&&Array.isArray(snap.data().products))products=snap.data().products.filter(p=>p.visible!==false);}
  catch(e){console.warn("Product samples are using built-in defaults.",e)}
- if(root){const cards=[...root.querySelectorAll(".product-card")];products.forEach((p,i)=>{const card=cards.find(x=>x.querySelector("h3")?.textContent.trim().toLowerCase()===p.name.toLowerCase())||cards[i];if(card)updateCard(card,p)});bind();}
+ if(root){const cards=[...root.querySelectorAll(".product-card")];products.forEach((p,i)=>{const card=cards.find(x=>x.querySelector("h3")?.textContent.trim().toLowerCase()===String(p.name||"").trim().toLowerCase())||cards[i];if(card)updateCard(card,p)});bind();}
 }
 load();
