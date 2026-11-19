@@ -66,6 +66,28 @@ jobs:
         run: |
           node -e "JSON.parse(require('node:fs').readFileSync('firebase.json','utf8'))"
           node -e "JSON.parse(require('node:fs').readFileSync('firestore.indexes.json','utf8'))"
+      - name: Guard Firebase deployment scope
+        run: |
+          node -e "
+            const scripts = require('./functions/package.json').scripts || {};
+            const deploy = scripts.deploy || '';
+            const required = [
+              'functions:startUpstoxAuthorization',
+              'functions:upstoxOAuthCallback',
+              'functions:disconnectUpstoxAccount',
+              'functions:getIndianMarketConnectionStatus'
+            ];
+            if (!deploy.startsWith('cd .. && firebase deploy --only ')) {
+              throw new Error('Firebase deploy script must use the explicit Indian-market-only allowlist.');
+            }
+            if (deploy.includes('--only functions') || deploy.includes('--only firestore') || deploy.includes('functions,')) {
+              throw new Error('Broad Firebase deployment target is forbidden.');
+            }
+            for (const target of required) {
+              if (!deploy.includes(target)) throw new Error('Missing deployment target: ' + target);
+            }
+            console.log('Firebase deploy scope is restricted to the four Indian-market Functions.');
+          "
       - name: Install Firebase Functions test dependencies
         run: npm install --prefix functions --ignore-scripts --no-audit --no-fund
       - name: Enforce Firebase Functions high and critical dependency audit
