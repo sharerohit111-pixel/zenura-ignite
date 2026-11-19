@@ -14,7 +14,7 @@ function jitteredReconnectDelay(delayMs, random=Math.random, jitterRatio=0.2) {
   const sample = random();
   if (!Number.isFinite(sample) || sample < 0 || sample > 1) return null;
   const factor = 1 - jitterRatio + (2 * jitterRatio * sample);
-  return Math.max(0, Math.round(delayMs * factor));
+  return Math.min(30000, Math.max(0, Math.round(delayMs * factor)));
 }
 
 function shouldReconnectAfterFeedError(eventName) {
