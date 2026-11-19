@@ -87,23 +87,27 @@ async function execute({db,orderRef,order,quote,nowMs,serverTimestamp}){
   });
   return outcome;
 }
-async function processPendingLimitOrders({db,fetchQuote,nowMs=Date.now(),serverTimestamp,maxOrders=50,logger={warn(){},error(){}}}){
+async function processPendingLimitOrders({db,fetchQuote,nowMs=Date.now(),serverTimestamp,maxOrders=50,concurrency=5,logger={warn(){},error(){}}}){
   if(!db||typeof fetchQuote!=="function"||typeof serverTimestamp!=="function")throw new TypeError("Pending LIMIT worker dependencies are invalid.");
-  if(!Number.isSafeInteger(nowMs)||nowMs<1||!Number.isInteger(maxOrders)||maxOrders<1||maxOrders>100)throw new TypeError("Pending LIMIT worker bounds are invalid.");
+  if(!Number.isSafeInteger(nowMs)||nowMs<1||!Number.isInteger(maxOrders)||maxOrders<1||maxOrders>100||
+    !Number.isInteger(concurrency)||concurrency<1||concurrency>10)throw new TypeError("Pending LIMIT worker bounds are invalid.");
   const snapshot=await db.collection("indianPaperOrders").where("orderType","==","LIMIT").where("status","==","PENDING").orderBy("createdAt","asc").limit(maxOrders).get();
   const summary={scanned:snapshot.size,filled:0,notEligible:0,failed:0,alreadyFilled:0};
-  for(const doc of snapshot.docs){
-    const order=doc.data();
-    try{
-      const quote=await fetchQuote(order);
-      const result=await execute({db,orderRef:doc.ref,order,quote,nowMs,serverTimestamp});
-      if(result==="FILLED")summary.filled++;
-      else if(result==="ALREADY_FILLED")summary.alreadyFilled++;
-      else summary.notEligible++;
-    }catch(error){
-      summary.failed++;
-      logger.warn("Pending LIMIT order was not processed",{orderId:doc.id,errorName:error.name||"Error",status:error.status||500});
-    }
+  for(let offset=0;offset<snapshot.docs.length;offset+=concurrency){
+    const batch=snapshot.docs.slice(offset,offset+concurrency);
+    await Promise.all(batch.map(async doc=>{
+      const order=doc.data();
+      try{
+        const quote=await fetchQuote(order);
+        const result=await execute({db,orderRef:doc.ref,order,quote,nowMs,serverTimestamp});
+        if(result==="FILLED")summary.filled++;
+        else if(result==="ALREADY_FILLED")summary.alreadyFilled++;
+        else summary.notEligible++;
+      }catch(error){
+        summary.failed++;
+        logger.warn("Pending LIMIT order was not processed",{orderId:doc.id,errorName:error.name||"Error",status:error.status||500});
+      }
+    }));
   }
   return summary;
 }
