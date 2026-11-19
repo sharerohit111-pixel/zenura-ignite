@@ -94,9 +94,9 @@ window.ZENURA_MARKET_CONNECTOR = {
     return auth.currentUser.getIdToken();
   }
 };
-onAuthStateChanged(auth, async () => {
+onAuthStateChanged(auth, async user => {
   await refreshStatus();
-  window.dispatchEvent(new Event("zenura-market-auth-ready"));
+  window.dispatchEvent(new CustomEvent("zenura-market-auth-ready", { detail: { signedIn: !!user } }));
 });
 if (new URLSearchParams(location.search).get("upstox") === "connected") {
   history.replaceState({}, "", location.pathname);
