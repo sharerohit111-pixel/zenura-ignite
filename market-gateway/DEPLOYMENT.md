@@ -61,6 +61,33 @@ Deploy `market-gateway/` as a separate Cloud Run service with Node.js 22. Config
 
 After deployment, set the exact Cloud Run HTTPS URL in the `market-gateway-url` meta tag in `markets/stocks/index.html`. Do not point the frontend at a placeholder or unverified URL.
 
+### Reproducible Cloud Run deployment
+
+Run these commands from the repository root after replacing the service-account placeholder with a dedicated service account that has the required Firestore access and Secret Manager access. Do not grant project Owner or Editor.
+
+```sh
+gcloud config set project zenura-ignite-technologies
+gcloud run deploy zenura-indian-market-gateway \
+  --source market-gateway \
+  --region asia-south1 \
+  --platform managed \
+  --allow-unauthenticated \
+  --service-account YOUR_GATEWAY_SERVICE_ACCOUNT@zenura-ignite-technologies.iam.gserviceaccount.com \
+  --set-env-vars ALLOWED_ORIGINS=https://zenuraignite.com,INDIAN_PAPER_STARTING_CASH_PAISE=100000000,MAX_INSTRUMENT_KEYS=100 \
+  --set-secrets UPSTOX_TOKEN_ENCRYPTION_KEY=UPSTOX_TOKEN_ENCRYPTION_KEY:latest
+```
+
+The service is intentionally internet-reachable for browser CORS requests; application routes still verify Firebase ID tokens. Grant the runtime service account Secret Manager Secret Accessor on the encryption-key secret and the minimum Firestore database IAM role needed by the Admin SDK. Confirm the Firestore database and Cloud Run service are in the same intended project. Do not copy the encryption key into `--set-env-vars`, source files, build arguments, or browser code.
+
+After deployment, obtain and verify the service URL before editing the frontend:
+
+```sh
+gcloud run services describe zenura-indian-market-gateway --region asia-south1 --format='value(status.url)'
+curl --fail --show-error "$(gcloud run services describe zenura-indian-market-gateway --region asia-south1 --format='value(status.url)')/health"
+```
+
+The health response is a liveness check only; it does not prove Firebase authentication, Firestore permissions, Upstox OAuth, or live streaming works. Complete the end-to-end checks below before setting the frontend gateway URL or enabling production access. Deploy with the intended production origin only; preview origins must be added deliberately and explicitly.
+
 ## 5. Verification before production
 
 1. Run `npm test` and `npm run check` in `market-gateway/`, plus the GitHub Actions workflow.
