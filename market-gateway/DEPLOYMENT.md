@@ -52,7 +52,7 @@ Do not put this value in client-side code. The gateway deliberately refuses to i
 
 ## 4. Cloud Run gateway
 
-Deploy `market-gateway/` as a separate Cloud Run service with Node.js 20. Configure:
+Deploy `market-gateway/` as a separate Cloud Run service with Node.js 22. Configure:
 - `UPSTOX_TOKEN_ENCRYPTION_KEY`: the same Secret Manager value as the Firebase Function.
 - `ALLOWED_ORIGINS=https://zenuraignite.com` (use the exact production origin, no wildcard).
 - `INDIAN_PAPER_STARTING_CASH_PAISE=100000000`.
