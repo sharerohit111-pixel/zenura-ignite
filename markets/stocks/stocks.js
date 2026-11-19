@@ -176,14 +176,16 @@
     }finally{if(seq===paperHistoryLoadSeq){paperHistoryLoading=false;paperHistoryMore.disabled=!paperHistoryHasMore;}}
   }
   paperHistoryMore?.addEventListener('click',()=>loadPaperHistory({append:true}));
+  let derivativePortfolioRequest=0;
   async function loadDerivativePortfolio(){
+    const request=++derivativePortfolioRequest;
     const body=document.getElementById('derivative-positions'),status=document.getElementById('derivative-portfolio-status');
     if(!body||!status||!gateway||!window.ZENURA_MARKET_CONNECTOR?.getIdToken)return;
     status.textContent='Refreshing verified option quotes…';
     try{
       const token=await window.ZENURA_MARKET_CONNECTOR.getIdToken();
       const [response,historyResponse]=await Promise.all([fetch(gateway+'/paper/derivatives/portfolio',{headers:{Authorization:'Bearer '+token,Accept:'application/json'}}),fetch(gateway+'/paper/derivative/orders?limit=50',{headers:{Authorization:'Bearer '+token,Accept:'application/json'}})]);
-      const data=await response.json(),history=await historyResponse.json();if(!response.ok)throw new Error(data.error||'Derivative portfolio unavailable');if(!historyResponse.ok)throw new Error(history.error||'Derivative order history unavailable');
+      const data=await response.json(),history=await historyResponse.json();if(request!==derivativePortfolioRequest)return;if(!response.ok)throw new Error(data.error||'Derivative portfolio unavailable');if(!historyResponse.ok)throw new Error(history.error||'Derivative order history unavailable');
       body.textContent='';
       if(!data.positions?.length)tableMessage(body,6,'No open derivative positions.');
       else data.positions.forEach(p=>{
@@ -483,7 +485,38 @@
     title.textContent='No instrument selected';symbol.textContent='Choose an instrument';price.textContent='—';updatePaperButtons();renderSavedWatchlist();loadInstruments();
   }));
   search.addEventListener('input',()=>{clearTimeout(debounce);debounce=setTimeout(loadInstruments,250);});
-  window.addEventListener('zenura-market-auth-ready',()=>{loadInstruments();loadCandles();loadPaperAccount();refreshPaperViews();loadSavedWatchlist();});
+  function clearPrivateSession(){
+    clearFeedTimers();
+    if(streamAbort){streamAbort.abort();streamAbort=null;}
+    selected=null;lastQuoteText='';reconnectAttempt=0;
+    ++watchlistLoadSeq;++watchQuoteSeq;++paperAccountRequest;++paperPortfolioRequest;
+    ++paperHistoryLoadSeq;++derivativePortfolioRequest;++optionChainRequest;
+    paperHistoryCursor=null;paperHistoryHasMore=false;paperHistoryLoading=false;
+    savedWatchlist=[];watchQuotes.clear();renderSavedWatchlist();
+    watchStatus.textContent='Sign in to view or save your private watchlists.';
+    paperCash.textContent='—';paperRealized.textContent='—';
+    paperAccountStatus.textContent='Sign in to load your private Indian-market account.';
+    paperMarketValue.textContent='—';paperUnrealized.textContent='—';paperEquity.textContent='—';
+    paperPortfolioStatus.textContent='Sign in to view your private portfolio.';
+    tableMessage(paperPositions,6,'Sign in to view holdings.');
+    tableMessage(paperHistory,6,'Sign in to view order history.');
+    if(paperHistoryStatus)paperHistoryStatus.textContent='Sign in required';
+    if(paperHistoryMore)paperHistoryMore.disabled=true;
+    const derivativeBody=document.getElementById('derivative-positions');
+    const derivativeStatus=document.getElementById('derivative-portfolio-status');
+    const derivativeHistory=document.getElementById('derivative-history');
+    if(derivativeBody)tableMessage(derivativeBody,6,'Sign in to view derivative positions.');
+    if(derivativeHistory)tableMessage(derivativeHistory,6,'Sign in to view derivative order history.');
+    if(derivativeStatus)derivativeStatus.textContent='Sign in required';
+    price.textContent='—';title.textContent='No instrument selected';symbol.textContent='Sign in to load market data';
+    setFeedStatus('SIGN IN REQUIRED','Your private market session has ended.');
+    resetOptionChain('Sign in to load a private option chain.');
+    updatePaperButtons();
+  }
+  window.addEventListener('zenura-market-auth-ready',()=>{
+    if(!window.ZENURA_MARKET_CONNECTOR?.isAuthenticated?.()){clearPrivateSession();return;}
+    loadInstruments();loadCandles();loadPaperAccount();refreshPaperViews();loadSavedWatchlist();
+  });
   window.ZENURA_INDIAN_MARKET={mode:'indian-stocks',provider:'upstox',status:'gateway-configurable',activeList:()=>activeList,refresh:loadInstruments};
   loadInstruments();
   renderSavedWatchlist();
