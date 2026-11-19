@@ -110,8 +110,8 @@
     $('ziQrSubmit').disabled=true;
     $('ziQrMessage').textContent='Submitting payment reference…';
     try {
-      const duplicate=await db.collection('payments').where('uid','==',user.uid).where('utr','==',utr).limit(1).get();
-      if(!duplicate.empty)throw new Error('This UTR has already been submitted. Contact support if this is your own earlier request.');
+      const ownRequests=await db.collection('payments').where('uid','==',user.uid).get();
+      if(ownRequests.docs.some(doc=>(doc.data().utr||'').toLowerCase()===utr.toLowerCase()))throw new Error('This UTR has already been submitted. Contact support if this is your own earlier request.');
       await db.collection('payments').add({
         uid:user.uid,email:user.email||'',planId:plan.id,planLabel:plan.label,
         amount:plan.amount,days:plan.days,utr,status:'pending',
