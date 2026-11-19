@@ -42,3 +42,15 @@ test("reads valid legacy and current cash-equity position maps",()=>{
  assert.deepEqual(readStoredPaperPositions({positions:undefined}),[]);
  assert.deepEqual(readStoredPaperPositions({positions:{"NSE_EQ|ABC":{quantity:1,averagePricePaise:100}}}),[["NSE_EQ|ABC",{quantity:1,averagePricePaise:100}]]);
 });
+
+test("values equity unrealized P&L from exact paise cost basis",()=>{
+ const exact=[["NSE_EQ|ABC",{quantity:2,averagePricePaise:101,costBasisPaise:201}]];
+ const result=buildPortfolioValuation({positions:exact,quotes:[{instrument_token:"NSE_EQ|ABC",last_price:1.10,last_trade_time:now}],cashPaise:0,now});
+ assert.equal(result.positions[0].costBasisPaise,201);
+ assert.equal(result.marketValuePaise,220);
+ assert.equal(result.unrealizedPnlPaise,19);
+});
+test("rejects inconsistent exact cash-equity cost basis",()=>{
+ const invalid=[["NSE_EQ|ABC",{quantity:2,averagePricePaise:101,costBasisPaise:199}]];
+ assert.throws(()=>buildPortfolioValuation({positions:invalid,quotes:[],cashPaise:0,now}),/invalid cost basis/);
+});
