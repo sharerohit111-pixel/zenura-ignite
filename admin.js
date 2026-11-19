@@ -15,7 +15,7 @@ function render(){
 }
 async function changeStatus(id,status,control){try{const {db}=await import("./firebase-client.js");const {doc,updateDoc}=await import("https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore.js");await updateDoc(doc(db,"enquiries",id),{status});const item=allEnquiries.find(x=>x.id===id);if(item)item.status=status;render()}catch(error){showError(dashboardError,"Could not update status: "+error.message);control.value=allEnquiries.find(x=>x.id===id)?.status||"new"}}
 async function loadEnquiries(){try{const {db}=await import("./firebase-client.js");const {collection,getDocs,orderBy,query}=await import("https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore.js");const snap=await getDocs(query(collection(db,"enquiries"),orderBy("createdAt","desc")));allEnquiries=snap.docs.map(d=>({id:d.id,...d.data()}));render();showError(dashboardError,"")}catch(error){showError(dashboardError,"Could not load enquiries: "+error.message)}}
-async function setupCatalogueAdmin(){
+async function setupCatalogueAdmin(auth){
  const {DEFAULT_SOLUTIONS}=await import("./solutions-catalogue-data.js");
  const {db}=await import("./firebase-client.js");
  const fs=await import("https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore.js");
@@ -34,6 +34,6 @@ if(!isFirebaseConfigured()){loginButton.disabled=true;loginButton.textContent="F
  const [{auth,googleProvider},{onAuthStateChanged,signInWithPopup,signOut}]=await Promise.all([import("./firebase-client.js"),import("https://www.gstatic.com/firebasejs/11.6.0/firebase-auth.js")]);
  loginButton.addEventListener("click",async()=>{showError(loginError,"");try{await signInWithPopup(auth,googleProvider)}catch(e){showError(loginError,e.message)}});
  logoutButton.addEventListener("click",()=>signOut(auth));
- onAuthStateChanged(auth,async user=>{if(user&&user.email===ADMIN_EMAIL&&user.emailVerified){loginPanel.hidden=true;dashboard.hidden=false;document.getElementById("identity").textContent="Signed in as "+user.email;await Promise.all([loadEnquiries(),setupCatalogueAdmin()]);document.getElementById("solutions-admin").hidden=false}else{if(user)await signOut(auth);loginPanel.hidden=false;dashboard.hidden=true;if(user)showError(loginError,"This Google account is not authorized.")}});
+ onAuthStateChanged(auth,async user=>{if(user&&user.email===ADMIN_EMAIL&&user.emailVerified){loginPanel.hidden=true;dashboard.hidden=false;document.getElementById("identity").textContent="Signed in as "+user.email;await Promise.all([loadEnquiries(),setupCatalogueAdmin(auth)]);document.getElementById("solutions-admin").hidden=false}else{if(user)await signOut(auth);loginPanel.hidden=false;dashboard.hidden=true;if(user)showError(loginError,"This Google account is not authorized.")}});
  document.getElementById("search").addEventListener("input",render);document.getElementById("status-filter").addEventListener("change",render);
 }
