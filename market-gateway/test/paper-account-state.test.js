@@ -2,85 +2,76 @@
 const test=require("node:test");
 const assert=require("node:assert/strict");
 const {normalizePaperAccountState,ensurePaperAccount}=require("../lib/paper-account-state");
-const valid=()=>({currency:"INR",startingCashPaise:100000000,cashPaise:100000000,
- positions:{},derivativePositions:{},reservedMarginPaise:0,realizedPnlPaise:0});
-test("normalizes valid account state and legacy optional fields",()=>{
- const account=valid();
- delete account.derivativePositions;
- delete account.reservedMarginPaise;
- delete account.realizedPnlPaise;
- const result=normalizePaperAccountState(account);
- assert.deepEqual(result,{currency:"INR",startingCashPaise:100000000,cashPaise:100000000,
-  positions:{},derivativePositions:{},reservedMarginPaise:0,realizedPnlPaise:0,updatedAt:null});
-});
-test("rejects malformed account balances and position containers",()=>{
- const cases=[
-  {currency:"USD"},{startingCashPaise:0},{startingCashPaise:Number.MAX_SAFE_INTEGER+1},
-  {cashPaise:-1},{cashPaise:Number.MAX_SAFE_INTEGER+1},{positions:null},
-  {positions:[]},{derivativePositions:null},{derivativePositions:[]},
-  {reservedMarginPaise:-1},{reservedMarginPaise:1.5},
-  {realizedPnlPaise:Number.MAX_SAFE_INTEGER+1},{realizedPnlPaise:"0"}
- ];
- for(const patch of cases)assert.equal(normalizePaperAccountState({...valid(),...patch}),null);
-});
-test("preserves valid negative realized P&L and safe balances",()=>{
- const result=normalizePaperAccountState({...valid(),cashPaise:0,realizedPnlPaise:-12500});
- assert.equal(result.cashPaise,0);assert.equal(result.realizedPnlPaise,-12500);
-});
 
-function transactionDb(account){
- const writes=[];
- return {writes,db:{async runTransaction(callback){
-  const tx={
-   async get(){return {exists:account!==null,data:()=>account};},
-   create(ref,data){writes.push({type:"create",data});},
-   update(ref,data){writes.push({type:"update",data});}
-  };
-  return callback(tx);
- }}};
+function makeDb(existing){
+ const state={value:existing?{...existing}:null,writes:[]};
+ const db={runTransaction:async callback=>callback({
+  get:async()=>({exists:state.value!==null,data:()=>state.value}),
+  create:(_ref,value)=>{state.writes.push(["create",value]);state.value=value;},
+  update:(_ref,patch)=>{state.writes.push(["update",patch]);state.value={...state.value,...patch};}
+ })};
+ return {db,state};
 }
-test("existing paper account remains accessible without starting cash configuration",async()=>{
- const account={currency:"INR",startingCashPaise:100000000,cashPaise:43210000,
-  positions:{"NSE_EQ|ABC":{quantity:3}},derivativePositions:{},reservedMarginPaise:0,realizedPnlPaise:0};
- const {db,writes}=transactionDb(account);
- await ensurePaperAccount({db,ref:{id:"user-1"},startingCashPaise:null,serverTimestamp:()=>"timestamp"});
- assert.deepEqual(writes,[]);
- assert.equal(account.cashPaise,43210000);
- assert.equal(account.positions["NSE_EQ|ABC"].quantity,3);
-});
-test("new paper account is created only with a valid configured starting balance",async()=>{
- const {db,writes}=transactionDb(null);
- await ensurePaperAccount({db,ref:{id:"user-2"},startingCashPaise:100000000,serverTimestamp:()=>"timestamp"});
- assert.equal(writes.length,1);
- assert.equal(writes[0].type,"create");
- assert.equal(writes[0].data.cashPaise,100000000);
- assert.equal(writes[0].data.startingCashPaise,100000000);
-});
-test("missing starting cash configuration blocks only new account creation",async()=>{
- const {db,writes}=transactionDb(null);
- await assert.rejects(ensurePaperAccount({db,ref:{id:"user-3"},startingCashPaise:null,serverTimestamp:()=>"timestamp"}),{status:503});
- assert.deepEqual(writes,[]);
-});
-test("legacy account migration adds missing fields without replacing balances or holdings",async()=>{
- const account={currency:"INR",startingCashPaise:100000000,cashPaise:76543210,
-  positions:{"NSE_EQ|ABC":{quantity:7}},realizedPnlPaise:-1200};
- const {db,writes}=transactionDb(account);
- await ensurePaperAccount({db,ref:{id:"user-4"},startingCashPaise:null,serverTimestamp:()=>"migration-time"});
- assert.equal(writes.length,1);
- assert.equal(writes[0].type,"update");
- assert.deepEqual(writes[0].data,{derivativePositions:{},reservedMarginPaise:0,updatedAt:"migration-time"});
- assert.equal(account.cashPaise,76543210);
- assert.equal(account.positions["NSE_EQ|ABC"].quantity,7);
- assert.equal(account.realizedPnlPaise,-1200);
+
+test("normalizes a valid INR paper account with empty optional maps",()=>{
+ const result=normalizePaperAccountState({currency:"INR",startingCashPaise:100000000,cashPaise:100000000});
+ assert.deepEqual(result,{currency:"INR",startingCashPaise:100000000,cashPaise:100000000,positions:{},derivativePositions:{},reservedMarginPaise:0,realizedPnlPaise:0,updatedAt:null});
 });
 
-test("legacy account migration restores a missing cash-equity positions map",async()=>{
- const account={currency:"INR",startingCashPaise:100000000,cashPaise:76543210,realizedPnlPaise:0};
- const {db,writes}=transactionDb(account);
- await ensurePaperAccount({db,ref:{id:"user-5"},startingCashPaise:null,serverTimestamp:()=>"migration-time"});
- assert.equal(writes.length,1);
- assert.deepEqual(writes[0].data.positions,{});
- assert.deepEqual(writes[0].data.derivativePositions,{});
- assert.equal(writes[0].data.reservedMarginPaise,0);
- assert.equal(account.cashPaise,76543210);
+test("normalizes Firestore timestamp without exposing account internals",()=>{
+ const result=normalizePaperAccountState({currency:"INR",startingCashPaise:1000,cashPaise:900,positions:{},derivativePositions:{},reservedMarginPaise:100,realizedPnlPaise:-25,updatedAt:{toMillis:()=>1234},version:8,privateSecret:"never-return"});
+ assert.equal(result.updatedAt,1234);
+ assert.equal(Object.hasOwn(result,"version"),false);
+ assert.equal(Object.hasOwn(result,"privateSecret"),false);
+});
+
+test("rejects malformed account identity, currency, balances and maps",()=>{
+ const valid={currency:"INR",startingCashPaise:1000,cashPaise:900,positions:{},derivativePositions:{},reservedMarginPaise:0,realizedPnlPaise:0};
+ for(const patch of [
+  {currency:"USD"},{startingCashPaise:0},{startingCashPaise:1.5},{cashPaise:-1},
+  {cashPaise:Number.MAX_SAFE_INTEGER+1},{positions:null},{positions:[]},
+  {derivativePositions:"bad"},{reservedMarginPaise:-1},{realizedPnlPaise:1.2}
+ ]) assert.equal(normalizePaperAccountState({...valid,...patch}),null);
+});
+
+test("rejects null, arrays and primitive account documents",()=>{
+ for(const value of [null,[], "bad", 0])assert.equal(normalizePaperAccountState(value),null);
+});
+
+test("initializes a missing account once with INR virtual cash and empty positions",async()=>{
+ const {db,state}=makeDb(null);
+ await ensurePaperAccount({db,ref:{id:"user-1"},startingCashPaise:100000000,serverTimestamp:()=>"server-time"});
+ assert.equal(state.writes.length,1);
+ assert.equal(state.writes[0][0],"create");
+ assert.deepEqual(state.value,{currency:"INR",startingCashPaise:100000000,cashPaise:100000000,positions:{},derivativePositions:{},reservedMarginPaise:0,realizedPnlPaise:0,createdAt:"server-time",updatedAt:"server-time",version:1});
+});
+
+test("does not reset an existing account balance or holdings",async()=>{
+ const original={currency:"INR",startingCashPaise:100000000,cashPaise:45000000,positions:{"NSE_EQ|ABC":{quantity:5,averagePricePaise:10000}},derivativePositions:{},reservedMarginPaise:0,realizedPnlPaise:2500,version:7};
+ const {db,state}=makeDb(original);
+ await ensurePaperAccount({db,ref:{id:"user-1"},startingCashPaise:999999999,serverTimestamp:()=>"new-time"});
+ assert.deepEqual(state.writes,[]);
+ assert.equal(state.value.cashPaise,45000000);
+ assert.equal(state.value.version,7);
+ assert.equal(state.value.positions["NSE_EQ|ABC"].quantity,5);
+});
+
+test("repairs only absent legacy maps and margin fields",async()=>{
+ const {db,state}=makeDb({currency:"INR",startingCashPaise:1000,cashPaise:700,realizedPnlPaise:10,version:2});
+ await ensurePaperAccount({db,ref:{id:"user-1"},startingCashPaise:9999,serverTimestamp:()=>"server-time"});
+ assert.deepEqual(state.writes,[["update",{positions:{},derivativePositions:{},reservedMarginPaise:0,updatedAt:"server-time"}]]);
+ assert.equal(state.value.cashPaise,700);
+ assert.equal(state.value.startingCashPaise,1000);
+});
+
+test("refuses to create an account without a valid configured virtual balance",async()=>{
+ for(const startingCashPaise of [0,-1,1.5,Number.MAX_SAFE_INTEGER+1]){
+  const {db,state}=makeDb(null);
+  await assert.rejects(ensurePaperAccount({db,ref:{id:"user-1"},startingCashPaise,serverTimestamp:()=>"server-time"}),{status:503});
+  assert.deepEqual(state.writes,[]);
+ }
+});
+
+test("rejects incomplete transaction dependencies",async()=>{
+ await assert.rejects(ensurePaperAccount({db:{},ref:{id:"user-1"},startingCashPaise:1000,serverTimestamp:()=>0}),TypeError);
 });
