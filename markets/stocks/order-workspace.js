@@ -108,6 +108,21 @@
       ? money(Math.round(price * 100) * quantity)
       : '—';
   }
+  let marketBuyDisabled = buy.disabled, marketSellDisabled = sell.disabled;
+  let lastBuyDisabled = buy.disabled, lastSellDisabled = sell.disabled;
+  function trackMarketButtonAvailability() {
+    if (selectedType !== 'LIMIT') return;
+    if (buy.disabled !== lastBuyDisabled) marketBuyDisabled = buy.disabled;
+    if (sell.disabled !== lastSellDisabled) marketSellDisabled = sell.disabled;
+    lastBuyDisabled = buy.disabled; lastSellDisabled = sell.disabled;
+    if (!buy.disabled) { buy.disabled = true; lastBuyDisabled = true; }
+    if (!sell.disabled) { sell.disabled = true; lastSellDisabled = true; }
+  }
+  if (typeof MutationObserver !== 'undefined') {
+    const buttonObserver = new MutationObserver(trackMarketButtonAvailability);
+    buttonObserver.observe(buy, {attributes:true,attributeFilter:['disabled']});
+    buttonObserver.observe(sell, {attributes:true,attributeFilter:['disabled']});
+  }
   function setOrderType(type) {
     selectedType = type;
     typeButtons.forEach(button => {
@@ -119,31 +134,21 @@
     referencePrice.closest('label').hidden = type === 'LIMIT';
     limitPrice.closest('label').hidden = type !== 'LIMIT';
     if (type === 'LIMIT') {
-      buy.disabled = true;
-      sell.disabled = true;
+      marketBuyDisabled = buy.disabled; marketSellDisabled = sell.disabled;
+      buy.disabled = true; sell.disabled = true;
+      lastBuyDisabled = true; lastSellDisabled = true;
       showMessage(limitNotice, translate('LIMIT orders are not enabled by the current backend API. No order was sent.'), 'warning');
       status.textContent = translate('LIMIT orders are not enabled by the current backend API. No order was sent.');
     } else {
       limitNotice.hidden = true;
-      if (window.ZENURA_MARKET_CONNECTOR?.getUserId?.() && gateway) {
-        buy.disabled = false;
-        sell.disabled = false;
-      }
+      buy.disabled = marketBuyDisabled; sell.disabled = marketSellDisabled;
+      lastBuyDisabled = buy.disabled; lastSellDisabled = sell.disabled;
       status.textContent = 'MARKET orders use a fresh server-verified Upstox quote. The displayed price is indicative only.';
     }
     updateEstimate();
   }
   typeButtons.forEach(button => button.addEventListener('click', () => setOrderType(button.dataset.orderType)));
-  const keepLimitDisabled = () => { if (selectedType === 'LIMIT') { buy.disabled = true; sell.disabled = true; } };
-  if (typeof MutationObserver !== 'undefined') new MutationObserver(keepLimitDisabled).observe(buy, {attributes:true,attributeFilter:['disabled']});
-  if (typeof MutationObserver !== 'undefined') new MutationObserver(keepLimitDisabled).observe(sell, {attributes:true,attributeFilter:['disabled']});
-  window.addEventListener('zenura-market-auth-ready', keepLimitDisabled);
-  [buy, sell].forEach(button => button.addEventListener('click', event => {
-    if (selectedType === 'LIMIT') {
-      event.preventDefault(); event.stopImmediatePropagation();
-      showMessage(limitNotice, translate('LIMIT orders are not enabled by the current backend API. No order was sent.'), 'warning');
-    }
-  }, true));
+  window.addEventListener('zenura-market-auth-ready', trackMarketButtonAvailability);
   qty?.addEventListener('input', updateEstimate);
   limitPrice?.addEventListener('input', updateEstimate);
   const selectedPrice = $('selected-price');
@@ -235,9 +240,7 @@
       latestCashPaise = Number.isSafeInteger(account.cashPaise) ? account.cashPaise : null;
       cashAvailable.textContent = money(latestCashPaise);
       cashReserved.textContent = translate('Not exposed by backend');
-      const holdings = Array.isArray(portfolio.positions) ? portfolio.positions : [];
-      const totalShares = holdings.reduce((sum, position) => sum + (Number.isSafeInteger(position.quantity) ? position.quantity : 0), 0);
-      sharesAvailable.textContent = totalShares.toLocaleString('en-IN') + ' across ' + holdings.length + ' positions';
+      sharesAvailable.textContent = translate('Not exposed by backend');
       sharesReserved.textContent = translate('Not exposed by backend');
     } catch (error) {
       cashAvailable.textContent = '—'; cashReserved.textContent = '—';
