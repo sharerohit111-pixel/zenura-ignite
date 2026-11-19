@@ -118,6 +118,7 @@
       }
     });
     if (type === 'LIMIT') {
+      limitNotice.hidden = false;
       showMessage(limitNotice, translate('LIMIT orders are sent to your private paper account and reserve virtual cash or shares.'), 'info');
       status.textContent = translate('LIMIT orders are sent to your private paper account and reserve virtual cash or shares.');
     } else {
@@ -177,7 +178,7 @@
     if (!Number.isSafeInteger(quantity) || quantity < 1 || quantity > 1000000) {
       showMessage(status, 'Enter a whole-number quantity between 1 and 1,000,000.', 'error'); return;
     }
-    if (!Number.isFinite(price) || price <= 0 || price > 99999999) {
+    if (!Number.isFinite(price) || price <= 0 || price > 99999999 || !/^\d{1,8}(?:\.\d{1,2})?$/.test(limitPrice.value.trim())) {
       showMessage(status, 'Enter a valid positive limit price (maximum 2 decimal places).', 'error'); return;
     }
     const limitPricePaise = Math.round(price * 100);
