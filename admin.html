@@ -15,11 +15,13 @@
       <small>Authorized account: sharerohit111@gmail.com</small>
       <p id="login-error" class="error" role="alert"></p>
     </section>
-    <section id="dashboard" hidden>\n      <section class="panel" id="solutions-admin" hidden>
+    <section id="dashboard" hidden>
+      <section class="panel" id="solutions-admin" hidden>
         <h2>Business Solutions Catalogue</h2>
-        <p>यह हिस्सा केवल अधिकृत व्यवस्थापक के लिए है। नीचे पूरा catalogue JSON बदलकर प्रकाशित कर सकते हैं।</p>
+        <p>Edit categories, products, plan prices and feature lists below. Changes are saved to the public catalogue only when you publish.</p>
         <div class="filters"><button id="catalogue-load" class="secondary">Load saved catalogue</button><button id="catalogue-defaults" class="secondary">Load default catalogue</button></div>
-        <textarea id="catalogue-json" spellcheck="false" style="width:100%;min-height:440px;background:#080f21;color:#eaf3ff;border:1px solid #526b99;border-radius:10px;padding:14px;font:12px/1.55 monospace"></textarea>
+        <div id="catalogue-visual-editor" class="catalogue-visual-editor"></div>
+        <details class="advanced-json"><summary>Advanced JSON editor</summary><textarea id="catalogue-json" spellcheck="false" style="width:100%;min-height:300px;background:#080f21;color:#eaf3ff;border:1px solid #526b99;border-radius:10px;padding:14px;font:12px/1.55 monospace"></textarea></details>
         <div class="filters"><button id="catalogue-publish" class="primary">Publish catalogue</button><button id="catalogue-hide" class="secondary">Hide from public website</button></div>
         <p id="catalogue-status" class="error" role="status"></p>
       </section>

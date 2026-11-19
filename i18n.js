@@ -47,6 +47,85 @@
     'Igniting innovation. Building the future.':'नवाचार को ऊर्जा देना। भविष्य का निर्माण करना।','Designed & Developed by':'डिज़ाइन और विकास','BACK TO TOP ↑':'ऊपर जाएँ ↑'
   };
 
+  Object.assign(translations, {
+    'Medicine shop and pharmacy':'दवा दुकान और मेडिकल स्टोर',
+    'Grocery stores, bookstores and small malls':'किराना, बुकस्टोर और छोटे मॉल',
+    'Car/bike garages and service centres':'कार/बाइक गैराज और सर्विस सेंटर',
+    'Coaching institutes and schools up to Class 12':'कोचिंग संस्थान और कक्षा 10वीं–12वीं तक के स्कूल',
+    'A simple digital solution for medicine lists, customer information and everyday store operations.':'दवा सूची, ग्राहक जानकारी और रोज़मर्रा के स्टोर संचालन के लिए सरल डिजिटल समाधान।',
+    'A simple solution for local grocery stores to display products and receive order enquiries.':'स्थानीय किराना दुकान के लिए उत्पाद सूची और ऑर्डर enquiry वाला सरल समाधान।',
+    'A website to showcase books, stationery and educational materials.':'किताबों, स्टेशनरी और शैक्षणिक सामग्री की सूची दिखाने के लिए वेबसाइट।',
+    'A digital directory for a small mall or multiple stores in one location.':'छोटे मॉल या एक ही स्थान पर कई दुकानों की डिजिटल डायरेक्टरी।',
+    'A solution for local garages with service listings, enquiries and appointment requests.':'स्थानीय गैराज के लिए सर्विस सूची, enquiry और appointment request वाला समाधान।',
+    'For coaching centres to present courses, batches, faculty and admission enquiries.':'कोचिंग सेंटर के courses, batches, faculty और admission enquiries के लिए।',
+    'A website for small and medium schools to share classes, facilities, notices and admission information.':'छोटे/मध्यम स्कूल के लिए कक्षाओं, सुविधाओं, सूचनाओं और प्रवेश जानकारी की वेबसाइट।',
+    'Mobile-friendly website':'मोबाइल-अनुकूल वेबसाइट',
+    'Medicine and product catalogue':'दवा और उत्पाद सूची',
+    'Store address and contact details':'दुकान का पता व संपर्क',
+    'WhatsApp enquiry button':'WhatsApp enquiry बटन',
+    'All Silver features':'Silver की सभी सुविधाएँ',
+    'Stock and expiry tracking module':'स्टॉक और एक्सपायरी रिकॉर्ड मॉड्यूल',
+    'Basic billing records':'बेसिक बिलिंग रिकॉर्ड',
+    'Customer enquiry management':'ग्राहक enquiry प्रबंधन',
+    'Store information and opening hours':'दुकान की जानकारी और समय',
+    'Product categories and catalogue':'उत्पाद श्रेणियाँ व सूची',
+    'WhatsApp order enquiries':'WhatsApp पर ऑर्डर enquiry',
+    'Mobile-friendly design':'मोबाइल-अनुकूल डिज़ाइन',
+    'Indicative project price':'Indicative project price',
+    'All sectors':'सभी क्षेत्र',
+    'View features & plan details ↗':'सुविधाएँ और प्लान देखें ↗',
+    'Request this solution ↗':'यह समाधान चुनें ↗',
+    'Medicine and product list':'दवा और उत्पाद सूची',
+    'Shop address and contact':'दुकान का पता व संपर्क',
+    'Stock and expiry records module':'स्टॉक और एक्सपायरी रिकॉर्ड मॉड्यूल',
+    'Basic billing records':'बेसिक बिलिंग रिकॉर्ड',
+    'Customer enquiry management':'ग्राहक enquiry प्रबंधन',
+    'Shop information and opening hours':'दुकान की जानकारी और समय',
+    'Product categories and list':'उत्पाद श्रेणियाँ व सूची',
+    'Mobile-friendly design':'मोबाइल-अनुकूल डिज़ाइन',
+    'Books and stationery catalogue':'Books और stationery catalogue',
+    'Categories by subject/class':'विषय/कक्षा के अनुसार श्रेणियाँ',
+    'Availability enquiry':'उपलब्धता enquiry',
+    'Shop contact and location':'दुकान संपर्क व लोकेशन',
+    'Author/publisher/class filters':'लेखक/प्रकाशक/कक्षा फ़िल्टर',
+    'New arrivals and offers':'नई arrivals और offers',
+    'WhatsApp order enquiry':'WhatsApp order enquiry',
+    'Mall introduction and location':'Mall परिचय और लोकेशन',
+    'List of shops':'दुकानों की सूची',
+    'Shop-wise contact details':'दुकान-वार संपर्क विवरण',
+    'Mobile-friendly page':'मोबाइल-अनुकूल पेज',
+    'Shop categories and search':'दुकान श्रेणी और खोज',
+    'Individual shop detail page':'प्रत्येक दुकान का विवरण पेज',
+    'Offers and announcements section':'ऑफर और सूचना सेक्शन',
+    'Service and repair list':'सर्विस और repair सूची',
+    'Garage address and hours':'गैराज का पता व समय',
+    'Call and WhatsApp buttons':'Call और WhatsApp बटन',
+    'Appointment request form':'Appointment request form',
+    'Vehicle service packages':'Vehicle service packages',
+    'Appointment request dashboard':'Appointment request dashboard',
+    'Customer and vehicle enquiry record':'Customer और vehicle enquiry record',
+    'Gallery and customer reviews':'Gallery और customer reviews',
+    'Course and subject information':'Courses और subjects की जानकारी',
+    'Faculty introduction':'Faculty परिचय',
+    'Batch timings and fee information':'Batch timing और fees जानकारी',
+    'Admission enquiry form':'Admission enquiry form',
+    'Online notices and updates section':'Online notice और updates section',
+    'Student enquiry management':'Student enquiry management',
+    'Study material download section':'Study material download section',
+    'School introduction and facilities':'School परिचय और सुविधाएँ',
+    'Class 1–12 information':'कक्षा 1–12 तक की जानकारी',
+    'Admission and contact section':'Admission और contact section',
+    'Photo gallery and notices':'Photo gallery और notices',
+    'Class-wise notice section':'Class-wise notice section',
+    'Downloadable forms/documents':'Downloadable forms/documents',
+    'Events and academic calendar':'Events और academic calendar',
+    'Admin notice/content editor':'Admin notice/content editor',
+    'Indicative pricing only. Final quotation depends on scope, content, hosting and custom requirements.':'केवल अनुमानित कीमत। अंतिम प्रस्ताव काम, सामग्री, होस्टिंग और विशेष आवश्यकताओं पर निर्भर करेगा।',
+    'All sectors':'सभी क्षेत्र',
+    'View features & plan details ↗':'सुविधाएँ और प्लान देखें ↗',
+    'Request this solution ↗':'यह समाधान चुनें ↗',
+    'Close ✕':'बंद करें ✕'
+  });
   const originalText = new WeakMap();
   const originalHtml = new WeakMap();
   const originalAttributes = new WeakMap();
@@ -66,8 +145,11 @@
       if (!originalText.has(element)) originalText.set(element, element.nodeValue);
       const source = originalText.get(element);
       const key = source.trim();
-      if (Object.prototype.hasOwnProperty.call(translations, key)) {
-        element.nodeValue = language === 'hi' ? source.replace(key, translations[key]) : source;
+      const englishKey = Object.prototype.hasOwnProperty.call(translations, key)
+        ? key : Object.keys(translations).find(k => translations[k] === key);
+      if (englishKey) {
+        const translated = language === 'hi' ? translations[englishKey] : englishKey;
+        element.nodeValue = source.replace(key, translated);
       }
       return;
     }
