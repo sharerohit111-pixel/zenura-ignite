@@ -8,14 +8,19 @@ test("requires email verification for password sign-in", () => {
   assert.equal(isVerifiedPasswordAccount({token:{firebase:{sign_in_provider:"password"},email_verified:true}}), true);
 });
 
-test("does not block Google and other federated providers", () => {
+test("allows Google sign-in with or without an email_verified claim", () => {
   assert.equal(isVerifiedPasswordAccount({token:{firebase:{sign_in_provider:"google.com"},email_verified:true}}), true);
   assert.equal(isVerifiedPasswordAccount({token:{firebase:{sign_in_provider:"google.com"},email_verified:false}}), true);
+});
+
+test("rejects anonymous, custom, phone and unknown providers", () => {
+  for (const provider of ["anonymous", "custom", "phone", "facebook.com", ""]) {
+    assert.equal(isVerifiedPasswordAccount({token:{firebase:{sign_in_provider:provider},email_verified:true}}), false);
+  }
 });
 
 test("rejects missing authentication context or provider", () => {
   assert.equal(isVerifiedPasswordAccount(null), false);
   assert.equal(isVerifiedPasswordAccount({}), false);
   assert.equal(isVerifiedPasswordAccount({token:{email_verified:true}}), false);
-  assert.equal(isVerifiedPasswordAccount({token:{firebase:{sign_in_provider:""},email_verified:true}}), false);
 });
