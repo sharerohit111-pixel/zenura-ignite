@@ -55,8 +55,8 @@ test("Order and trade history use backend statuses, execution prices and cursor 
   assert.match(source,/order\.executionPricePaise/);
   assert.match(source,/order\.createdAt/);
   assert.match(source,/order\.status === 'PENDING'/);
-  assert.match(source,/order\.status === 'FILLED'/);
-  assert.match(source,/order\.status === 'CANCELLED'/);
+  assert.match(source,/status\)\.toUpperCase\(\) === 'FILLED'/);
+  assert.match(source,/status\)\.toUpperCase\(\) === 'CANCELLED'/);
   assert.match(gateway,/nextCursor:hasMore/);
 });
 
