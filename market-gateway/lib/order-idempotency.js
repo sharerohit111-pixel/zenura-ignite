@@ -5,11 +5,13 @@ function makeOrderId(uid,idempotencyKey){
  if(typeof uid!=="string"||!uid||!isUuid(idempotencyKey))throw Object.assign(new Error("Invalid order idempotency identity."),{status:400});
  return crypto.createHash("sha256").update(uid+":"+idempotencyKey).digest("hex");
 }
-function makeOrderFingerprint({instrumentKey,side,quantity,orderType="MARKET"}){
- if(typeof instrumentKey!=="string"||!instrumentKey||!["BUY","SELL"].includes(side)||!Number.isSafeInteger(quantity)||quantity<1||!["MARKET","LIMIT"].includes(orderType))
+function makeOrderFingerprint({instrumentKey,side,quantity,orderType="MARKET",limitPricePaise}){
+ if(typeof instrumentKey!=="string"||!instrumentKey||!["BUY","SELL"].includes(side)||!Number.isSafeInteger(quantity)||quantity<1||!["MARKET","LIMIT"].includes(orderType)||
+    (orderType==="LIMIT"&&(!Number.isSafeInteger(limitPricePaise)||limitPricePaise<1))||
+    (orderType==="MARKET"&&limitPricePaise!==undefined))
   throw Object.assign(new Error("Invalid order request fingerprint."),{status:400});
  // Preserve the original MARKET fingerprint so retries of pre-upgrade orders remain idempotent.
- const payload=orderType==="MARKET"?{instrumentKey,side,quantity}:{instrumentKey,side,quantity,orderType};
+ const payload=orderType==="MARKET"?{instrumentKey,side,quantity}:{instrumentKey,side,quantity,orderType,limitPricePaise};
  return crypto.createHash("sha256").update(JSON.stringify(payload)).digest("hex");
 }
 function buildPaperOrderUpdate(account,{instrumentKey,side,quantity,pricePaise}){

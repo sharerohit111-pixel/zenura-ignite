@@ -57,3 +57,12 @@ test("rejects an exhausted or malformed account version instead of overflowing",
  assert.throws(()=>buildPaperOrderUpdate(base,{instrumentKey:"NSE_EQ|AAA",side:"BUY",quantity:1,pricePaise:100}),{status:409});
  assert.throws(()=>buildPaperOrderUpdate({...base,version:0},{instrumentKey:"NSE_EQ|AAA",side:"BUY",quantity:1,pricePaise:100}),{status:409});
 });
+
+test("limit order fingerprint includes a positive limit price",()=>{
+ const limit={...request,orderType:"LIMIT",limitPricePaise:12500};
+ assert.equal(makeOrderFingerprint(limit),makeOrderFingerprint({...limit}));
+ assert.notEqual(makeOrderFingerprint(limit),makeOrderFingerprint({...limit,limitPricePaise:12600}));
+ assert.throws(()=>makeOrderFingerprint({...limit,limitPricePaise:0}),{status:400});
+ assert.throws(()=>makeOrderFingerprint({...limit,limitPricePaise:1.5}),{status:400});
+ assert.throws(()=>makeOrderFingerprint({...request,orderType:"MARKET",limitPricePaise:12500}),{status:400});
+});
