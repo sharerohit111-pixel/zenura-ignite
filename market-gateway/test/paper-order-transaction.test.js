@@ -5,7 +5,7 @@ const {executePaperOrderTransaction}=require("../lib/paper-order-transaction");
 const account={cashPaise:10000,realizedPnlPaise:0,positions:{},version:1};
 function setup(existingOrder,initialAccount=account){
  const writes=[];
- const snapshots={"user-1":{exists:true,data:()=>({...initialAccount,positions:{...initialAccount.positions}})},order:{exists:Boolean(existingOrder),data:()=>existingOrder}};
+ const snapshots={"user-1":{exists:true,data:()=>({...initialAccount,positions:{...initialAccount.positions}})},order:{exists:Boolean(existingOrder),data:()=>existingOrder?(existingOrder.uid===undefined?{...existingOrder,uid:"user-1"}:existingOrder):existingOrder}};
  const db={runTransaction:async callback=>callback({get:async ref=>snapshots[ref.id],create:(ref,data)=>writes.push(["create",ref.id,data]),update:(ref,data)=>writes.push(["update",ref.id,data])})};
  const common={db,accountRef:{id:"user-1"},orderRef:{id:"order"},uid:"user-1",requestFingerprint:"fingerprint",order:{uid:"user-1",requestFingerprint:"fingerprint",instrumentKey:"NSE_EQ|AAA",side:"BUY",quantity:2},pricePaise:1000,publicPaperOrder:(order,meta)=>({order,meta}),serverTimestamp:()=>"server-time"};
  return {common,writes};
@@ -205,4 +205,10 @@ test("null or array positions maps remain invalid account state",()=>{
  for(const positions of [null,[],"invalid"]){
   assert.throws(()=>buildPaperOrderUpdate({cashPaise:10000,positions},{instrumentKey:"NSE_EQ|AAA",side:"BUY",quantity:1,pricePaise:1000}),{status:409});
  }
+});
+
+test("rejects an existing order owned by a different account before replay",async()=>{
+ const {common,writes}=setup({uid:"user-2",requestFingerprint:"fingerprint",status:"FILLED"});
+ await assert.rejects(executePaperOrderTransaction(common),{status:409});
+ assert.equal(writes.length,0);
 });
