@@ -1,4 +1,5 @@
 import { db } from "./firebase-client.js";
+import { DEFAULT_DIGITAL_PRODUCTS } from "./digital-products-data.js";
 import { doc, getDoc } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore.js";
 
 const root = document.getElementById("digital-products-catalogue");
@@ -11,7 +12,10 @@ if (root) {
   };
   const safeUrl = value => {
     try {
-      const url = new URL(String(value || ""));
+      const raw = String(value || "").trim();
+      if (!raw) return "";
+      if (raw.startsWith("./") || raw.startsWith("/")) return raw;
+      const url = new URL(raw);
       return url.protocol === "https:" ? url.href : "";
     } catch {
       return "";
@@ -159,13 +163,13 @@ if (root) {
     try {
       const snapshot = await getDoc(doc(db, "publicCatalog", "digitalProducts"));
       if (!snapshot.exists() || snapshot.data().published !== true || !Array.isArray(snapshot.data().products)) {
-        render([]);
+        render(DEFAULT_DIGITAL_PRODUCTS);
         return;
       }
       render(snapshot.data().products);
     } catch (error) {
-      root.replaceChildren(text("p", "Product details could not be loaded. Please try again later.", "digital-products-empty"));
-      console.warn("Digital product catalogue unavailable.", error);
+      render(DEFAULT_DIGITAL_PRODUCTS);
+      console.warn("Using built-in Product Samples because the published catalogue is unavailable.", error);
     }
   }
   load();
