@@ -19,6 +19,6 @@ function bind(){
 async function load(){
  try{const snap=await getDoc(doc(db,"publicCatalog","digitalProducts"));if(snap.exists()&&snap.data().published&&Array.isArray(snap.data().products))products=snap.data().products;}
  catch(e){console.warn("Digital product details are using built-in defaults.",e)}
- if(root){products.forEach(p=>{const card=[...root.querySelectorAll(".product-card")].find(x=>x.querySelector("h3")?.textContent.trim().toLowerCase()===p.name.toLowerCase());if(card){const link=card.querySelector(".product-link");if(link){link.removeAttribute("href");link.dataset.productDetail=p.id;link.textContent="Explore product details ↗";}if(p.imageUrl){const art=card.querySelector(".product-art");if(art){const img=document.createElement("img");img.className="product-card-image";img.src=p.imageUrl;img.alt=p.name+" product image";img.loading="lazy";art.prepend(img)}}}});bind();}
+ if(root){products.forEach(p=>{const card=[...root.querySelectorAll(".product-card")].find(x=>x.querySelector("h3")?.textContent.trim().toLowerCase()===p.name.toLowerCase());if(card){const link=card.querySelector(".product-link");if(link){link.removeAttribute("href");link.dataset.productDetail=p.id;link.textContent="Explore product details ↗";}if(safeUrl(p.imageUrl)){const art=card.querySelector(".product-art");if(art){const img=document.createElement("img");img.className="product-card-image";img.src=safeUrl(p.imageUrl);img.alt=p.name+" product image";img.loading="lazy";art.prepend(img)}}}});bind();}
 }
 load();
