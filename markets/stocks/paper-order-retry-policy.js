@@ -34,6 +34,10 @@ function inspectLegacyPendingPaperOrder(storage,legacyStorageKey,userId,scopedSt
   let raw;
   try{raw=storage.getItem(legacyStorageKey);}catch(_){return {state:"unavailable"};}
   if(raw===null||raw===undefined)return {state:"none"};
+  const quarantineKey=legacyStorageKey+":quarantined:"+encodeURIComponent(userId);
+  try{
+    if(storage.getItem(quarantineKey)==="1")return {state:"quarantined"};
+  }catch(_){return {state:"unavailable"};}
   let value;
   try{value=JSON.parse(raw);}catch(_){return {state:"ambiguous"};}
   if(!value||typeof value!=="object"||typeof value.fingerprint!=="string"||!value.fingerprint||
