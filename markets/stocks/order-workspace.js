@@ -43,6 +43,7 @@
 
   const translations = {
     'Paper Trading Order Ticket':'पेपर ट्रेडिंग ऑर्डर टिकट',
+    'VIRTUAL CASH':'वर्चुअल नकद','REALIZED P&L':'वास्तविक P&L','DATE & TIME':'तारीख और समय','STOCK':'शेयर','SIDE':'प्रकार','TYPE':'ऑर्डर प्रकार','QTY':'मात्रा','EXECUTION PRICE':'एक्जीक्यूशन कीमत','ACTION':'कार्रवाई','Limit Price':'लिमिट कीमत','Order':'ऑर्डर','Status':'स्थिति',
     'Pending & Order Book':'पेंडिंग और ऑर्डर बुक',
     'Reference / live price':'संदर्भ / लाइव कीमत','Limit price (₹)':'लिमिट कीमत (₹)',
     'Quantity':'मात्रा','Estimated order value':'अनुमानित ऑर्डर मूल्य',
@@ -66,7 +67,7 @@
     'Cancellation is available only for pending LIMIT orders.':'रद्द करने की सुविधा केवल पेंडिंग LIMIT ऑर्डर के लिए उपलब्ध है।',
     'Loading orders from your private paper account…':'आपके निजी पेपर अकाउंट से ऑर्डर लोड हो रहे हैं…',
     'No paper orders recorded yet.':'अभी कोई पेपर ऑर्डर दर्ज नहीं है।',
-    'Loading balances…':'बैलेंस लोड हो रहा है…'
+    'Loading balances…':'बैलेंस लोड हो रहा है…','Balances and reservations refreshed from your private paper account.':'आपके निजी पेपर अकाउंट का बैलेंस और आरक्षण अपडेट हुआ।','Trade history includes only backend orders with FILLED status.':'ट्रेड हिस्ट्री में केवल बैकएंड के FILLED ऑर्डर शामिल हैं।','Loading older orders…':'पुराने ऑर्डर लोड हो रहे हैं…','orders loaded from backend.':'ऑर्डर बैकएंड से लोड हुए।'
   };
   const translate = value => language === 'hi' ? (translations[value] || value) : value;
 
@@ -403,6 +404,8 @@
     typeButtons.forEach(button => { button.textContent = translate(button.dataset.orderType); });
     tabs.forEach(button => { const key = button.dataset.orderFilter === 'OPEN' ? 'OPEN / PENDING' : button.dataset.orderFilter; button.textContent = translate(key); });
     if (langButton) langButton.textContent = language === 'en' ? 'हिन्दी' : 'English';
+    referencePrice.placeholder = language === 'hi' ? 'सत्यापित भाव की प्रतीक्षा' : 'Waiting for verified quote';
+    limitPrice.placeholder = language === 'hi' ? 'लिमिट कीमत दर्ज करें' : 'Enter limit price';
     renderOrders(); renderTrades();
   });
   setOrderType('MARKET');
