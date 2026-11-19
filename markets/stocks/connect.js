@@ -90,6 +90,12 @@ button.addEventListener("click", async () => {
       uid = auth.currentUser?.uid || null;
     }
     if (!uid || auth.currentUser?.uid !== uid) return;
+    const currentUser = auth.currentUser;
+    const usesPasswordProvider = currentUser.providerData?.some(provider => provider.providerId === "password");
+    if (usesPasswordProvider && !currentUser.emailVerified) {
+      setState("EMAIL VERIFICATION REQUIRED", "Verify your email address using the link sent by Firebase, then sign in again before connecting Upstox.");
+      return;
+    }
     const sequence = authStateSequence;
     setState("STARTING UPSTOX", "Preparing secure authorization…");
     const result = await startAuthorization();
