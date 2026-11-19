@@ -40,36 +40,37 @@
   const watchAdd=document.getElementById('watchlist-add'),watchStatus=document.getElementById('watchlist-status'),watchBody=document.getElementById('saved-watchlist'),watchSelect=document.getElementById('watchlist-select');
   let savedWatchlist=[],watchQuotes=new Map(),activeWatchlist=watchSelect.value,watchlistLoadSeq=0,watchQuoteSeq=0;
   async function loadWatchlistQuotes(){
-    const request=++watchQuoteSeq,name=activeWatchlist,items=savedWatchlist.slice(),connector=window.ZENURA_MARKET_CONNECTOR;
-    if(!gateway||!connector?.getIdToken||!items.length){watchQuotes.clear();renderSavedWatchlist();return;}
+    const request=++watchQuoteSeq,name=activeWatchlist,items=savedWatchlist.slice(),connector=window.ZENURA_MARKET_CONNECTOR,uid=connector?.getUserId?.();
+    if(!gateway||!connector?.getIdToken||!uid||!items.length){watchQuotes.clear();renderSavedWatchlist();return;}
     watchStatus.textContent='Refreshing verified watchlist prices…';
     try{
-      const token=await connector.getIdToken(),response=await fetch(gateway+'/watchlist/quotes?name='+encodeURIComponent(name),{headers:{Authorization:'Bearer '+token,Accept:'application/json'}});
+      const token=await connector.getIdToken();
+      if(request!==watchQuoteSeq||connector.getUserId()!==uid||name!==activeWatchlist)return;
+      const response=await fetch(gateway+'/watchlist/quotes?name='+encodeURIComponent(name),{headers:{Authorization:'Bearer '+token,Accept:'application/json'}});
       const data=await response.json();if(!response.ok)throw new Error(data.error||'Watchlist quotes unavailable.');
-      if(request!==watchQuoteSeq||name!==activeWatchlist)return;
+      if(request!==watchQuoteSeq||connector.getUserId()!==uid||name!==activeWatchlist)return;
       watchQuotes=new Map((data.quotes||[]).map(q=>[q.instrumentKey,q]));
       renderSavedWatchlist();
       const fresh=(data.quotes||[]).filter(q=>q.status==='fresh').length;
       watchStatus.textContent=fresh+' of '+savedWatchlist.length+' watchlist prices are fresh provider quotes. '+(fresh<savedWatchlist.length?'Some prices are stale or unavailable.':'');
-    }catch(error){if(request!==watchQuoteSeq||name!==activeWatchlist)return;watchStatus.textContent=error.message||'Watchlist quotes unavailable.';renderSavedWatchlist();}
+    }catch(error){if(request!==watchQuoteSeq||connector.getUserId()!==uid||name!==activeWatchlist)return;watchStatus.textContent=error.message||'Watchlist quotes unavailable.';renderSavedWatchlist();}
   }
   let watchlistSaveQueue=Promise.resolve(),watchlistEditSeq=0;
   function saveWatchlist(){
-    const name=activeWatchlist,keys=savedWatchlist.map(x=>x.instrument_key),edit=watchlistEditSeq;
-    if(!gateway||!window.ZENURA_MARKET_CONNECTOR?.getIdToken){watchStatus.textContent='Sign in and configure the gateway to save your watchlist.';return Promise.resolve(false);}
+    const name=activeWatchlist,keys=savedWatchlist.map(x=>x.instrument_key),edit=watchlistEditSeq,connector=window.ZENURA_MARKET_CONNECTOR,uid=connector?.getUserId?.();
+    if(!gateway||!connector?.getIdToken||!uid){watchStatus.textContent='Sign in and configure the gateway to save your watchlist.';return Promise.resolve(false);}
     const write=async()=>{
       if(name!==activeWatchlist)return false;
       try{
-        const connector=window.ZENURA_MARKET_CONNECTOR;
-        if(!connector?.getIdToken)throw new Error('Sign in to save your watchlist.');
+        if(!connector?.getIdToken||connector.getUserId()!==uid) return false;
         watchStatus.textContent='Saving your private watchlist…';
         const token=await connector.getIdToken();
-        if(name!==activeWatchlist)return false;
+        if(name!==activeWatchlist||edit!==watchlistEditSeq||connector.getUserId()!==uid)return false;
         const response=await fetch(gateway+'/watchlist',{method:'PUT',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json',Accept:'application/json'},body:JSON.stringify({name,instrumentKeys:keys})});
         const data=await response.json();if(!response.ok)throw new Error(data.error||'Watchlist save failed.');
-        if(name===activeWatchlist&&edit===watchlistEditSeq)watchStatus.textContent=data.count+' of 50 instruments saved to your account.';
-        return true;
-      }catch(error){if(name===activeWatchlist&&edit===watchlistEditSeq)watchStatus.textContent=error.message||'Watchlist save failed.';return false;}
+        if(name===activeWatchlist&&edit===watchlistEditSeq&&connector.getUserId()===uid)watchStatus.textContent=data.count+' of 50 instruments saved to your account.';
+        return connector.getUserId()===uid&&edit===watchlistEditSeq;
+      }catch(error){if(name===activeWatchlist&&edit===watchlistEditSeq&&connector.getUserId()===uid)watchStatus.textContent=error.message||'Watchlist save failed.';return false;}
     };
     const result=watchlistSaveQueue.then(write,write);
     watchlistSaveQueue=result.then(()=>undefined,()=>undefined);
@@ -95,13 +96,15 @@
     watchAdd.disabled=!selected||savedWatchlist.some(x=>x.instrument_key===selected.instrument_key)||savedWatchlist.length>=50||!window.ZENURA_MARKET_CONNECTOR?.getIdToken;
   }
   async function loadSavedWatchlist(){
-    const request=++watchlistLoadSeq,name=activeWatchlist,connector=window.ZENURA_MARKET_CONNECTOR;if(!gateway||!connector?.getIdToken)return;
+    const request=++watchlistLoadSeq,name=activeWatchlist,connector=window.ZENURA_MARKET_CONNECTOR,uid=connector?.getUserId?.();if(!gateway||!connector?.getIdToken||!uid)return;
     try{
-      const token=await connector.getIdToken(),response=await fetch(gateway+'/watchlist?name='+encodeURIComponent(name),{headers:{Authorization:'Bearer '+token,Accept:'application/json'}});
+      const token=await connector.getIdToken();
+      if(request!==watchlistLoadSeq||connector.getUserId()!==uid||name!==activeWatchlist)return;
+      const response=await fetch(gateway+'/watchlist?name='+encodeURIComponent(name),{headers:{Authorization:'Bearer '+token,Accept:'application/json'}});
       const data=await response.json();if(!response.ok)throw new Error(data.error||'Watchlist unavailable');
-      if(request!==watchlistLoadSeq||name!==activeWatchlist)return;
+      if(request!==watchlistLoadSeq||connector.getUserId()!==uid||name!==activeWatchlist)return;
       savedWatchlist=data.items||[];renderSavedWatchlist();await loadWatchlistQuotes();
-    }catch(error){if(request===watchlistLoadSeq&&name===activeWatchlist)watchStatus.textContent=error.message||'Watchlist could not be loaded.';}
+    }catch(error){if(request===watchlistLoadSeq&&connector.getUserId()===uid&&name===activeWatchlist)watchStatus.textContent=error.message||'Watchlist could not be loaded.';}
   }
   watchSelect.addEventListener('change',async()=>{activeWatchlist=watchSelect.value;watchlistLoadSeq++;watchQuoteSeq++;savedWatchlist=[];watchQuotes.clear();renderSavedWatchlist();await loadSavedWatchlist();});
   watchAdd.addEventListener('click',async()=>{
@@ -512,7 +515,7 @@
     clearFeedTimers();
     if(streamAbort){streamAbort.abort();streamAbort=null;}
     selected=null;lastQuoteText='';reconnectAttempt=0;
-    ++watchlistLoadSeq;++watchQuoteSeq;++paperAccountRequest;++paperPortfolioRequest;
+    ++watchlistLoadSeq;++watchQuoteSeq;++watchlistEditSeq;++paperAccountRequest;++paperPortfolioRequest;
     ++paperHistoryLoadSeq;++derivativePortfolioRequest;++optionChainRequest;++futuresMarginRequest;
     futuresMarginStatus.textContent='Sign in to request broker margin preview.';
     paperHistoryCursor=null;paperHistoryHasMore=false;paperHistoryLoading=false;
@@ -537,7 +540,7 @@
     price.textContent='—';title.textContent='No instrument selected';symbol.textContent='Sign in to load market data';
     setFeedStatus('SIGN IN REQUIRED','Your private market session has ended.');
     resetOptionChain('Sign in to load a private option chain.');
-    updatePaperButtons();
+    updatePaperButtons();updateFuturesMarginButton();
   }
   window.addEventListener('zenura-market-auth-ready',event=>{
     // Never leave one account's private data visible while another account is loading.
