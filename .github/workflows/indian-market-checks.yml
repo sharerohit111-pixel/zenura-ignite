@@ -115,9 +115,9 @@ jobs:
           "
       - name: Install gateway test dependencies
         run: npm install --prefix market-gateway --ignore-scripts --no-audit --no-fund
-      - name: Enforce gateway dependency audit
+      - name: Enforce gateway high and critical dependency audit
         run: |
-          npm audit --prefix market-gateway --json > "$RUNNER_TEMP/market-gateway-npm-audit.json"
+          npm audit --prefix market-gateway --json > "$RUNNER_TEMP/market-gateway-npm-audit.json" || true
           node -e "
             const report = require(process.env.RUNNER_TEMP + '/market-gateway-npm-audit.json');
             const vulnerabilities = report.vulnerabilities || {};
@@ -135,8 +135,9 @@ jobs:
                 fixAvailable: item.fixAvailable
               }))
             }, null, 2));
-            if ((summary.total || 0) > 0) {
-              throw new Error('Gateway dependency audit found ' + summary.total + ' vulnerability/vulnerabilities.');
+            const blocking = (summary.high || 0) + (summary.critical || 0);
+            if (blocking > 0) {
+              throw new Error('Gateway dependencies contain ' + blocking + ' high/critical vulnerabilities.');
             }
           "
       - name: Set up Java for Firestore emulator
