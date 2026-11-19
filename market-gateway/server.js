@@ -33,6 +33,7 @@ const {readProviderJson}=require("./lib/provider-json");
 const {isUpstoxTokenUsable}=require("./lib/upstox-token");
 const {decryptUpstoxToken}=require("./lib/upstox-token-crypto");
 const {executeLongOptionTransaction}=require("./lib/derivative-order-transaction");
+const {placePendingLimitOrder,cancelPendingLimitOrder}=require("./lib/pending-limit-order-transaction");
 const {readReplayAccountState}=require("./lib/paper-replay-account");
 const {parseMarginPreviewInput}=require("./lib/margin-preview-input");
 const {consumeMarginPreviewSlot}=require("./lib/margin-preview-rate-limit");
@@ -249,9 +250,20 @@ app.post("/paper/orders",async(req,res)=>{
     if(!isUuid(idempotencyKey))return res.status(400).json({error:"A valid UUID idempotency_key is required."});
     if(!instrumentKey||instrumentKey.length>100||/[\r\n]/.test(instrumentKey))return res.status(400).json({error:"A valid instrument_key is required."});
     if(!["BUY","SELL"].includes(side))return res.status(400).json({error:"Only BUY and SELL paper orders are supported."});
-    if(orderType!=="MARKET")return res.status(400).json({error:"Only MARKET orders are currently enabled; LIMIT orders are not active yet."});
+    if(!["MARKET","LIMIT"].includes(orderType))return res.status(400).json({error:"Only MARKET and LIMIT paper orders are supported."});
     if(!Number.isSafeInteger(quantity)||quantity<1||quantity>1000000)return res.status(400).json({error:"Quantity must be a whole number between 1 and 1,000,000."});
-    const orderId=makeOrderId(decoded.uid,idempotencyKey),requestFingerprint=makeOrderFingerprint({instrumentKey,side,quantity,orderType});
+    let limitPricePaise;
+    if(orderType==="LIMIT"){
+      if(req.body?.limit_price_paise!==undefined){
+        limitPricePaise=Number(req.body.limit_price_paise);
+      }else{
+        const rawPrice=String(req.body?.limit_price??"");
+        if(!/^\\d{1,8}(?:\\.\\d{1,2})?$/.test(rawPrice))return res.status(400).json({error:"LIMIT orders require limit_price (INR, up to 2 decimals) or limit_price_paise."});
+        limitPricePaise=Math.round(Number(rawPrice)*100);
+      }
+      if(!Number.isSafeInteger(limitPricePaise)||limitPricePaise<1)return res.status(400).json({error:"A valid positive LIMIT price is required."});
+    }
+    const orderId=makeOrderId(decoded.uid,idempotencyKey),requestFingerprint=makeOrderFingerprint({instrumentKey,side,quantity,orderType,...(orderType==="LIMIT"?{limitPricePaise}:{})});
     const orderRef=db.collection("indianPaperOrders").doc(orderId);
     const priorOrder=await orderRef.get();
     if(priorOrder.exists){
@@ -268,6 +280,16 @@ app.post("/paper/orders",async(req,res)=>{
     if(!connection.exists)return res.status(403).json({error:"Connect your Upstox account before placing a paper order."});
     const connectionData=connection.data();
     if(!isUpstoxTokenUsable(connectionData))return res.status(403).json({error:"Upstox token expired. Reconnect your account."});
+    const accountRef=paperAccountRef(decoded.uid);
+    if(orderType==="LIMIT"){
+      const result=await placePendingLimitOrder({
+        db,accountRef,orderRef,uid:decoded.uid,
+        order:{uid:decoded.uid,requestFingerprint,instrumentKey,tradingSymbol:instrument.trading_symbol||instrument.name,exchange:instrument.exchange,side,quantity,orderType:"LIMIT",limitPricePaise,status:"PENDING",simulationOnly:true},
+        serverTimestamp:()=>FieldValue.serverTimestamp()
+      });
+      res.set("Cache-Control","private, no-store");
+      return res.status(201).json(result);
+    }
     const accessToken=decryptToken(connectionData.tokenCiphertext);
     const quoteUrl="https://api.upstox.com/v3/market-quote/quotes?"+new URLSearchParams({instrument_key:instrumentKey});
     const quoteResponse=await fetchProvider(quoteUrl,{headers:{Authorization:"Bearer "+accessToken,Accept:"application/json"}});
@@ -290,6 +312,19 @@ app.post("/paper/orders",async(req,res)=>{
     res.set("Cache-Control","private, no-store");
     res.status(result.idempotentReplay?200:201).json(result);
   }catch(error){res.status(errorStatus(error)).json({error:error.status?error.message:"Paper order could not be completed."});}
+});
+
+app.post("/paper/orders/:orderId/cancel",async(req,res)=>{
+  try{
+    const decoded=await authenticate(req),orderId=String(req.params.orderId||"");
+    if(!/^[a-f0-9]{64}$/.test(orderId))return res.status(400).json({error:"Invalid paper order id."});
+    const result=await cancelPendingLimitOrder({
+      db,accountRef:paperAccountRef(decoded.uid),orderRef:db.collection("indianPaperOrders").doc(orderId),
+      uid:decoded.uid,serverTimestamp:()=>FieldValue.serverTimestamp()
+    });
+    res.set("Cache-Control","private, no-store");
+    res.json(result);
+  }catch(error){res.status(errorStatus(error)).json({error:error.status?error.message:"LIMIT order cancellation failed."});}
 });
 
 // Futures margin preview only. This endpoint never reserves virtual cash or places an order.
@@ -532,7 +567,7 @@ app.get("/paper/orders",async(req,res)=>{
       query=query.startAfter(cursorSnap);
     }
     const snap=await query.limit(limit+1).get(),hasMore=snap.docs.length>limit,docs=snap.docs.slice(0,limit);
-    const orders=docs.map(doc=>{const order=doc.data();return {id:doc.id,tradingSymbol:order.tradingSymbol,exchange:order.exchange,side:order.side,quantity:order.quantity,executionPricePaise:order.executionPricePaise,grossPaise:order.grossPaise,realizedPnlPaise:order.realizedPnlPaise,orderType:order.orderType,status:order.status,simulationOnly:order.simulationOnly,createdAt:order.createdAt?.toMillis?.()||null};});
+    const orders=docs.map(doc=>{const order=doc.data();return {id:doc.id,tradingSymbol:order.tradingSymbol,exchange:order.exchange,side:order.side,quantity:order.quantity,executionPricePaise:order.executionPricePaise,limitPricePaise:order.limitPricePaise??null,grossPaise:order.grossPaise,realizedPnlPaise:order.realizedPnlPaise,orderType:order.orderType,status:order.status,simulationOnly:order.simulationOnly,createdAt:order.createdAt?.toMillis?.()||null};});
     res.set("Cache-Control","private, no-store");
     res.json({orders,hasMore,nextCursor:hasMore?docs[docs.length-1].id:null,simulationOnly:true});
   }catch(error){res.status(errorStatus(error)).json({error:error.status?error.message:"Paper order history could not be loaded."});}
