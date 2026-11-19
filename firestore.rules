@@ -36,6 +36,48 @@ service cloud.firestore {
       allow write: if false;
     }
 
+
+    // QR/UPI manual payment requests: users may submit their own UTR;
+    // only the verified ZENURA admin may review them after checking bank credit.
+    match /payments/{paymentId} {
+      function validPlan(data) {
+        return (data.planKey == "monthly" && data.planLabel == "1 Month" && data.amount == 99 && data.months == 1)
+          || (data.planKey == "quarterly" && data.planLabel == "3 Months" && data.amount == 199 && data.months == 3)
+          || (data.planKey == "halfyear" && data.planLabel == "6 Months" && data.amount == 399 && data.months == 6)
+          || (data.planKey == "yearly" && data.planLabel == "1 Year" && data.amount == 799 && data.months == 12);
+      }
+      allow create: if request.auth != null
+        && request.resource.data.keys().hasOnly(["uid","email","planKey","planLabel","amount","months","utr","status","createdAt"])
+        && request.resource.data.keys().hasAll(["uid","email","planKey","planLabel","amount","months","utr","status","createdAt"])
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.email == request.auth.token.email
+        && validPlan(request.resource.data)
+        && request.resource.data.utr is string
+        && request.resource.data.utr.matches("^[A-Za-z0-9-]{8,40}$")
+        && request.resource.data.status == "pending"
+        && request.resource.data.createdAt == request.time;
+      allow get, list: if isZenuraAdmin()
+        || (request.auth != null && resource.data.uid == request.auth.uid);
+      allow update: if isZenuraAdmin()
+        && resource.data.status == "pending"
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["status","reviewedAt","reviewedBy"])
+        && request.resource.data.status in ["approved","rejected"]
+        && request.resource.data.reviewedBy == request.auth.token.email
+        && request.resource.data.reviewedAt == request.time;
+      allow delete: if false;
+    }
+
+    // The user's crypto Premium entitlement is readable by that user,
+    // but can only be written by the verified administrator after UTR review.
+    match /users/{uid}/private/entitlement {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow create, update: if isZenuraAdmin()
+        && request.resource.data.active is bool
+        && request.resource.data.planKey is string
+        && request.resource.data.validUntil is timestamp;
+      allow delete: if false;
+    }
+
     match /enquiries/{enquiryId} {
       // Public website visitors may submit a validated enquiry only.
       allow create: if
