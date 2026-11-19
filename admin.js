@@ -22,9 +22,42 @@ async function setupCatalogueAdmin(auth){
  const area=document.getElementById("catalogue-json"),status=document.getElementById("catalogue-status");
  const say=m=>status.textContent=m;
  const ref=fs.doc(db,"publicCatalog","businessSolutions");
- async function loadSaved(){try{const snap=await fs.getDoc(ref);area.value=JSON.stringify(snap.exists()?snap.data().categories:DEFAULT_SOLUTIONS,null,2);say(snap.exists()?(snap.data().published?"Saved catalogue loaded (published).":"Saved catalogue is hidden."):"No saved catalogue yet. Defaults loaded; publish to make them live.")}catch(e){say("Load failed: "+e.message)}}
+ const editor=document.getElementById("catalogue-visual-editor");
+ const field=(label,value,oninput,type="text")=>{const wrap=document.createElement("label");wrap.className="catalogue-field";const title=document.createElement("span");title.textContent=label;const input=type==="textarea"?document.createElement("textarea"):document.createElement("input");if(type!=="textarea")input.type=type;input.value=value??"";input.addEventListener("input",()=>oninput(input.value));wrap.append(title,input);return wrap};
+ function renderVisualEditor(){
+  let data;try{data=JSON.parse(area.value)}catch{editor.textContent="JSON ठीक करें या saved catalogue दोबारा load करें।";return}
+  editor.replaceChildren();
+  data.forEach((category,ci)=>{
+   const section=document.createElement("section");section.className="catalogue-edit-category";
+   const heading=document.createElement("h3");heading.textContent="Category: "+(category.name||category.id);section.append(heading);
+   section.append(field("Category name",category.name,v=>{category.name=v;heading.textContent="Category: "+v;sync()}));
+   section.append(field("Category description",category.description,v=>{category.description=v;sync()}));
+   (category.products||[]).forEach((product,pi)=>{
+    const card=document.createElement("article");card.className="catalogue-edit-product";
+    const h=document.createElement("h4");h.textContent=product.name||"New product";card.append(h);
+    card.append(field("Product name",product.name,v=>{product.name=v;h.textContent=v||"New product";sync()}));
+    card.append(field("Product description",product.desc,v=>{product.desc=v;sync()}));
+    const plans=document.createElement("div");plans.className="catalogue-edit-plans";
+    for(const [key,label] of [["silver","Silver Plan"],["gold","Golden Plan"]]){
+     product[key]=product[key]||{price:0,features:[]};const plan=product[key],box=document.createElement("div");box.className="catalogue-edit-plan";
+     const title=document.createElement("strong");title.textContent=label;box.append(title);
+     box.append(field(label+" price (₹)",plan.price,v=>{plan.price=Number(v)||0;sync()},"number"));
+     box.append(field(label+" features (one per line)",(plan.features||[]).join("\n"),v=>{plan.features=v.split("\n").map(x=>x.trim()).filter(Boolean);sync()},"textarea"));
+     plans.append(box);
+    }
+    card.append(plans);
+    const remove=document.createElement("button");remove.type="button";remove.className="secondary";remove.textContent="Remove product";remove.addEventListener("click",()=>{category.products.splice(pi,1);sync();renderVisualEditor()});card.append(remove);
+    section.append(card);
+   });
+   const add=document.createElement("button");add.type="button";add.className="secondary";add.textContent="+ Add product to "+(category.name||"category");add.addEventListener("click",()=>{category.products.push({id:"new-product-"+Date.now(),name:"New product",icon:"✦",desc:"",silver:{price:0,features:[]},gold:{price:0,features:[]}});sync();renderVisualEditor()});section.append(add);
+   editor.append(section);
+  });
+  function sync(){area.value=JSON.stringify(data,null,2)}
+ }
+ async function loadSaved(){try{const snap=await fs.getDoc(ref);area.value=JSON.stringify(snap.exists()?snap.data().categories:DEFAULT_SOLUTIONS,null,2);renderVisualEditor();say(snap.exists()?(snap.data().published?"Saved catalogue loaded (published).":"Saved catalogue is hidden."):"No saved catalogue yet. Defaults loaded; publish to make them live.")}catch(e){say("Load failed: "+e.message)}}
+ area.addEventListener("input",()=>{try{renderVisualEditor()}catch{}});
  document.getElementById("catalogue-load").addEventListener("click",loadSaved);
- document.getElementById("catalogue-defaults").addEventListener("click",()=>{area.value=JSON.stringify(DEFAULT_SOLUTIONS,null,2);say("Default catalogue loaded in editor. Publish to save it.")});
+ document.getElementById("catalogue-defaults").addEventListener("click",()=>{area.value=JSON.stringify(DEFAULT_SOLUTIONS,null,2);renderVisualEditor();say("Default catalogue loaded in editor. Publish to save it.")});
  async function publish(published){try{const categories=JSON.parse(area.value);if(!Array.isArray(categories)||!categories.length)throw new Error("Catalogue must be a non-empty array.");for(const c of categories){if(!c.id||!c.name||!Array.isArray(c.products))throw new Error("Every category needs id, name and products.");for(const p of c.products){if(!p.id||!p.name||!p.silver||!p.gold||!Array.isArray(p.silver.features)||!Array.isArray(p.gold.features))throw new Error("Each product needs id, name, Silver and Golden plans with feature lists.");for(const plan of [p.silver,p.gold])if(!Number.isFinite(Number(plan.price))||Number(plan.price)<0)throw new Error("Plan prices must be zero or greater.")}}await fs.setDoc(ref,{categories,published,updatedAt:fs.serverTimestamp(),updatedBy:auth.currentUser.email});say(published?"Published successfully. Public website will show this catalogue.":"Catalogue hidden from public website.");}catch(e){say("Save failed: "+e.message)}}
  document.getElementById("catalogue-publish").addEventListener("click",()=>publish(true));
  document.getElementById("catalogue-hide").addEventListener("click",()=>publish(false));
