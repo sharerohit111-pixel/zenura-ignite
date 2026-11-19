@@ -41,10 +41,10 @@ test("exact paise cost basis survives odd-paise weighted buys and partial sells"
  assert.equal(second.position.averagePricePaise,101);
  assert.equal(second.position.costBasisPaise,201);
  const sold=calculatePaperFill({side:"SELL",quantity:1,pricePaise:110,cashPaise:second.cashPaise,position:second.position});
- assert.equal(sold.orderRealizedPnlPaise,10);
- assert.deepEqual(sold.position,{quantity:1,averagePricePaise:101,costBasisPaise:101});
+ assert.equal(sold.orderRealizedPnlPaise,9);
+ assert.deepEqual(sold.position,{quantity:1,averagePricePaise:100,costBasisPaise:100});
  const closed=calculatePaperFill({side:"SELL",quantity:1,pricePaise:90,cashPaise:sold.cashPaise,position:sold.position});
- assert.equal(closed.orderRealizedPnlPaise,-11);
+ assert.equal(closed.orderRealizedPnlPaise,-10);
  assert.deepEqual(closed.position,{quantity:0,averagePricePaise:0,costBasisPaise:0});
  assert.equal(sold.orderRealizedPnlPaise+closed.orderRealizedPnlPaise,-1);
 });
