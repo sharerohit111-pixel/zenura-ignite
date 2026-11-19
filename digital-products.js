@@ -10,49 +10,33 @@ function productModal(p){
  document.getElementById("digital-product-modal")?.remove();
  const el=document.createElement("div");el.id="digital-product-modal";el.className="digital-product-backdrop";
  const images=[p.imageUrl,...(Array.isArray(p.gallery)?p.gallery:[])].map(safeUrl).filter(Boolean);
+ const videoUrl=safeUrl(p.videoUrl),websiteUrl=safeUrl(p.websiteUrl);
  const hero=images[0]?'<img class="digital-product-hero" src="'+esc(images[0])+'" alt="'+esc(p.name)+'" loading="lazy">':'<div class="digital-product-placeholder"><span>'+esc(p.name)+'</span><small>ZENURA IGNITE TECHNOLOGIES</small></div>';
- el.innerHTML='<article class="digital-product-dialog" role="dialog" aria-modal="true" aria-label="'+esc(p.name)+'"><button class="digital-product-close" type="button" aria-label="Close">×</button>'+hero+'<div class="digital-product-body"><small class="tag">'+esc(p.category||"ZENURA DIGITAL PRODUCT")+'</small><h2>'+esc(p.name)+'</h2><h3>'+esc(p.subtitle||"")+'</h3><p>'+esc(p.description||"")+'</p><div class="digital-product-details">'+esc(p.details||"")+'</div><h4>Key Features</h4><ul class="digital-product-features">'+(p.features||[]).map(x=>'<li>'+esc(x)+'</li>').join("")+'</ul>'+(images.length>1?'<div class="digital-product-gallery">'+images.slice(1).map(src=>'<img src="'+esc(src)+'" alt="'+esc(p.name)+' feature image" loading="lazy">').join("")+'</div>':'')+'<div class="product-tags">'+(p.tags||[]).map(x=>'<span>'+esc(x)+'</span>').join("")+'</div>'+(safeUrl(p.videoUrl)?'<video class="digital-product-video" controls playsinline preload="metadata" src="'+esc(safeUrl(p.videoUrl))+'">Your browser does not support video.</video>':'')+(safeUrl(p.websiteUrl)?'<a class="product-link" href="'+esc(safeUrl(p.websiteUrl))+'" target="_blank" rel="noopener noreferrer">Visit product ↗</a>':'')+'</div></article>';
- document.body.append(el);el.querySelector(".digital-product-close").addEventListener("click",()=>el.remove());el.addEventListener("click",e=>{if(e.target===el)el.remove()});
+ el.innerHTML='<article class="digital-product-dialog" role="dialog" aria-modal="true" aria-label="'+esc(p.name)+'"><button class="digital-product-close" type="button" aria-label="Close">×</button>'+hero+'<div class="digital-product-body"><small class="tag">'+esc(p.category||"PRODUCT SAMPLE")+'</small><h2>'+esc(p.name)+'</h2><h3>'+esc(p.subtitle||"")+'</h3><p>'+esc(p.description||"")+'</p><div class="digital-product-details">'+esc(p.details||"")+'</div><h4>Key Features</h4><ul class="digital-product-features">'+(p.features||[]).map(x=>'<li>'+esc(x)+'</li>').join("")+'</ul>'+(images.length>1?'<div class="digital-product-gallery">'+images.slice(1).map(src=>'<img src="'+esc(src)+'" alt="'+esc(p.name)+' feature image" loading="lazy">').join("")+'</div>':'')+'<div class="product-tags">'+(p.tags||[]).map(x=>'<span>'+esc(x)+'</span>').join("")+'</div>'+(videoUrl?'<video class="digital-product-video" controls playsinline preload="metadata" src="'+esc(videoUrl)+'">Your browser does not support video.</video>':'')+(websiteUrl?'<a class="product-link" href="'+esc(websiteUrl)+'" target="_blank" rel="noopener noreferrer">Visit product ↗</a>':'')+'</div></article>';
+ document.body.append(el);
+ const close=()=>el.remove();el.querySelector(".digital-product-close").addEventListener("click",close);el.addEventListener("click",e=>{if(e.target===el)close()});
 }
-function bind(){
- root?.querySelectorAll("[data-product-detail]").forEach(b=>b.addEventListener("click",()=>{const p=products.find(x=>x.id===b.dataset.productDetail);if(p)productModal(p)}));
+function bind(){root?.querySelectorAll("[data-product-detail]").forEach(b=>b.addEventListener("click",()=>{const p=products.find(x=>x.id===b.dataset.productDetail);if(p)productModal(p)}));}
+function updateCard(card,p){
+ const art=card.querySelector(".product-art"),content=card.querySelector(".product-content");
+ if(!art||!content)return;
+ art.querySelector(".product-card-image")?.remove();
+ const imageUrl=safeUrl(p.imageUrl);
+ if(imageUrl){const img=document.createElement("img");img.className="product-card-image";img.src=imageUrl;img.alt=p.name+" product image";img.loading="lazy";img.decoding="async";art.prepend(img);art.classList.add("has-product-image");}
+ const title=content.querySelector("h3");if(title)title.textContent=p.name;
+ const subtitle=content.querySelector(".product-subtitle");if(subtitle)subtitle.textContent=p.subtitle||"";
+ const paragraphs=content.querySelectorAll(":scope > p:not(.product-subtitle)");if(paragraphs[0])paragraphs[0].textContent=p.description||"";
+ const tags=content.querySelector(".product-tags");if(tags)tags.innerHTML=(p.tags||[]).map(x=>"<span>"+esc(x)+"</span>").join("");
+ const link=content.querySelector(".product-link");if(link){link.removeAttribute("href");link.dataset.productDetail=p.id;link.textContent="View product details & images ↗";}
+ card.dataset.productId=p.id;card.hidden=false;
 }
 async function load(){
- try{
-  const snap=await getDoc(doc(db,"publicCatalog","digitalProducts"));
-  if(snap.exists()){
-   const data=snap.data();
-   cataloguePublished=data.published===true&&Array.isArray(data.products);
-   products=cataloguePublished?data.products:[];
-  }
- }catch(e){console.warn("Digital product details are using built-in defaults.",e)}
+ try{const snap=await getDoc(doc(db,"publicCatalog","digitalProducts"));if(snap.exists()){const data=snap.data();cataloguePublished=data.published===true&&Array.isArray(data.products);products=cataloguePublished?data.products.filter(p=>p&&p.visible!==false):[];}}
+ catch(e){console.warn("Product samples are using built-in defaults.",e)}
  if(!root)return;
- const cards=[...root.querySelectorAll(".product-card")];
- for(const card of cards){
-  const title=card.querySelector("h3")?.textContent.trim().toLowerCase();
-  const product=products.find(item=>(card.dataset.productId&&item.id===card.dataset.productId)||String(item.name||"").trim().toLowerCase()===title);
-  if(!product){if(cataloguePublished)card.hidden=true;continue;}
-  if(product.visible===false){card.hidden=true;continue;}
-  card.hidden=false;
-  const link=card.querySelector(".product-link");
-  if(link){
-   link.removeAttribute("href");
-   link.dataset.productDetail=product.id;
-   link.textContent="Explore product details ↗";
-  }
-  const imageUrl=safeUrl(product.imageUrl);
-  if(imageUrl){
-   const art=card.querySelector(".product-art");
-   if(art){
-    const img=document.createElement("img");
-    img.className="product-card-image";
-    img.src=imageUrl;
-    img.alt=product.name+" product image";
-    img.loading="lazy";
-    art.prepend(img);
-   }
-  }
- }
+ const cards=[...root.querySelectorAll(".product-card")],used=new Set();
+ if(cataloguePublished){products.forEach((p,i)=>{const card=cards.find(x=>!used.has(x)&&((x.dataset.productId&&x.dataset.productId===p.id)||x.querySelector("h3")?.textContent.trim().toLowerCase()===String(p.name||"").trim().toLowerCase()))||cards.find(x=>!used.has(x)) ;if(card){used.add(card);updateCard(card,p);}});cards.forEach(card=>{if(!used.has(card))card.hidden=true;});}
+ else cards.forEach(card=>{card.hidden=true;});
  bind();
 }
 load();
