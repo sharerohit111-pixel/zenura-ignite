@@ -1,0 +1,35 @@
+/* ZENURA IGNITE — published digital products */
+.digital-products-section{padding:76px 0 82px;border-top:1px solid #28456c55}
+.digital-products-heading{display:grid;grid-template-columns:1fr .8fr;gap:40px;align-items:end;margin:18px 0 28px}
+.digital-products-heading h2{font:700 clamp(38px,5vw,58px)/1.06 'Space Grotesk';letter-spacing:-2px;margin:14px 0}
+.digital-products-heading h2 em{font-style:normal;color:var(--cyan);text-shadow:0 0 24px #35e4ff55}
+.digital-products-heading p{font-size:13px;line-height:1.8;color:var(--muted);margin:0 0 18px}
+.digital-products-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
+.digital-product-card{overflow:hidden;display:grid;grid-template-columns:minmax(130px,.72fr) 1.28fr;min-width:0;border:1px solid #426eb688;border-radius:18px;background:linear-gradient(145deg,#122347,#090f22);box-shadow:inset 0 0 22px #2d6dff12}
+.digital-product-card-media{min-height:245px;background:radial-gradient(circle at 70% 20%,#2365a777,transparent 45%),linear-gradient(145deg,#0d2948,#080e20);display:grid;place-items:center;overflow:hidden}
+.digital-product-card-media img{width:100%;height:100%;min-height:245px;object-fit:cover}
+.digital-product-placeholder{font:700 58px 'Space Grotesk';color:var(--cyan);text-shadow:0 0 30px #35e4ff88}
+.digital-product-card-body{padding:22px;display:flex;flex-direction:column;align-items:flex-start;min-width:0}
+.digital-product-kicker{font:700 9px 'Space Grotesk';letter-spacing:1.5px;color:var(--cyan);text-transform:uppercase}
+.digital-product-card h3{font:700 22px 'Space Grotesk';margin:10px 0 4px}
+.digital-product-subtitle{font-size:12px;color:#a9eaff;font-weight:700;margin:0 0 12px}
+.digital-product-description,.digital-product-full-details{font-size:12px;line-height:1.8;color:var(--muted);white-space:pre-line}
+.digital-product-card-body ul,.digital-product-features ul{padding-left:18px;color:#d3e2f7;font-size:11px;line-height:1.9}
+.digital-product-details-button,.digital-product-visit{margin-top:auto;border:1px solid #35cdec88;border-radius:999px;padding:11px 15px;background:#0e2946;color:var(--cyan);font:700 11px 'DM Sans';text-decoration:none;cursor:pointer}
+.digital-product-details-button:hover,.digital-product-visit:hover{background:#123b60;color:#fff}
+.digital-product-modal{position:fixed;inset:0;z-index:1000;background:#020817dd;backdrop-filter:blur(12px);display:grid;place-items:center;padding:18px}
+.digital-product-dialog{width:min(760px,100%);max-height:min(88vh,900px);overflow:auto;padding:24px;border:1px solid #3b82b8;border-radius:20px;background:linear-gradient(145deg,#122347,#070d1c);box-shadow:0 24px 80px #000a}
+.digital-product-dialog-head{display:flex;justify-content:space-between;gap:18px;align-items:flex-start}
+.digital-product-dialog h2{font:700 clamp(24px,4vw,34px) 'Space Grotesk';margin:8px 0}
+.digital-product-dialog-head p{margin:0 0 8px}
+.digital-product-close{flex:none;border:1px solid #526b99;border-radius:999px;padding:9px 12px;background:#0b1730;color:#dceaff;cursor:pointer}
+.digital-product-gallery{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:9px;margin:18px 0}
+.digital-product-gallery img{width:100%;height:150px;object-fit:cover;border-radius:12px;border:1px solid #426eb688}
+.digital-product-features{margin:16px 0}
+.digital-product-features h3{font:700 17px 'Space Grotesk';margin-bottom:5px}
+.digital-product-tags{display:flex;flex-wrap:wrap;gap:7px;margin:15px 0}
+.digital-product-tags span{padding:6px 10px;border:1px solid #385b85;border-radius:999px;color:#c6d9f4;font-size:10px}
+.digital-product-video{width:100%;max-height:360px;margin:12px 0;border-radius:12px;background:#000}
+.digital-product-empty{padding:24px;border:1px dashed #426eb688;border-radius:14px;color:var(--muted);text-align:center}
+@media(max-width:760px){.digital-products-heading{grid-template-columns:1fr;gap:0}.digital-products-grid{grid-template-columns:1fr}.digital-product-card{grid-template-columns:120px 1fr}.digital-product-card-media,.digital-product-card-media img{min-height:210px}.digital-product-card-body{padding:16px}.digital-product-card h3{font-size:19px}}
+@media(max-width:440px){.digital-product-card{grid-template-columns:1fr}.digital-product-card-media,.digital-product-card-media img{height:170px;min-height:170px}.digital-product-dialog{padding:17px}.digital-product-gallery{grid-template-columns:repeat(2,minmax(0,1fr))}}
