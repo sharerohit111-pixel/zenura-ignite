@@ -117,6 +117,13 @@ if(!isFirebaseConfigured()){loginButton.disabled=true;loginButton.textContent="F
  const [{auth,googleProvider},{onAuthStateChanged,signInWithPopup,signOut}]=await Promise.all([import("./firebase-client.js"),import("https://www.gstatic.com/firebasejs/11.6.0/firebase-auth.js")]);
  loginButton.addEventListener("click",async()=>{showError(loginError,"");try{await signInWithPopup(auth,googleProvider)}catch(e){showError(loginError,e.message)}});
  logoutButton.addEventListener("click",()=>signOut(auth));
- onAuthStateChanged(auth,async user=>{if(user&&user.email===ADMIN_EMAIL&&user.emailVerified){loginPanel.hidden=true;dashboard.hidden=false;document.getElementById("identity").textContent="Signed in as "+user.email;await Promise.all([loadEnquiries(),setupCatalogueAdmin(auth),setupDigitalProductsAdmin()]);document.getElementById("solutions-admin").hidden=false;document.getElementById("digital-products-admin").hidden=false}else{if(user)await signOut(auth);loginPanel.hidden=false;dashboard.hidden=true;if(user)showError(loginError,"This Google account is not authorized.")}});
+ onAuthStateChanged(auth,async user=>{if(user&&user.email===ADMIN_EMAIL&&user.emailVerified){loginPanel.hidden=true;dashboard.hidden=false;setupAdminNavigation();document.getElementById("identity").textContent="Signed in as "+user.email;await Promise.all([loadEnquiries(),setupCatalogueAdmin(auth),setupDigitalProductsAdmin()]);document.getElementById("solutions-admin").hidden=false;document.getElementById("digital-products-admin").hidden=false}else{if(user)await signOut(auth);loginPanel.hidden=false;dashboard.hidden=true;if(user)showError(loginError,"This Google account is not authorized.")}});
  document.getElementById("search").addEventListener("input",render);document.getElementById("status-filter").addEventListener("change",render);
+}
+
+function setupAdminNavigation(){
+ const tabs=[...document.querySelectorAll("[data-admin-tab]")],panes=[...document.querySelectorAll("[data-admin-pane]")];
+ function activate(name){tabs.forEach(t=>t.classList.toggle("active",t.dataset.adminTab===name));panes.forEach(p=>p.classList.toggle("active",p.dataset.adminPane===name));}
+ tabs.forEach(t=>t.addEventListener("click",()=>activate(t.dataset.adminTab)));
+ document.querySelectorAll("[data-go-tab]").forEach(b=>b.addEventListener("click",()=>activate(b.dataset.goTab)));
 }
