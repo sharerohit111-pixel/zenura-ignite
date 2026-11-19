@@ -80,11 +80,12 @@ jobs:
             if (!deploy.startsWith('cd .. && firebase deploy --only ')) {
               throw new Error('Firebase deploy script must use the explicit Indian-market-only allowlist.');
             }
-            if (deploy.includes('--only functions') || deploy.includes('--only firestore') || deploy.includes('functions,')) {
-              throw new Error('Broad Firebase deployment target is forbidden.');
+            const targets = (deploy.split('--only ')[1] || '').split(',');
+            if (targets.length !== required.length || targets.some(target => !/^functions:[A-Za-z0-9]+$/.test(target))) {
+              throw new Error('Only the four explicit Indian-market Functions may be deployed by this script.');
             }
             for (const target of required) {
-              if (!deploy.includes(target)) throw new Error('Missing deployment target: ' + target);
+              if (!targets.includes(target)) throw new Error('Missing deployment target: ' + target);
             }
             console.log('Firebase deploy scope is restricted to the four Indian-market Functions.');
           "
