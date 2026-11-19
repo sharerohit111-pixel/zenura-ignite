@@ -10,3 +10,14 @@
 .upload-note{display:block;color:#8ea9ce;font-size:12px;margin-top:5px}
 .media-preview{display:block;max-width:100%;max-height:220px;object-fit:contain;border:1px solid #526b99;border-radius:10px;margin:12px 0;background:#050916}
 .digital-product-video{display:block;width:100%;max-height:360px;margin:18px 0;border-radius:12px;background:#000}
+
+.admin-workspace{display:grid;grid-template-columns:245px minmax(0,1fr);gap:22px;align-items:start;margin-top:30px}
+.admin-sidebar{position:sticky;top:18px;display:grid;gap:8px;padding:16px;border:1px solid #426eb6;border-radius:18px;background:linear-gradient(145deg,#111f3d,#0b1227)}
+.sidebar-title{margin:0 0 8px;padding:5px 8px;color:#59e6ff;font-size:10px;font-weight:800;letter-spacing:2px}
+.admin-tab{width:100%;padding:14px 13px;text-align:left;border:1px solid transparent;border-radius:11px;background:transparent;color:#dce8fb;font-weight:700;cursor:pointer}
+.admin-tab:hover,.admin-tab.active{border-color:#3c9acb;background:linear-gradient(100deg,#12385a,#29204b);color:#61eaff;box-shadow:inset 0 0 18px #35e4ff12}
+.admin-content{min-width:0}.admin-pane{display:none;min-width:0}.admin-pane.active{display:block}
+.admin-section{max-width:none;margin:0 0 22px}.admin-welcome{max-width:none;margin:0;min-height:260px}
+.admin-shortcuts{display:flex;flex-wrap:wrap;gap:10px;margin-top:22px}
+#dashboard .toolbar{margin-top:0}#dashboard .stats{margin-bottom:20px}
+@media(max-width:760px){.admin-workspace{grid-template-columns:1fr;gap:14px}.admin-sidebar{position:static;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;padding:10px}.sidebar-title{grid-column:1/-1}.admin-tab{font-size:12px;padding:12px 9px}.admin-section{padding:18px}.admin-shortcuts{display:grid}}
