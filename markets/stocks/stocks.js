@@ -203,7 +203,13 @@
     const allowed=!paperOrderSubmitting&&!!selected&&['NSE_EQ','BSE_EQ'].includes(selected.segment)&&selected.instrument_type==='EQ'&&!!window.ZENURA_MARKET_CONNECTOR?.getIdToken&&!!gateway;
     paperBuy.disabled=!allowed;paperSell.disabled=!allowed;
   }
-  let pendingPaperOrderKey=null,pendingPaperOrderFingerprint='';
+  const pendingOrderStorage=(()=>{try{return window.sessionStorage;}catch(_){return null;}})();
+  const paperPendingStorageKey='zenura-indian-paper-order-pending-v1';
+  const derivativePendingStorageKey='zenura-indian-derivative-order-pending-v1';
+  const retryPolicy=window.ZenuraPaperOrderRetryPolicy;
+  const restoredPaperOrder=retryPolicy.readPendingPaperOrder(pendingOrderStorage,paperPendingStorageKey);
+  let pendingPaperOrderKey=restoredPaperOrder?.key||null,pendingPaperOrderFingerprint=restoredPaperOrder?.fingerprint||'';
+  if(restoredPaperOrder)paperOrderStatus.textContent='A previous paper order response may be uncertain. Retry the same stock, side and quantity before starting another order.';
   async function submitPaperOrder(side){
     if(paperOrderSubmitting)return;
     const qty=Number(paperQuantity.value);
@@ -214,14 +220,17 @@
     if(pendingPaperOrderKey&&!window.ZenuraPaperOrderRetryPolicy.canRetryPendingPaperOrder(pendingPaperOrderFingerprint,fingerprint)){
       paperOrderStatus.textContent='A previous order response is uncertain. Retry the same stock, side and quantity before starting another order.';return;
     }
-    if(!pendingPaperOrderKey){pendingPaperOrderKey=crypto.randomUUID();pendingPaperOrderFingerprint=fingerprint;}
+    if(!pendingPaperOrderKey){
+      pendingPaperOrderKey=crypto.randomUUID();pendingPaperOrderFingerprint=fingerprint;
+      retryPolicy.writePendingPaperOrder(pendingOrderStorage,paperPendingStorageKey,{key:pendingPaperOrderKey,fingerprint:pendingPaperOrderFingerprint});
+    }
     paperOrderSubmitting=true;updatePaperButtons();paperOrderStatus.textContent='Verifying fresh provider quote and processing simulated order…';
     try{
       const token=await window.ZENURA_MARKET_CONNECTOR.getIdToken();
       const response=await fetch(gateway+'/paper/orders',{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json',Accept:'application/json'},body:JSON.stringify({instrument_key:instrumentKey,side,quantity:qty,idempotency_key:pendingPaperOrderKey})});
       const data=await response.json().catch(()=>({}));
-      if(!response.ok){if(response.status>=400&&response.status<500){pendingPaperOrderKey=null;pendingPaperOrderFingerprint='';}throw new Error(data.error||'Paper order rejected');}
-      pendingPaperOrderKey=null;pendingPaperOrderFingerprint='';
+      if(!response.ok){if(response.status>=400&&response.status<500){pendingPaperOrderKey=null;pendingPaperOrderFingerprint='';retryPolicy.clearPendingPaperOrder(pendingOrderStorage,paperPendingStorageKey);}throw new Error(data.error||'Paper order rejected');}
+      pendingPaperOrderKey=null;pendingPaperOrderFingerprint='';retryPolicy.clearPendingPaperOrder(pendingOrderStorage,paperPendingStorageKey);
       const fillMessage=side+' '+qty+' '+(data.tradingSymbol||tradingSymbol)+' filled at '+inrPaise(data.executionPricePaise)+' · Simulated only';
       paperOrderStatus.textContent=fillMessage;
       try{await loadPaperAccount();await refreshPaperViews();}
@@ -318,7 +327,9 @@
     }catch(error){if(request===optionChainRequest&&selected?.instrument_key===instrumentKey&&optionExpiry.value===expiry)optionStatus.textContent=error.message||'Option chain request failed.';}
     finally{if(request===optionChainRequest)optionButton.disabled=false;}
   }
-  let pendingDerivativeOrder=null,derivativeOrderSubmitting=false;
+  const restoredDerivativeOrder=retryPolicy.readPendingPaperOrder(pendingOrderStorage,derivativePendingStorageKey);
+  let pendingDerivativeOrder=restoredDerivativeOrder,derivativeOrderSubmitting=false;
+  if(restoredDerivativeOrder)optionStatus.textContent='A previous option order response may be uncertain. Retry the same contract, side and lots before starting another order.';
   async function submitDerivativeOrder(instrumentKey,type,strike,side='BUY'){
     if(derivativeOrderSubmitting)return;
     const connector=window.ZENURA_MARKET_CONNECTOR;
@@ -330,12 +341,15 @@
     if(!window.crypto?.randomUUID){optionStatus.textContent='A secure order request ID could not be created in this browser.';return;}
     const fingerprint=instrumentKey+'|'+side+'|'+lots;
     if(pendingDerivativeOrder&&pendingDerivativeOrder.fingerprint!==fingerprint){optionStatus.textContent='A previous order response is uncertain. Retry the same contract and lot quantity first.';return;}
-    if(!pendingDerivativeOrder)pendingDerivativeOrder={fingerprint,key:window.crypto.randomUUID()};
+    if(!pendingDerivativeOrder){
+      pendingDerivativeOrder={fingerprint,key:window.crypto.randomUUID()};
+      retryPolicy.writePendingPaperOrder(pendingOrderStorage,derivativePendingStorageKey,pendingDerivativeOrder);
+    }
     derivativeOrderSubmitting=true;optionButton.disabled=true;optionStatus.textContent='Verifying live option quote and placing simulated '+type+' '+side+'…';
     try{
       const token=await connector.getIdToken(),response=await fetch(gateway+'/paper/derivative/orders',{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json',Accept:'application/json'},body:JSON.stringify({instrument_key:instrumentKey,side,lots,idempotency_key:pendingDerivativeOrder.key})});
-      const data=await response.json();if(!response.ok){if(response.status>=400&&response.status<500)pendingDerivativeOrder=null;throw new Error(data.error||'Derivative paper order rejected.');}
-      pendingDerivativeOrder=null;
+      const data=await response.json();if(!response.ok){if(response.status>=400&&response.status<500){pendingDerivativeOrder=null;retryPolicy.clearPendingPaperOrder(pendingOrderStorage,derivativePendingStorageKey);}throw new Error(data.error||'Derivative paper order rejected.');}
+      pendingDerivativeOrder=null;retryPolicy.clearPendingPaperOrder(pendingOrderStorage,derivativePendingStorageKey);
       const fillMessage='SIMULATED '+side+' FILLED · '+data.tradingSymbol+' · '+data.quantity+' units · Premium '+inrPaise(data.grossPaise)+' · Estimated charges '+inrPaise(data.chargesPaise)+' · '+(side==='BUY'?'Total debit '+inrPaise(data.totalDebitPaise):'Net proceeds '+inrPaise(data.netCreditPaise))+'.';
       optionStatus.textContent=fillMessage;
       try{await loadPaperAccount();await refreshPaperViews();}
