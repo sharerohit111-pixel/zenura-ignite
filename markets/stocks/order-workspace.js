@@ -200,7 +200,7 @@
       }
     }
     limitSubmitting = true;
-    buy.disabled = true; sell.disabled = true;
+    [buy,sell].forEach(button => button.setAttribute('aria-busy','true'));
     showMessage(status, 'Submitting LIMIT order and reserving virtual funds/shares…', 'loading');
     try {
       const headers = await authHeaders();
@@ -225,7 +225,7 @@
       showMessage(status, error.message || 'LIMIT order submission failed.', 'error');
     } finally {
       limitSubmitting = false;
-      if (selectedType === 'LIMIT') { buy.disabled = false; sell.disabled = false; }
+      [buy,sell].forEach(button => button.removeAttribute('aria-busy'));
     }
   }
   [buy, sell].forEach((button, index) => button.addEventListener('click', event => {
