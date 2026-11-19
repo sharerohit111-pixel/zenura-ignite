@@ -17,8 +17,8 @@ function bind(){
  root?.querySelectorAll("[data-product-detail]").forEach(b=>b.addEventListener("click",()=>{const p=products.find(x=>x.id===b.dataset.productDetail);if(p)productModal(p)}));
 }
 async function load(){
- try{const snap=await getDoc(doc(db,"publicCatalog","digitalProducts"));if(snap.exists()&&snap.data().published&&Array.isArray(snap.data().products))products=snap.data().products;}
+ try{const snap=await getDoc(doc(db,"publicCatalog","digitalProducts"));if(snap.exists())products=snap.data().published===true&&Array.isArray(snap.data().products)?snap.data().products:[];}
  catch(e){console.warn("Digital product details are using built-in defaults.",e)}
- if(root){products.forEach(p=>{const card=[...root.querySelectorAll(".product-card")].find(x=>x.querySelector("h3")?.textContent.trim().toLowerCase()===p.name.toLowerCase());if(card){const link=card.querySelector(".product-link");if(link){link.removeAttribute("href");link.dataset.productDetail=p.id;link.textContent="Explore product details ↗";}if(safeUrl(p.imageUrl)){const art=card.querySelector(".product-art");if(art){const img=document.createElement("img");img.className="product-card-image";img.src=safeUrl(p.imageUrl);img.alt=p.name+" product image";img.loading="lazy";art.prepend(img)}}}});bind();}
+ if(root){const cards=[...root.querySelectorAll(".product-card")];cards.forEach(card=>{const title=card.querySelector("h3")?.textContent.trim().toLowerCase();const product=products.find(p=>String(p.name||"").trim().toLowerCase()===title);if(!product){return;}if(product.visible===false){card.hidden=true;return;}card.hidden=false;const p=product;{const link=card.querySelector(".product-link");if(link){link.removeAttribute("href");link.dataset.productDetail=p.id;link.textContent="Explore product details ↗";}if(safeUrl(p.imageUrl)){const art=card.querySelector(".product-art");if(art){const img=document.createElement("img");img.className="product-card-image";img.src=safeUrl(p.imageUrl);img.alt=p.name+" product image";img.loading="lazy";art.prepend(img)}}}});bind();}
 }
 load();
