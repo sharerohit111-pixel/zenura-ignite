@@ -17,8 +17,8 @@ test("paper account transitions compose without losing earlier concurrent state"
  assert.equal(first.cashPaise,95000);
  assert.equal(second.cashPaise,85000);
  assert.equal(third.cashPaise,88000);
- assert.deepEqual(third.positions["NSE_EQ|AAA"],{quantity:3,averagePricePaise:1000});
- assert.deepEqual(third.positions["NSE_EQ|BBB"],{quantity:2,averagePricePaise:5000});
+ assert.deepEqual(third.positions["NSE_EQ|AAA"],{quantity:3,averagePricePaise:1000,costBasisPaise:3000});
+ assert.deepEqual(third.positions["NSE_EQ|BBB"],{quantity:2,averagePricePaise:5000,costBasisPaise:10000});
  assert.equal(third.realizedPnlPaise,1000);
  assert.equal(third.version,4);
 });
