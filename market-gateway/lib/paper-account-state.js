@@ -4,6 +4,8 @@ function normalizePaperAccountState(account){
  const positions=account.positions===undefined?{}:account.positions;
  const derivativePositions=account.derivativePositions===undefined?{}:account.derivativePositions;
  const reservedMarginPaise=account.reservedMarginPaise===undefined?0:account.reservedMarginPaise;
+ const reservedCashPaise=account.reservedCashPaise===undefined?0:account.reservedCashPaise;
+ const reservedPositions=account.reservedPositions===undefined?{}:account.reservedPositions;
  const realizedPnlPaise=account.realizedPnlPaise===undefined?0:account.realizedPnlPaise;
  if(account.currency!=="INR"||
     !Number.isSafeInteger(account.startingCashPaise)||account.startingCashPaise<1||
@@ -11,9 +13,14 @@ function normalizePaperAccountState(account){
     !positions||typeof positions!=="object"||Array.isArray(positions)||
     !derivativePositions||typeof derivativePositions!=="object"||Array.isArray(derivativePositions)||
     !Number.isSafeInteger(reservedMarginPaise)||reservedMarginPaise<0||
+    !Number.isSafeInteger(reservedCashPaise)||reservedCashPaise<0||reservedCashPaise+reservedMarginPaise>account.cashPaise||
+    !reservedPositions||typeof reservedPositions!=="object"||Array.isArray(reservedPositions)||
     !Number.isSafeInteger(realizedPnlPaise))return null;
+ for(const [key,value] of Object.entries(reservedPositions)){
+  if(!key||!Number.isSafeInteger(value)||value<0||value>(positions[key]?.quantity??0))return null;
+ }
  return {currency:"INR",startingCashPaise:account.startingCashPaise,cashPaise:account.cashPaise,
-  positions,derivativePositions,reservedMarginPaise,realizedPnlPaise,
+  positions,derivativePositions,reservedMarginPaise,reservedCashPaise,reservedPositions,realizedPnlPaise,
   updatedAt:account.updatedAt?.toMillis?.()||null};
 }
 async function ensurePaperAccount({db,ref,startingCashPaise,serverTimestamp}){
@@ -26,13 +33,15 @@ async function ensurePaperAccount({db,ref,startingCashPaise,serverTimestamp}){
     throw Object.assign(new Error("Indian paper-trading starting balance is not configured by the administrator."),{status:503});
    const timestamp=serverTimestamp();
    tx.create(ref,{currency:"INR",startingCashPaise,cashPaise:startingCashPaise,positions:{},derivativePositions:{},
-    reservedMarginPaise:0,realizedPnlPaise:0,createdAt:timestamp,updatedAt:timestamp,version:1});
+    reservedMarginPaise:0,reservedCashPaise:0,reservedPositions:{},realizedPnlPaise:0,createdAt:timestamp,updatedAt:timestamp,version:1});
   }else{
    const account=snap.data()||{};
    const patch={};
    if(account.positions===undefined)patch.positions={};
    if(account.derivativePositions===undefined)patch.derivativePositions={};
    if(account.reservedMarginPaise===undefined)patch.reservedMarginPaise=0;
+   if(account.reservedCashPaise===undefined)patch.reservedCashPaise=0;
+   if(account.reservedPositions===undefined)patch.reservedPositions={};
    if(Object.keys(patch).length){patch.updatedAt=serverTimestamp();tx.update(ref,patch);}
   }
  });

@@ -15,7 +15,7 @@ function makeDb(existing){
 
 test("normalizes a valid INR paper account with empty optional maps",()=>{
  const result=normalizePaperAccountState({currency:"INR",startingCashPaise:100000000,cashPaise:100000000});
- assert.deepEqual(result,{currency:"INR",startingCashPaise:100000000,cashPaise:100000000,positions:{},derivativePositions:{},reservedMarginPaise:0,realizedPnlPaise:0,updatedAt:null});
+ assert.deepEqual(result,{currency:"INR",startingCashPaise:100000000,cashPaise:100000000,positions:{},derivativePositions:{},reservedMarginPaise:0,reservedCashPaise:0,reservedPositions:{},realizedPnlPaise:0,updatedAt:null});
 });
 
 test("normalizes Firestore timestamp without exposing account internals",()=>{
@@ -30,7 +30,7 @@ test("rejects malformed account identity, currency, balances and maps",()=>{
  for(const patch of [
   {currency:"USD"},{startingCashPaise:0},{startingCashPaise:1.5},{cashPaise:-1},
   {cashPaise:Number.MAX_SAFE_INTEGER+1},{positions:null},{positions:[]},
-  {derivativePositions:"bad"},{reservedMarginPaise:-1},{realizedPnlPaise:1.2}
+  {derivativePositions:"bad"},{reservedMarginPaise:-1},{reservedCashPaise:-1},{reservedCashPaise:901},{reservedPositions:[]},{reservedPositions:{"NSE_EQ|BAD":1}},{realizedPnlPaise:1.2}
  ]) assert.equal(normalizePaperAccountState({...valid,...patch}),null);
 });
 
@@ -43,7 +43,7 @@ test("initializes a missing account once with INR virtual cash and empty positio
  await ensurePaperAccount({db,ref:{id:"user-1"},startingCashPaise:100000000,serverTimestamp:()=>"server-time"});
  assert.equal(state.writes.length,1);
  assert.equal(state.writes[0][0],"create");
- assert.deepEqual(state.value,{currency:"INR",startingCashPaise:100000000,cashPaise:100000000,positions:{},derivativePositions:{},reservedMarginPaise:0,realizedPnlPaise:0,createdAt:"server-time",updatedAt:"server-time",version:1});
+ assert.deepEqual(state.value,{currency:"INR",startingCashPaise:100000000,cashPaise:100000000,positions:{},derivativePositions:{},reservedMarginPaise:0,reservedCashPaise:0,reservedPositions:{},realizedPnlPaise:0,createdAt:"server-time",updatedAt:"server-time",version:1});
 });
 
 test("does not reset an existing account balance or holdings",async()=>{
@@ -59,7 +59,7 @@ test("does not reset an existing account balance or holdings",async()=>{
 test("repairs only absent legacy maps and margin fields",async()=>{
  const {db,state}=makeDb({currency:"INR",startingCashPaise:1000,cashPaise:700,realizedPnlPaise:10,version:2});
  await ensurePaperAccount({db,ref:{id:"user-1"},startingCashPaise:9999,serverTimestamp:()=>"server-time"});
- assert.deepEqual(state.writes,[["update",{positions:{},derivativePositions:{},reservedMarginPaise:0,updatedAt:"server-time"}]]);
+ assert.deepEqual(state.writes,[["update",{positions:{},derivativePositions:{},reservedMarginPaise:0,reservedCashPaise:0,reservedPositions:{},updatedAt:"server-time"}]]);
  assert.equal(state.value.cashPaise,700);
  assert.equal(state.value.startingCashPaise,1000);
 });

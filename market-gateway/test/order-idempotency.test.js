@@ -66,3 +66,26 @@ test("limit order fingerprint includes a positive limit price",()=>{
  assert.throws(()=>makeOrderFingerprint({...limit,limitPricePaise:1.5}),{status:400});
  assert.throws(()=>makeOrderFingerprint({...request,orderType:"MARKET",limitPricePaise:12500}),{status:400});
 });
+
+test("market BUY cannot spend cash reserved by pending LIMIT orders or margin",()=>{
+ const account={cashPaise:10000,reservedCashPaise:3000,reservedMarginPaise:2000,reservedPositions:{},realizedPnlPaise:0,positions:{},version:1};
+ const next=buildPaperOrderUpdate(account,{instrumentKey:"NSE_EQ|AAA",side:"BUY",quantity:1,pricePaise:5000});
+ assert.equal(next.cashPaise,5000);
+ assert.equal(next.reservedCashPaise,3000);
+ assert.deepEqual(next.reservedPositions,{});
+ assert.throws(()=>buildPaperOrderUpdate(account,{instrumentKey:"NSE_EQ|AAA",side:"BUY",quantity:1,pricePaise:5001}),{status:409});
+});
+
+test("market SELL cannot consume shares reserved by a pending LIMIT sell",()=>{
+ const account={cashPaise:10000,reservedCashPaise:0,reservedPositions:{"NSE_EQ|AAA":2},realizedPnlPaise:0,positions:{"NSE_EQ|AAA":{quantity:5,averagePricePaise:1000}},version:1};
+ const next=buildPaperOrderUpdate(account,{instrumentKey:"NSE_EQ|AAA",side:"SELL",quantity:3,pricePaise:1200});
+ assert.equal(next.positions["NSE_EQ|AAA"].quantity,2);
+ assert.deepEqual(next.reservedPositions,{"NSE_EQ|AAA":2});
+ assert.throws(()=>buildPaperOrderUpdate(account,{instrumentKey:"NSE_EQ|AAA",side:"SELL",quantity:4,pricePaise:1200}),{status:409});
+});
+
+test("rejects malformed reserved cash and share reservations",()=>{
+ const base={cashPaise:10000,reservedCashPaise:1000,reservedPositions:{},realizedPnlPaise:0,positions:{},version:1};
+ for(const patch of [{reservedCashPaise:-1},{reservedCashPaise:10001},{reservedPositions:[]},{reservedPositions:{"NSE_EQ|AAA":1}}])
+  assert.throws(()=>buildPaperOrderUpdate({...base,...patch},{instrumentKey:"NSE_EQ|AAA",side:"BUY",quantity:1,pricePaise:100}),{status:409});
+});

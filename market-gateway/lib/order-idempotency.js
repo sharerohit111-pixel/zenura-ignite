@@ -19,6 +19,16 @@ function buildPaperOrderUpdate(account,{instrumentKey,side,quantity,pricePaise})
     (account.positions!==undefined&&(!account.positions||typeof account.positions!=="object"||Array.isArray(account.positions))))
   throw Object.assign(new Error("Invalid paper account state."),{status:409});
  const {calculatePaperFill}=require("./paper-math");
+ const reservedCashPaise=account.reservedCashPaise===undefined?0:account.reservedCashPaise;
+ const reservedMarginPaise=account.reservedMarginPaise===undefined?0:account.reservedMarginPaise;
+ const reservedPositions=account.reservedPositions===undefined?{}:account.reservedPositions;
+ if(!Number.isSafeInteger(reservedCashPaise)||reservedCashPaise<0||!Number.isSafeInteger(reservedMarginPaise)||reservedMarginPaise<0||
+    reservedCashPaise+reservedMarginPaise>account.cashPaise||!reservedPositions||typeof reservedPositions!=="object"||Array.isArray(reservedPositions))
+  throw Object.assign(new Error("Paper account contains invalid reserved resources."),{status:409});
+ for(const [key,value] of Object.entries(reservedPositions)){
+  if(!key||!Number.isSafeInteger(value)||value<0||value>(account.positions?.[key]?.quantity??0))
+   throw Object.assign(new Error("Paper account contains invalid reserved share quantities."),{status:409});
+ }
  // The portfolio reader treats a missing legacy positions map as an empty portfolio.
  const positions={...(account.positions||{})};
  let openPositionCount=0;
@@ -41,10 +51,14 @@ function buildPaperOrderUpdate(account,{instrumentKey,side,quantity,pricePaise})
  if(side==="BUY"&&!Object.prototype.hasOwnProperty.call(positions,instrumentKey)&&openPositionCount>=50)
   throw Object.assign(new Error("Paper portfolio is limited to 50 open positions. Close an existing position before opening another."),{status:409});
  const position={...(positions[instrumentKey]||{quantity:0,averagePricePaise:0})};
- const fill=calculatePaperFill({side,quantity,pricePaise,cashPaise:account.cashPaise,realizedPnlPaise:account.realizedPnlPaise??0,position});
+ const availableQuantity=position.quantity-(reservedPositions[instrumentKey]||0);
+ if(side==="SELL"&&quantity>availableQuantity)
+  throw Object.assign(new Error("Insufficient unreserved shares for this paper sell order."),{status:409});
+ const availableCashPaise=account.cashPaise-reservedCashPaise-reservedMarginPaise;
+ const fill=calculatePaperFill({side,quantity,pricePaise,cashPaise:availableCashPaise,realizedPnlPaise:account.realizedPnlPaise??0,position});
  if(fill.position.quantity===0)delete positions[instrumentKey];else positions[instrumentKey]=fill.position;
  const currentVersion=account.version===undefined?1:account.version;if(!Number.isSafeInteger(currentVersion)||currentVersion<1||currentVersion>=Number.MAX_SAFE_INTEGER)throw Object.assign(new Error("Invalid paper account version."),{status:409});
- return {cashPaise:fill.cashPaise,realizedPnlPaise:fill.realizedPnlPaise,positions,orderRealizedPnlPaise:fill.orderRealizedPnlPaise,grossPaise:fill.grossPaise,version:currentVersion+1};
+ return {cashPaise:fill.cashPaise+reservedCashPaise+reservedMarginPaise,realizedPnlPaise:fill.realizedPnlPaise,positions,reservedCashPaise,reservedPositions:{...reservedPositions},orderRealizedPnlPaise:fill.orderRealizedPnlPaise,grossPaise:fill.grossPaise,version:currentVersion+1};
 }
 function assertIdempotentReplay(existingOrder,requestFingerprint){
  if(!existingOrder||existingOrder.requestFingerprint!==requestFingerprint)

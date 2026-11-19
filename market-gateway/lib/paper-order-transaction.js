@@ -22,7 +22,7 @@ async function executePaperOrderTransaction({db,accountRef,orderRef,uid,requestF
     const next=buildPaperOrderUpdate(accountSnap.data(),{instrumentKey:order.instrumentKey,side:order.side,quantity:order.quantity,pricePaise});
     const storedOrder={...order,grossPaise:next.grossPaise,realizedPnlPaise:next.orderRealizedPnlPaise,createdAt:serverTimestamp()};
     tx.create(orderRef,storedOrder);
-    tx.update(accountRef,{cashPaise:next.cashPaise,positions:next.positions,realizedPnlPaise:next.realizedPnlPaise,updatedAt:serverTimestamp(),version:next.version});
+    tx.update(accountRef,{cashPaise:next.cashPaise,positions:next.positions,reservedCashPaise:next.reservedCashPaise,reservedPositions:next.reservedPositions,realizedPnlPaise:next.realizedPnlPaise,updatedAt:serverTimestamp(),version:next.version});
     result=publicPaperOrder(storedOrder,{orderId:orderRef.id,cashPaise:next.cashPaise,realizedPnlTotalPaise:next.realizedPnlPaise});
   });
   return result;
