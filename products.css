@@ -61,3 +61,14 @@
 .digital-product-gallery img{width:100%;max-height:230px;object-fit:cover;border-radius:12px;border:1px solid #426eb6}
 .digital-product-video{display:block;width:100%;max-height:360px;margin:20px 0;border-radius:14px;background:#000}
 @media(max-width:600px){.product-art.has-product-image{height:190px}.digital-product-backdrop{padding:8px}.digital-product-body{padding:18px}.digital-product-gallery{grid-template-columns:1fr}}
+
+
+/* FIX: keep uploaded sample artwork inside its own fixed-height card header. */
+.product-card{min-width:0;isolation:isolate}
+.product-art{flex:0 0 176px;min-height:176px;max-height:176px;min-width:0;isolation:isolate;overflow:hidden}
+.product-art.has-product-image,
+.product-card-featured .product-art.has-product-image{height:190px;min-height:190px;max-height:190px;flex:0 0 190px;padding:0;display:block;position:relative;overflow:hidden;isolation:isolate}
+.product-art.has-product-image>.product-card-image{position:absolute;inset:0;display:block;width:100%;height:100%;min-height:0;max-height:none;max-width:none;margin:0;padding:0;border:0;border-radius:0;object-fit:cover;object-position:center;z-index:0}
+.product-art.has-product-image>:not(.product-card-image){visibility:hidden}
+.product-art.has-product-image:after{content:"";position:absolute;inset:45% 0 0;width:auto;height:auto;right:0;bottom:0;border:0;border-radius:0;box-shadow:none;background:linear-gradient(180deg,transparent,#07102055);z-index:1;pointer-events:none}
+@media(max-width:600px){.product-art,.product-card-featured .product-art{height:160px;min-height:160px;max-height:160px;flex:0 0 160px}.product-art.has-product-image,.product-card-featured .product-art.has-product-image{height:180px;min-height:180px;max-height:180px;flex:0 0 180px}}
