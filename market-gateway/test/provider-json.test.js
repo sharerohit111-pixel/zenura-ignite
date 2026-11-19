@@ -22,6 +22,6 @@ test("rejects declared response larger than budget",async()=>{
 test("rejects streamed response larger than budget",async()=>{
  await assert.rejects(readProviderJson(responseFor(Buffer.from('{"data":"123456789"}')),{maxBytes:8}),e=>e.status===502&&/size limit/.test(e.message));
 });
-test("returns null for invalid JSON",async()=>{
- assert.equal(await readProviderJson(responseFor(Buffer.from("{bad"))),null);
+test("rejects invalid provider JSON instead of returning a successful null payload",async()=>{
+ await assert.rejects(readProviderJson(responseFor(Buffer.from("{bad"))),e=>e.status===502&&/invalid JSON/.test(e.message));
 });
