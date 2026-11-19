@@ -243,13 +243,15 @@ app.post("/paper/orders",async(req,res)=>{
     const decoded=await authenticate(req);
     const instrumentKey=typeof req.body?.instrument_key==="string"?req.body.instrument_key:"";
     const side=String(req.body?.side||"").toUpperCase();
+    const orderType=String(req.body?.order_type||"MARKET").toUpperCase();
     const quantity=Number(req.body?.quantity);
     const idempotencyKey=typeof req.body?.idempotency_key==="string"?req.body.idempotency_key:"";
     if(!isUuid(idempotencyKey))return res.status(400).json({error:"A valid UUID idempotency_key is required."});
     if(!instrumentKey||instrumentKey.length>100||/[\r\n]/.test(instrumentKey))return res.status(400).json({error:"A valid instrument_key is required."});
     if(!["BUY","SELL"].includes(side))return res.status(400).json({error:"Only BUY and SELL paper orders are supported."});
+    if(orderType!=="MARKET")return res.status(400).json({error:"Only MARKET orders are currently enabled; LIMIT orders are not active yet."});
     if(!Number.isSafeInteger(quantity)||quantity<1||quantity>1000000)return res.status(400).json({error:"Quantity must be a whole number between 1 and 1,000,000."});
-    const orderId=makeOrderId(decoded.uid,idempotencyKey),requestFingerprint=makeOrderFingerprint({instrumentKey,side,quantity});
+    const orderId=makeOrderId(decoded.uid,idempotencyKey),requestFingerprint=makeOrderFingerprint({instrumentKey,side,quantity,orderType});
     const orderRef=db.collection("indianPaperOrders").doc(orderId);
     const priorOrder=await orderRef.get();
     if(priorOrder.exists){
@@ -282,7 +284,7 @@ app.post("/paper/orders",async(req,res)=>{
     const {executePaperOrderTransaction}=require("./lib/paper-order-transaction");
     const result=await executePaperOrderTransaction({
       db,accountRef,orderRef,uid:decoded.uid,requestFingerprint,
-      order:{uid:decoded.uid,requestFingerprint,instrumentKey,tradingSymbol:instrument.trading_symbol||instrument.name,exchange:instrument.exchange,side,quantity,executionPricePaise:pricePaise,quoteTimestampMs:tradeTimeMs,quoteAgeMs:quoteAge,orderType:"MARKET",status:"FILLED",simulationOnly:true},
+      order:{uid:decoded.uid,requestFingerprint,instrumentKey,tradingSymbol:instrument.trading_symbol||instrument.name,exchange:instrument.exchange,side,quantity,executionPricePaise:pricePaise,quoteTimestampMs:tradeTimeMs,quoteAgeMs:quoteAge,orderType,status:"FILLED",simulationOnly:true},
       pricePaise,publicPaperOrder,serverTimestamp:()=>FieldValue.serverTimestamp()
     });
     res.set("Cache-Control","private, no-store");
