@@ -220,7 +220,7 @@
   async function refreshPaperViews(){await Promise.all([loadPaperPortfolio(),loadPaperHistory(),loadDerivativePortfolio()]);}
   paperRefresh.addEventListener('click',refreshPaperViews);
 
-  let paperOrderSubmitting=false;
+  let paperOrderSubmitting=false,paperOrderSubmitSeq=0;
   function updatePaperButtons(){
     const allowed=!paperOrderSubmitting&&!!selected&&['NSE_EQ','BSE_EQ'].includes(selected.segment)&&selected.instrument_type==='EQ'&&!!window.ZENURA_MARKET_CONNECTOR?.getIdToken&&!!gateway;
     paperBuy.disabled=!allowed;paperSell.disabled=!allowed;
@@ -256,7 +256,7 @@
         return;
       }
     }
-    paperOrderSubmitting=true;updatePaperButtons();paperOrderStatus.textContent='Verifying fresh provider quote and processing simulated order…';
+    paperOrderSubmitting=true;const submitSeq=++paperOrderSubmitSeq;updatePaperButtons();paperOrderStatus.textContent='Verifying fresh provider quote and processing simulated order…';
     try{
       const token=await connector.getIdToken();
       if(connector.getUserId()!==uid)throw new Error('Account changed. Sign back into the original account to safely verify this pending order.');
@@ -272,7 +272,7 @@
       try{await loadPaperAccount();await refreshPaperViews();}
       catch(refreshError){if(connector.getUserId()===uid)paperOrderStatus.textContent=fillMessage+' Portfolio refresh failed; use Refresh to reload balances.';}
     }catch(error){if(connector.getUserId()===uid)paperOrderStatus.textContent=error.message||'Paper order failed.';}
-    finally{paperOrderSubmitting=false;updatePaperButtons();}
+    finally{if(submitSeq===paperOrderSubmitSeq){paperOrderSubmitting=false;updatePaperButtons();}}
   }
   paperBuy.addEventListener('click',()=>submitPaperOrder('BUY'));
   paperSell.addEventListener('click',()=>submitPaperOrder('SELL'));
@@ -367,7 +367,7 @@
     }catch(error){if(request===optionChainRequest&&connector.getUserId()===uid&&selected?.instrument_key===instrumentKey&&optionExpiry.value===expiry)optionStatus.textContent=error.message||'Option chain request failed.';}
     finally{if(request===optionChainRequest)optionButton.disabled=false;}
   }
-  let derivativeOrderSubmitting=false;
+  let derivativeOrderSubmitting=false,derivativeOrderSubmitSeq=0;
   async function submitDerivativeOrder(instrumentKey,type,strike,side='BUY'){
     if(derivativeOrderSubmitting)return;
     const connector=window.ZENURA_MARKET_CONNECTOR,uid=connector?.getUserId?.(),chainRequest=optionChainRequest,underlyingKey=selected?.instrument_key,expiry=optionExpiry.value;
@@ -391,7 +391,7 @@
       optionStatus.textContent='Browser session storage is unavailable. The option order was not sent because safe retry protection could not be saved.';
       return;
     }
-    derivativeOrderSubmitting=true;optionButton.disabled=true;optionStatus.textContent='Verifying live option quote and placing simulated '+type+' '+side+'…';
+    derivativeOrderSubmitting=true;const submitSeq=++derivativeOrderSubmitSeq;optionButton.disabled=true;optionStatus.textContent='Verifying live option quote and placing simulated '+type+' '+side+'…';
     try{
       const token=await connector.getIdToken();
       if(connector.getUserId()!==uid)throw new Error('Account changed. Sign back into the original account to safely verify this pending option order.');
@@ -408,7 +408,7 @@
       try{await loadPaperAccount();await refreshPaperViews();}
       catch(refreshError){if(connector.getUserId()===uid)optionStatus.textContent=fillMessage+' Portfolio refresh failed; use Refresh to reload balances.';}
     }catch(error){if(connector.getUserId()===uid)optionStatus.textContent=error.message||'Derivative paper order failed.';}
-    finally{derivativeOrderSubmitting=false;if(connector.getUserId()===uid&&optionChainRequest===chainRequest)optionButton.disabled=false;}
+    finally{if(submitSeq===derivativeOrderSubmitSeq){derivativeOrderSubmitting=false;if(connector.getUserId()===uid&&optionChainRequest===chainRequest)optionButton.disabled=false;}}
   }
   optionButton.addEventListener('click',loadOptionChain);
 
@@ -540,6 +540,7 @@
     selected=null;lastQuoteText='';reconnectAttempt=0;
     ++watchlistLoadSeq;++watchQuoteSeq;++watchlistEditSeq;++paperAccountRequest;++paperPortfolioRequest;
     ++paperHistoryLoadSeq;++derivativePortfolioRequest;++optionChainRequest;++futuresMarginRequest;++chartRequest;
+    ++paperOrderSubmitSeq;++derivativeOrderSubmitSeq;paperOrderSubmitting=false;derivativeOrderSubmitting=false;
     chart.textContent='';chartStatus.textContent='Sign in to load historical candles';
     futuresMarginStatus.textContent='Sign in to request broker margin preview.';
     paperHistoryCursor=null;paperHistoryHasMore=false;paperHistoryLoading=false;
