@@ -5,6 +5,7 @@ const assert=require("node:assert/strict");
 const {Firestore,FieldValue}=require("@google-cloud/firestore");
 const {executePaperOrderTransaction}=require("../lib/paper-order-transaction");
 const {consumeMarginPreviewSlot}=require("../lib/margin-preview-rate-limit");
+const {mergeWatchlistUpdate}=require("../lib/watchlists");
 
 const emulatorHost=process.env.FIRESTORE_EMULATOR_HOST;
 const integrationTest=emulatorHost?test:test.skip;
@@ -312,5 +313,37 @@ integrationTest("Firestore emulator isolates stream leases and disconnect cleanu
   assert.equal(await releaseStreamLease(db,uidB,"lease-b"),true);
   assert.equal((await refB.get()).exists,false);
   assert.equal((await refA.get()).data().revoked,true);
+ }finally{await clean([refA,refB]);}
+});
+
+
+integrationTest("Firestore emulator isolates named watchlists across different UIDs",async()=>{
+ const id=crypto.randomUUID();
+ const uidA="watchlist-user-a-"+id,uidB="watchlist-user-b-"+id;
+ const refA=db.collection("indianMarketWatchlists").doc(uidA);
+ const refB=db.collection("indianMarketWatchlists").doc(uidB);
+ const initialA={uid:uidA,watchlists:{"My Stocks":["NSE_EQ|AAA"],Banking:["NSE_EQ|BANKA"]}};
+ const initialB={uid:uidB,watchlists:{"My Stocks":["NSE_EQ|BBB"],Banking:["NSE_EQ|BANKB"]}};
+ try{
+  await Promise.all([refA.set(initialA),refB.set(initialB)]);
+  await Promise.all([
+   db.runTransaction(async tx=>{
+    const snap=await tx.get(refA);
+    const data=snap.exists?snap.data():{};
+    tx.set(refA,{uid:uidA,watchlists:mergeWatchlistUpdate(data,"Banking",["NSE_EQ|BANKA2"])},{merge:true});
+   }),
+   db.runTransaction(async tx=>{
+    const snap=await tx.get(refB);
+    const data=snap.exists?snap.data():{};
+    tx.set(refB,{uid:uidB,watchlists:mergeWatchlistUpdate(data,"My Stocks",["NSE_EQ|BBB2"])},{merge:true});
+   })
+  ]);
+  const [storedA,storedB]=await Promise.all([refA.get(),refB.get()]);
+  assert.equal(storedA.data().uid,uidA);
+  assert.equal(storedB.data().uid,uidB);
+  assert.deepEqual(storedA.data().watchlists["My Stocks"],["NSE_EQ|AAA"]);
+  assert.deepEqual(storedA.data().watchlists.Banking,["NSE_EQ|BANKA2"]);
+  assert.deepEqual(storedB.data().watchlists["My Stocks"],["NSE_EQ|BBB2"]);
+  assert.deepEqual(storedB.data().watchlists.Banking,["NSE_EQ|BANKB"]);
  }finally{await clean([refA,refB]);}
 });
