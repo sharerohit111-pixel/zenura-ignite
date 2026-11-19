@@ -60,6 +60,26 @@ jobs:
           node -e "JSON.parse(require('node:fs').readFileSync('firestore.indexes.json','utf8'))"
       - name: Install gateway test dependencies
         run: npm install --prefix market-gateway --ignore-scripts --no-audit --no-fund
+      - name: Report gateway dependency audit
+        run: |
+          npm audit --prefix market-gateway --json > "$RUNNER_TEMP/market-gateway-npm-audit.json" || true
+          node -e "
+            const report = require(process.env.RUNNER_TEMP + '/market-gateway-npm-audit.json');
+            const vulnerabilities = report.vulnerabilities || {};
+            console.log(JSON.stringify({
+              metadata: report.metadata?.vulnerabilities || {},
+              packages: Object.entries(vulnerabilities).map(([name, item]) => ({
+                name,
+                severity: item.severity,
+                direct: item.isDirect,
+                range: item.range,
+                via: item.via.map(entry => typeof entry === 'string' ? entry : {
+                  title: entry.title, url: entry.url, range: entry.range
+                }),
+                fixAvailable: item.fixAvailable
+              }))
+            }, null, 2));
+          "
       - name: Set up Java for Firestore emulator
         uses: actions/setup-java@v4
         with:
