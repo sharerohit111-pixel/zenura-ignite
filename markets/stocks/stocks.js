@@ -250,7 +250,7 @@
       const fillMessage=side+' '+qty+' '+(data.tradingSymbol||tradingSymbol)+' filled at '+inrPaise(data.executionPricePaise)+' · Simulated only';
       paperOrderStatus.textContent=fillMessage;
       try{await loadPaperAccount();await refreshPaperViews();}
-      catch(refreshError){paperOrderStatus.textContent=fillMessage+' Portfolio refresh failed; use Refresh to reload balances.';}
+      catch(refreshError){if(connector.getUserId()===uid)paperOrderStatus.textContent=fillMessage+' Portfolio refresh failed; use Refresh to reload balances.';}
     }catch(error){if(connector.getUserId()===uid)paperOrderStatus.textContent=error.message||'Paper order failed.';}
     finally{paperOrderSubmitting=false;updatePaperButtons();}
   }
@@ -381,7 +381,7 @@
       const fillMessage='SIMULATED '+side+' FILLED · '+data.tradingSymbol+' · '+data.quantity+' units · Premium '+inrPaise(data.grossPaise)+' · Estimated charges '+inrPaise(data.chargesPaise)+' · '+(side==='BUY'?'Total debit '+inrPaise(data.totalDebitPaise):'Net proceeds '+inrPaise(data.netCreditPaise))+'.';
       optionStatus.textContent=fillMessage;
       try{await loadPaperAccount();await refreshPaperViews();}
-      catch(refreshError){optionStatus.textContent=fillMessage+' Portfolio refresh failed; use Refresh to reload balances.';}
+      catch(refreshError){if(connector.getUserId()===uid)optionStatus.textContent=fillMessage+' Portfolio refresh failed; use Refresh to reload balances.';}
     }catch(error){if(connector.getUserId()===uid)optionStatus.textContent=error.message||'Derivative paper order failed.';}
     finally{derivativeOrderSubmitting=false;optionButton.disabled=false;}
   }
