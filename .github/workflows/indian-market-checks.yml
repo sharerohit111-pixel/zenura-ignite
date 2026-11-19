@@ -33,6 +33,7 @@ on:
       - "firestore.rules"
       - "firestore.indexes.json"
       - ".github/workflows/indian-market-checks.yml"
+      - ".github/workflows/deploy-firebase-rules.yml"
   push:
     branches: ["feature/indian-stock-market", "reconcile/indian-stock-market-main-sync"]
     paths:
@@ -65,6 +66,7 @@ on:
       - "firestore.rules"
       - "firestore.indexes.json"
       - ".github/workflows/indian-market-checks.yml"
+      - ".github/workflows/deploy-firebase-rules.yml"
   workflow_dispatch:
 
 permissions:
@@ -127,6 +129,7 @@ jobs:
           node -e "JSON.parse(require('node:fs').readFileSync('firestore.indexes.json','utf8'))"
           node -e "if (JSON.parse(require('node:fs').readFileSync('firebase.json','utf8')).storage?.rules !== 'storage.rules') throw new Error('Firebase Storage rules must be configured.')"
           test -s storage.rules
+          node -e "const r=require('node:fs').readFileSync('storage.rules','utf8'); for (const token of ['isZenuraAdmin()', 'request.resource.contentType.matches(\'image/.*\')', '10 * 1024 * 1024', '100 * 1024 * 1024']) if (!r.includes(token)) throw new Error('Storage rules missing required media restriction: '+token)"
           test -s digital-products-data.js
           test -s digital-products.css
       - name: Guard Firebase deployment scope
