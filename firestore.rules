@@ -90,10 +90,17 @@ service cloud.firestore {
     match /publicCatalog/{catalogId} {
       allow get, list: if resource.data.published == true || isZenuraAdmin();
       allow create, update: if isZenuraAdmin()
-        && request.resource.data.keys().hasOnly(["categories", "published", "updatedAt", "updatedBy"])
-        && request.resource.data.keys().hasAll(["categories", "published", "updatedAt", "updatedBy"])
-        && request.resource.data.categories is list
-        && request.resource.data.categories.size() <= 30
+        && request.resource.data.keys().hasOnly(["categories", "products", "published", "updatedAt", "updatedBy"])
+        && request.resource.data.keys().hasAll(["published", "updatedAt", "updatedBy"])
+        && (
+          ("categories" in request.resource.data
+            && request.resource.data.categories is list
+            && request.resource.data.categories.size() <= 30)
+          ||
+          ("products" in request.resource.data
+            && request.resource.data.products is list
+            && request.resource.data.products.size() <= 20)
+        )
         && request.resource.data.published is bool
         && request.resource.data.updatedBy == request.auth.token.email
         && request.resource.data.updatedAt == request.time;
