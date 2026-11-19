@@ -61,14 +61,15 @@ jobs:
           node -e "JSON.parse(require('node:fs').readFileSync('firestore.indexes.json','utf8'))"
       - name: Install gateway test dependencies
         run: npm install --prefix market-gateway --ignore-scripts --no-audit --no-fund
-      - name: Report gateway dependency audit
+      - name: Enforce gateway dependency audit
         run: |
-          npm audit --prefix market-gateway --json > "$RUNNER_TEMP/market-gateway-npm-audit.json" || true
+          npm audit --prefix market-gateway --json > "$RUNNER_TEMP/market-gateway-npm-audit.json"
           node -e "
             const report = require(process.env.RUNNER_TEMP + '/market-gateway-npm-audit.json');
             const vulnerabilities = report.vulnerabilities || {};
+            const summary = report.metadata?.vulnerabilities || {};
             console.log(JSON.stringify({
-              metadata: report.metadata?.vulnerabilities || {},
+              metadata: summary,
               packages: Object.entries(vulnerabilities).map(([name, item]) => ({
                 name,
                 severity: item.severity,
@@ -80,6 +81,9 @@ jobs:
                 fixAvailable: item.fixAvailable
               }))
             }, null, 2));
+            if ((summary.total || 0) > 0) {
+              throw new Error('Gateway dependency audit found ' + summary.total + ' vulnerability/vulnerabilities.');
+            }
           "
       - name: Set up Java for Firestore emulator
         uses: actions/setup-java@v6
