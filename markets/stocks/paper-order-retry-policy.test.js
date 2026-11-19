@@ -2,7 +2,7 @@
 const test=require("node:test");
 const assert=require("node:assert/strict");
 const {
-  canRetryPendingPaperOrder,readPendingPaperOrder,writePendingPaperOrder,clearPendingPaperOrder
+  userScopedStorageKey,canRetryPendingPaperOrder,readPendingPaperOrder,writePendingPaperOrder,clearPendingPaperOrder
 }=require("./paper-order-retry-policy");
 
 const key="123e4567-e89b-42d3-a456-426614174000";
@@ -14,6 +14,14 @@ function memoryStorage(){
     removeItem:name=>values.delete(name)
   };
 }
+
+test("scopes pending order storage keys to the authenticated user",()=>{
+  assert.equal(userScopedStorageKey("paper-pending","user-a"),"paper-pending:user-a");
+  assert.equal(userScopedStorageKey("paper-pending","user b"),"paper-pending:user%20b");
+  assert.notEqual(userScopedStorageKey("paper-pending","user-a"),userScopedStorageKey("paper-pending","user-b"));
+  assert.equal(userScopedStorageKey("paper-pending",""),null);
+  assert.equal(userScopedStorageKey("", "user-a"),null);
+});
 
 test("allows retry only for the same pending paper order fingerprint",()=>{
   const fingerprint=JSON.stringify({instrument_key:"NSE_EQ|INE001A01036",side:"BUY",quantity:2});
