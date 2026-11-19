@@ -96,8 +96,10 @@ window.ZENURA_MARKET_CONNECTOR = {
   }
 };
 onAuthStateChanged(auth, async user => {
-  await refreshStatus();
+  // Clear the previous account's private UI immediately on every auth transition.
+  // Do not wait for a network-backed connection-status lookup before notifying the market page.
   window.dispatchEvent(new CustomEvent("zenura-market-auth-ready", { detail: { signedIn: !!user } }));
+  await refreshStatus();
 });
 if (new URLSearchParams(location.search).get("upstox") === "connected") {
   history.replaceState({}, "", location.pathname);
