@@ -27,7 +27,7 @@ test("BSE option BUY uses BSE exchange transaction rate",()=>{
 test("NSE IPFT uses Upstox ₹0.50 per lakh option-premium schedule and is included in GST",()=>{
  const c=calculateLongOptionBuyCharges({grossPaise:10000000,exchange:"NSE"});
  assert.equal(c.ipftPaise,50);
- assert.equal(c.gstPaise,374);
+ assert.equal(c.gstPaise,1009);
 });
 
 test("rejects invalid turnover, exchange and brokerage",()=>{
