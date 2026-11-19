@@ -73,19 +73,19 @@ jobs:
           node --input-type=module --check < solutions-catalogue.js
       - name: Validate product catalogue page local assets
         run: |
-          node -e "
-            const fs = require('node:fs');
-            for (const page of ['index.html', 'our-products.html']) {
-              const html = fs.readFileSync(page, 'utf8');
-              const refs = [...html.matchAll(/(?:src|href)=\\\"([^\\\"]+)\\\"/g)]
-                .map(match => match[1].split('?')[0])
-                .filter(ref => ref && !/^(?:https?:|mailto:|#|\\/\\/)/i.test(ref));
-              for (const ref of refs) {
-                if (!fs.existsSync(ref)) throw new Error(page + ' references missing local asset: ' + ref);
-              }
+          node <<'NODE'
+          const fs = require('node:fs');
+          for (const page of ['index.html', 'our-products.html']) {
+            const html = fs.readFileSync(page, 'utf8');
+            const refs = [...html.matchAll(/(?:src|href)="([^"]+)"/g)]
+              .map(match => match[1].split(/[?#]/, 1)[0])
+              .filter(ref => ref && !/^(?:https?:|mailto:|#|\/\/)/i.test(ref));
+            for (const ref of refs) {
+              if (!fs.existsSync(ref)) throw new Error(page + ' references missing local asset: ' + ref);
             }
-            console.log('Product catalogue pages reference existing local assets.');
-          "
+          }
+          console.log('Product catalogue pages reference existing local assets.');
+          NODE
       - name: Check browser module syntax
         run: node --check markets/stocks/stocks.js
       - name: Check SSE parser syntax
