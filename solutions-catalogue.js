@@ -3,7 +3,7 @@ import { db } from "./firebase-client.js";
 import { doc, getDoc } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore.js";
 const root=document.getElementById("solution-catalogue");
 const clone=x=>JSON.parse(JSON.stringify(x));
-const esc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const esc=v=>{let value=String(v??"");if(window.ZenuraI18n?.getLanguage?.()==="en")value=window.ZenuraI18n.toEnglish?.(value)??value;return value.replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));};
 const money=n=>"₹"+Number(n||0).toLocaleString("en-IN");
 let categories=clone(DEFAULT_SOLUTIONS),active="all";
 function render(){
