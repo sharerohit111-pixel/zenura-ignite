@@ -16,7 +16,7 @@ on:
       - "firestore.indexes.json"
       - ".github/workflows/indian-market-checks.yml"
   push:
-    branches: ["feature/indian-stock-market"]
+    branches: ["feature/indian-stock-market", "reconcile/indian-stock-market-main-sync"]
     paths:
       - "markets/stocks/**"
       - "crypto/index.html"
