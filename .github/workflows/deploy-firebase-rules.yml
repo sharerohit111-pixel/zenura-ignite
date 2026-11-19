@@ -35,7 +35,7 @@ jobs:
       - name: Install Firebase CLI
         run: npm install --global firebase-tools
 
-      - name: Deploy Firestore security rules
+      - name: Deploy Firestore and Storage security rules
         env:
           GOOGLE_APPLICATION_CREDENTIALS: ${{ steps.auth.outputs.credentials_file_path }}
         run: firebase deploy --only firestore:rules,storage --project zenura-ignite-technologies --non-interactive
