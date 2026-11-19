@@ -47,6 +47,35 @@
     'Igniting innovation. Building the future.':'नवाचार को ऊर्जा देना। भविष्य का निर्माण करना।','Designed & Developed by':'डिज़ाइन और विकास','BACK TO TOP ↑':'ऊपर जाएँ ↑'
   };
 
+  Object.assign(translations, {
+    'Medicine shop and pharmacy':'दवा दुकान और मेडिकल स्टोर',
+    'Grocery stores, bookstores and small malls':'किराना, बुकस्टोर और छोटे मॉल',
+    'Car/bike garages and service centres':'कार/बाइक गैराज और सर्विस सेंटर',
+    'Coaching institutes and schools up to Class 12':'कोचिंग संस्थान और कक्षा 10वीं–12वीं तक के स्कूल',
+    'A simple digital solution for medicine lists, customer information and everyday store operations.':'दवा सूची, ग्राहक जानकारी और रोज़मर्रा के स्टोर संचालन के लिए सरल डिजिटल समाधान।',
+    'A simple solution for local grocery stores to display products and receive order enquiries.':'स्थानीय किराना दुकान के लिए उत्पाद सूची और ऑर्डर enquiry वाला सरल समाधान।',
+    'A website to showcase books, stationery and educational materials.':'किताबों, स्टेशनरी और शैक्षणिक सामग्री की सूची दिखाने के लिए वेबसाइट।',
+    'A digital directory for a small mall or multiple stores in one location.':'छोटे मॉल या एक ही स्थान पर कई दुकानों की डिजिटल डायरेक्टरी।',
+    'A solution for local garages with service listings, enquiries and appointment requests.':'स्थानीय गैराज के लिए सर्विस सूची, enquiry और appointment request वाला समाधान।',
+    'For coaching centres to present courses, batches, faculty and admission enquiries.':'कोचिंग सेंटर के courses, batches, faculty और admission enquiries के लिए।',
+    'A website for small and medium schools to share classes, facilities, notices and admission information.':'छोटे/मध्यम स्कूल के लिए कक्षाओं, सुविधाओं, सूचनाओं और प्रवेश जानकारी की वेबसाइट।',
+    'Mobile-friendly website':'मोबाइल-अनुकूल वेबसाइट',
+    'Medicine and product catalogue':'दवा और उत्पाद सूची',
+    'Store address and contact details':'दुकान का पता व संपर्क',
+    'WhatsApp enquiry button':'WhatsApp enquiry बटन',
+    'All Silver features':'Silver की सभी सुविधाएँ',
+    'Stock and expiry tracking module':'स्टॉक और एक्सपायरी रिकॉर्ड मॉड्यूल',
+    'Basic billing records':'बेसिक बिलिंग रिकॉर्ड',
+    'Customer enquiry management':'ग्राहक enquiry प्रबंधन',
+    'Store information and opening hours':'दुकान की जानकारी और समय',
+    'Product categories and catalogue':'उत्पाद श्रेणियाँ व सूची',
+    'WhatsApp order enquiries':'WhatsApp पर ऑर्डर enquiry',
+    'Mobile-friendly design':'मोबाइल-अनुकूल डिज़ाइन',
+    'Indicative project price':'Indicative project price',
+    'All sectors':'सभी क्षेत्र',
+    'View features & plan details ↗':'सुविधाएँ और प्लान देखें ↗',
+    'Request this solution ↗':'यह समाधान चुनें ↗'
+  });
   const originalText = new WeakMap();
   const originalHtml = new WeakMap();
   const originalAttributes = new WeakMap();
@@ -68,6 +97,9 @@
       const key = source.trim();
       if (Object.prototype.hasOwnProperty.call(translations, key)) {
         element.nodeValue = language === 'hi' ? source.replace(key, translations[key]) : source;
+      } else if (language === 'en') {
+        const english = Object.keys(translations).find(k => translations[k] === key);
+        if (english) element.nodeValue = source.replace(key, english);
       }
       return;
     }
