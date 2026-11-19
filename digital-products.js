@@ -27,7 +27,12 @@ if (root) {
     if (className) node.className = className;
     return node;
   };
-  const closeModal = () => document.getElementById("digital-product-modal")?.remove();
+  let activeEscapeHandler = null;
+  const closeModal = () => {
+    if (activeEscapeHandler) document.removeEventListener("keydown", activeEscapeHandler);
+    activeEscapeHandler = null;
+    document.getElementById("digital-product-modal")?.remove();
+  };
 
   function showDetails(product) {
     closeModal();
@@ -103,12 +108,10 @@ if (root) {
     backdrop.addEventListener("click", event => {
       if (event.target === backdrop) closeModal();
     });
-    document.addEventListener("keydown", function onEscape(event) {
-      if (event.key === "Escape") {
-        closeModal();
-        document.removeEventListener("keydown", onEscape);
-      }
-    });
+    activeEscapeHandler = event => {
+      if (event.key === "Escape") closeModal();
+    };
+    document.addEventListener("keydown", activeEscapeHandler);
     document.body.append(backdrop);
     close.focus();
   }
@@ -127,7 +130,7 @@ if (root) {
       card.className = "digital-product-card";
       const media = document.createElement("div");
       media.className = "digital-product-card-media";
-      const cover = image(product.imageUrl, product.name || "Product cover");
+      const cover = image(product.imageUrl || product.gallery?.[0], product.name || "Product cover");
       if (cover) media.append(cover);
       else media.append(text("span", "✦", "digital-product-placeholder"));
       card.append(media);
