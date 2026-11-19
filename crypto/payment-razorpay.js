@@ -14,7 +14,50 @@
     halfyear: {id:'month_6',label:'6 Months',amount:399,days:180},
     yearly: {id:'year_1',label:'1 Year',amount:799,days:365}
   };
-  let db, auth, qrPromise;
+  let db, auth, qrPromise, activePlan = null;
+  let paymentLanguage = localStorage.getItem('ziPaymentLanguage') === 'hi' ? 'hi' : 'en';
+  const tr = (en, hi) => paymentLanguage === 'hi' ? hi : en;
+  const PAYMENT_TEXT = {
+    intro:['Scan the QR using any UPI app. Payee details are shown by your UPI app after scanning.','किसी भी UPI ऐप से QR स्कैन करें। भुगतान पाने वाले की जानकारी आपका UPI ऐप स्कैन करने के बाद दिखाएगा।'],
+    qrNote:['QR payment only · No phone number or UPI ID is printed on this page. Your UPI app may display payee details from the QR.','केवल QR से भुगतान · इस पेज पर मोबाइल नंबर या UPI ID नहीं दिखाई जाती। QR स्कैन करने पर आपका UPI ऐप भुगतान पाने वाले की जानकारी दिखा सकता है।'],
+    utrLabel:['UPI Transaction ID / UTR','UPI ट्रांज़ैक्शन ID / UTR'],
+    utrPlaceholder:['Enter UTR after successful payment','सफल भुगतान के बाद UTR दर्ज करें'],
+    submit:['I HAVE PAID — SUBMIT UTR','मैंने भुगतान कर दिया — UTR जमा करें'],
+    adminIntro:['Approve only after matching the UTR and exact amount against the actual bank / UPI account credit. A screenshot or UTR alone is not proof.','UTR और सही राशि को बैंक / UPI खाते में प्राप्त वास्तविक भुगतान से मिलाने के बाद ही मंज़ूर करें। केवल स्क्रीनशॉट या UTR भुगतान का प्रमाण नहीं है।'],
+    adminRefresh:['REFRESH REQUESTS','रिक्वेस्ट रीफ्रेश करें'],
+    adminApprove:['VERIFY BANK CREDIT & APPROVE','बैंक भुगतान जाँचें और मंज़ूर करें'],
+    adminReject:['REJECT','अस्वीकार करें'],
+    preparing:['Preparing your secure payment QR…','आपका सुरक्षित पेमेंट QR तैयार हो रहा है…'],
+    afterPay:['After paying, enter the UTR shown in your UPI app. Premium activates only after the payment is checked against the merchant bank account.','भुगतान के बाद अपने UPI ऐप में दिखने वाला UTR दर्ज करें। मर्चेंट बैंक खाते में भुगतान की पुष्टि होने के बाद ही Premium सक्रिय होगा।'],
+    qrError:['QR could not be loaded. Check your internet connection and retry.','QR लोड नहीं हो पाया। इंटरनेट कनेक्शन जाँचकर दोबारा कोशिश करें।'],
+    submitted:['Payment reference submitted. Your Premium access will activate after the administrator verifies the actual bank credit. Please do not pay again.','भुगतान विवरण जमा हो गया है। एडमिन द्वारा बैंक में वास्तविक भुगतान की पुष्टि के बाद Premium सक्रिय होगा। कृपया दोबारा भुगतान न करें।'],
+    submitting:['Submitting payment reference…','भुगतान विवरण जमा किया जा रहा है…'],
+    invalidUtr:['Enter a valid UTR / transaction ID (8–40 letters or digits).','सही UTR / ट्रांज़ैक्शन ID दर्ज करें (8–40 अक्षर या अंक)।'],
+    signInAgain:['Please sign in again.','कृपया दोबारा लॉगिन करें।'],
+    duplicate:['This UTR has already been submitted. Contact support if this is your own earlier request.','यह UTR पहले ही जमा किया जा चुका है। यदि यह आपकी पिछली रिक्वेस्ट है तो सपोर्ट से संपर्क करें।'],
+    submittedStatus:['UPI payment request submitted — awaiting manual bank verification.','UPI भुगतान रिक्वेस्ट जमा है — बैंक से मैन्युअल पुष्टि बाकी है।'],
+    noPending:['No pending payment requests.','कोई लंबित भुगतान रिक्वेस्ट नहीं है।'],
+    loading:['Loading…','लोड हो रहा है…'],
+    loadError:['Could not load requests. Publish the updated Firestore rules and sign in as the verified admin.','रिक्वेस्ट लोड नहीं हो सकीं। अपडेटेड Firestore Rules पब्लिश करें और सत्यापित एडमिन से लॉगिन करें।']
+  };
+  const paymentText = key => tr(PAYMENT_TEXT[key][0], PAYMENT_TEXT[key][1]);
+  function applyPaymentLanguage() {
+    const set=(id,key)=>{const el=$(id);if(el)el.textContent=paymentText(key);};
+    set('ziQrIntro','intro');set('ziQrNote','qrNote');set('ziQrUtrLabel','utrLabel');
+    const input=$('ziQrUtr');if(input)input.placeholder=paymentText('utrPlaceholder');
+    const submit=$('ziQrSubmit');if(submit&&!submit.hidden)submit.textContent=paymentText('submit');
+    const toggle=$('ziQrLanguage');if(toggle){toggle.textContent=paymentLanguage==='en'?'हिंदी':'English';toggle.setAttribute('aria-label',paymentLanguage==='en'?'Switch to Hindi':'Switch to English');}
+    const adminIntro=$('ziQrAdminIntro');if(adminIntro)adminIntro.textContent=paymentText('adminIntro');
+    const refresh=$('ziQrAdminRefresh');if(refresh)refresh.textContent=paymentText('adminRefresh');
+    document.querySelectorAll('[data-zi-admin-approve]').forEach(el=>el.textContent=paymentText('adminApprove'));
+    document.querySelectorAll('[data-zi-admin-reject]').forEach(el=>el.textContent=paymentText('adminReject'));
+    if(activePlan)$('ziQrPrice').textContent='₹'+activePlan.amount+' · '+tr(activePlan.label,({'1 Month':'1 महीना','3 Months':'3 महीने','6 Months':'6 महीने','1 Year':'1 साल'})[activePlan.label]);
+  }
+  function togglePaymentLanguage() {
+    paymentLanguage=paymentLanguage==='en'?'hi':'en';
+    try{localStorage.setItem('ziPaymentLanguage',paymentLanguage);}catch(_){}
+    applyPaymentLanguage();
+  }
   const status = $('premiumStatus');
   const say = message => { if (status) status.textContent = message; };
   function services() {
@@ -42,7 +85,7 @@
     style.textContent = `
       #ziQrShade{position:fixed;inset:0;z-index:10050;background:#030914d9;display:none;align-items:center;justify-content:center;padding:14px}
       #ziQrShade.open{display:flex}#ziQrPanel{width:min(100%,430px);max-height:92dvh;overflow:auto;background:#0b1728;color:#eef5ff;border:1px solid #28435e;border-radius:20px;padding:20px;box-shadow:0 24px 80px #0009}
-      #ziQrPanel h2{font-size:20px;margin:0 0 6px}#ziQrPanel .zi-muted{font-size:12px;line-height:1.5;color:#9eb2c9}
+      #ziQrPanel h2{font-size:20px;margin:0 0 6px}#ziQrLanguage{background:#20344b;color:#eaf2fc;padding:9px 12px!important;font-size:12px}#ziQrPanel .zi-muted{font-size:12px;line-height:1.5;color:#9eb2c9}
       #ziQrPanel .zi-price{font-size:34px;font-weight:850;text-align:center;margin:12px 0}
       #ziQrCanvas{background:#fff;padding:12px;border-radius:14px;display:grid;place-items:center;width:264px;height:264px;max-width:100%;margin:12px auto}
       #ziQrCanvas img{max-width:240px;max-height:240px}#ziQrCanvas canvas{max-width:240px;max-height:240px}
@@ -59,11 +102,11 @@
     const shade = document.createElement('div');
     shade.id = 'ziQrShade';
     shade.innerHTML = `<section id="ziQrPanel" role="dialog" aria-modal="true" aria-label="ZENURA QR payment">
-      <div style="display:flex;justify-content:space-between;align-items:center;gap:12px"><h2>ZENURA IGNITE</h2><button id="ziQrClose" type="button">✕</button></div>
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><h2>ZENURA IGNITE</h2><div style="display:flex;align-items:center;gap:7px"><button id="ziQrLanguage" type="button" aria-label="Switch language">हिंदी</button><button id="ziQrClose" type="button">✕</button></div></div>
       <p class="zi-muted" id="ziQrIntro">Scan the QR using any UPI app. Payee details are shown by your UPI app after scanning.</p>
       <div class="zi-price" id="ziQrPrice"></div><div id="ziQrCanvas" aria-label="UPI payment QR code"></div>
-      <p class="zi-muted" style="text-align:center">QR payment only · No phone number or UPI ID is printed on this page. Your UPI app may display payee details from the QR.</p>
-      <label for="ziQrUtr" style="font-size:13px;font-weight:750">UPI Transaction ID / UTR</label>
+      <p class="zi-muted" id="ziQrNote" style="text-align:center">QR payment only · No phone number or UPI ID is printed on this page. Your UPI app may display payee details from the QR.</p>
+      <label id="ziQrUtrLabel" for="ziQrUtr" style="font-size:13px;font-weight:750">UPI Transaction ID / UTR</label>
       <input id="ziQrUtr" inputmode="text" autocomplete="off" maxlength="40" placeholder="Enter UTR after successful payment">
       <button id="ziQrSubmit" type="button">I HAVE PAID — SUBMIT UTR</button>
       <p class="zi-muted" id="ziQrMessage" aria-live="polite"></p>
@@ -71,6 +114,8 @@
     </section>`;
     document.body.appendChild(shade);
     $('ziQrClose').onclick = close;
+    $('ziQrLanguage').onclick = togglePaymentLanguage;
+    applyPaymentLanguage();
     shade.addEventListener('click',e=>{if(e.target===shade)close();});
   }
   function open() { ensureModal(); $('ziQrShade').classList.add('open'); }
@@ -89,38 +134,38 @@
     if(!user){say('Please sign in before purchasing.');const shade=$('authShade');if(shade)shade.classList.add('open');return;}
     open();
     $('ziQrAdmin').hidden=true;$('ziQrUtr').hidden=false;$('ziQrUtr').previousElementSibling.hidden=false;$('ziQrSubmit').hidden=false;$('ziQrSubmit').textContent='I HAVE PAID — SUBMIT UTR';
-    $('ziQrPrice').textContent='₹'+plan.amount+' · '+plan.label;
-    $('ziQrMessage').textContent='Preparing your secure payment QR…';
+    activePlan=plan;applyPaymentLanguage();
+    $('ziQrMessage').textContent=paymentText('preparing');
     $('ziQrUtr').value=''; $('ziQrSubmit').disabled=true;
     $('ziQrCanvas').innerHTML='';
     try {
       await loadQrLibrary();
       new QRCode($('ziQrCanvas'),{text:upiUri(plan),width:240,height:240,colorDark:'#111827',colorLight:'#ffffff',correctLevel:QRCode.CorrectLevel.M});
-      $('ziQrMessage').textContent='After paying, enter the UTR shown in your UPI app. Premium activates only after the payment is checked against the merchant bank account.';
+      $('ziQrMessage').textContent=paymentText('afterPay');
       $('ziQrSubmit').disabled=false;
     } catch(error) {
       console.error('QR creation failed',error);
-      $('ziQrMessage').textContent='QR could not be loaded. Check your internet connection and retry.';
+      $('ziQrMessage').textContent=paymentText('qrError');
     }
     $('ziQrSubmit').onclick=()=>submitUtr(key,plan);
   }
   async function submitUtr(key,plan) {
     const user=auth.currentUser, utr=$('ziQrUtr').value.trim();
-    if(!user)return $('ziQrMessage').textContent='Please sign in again.';
-    if(!/^[A-Za-z0-9-]{8,40}$/.test(utr))return $('ziQrMessage').textContent='Enter a valid UTR / transaction ID (8–40 letters or digits).';
+    if(!user)return $('ziQrMessage').textContent=paymentText('signInAgain');
+    if(!/^[A-Za-z0-9-]{8,40}$/.test(utr))return $('ziQrMessage').textContent=paymentText('invalidUtr');
     $('ziQrSubmit').disabled=true;
-    $('ziQrMessage').textContent='Submitting payment reference…';
+    $('ziQrMessage').textContent=paymentText('submitting');
     try {
       const ownRequests=await db.collection('payments').where('uid','==',user.uid).get();
-      if(ownRequests.docs.some(doc=>(doc.data().utr||'').toLowerCase()===utr.toLowerCase()))throw new Error('This UTR has already been submitted. Contact support if this is your own earlier request.');
+      if(ownRequests.docs.some(doc=>(doc.data().utr||'').toLowerCase()===utr.toLowerCase()))throw new Error(paymentText('duplicate'));
       await db.collection('payments').add({
         uid:user.uid,email:user.email||'',planId:plan.id,planLabel:plan.label,
         amount:plan.amount,days:plan.days,utr,status:'pending',
         createdAt:firebase.firestore.FieldValue.serverTimestamp()
       });
-      $('ziQrMessage').textContent='Payment reference submitted. Your Premium access will activate after the administrator verifies the actual bank credit. Please do not pay again.';
+      $('ziQrMessage').textContent=paymentText('submitted');
       $('ziQrSubmit').textContent='SUBMITTED';
-      say('UPI payment request submitted — awaiting manual bank verification.');
+      say(paymentText('submittedStatus'));
     } catch(error) {
       console.error('UPI payment submission failed',error);
       $('ziQrMessage').textContent=error.message||'Could not submit. Please retry later.';
@@ -143,28 +188,28 @@
     $('ziQrPrice').textContent='ADMIN · UPI PAYMENT APPROVALS';
     $('ziQrCanvas').innerHTML='';
     $('ziQrUtr').hidden=true;$('ziQrUtr').previousElementSibling.hidden=true;$('ziQrSubmit').hidden=true;
-    $('ziQrIntro').textContent='Approve only after matching the UTR and exact amount against the actual bank / UPI account credit. A screenshot or UTR alone is not proof.';
-    const admin=$('ziQrAdmin');admin.hidden=false;admin.innerHTML='<button id="ziQrAdminRefresh" type="button">REFRESH REQUESTS</button><div id="ziQrAdminList" class="zi-muted">Loading…</div>';
+    $('ziQrIntro').textContent=paymentText('adminIntro');
+    const admin=$('ziQrAdmin');admin.hidden=false;admin.innerHTML='<button id="ziQrAdminRefresh" type="button">REFRESH REQUESTS</button><div id="ziQrAdminList" class="zi-muted">Loading…</div>';applyPaymentLanguage();
     $('ziQrClose').onclick=close;
     $('ziQrAdminRefresh').onclick=loadAdminRequests;
     await loadAdminRequests();
   }
   async function loadAdminRequests() {
-    const list=$('ziQrAdminList');if(!list)return;list.textContent='Loading…';
+    const list=$('ziQrAdminList');if(!list)return;list.textContent=paymentText('loading');
     try {
       const snap=await db.collection('payments').where('status','==','pending').limit(50).get();
       list.innerHTML='';
-      if(snap.empty){list.textContent='No pending payment requests.';return;}
+      if(snap.empty){list.textContent=paymentText('noPending');return;}
       snap.docs.forEach(doc=>{
         const p=doc.data(),card=document.createElement('article');card.className='zi-admin-card';
         const detail=document.createElement('div');
         detail.textContent=(p.planLabel||'Plan')+' · ₹'+p.amount+' | '+(p.email||'—')+' | UTR: '+(p.utr||'—');
-        const yes=document.createElement('button');yes.type='button';yes.textContent='VERIFY BANK CREDIT & APPROVE';
-        const no=document.createElement('button');no.type='button';no.className='zi-reject';no.textContent='REJECT';
+        const yes=document.createElement('button');yes.type='button';yes.dataset.ziAdminApprove='1';yes.textContent=paymentText('adminApprove');
+        const no=document.createElement('button');no.type='button';no.className='zi-reject';no.dataset.ziAdminReject='1';no.textContent=paymentText('adminReject');
         yes.onclick=()=>reviewPayment(doc.id,p,true,yes,no);no.onclick=()=>reviewPayment(doc.id,p,false,yes,no);
         card.append(detail,yes,no);list.append(card);
       });
-    } catch(error){console.error(error);list.textContent='Could not load requests. Publish the updated Firestore rules and sign in as the verified admin.';}
+    } catch(error){console.error(error);list.textContent=paymentText('loadError');}
   }
   async function reviewPayment(id,p,approve,yes,no) {
     if(!auth.currentUser||(auth.currentUser.email||'').toLowerCase()!==ADMIN_EMAIL)return say('Admin access denied.');
