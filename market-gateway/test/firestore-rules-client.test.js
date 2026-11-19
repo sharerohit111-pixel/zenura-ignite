@@ -16,7 +16,8 @@ const {
   getDocs,
   setDoc,
   updateDoc,
-  deleteDoc
+  deleteDoc,
+  serverTimestamp
 } = require("firebase/firestore");
 
 const emulatorAddress = process.env.FIRESTORE_EMULATOR_HOST;
@@ -125,6 +126,56 @@ integrationTest("Firestore client rules preserve owner-only Premium entitlement 
   await assertFails(getDoc(doc(userB, "entitlements", "user-a")));
 });
 
+
+integrationTest("Firestore client rules protect digital product details and allow only the verified admin to publish", async () => {
+  await environment.withSecurityRulesDisabled(async (context) => {
+    const db = context.firestore();
+    await setDoc(doc(db, "publicCatalog", "digitalProducts"), {
+      published: true,
+      updatedBy: "sharerohit111@gmail.com",
+      updatedAt: new Date(),
+      products: [{
+        id: "zenura-ignite",
+        name: "ZENURA IGNITE",
+        description: "Paper trading practice",
+        details: "Virtual market simulator",
+        features: ["Paper Trading", "Paper Investing"],
+        imageUrl: "https://example.com/product.png",
+        gallery: [],
+        tags: [],
+        visible: true
+      }]
+    });
+  });
+
+  const anonymous = environment.unauthenticatedContext().firestore();
+  const customer = environment.authenticatedContext("customer-a", {
+    email: "customer@example.com",
+    email_verified: true
+  }).firestore();
+  const admin = environment.authenticatedContext("admin-a", {
+    email: "sharerohit111@gmail.com",
+    email_verified: true
+  }).firestore();
+  const publishedRef = doc(anonymous, "publicCatalog", "digitalProducts");
+
+  await assertSucceeds(getDoc(publishedRef));
+  await assertFails(setDoc(doc(customer, "publicCatalog", "digitalProducts"), {
+    products: [], published: true, updatedBy: "customer@example.com", updatedAt: serverTimestamp()
+  }));
+  await assertSucceeds(setDoc(doc(admin, "publicCatalog", "digitalProducts"), {
+    products: [{ id: "railway-mitra", name: "Railway Mitra", features: [], gallery: [], tags: [] }],
+    published: true,
+    updatedBy: "sharerohit111@gmail.com",
+    updatedAt: serverTimestamp()
+  }, { merge: true }));
+  await assertSucceeds(updateDoc(doc(admin, "publicCatalog", "digitalProducts"), {
+    published: false,
+    updatedAt: serverTimestamp()
+  }));
+  await assertFails(getDoc(publishedRef));
+  await assertSucceeds(getDoc(doc(admin, "publicCatalog", "digitalProducts")));
+});
 
 integrationTest("Firestore client rules keep published catalogue public and hidden catalogue admin-only", async () => {
   await environment.withSecurityRulesDisabled(async (context) => {
