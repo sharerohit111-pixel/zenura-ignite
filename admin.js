@@ -123,7 +123,13 @@ if(!isFirebaseConfigured()){loginButton.disabled=true;loginButton.textContent="F
 
 function setupAdminNavigation(){
  const tabs=[...document.querySelectorAll("[data-admin-tab]")],panes=[...document.querySelectorAll("[data-admin-pane]")];
- function activate(name){tabs.forEach(t=>t.classList.toggle("active",t.dataset.adminTab===name));panes.forEach(p=>p.classList.toggle("active",p.dataset.adminPane===name));}
- tabs.forEach(t=>t.addEventListener("click",()=>activate(t.dataset.adminTab)));
- document.querySelectorAll("[data-go-tab]").forEach(b=>b.addEventListener("click",()=>activate(b.dataset.goTab)));
+ function activate(name){
+  const target=panes.find(p=>p.dataset.adminPane===name);if(!target)return;
+  tabs.forEach(t=>{const selected=t.dataset.adminTab===name;t.classList.toggle("active",selected);t.setAttribute("aria-selected",String(selected));});
+  panes.forEach(p=>{const selected=p.dataset.adminPane===name;p.classList.toggle("active",selected);p.hidden=!selected;});
+  if(history.replaceState)history.replaceState(null,"","#"+name);
+ }
+ tabs.forEach(t=>t.addEventListener("click",event=>{event.preventDefault();activate(t.dataset.adminTab)}));
+ document.querySelectorAll("[data-go-tab]").forEach(b=>b.addEventListener("click",event=>{event.preventDefault();activate(b.dataset.goTab)}));
+ const requested=location.hash.replace("#","");activate(panes.some(p=>p.dataset.adminPane===requested)?requested:"overview");
 }
