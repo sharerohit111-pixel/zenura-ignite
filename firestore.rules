@@ -7,10 +7,63 @@ service cloud.firestore {
         && request.auth.token.email_verified == true;
     }
 
-    // ZENURA IGNITE Premium records are server-managed; clients cannot write them.
+    // Premium entitlement writes are restricted to the verified ZENURA administrator.
+    // The QR payment flow requires manual bank-credit verification before activation.
     match /entitlements/{uid} {
-      allow read: if request.auth != null && request.auth.uid == uid;
-      allow write: if false;
+      allow read: if request.auth != null && (request.auth.uid == uid || isZenuraAdmin());
+      allow create, update: if isZenuraAdmin()
+        && request.resource.data.keys().hasOnly([
+          "uid", "status", "planId", "currentPeriodStart", "currentPeriodEnd",
+          "autoRenew", "provider", "updatedAt"
+        ])
+        && request.resource.data.keys().hasAll([
+          "uid", "status", "planId", "currentPeriodStart", "currentPeriodEnd",
+          "autoRenew", "provider", "updatedAt"
+        ])
+        && request.resource.data.uid == uid
+        && request.resource.data.status == "premium"
+        && request.resource.data.planId in ["month_1", "month_3", "month_6", "year_1"]
+        && request.resource.data.currentPeriodStart is timestamp
+        && request.resource.data.currentPeriodEnd is timestamp
+        && request.resource.data.currentPeriodEnd > request.resource.data.currentPeriodStart
+        && request.resource.data.autoRenew == false
+        && request.resource.data.provider == "upi_qr_manual"
+        && request.resource.data.updatedAt == request.time;
+      allow delete: if false;
+    }
+    // A signed-in customer may submit their own UTR. Only the verified admin can review it.
+    match /payments/{paymentId} {
+      function validPlan(data) {
+        return (data.planId == "month_1" && data.planLabel == "1 Month" && data.amount == 99 && data.days == 30)
+          || (data.planId == "month_3" && data.planLabel == "3 Months" && data.amount == 199 && data.days == 90)
+          || (data.planId == "month_6" && data.planLabel == "6 Months" && data.amount == 399 && data.days == 180)
+          || (data.planId == "year_1" && data.planLabel == "1 Year" && data.amount == 799 && data.days == 365);
+      }
+      allow create: if request.auth != null
+        && request.resource.data.keys().hasOnly([
+          "uid", "email", "planId", "planLabel", "amount", "days",
+          "utr", "status", "createdAt"
+        ])
+        && request.resource.data.keys().hasAll([
+          "uid", "email", "planId", "planLabel", "amount", "days",
+          "utr", "status", "createdAt"
+        ])
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.email == request.auth.token.email
+        && validPlan(request.resource.data)
+        && request.resource.data.utr is string
+        && request.resource.data.utr.matches("^[A-Za-z0-9-]{8,40}$")
+        && request.resource.data.status == "pending"
+        && request.resource.data.createdAt == request.time;
+      allow get, list: if isZenuraAdmin()
+        || (request.auth != null && resource.data.uid == request.auth.uid);
+      allow update: if isZenuraAdmin()
+        && resource.data.status == "pending"
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["status", "reviewedAt", "reviewedBy"])
+        && request.resource.data.status in ["approved", "rejected"]
+        && request.resource.data.reviewedBy == request.auth.token.email
+        && request.resource.data.reviewedAt == request.time;
+      allow delete: if false;
     }
     match /paymentOrders/{orderId} {
       allow read, write: if false;
