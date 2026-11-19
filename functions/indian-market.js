@@ -5,6 +5,8 @@ const crypto = require("node:crypto");
 const { getFirestore, FieldValue, Timestamp } = require("firebase-admin/firestore");
 const { defineSecret } = require("firebase-functions/params");
 const { onCall, onRequest, HttpsError } = require("firebase-functions/v2/https");
+const { onSchedule } = require("firebase-functions/v2/scheduler");
+const { processPendingLimitOrders } = require("./lib/pending-limit-order-worker");
 const logger = require("firebase-functions/logger");
 const { connectionStatus } = require("./lib/upstox-connection-status");
 const { disconnectUpstoxAccount: disconnectUpstoxAccountForUser, isOAuthGenerationCurrent, connectionGeneration } = require("./lib/upstox-disconnect");
@@ -123,5 +125,63 @@ exports.getIndianMarketConnectionStatus = onCall(
     const uid=uidOf(req), snap=await db.collection("upstoxConnections").doc(uid).get();
     if(!snap.exists) return {connected:false,feedReady:false,status:"not_connected"};
     return connectionStatus(snap.data());
+  }
+);
+
+function decryptPendingUpstoxToken(envelope) {
+  if(!envelope||typeof envelope!=="object"||Array.isArray(envelope)||envelope.v!==1)
+    throw new Error("Invalid encrypted Upstox token envelope.");
+  const key=decodeUpstoxEncryptionKey(TOKEN_ENCRYPTION_KEY.value());
+  const decode=(value,length)=>{if(typeof value!=="string"||!value)throw new Error("Invalid encrypted token field.");const b=Buffer.from(value,"base64");if(b.toString("base64")!==value||(length&&b.length!==length))throw new Error("Invalid encrypted token field.");return b;};
+  const iv=decode(envelope.iv,12),tag=decode(envelope.tag,16),data=decode(envelope.data);
+  if(data.length<1||data.length>16384)throw new Error("Invalid encrypted token payload.");
+  const decipher=crypto.createDecipheriv("aes-256-gcm",key,iv);
+  decipher.setAuthTag(tag);
+  const plain=Buffer.concat([decipher.update(data),decipher.final()]);
+  const token=plain.toString("utf8");
+  if(!token.trim()||/[\\u0000-\\u001f\\u007f]/.test(token)||!Buffer.from(token,"utf8").equals(plain))throw new Error("Invalid decrypted Upstox token.");
+  return token;
+}
+function isIndianCashMarketOpen(nowMs) {
+  const parts=new Intl.DateTimeFormat("en-GB",{timeZone:"Asia/Kolkata",weekday:"short",hour:"2-digit",minute:"2-digit",hourCycle:"h23"}).formatToParts(new Date(nowMs));
+  const get=type=>parts.find(part=>part.type===type)?.value;
+  const weekday=get("weekday"),minutes=Number(get("hour"))*60+Number(get("minute"));
+  return !["Sat","Sun"].includes(weekday)&&minutes>=555&&minutes<=930;
+}
+async function fetchFreshPendingLimitQuote(order) {
+  if(!order||typeof order.uid!=="string"||typeof order.instrumentKey!=="string"||!order.instrumentKey)
+    throw new Error("Malformed pending LIMIT order identity.");
+  const connectionSnap=await db.collection("upstoxConnections").doc(order.uid).get();
+  if(!connectionSnap.exists)throw new Error("Upstox connection is unavailable.");
+  const connection=connectionSnap.data(),now=Date.now();
+  const expiry=connection?.expiresAt?.toMillis?.();
+  if(connection?.status!=="connected"||!connection.tokenCiphertext||!Number.isSafeInteger(expiry)||expiry<=now)
+    throw new Error("Upstox connection token is not usable.");
+  const accessToken=decryptPendingUpstoxToken(connection.tokenCiphertext);
+  const url="https://api.upstox.com/v3/market-quote/quotes?"+new URLSearchParams({instrument_key:order.instrumentKey});
+  const response=await fetch(url,{headers:{Authorization:"Bearer "+accessToken,Accept:"application/json"},signal:AbortSignal.timeout(12000)});
+  const payload=await response.json().catch(()=>({}));
+  if(!response.ok)throw new Error("Upstox quote request failed with status "+response.status+".");
+  const entry=Object.values(payload?.data||{}).find(value=>value?.instrument_token===order.instrumentKey);
+  const price=Number(entry?.last_price),timestampMs=Number(entry?.last_trade_time);
+  const pricePaise=Math.round(price*100),age=Date.now()-timestampMs;
+  if(!Number.isSafeInteger(timestampMs)||timestampMs<1||!Number.isFinite(price)||price<=0||
+    !Number.isSafeInteger(pricePaise)||pricePaise<1||age<0||age>15000)
+    throw new Error("Upstox quote is missing, stale, future-dated, or invalid.");
+  return {pricePaise,timestampMs};
+}
+exports.processPendingPaperLimitOrders = onSchedule(
+  {schedule:"every 1 minutes",timeZone:"Asia/Kolkata",region:REGION,secrets:[TOKEN_ENCRYPTION_KEY],maxInstances:1,timeoutSeconds:540},
+  async event => {
+    const now=Date.now();
+    if(!isIndianCashMarketOpen(now)){
+      logger.info("Pending LIMIT worker skipped outside Indian cash-market session.");
+      return;
+    }
+    const summary=await processPendingLimitOrders({
+      db,fetchQuote:fetchFreshPendingLimitQuote,nowMs:now,maxOrders:50,
+      serverTimestamp:()=>FieldValue.serverTimestamp(),logger
+    });
+    logger.info("Pending paper LIMIT worker completed",summary);
   }
 );
