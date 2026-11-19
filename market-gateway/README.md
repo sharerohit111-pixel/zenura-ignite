@@ -6,7 +6,7 @@ This service is a separate long-lived gateway for Upstox Market Data Feed V3. It
 - `UPSTOX_TOKEN_ENCRYPTION_KEY`: same base64-encoded 32-byte key used by Firebase Functions.
 - `MAX_INSTRUMENT_KEYS`: per-browser-session guardrail (default 100; must remain within provider limits).
 - `ALLOWED_ORIGINS`: comma-separated exact HTTPS origins allowed to call the gateway, e.g. `https://zenuraignite.com`; do not use `*`.
-- Cloud Run service account must have Firestore read access to `upstoxConnections` only as required.
+- Cloud Run must run as a dedicated service account with the Firestore database-level IAM role required for its Admin SDK operations. The gateway reads `upstoxConnections` and reads/writes `indianMarketWatchlists`, `indianPaperAccounts`, `indianPaperOrders`, `indianDerivativeOrders`, `indianMarketStreamLeases`, and `indianMarginPreviewLimits`. Firestore IAM is not collection-scoped, and Admin SDK calls bypass Firestore Security Rules: the rules protecting these collections block browser/client access but do not restrict this service account. Keep the service account dedicated to this gateway, grant no project-wide Owner/Editor role, and enforce collection-level access boundaries in the gateway code.
 
 ## Deploy
 Build and deploy this directory as a Cloud Run service. Set ingress/auth policy to allow the public HTTPS endpoint because Firebase ID token validation is performed in the service. Never disable application authentication. Set `UPSTOX_TOKEN_ENCRYPTION_KEY` from Secret Manager, not source control.
