@@ -1,4 +1,4 @@
-# ZENURA IGNITE — Crypto Paper Trading
+# ZENURA IGNITE — Paper Trading & Paper Investing
 
 This is an isolated app folder deployed alongside (not replacing) the ZENURA IGNITE website.
 
