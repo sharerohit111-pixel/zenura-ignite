@@ -2,9 +2,13 @@
 
 function invalid(message){throw Object.assign(new Error(message),{status:409});}
 function eligible(order,quote,nowMs){
-  if(!quote||!Number.isSafeInteger(quote.pricePaise)||quote.pricePaise<1||
+  if(!order||typeof order!=="object"||order.orderType!=="LIMIT"||order.status!=="PENDING"||order.simulationOnly!==true||
+    typeof order.uid!=="string"||!order.uid||typeof order.instrumentKey!=="string"||!order.instrumentKey||
+    !["BUY","SELL"].includes(order.side)||!Number.isSafeInteger(order.quantity)||order.quantity<1||order.quantity>1000000||
+    !Number.isSafeInteger(order.limitPricePaise)||order.limitPricePaise<1||
+    !quote||!Number.isSafeInteger(quote.pricePaise)||quote.pricePaise<1||
     !Number.isSafeInteger(quote.timestampMs)||quote.timestampMs<1||
-    quote.timestampMs>nowMs||nowMs-quote.timestampMs>15000)return false;
+    !Number.isSafeInteger(nowMs)||quote.timestampMs>nowMs||nowMs-quote.timestampMs>15000)return false;
   return order.side==="BUY"?quote.pricePaise<=order.limitPricePaise:quote.pricePaise>=order.limitPricePaise;
 }
 function validateAccount(account){
@@ -35,7 +39,7 @@ function calculateFill(account,order,pricePaise){
   const quantity=current.quantity,average=current.averagePricePaise;
   const costBasis=current.costBasisPaise===undefined?quantity*average:current.costBasisPaise;
   if(!Number.isSafeInteger(quantity)||quantity<0||!Number.isSafeInteger(average)||average<0||
-    !Number.isSafeInteger(costBasis)||costBasis<0||(quantity>0&&average<1))invalid("Existing paper position is invalid.");
+    !Number.isSafeInteger(costBasis)||costBasis<0||(quantity>0&&(average<1||costBasis<1||Math.round(costBasis/quantity)!==average)))invalid("Existing paper position is invalid.");
   if(order.side==="BUY"){
     const reserve=order.reservedCashPaise;
     if(!Number.isSafeInteger(reserve)||reserve<grossPaise||reservedCashPaise<reserve)invalid("LIMIT BUY cash reservation is inconsistent.");
