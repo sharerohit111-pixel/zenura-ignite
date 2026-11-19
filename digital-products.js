@@ -42,7 +42,7 @@ function bind(){
    img.src=p.imageUrl;
    img.alt=p.name+" product image";
    img.loading="eager";
-   img.addEventListener("click",()=>productModal(p),{once:true});
+   img.onclick=()=>productModal(p);
    img.style.cursor="pointer";
   }
  });
