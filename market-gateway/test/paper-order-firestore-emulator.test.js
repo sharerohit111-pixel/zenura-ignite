@@ -287,3 +287,30 @@ integrationTest("Firestore emulator allows adding to an existing derivative posi
   assert.equal(account.data().derivativePositions[derivativeInstrument.instrument_key].netQuantity,130);
  }finally{await clean([common.accountRef,common.orderRef]);}
 });
+
+
+integrationTest("Firestore emulator isolates stream leases and disconnect cleanup across different UIDs",async()=>{
+ const suffix=crypto.randomUUID();
+ const uidA="stream-user-a-"+suffix,uidB="stream-user-b-"+suffix;
+ const refA=db.collection("indianMarketStreamLeases").doc(uidA);
+ const refB=db.collection("indianMarketStreamLeases").doc(uidB);
+ const now=Date.now();
+ try{
+  const acquired=await Promise.all([
+   acquireStreamLease(db,uidA,"lease-a",{now,leaseMs:60000}),
+   acquireStreamLease(db,uidB,"lease-b",{now,leaseMs:60000})
+  ]);
+  assert.deepEqual(acquired,[true,true]);
+  assert.equal((await refA.get()).data().uid,uidA);
+  assert.equal((await refB.get()).data().uid,uidB);
+  // Revoking or releasing one account's lease must not affect the other user's lease.
+  await refA.update({revoked:true});
+  assert.equal(await renewStreamLease(db,uidA,"lease-a",{now:now+1000,leaseMs:60000}),false);
+  assert.equal(await renewStreamLease(db,uidB,"lease-b",{now:now+1000,leaseMs:60000}),true);
+  assert.equal(await releaseStreamLease(db,uidA,"lease-b"),false);
+  assert.equal((await refB.get()).exists,true);
+  assert.equal(await releaseStreamLease(db,uidB,"lease-b"),true);
+  assert.equal((await refB.get()).exists,false);
+  assert.equal((await refA.get()).data().revoked,true);
+ }finally{await clean([refA,refB]);}
+});
