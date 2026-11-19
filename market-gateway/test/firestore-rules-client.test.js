@@ -50,6 +50,7 @@ const serverOnlyDocuments = [
   ["upstoxOAuthStates", "oauth-state-a"],
   ["indianMarketWatchlists", "user-a"],
   ["indianMarketStreamLeases", "user-a"],
+  ["indianMarketWorkerState", "pendingLimitOrders"],
   ["indianMarginPreviewLimits", "user-a"],
   ["upstoxConnectionControls", "user-a"]
 ];
