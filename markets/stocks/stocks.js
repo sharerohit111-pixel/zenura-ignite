@@ -369,14 +369,15 @@
   let derivativeOrderSubmitting=false;
   async function submitDerivativeOrder(instrumentKey,type,strike,side='BUY'){
     if(derivativeOrderSubmitting)return;
-    const connector=window.ZENURA_MARKET_CONNECTOR;
-    if(!gateway||!connector?.getIdToken||!connector?.getUserId?.()){optionStatus.textContent='Sign in and connect Upstox before placing a paper order.';return;}
+    const connector=window.ZENURA_MARKET_CONNECTOR,uid=connector?.getUserId?.(),chainRequest=optionChainRequest,underlyingKey=selected?.instrument_key;
+    if(!gateway||!connector?.getIdToken||!uid||!underlyingKey){optionStatus.textContent='Sign in and connect Upstox before placing a paper order.';return;}
     const lotsRaw=window.prompt('Number of '+type+' lots to '+side.toLowerCase()+' (market paper order):','1');
     if(lotsRaw===null)return;
+    if(connector.getUserId()!==uid||optionChainRequest!==chainRequest||selected?.instrument_key!==underlyingKey){optionStatus.textContent='Account or selected option chain changed. Reload the option chain before placing an order.';return;}
     const lots=Number(lotsRaw);
     if(!Number.isSafeInteger(lots)||lots<1||lots>10000){optionStatus.textContent='Enter a whole number of lots from 1 to 10,000.';return;}
     if(!window.crypto?.randomUUID){optionStatus.textContent='A secure order request ID could not be created in this browser.';return;}
-    const uid=connector.getUserId(),storageKey=retryPolicy.userScopedStorageKey(derivativePendingStorageKey,uid);
+    const storageKey=retryPolicy.userScopedStorageKey(derivativePendingStorageKey,uid);
     if(!storageKey){optionStatus.textContent='Could not identify the signed-in account. Please sign in again.';return;}
     const legacy=retryPolicy.inspectLegacyPendingPaperOrder(pendingOrderStorage,derivativePendingStorageKey,uid,storageKey);
     if(legacy.state==='ambiguous'){optionStatus.textContent='A legacy option order from an earlier version cannot be safely attributed to this account. No retry was sent. Review this account’s derivative order history before continuing.';return;}
@@ -406,7 +407,7 @@
       try{await loadPaperAccount();await refreshPaperViews();}
       catch(refreshError){if(connector.getUserId()===uid)optionStatus.textContent=fillMessage+' Portfolio refresh failed; use Refresh to reload balances.';}
     }catch(error){if(connector.getUserId()===uid)optionStatus.textContent=error.message||'Derivative paper order failed.';}
-    finally{derivativeOrderSubmitting=false;optionButton.disabled=false;}
+    finally{derivativeOrderSubmitting=false;if(connector.getUserId()===uid&&optionChainRequest===chainRequest)optionButton.disabled=false;}
   }
   optionButton.addEventListener('click',loadOptionChain);
 
