@@ -62,34 +62,46 @@ async function refreshStatus(sequence = authStateSequence) {
   }
 }
 disconnectButton.addEventListener("click", async () => {
+  const uid = auth.currentUser?.uid;
+  if (!uid) return;
   disconnectButton.disabled = true;
   try {
     setState("DISCONNECTING UPSTOX", "Removing the locally saved token and ending this app's live feed…");
     await disconnectAccount();
-    await refreshStatus();
-    setState("UPSTOX DISCONNECTED", "Saved token removed and this app's feed will close on its next lease check. This does not revoke app access at Upstox; remove that permission separately in your Upstox account.");
+    if (auth.currentUser?.uid !== uid) return;
+    const sequence = authStateSequence;
+    await refreshStatus(sequence);
+    if (sequence === authStateSequence && auth.currentUser?.uid === uid) {
+      setState("UPSTOX DISCONNECTED", "Saved token removed and this app's feed will close on its next lease check. This does not revoke app access at Upstox; remove that permission separately in your Upstox account.", false, false);
+    }
   } catch (error) {
-    setState("DISCONNECT FAILED", explainError(error));
+    if (auth.currentUser?.uid === uid) setState("DISCONNECT FAILED", explainError(error));
   } finally {
     disconnectButton.disabled = false;
   }
 });
 button.addEventListener("click", async () => {
   button.disabled = true;
+  let uid = auth.currentUser?.uid || null;
   try {
     if (!auth.currentUser) {
       setState("SIGNING IN", "Complete Google sign-in in the popup.");
       await signInWithPopup(auth, new GoogleAuthProvider());
+      uid = auth.currentUser?.uid || null;
     }
+    if (!uid || auth.currentUser?.uid !== uid) return;
+    const sequence = authStateSequence;
     setState("STARTING UPSTOX", "Preparing secure authorization…");
     const result = await startAuthorization();
+    if (sequence !== authStateSequence || auth.currentUser?.uid !== uid) return;
     const url = result.data?.authorizationUrl;
     if (!url || !url.startsWith("https://api.upstox.com/")) {
       throw new Error("The server did not return a valid Upstox authorization URL.");
     }
     window.location.assign(url);
   } catch (error) {
-    setState("CONNECTION NOT COMPLETED", explainError(error));
+    if (!uid || auth.currentUser?.uid === uid) setState("CONNECTION NOT COMPLETED", explainError(error));
+  } finally {
     button.disabled = false;
   }
 });
