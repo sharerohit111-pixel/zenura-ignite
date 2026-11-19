@@ -127,6 +127,33 @@ jobs:
       - name: Check Firebase Functions syntax
         run: |
           find functions -name '*.js' -type f -print0 | xargs -0 -n1 node --check
+      - name: Validate scheduled paper LIMIT worker wiring
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+          const schedule = fs.readFileSync('functions/indian-market.js', 'utf8');
+          const worker = fs.readFileSync('functions/lib/pending-limit-order-worker.js', 'utf8');
+          const tests = 'functions/test/pending-limit-order-worker.test.js';
+          for (const token of [
+            'exports.processPendingPaperLimitOrders',
+            'onSchedule(',
+            'TOKEN_ENCRYPTION_KEY',
+            'maxOrders:50',
+            'fetchFreshPendingLimitQuote'
+          ]) {
+            if (!schedule.includes(token)) throw new Error('Scheduled LIMIT worker missing: ' + token);
+          }
+          for (const token of [
+            'runTransaction',
+            'status:"FILLED"',
+            'quoteAgeMs',
+            '15000'
+          ]) {
+            if (!worker.includes(token)) throw new Error('LIMIT worker safety check missing: ' + token);
+          }
+          if (!fs.existsSync(tests)) throw new Error('Scheduled LIMIT worker tests are missing.');
+          console.log('Scheduled LIMIT worker wiring, quote freshness and tests are present.');
+          NODE
       - name: Validate Firebase configuration and indexes
         run: |
           node -e "JSON.parse(require('node:fs').readFileSync('firebase.json','utf8'))"
