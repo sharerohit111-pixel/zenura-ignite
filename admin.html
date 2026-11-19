@@ -15,7 +15,15 @@
       <small>Authorized account: sharerohit111@gmail.com</small>
       <p id="login-error" class="error" role="alert"></p>
     </section>
-    <section id="dashboard" hidden>
+    <section id="dashboard" hidden>\n      <section class="panel" id="solutions-admin" hidden>
+        <h2>Business Solutions Catalogue</h2>
+        <p>यह हिस्सा केवल अधिकृत व्यवस्थापक के लिए है। नीचे पूरा catalogue JSON बदलकर प्रकाशित कर सकते हैं।</p>
+        <div class="filters"><button id="catalogue-load" class="secondary">Load saved catalogue</button><button id="catalogue-defaults" class="secondary">Load default catalogue</button></div>
+        <textarea id="catalogue-json" spellcheck="false" style="width:100%;min-height:440px;background:#080f21;color:#eaf3ff;border:1px solid #526b99;border-radius:10px;padding:14px;font:12px/1.55 monospace"></textarea>
+        <div class="filters"><button id="catalogue-publish" class="primary">Publish catalogue</button><button id="catalogue-hide" class="secondary">Hide from public website</button></div>
+        <p id="catalogue-status" class="error" role="status"></p>
+      </section>
+
       <div class="toolbar"><div><p id="identity"></p><h2>Enquiry inbox</h2></div><button id="logout" class="secondary">Sign out</button></div>
       <div class="stats"><article><small>Total</small><b id="total">0</b></article><article><small>New</small><b id="new-count">0</b></article><article><small>In progress</small><b id="progress-count">0</b></article><article><small>Completed</small><b id="done-count">0</b></article></div>
       <div class="filters"><input id="search" type="search" placeholder="Search name, contact or service"><select id="status-filter"><option value="all">All statuses</option><option value="new">New</option><option value="in-progress">In progress</option><option value="completed">Completed</option></select></div>
