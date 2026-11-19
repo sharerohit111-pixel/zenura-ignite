@@ -22,6 +22,29 @@ function readPendingPaperOrder(storage,storageKey){
   }catch(_){return null;}
 }
 
+/**
+ * Safely inspect pre-account-scoped pending records. Old releases stored only
+ * fingerprint+key, so those records cannot be attributed to a Firebase UID.
+ * Such records are quarantined instead of being replayed under a new account.
+ */
+function inspectLegacyPendingPaperOrder(storage,legacyStorageKey,userId,scopedStorageKey){
+  if(!storage||typeof storage.getItem!=="function"||typeof storage.removeItem!=="function"||
+     typeof legacyStorageKey!=="string"||!legacyStorageKey||typeof userId!=="string"||!userId||
+     typeof scopedStorageKey!=="string"||!scopedStorageKey)return {state:"unavailable"};
+  let raw;
+  try{raw=storage.getItem(legacyStorageKey);}catch(_){return {state:"unavailable"};}
+  if(raw===null||raw===undefined)return {state:"none"};
+  let value;
+  try{value=JSON.parse(raw);}catch(_){return {state:"ambiguous"};}
+  if(!value||typeof value!=="object"||typeof value.fingerprint!=="string"||!value.fingerprint||
+     typeof value.key!=="string"||!UUID_PATTERN.test(value.key))return {state:"ambiguous"};
+  if(value.uid!==userId)return {state:"ambiguous"};
+  if(!writePendingPaperOrder(storage,scopedStorageKey,{fingerprint:value.fingerprint,key:value.key}))
+    return {state:"unavailable"};
+  try{storage.removeItem(legacyStorageKey);}catch(_){return {state:"unavailable"};}
+  return {state:"migrated",pending:{fingerprint:value.fingerprint,key:value.key}};
+}
+
 function writePendingPaperOrder(storage,storageKey,pending){
   if(!storage||typeof storage.setItem!=="function"||typeof storageKey!=="string"||!storageKey||
      !pending||typeof pending.fingerprint!=="string"||!pending.fingerprint||
@@ -36,6 +59,6 @@ function clearPendingPaperOrder(storage,storageKey){
   catch(_){return false;}
 }
 
-const policy={userScopedStorageKey,canRetryPendingPaperOrder,readPendingPaperOrder,writePendingPaperOrder,clearPendingPaperOrder};
+const policy={userScopedStorageKey,canRetryPendingPaperOrder,readPendingPaperOrder,inspectLegacyPendingPaperOrder,writePendingPaperOrder,clearPendingPaperOrder};
 if(typeof window!=="undefined")window.ZenuraPaperOrderRetryPolicy=policy;
 if(typeof module!=="undefined"&&module.exports)module.exports=policy;
