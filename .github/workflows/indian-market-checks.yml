@@ -5,6 +5,7 @@ on:
     branches: ["main"]
     paths:
       - "markets/stocks/**"
+      - "crypto/index.html"
       - "market-gateway/**"
       - "functions/**"
       - "firebase.json"
@@ -18,6 +19,7 @@ on:
     branches: ["feature/indian-stock-market"]
     paths:
       - "markets/stocks/**"
+      - "crypto/index.html"
       - "market-gateway/**"
       - "functions/**"
       - "firebase.json"
@@ -42,6 +44,9 @@ jobs:
         with:
           node-version: "22"
           package-manager-cache: false
+      - name: Check existing Crypto app inline JavaScript syntax
+        run: |
+          node -e "const fs=require('node:fs'); const html=fs.readFileSync('crypto/index.html','utf8'); const scripts=[...html.matchAll(/<script(?![^>]*\\bsrc=)[^>]*>([\\s\\S]*?)<\\/script>/gi)].map(x=>x[1]); if(!scripts.length) throw new Error('No inline scripts found'); scripts.forEach((code,i)=>require('node:child_process').execFileSync(process.execPath,['--check'],{input:code,stdio:['pipe','inherit','inherit']})); console.log('Checked '+scripts.length+' inline script(s)');"
       - name: Check browser module syntax
         run: node --check markets/stocks/stocks.js
       - name: Check SSE parser syntax
