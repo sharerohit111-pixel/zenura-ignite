@@ -47,7 +47,7 @@ test("initializes a missing account once with INR virtual cash and empty positio
 });
 
 test("does not reset an existing account balance or holdings",async()=>{
- const original={currency:"INR",startingCashPaise:100000000,cashPaise:45000000,positions:{"NSE_EQ|ABC":{quantity:5,averagePricePaise:10000}},derivativePositions:{},reservedMarginPaise:0,realizedPnlPaise:2500,version:7};
+ const original={currency:"INR",startingCashPaise:100000000,cashPaise:45000000,positions:{"NSE_EQ|ABC":{quantity:5,averagePricePaise:10000}},derivativePositions:{},reservedMarginPaise:0,reservedCashPaise:0,reservedPositions:{},realizedPnlPaise:2500,version:7};
  const {db,state}=makeDb(original);
  await ensurePaperAccount({db,ref:{id:"user-1"},startingCashPaise:999999999,serverTimestamp:()=>"new-time"});
  assert.deepEqual(state.writes,[]);
