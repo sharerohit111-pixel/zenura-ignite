@@ -1,0 +1,155 @@
+name: Validate Indian Market Code
+
+on:
+  pull_request:
+    branches: ["main"]
+    paths:
+      - "markets/stocks/**"
+      - "crypto/index.html"
+      - "market-gateway/**"
+      - "functions/**"
+      - "firebase.json"
+      - ".firebaserc"
+      - "market-gateway/DEPLOYMENT.md"
+      - "market-gateway/README.md"
+      - "firestore.rules"
+      - "firestore.indexes.json"
+      - ".github/workflows/indian-market-checks.yml"
+  push:
+    branches: ["feature/indian-stock-market", "reconcile/indian-stock-market-main-sync"]
+    paths:
+      - "markets/stocks/**"
+      - "crypto/index.html"
+      - "market-gateway/**"
+      - "functions/**"
+      - "firebase.json"
+      - ".firebaserc"
+      - "market-gateway/DEPLOYMENT.md"
+      - "market-gateway/README.md"
+      - "firestore.rules"
+      - "firestore.indexes.json"
+      - ".github/workflows/indian-market-checks.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  syntax-and-unit-tests:
+    name: Syntax and gateway unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          package-manager-cache: false
+      - name: Check existing Crypto app inline JavaScript syntax
+        run: |
+          node -e "const fs=require('node:fs'); const html=fs.readFileSync('crypto/index.html','utf8'); const scripts=[...html.matchAll(/<script(?![^>]*\\bsrc=)[^>]*>([\\s\\S]*?)<\\/script>/gi)].map(x=>x[1]); if(!scripts.length) throw new Error('No inline scripts found'); scripts.forEach((code,i)=>require('node:child_process').execFileSync(process.execPath,['--check'],{input:code,stdio:['pipe','inherit','inherit']})); console.log('Checked '+scripts.length+' inline script(s)');"
+      - name: Check browser module syntax
+        run: node --check markets/stocks/stocks.js
+      - name: Check SSE parser syntax
+        run: node --check markets/stocks/sse-parser.js
+      - name: Check email authentication module syntax
+        run: node --input-type=module --check < markets/stocks/email-auth.js
+      - name: Check Upstox connection module syntax
+        run: node --input-type=module --check < markets/stocks/connect.js
+      - name: Check gateway syntax
+        run: node --check market-gateway/server.js
+      - name: Validate gateway package manifest
+        run: node -e "JSON.parse(require('node:fs').readFileSync('market-gateway/package.json','utf8'))"
+      - name: Check Firebase Functions syntax
+        run: |
+          find functions -name '*.js' -type f -print0 | xargs -0 -n1 node --check
+      - name: Validate Firebase configuration and indexes
+        run: |
+          node -e "JSON.parse(require('node:fs').readFileSync('firebase.json','utf8'))"
+          node -e "JSON.parse(require('node:fs').readFileSync('firestore.indexes.json','utf8'))"
+      - name: Guard Firebase deployment scope
+        run: |
+          node -e "
+            const scripts = require('./functions/package.json').scripts || {};
+            const deploy = scripts.deploy || '';
+            const required = [
+              'functions:startUpstoxAuthorization',
+              'functions:upstoxOAuthCallback',
+              'functions:disconnectUpstoxAccount',
+              'functions:getIndianMarketConnectionStatus'
+            ];
+            if (!deploy.startsWith('cd .. && firebase deploy --only ')) {
+              throw new Error('Firebase deploy script must use the explicit Indian-market-only allowlist.');
+            }
+            const targets = (deploy.split('--only ')[1] || '').split(',');
+            if (targets.length !== required.length || targets.some(target => !/^functions:[A-Za-z0-9]+$/.test(target))) {
+              throw new Error('Only the four explicit Indian-market Functions may be deployed by this script.');
+            }
+            for (const target of required) {
+              if (!targets.includes(target)) throw new Error('Missing deployment target: ' + target);
+            }
+            console.log('Firebase deploy scope is restricted to the four Indian-market Functions.');
+          "
+      - name: Install Firebase Functions test dependencies
+        run: npm install --prefix functions --ignore-scripts --no-audit --no-fund
+      - name: Enforce Firebase Functions high and critical dependency audit
+        run: |
+          npm audit --prefix functions --json > "$RUNNER_TEMP/firebase-functions-npm-audit.json" || true
+          node -e "
+            const report = require(process.env.RUNNER_TEMP + '/firebase-functions-npm-audit.json');
+            const summary = report.metadata?.vulnerabilities || {};
+            const vulnerabilities = report.vulnerabilities || {};
+            console.log(JSON.stringify({
+              metadata: summary,
+              packages: Object.entries(vulnerabilities).map(([name, item]) => ({
+                name,
+                severity: item.severity,
+                direct: item.isDirect,
+                range: item.range,
+                fixAvailable: item.fixAvailable
+              }))
+            }, null, 2));
+            const blocking = (summary.high || 0) + (summary.critical || 0);
+            if (blocking > 0) {
+              throw new Error('Firebase Functions dependencies contain ' + blocking + ' high/critical vulnerabilities.');
+            }
+          "
+      - name: Install gateway test dependencies
+        run: npm install --prefix market-gateway --ignore-scripts --no-audit --no-fund
+      - name: Enforce gateway high and critical dependency audit
+        run: |
+          npm audit --prefix market-gateway --json > "$RUNNER_TEMP/market-gateway-npm-audit.json" || true
+          node -e "
+            const report = require(process.env.RUNNER_TEMP + '/market-gateway-npm-audit.json');
+            const vulnerabilities = report.vulnerabilities || {};
+            const summary = report.metadata?.vulnerabilities || {};
+            console.log(JSON.stringify({
+              metadata: summary,
+              packages: Object.entries(vulnerabilities).map(([name, item]) => ({
+                name,
+                severity: item.severity,
+                direct: item.isDirect,
+                range: item.range,
+                via: item.via.map(entry => typeof entry === 'string' ? entry : {
+                  title: entry.title, url: entry.url, range: entry.range
+                }),
+                fixAvailable: item.fixAvailable
+              }))
+            }, null, 2));
+            const blocking = (summary.high || 0) + (summary.critical || 0);
+            if (blocking > 0) {
+              throw new Error('Gateway dependencies contain ' + blocking + ' high/critical vulnerabilities.');
+            }
+          "
+      - name: Set up Java for Firestore emulator
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "21"
+      - name: Run unit and Firestore emulator integration tests
+        run: npx --yes firebase-tools@14 emulators:exec --only firestore --project demo-zenura-ignite "node --test functions/test/*.test.js market-gateway/test/*.test.js markets/stocks/*.test.js"
+      - name: Build gateway Docker image
+        run: docker build --tag zenura-indian-market-gateway:ci market-gateway
+      - name: Verify gateway image runs as non-root
+        run: |
+          test "$(docker image inspect zenura-indian-market-gateway:ci --format '{{.Config.User}}')" = "node"
+          docker run --rm --entrypoint node zenura-indian-market-gateway:ci -e "if (process.getuid() === 0) { throw new Error('Gateway container process is running as root'); } console.log('Gateway container UID:', process.getuid());"

@@ -3,11 +3,11 @@
   "private": true,
   "main": "index.js",
   "engines": {
-    "node": "20"
+    "node": "22"
   },
   "scripts": {
     "emulate": "firebase emulators:start --only functions,firestore",
-    "deploy": "firebase deploy --only functions,firestore:rules"
+    "deploy": "cd .. && firebase deploy --only functions:startUpstoxAuthorization,functions:upstoxOAuthCallback,functions:disconnectUpstoxAccount,functions:getIndianMarketConnectionStatus"
   },
   "dependencies": {
     "firebase-admin": "^13.0.0",
