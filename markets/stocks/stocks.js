@@ -218,6 +218,9 @@
     if(!uid||!connector?.getIdToken){paperOrderStatus.textContent='Sign in before placing a paper order.';return;}
     const storageKey=retryPolicy.userScopedStorageKey(paperPendingStorageKey,uid);
     if(!storageKey){paperOrderStatus.textContent='Could not identify the signed-in account. Please sign in again.';return;}
+    const legacy=retryPolicy.inspectLegacyPendingPaperOrder(pendingOrderStorage,paperPendingStorageKey,uid,storageKey);
+    if(legacy.state==='ambiguous'){paperOrderStatus.textContent='A legacy pending order from an earlier version cannot be safely attributed to this account. No retry was sent. Review this account’s paper order history before continuing.';return;}
+    if(legacy.state==='unavailable'){paperOrderStatus.textContent='Legacy pending-order recovery could not be verified. No order was sent; retry after browser storage is available.';return;}
     const pending=retryPolicy.readPendingPaperOrder(pendingOrderStorage,storageKey);
     let pendingKey=pending?.key||null;
     const instrumentKey=selected.instrument_key,tradingSymbol=selected.trading_symbol||selected.name||selected.instrument_key;
@@ -352,6 +355,9 @@
     if(!window.crypto?.randomUUID){optionStatus.textContent='A secure order request ID could not be created in this browser.';return;}
     const uid=connector.getUserId(),storageKey=retryPolicy.userScopedStorageKey(derivativePendingStorageKey,uid);
     if(!storageKey){optionStatus.textContent='Could not identify the signed-in account. Please sign in again.';return;}
+    const legacy=retryPolicy.inspectLegacyPendingPaperOrder(pendingOrderStorage,derivativePendingStorageKey,uid,storageKey);
+    if(legacy.state==='ambiguous'){optionStatus.textContent='A legacy option order from an earlier version cannot be safely attributed to this account. No retry was sent. Review this account’s derivative order history before continuing.';return;}
+    if(legacy.state==='unavailable'){optionStatus.textContent='Legacy option-order recovery could not be verified. No order was sent; retry after browser storage is available.';return;}
     const pending=retryPolicy.readPendingPaperOrder(pendingOrderStorage,storageKey);
     const fingerprint=instrumentKey+'|'+side+'|'+lots;
     if(pending&&pending.fingerprint!==fingerprint){optionStatus.textContent='A previous option order response is uncertain for this account. Retry the same contract and lot quantity first.';return;}
