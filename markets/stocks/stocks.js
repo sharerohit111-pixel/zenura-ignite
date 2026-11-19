@@ -209,32 +209,38 @@
   const paperPendingStorageKey='zenura-indian-paper-order-pending-v1';
   const derivativePendingStorageKey='zenura-indian-derivative-order-pending-v1';
   const retryPolicy=window.ZenuraPaperOrderRetryPolicy;
-  const restoredPaperOrder=retryPolicy.readPendingPaperOrder(pendingOrderStorage,paperPendingStorageKey);
-  let pendingPaperOrderKey=restoredPaperOrder?.key||null,pendingPaperOrderFingerprint=restoredPaperOrder?.fingerprint||'';
-  if(restoredPaperOrder)paperOrderStatus.textContent='A previous paper order response may be uncertain. Retry the same stock, side and quantity before starting another order.';
   async function submitPaperOrder(side){
     if(paperOrderSubmitting)return;
     const qty=Number(paperQuantity.value);
     if(!Number.isSafeInteger(qty)||qty<1||qty>1000000){paperOrderStatus.textContent='Enter a whole-number quantity between 1 and 1,000,000.';return;}
     if(!selected||!['NSE_EQ','BSE_EQ'].includes(selected.segment)||selected.instrument_type!=='EQ'){paperOrderStatus.textContent='Select an NSE/BSE cash equity first.';return;}
+    const connector=window.ZENURA_MARKET_CONNECTOR,uid=connector?.getUserId?.();
+    if(!uid||!connector?.getIdToken){paperOrderStatus.textContent='Sign in before placing a paper order.';return;}
+    const storageKey=retryPolicy.userScopedStorageKey(paperPendingStorageKey,uid);
+    if(!storageKey){paperOrderStatus.textContent='Could not identify the signed-in account. Please sign in again.';return;}
+    const pending=retryPolicy.readPendingPaperOrder(pendingOrderStorage,storageKey);
+    let pendingKey=pending?.key||null;
     const instrumentKey=selected.instrument_key,tradingSymbol=selected.trading_symbol||selected.name||selected.instrument_key;
     const fingerprint=JSON.stringify({instrument_key:instrumentKey,side,quantity:qty});
-    if(pendingPaperOrderKey&&!window.ZenuraPaperOrderRetryPolicy.canRetryPendingPaperOrder(pendingPaperOrderFingerprint,fingerprint)){
-      paperOrderStatus.textContent='A previous order response is uncertain. Retry the same stock, side and quantity before starting another order.';return;
+    if(pendingKey&&!retryPolicy.canRetryPendingPaperOrder(pending.fingerprint,fingerprint)){
+      paperOrderStatus.textContent='A previous order response is uncertain for this account. Retry the same stock, side and quantity first.';return;
     }
-    if(!pendingPaperOrderKey){
-      pendingPaperOrderKey=crypto.randomUUID();pendingPaperOrderFingerprint=fingerprint;
-      retryPolicy.writePendingPaperOrder(pendingOrderStorage,paperPendingStorageKey,{key:pendingPaperOrderKey,fingerprint:pendingPaperOrderFingerprint});
+    if(!pendingKey){
+      if(!window.crypto?.randomUUID){paperOrderStatus.textContent='A secure order request ID could not be created in this browser.';return;}
+      pendingKey=window.crypto.randomUUID();
+      retryPolicy.writePendingPaperOrder(pendingOrderStorage,storageKey,{key:pendingKey,fingerprint});
     }
     paperOrderSubmitting=true;updatePaperButtons();paperOrderStatus.textContent='Verifying fresh provider quote and processing simulated order…';
     try{
-      const token=await window.ZENURA_MARKET_CONNECTOR.getIdToken();
-      const response=await fetch(gateway+'/paper/orders',{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json',Accept:'application/json'},body:JSON.stringify({instrument_key:instrumentKey,side,quantity:qty,idempotency_key:pendingPaperOrderKey})});
+      const token=await connector.getIdToken();
+      if(connector.getUserId()!==uid)throw new Error('Account changed. Sign back into the original account to safely verify this pending order.');
+      const response=await fetch(gateway+'/paper/orders',{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json',Accept:'application/json'},body:JSON.stringify({instrument_key:instrumentKey,side,quantity:qty,idempotency_key:pendingKey})});
       const data=await response.json().catch(()=>({}));
-      if(!response.ok){if(response.status>=400&&response.status<500){pendingPaperOrderKey=null;pendingPaperOrderFingerprint='';retryPolicy.clearPendingPaperOrder(pendingOrderStorage,paperPendingStorageKey);}throw new Error(data.error||'Paper order rejected');}
+      if(connector.getUserId()!==uid)throw new Error('Account changed while the order was processing. Sign back into the original account to verify its result.');
+      if(!response.ok){if(response.status>=400&&response.status<500)retryPolicy.clearPendingPaperOrder(pendingOrderStorage,storageKey);throw new Error(data.error||'Paper order rejected');}
       if(typeof data.orderId!=='string'||!Number.isSafeInteger(data.executionPricePaise)||data.executionPricePaise<1)
         throw new Error('Order response could not be verified. Retry the same order to safely check its result.');
-      pendingPaperOrderKey=null;pendingPaperOrderFingerprint='';retryPolicy.clearPendingPaperOrder(pendingOrderStorage,paperPendingStorageKey);
+      retryPolicy.clearPendingPaperOrder(pendingOrderStorage,storageKey);
       const fillMessage=side+' '+qty+' '+(data.tradingSymbol||tradingSymbol)+' filled at '+inrPaise(data.executionPricePaise)+' · Simulated only';
       paperOrderStatus.textContent=fillMessage;
       try{await loadPaperAccount();await refreshPaperViews();}
@@ -331,32 +337,35 @@
     }catch(error){if(request===optionChainRequest&&selected?.instrument_key===instrumentKey&&optionExpiry.value===expiry)optionStatus.textContent=error.message||'Option chain request failed.';}
     finally{if(request===optionChainRequest)optionButton.disabled=false;}
   }
-  const restoredDerivativeOrder=retryPolicy.readPendingPaperOrder(pendingOrderStorage,derivativePendingStorageKey);
-  let pendingDerivativeOrder=restoredDerivativeOrder,derivativeOrderSubmitting=false;
-  if(restoredDerivativeOrder)optionStatus.textContent='A previous option order response may be uncertain. Retry the same contract, side and lots before starting another order.';
+  let derivativeOrderSubmitting=false;
   async function submitDerivativeOrder(instrumentKey,type,strike,side='BUY'){
     if(derivativeOrderSubmitting)return;
     const connector=window.ZENURA_MARKET_CONNECTOR;
-    if(!gateway||!connector?.getIdToken){optionStatus.textContent='Sign in and connect Upstox before placing a paper order.';return;}
+    if(!gateway||!connector?.getIdToken||!connector?.getUserId?.()){optionStatus.textContent='Sign in and connect Upstox before placing a paper order.';return;}
     const lotsRaw=window.prompt('Number of '+type+' lots to '+side.toLowerCase()+' (market paper order):','1');
     if(lotsRaw===null)return;
     const lots=Number(lotsRaw);
     if(!Number.isSafeInteger(lots)||lots<1||lots>10000){optionStatus.textContent='Enter a whole number of lots from 1 to 10,000.';return;}
     if(!window.crypto?.randomUUID){optionStatus.textContent='A secure order request ID could not be created in this browser.';return;}
+    const uid=connector.getUserId(),storageKey=retryPolicy.userScopedStorageKey(derivativePendingStorageKey,uid);
+    if(!storageKey){optionStatus.textContent='Could not identify the signed-in account. Please sign in again.';return;}
+    const pending=retryPolicy.readPendingPaperOrder(pendingOrderStorage,storageKey);
     const fingerprint=instrumentKey+'|'+side+'|'+lots;
-    if(pendingDerivativeOrder&&pendingDerivativeOrder.fingerprint!==fingerprint){optionStatus.textContent='A previous order response is uncertain. Retry the same contract and lot quantity first.';return;}
-    if(!pendingDerivativeOrder){
-      pendingDerivativeOrder={fingerprint,key:window.crypto.randomUUID()};
-      retryPolicy.writePendingPaperOrder(pendingOrderStorage,derivativePendingStorageKey,pendingDerivativeOrder);
-    }
+    if(pending&&pending.fingerprint!==fingerprint){optionStatus.textContent='A previous option order response is uncertain for this account. Retry the same contract and lot quantity first.';return;}
+    const pendingKey=pending?.key||window.crypto.randomUUID();
+    if(!pending)retryPolicy.writePendingPaperOrder(pendingOrderStorage,storageKey,{fingerprint,key:pendingKey});
     derivativeOrderSubmitting=true;optionButton.disabled=true;optionStatus.textContent='Verifying live option quote and placing simulated '+type+' '+side+'…';
     try{
-      const token=await connector.getIdToken(),response=await fetch(gateway+'/paper/derivative/orders',{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json',Accept:'application/json'},body:JSON.stringify({instrument_key:instrumentKey,side,lots,idempotency_key:pendingDerivativeOrder.key})});
-      const data=await response.json();if(!response.ok){if(response.status>=400&&response.status<500){pendingDerivativeOrder=null;retryPolicy.clearPendingPaperOrder(pendingOrderStorage,derivativePendingStorageKey);}throw new Error(data.error||'Derivative paper order rejected.');}
+      const token=await connector.getIdToken();
+      if(connector.getUserId()!==uid)throw new Error('Account changed. Sign back into the original account to safely verify this pending option order.');
+      const response=await fetch(gateway+'/paper/derivative/orders',{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json',Accept:'application/json'},body:JSON.stringify({instrument_key:instrumentKey,side,lots,idempotency_key:pendingKey})});
+      const data=await response.json();
+      if(connector.getUserId()!==uid)throw new Error('Account changed while the option order was processing. Sign back into the original account to verify its result.');
+      if(!response.ok){if(response.status>=400&&response.status<500)retryPolicy.clearPendingPaperOrder(pendingOrderStorage,storageKey);throw new Error(data.error||'Derivative paper order rejected.');}
       if(typeof data.orderId!=='string'||!Number.isSafeInteger(data.quantity)||data.quantity<1||
          !Number.isSafeInteger(data.executionPricePaise)||data.executionPricePaise<1)
         throw new Error('Option order response could not be verified. Retry the same order to safely check its result.');
-      pendingDerivativeOrder=null;retryPolicy.clearPendingPaperOrder(pendingOrderStorage,derivativePendingStorageKey);
+      retryPolicy.clearPendingPaperOrder(pendingOrderStorage,storageKey);
       const fillMessage='SIMULATED '+side+' FILLED · '+data.tradingSymbol+' · '+data.quantity+' units · Premium '+inrPaise(data.grossPaise)+' · Estimated charges '+inrPaise(data.chargesPaise)+' · '+(side==='BUY'?'Total debit '+inrPaise(data.totalDebitPaise):'Net proceeds '+inrPaise(data.netCreditPaise))+'.';
       optionStatus.textContent=fillMessage;
       try{await loadPaperAccount();await refreshPaperViews();}
