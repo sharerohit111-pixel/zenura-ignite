@@ -91,7 +91,18 @@ async function processPendingLimitOrders({db,fetchQuote,nowMs=Date.now(),serverT
   if(!db||typeof fetchQuote!=="function"||typeof serverTimestamp!=="function")throw new TypeError("Pending LIMIT worker dependencies are invalid.");
   if(!Number.isSafeInteger(nowMs)||nowMs<1||!Number.isInteger(maxOrders)||maxOrders<1||maxOrders>100||
     !Number.isInteger(concurrency)||concurrency<1||concurrency>10)throw new TypeError("Pending LIMIT worker bounds are invalid.");
-  const snapshot=await db.collection("indianPaperOrders").where("orderType","==","LIMIT").where("status","==","PENDING").orderBy("createdAt","asc").limit(maxOrders).get();
+  const ordersCollection=db.collection("indianPaperOrders");
+  const baseQuery=ordersCollection.where("orderType","==","LIMIT").where("status","==","PENDING").orderBy("createdAt","asc");
+  const cursorRef=db.collection("indianMarketWorkerState").doc("pendingLimitOrders");
+  const cursorSnap=await cursorRef.get();
+  const cursorId=cursorSnap.exists&&typeof cursorSnap.data()?.cursorOrderId==="string"?cursorSnap.data().cursorOrderId:null;
+  let query=baseQuery;
+  if(cursorId){
+    const lastOrder=await ordersCollection.doc(cursorId).get();
+    if(lastOrder.exists)query=query.startAfter(lastOrder);
+  }
+  let snapshot=await query.limit(maxOrders).get();
+  if(snapshot.empty&&cursorId)snapshot=await baseQuery.limit(maxOrders).get();
   const summary={scanned:snapshot.size,filled:0,notEligible:0,failed:0,alreadyFilled:0};
   for(let offset=0;offset<snapshot.docs.length;offset+=concurrency){
     const batch=snapshot.docs.slice(offset,offset+concurrency);
@@ -108,6 +119,11 @@ async function processPendingLimitOrders({db,fetchQuote,nowMs=Date.now(),serverT
         logger.warn("Pending LIMIT order was not processed",{orderId:doc.id,errorName:error.name||"Error",status:error.status||500});
       }
     }));
+  }
+  if(snapshot.docs.length){
+    await cursorRef.set({cursorOrderId:snapshot.docs[snapshot.docs.length-1].id,updatedAt:serverTimestamp()},{merge:true});
+  }else if(cursorId){
+    await cursorRef.set({cursorOrderId:null,updatedAt:serverTimestamp()},{merge:true});
   }
   return summary;
 }
