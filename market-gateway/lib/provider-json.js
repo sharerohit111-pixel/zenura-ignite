@@ -26,7 +26,7 @@ async function readProviderJson(response,{maxBytes=MAX_PROVIDER_JSON_BYTES}={}){
   }
  }finally{reader.releaseLock();}
  try{return JSON.parse(Buffer.concat(chunks,total).toString("utf8"));}
- catch{return null;}
+ catch{throw Object.assign(new Error("Upstream provider returned invalid JSON."),{status:502});}
 }
 
 module.exports={readProviderJson,MAX_PROVIDER_JSON_BYTES};
