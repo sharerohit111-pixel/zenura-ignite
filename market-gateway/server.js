@@ -26,6 +26,7 @@ const {createStreamLifecycle}=require("./lib/stream-lifecycle");
 const {sendUpstoxSubscription}=require("./lib/upstox-subscription");
 const {decodeFeedResponse}=require("./lib/upstox-feed-decoder");
 const {filterFreshMarketFeeds}=require("./lib/market-feed-validation");
+const {createMarketFeedEventOrderFilter}=require("./lib/market-feed-event-order");
 const {buildPortfolioValuation,readStoredPaperPositions}=require("./lib/paper-portfolio-valuation");
 const {createLeaseHeartbeat}=require("./lib/lease-heartbeat");
 const {readProviderJson}=require("./lib/provider-json");
@@ -653,6 +654,7 @@ app.post("/stream",async(req,res)=>{
     let keys;
     try{keys=validateStreamInstrumentKeys(req.body?.instrumentKeys,instrumentCache.map(item=>item.instrument_key),MAX_KEYS);}
     catch(error){return res.status(error.status||400).json({error:error.message});}
+    const acceptOrderedMarketEvent=createMarketFeedEventOrderFilter();
     const mode=req.body?.mode||"ltpc";
     if(!["ltpc","full","option_greeks"].includes(mode)) return res.status(400).json({error:"Unsupported feed mode."});
     const connection=await db.collection("upstoxConnections").doc(decoded.uid).get();
@@ -693,7 +695,8 @@ app.post("/stream",async(req,res)=>{
       try{
         const decoded=decodeFeedResponse(FeedResponse,bytes);
         const validated=filterFreshMarketFeeds(decoded,keys);
-        if(validated)writeEvent("market",validated);
+        const ordered=validated&&acceptOrderedMarketEvent(validated);
+        if(ordered)writeEvent("market",ordered);
       }catch(error){
         writeEvent("error",{message:"Market feed decode failed"});
       }
