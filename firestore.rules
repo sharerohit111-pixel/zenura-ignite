@@ -81,6 +81,7 @@ service cloud.firestore {
     match /upstoxConnections/{uid} { allow read, write: if false; }
     match /upstoxConnectionControls/{uid} { allow read, write: if false; }
     match /indianMarketStreamLeases/{uid} { allow read, write: if false; }
+    match /indianMarketWorkerState/{workerId} { allow read, write: if false; }
     match /indianMarketWatchlists/{uid} { allow read, write: if false; }
     match /indianPaperAccounts/{uid} { allow read, write: if false; }
     match /indianPaperOrders/{orderId} { allow read, write: if false; }
