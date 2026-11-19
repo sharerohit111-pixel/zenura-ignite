@@ -85,7 +85,7 @@
     const note = 'ZENURA ' + plan.label + ' ' + user.uid.slice(0,8);
     const upi = 'upi://pay?pa=' + encodeURIComponent(UPI_ID) +
       '&pn=' + encodeURIComponent(PAYEE_NAME) +
-      '&am=' + encodeURIComponent(String(plan.amount)) +
+      '&am=' + encodeURIComponent(Number(plan.amount).toFixed(2)) +
       '&cu=INR&tn=' + encodeURIComponent(note);
     body.innerHTML = `
       <p class="zpay-muted">${t(1)} <b>${paymentLanguage==='hi'?({monthly:'1 महीना',quarterly:'3 महीने',halfyear:'6 महीने',yearly:'1 साल'}[planKey]):plan.label}</b> · ${t(2)} <b>₹${plan.amount}</b></p>
