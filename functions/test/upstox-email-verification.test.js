@@ -5,12 +5,14 @@ const {isVerifiedPasswordAccount} = require("../lib/upstox-email-verification");
 
 test("requires email verification for password sign-in", () => {
   assert.equal(isVerifiedPasswordAccount({token:{firebase:{sign_in_provider:"password"},email_verified:false}}), false);
+  assert.equal(isVerifiedPasswordAccount({token:{firebase:{sign_in_provider:"password"}}}), false);
   assert.equal(isVerifiedPasswordAccount({token:{firebase:{sign_in_provider:"password"},email_verified:true}}), true);
 });
 
-test("allows Google sign-in with or without an email_verified claim", () => {
+test("requires email verification for Google sign-in", () => {
+  assert.equal(isVerifiedPasswordAccount({token:{firebase:{sign_in_provider:"google.com"},email_verified:false}}), false);
+  assert.equal(isVerifiedPasswordAccount({token:{firebase:{sign_in_provider:"google.com"}}}), false);
   assert.equal(isVerifiedPasswordAccount({token:{firebase:{sign_in_provider:"google.com"},email_verified:true}}), true);
-  assert.equal(isVerifiedPasswordAccount({token:{firebase:{sign_in_provider:"google.com"},email_verified:false}}), true);
 });
 
 test("rejects anonymous, custom, phone and unknown providers", () => {
