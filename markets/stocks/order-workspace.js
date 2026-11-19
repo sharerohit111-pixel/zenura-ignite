@@ -57,7 +57,9 @@
   function applyLanguage() {
     document.querySelectorAll('[data-paper-en]').forEach(el => {
       const english = el.getAttribute('data-paper-en');
-      el.textContent = translate(english);
+      const textNode = [...el.childNodes].find(node => node.nodeType === 3);
+      if (textNode) textNode.textContent = translate(english);
+      else el.insertBefore(document.createTextNode(translate(english)), el.firstChild);
     });
     if (langButton) langButton.textContent = language === 'en' ? 'हिन्दी' : 'English';
     ticket.querySelectorAll('[data-order-type]').forEach(button => {
@@ -129,6 +131,10 @@
     updateEstimate();
   }
   typeButtons.forEach(button => button.addEventListener('click', () => setOrderType(button.dataset.orderType)));
+  const keepLimitDisabled = () => { if (selectedType === 'LIMIT') { buy.disabled = true; sell.disabled = true; } };
+  if (typeof MutationObserver !== 'undefined') new MutationObserver(keepLimitDisabled).observe(buy, {attributes:true,attributeFilter:['disabled']});
+  if (typeof MutationObserver !== 'undefined') new MutationObserver(keepLimitDisabled).observe(sell, {attributes:true,attributeFilter:['disabled']});
+  window.addEventListener('zenura-market-auth-ready', keepLimitDisabled);
   qty?.addEventListener('input', updateEstimate);
   limitPrice?.addEventListener('input', updateEstimate);
   const selectedPrice = $('selected-price');
