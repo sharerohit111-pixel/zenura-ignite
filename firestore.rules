@@ -86,7 +86,21 @@ service cloud.firestore {
       allow write: if false;
     }
 
-    // Public business catalogue: visitors can read only while published; only verified admin can write.\n    match /publicCatalog/{catalogId} {\n      allow get, list: if resource.data.published == true || isZenuraAdmin();\n      allow create, update: if isZenuraAdmin()\n        && request.resource.data.keys().hasOnly(["categories", "published", "updatedAt", "updatedBy"])\n        && request.resource.data.keys().hasAll(["categories", "published", "updatedAt", "updatedBy"])\n        && request.resource.data.categories is list\n        && request.resource.data.categories.size() <= 30\n        && request.resource.data.published is bool\n        && request.resource.data.updatedBy == request.auth.token.email\n        && request.resource.data.updatedAt == request.time;\n      allow delete: if isZenuraAdmin();\n    }\n\n    match /enquiries/{enquiryId} {
+    // Public business catalogue: visitors can read only while published; only verified admin can write.
+    match /publicCatalog/{catalogId} {
+      allow get, list: if resource.data.published == true || isZenuraAdmin();
+      allow create, update: if isZenuraAdmin()
+        && request.resource.data.keys().hasOnly(["categories", "published", "updatedAt", "updatedBy"])
+        && request.resource.data.keys().hasAll(["categories", "published", "updatedAt", "updatedBy"])
+        && request.resource.data.categories is list
+        && request.resource.data.categories.size() <= 30
+        && request.resource.data.published is bool
+        && request.resource.data.updatedBy == request.auth.token.email
+        && request.resource.data.updatedAt == request.time;
+      allow delete: if isZenuraAdmin();
+    }
+
+    match /enquiries/{enquiryId} {
       // Public website visitors may submit a validated enquiry only.
       allow create: if
         request.resource.data.keys().hasAll([
