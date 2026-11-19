@@ -21,3 +21,15 @@
 .admin-shortcuts{display:flex;flex-wrap:wrap;gap:10px;margin-top:22px}
 #dashboard .toolbar{margin-top:0}#dashboard .stats{margin-bottom:20px}
 @media(max-width:760px){.admin-workspace{grid-template-columns:1fr;gap:14px}.admin-sidebar{position:static;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;padding:10px}.sidebar-title{grid-column:1/-1}.admin-tab{font-size:12px;padding:12px 9px}.admin-section{padding:18px}.admin-shortcuts{display:grid}}
+
+/* Keep inactive admin categories fully hidden; active tab alone occupies the content area. */
+#dashboard .admin-pane:not(.active){display:none!important}
+#dashboard .admin-pane.active{display:block!important}
+#dashboard .admin-pane[hidden]{display:none!important}
+#dashboard .admin-sidebar{z-index:2}
+#dashboard .admin-tab{appearance:none;-webkit-appearance:none;font:inherit}
+@media(max-width:760px){
+ #dashboard .admin-sidebar{position:sticky;top:0;z-index:20;grid-template-columns:repeat(2,minmax(0,1fr));background:#0b1429f5;backdrop-filter:blur(12px)}
+ #dashboard .admin-tab{min-height:46px;text-align:left;white-space:normal}
+ #dashboard .admin-content{min-height:55vh}
+}
