@@ -1,9 +1,9 @@
 "use strict";
 
-// Indicative Upstox NSE/BSE equity-option BUY charges, in paise.
+// Indicative Upstox NSE/BSE equity-option charges, in paise.
 // These are paper-simulation estimates, not a broker contract note.
 const RATES={
-  NSE:{exchangeTransaction:0.0003553,ipft:0.000000001},
+  NSE:{exchangeTransaction:0.0003553,ipft:0.000005}, // ₹0.50 per lakh of option premium
   BSE:{exchangeTransaction:0.000325,ipft:0}
 };
 const STAMP_DUTY_BUY=0.00003; // 0.003%
