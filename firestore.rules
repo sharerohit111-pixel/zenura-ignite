@@ -111,6 +111,21 @@ service cloud.firestore {
       allow delete: if isZenuraAdmin();
     }
 
+    // Digital product details and media metadata are managed only by the verified admin.
+    // Public visitors can read the document only while it is published.
+    match /publicCatalog/digitalProducts {
+      allow get, list: if resource.data.published == true || isZenuraAdmin();
+      allow create, update: if isZenuraAdmin()
+        && request.resource.data.keys().hasOnly(["products", "published", "updatedAt", "updatedBy"])
+        && request.resource.data.keys().hasAll(["products", "published", "updatedAt", "updatedBy"])
+        && request.resource.data.products is list
+        && request.resource.data.products.size() <= 50
+        && request.resource.data.published is bool
+        && request.resource.data.updatedBy == request.auth.token.email
+        && request.resource.data.updatedAt == request.time;
+      allow delete: if isZenuraAdmin();
+    }
+
     match /enquiries/{enquiryId} {
       // Public website visitors may submit a validated enquiry only.
       allow create: if
