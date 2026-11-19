@@ -251,7 +251,7 @@
       paperOrderStatus.textContent=fillMessage;
       try{await loadPaperAccount();await refreshPaperViews();}
       catch(refreshError){paperOrderStatus.textContent=fillMessage+' Portfolio refresh failed; use Refresh to reload balances.';}
-    }catch(error){paperOrderStatus.textContent=error.message||'Paper order failed.';}
+    }catch(error){if(connector.getUserId()===uid)paperOrderStatus.textContent=error.message||'Paper order failed.';}
     finally{paperOrderSubmitting=false;updatePaperButtons();}
   }
   paperBuy.addEventListener('click',()=>submitPaperOrder('BUY'));
@@ -382,7 +382,7 @@
       optionStatus.textContent=fillMessage;
       try{await loadPaperAccount();await refreshPaperViews();}
       catch(refreshError){optionStatus.textContent=fillMessage+' Portfolio refresh failed; use Refresh to reload balances.';}
-    }catch(error){optionStatus.textContent=error.message||'Derivative paper order failed.';}
+    }catch(error){if(connector.getUserId()===uid)optionStatus.textContent=error.message||'Derivative paper order failed.';}
     finally{derivativeOrderSubmitting=false;optionButton.disabled=false;}
   }
   optionButton.addEventListener('click',loadOptionChain);
