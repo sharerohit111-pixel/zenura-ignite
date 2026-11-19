@@ -347,3 +347,28 @@ integrationTest("Firestore emulator isolates named watchlists across different U
   assert.deepEqual(storedB.data().watchlists.Banking,["NSE_EQ|BANKB"]);
  }finally{await clean([refA,refB]);}
 });
+
+
+integrationTest("Firestore emulator preserves concurrent updates to different watchlists in the same UID document",async()=>{
+ const uid="watchlist-concurrent-user-"+crypto.randomUUID();
+ const ref=db.collection("indianMarketWatchlists").doc(uid);
+ await ref.set({uid,watchlists:{"My Stocks":["NSE_EQ|AAA"],Banking:["NSE_EQ|BANKA"]}});
+ try{
+  await Promise.all([
+   db.runTransaction(async tx=>{
+    const snap=await tx.get(ref);
+    const data=snap.exists?snap.data():{};
+    tx.set(ref,{uid,watchlists:mergeWatchlistUpdate(data,"My Stocks",["NSE_EQ|AAA2"])},{merge:true});
+   }),
+   db.runTransaction(async tx=>{
+    const snap=await tx.get(ref);
+    const data=snap.exists?snap.data():{};
+    tx.set(ref,{uid,watchlists:mergeWatchlistUpdate(data,"Banking",["NSE_EQ|BANKA2"])},{merge:true});
+   })
+  ]);
+  const stored=await ref.get(),data=stored.data();
+  assert.equal(data.uid,uid);
+  assert.deepEqual(data.watchlists["My Stocks"],["NSE_EQ|AAA2"]);
+  assert.deepEqual(data.watchlists.Banking,["NSE_EQ|BANKA2"]);
+ }finally{await ref.delete().catch(()=>{});}
+});
