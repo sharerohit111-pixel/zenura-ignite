@@ -93,7 +93,7 @@
       const remove=document.createElement('button');remove.type='button';remove.className='saved-watch-remove';remove.textContent='REMOVE';remove.setAttribute('aria-label','Remove '+(item.trading_symbol||item.instrument_key)+' from watchlist');remove.addEventListener('click',async()=>{const previous=savedWatchlist;savedWatchlist=savedWatchlist.filter(x=>x.instrument_key!==item.instrument_key);const edit=++watchlistEditSeq;renderSavedWatchlist();if(!await saveWatchlist()&&edit===watchlistEditSeq){savedWatchlist=previous;watchlistEditSeq++;renderSavedWatchlist();}});
       row.append(info,remove);watchBody.append(row);
     });
-    watchAdd.disabled=!selected||savedWatchlist.some(x=>x.instrument_key===selected.instrument_key)||savedWatchlist.length>=50||!window.ZENURA_MARKET_CONNECTOR?.getIdToken;
+    watchAdd.disabled=!selected||savedWatchlist.some(x=>x.instrument_key===selected.instrument_key)||savedWatchlist.length>=50||!window.ZENURA_MARKET_CONNECTOR?.getIdToken||!window.ZENURA_MARKET_CONNECTOR?.getUserId?.();
   }
   async function loadSavedWatchlist(){
     const request=++watchlistLoadSeq,name=activeWatchlist,connector=window.ZENURA_MARKET_CONNECTOR,uid=connector?.getUserId?.();if(!gateway||!connector?.getIdToken||!uid)return;
@@ -222,7 +222,7 @@
 
   let paperOrderSubmitting=false,paperOrderSubmitSeq=0;
   function updatePaperButtons(){
-    const allowed=!paperOrderSubmitting&&!!selected&&['NSE_EQ','BSE_EQ'].includes(selected.segment)&&selected.instrument_type==='EQ'&&!!window.ZENURA_MARKET_CONNECTOR?.getIdToken&&!!gateway;
+    const allowed=!paperOrderSubmitting&&!!selected&&['NSE_EQ','BSE_EQ'].includes(selected.segment)&&selected.instrument_type==='EQ'&&!!window.ZENURA_MARKET_CONNECTOR?.getIdToken&&!!window.ZENURA_MARKET_CONNECTOR?.getUserId?.()&&!!gateway;
     paperBuy.disabled=!allowed;paperSell.disabled=!allowed;
   }
   const pendingOrderStorage=(()=>{try{return window.sessionStorage;}catch(_){return null;}})();
@@ -283,8 +283,10 @@
   const futuresMarginProduct=document.getElementById('futures-margin-product');
   const futuresMarginStatus=document.getElementById('futures-margin-status');
   function updateFuturesMarginButton(){
-    if(futuresMarginButton)futuresMarginButton.disabled=!selected||selected.instrument_type!=='FUT';
-    if(futuresMarginStatus&&(!selected||selected.instrument_type!=='FUT'))futuresMarginStatus.textContent='Select a verified futures contract from the Futures watchlist.';
+    const signedIn=!!window.ZENURA_MARKET_CONNECTOR?.getUserId?.();
+    if(futuresMarginButton)futuresMarginButton.disabled=!signedIn||!gateway||!selected||selected.instrument_type!=='FUT';
+    if(futuresMarginStatus&&!signedIn)futuresMarginStatus.textContent='Sign in to request broker margin preview.';
+    else if(futuresMarginStatus&&(!selected||selected.instrument_type!=='FUT'))futuresMarginStatus.textContent='Select a verified futures contract from the Futures watchlist.';
   }
   let futuresMarginRequest=0;
   async function requestFuturesMarginPreview(){
