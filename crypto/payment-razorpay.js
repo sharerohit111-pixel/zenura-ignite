@@ -74,7 +74,7 @@
     shade.addEventListener('click',e=>{if(e.target===shade)close();});
   }
   function open() { ensureModal(); $('ziQrShade').classList.add('open'); }
-  function close() { const shade=$('ziQrShade'); if(shade)shade.classList.remove('open'); }
+  function close() { const shade=$('ziQrShade'); if(shade)shade.classList.remove('open'); if($('ziQrUtr')){$('ziQrUtr').hidden=false;$('ziQrUtr').previousElementSibling.hidden=false;} if($('ziQrSubmit'))$('ziQrSubmit').hidden=false; if($('ziQrAdmin'))$('ziQrAdmin').hidden=true; }
   function upiUri(plan) {
     const params = new URLSearchParams({
       pa:PAYEE_UPI,pn:PAYEE_NAME,am:plan.amount.toFixed(2),cu:'INR',
@@ -88,6 +88,7 @@
     const user=auth.currentUser;
     if(!user){say('Please sign in before purchasing.');const shade=$('authShade');if(shade)shade.classList.add('open');return;}
     open();
+    $('ziQrAdmin').hidden=true;$('ziQrUtr').hidden=false;$('ziQrUtr').previousElementSibling.hidden=false;$('ziQrSubmit').hidden=false;$('ziQrSubmit').textContent='I HAVE PAID — SUBMIT UTR';
     $('ziQrPrice').textContent='₹'+plan.amount+' · '+plan.label;
     $('ziQrMessage').textContent='Preparing your secure payment QR…';
     $('ziQrUtr').value=''; $('ziQrSubmit').disabled=true;
@@ -144,7 +145,7 @@
     $('ziQrUtr').hidden=true;$('ziQrUtr').previousElementSibling.hidden=true;$('ziQrSubmit').hidden=true;
     $('ziQrIntro').textContent='Approve only after matching the UTR and exact amount against the actual bank / UPI account credit. A screenshot or UTR alone is not proof.';
     const admin=$('ziQrAdmin');admin.hidden=false;admin.innerHTML='<button id="ziQrAdminRefresh" type="button">REFRESH REQUESTS</button><div id="ziQrAdminList" class="zi-muted">Loading…</div>';
-    $('ziQrClose').onclick=()=>{close();$('ziQrUtr').hidden=false;$('ziQrUtr').previousElementSibling.hidden=false;$('ziQrSubmit').hidden=false;};
+    $('ziQrClose').onclick=close;
     $('ziQrAdminRefresh').onclick=loadAdminRequests;
     await loadAdminRequests();
   }
@@ -179,7 +180,7 @@
         const now=new Date(),oldEnd=old.currentPeriodEnd&&old.currentPeriodEnd.toDate?old.currentPeriodEnd.toDate():null;
         const start=oldEnd&&oldEnd.getTime()>now.getTime()?oldEnd:now;
         const end=new Date(start.getTime()+p.days*86400000);
-        batch.set(entitlementRef,{uid:p.uid,status:'premium',planId:p.planId,currentPeriodStart:old.currentPeriodStart||firebase.firestore.Timestamp.fromDate(now),currentPeriodEnd:firebase.firestore.Timestamp.fromDate(end),autoRenew:false,provider:'upi_qr_manual',updatedAt:firebase.firestore.FieldValue.serverTimestamp()});
+        batch.set(entitlementRef,{uid:p.uid,status:'premium',planId:p.planId,currentPeriodStart:firebase.firestore.Timestamp.fromDate(start),currentPeriodEnd:firebase.firestore.Timestamp.fromDate(end),autoRenew:false,provider:'upi_qr_manual',updatedAt:firebase.firestore.FieldValue.serverTimestamp()});
       }
       batch.update(paymentRef,{status:approve?'approved':'rejected',reviewedAt:firebase.firestore.FieldValue.serverTimestamp(),reviewedBy:auth.currentUser.email});
       await batch.commit();
