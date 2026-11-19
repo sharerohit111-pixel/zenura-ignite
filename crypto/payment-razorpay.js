@@ -14,7 +14,7 @@
     halfyear: {id:'month_6',label:'6 Months',amount:399,days:180},
     yearly: {id:'year_1',label:'1 Year',amount:799,days:365}
   };
-  let db, auth, qrPromise, activePlan = null, adminMode = false;
+  let db, auth, qrPromise, activePlan = null, adminMode = false, entitlementUnsubscribe = null;
   let paymentLanguage = localStorage.getItem('ziPaymentLanguage') === 'hi' ? 'hi' : 'en';
   const tr = (en, hi) => paymentLanguage === 'hi' ? hi : en;
   const PAYMENT_TEXT = {
@@ -60,6 +60,111 @@
   }
   const status = $('premiumStatus');
   const say = message => { if (status) status.textContent = message; };
+  let membershipCard = null;
+  const homePremiumBadge = $('homePremiumBadge');
+  function ensureMembershipCard() {
+    if (membershipCard || !status || !status.parentNode) return membershipCard;
+    const style = document.createElement('style');
+    style.textContent = '#homePremiumBadge{margin-top:12px;padding:11px 14px;border:1px solid #287b68;border-radius:12px;background:linear-gradient(110deg,#103b39,#10243b);color:#83f4ce;font-size:11px;font-weight:850;letter-spacing:.35px;line-height:1.5;box-shadow:0 0 20px #20c99718}#homePremiumBadge[hidden]{display:none}.zi-membership{margin-top:14px;padding:16px;border:1px solid #287b68;border-radius:14px;background:linear-gradient(125deg,#103b39,#10243b);color:#eaf8f5}.zi-membership[hidden]{display:none}.zi-membership-top{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}.zi-membership-title{font:700 15px "Space Grotesk",sans-serif}.zi-membership-badge{border-radius:30px;padding:6px 10px;background:#14533f;color:#83f4ce;font-size:9px;font-weight:800;letter-spacing:.7px}.zi-membership p{margin:9px 0 0;color:#b5c9d7;font-size:11px;line-height:1.5}.zi-membership strong{color:#f1fbff}';
+    document.head.appendChild(style);
+    membershipCard = document.createElement('section');
+    membershipCard.className = 'zi-membership';
+    membershipCard.hidden = true;
+    membershipCard.setAttribute('aria-live','polite');
+    membershipCard.innerHTML = '<div class="zi-membership-top"><span class="zi-membership-title">ZENURA Membership</span><span class="zi-membership-badge" data-membership-state></span></div><p data-membership-plan></p><p data-membership-validity></p>';
+    status.parentNode.insertBefore(membershipCard,status.nextSibling);
+    return membershipCard;
+  }
+  function normalizedEntitlement(data) {
+    if (!data) return null;
+    if (data.status === 'premium') return data;
+    if (data.active === true) {
+      const legacyPlans = {monthly:'month_1',quarterly:'month_3',halfyear:'month_6',yearly:'year_1'};
+      return {status:'premium',planId:legacyPlans[data.planKey]||data.planKey,
+        currentPeriodStart:data.startsAt,currentPeriodEnd:data.validUntil,
+        email:data.email,displayName:data.displayName,paymentId:data.paymentId,approvedBy:data.approvedBy,provider:'legacy_upi'};
+    }
+    return data;
+  }
+  function renderHomePremium(data) {
+    if (!homePremiumBadge) return;
+    const end = data && data.currentPeriodEnd && data.currentPeriodEnd.toDate ? data.currentPeriodEnd.toDate() : null;
+    const active = data && data.status === 'premium' && end && end.getTime() > Date.now();
+    homePremiumBadge.hidden = !active;
+    if (active) {
+      const labels = {month_1:'1 Month · ₹99',month_3:'3 Months · ₹199',month_6:'6 Months · ₹399',year_1:'1 Year · ₹799'};
+      homePremiumBadge.textContent = '✦ PREMIUM MEMBER · ACTIVE  |  ' + (labels[data.planId] || data.planId || 'Premium') + '  |  Valid until ' + end.toLocaleDateString('en-IN');
+    }
+  }
+  function renderMembership(data) {
+    const card = ensureMembershipCard();
+    if (!card) return;
+    const state = card.querySelector('[data-membership-state]');
+    const planLine = card.querySelector('[data-membership-plan]');
+    const validity = card.querySelector('[data-membership-validity]');
+    if (!auth.currentUser || !data) {
+      card.hidden = true;
+      say(auth.currentUser ? 'No Premium membership is active on this account.' : 'Sign in to view your Premium membership.');
+      return;
+    }
+    const now = Date.now();
+    const start = data.currentPeriodStart && data.currentPeriodStart.toDate ? data.currentPeriodStart.toDate() : null;
+    const end = data.currentPeriodEnd && data.currentPeriodEnd.toDate ? data.currentPeriodEnd.toDate() : null;
+    const trialEnd = data.trialEndsAt && data.trialEndsAt.toDate ? data.trialEndsAt.toDate() : null;
+    const premiumActive = data.status === 'premium' && end && end.getTime() > now;
+    renderHomePremium(data);
+    const planGrid = document.querySelector('.premium-grid');
+    const renewBox = document.querySelector('.renew-box');
+    if (planGrid) planGrid.style.display = premiumActive ? 'none' : '';
+    if (renewBox) renewBox.style.display = premiumActive ? 'none' : '';
+    const trialActive = data.status === 'trial' && trialEnd && trialEnd.getTime() > now;
+    card.hidden = false;
+    if (premiumActive) {
+      const labels = {month_1:'1 Month · ₹99',month_3:'3 Months · ₹199',month_6:'6 Months · ₹399',year_1:'1 Year · ₹799'};
+      state.textContent = 'PREMIUM MEMBER · ACTIVE';
+      planLine.textContent = 'Plan: ' + (labels[data.planId] || data.planId || 'Premium');
+      validity.textContent = (start ? 'Started: ' + start.toLocaleDateString('en-IN') + ' · ' : '') + 'Valid until: ' + end.toLocaleString('en-IN',{dateStyle:'medium',timeStyle:'short'}) + ' · Auto-renewal: Off';
+      say('Premium membership is active on this account.');
+    } else if (trialActive) {
+      state.textContent = 'FREE DEMO ACTIVE';
+      planLine.textContent = 'Your 3-day free demo is active.';
+      validity.textContent = 'Demo ends: ' + trialEnd.toLocaleString('en-IN',{dateStyle:'medium',timeStyle:'short'});
+      say('Free demo is active. Choose a Premium plan when you are ready.');
+    } else {
+      state.textContent = 'NOT ACTIVE';
+      planLine.textContent = 'No active Premium plan on this account.';
+      validity.textContent = 'Choose a plan to activate Premium access.';
+      say('Your demo or Premium access has expired. Choose a plan to continue.');
+    }
+  }
+  function watchMembership(user) {
+    if (entitlementUnsubscribe) { entitlementUnsubscribe(); entitlementUnsubscribe = null; }
+    const card = ensureMembershipCard();
+    if (!user) {
+      if (card) card.hidden = true;
+      say('Sign in to view your Premium membership.');
+      return;
+    }
+    // Check canonical and older approved memberships before creating a free-demo record.
+    // This prevents a new trial document from masking an existing legacy Premium purchase.
+    let trialInitializationStarted = false;
+    entitlementUnsubscribe = db.collection('entitlements').doc(user.uid).onSnapshot(
+      async snapshot => {
+        if (snapshot.exists) { renderMembership(normalizedEntitlement(snapshot.data())); return; }
+        try {
+          const legacy = await db.collection('users').doc(user.uid).collection('private').doc('entitlement').get();
+          if (legacy.exists && legacy.data().active) { renderMembership(normalizedEntitlement(legacy.data())); return; }
+        } catch (legacyError) { console.warn('Legacy entitlement lookup failed:',legacyError); }
+        renderMembership(null);
+        if (!trialInitializationStarted) {
+          trialInitializationStarted = true;
+          firebase.app().functions('asia-south1').httpsCallable('getPremiumAccess')({})
+            .catch(error => console.warn('Premium access initialization failed:',error));
+        }
+      },
+      error => { console.warn('Premium entitlement listener failed:',error); say('Could not refresh Premium status. Please reopen this page.'); }
+    );
+  }
   function services() {
     if (!window.firebase || !firebase.apps.length || !firebase.auth || !firebase.firestore) throw new Error('Firebase is not ready.');
     auth = auth || firebase.auth();
@@ -159,7 +264,7 @@
       const ownRequests=await db.collection('payments').where('uid','==',user.uid).get();
       if(ownRequests.docs.some(doc=>(doc.data().utr||'').toLowerCase()===utr.toLowerCase()))throw new Error(paymentText('duplicate'));
       await db.collection('payments').add({
-        uid:user.uid,email:user.email||'',planId:plan.id,planLabel:plan.label,
+        uid:user.uid,email:user.email||'',displayName:user.displayName||user.email||'ZENURA Member',planId:plan.id,planLabel:plan.label,
         amount:plan.amount,days:plan.days,utr,status:'pending',
         createdAt:firebase.firestore.FieldValue.serverTimestamp()
       });
@@ -177,9 +282,15 @@
     if(!drawer||$('ziQrAdminButton'))return;
     const button=document.createElement('button');
     button.id='ziQrAdminButton';button.type='button';button.textContent='▣ Admin UPI Approvals';button.style.display='none';
-    drawer.appendChild(button);
+    const membersButton=document.createElement('button');
+    membersButton.id='ziQrPremiumMembersButton';membersButton.type='button';membersButton.textContent='✦ Premium Members';membersButton.style.display='none';
+    drawer.append(button,membersButton);
     button.onclick=()=>{drawer.classList.remove('open');const shade=$('drawerShade');if(shade)shade.classList.remove('open');openAdmin();};
-    auth.onAuthStateChanged(user=>{button.style.display=user&&(user.email||'').toLowerCase()===ADMIN_EMAIL?'block':'none';});
+    membersButton.onclick=()=>{drawer.classList.remove('open');const shade=$('drawerShade');if(shade)shade.classList.remove('open');openPremiumMembers();};
+    auth.onAuthStateChanged(user=>{
+      const isAdmin=!!user&&(user.email||'').toLowerCase()===ADMIN_EMAIL;
+      button.style.display=isAdmin?'block':'none';membersButton.style.display=isAdmin?'block':'none';
+    });
   }
   async function openAdmin() {
     const user=auth.currentUser;
@@ -193,6 +304,77 @@
     $('ziQrClose').onclick=close;
     $('ziQrAdminRefresh').onclick=loadAdminRequests;
     await loadAdminRequests();
+  }
+  async function openPremiumMembers() {
+    const user=auth.currentUser;
+    if(!user||(user.email||'').toLowerCase()!==ADMIN_EMAIL)return say('Admin access denied.');
+    ensureModal();open();adminMode=true;activePlan=null;applyPaymentLanguage();
+    $('ziQrPrice').textContent='PREMIUM MEMBERS DIRECTORY';
+    $('ziQrCanvas').innerHTML='';
+    $('ziQrUtr').hidden=true;$('ziQrUtr').previousElementSibling.hidden=true;$('ziQrSubmit').hidden=true;
+    $('ziQrIntro').textContent='All customer memberships, selected plans and validity. Active and expired accounts are shown separately.';
+    const admin=$('ziQrAdmin');admin.hidden=false;
+    admin.innerHTML='<button id="ziQrPremiumRefresh" type="button">REFRESH MEMBERS</button><div id="ziQrPremiumSummary" class="zi-muted">Loading membership totals…</div><div id="ziQrPremiumList" class="zi-muted">Loading members…</div>';
+    $('ziQrClose').onclick=close;
+    $('ziQrPremiumRefresh').onclick=loadPremiumMembers;
+    await loadPremiumMembers();
+  }
+  async function loadPremiumMembers() {
+    const list=$('ziQrPremiumList'),summary=$('ziQrPremiumSummary');
+    if(!list||!summary)return;
+    list.textContent='Loading premium members…';summary.textContent='Loading totals…';
+    try {
+      const [entitlements,approvedPayments]=await Promise.all([
+        db.collection('entitlements').get(),
+        db.collection('payments').where('status','==','approved').limit(300).get()
+      ]);
+      const records=new Map();
+      entitlements.forEach(doc=>records.set(doc.id,{uid:doc.id,data:doc.data(),email:doc.data().email||'',displayName:doc.data().displayName||''}));
+      approvedPayments.docs.forEach(doc=>{
+        const p=doc.data(),old=records.get(p.uid)||{uid:p.uid,data:null,email:'',displayName:''};
+        if(!old.email)old.email=p.email||'';
+        if(!old.displayName)old.displayName=p.displayName||'';
+        if(!old.latestPayment||(p.createdAt?.toMillis?.()||0)>(old.latestPayment.createdAt?.toMillis?.()||0))old.latestPayment=p;
+        records.set(p.uid,old);
+      });
+      await Promise.all([...records.values()].filter(x=>!x.data).map(async x=>{
+        try {
+          const legacy=await db.collection('users').doc(x.uid).collection('private').doc('entitlement').get();
+          if(legacy.exists)x.data=normalizedEntitlement(legacy.data());
+        } catch(error){console.warn('Legacy member lookup failed for',x.uid,error);}
+      }));
+      const legacyMembers=[...records.values()].filter(x=>x.data?.provider==='legacy_upi'&&x.data.status==='premium'&&x.data.currentPeriodStart&&x.data.currentPeriodEnd);
+      if(legacyMembers.length){
+        const migration=db.batch();
+        legacyMembers.forEach(x=>migration.set(db.collection('entitlements').doc(x.uid),{
+          uid:x.uid,email:x.email||x.data.email||'',displayName:x.displayName||x.data.displayName||x.email||'ZENURA Member',
+          status:'premium',planId:x.data.planId,currentPeriodStart:x.data.currentPeriodStart,currentPeriodEnd:x.data.currentPeriodEnd,
+          autoRenew:false,provider:'upi_qr_manual',paymentId:x.data.paymentId||'',approvedBy:x.data.approvedBy||auth.currentUser.email,
+          updatedAt:firebase.firestore.FieldValue.serverTimestamp()
+        },{merge:true}));
+        await migration.commit();
+        legacyMembers.forEach(x=>{x.data.provider='upi_qr_manual';});
+      }
+      const rows=[...records.values()].filter(x=>x.data||x.latestPayment).map(x=>{
+        const d=x.data||{},end=d.currentPeriodEnd?.toDate?.()||null;
+        const active=d.status==='premium'&&end&&end.getTime()>Date.now();
+        const labels={month_1:'1 Month · ₹99',month_3:'3 Months · ₹199',month_6:'6 Months · ₹399',year_1:'1 Year · ₹799'};
+        return {...x,end,active,plan:labels[d.planId]||x.latestPayment?.planLabel||d.planId||'Plan not recorded'};
+      }).sort((a,b)=>(Number(b.active)-Number(a.active))||((b.end?.getTime()||0)-(a.end?.getTime()||0)));
+      const activeCount=rows.filter(x=>x.active).length;
+      summary.textContent='TOTAL MEMBERS: '+rows.length+'  ·  ACTIVE: '+activeCount+'  ·  EXPIRED / NEEDS REVIEW: '+(rows.length-activeCount);
+      list.innerHTML='';
+      if(!rows.length){list.textContent='No approved Premium members found yet.';return;}
+      rows.forEach(x=>{
+        const card=document.createElement('article');card.className='zi-admin-card';
+        const name=document.createElement('strong');name.textContent=x.displayName||x.email||('Member '+x.uid.slice(0,8));
+        const details=document.createElement('div');details.className='zi-muted';
+        details.textContent=(x.email||'Email not recorded')+' · '+x.plan+' · '+(x.end?'Valid until '+x.end.toLocaleDateString('en-IN'):'Expiry not recorded')+' · UID '+x.uid;
+        const state=document.createElement('div');state.style.cssText='margin-top:7px;font-weight:800;color:'+(x.active?'#69e4bb':'#f2bd72');
+        state.textContent=x.active?'PREMIUM ACTIVE':'EXPIRED / NEEDS REVIEW';
+        card.append(name,details,state);list.append(card);
+      });
+    } catch(error){console.error('Premium directory load failed',error);list.textContent='Could not load members. Confirm the latest Firestore rules are deployed and you are signed in as the verified admin.';}
   }
   async function loadAdminRequests() {
     const list=$('ziQrAdminList');if(!list)return;list.textContent=paymentText('loading');
@@ -225,7 +407,7 @@
         const now=new Date(),oldEnd=old.currentPeriodEnd&&old.currentPeriodEnd.toDate?old.currentPeriodEnd.toDate():null;
         const start=oldEnd&&oldEnd.getTime()>now.getTime()?oldEnd:now;
         const end=new Date(start.getTime()+p.days*86400000);
-        batch.set(entitlementRef,{uid:p.uid,status:'premium',planId:p.planId,currentPeriodStart:firebase.firestore.Timestamp.fromDate(start),currentPeriodEnd:firebase.firestore.Timestamp.fromDate(end),autoRenew:false,provider:'upi_qr_manual',updatedAt:firebase.firestore.FieldValue.serverTimestamp()});
+        batch.set(entitlementRef,{uid:p.uid,email:p.email||'',displayName:p.displayName||p.email||'ZENURA Member',status:'premium',planId:p.planId,currentPeriodStart:firebase.firestore.Timestamp.fromDate(start),currentPeriodEnd:firebase.firestore.Timestamp.fromDate(end),autoRenew:false,provider:'upi_qr_manual',paymentId:id,approvedBy:auth.currentUser.email,updatedAt:firebase.firestore.FieldValue.serverTimestamp()});
       }
       batch.update(paymentRef,{status:approve?'approved':'rejected',reviewedAt:firebase.firestore.FieldValue.serverTimestamp(),reviewedBy:auth.currentUser.email});
       await batch.commit();
@@ -239,16 +421,7 @@
       button.addEventListener('click',event=>{event.preventDefault();event.stopImmediatePropagation();openPlan(button.getAttribute('data-plan'));},true);
     });
     addAdminButton();
-    auth.onAuthStateChanged(async user=>{
-      if(!user){say('Sign in to view Premium access and purchase a plan.');return;}
-      try{
-        const result=await firebase.app().functions('asia-south1').httpsCallable('getPremiumAccess')({});
-        const data=result.data||{};
-        if(data.status==='premium'&&data.premiumEndsAt)say('Premium active until '+new Date(data.premiumEndsAt).toLocaleDateString('en-IN')+'.');
-        else if(data.status==='trial'&&data.trialEndsAt)say('Free demo active until '+new Date(data.trialEndsAt).toLocaleDateString('en-IN')+'.');
-        else say('Your demo has ended. Choose a Premium plan to continue.');
-      }catch(error){console.warn('Premium status refresh failed',error);}
-    });
+    auth.onAuthStateChanged(user=>watchMembership(user));
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
 })();
