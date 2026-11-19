@@ -332,20 +332,21 @@
   async function loadOptionChain(){
     if(!selected){optionStatus.textContent='Select an underlying instrument first';return;}
     if(!['NSE_INDEX','BSE_INDEX','NSE_EQ','BSE_EQ'].includes(selected.segment)){optionStatus.textContent='Option chain requires an NSE/BSE index or cash-equity underlying, not an option or futures contract.';return;}
-    if(!gateway||!window.ZENURA_MARKET_CONNECTOR?.getIdToken){optionStatus.textContent='Sign in and configure the market gateway first';return;}
+    const connector=window.ZENURA_MARKET_CONNECTOR,uid=connector?.getUserId?.();
+    if(!gateway||!connector?.getIdToken||!uid){optionStatus.textContent='Sign in and configure the market gateway first';return;}
     const request=++optionChainRequest,instrumentKey=selected.instrument_key,expiry=optionExpiry.value;
     optionButton.disabled=true;optionStatus.textContent='Loading official Upstox option chain…';
     try{
-      const token=await window.ZENURA_MARKET_CONNECTOR.getIdToken();
-      if(request!==optionChainRequest||selected?.instrument_key!==instrumentKey||optionExpiry.value!==expiry)return;
+      const token=await connector.getIdToken();
+      if(request!==optionChainRequest||connector.getUserId()!==uid||selected?.instrument_key!==instrumentKey||optionExpiry.value!==expiry)return;
       const params=new URLSearchParams({instrument_key:instrumentKey,expiry_date:expiry});
       const response=await fetch(gateway+'/option-chain?'+params,{headers:{Authorization:'Bearer '+token,Accept:'application/json'}});
       if(!response.ok)throw new Error('Option chain unavailable ('+response.status+').');
       const payload=await response.json();
-      if(request!==optionChainRequest||selected?.instrument_key!==instrumentKey||optionExpiry.value!==expiry)return;
+      if(request!==optionChainRequest||connector.getUserId()!==uid||selected?.instrument_key!==instrumentKey||optionExpiry.value!==expiry)return;
       renderOptionChain(payload.data||[]);
       optionStatus.textContent='Provider response · '+(payload.data?.length||0)+' strikes · '+expiry;
-    }catch(error){if(request===optionChainRequest&&selected?.instrument_key===instrumentKey&&optionExpiry.value===expiry)optionStatus.textContent=error.message||'Option chain request failed.';}
+    }catch(error){if(request===optionChainRequest&&connector.getUserId()===uid&&selected?.instrument_key===instrumentKey&&optionExpiry.value===expiry)optionStatus.textContent=error.message||'Option chain request failed.';}
     finally{if(request===optionChainRequest)optionButton.disabled=false;}
   }
   let derivativeOrderSubmitting=false;
@@ -419,19 +420,19 @@
   }
   async function loadCandles(){
     if(!selected||!gateway)return;
-    const connector=window.ZENURA_MARKET_CONNECTOR;
-    if(!connector?.getIdToken){chartStatus.textContent='Sign in to load historical candles';return;}
+    const connector=window.ZENURA_MARKET_CONNECTOR,uid=connector?.getUserId?.();
+    if(!connector?.getIdToken||!uid){chartStatus.textContent='Sign in to load historical candles';return;}
     const request=++chartRequest,instrumentKey=selected.instrument_key,timeframe=activeTimeframe,[unit,interval,days]=frames[activeTimeframe];
     chart.textContent='';const loading=document.createElement('b');loading.textContent='Loading verified historical candles…';chart.append(loading);chartStatus.textContent='Requesting Upstox V3';
     try{
       const token=await connector.getIdToken(),to=localDate(),from=localDate(-days);
-      if(request!==chartRequest||selected?.instrument_key!==instrumentKey)return;
+      if(request!==chartRequest||connector.getUserId()!==uid||selected?.instrument_key!==instrumentKey)return;
       const params=new URLSearchParams({instrument_key:instrumentKey,unit,interval:String(interval),to_date:to,from_date:from});
       const response=await fetch(gateway+'/candles?'+params,{headers:{Authorization:'Bearer '+token,Accept:'application/json'}});
       if(!response.ok)throw new Error('Historical candles unavailable ('+response.status+').');
-      const payload=await response.json();if(request!==chartRequest||selected?.instrument_key!==instrumentKey)return;
+      const payload=await response.json();if(request!==chartRequest||connector.getUserId()!==uid||selected?.instrument_key!==instrumentKey)return;
       renderChart(payload.data?.candles||[]);chartStatus.textContent='Historical candles · Upstox V3 · '+timeframe;
-    }catch(error){if(request!==chartRequest)return;chart.textContent='';const b=document.createElement('b');b.textContent='Chart data unavailable';const span=document.createElement('span');span.textContent=error.message||'Could not load historical candles.';chart.append(b,span);chartStatus.textContent='Not connected';}
+    }catch(error){if(request!==chartRequest||connector.getUserId()!==uid)return;chart.textContent='';const b=document.createElement('b');b.textContent='Chart data unavailable';const span=document.createElement('span');span.textContent=error.message||'Could not load historical candles.';chart.append(b,span);chartStatus.textContent='Not connected';}
   }
   timeframeButtons.forEach(button=>button.addEventListener('click',()=>{activeTimeframe=button.dataset.timeframe;timeframeButtons.forEach(x=>x.classList.toggle('active',x===button));loadCandles();}));
   function setFeedStatus(heading,message){const h=document.querySelector('.chart-placeholder b'),s=document.querySelector('.chart-placeholder span');if(h)h.textContent=heading;if(s)s.textContent=message;}
@@ -516,7 +517,8 @@
     if(streamAbort){streamAbort.abort();streamAbort=null;}
     selected=null;lastQuoteText='';reconnectAttempt=0;
     ++watchlistLoadSeq;++watchQuoteSeq;++watchlistEditSeq;++paperAccountRequest;++paperPortfolioRequest;
-    ++paperHistoryLoadSeq;++derivativePortfolioRequest;++optionChainRequest;++futuresMarginRequest;
+    ++paperHistoryLoadSeq;++derivativePortfolioRequest;++optionChainRequest;++futuresMarginRequest;++chartRequest;
+    chart.textContent='';chartStatus.textContent='Sign in to load historical candles';
     futuresMarginStatus.textContent='Sign in to request broker margin preview.';
     paperHistoryCursor=null;paperHistoryHasMore=false;paperHistoryLoading=false;
     savedWatchlist=[];watchQuotes.clear();renderSavedWatchlist();
