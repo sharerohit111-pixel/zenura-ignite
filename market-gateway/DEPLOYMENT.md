@@ -8,14 +8,20 @@ The checked-in Firebase Web App config in `firebase-config.js` identifies the de
 2. In Authentication → Sign-in method, enable **Google** and **Email/Password**.
 3. In Authentication → Settings → Authorized domains, add the production website host (for example `zenuraignite.com`) and any deliberate preview host.
 4. Confirm the web app in this project matches the public config in `firebase-config.js`.
-5. Install Firebase CLI, authenticate as a project administrator, then run from repository root:
+5. Install Firebase CLI and authenticate against the intended project. First deploy only the four Indian-market Functions from the repository root:
 
 ```sh
 firebase use default
-firebase deploy --only firestore:rules,firestore:indexes,functions
+firebase deploy --only functions:startUpstoxAuthorization,functions:upstoxOAuthCallback,functions:disconnectUpstoxAccount,functions:getIndianMarketConnectionStatus
 ```
 
-This deploys the repository's existing Premium/Razorpay Functions as well as the new Indian-market callable and callback functions to this project. Review existing production Functions and secrets before deploying; do not deploy if this is not the intended project.
+Do **not** use `--only functions` for the initial Indian-market rollout: that can redeploy the existing Premium/Razorpay Functions as well. Firestore rules and indexes are project-wide resources, not isolated per feature. Review the complete current production rules/indexes and verify that existing Crypto/Premium entitlements and payment access remain intact before separately deploying them:
+
+```sh
+firebase deploy --only firestore:rules,firestore:indexes
+```
+
+Prefer a staging project first. Confirm the selected Firebase project ID before every deploy; stop if it is not the intended project.
 
 ## 2. Upstox OAuth secrets
 
