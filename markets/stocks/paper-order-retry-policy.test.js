@@ -23,6 +23,26 @@ test("scopes pending order storage keys to the authenticated user",()=>{
   assert.equal(userScopedStorageKey("", "user-a"),null);
 });
 
+test("keeps cash and derivative pending records isolated across user accounts",()=>{
+  const storage=memoryStorage();
+  const cashA=userScopedStorageKey("cash-pending","user-a");
+  const cashB=userScopedStorageKey("cash-pending","user-b");
+  const derivativeA=userScopedStorageKey("derivative-pending","user-a");
+  const fingerprint="NSE_EQ|ABC|BUY|2";
+  const pendingA={fingerprint,key};
+  const pendingB={fingerprint:"NSE_EQ|XYZ|SELL|1",key:"223e4567-e89b-42d3-a456-426614174000"};
+  assert.equal(writePendingPaperOrder(storage,cashA,pendingA),true);
+  assert.equal(writePendingPaperOrder(storage,cashB,pendingB),true);
+  assert.equal(writePendingPaperOrder(storage,derivativeA,{...pendingA,key:"323e4567-e89b-42d3-a456-426614174000"}),true);
+  assert.deepEqual(readPendingPaperOrder(storage,cashA),pendingA);
+  assert.deepEqual(readPendingPaperOrder(storage,cashB),pendingB);
+  assert.notDeepEqual(readPendingPaperOrder(storage,derivativeA),readPendingPaperOrder(storage,cashA));
+  assert.equal(clearPendingPaperOrder(storage,cashA),true);
+  assert.equal(readPendingPaperOrder(storage,cashA),null);
+  assert.deepEqual(readPendingPaperOrder(storage,cashB),pendingB);
+  assert.equal(readPendingPaperOrder(storage,derivativeA).fingerprint,fingerprint);
+});
+
 test("allows retry only for the same pending paper order fingerprint",()=>{
   const fingerprint=JSON.stringify({instrument_key:"NSE_EQ|INE001A01036",side:"BUY",quantity:2});
   assert.equal(canRetryPendingPaperOrder(fingerprint,fingerprint),true);
