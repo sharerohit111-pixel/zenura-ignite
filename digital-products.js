@@ -5,6 +5,7 @@ const esc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&
 const safeUrl=value=>{try{const url=new URL(String(value||""));return url.protocol==="https:"?url.href:""}catch{return ""}};
 const root=document.querySelector(".products-grid");
 let products=DEFAULT_DIGITAL_PRODUCTS;
+let cataloguePublished=false;
 function productModal(p){
  document.getElementById("digital-product-modal")?.remove();
  const el=document.createElement("div");el.id="digital-product-modal";el.className="digital-product-backdrop";
@@ -21,7 +22,8 @@ async function load(){
   const snap=await getDoc(doc(db,"publicCatalog","digitalProducts"));
   if(snap.exists()){
    const data=snap.data();
-   products=data.published===true&&Array.isArray(data.products)?data.products:[];
+   cataloguePublished=data.published===true&&Array.isArray(data.products);
+   products=cataloguePublished?data.products:[];
   }
  }catch(e){console.warn("Digital product details are using built-in defaults.",e)}
  if(!root)return;
@@ -29,7 +31,7 @@ async function load(){
  for(const card of cards){
   const title=card.querySelector("h3")?.textContent.trim().toLowerCase();
   const product=products.find(item=>(card.dataset.productId&&item.id===card.dataset.productId)||String(item.name||"").trim().toLowerCase()===title);
-  if(!product)continue;
+  if(!product){if(cataloguePublished)card.hidden=true;continue;}
   if(product.visible===false){card.hidden=true;continue;}
   card.hidden=false;
   const link=card.querySelector(".product-link");
