@@ -25,6 +25,12 @@ function buildPaperOrderUpdate(account,{instrumentKey,side,quantity,pricePaise})
      !Number.isSafeInteger(stored.averagePricePaise)||stored.averagePricePaise<0||
      (stored.quantity>0&&stored.averagePricePaise<1))
    throw Object.assign(new Error("Paper account contains a malformed cash-equity position."),{status:409});
+  const legacyCost=stored.quantity*stored.averagePricePaise;
+  const costBasis=stored.costBasisPaise===undefined?legacyCost:stored.costBasisPaise;
+  if(!Number.isSafeInteger(legacyCost)||!Number.isSafeInteger(costBasis)||costBasis<0||
+     (stored.quantity>0&&costBasis<1)||(stored.quantity===0&&costBasis!==0)||
+     (stored.quantity>0&&Math.round(costBasis/stored.quantity)!==stored.averagePricePaise))
+   throw Object.assign(new Error("Paper account contains an invalid cash-equity cost basis."),{status:409});
   if(stored.quantity>0)openPositionCount++;
  }
  // Closed legacy entries do not consume the 50-open-position valuation limit.
