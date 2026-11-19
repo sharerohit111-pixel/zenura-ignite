@@ -302,7 +302,6 @@ app.post("/paper/orders",async(req,res)=>{
     const {pricePaise,tradeTimeMs,quoteAgeMs:quoteAge}=normalizedQuote;
     const grossPaise=pricePaise*quantity;
     if(!Number.isSafeInteger(grossPaise)||grossPaise<=0)return res.status(400).json({error:"Order value exceeds supported calculation limits."});
-    const accountRef=paperAccountRef(decoded.uid);
     const {executePaperOrderTransaction}=require("./lib/paper-order-transaction");
     const result=await executePaperOrderTransaction({
       db,accountRef,orderRef,uid:decoded.uid,requestFingerprint,
