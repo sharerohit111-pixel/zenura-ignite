@@ -230,6 +230,8 @@
       const response=await fetch(gateway+'/paper/orders',{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json',Accept:'application/json'},body:JSON.stringify({instrument_key:instrumentKey,side,quantity:qty,idempotency_key:pendingPaperOrderKey})});
       const data=await response.json().catch(()=>({}));
       if(!response.ok){if(response.status>=400&&response.status<500){pendingPaperOrderKey=null;pendingPaperOrderFingerprint='';retryPolicy.clearPendingPaperOrder(pendingOrderStorage,paperPendingStorageKey);}throw new Error(data.error||'Paper order rejected');}
+      if(typeof data.orderId!=='string'||!Number.isSafeInteger(data.executionPricePaise)||data.executionPricePaise<1)
+        throw new Error('Order response could not be verified. Retry the same order to safely check its result.');
       pendingPaperOrderKey=null;pendingPaperOrderFingerprint='';retryPolicy.clearPendingPaperOrder(pendingOrderStorage,paperPendingStorageKey);
       const fillMessage=side+' '+qty+' '+(data.tradingSymbol||tradingSymbol)+' filled at '+inrPaise(data.executionPricePaise)+' · Simulated only';
       paperOrderStatus.textContent=fillMessage;
@@ -349,6 +351,9 @@
     try{
       const token=await connector.getIdToken(),response=await fetch(gateway+'/paper/derivative/orders',{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json',Accept:'application/json'},body:JSON.stringify({instrument_key:instrumentKey,side,lots,idempotency_key:pendingDerivativeOrder.key})});
       const data=await response.json();if(!response.ok){if(response.status>=400&&response.status<500){pendingDerivativeOrder=null;retryPolicy.clearPendingPaperOrder(pendingOrderStorage,derivativePendingStorageKey);}throw new Error(data.error||'Derivative paper order rejected.');}
+      if(typeof data.orderId!=='string'||!Number.isSafeInteger(data.quantity)||data.quantity<1||
+         !Number.isSafeInteger(data.executionPricePaise)||data.executionPricePaise<1)
+        throw new Error('Option order response could not be verified. Retry the same order to safely check its result.');
       pendingDerivativeOrder=null;retryPolicy.clearPendingPaperOrder(pendingOrderStorage,derivativePendingStorageKey);
       const fillMessage='SIMULATED '+side+' FILLED · '+data.tradingSymbol+' · '+data.quantity+' units · Premium '+inrPaise(data.grossPaise)+' · Estimated charges '+inrPaise(data.chargesPaise)+' · '+(side==='BUY'?'Total debit '+inrPaise(data.totalDebitPaise):'Net proceeds '+inrPaise(data.netCreditPaise))+'.';
       optionStatus.textContent=fillMessage;
