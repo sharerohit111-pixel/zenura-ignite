@@ -188,6 +188,10 @@ integrationTest("Firestore client rules keep published catalogue public and hidd
       published: false,
       categories: []
     });
+    await setDoc(doc(db, "publicCatalog", "productsOnly"), {
+      published: true,
+      products: [{ id: "legacy-product", name: "Legacy product" }]
+    });
   });
 
   const anonymous = environment.unauthenticatedContext().firestore();
@@ -198,6 +202,7 @@ integrationTest("Firestore client rules keep published catalogue public and hidd
   }).firestore();
 
   await assertSucceeds(getDoc(doc(anonymous, "publicCatalog", "published")));
+  await assertSucceeds(getDoc(doc(anonymous, "publicCatalog", "productsOnly")));
   await assertFails(getDoc(doc(anonymous, "publicCatalog", "hidden")));
   await assertFails(getDoc(doc(customer, "publicCatalog", "hidden")));
   await assertSucceeds(getDoc(doc(admin, "publicCatalog", "hidden")));
