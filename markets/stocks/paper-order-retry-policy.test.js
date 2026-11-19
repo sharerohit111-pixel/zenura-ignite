@@ -125,3 +125,20 @@ test("contains corrupt legacy records and unavailable storage without replaying 
   const blocked={getItem(){throw new Error("blocked");},setItem(){throw new Error("blocked");},removeItem(){throw new Error("blocked");}};
   assert.equal(inspectLegacyPendingPaperOrder(blocked,"legacy","user-a","scoped").state,"unavailable");
 });
+
+test("quarantines ambiguous legacy orders once per account without blocking later new orders",()=>{
+  const storage=memoryStorage(),legacyKey="legacy-pending",scopedKey="legacy-pending:user-a";
+  storage.setItem(legacyKey,JSON.stringify({fingerprint:"NSE_EQ|ABC|BUY|2",key}));
+  assert.equal(inspectLegacyPendingPaperOrder(storage,legacyKey,"user-a",scopedKey).state,"ambiguous");
+  assert.equal(inspectLegacyPendingPaperOrder(storage,legacyKey,"user-a",scopedKey).state,"quarantined");
+  assert.equal(readPendingPaperOrder(storage,scopedKey),null);
+  assert.notEqual(storage.getItem(legacyKey),null);
+});
+test("quarantines malformed legacy JSON and contains marker write failures",()=>{
+  const storage=memoryStorage();
+  storage.setItem("legacy","{");
+  assert.equal(inspectLegacyPendingPaperOrder(storage,"legacy","user-a","scoped").state,"ambiguous");
+  assert.equal(inspectLegacyPendingPaperOrder(storage,"legacy","user-a","scoped").state,"quarantined");
+  const blocked={getItem:()=>"{",setItem(){throw new Error("blocked");},removeItem(){}};
+  assert.equal(inspectLegacyPendingPaperOrder(blocked,"legacy","user-a","scoped").state,"unavailable");
+});
