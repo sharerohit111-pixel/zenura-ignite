@@ -22,6 +22,8 @@ function setState(title, message, connected = false, showDisconnect = connected)
   button.textContent = connected ? "RECONNECT UPSTOX" : (auth.currentUser ? "CONNECT UPSTOX" : "SIGN IN / CONNECT");
   disconnectButton.hidden = !showDisconnect;
 }
+let authStateSequence = 0;
+
 function explainError(error) {
   const code = error?.code || "";
   if (code.includes("unauthenticated")) return "Sign-in required. Please sign in and retry.";
@@ -30,13 +32,15 @@ function explainError(error) {
   if (code.includes("unauthorized-domain")) return "Add this website domain in Firebase Authentication → Settings → Authorized domains.";
   return error?.message || "Could not connect. Please retry.";
 }
-async function refreshStatus() {
-  if (!auth.currentUser) {
+async function refreshStatus(sequence = authStateSequence) {
+  const userAtStart = auth.currentUser;
+  if (!userAtStart) {
     setState("SIGN IN REQUIRED", "Sign in with Google to securely connect your Upstox account.");
     return;
   }
   try {
     const result = await getConnectionStatus();
+    if (sequence !== authStateSequence || auth.currentUser?.uid !== userAtStart.uid) return;
     const data = result.data || {};
     if (data.connected) {
       const expiry = Number.isFinite(data.expiresAt)
@@ -52,7 +56,9 @@ async function refreshStatus() {
       setState("UPSTOX NOT CONNECTED", "Authorize Upstox to link your trading account.");
     }
   } catch (error) {
-    setState("BACKEND NOT READY", explainError(error));
+    if (sequence === authStateSequence && auth.currentUser?.uid === userAtStart.uid) {
+      setState("BACKEND NOT READY", explainError(error));
+    }
   }
 }
 disconnectButton.addEventListener("click", async () => {
@@ -96,10 +102,11 @@ window.ZENURA_MARKET_CONNECTOR = {
   }
 };
 onAuthStateChanged(auth, async user => {
+  const sequence = ++authStateSequence;
   // Clear the previous account's private UI immediately on every auth transition.
   // Do not wait for a network-backed connection-status lookup before notifying the market page.
   window.dispatchEvent(new CustomEvent("zenura-market-auth-ready", { detail: { signedIn: !!user } }));
-  await refreshStatus();
+  await refreshStatus(sequence);
 });
 if (new URLSearchParams(location.search).get("upstox") === "connected") {
   history.replaceState({}, "", location.pathname);
