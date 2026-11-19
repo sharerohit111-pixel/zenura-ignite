@@ -86,6 +86,7 @@
       return;
     }
     const now = Date.now();
+    const start = data.currentPeriodStart && data.currentPeriodStart.toDate ? data.currentPeriodStart.toDate() : null;
     const end = data.currentPeriodEnd && data.currentPeriodEnd.toDate ? data.currentPeriodEnd.toDate() : null;
     const trialEnd = data.trialEndsAt && data.trialEndsAt.toDate ? data.trialEndsAt.toDate() : null;
     const premiumActive = data.status === 'premium' && end && end.getTime() > now;
@@ -93,9 +94,9 @@
     card.hidden = false;
     if (premiumActive) {
       const labels = {month_1:'1 Month · ₹99',month_3:'3 Months · ₹199',month_6:'6 Months · ₹399',year_1:'1 Year · ₹799'};
-      state.textContent = 'PREMIUM ACTIVE';
+      state.textContent = 'PREMIUM MEMBER · ACTIVE';
       planLine.textContent = 'Plan: ' + (labels[data.planId] || data.planId || 'Premium');
-      validity.textContent = 'Valid until: ' + end.toLocaleString('en-IN',{dateStyle:'medium',timeStyle:'short'}) + ' · Auto-renewal: Off';
+      validity.textContent = (start ? 'Started: ' + start.toLocaleDateString('en-IN') + ' · ' : '') + 'Valid until: ' + end.toLocaleString('en-IN',{dateStyle:'medium',timeStyle:'short'}) + ' · Auto-renewal: Off';
       say('Premium membership is active on this account.');
     } else if (trialActive) {
       state.textContent = 'FREE DEMO ACTIVE';
