@@ -433,7 +433,7 @@
   function scheduleReconnect(item){
     if(selected?.instrument_key!==item.instrument_key||reconnectTimer)return;
     const retry=window.ZenuraReconnectPolicy.nextReconnectDelay(reconnectAttempt);reconnectAttempt=retry.nextAttempt;
-    const delay=retry.delayMs;
+    const delay=window.ZenuraReconnectPolicy.jitteredReconnectDelay(retry.delayMs)??retry.delayMs;
     setFeedStatus('Live feed disconnected','Reconnecting in '+Math.round(delay/1000)+'s…');
     reconnectTimer=setTimeout(()=>{reconnectTimer=null;if(selected?.instrument_key===item.instrument_key)select(item,true);},delay);
   }
