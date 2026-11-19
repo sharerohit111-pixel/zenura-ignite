@@ -2,6 +2,11 @@
 
 const UUID_PATTERN=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
+function userScopedStorageKey(baseKey,userId){
+  if(typeof baseKey!=="string"||!baseKey||typeof userId!=="string"||!userId)return null;
+  return baseKey+":"+encodeURIComponent(userId);
+}
+
 function canRetryPendingPaperOrder(pendingFingerprint,nextFingerprint){
   return typeof pendingFingerprint === "string" && pendingFingerprint.length > 0
     && pendingFingerprint === nextFingerprint;
@@ -31,6 +36,6 @@ function clearPendingPaperOrder(storage,storageKey){
   catch(_){return false;}
 }
 
-const policy={canRetryPendingPaperOrder,readPendingPaperOrder,writePendingPaperOrder,clearPendingPaperOrder};
+const policy={userScopedStorageKey,canRetryPendingPaperOrder,readPendingPaperOrder,writePendingPaperOrder,clearPendingPaperOrder};
 if(typeof window!=="undefined")window.ZenuraPaperOrderRetryPolicy=policy;
 if(typeof module!=="undefined"&&module.exports)module.exports=policy;
