@@ -9,6 +9,7 @@ async function executePaperOrderTransaction({db,accountRef,orderRef,uid,requestF
     const [accountSnap,existingOrder]=await Promise.all([tx.get(accountRef),tx.get(orderRef)]);
     if(existingOrder.exists){
       const prior=existingOrder.data();
+      if(prior?.uid!==uid)throw Object.assign(new Error("Stored paper order does not belong to the authenticated account."),{status:409});
       assertIdempotentReplay(prior,requestFingerprint);
       if(!accountSnap.exists)throw Object.assign(new Error("Paper account is not initialized."),{status:409});
       const current=accountSnap.data();
