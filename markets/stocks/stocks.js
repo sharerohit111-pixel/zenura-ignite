@@ -195,7 +195,7 @@
       });
       status.textContent=data.valuationStatus==='fresh'?'Long CE/PE positions · Fresh Upstox quotes · Entry charges included; exit charges excluded':'No open derivative positions';
       const historyBody=document.getElementById('derivative-history');if(historyBody){historyBody.textContent='';if(!history.orders?.length)tableMessage(historyBody,6,'No derivative orders yet.');else history.orders.forEach(order=>{const tr=document.createElement('tr'),date=order.createdAt?new Date(order.createdAt).toLocaleString('en-IN'):'—';[date,order.tradingSymbol,order.side,order.lots,inrPaise(order.grossPaise),order.status+' · fees '+inrPaise(order.chargesPaise)+' · SIM'].forEach(v=>{const td=document.createElement('td');td.textContent=String(v);tr.append(td);});historyBody.append(tr);});}
-    }catch(error){status.textContent=error.message||'Derivative valuation unavailable';}
+    }catch(error){if(request===derivativePortfolioRequest)status.textContent=error.message||'Derivative valuation unavailable';}
   }
   async function refreshPaperViews(){await Promise.all([loadPaperPortfolio(),loadPaperHistory(),loadDerivativePortfolio()]);}
   paperRefresh.addEventListener('click',refreshPaperViews);
