@@ -117,29 +117,29 @@
   function inrPaise(value){const amount=Number(value||0)/100,formatted=Math.abs(amount).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});return amount<0?'-₹'+formatted:'₹'+formatted;}
   let paperAccountRequest=0;
   async function loadPaperAccount(){
-    const connector=window.ZENURA_MARKET_CONNECTOR,request=++paperAccountRequest;
-    if(!gateway||!connector?.getIdToken)return;
+    const connector=window.ZENURA_MARKET_CONNECTOR,uid=connector?.getUserId?.(),request=++paperAccountRequest;
+    if(!gateway||!connector?.getIdToken||!uid)return;
     try{
-      const token=await connector.getIdToken();if(request!==paperAccountRequest)return;
+      const token=await connector.getIdToken();if(request!==paperAccountRequest||connector.getUserId()!==uid)return;
       const response=await fetch(gateway+'/paper/account',{headers:{Authorization:'Bearer '+token,Accept:'application/json'}});
-      const data=await response.json();if(request!==paperAccountRequest)return;if(!response.ok)throw new Error(data.error||'Paper account unavailable');
+      const data=await response.json();if(request!==paperAccountRequest||connector.getUserId()!==uid)return;if(!response.ok)throw new Error(data.error||'Paper account unavailable');
       paperCash.textContent=inrPaise(data.cashPaise);paperRealized.textContent=inrPaise(data.realizedPnlPaise);
       paperAccountStatus.textContent='Separate Indian-market virtual account · No real funds';
       updatePaperButtons();
-    }catch(error){if(request===paperAccountRequest)paperAccountStatus.textContent=error.message||'Paper account not ready';}
+    }catch(error){if(request===paperAccountRequest&&connector.getUserId()===uid)paperAccountStatus.textContent=error.message||'Paper account not ready';}
   }
   const paperMarketValue=document.getElementById('paper-market-value'),paperUnrealized=document.getElementById('paper-unrealized'),paperEquity=document.getElementById('paper-equity'),paperPortfolioStatus=document.getElementById('paper-portfolio-status'),paperPositions=document.getElementById('paper-positions'),paperHistory=document.getElementById('paper-history'),paperRefresh=document.getElementById('refresh-paper-portfolio'),paperHistoryMore=document.getElementById('paper-history-more'),paperHistoryStatus=document.getElementById('paper-history-status');
   function tableMessage(body,columns,message){body.textContent='';const tr=document.createElement('tr'),td=document.createElement('td');td.colSpan=columns;td.textContent=message;tr.append(td);body.append(tr);}
   function signedMoney(value){const n=Number(value||0);return (n>0?'+':n<0?'−':'')+inrPaise(Math.abs(n));}
   let paperPortfolioRequest=0;
   async function loadPaperPortfolio(){
-    const request=++paperPortfolioRequest;
-    if(!gateway||!window.ZENURA_MARKET_CONNECTOR?.getIdToken)return;
+    const connector=window.ZENURA_MARKET_CONNECTOR,uid=connector?.getUserId?.(),request=++paperPortfolioRequest;
+    if(!gateway||!connector?.getIdToken||!uid)return;
     paperPortfolioStatus.textContent='Refreshing verified market valuation…';
     try{
-      const token=await window.ZENURA_MARKET_CONNECTOR.getIdToken();if(request!==paperPortfolioRequest)return;
+      const token=await connector.getIdToken();if(request!==paperPortfolioRequest||connector.getUserId()!==uid)return;
       const response=await fetch(gateway+'/paper/portfolio',{headers:{Authorization:'Bearer '+token,Accept:'application/json'}});
-      const data=await response.json();if(request!==paperPortfolioRequest)return;if(!response.ok)throw new Error(data.error||'Portfolio valuation unavailable');
+      const data=await response.json();if(request!==paperPortfolioRequest||connector.getUserId()!==uid)return;if(!response.ok)throw new Error(data.error||'Portfolio valuation unavailable');
       paperMarketValue.textContent=inrPaise(data.marketValuePaise);paperUnrealized.textContent=signedMoney(data.unrealizedPnlPaise);paperEquity.textContent=inrPaise(data.equityPaise);
       paperPortfolioStatus.textContent=data.valuationStatus==='fresh'?'All holdings valued from fresh Upstox quotes.':data.valuationStatus==='no_open_positions'?'No open holdings.':'Some quotes are stale or unavailable; those positions are excluded from totals ('+data.stalePositions+').';
       paperPositions.textContent='';
@@ -149,20 +149,21 @@
         [p.tradingSymbol,p.quantity,inrPaise(p.averagePricePaise),p.lastPricePaise===null?'STALE':inrPaise(p.lastPricePaise),p.marketValuePaise===null?'—':inrPaise(p.marketValuePaise),p.unrealizedPnlPaise===null?'—':signedMoney(p.unrealizedPnlPaise)].forEach(v=>{const td=document.createElement('td');td.textContent=String(v);tr.append(td);});
         paperPositions.append(tr);
       });
-    }catch(error){if(request===paperPortfolioRequest)paperPortfolioStatus.textContent=error.message||'Portfolio refresh failed.';}
+    }catch(error){if(request===paperPortfolioRequest&&connector.getUserId()===uid)paperPortfolioStatus.textContent=error.message||'Portfolio refresh failed.';}
   }
   let paperHistoryCursor=null,paperHistoryHasMore=false,paperHistoryLoading=false,paperHistoryLoadSeq=0;
   async function loadPaperHistory({append=false}={}){
-    if(!gateway||!window.ZENURA_MARKET_CONNECTOR?.getIdToken)return;
+    const connector=window.ZENURA_MARKET_CONNECTOR,uid=connector?.getUserId?.();
+    if(!gateway||!connector?.getIdToken||!uid)return;
     if(append&&(paperHistoryLoading||!paperHistoryHasMore||!paperHistoryCursor))return;
     const seq=++paperHistoryLoadSeq,cursor=paperHistoryCursor;paperHistoryLoading=true;paperHistoryMore.disabled=true;
     if(paperHistoryStatus)paperHistoryStatus.textContent=append?'Loading older orders…':'Loading latest orders…';
     try{
-      const token=await window.ZENURA_MARKET_CONNECTOR.getIdToken();if(seq!==paperHistoryLoadSeq)return;
+      const token=await connector.getIdToken();if(seq!==paperHistoryLoadSeq||connector.getUserId()!==uid)return;
       const params=new URLSearchParams({limit:'50'});
       if(append)params.set('cursor',cursor);
       const response=await fetch(gateway+'/paper/orders?'+params.toString(),{headers:{Authorization:'Bearer '+token,Accept:'application/json'}});
-      const data=await response.json();if(seq!==paperHistoryLoadSeq)return;if(!response.ok)throw new Error(data.error||'Order history unavailable');
+      const data=await response.json();if(seq!==paperHistoryLoadSeq||connector.getUserId()!==uid)return;if(!response.ok)throw new Error(data.error||'Order history unavailable');
       if(!append)paperHistory.textContent='';
       if(!data.orders?.length&&!append)tableMessage(paperHistory,6,'No paper orders yet.');
       else data.orders.forEach(order=>{
@@ -175,31 +176,12 @@
       if(paperHistoryStatus)paperHistoryStatus.textContent=paperHistoryHasMore?'Showing '+paperHistory.children.length+' orders':'All available orders loaded';
       paperHistoryMore.disabled=!paperHistoryHasMore;
     }catch(error){
-      if(seq===paperHistoryLoadSeq){if(paperHistoryStatus)paperHistoryStatus.textContent='Could not load order history';if(!append)tableMessage(paperHistory,6,error.message||'Could not load order history.');}
-    }finally{if(seq===paperHistoryLoadSeq){paperHistoryLoading=false;paperHistoryMore.disabled=!paperHistoryHasMore;}}
+      if(seq===paperHistoryLoadSeq&&connector.getUserId()===uid){if(paperHistoryStatus)paperHistoryStatus.textContent='Could not load order history';if(!append)tableMessage(paperHistory,6,error.message||'Could not load order history.');}
+    }finally{if(seq===paperHistoryLoadSeq&&connector.getUserId()===uid){paperHistoryLoading=false;paperHistoryMore.disabled=!paperHistoryHasMore;}}
   }
   paperHistoryMore?.addEventListener('click',()=>loadPaperHistory({append:true}));
   let derivativePortfolioRequest=0;
-  async function loadDerivativePortfolio(){
-    const request=++derivativePortfolioRequest;
-    const body=document.getElementById('derivative-positions'),status=document.getElementById('derivative-portfolio-status');
-    if(!body||!status||!gateway||!window.ZENURA_MARKET_CONNECTOR?.getIdToken)return;
-    status.textContent='Refreshing verified option quotes…';
-    try{
-      const token=await window.ZENURA_MARKET_CONNECTOR.getIdToken();
-      const [response,historyResponse]=await Promise.all([fetch(gateway+'/paper/derivatives/portfolio',{headers:{Authorization:'Bearer '+token,Accept:'application/json'}}),fetch(gateway+'/paper/derivative/orders?limit=50',{headers:{Authorization:'Bearer '+token,Accept:'application/json'}})]);
-      const data=await response.json(),history=await historyResponse.json();if(request!==derivativePortfolioRequest)return;if(!response.ok)throw new Error(data.error||'Derivative portfolio unavailable');if(!historyResponse.ok)throw new Error(history.error||'Derivative order history unavailable');
-      body.textContent='';
-      if(!data.positions?.length)tableMessage(body,6,'No open derivative positions.');
-      else data.positions.forEach(p=>{
-        const tr=document.createElement('tr');
-        [p.instrumentKey,p.netQuantity,inrPaise(p.averagePricePaise),inrPaise(p.marketPricePaise),inrPaise(Math.abs(p.marketValuePaise)),signedMoney(p.unrealizedPnlPaise)].forEach(v=>{const td=document.createElement('td');td.textContent=String(v);tr.append(td);});
-        body.append(tr);
-      });
-      status.textContent=data.valuationStatus==='fresh'?'Long CE/PE positions · Fresh Upstox quotes · Entry charges included; exit charges excluded':'No open derivative positions';
-      const historyBody=document.getElementById('derivative-history');if(historyBody){historyBody.textContent='';if(!history.orders?.length)tableMessage(historyBody,6,'No derivative orders yet.');else history.orders.forEach(order=>{const tr=document.createElement('tr'),date=order.createdAt?new Date(order.createdAt).toLocaleString('en-IN'):'—';[date,order.tradingSymbol,order.side,order.lots,inrPaise(order.grossPaise),order.status+' · fees '+inrPaise(order.chargesPaise)+' · SIM'].forEach(v=>{const td=document.createElement('td');td.textContent=String(v);tr.append(td);});historyBody.append(tr);});}
-    }catch(error){if(request===derivativePortfolioRequest)status.textContent=error.message||'Derivative valuation unavailable';}
-  }
+undefined
   async function refreshPaperViews(){await Promise.all([loadPaperPortfolio(),loadPaperHistory(),loadDerivativePortfolio()]);}
   paperRefresh.addEventListener('click',refreshPaperViews);
 
