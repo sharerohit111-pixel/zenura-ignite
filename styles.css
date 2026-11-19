@@ -78,3 +78,5 @@
 .back-to-top:active{transform:scale(.94)}
 @media(max-width:600px){.back-to-top{right:16px;bottom:82px;width:46px;height:46px;font-size:25px}}
 @media(prefers-reduced-motion:reduce){.back-to-top{transition:none}}
+
+.header nav .admin-nav-link{margin-top:8px;border-top:1px solid #35e4ff55;color:#48e6ff;font-weight:800}.header nav .admin-nav-link:hover{background:#12304b;color:#fff}
