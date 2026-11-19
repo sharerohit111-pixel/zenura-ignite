@@ -94,10 +94,15 @@ service cloud.firestore {
       allow read: if request.auth != null && request.auth.uid == uid;
       allow write: if false;
     }
-    // Backward-compatible read for accounts whose older admin approvals used nested entitlements.
+    // Preserve the existing admin-only legacy entitlement write path during migration.
+    // Owners retain read-only access; arbitrary users cannot create or change membership.
     match /users/{uid}/private/entitlement {
       allow read: if request.auth != null && (request.auth.uid == uid || isZenuraAdmin());
-      allow write: if false;
+      allow create, update: if isZenuraAdmin()
+        && request.resource.data.active is bool
+        && request.resource.data.planKey is string
+        && request.resource.data.validUntil is timestamp;
+      allow delete: if false;
     }
 
     match /enquiries/{enquiryId} {
