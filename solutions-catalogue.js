@@ -5,6 +5,15 @@ const root=document.getElementById("solution-catalogue");
 const clone=x=>JSON.parse(JSON.stringify(x));
 const esc=v=>{let value=String(v??"");if(window.ZenuraI18n?.getLanguage?.()==="en")value=window.ZenuraI18n.toEnglish?.(value)??value;return value.replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));};
 const money=n=>"₹"+Number(n||0).toLocaleString("en-IN");
+const PRODUCT_IMAGES = {
+ "medical-store": "https://qaymny.com/assets/businesses/medicina-pharmacy-umm-suqeim-st-al-barsha-dubai-sy-dby/thumbnail.jpg",
+ "kirana": "https://img.lentlo.com/images/listing-img-80694/w-640.webp",
+ "bookstore": "https://coubic-images.s3.ap-northeast-1.amazonaws.com/merchant_images/p1280x1280_ccc4266_bab18132.jpg",
+ "small-mall": "https://static.hiamag.com/styles/autox754/public/article/01/08/2017/5723006-788243592.jpg",
+ "garage": "https://www.capricorn.coop/-/media/project/csl/capricorn/articles/feature-images/tatbiz-workshop-design-caphubfeature.jpg?h=450&hash=820D2938C10EA00FA0834D261812F2C4&iar=0&w=720",
+ "coaching": "https://www.pw.live/offline-centres/_next/image?q=75&url=https%3A%2F%2Fstatic.pw.live%2F5eb393ee95fab7468a79d189%2FADMIN%2F88a70f46-392c-47c5-b3ad-556f84ab9a17.jpg&w=1200",
+ "school": "https://cdnbbsr.s3waas.gov.in/s3kv022d8f5be5f02d39ca6a6e1b5f720b/uploads/2024/03/2026061859.png"
+};
 let categories=clone(DEFAULT_SOLUTIONS),active="all";
 function render(){
  const visible=categories.filter(c=>c.products?.some(p=>p.visible!==false));
@@ -13,7 +22,7 @@ function render(){
  root.querySelectorAll("[data-cat]").forEach(b=>b.addEventListener("click",()=>{active=b.dataset.cat;render()}));
  root.querySelectorAll("[data-detail]").forEach(b=>b.addEventListener("click",()=>detail(find(b.dataset.detail))));
 }
-function card(p,c){return '<article class="solution-product"><div class="solution-product-top"><span class="solution-product-icon">'+esc(p.icon||"✦")+'</span><h4>'+esc(p.name)+'</h4><p>'+esc(p.desc)+'</p></div><div class="solution-plans">'+mini("SILVER",p.silver,false)+mini("GOLDEN",p.gold,true)+'</div><div class="solution-product-actions"><button class="solution-detail-btn" data-detail="'+esc(p.id)+'">View features & plan details ↗</button></div></article>'}
+function card(p,c){const image=p.imageUrl||PRODUCT_IMAGES[p.id];return '<article class="solution-product">'+(image?'<div class="solution-product-image-wrap"><img class="solution-product-image" src="'+esc(image)+'" alt="'+esc(p.name)+'" loading="lazy" decoding="async"></div>':'')+'<div class="solution-product-top"><span class="solution-product-icon">'+esc(p.icon||"✦")+'</span><h4>'+esc(p.name)+'</h4><p>'+esc(p.desc)+'</p></div><div class="solution-plans">'+mini("SILVER",p.silver,false)+mini("GOLDEN",p.gold,true)+'</div><div class="solution-product-actions"><button class="solution-detail-btn" data-detail="'+esc(p.id)+'">View features & plan details ↗</button></div></article>'}
 function mini(label,plan,gold){plan=plan||{price:0,features:[]};return '<div class="solution-plan '+(gold?"gold":"")+'"><div class="solution-plan-label">'+label+' PLAN</div><div class="solution-plan-price">'+money(plan.price)+'</div><div class="solution-plan-caption">Indicative project price</div><ul>'+(plan.features||[]).slice(0,3).map(x=>'<li>'+esc(x)+'</li>').join("")+'</ul></div>'}
 function find(id){for(const c of categories){const p=c.products.find(x=>x.id===id);if(p)return {p,c}}return null}
 function modal(html){document.getElementById("solution-modal-backdrop")?.remove();const el=document.createElement("div");el.id="solution-modal-backdrop";el.className="solution-modal-backdrop open";el.innerHTML='<div class="solution-modal" role="dialog" aria-modal="true">'+html+'</div>';document.body.append(el);el.addEventListener("click",e=>{if(e.target===el)el.remove()});el.querySelector("[data-close]")?.addEventListener("click",()=>el.remove())}
