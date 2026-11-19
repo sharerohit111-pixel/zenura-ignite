@@ -17,6 +17,11 @@ function buildPortfolioValuation({positions,quotes,cashPaise,realizedPnlPaise=0,
   for(const [instrumentKey,position] of positions){
     if(typeof instrumentKey!=="string"||!instrumentKey||!position||!Number.isSafeInteger(position.quantity)||position.quantity<1||position.quantity>1000000||!Number.isSafeInteger(position.averagePricePaise)||position.averagePricePaise<1)
       throw Object.assign(new Error("Portfolio contains an invalid position."),{status:409});
+    const legacyCost=position.quantity*position.averagePricePaise;
+    const costBasisPaise=position.costBasisPaise===undefined?legacyCost:position.costBasisPaise;
+    if(!Number.isSafeInteger(legacyCost)||!Number.isSafeInteger(costBasisPaise)||costBasisPaise<1||
+       Math.round(costBasisPaise/position.quantity)!==position.averagePricePaise)
+      throw Object.assign(new Error("Portfolio contains an invalid cost basis."),{status:409});
     const instrument=instruments.find(x=>x?.instrument_key===instrumentKey);
     const quote=quotes.find(x=>x?.instrument_token===instrumentKey);
     let normalized=null;
@@ -24,15 +29,15 @@ function buildPortfolioValuation({positions,quotes,cashPaise,realizedPnlPaise=0,
     if(!normalized){
       staleCount++;
       const age=quoteAgeMs(quote?.last_trade_time,now);
-      valued.push({instrumentKey,tradingSymbol:instrument?.trading_symbol||instrumentKey,quantity:position.quantity,averagePricePaise:position.averagePricePaise,lastPricePaise:null,marketValuePaise:null,unrealizedPnlPaise:null,quoteAgeMs:Number.isFinite(age)?age:null,valuationStatus:"stale_or_unavailable"});
+      valued.push({instrumentKey,tradingSymbol:instrument?.trading_symbol||instrumentKey,quantity:position.quantity,averagePricePaise:position.averagePricePaise,costBasisPaise,lastPricePaise:null,marketValuePaise:null,unrealizedPnlPaise:null,quoteAgeMs:Number.isFinite(age)?age:null,valuationStatus:"stale_or_unavailable"});
       continue;
     }
     const {pricePaise:lastPricePaise,quoteAgeMs:age}=normalized;
-    const value=lastPricePaise*position.quantity,pnl=(lastPricePaise-position.averagePricePaise)*position.quantity;
+    const value=lastPricePaise*position.quantity,pnl=value-costBasisPaise;
     if(!Number.isSafeInteger(value)||!Number.isSafeInteger(pnl)||!Number.isSafeInteger(marketValuePaise+value)||!Number.isSafeInteger(unrealizedPnlPaise+pnl))
       throw Object.assign(new Error("Portfolio valuation exceeds safe calculation limits."),{status:409});
     marketValuePaise+=value;unrealizedPnlPaise+=pnl;
-    valued.push({instrumentKey,tradingSymbol:instrument?.trading_symbol||quote.symbol||instrumentKey,quantity:position.quantity,averagePricePaise:position.averagePricePaise,lastPricePaise,marketValuePaise:value,unrealizedPnlPaise:pnl,quoteAgeMs:age,valuationStatus:"fresh"});
+    valued.push({instrumentKey,tradingSymbol:instrument?.trading_symbol||quote.symbol||instrumentKey,quantity:position.quantity,averagePricePaise:position.averagePricePaise,costBasisPaise,lastPricePaise,marketValuePaise:value,unrealizedPnlPaise:pnl,quoteAgeMs:age,valuationStatus:"fresh"});
   }
   const equityPaise=cashPaise+marketValuePaise;
   if(!Number.isSafeInteger(equityPaise))throw Object.assign(new Error("Portfolio equity exceeds safe calculation limits."),{status:409});
