@@ -165,10 +165,10 @@
       const response=await fetch(gateway+'/paper/orders?'+params.toString(),{headers:{Authorization:'Bearer '+token,Accept:'application/json'}});
       const data=await response.json();if(seq!==paperHistoryLoadSeq||connector.getUserId()!==uid)return;if(!response.ok)throw new Error(data.error||'Order history unavailable');
       if(!append)paperHistory.textContent='';
-      if(!data.orders?.length&&!append)tableMessage(paperHistory,6,'No paper orders yet.');
+      if(!data.orders?.length&&!append)tableMessage(paperHistory,7,'No paper orders yet.');
       else data.orders.forEach(order=>{
         const tr=document.createElement('tr'),date=order.createdAt?new Date(order.createdAt).toLocaleString('en-IN'):'—';
-        [date,order.tradingSymbol,order.side,order.quantity,inrPaise(order.executionPricePaise),order.status+' · SIM'].forEach(v=>{const td=document.createElement('td');td.textContent=String(v);tr.append(td);});
+        [date,order.tradingSymbol,order.side,order.orderType||'MARKET',order.quantity,inrPaise(order.executionPricePaise),order.status+' · SIM'].forEach(v=>{const td=document.createElement('td');td.textContent=String(v);tr.append(td);});
         paperHistory.append(tr);
       });
       paperHistoryCursor=data.nextCursor||null;
@@ -176,7 +176,7 @@
       if(paperHistoryStatus)paperHistoryStatus.textContent=paperHistoryHasMore?'Showing '+paperHistory.children.length+' orders':'All available orders loaded';
       paperHistoryMore.disabled=!paperHistoryHasMore;
     }catch(error){
-      if(seq===paperHistoryLoadSeq&&connector.getUserId()===uid){if(paperHistoryStatus)paperHistoryStatus.textContent='Could not load order history';if(!append)tableMessage(paperHistory,6,error.message||'Could not load order history.');}
+      if(seq===paperHistoryLoadSeq&&connector.getUserId()===uid){if(paperHistoryStatus)paperHistoryStatus.textContent='Could not load order history';if(!append)tableMessage(paperHistory,7,error.message||'Could not load order history.');}
     }finally{if(seq===paperHistoryLoadSeq&&connector.getUserId()===uid){paperHistoryLoading=false;paperHistoryMore.disabled=!paperHistoryHasMore;}}
   }
   paperHistoryMore?.addEventListener('click',()=>loadPaperHistory({append:true}));
@@ -553,7 +553,7 @@
     paperMarketValue.textContent='—';paperUnrealized.textContent='—';paperEquity.textContent='—';
     paperPortfolioStatus.textContent='Sign in to view your private portfolio.';
     tableMessage(paperPositions,6,'Sign in to view holdings.');
-    tableMessage(paperHistory,6,'Sign in to view order history.');
+    tableMessage(paperHistory,7,'Sign in to view order history.');
     if(paperHistoryStatus)paperHistoryStatus.textContent='Sign in required';
     if(paperHistoryMore)paperHistoryMore.disabled=true;
     const derivativeBody=document.getElementById('derivative-positions');
