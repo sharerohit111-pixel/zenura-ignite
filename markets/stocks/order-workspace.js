@@ -53,7 +53,7 @@
     'Sign in to view private orders.':'निजी ऑर्डर देखने के लिए साइन इन करें।',
     'LIMIT orders are not enabled by the current backend API. No order was sent.':'मौजूदा बैकएंड API में LIMIT ऑर्डर उपलब्ध नहीं हैं। कोई ऑर्डर नहीं भेजा गया।',
     'Cancel is unavailable: the backend has no verified cancel endpoint.':'रद्द करने की सुविधा उपलब्ध नहीं: बैकएंड में सत्यापित cancel endpoint नहीं है।',
-    'Not exposed by backend':'बैकएंड से उपलब्ध नहीं'
+    'Not exposed by backend':'बैकएंड से उपलब्ध नहीं','CANCEL UNAVAILABLE':'रद्द करना उपलब्ध नहीं','BUY':'खरीदें','SELL':'बेचें','PENDING':'पेंडिंग','OPEN':'खुला','PARTIALLY_FILLED':'आंशिक रूप से पूरा','CANCELLED':'रद्द','REJECTED':'अस्वीकृत'
   };
   const translate = value => language === 'hi' ? (translations[value] || value) : value;
   function applyLanguage() {
@@ -161,7 +161,7 @@
     const tr = document.createElement('tr');
     const when = order.createdAt ? new Date(order.createdAt).toLocaleString('en-IN', {dateStyle:'medium',timeStyle:'short'}) : '—';
     const price = Number.isSafeInteger(order.executionPricePaise) ? money(order.executionPricePaise) : '—';
-    const values = [when, order.tradingSymbol, order.side, order.orderType || 'MARKET', order.quantity, price, order.status];
+    const values = [when, order.tradingSymbol, translate(String(order.side || '')), translate(String(order.orderType || 'MARKET')), order.quantity, price, translate(String(order.status || ''))];
     values.forEach(value => {
       const td = document.createElement('td');
       td.textContent = safeText(value);
@@ -173,7 +173,7 @@
       button.type = 'button';
       button.className = 'paper-cancel-unavailable';
       button.disabled = true;
-      button.textContent = 'CANCEL UNAVAILABLE';
+      button.textContent = translate('CANCEL UNAVAILABLE');
       button.title = translate('Cancel is unavailable: the backend has no verified cancel endpoint.');
       td.append(button);
       tr.append(td);
@@ -207,7 +207,7 @@
     filled.forEach(order => {
       const tr = document.createElement('tr');
       const when = order.createdAt ? new Date(order.createdAt).toLocaleString('en-IN', {dateStyle:'medium',timeStyle:'short'}) : '—';
-      [when,order.tradingSymbol,order.side,order.quantity,money(order.executionPricePaise),order.orderType || 'MARKET'].forEach(value => {
+      [when,order.tradingSymbol,translate(String(order.side || '')),order.quantity,money(order.executionPricePaise),translate(String(order.orderType || 'MARKET'))].forEach(value => {
         const td = document.createElement('td'); td.textContent = safeText(value); tr.append(td);
       });
       tradeBody.append(tr);
@@ -231,6 +231,7 @@
       const [account, portfolio] = await Promise.all([accountResponse.json(), portfolioResponse.json()]);
       if (connector.getUserId() !== uid) return;
       if (!accountResponse.ok) throw new Error(account.error || 'Account balance unavailable.');
+      if (!portfolioResponse.ok) throw new Error(portfolio.error || 'Share availability could not be verified.');
       latestCashPaise = Number.isSafeInteger(account.cashPaise) ? account.cashPaise : null;
       cashAvailable.textContent = money(latestCashPaise);
       cashReserved.textContent = translate('Not exposed by backend');
