@@ -45,7 +45,8 @@ test("adds bounded jitter to reconnect delays to spread client retries",()=>{
   assert.equal(jitteredReconnectDelay(1000,()=>0),800);
   assert.equal(jitteredReconnectDelay(1000,()=>0.5),1000);
   assert.equal(jitteredReconnectDelay(1000,()=>1),1200);
-  assert.equal(jitteredReconnectDelay(30000,()=>1),36000);
+  assert.equal(jitteredReconnectDelay(30000,()=>1),30000);
+  assert.equal(jitteredReconnectDelay(30000,()=>0),24000);
 });
 test("rejects invalid jitter inputs",()=>{
   const {jitteredReconnectDelay}=require("./reconnect-policy");
