@@ -82,7 +82,7 @@
       const legacyPlans = {monthly:'month_1',quarterly:'month_3',halfyear:'month_6',yearly:'year_1'};
       return {status:'premium',planId:legacyPlans[data.planKey]||data.planKey,
         currentPeriodStart:data.startsAt,currentPeriodEnd:data.validUntil,
-        email:data.email,displayName:data.displayName,provider:'legacy_upi'};
+        email:data.email,displayName:data.displayName,paymentId:data.paymentId,approvedBy:data.approvedBy,provider:'legacy_upi'};
     }
     return data;
   }
@@ -343,6 +343,18 @@
           if(legacy.exists)x.data=normalizedEntitlement(legacy.data());
         } catch(error){console.warn('Legacy member lookup failed for',x.uid,error);}
       }));
+      const legacyMembers=[...records.values()].filter(x=>x.data?.provider==='legacy_upi'&&x.data.status==='premium'&&x.data.currentPeriodStart&&x.data.currentPeriodEnd);
+      if(legacyMembers.length){
+        const migration=db.batch();
+        legacyMembers.forEach(x=>migration.set(db.collection('entitlements').doc(x.uid),{
+          uid:x.uid,email:x.email||x.data.email||'',displayName:x.displayName||x.data.displayName||x.email||'ZENURA Member',
+          status:'premium',planId:x.data.planId,currentPeriodStart:x.data.currentPeriodStart,currentPeriodEnd:x.data.currentPeriodEnd,
+          autoRenew:false,provider:'upi_qr_manual',paymentId:x.data.paymentId||'',approvedBy:x.data.approvedBy||auth.currentUser.email,
+          updatedAt:firebase.firestore.FieldValue.serverTimestamp()
+        },{merge:true}));
+        await migration.commit();
+        legacyMembers.forEach(x=>{x.data.provider='upi_qr_manual';});
+      }
       const rows=[...records.values()].filter(x=>x.data||x.latestPayment).map(x=>{
         const d=x.data||{},end=d.currentPeriodEnd?.toDate?.()||null;
         const active=d.status==='premium'&&end&&end.getTime()>Date.now();
