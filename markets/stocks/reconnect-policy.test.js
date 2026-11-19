@@ -39,3 +39,17 @@ test("reconnects after provider error events but not ordinary feed events",()=>{
   assert.equal(shouldReconnectAfterFeedError("error"),true);
   for(const event of ["status","market","message",undefined])assert.equal(shouldReconnectAfterFeedError(event),false);
 });
+
+test("adds bounded jitter to reconnect delays to spread client retries",()=>{
+  const {jitteredReconnectDelay}=require("./reconnect-policy");
+  assert.equal(jitteredReconnectDelay(1000,()=>0),800);
+  assert.equal(jitteredReconnectDelay(1000,()=>0.5),1000);
+  assert.equal(jitteredReconnectDelay(1000,()=>1),1200);
+  assert.equal(jitteredReconnectDelay(30000,()=>1),36000);
+});
+test("rejects invalid jitter inputs",()=>{
+  const {jitteredReconnectDelay}=require("./reconnect-policy");
+  assert.equal(jitteredReconnectDelay(-1),null);
+  assert.equal(jitteredReconnectDelay(1000,()=>2),null);
+  assert.equal(jitteredReconnectDelay(1000,()=>0.5,2),null);
+});
