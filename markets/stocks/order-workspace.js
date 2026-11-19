@@ -108,21 +108,6 @@
       ? money(Math.round(price * 100) * quantity)
       : '—';
   }
-  let marketBuyDisabled = buy.disabled, marketSellDisabled = sell.disabled;
-  let lastBuyDisabled = buy.disabled, lastSellDisabled = sell.disabled;
-  function trackMarketButtonAvailability() {
-    if (selectedType !== 'LIMIT') return;
-    if (buy.disabled !== lastBuyDisabled) marketBuyDisabled = buy.disabled;
-    if (sell.disabled !== lastSellDisabled) marketSellDisabled = sell.disabled;
-    lastBuyDisabled = buy.disabled; lastSellDisabled = sell.disabled;
-    if (!buy.disabled) { buy.disabled = true; lastBuyDisabled = true; }
-    if (!sell.disabled) { sell.disabled = true; lastSellDisabled = true; }
-  }
-  if (typeof MutationObserver !== 'undefined') {
-    const buttonObserver = new MutationObserver(trackMarketButtonAvailability);
-    buttonObserver.observe(buy, {attributes:true,attributeFilter:['disabled']});
-    buttonObserver.observe(sell, {attributes:true,attributeFilter:['disabled']});
-  }
   function setOrderType(type) {
     selectedType = type;
     typeButtons.forEach(button => {
@@ -134,21 +119,17 @@
     referencePrice.closest('label').hidden = type === 'LIMIT';
     limitPrice.closest('label').hidden = type !== 'LIMIT';
     if (type === 'LIMIT') {
-      marketBuyDisabled = buy.disabled; marketSellDisabled = sell.disabled;
-      buy.disabled = true; sell.disabled = true;
-      lastBuyDisabled = true; lastSellDisabled = true;
+      [buy, sell].forEach(button => { button.setAttribute('aria-disabled', 'true'); button.classList.add('paper-limit-blocked'); });
       showMessage(limitNotice, translate('LIMIT orders are not enabled by the current backend API. No order was sent.'), 'warning');
       status.textContent = translate('LIMIT orders are not enabled by the current backend API. No order was sent.');
     } else {
       limitNotice.hidden = true;
-      buy.disabled = marketBuyDisabled; sell.disabled = marketSellDisabled;
-      lastBuyDisabled = buy.disabled; lastSellDisabled = sell.disabled;
+      [buy, sell].forEach(button => { button.removeAttribute('aria-disabled'); button.classList.remove('paper-limit-blocked'); });
       status.textContent = 'MARKET orders use a fresh server-verified Upstox quote. The displayed price is indicative only.';
     }
     updateEstimate();
   }
   typeButtons.forEach(button => button.addEventListener('click', () => setOrderType(button.dataset.orderType)));
-  window.addEventListener('zenura-market-auth-ready', trackMarketButtonAvailability);
   qty?.addEventListener('input', updateEstimate);
   limitPrice?.addEventListener('input', updateEstimate);
   const selectedPrice = $('selected-price');
