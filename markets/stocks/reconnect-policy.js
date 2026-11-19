@@ -8,7 +8,16 @@ function nextReconnectDelay(attempt) {
   };
 }
 
-function jitteredReconnectDelay(delayMs, random=Math.random, jitterRatio=0.2) {\n  if (!Number.isFinite(delayMs) || delayMs < 0 || typeof random !== "function" ||\n      !Number.isFinite(jitterRatio) || jitterRatio < 0 || jitterRatio > 1) return null;\n  const sample = random();\n  if (!Number.isFinite(sample) || sample < 0 || sample > 1) return null;\n  const factor = 1 - jitterRatio + (2 * jitterRatio * sample);\n  return Math.max(0, Math.round(delayMs * factor));\n}\n\nfunction shouldReconnectAfterFeedError(eventName) {
+function jitteredReconnectDelay(delayMs, random=Math.random, jitterRatio=0.2) {
+  if (!Number.isFinite(delayMs) || delayMs < 0 || typeof random !== "function" ||
+      !Number.isFinite(jitterRatio) || jitterRatio < 0 || jitterRatio > 1) return null;
+  const sample = random();
+  if (!Number.isFinite(sample) || sample < 0 || sample > 1) return null;
+  const factor = 1 - jitterRatio + (2 * jitterRatio * sample);
+  return Math.max(0, Math.round(delayMs * factor));
+}
+
+function shouldReconnectAfterFeedError(eventName) {
   return eventName === "error";
 }
 
