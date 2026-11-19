@@ -231,7 +231,7 @@ test("Firestore transaction retry re-reads a competing committed order before re
  const fingerprint=require("../lib/order-idempotency").makeOrderFingerprint({
   instrumentKey:instrument.instrument_key,side:"BUY",quantity:65
  });
- const competingOrder={requestFingerprint:fingerprint,status:"FILLED",grossPaise:81250};
+ const competingOrder={uid,requestFingerprint:fingerprint,status:"FILLED",grossPaise:81250};
  let attempts=0;
  const db={runTransaction:async callback=>{
   const firstTx={
