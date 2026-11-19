@@ -29,3 +29,5 @@
 .paper-language-toggle{position:fixed;right:max(14px,env(safe-area-inset-right));bottom:max(14px,env(safe-area-inset-bottom));z-index:30;min-width:62px;min-height:44px;padding:10px 14px;border:1px solid #3b927f;border-radius:999px;background:rgba(9,35,43,.94);color:#8af0d2;font-size:11px;font-weight:900;box-shadow:0 8px 30px #0008;backdrop-filter:blur(12px);cursor:pointer}
 @media(max-width:760px){.paper-balance-grid{grid-template-columns:1fr 1fr}.paper-ticket-estimate{align-items:flex-start;flex-direction:column}.paper-order-tabs button{flex:1 1 calc(50% - 6px)}}
 @media(max-width:420px){.paper-order-tabs button{font-size:8px;padding:9px 6px}.paper-balance-grid b{font-size:12px}}
+
+.order-panel #paper-buy.paper-limit-blocked,.order-panel #paper-sell.paper-limit-blocked{opacity:.42;filter:saturate(.35);cursor:not-allowed;box-shadow:none}
