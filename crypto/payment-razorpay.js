@@ -14,7 +14,7 @@
     halfyear: {id:'month_6',label:'6 Months',amount:399,days:180},
     yearly: {id:'year_1',label:'1 Year',amount:799,days:365}
   };
-  let db, auth, qrPromise, activePlan = null, adminMode = false;
+  let db, auth, qrPromise, activePlan = null, adminMode = false, entitlementUnsubscribe = null;
   let paymentLanguage = localStorage.getItem('ziPaymentLanguage') === 'hi' ? 'hi' : 'en';
   const tr = (en, hi) => paymentLanguage === 'hi' ? hi : en;
   const PAYMENT_TEXT = {
@@ -60,6 +60,72 @@
   }
   const status = $('premiumStatus');
   const say = message => { if (status) status.textContent = message; };
+  let membershipCard = null;
+  function ensureMembershipCard() {
+    if (membershipCard || !status || !status.parentNode) return membershipCard;
+    const style = document.createElement('style');
+    style.textContent = '.zi-membership{margin-top:14px;padding:16px;border:1px solid #287b68;border-radius:14px;background:linear-gradient(125deg,#103b39,#10243b);color:#eaf8f5}.zi-membership[hidden]{display:none}.zi-membership-top{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}.zi-membership-title{font:700 15px "Space Grotesk",sans-serif}.zi-membership-badge{border-radius:30px;padding:6px 10px;background:#14533f;color:#83f4ce;font-size:9px;font-weight:800;letter-spacing:.7px}.zi-membership p{margin:9px 0 0;color:#b5c9d7;font-size:11px;line-height:1.5}.zi-membership strong{color:#f1fbff}';
+    document.head.appendChild(style);
+    membershipCard = document.createElement('section');
+    membershipCard.className = 'zi-membership';
+    membershipCard.hidden = true;
+    membershipCard.setAttribute('aria-live','polite');
+    membershipCard.innerHTML = '<div class="zi-membership-top"><span class="zi-membership-title">ZENURA Membership</span><span class="zi-membership-badge" data-membership-state></span></div><p data-membership-plan></p><p data-membership-validity></p>';
+    status.parentNode.insertBefore(membershipCard,status.nextSibling);
+    return membershipCard;
+  }
+  function renderMembership(data) {
+    const card = ensureMembershipCard();
+    if (!card) return;
+    const state = card.querySelector('[data-membership-state]');
+    const planLine = card.querySelector('[data-membership-plan]');
+    const validity = card.querySelector('[data-membership-validity]');
+    if (!auth.currentUser || !data) {
+      card.hidden = true;
+      say(auth.currentUser ? 'No Premium membership is active on this account.' : 'Sign in to view your Premium membership.');
+      return;
+    }
+    const now = Date.now();
+    const end = data.currentPeriodEnd && data.currentPeriodEnd.toDate ? data.currentPeriodEnd.toDate() : null;
+    const trialEnd = data.trialEndsAt && data.trialEndsAt.toDate ? data.trialEndsAt.toDate() : null;
+    const premiumActive = data.status === 'premium' && end && end.getTime() > now;
+    const trialActive = data.status === 'trial' && trialEnd && trialEnd.getTime() > now;
+    card.hidden = false;
+    if (premiumActive) {
+      const labels = {month_1:'1 Month · ₹99',month_3:'3 Months · ₹199',month_6:'6 Months · ₹399',year_1:'1 Year · ₹799'};
+      state.textContent = 'PREMIUM ACTIVE';
+      planLine.textContent = 'Plan: ' + (labels[data.planId] || data.planId || 'Premium');
+      validity.textContent = 'Valid until: ' + end.toLocaleString('en-IN',{dateStyle:'medium',timeStyle:'short'}) + ' · Auto-renewal: Off';
+      say('Premium membership is active on this account.');
+    } else if (trialActive) {
+      state.textContent = 'FREE DEMO ACTIVE';
+      planLine.textContent = 'Your 3-day free demo is active.';
+      validity.textContent = 'Demo ends: ' + trialEnd.toLocaleString('en-IN',{dateStyle:'medium',timeStyle:'short'});
+      say('Free demo is active. Choose a Premium plan when you are ready.');
+    } else {
+      state.textContent = 'NOT ACTIVE';
+      planLine.textContent = 'No active Premium plan on this account.';
+      validity.textContent = 'Choose a plan to activate Premium access.';
+      say('Your demo or Premium access has expired. Choose a plan to continue.');
+    }
+  }
+  function watchMembership(user) {
+    if (entitlementUnsubscribe) { entitlementUnsubscribe(); entitlementUnsubscribe = null; }
+    const card = ensureMembershipCard();
+    if (!user) {
+      if (card) card.hidden = true;
+      say('Sign in to view your Premium membership.');
+      return;
+    }
+    // Initialize the account's server-timed demo, then keep the membership UI
+    // synchronized with admin approvals across devices in real time.
+    firebase.app().functions('asia-south1').httpsCallable('getPremiumAccess')({})
+      .catch(error => console.warn('Premium access initialization failed:',error));
+    entitlementUnsubscribe = db.collection('entitlements').doc(user.uid).onSnapshot(
+      snapshot => renderMembership(snapshot.exists ? snapshot.data() : null),
+      error => { console.warn('Premium entitlement listener failed:',error); say('Could not refresh Premium status. Please reopen this page.'); }
+    );
+  }
   function services() {
     if (!window.firebase || !firebase.apps.length || !firebase.auth || !firebase.firestore) throw new Error('Firebase is not ready.');
     auth = auth || firebase.auth();
@@ -239,16 +305,7 @@
       button.addEventListener('click',event=>{event.preventDefault();event.stopImmediatePropagation();openPlan(button.getAttribute('data-plan'));},true);
     });
     addAdminButton();
-    auth.onAuthStateChanged(async user=>{
-      if(!user){say('Sign in to view Premium access and purchase a plan.');return;}
-      try{
-        const result=await firebase.app().functions('asia-south1').httpsCallable('getPremiumAccess')({});
-        const data=result.data||{};
-        if(data.status==='premium'&&data.premiumEndsAt)say('Premium active until '+new Date(data.premiumEndsAt).toLocaleDateString('en-IN')+'.');
-        else if(data.status==='trial'&&data.trialEndsAt)say('Free demo active until '+new Date(data.trialEndsAt).toLocaleDateString('en-IN')+'.');
-        else say('Your demo has ended. Choose a Premium plan to continue.');
-      }catch(error){console.warn('Premium status refresh failed',error);}
-    });
+    auth.onAuthStateChanged(user=>watchMembership(user));
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
 })();
