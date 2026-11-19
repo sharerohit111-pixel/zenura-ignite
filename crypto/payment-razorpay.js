@@ -65,7 +65,7 @@
   function ensureMembershipCard() {
     if (membershipCard || !status || !status.parentNode) return membershipCard;
     const style = document.createElement('style');
-    style.textContent = '.zi-membership{margin-top:14px;padding:16px;border:1px solid #287b68;border-radius:14px;background:linear-gradient(125deg,#103b39,#10243b);color:#eaf8f5}.zi-membership[hidden]{display:none}.zi-membership-top{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}.zi-membership-title{font:700 15px "Space Grotesk",sans-serif}.zi-membership-badge{border-radius:30px;padding:6px 10px;background:#14533f;color:#83f4ce;font-size:9px;font-weight:800;letter-spacing:.7px}.zi-membership p{margin:9px 0 0;color:#b5c9d7;font-size:11px;line-height:1.5}.zi-membership strong{color:#f1fbff}';
+    style.textContent = '#homePremiumBadge{margin-top:12px;padding:11px 14px;border:1px solid #287b68;border-radius:12px;background:linear-gradient(110deg,#103b39,#10243b);color:#83f4ce;font-size:11px;font-weight:850;letter-spacing:.35px;line-height:1.5;box-shadow:0 0 20px #20c99718}#homePremiumBadge[hidden]{display:none}.zi-membership{margin-top:14px;padding:16px;border:1px solid #287b68;border-radius:14px;background:linear-gradient(125deg,#103b39,#10243b);color:#eaf8f5}.zi-membership[hidden]{display:none}.zi-membership-top{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}.zi-membership-title{font:700 15px "Space Grotesk",sans-serif}.zi-membership-badge{border-radius:30px;padding:6px 10px;background:#14533f;color:#83f4ce;font-size:9px;font-weight:800;letter-spacing:.7px}.zi-membership p{margin:9px 0 0;color:#b5c9d7;font-size:11px;line-height:1.5}.zi-membership strong{color:#f1fbff}';
     document.head.appendChild(style);
     membershipCard = document.createElement('section');
     membershipCard.className = 'zi-membership';
@@ -115,8 +115,8 @@
     renderHomePremium(data);
     const planGrid = document.querySelector('.premium-grid');
     const renewBox = document.querySelector('.renew-box');
-    if (planGrid) planGrid.hidden = !!premiumActive;
-    if (renewBox) renewBox.hidden = !!premiumActive;
+    if (planGrid) planGrid.style.display = premiumActive ? 'none' : '';
+    if (renewBox) renewBox.style.display = premiumActive ? 'none' : '';
     const trialActive = data.status === 'trial' && trialEnd && trialEnd.getTime() > now;
     card.hidden = false;
     if (premiumActive) {
