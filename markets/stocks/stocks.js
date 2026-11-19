@@ -528,8 +528,10 @@
     resetOptionChain('Sign in to load a private option chain.');
     updatePaperButtons();
   }
-  window.addEventListener('zenura-market-auth-ready',()=>{
-    if(!window.ZENURA_MARKET_CONNECTOR?.isAuthenticated?.()){clearPrivateSession();return;}
+  window.addEventListener('zenura-market-auth-ready',event=>{
+    // Never leave one account's private data visible while another account is loading.
+    clearPrivateSession();
+    if(!event.detail?.signedIn||!window.ZENURA_MARKET_CONNECTOR?.isAuthenticated?.())return;
     loadInstruments();loadCandles();loadPaperAccount();refreshPaperViews();loadSavedWatchlist();
   });
   window.ZENURA_INDIAN_MARKET={mode:'indian-stocks',provider:'upstox',status:'gateway-configurable',activeList:()=>activeList,refresh:loadInstruments};
