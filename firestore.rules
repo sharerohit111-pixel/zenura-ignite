@@ -100,6 +100,20 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Public business catalogue: visitors can read only while published; only verified admin can write.
+    match /publicCatalog/{catalogId} {
+      allow get, list: if resource.data.published == true || isZenuraAdmin();
+      allow create, update: if isZenuraAdmin()
+        && request.resource.data.keys().hasOnly(["categories", "published", "updatedAt", "updatedBy"])
+        && request.resource.data.keys().hasAll(["categories", "published", "updatedAt", "updatedBy"])
+        && request.resource.data.categories is list
+        && request.resource.data.categories.size() <= 30
+        && request.resource.data.published is bool
+        && request.resource.data.updatedBy == request.auth.token.email
+        && request.resource.data.updatedAt == request.time;
+      allow delete: if isZenuraAdmin();
+    }
+
     match /enquiries/{enquiryId} {
       // Public website visitors may submit a validated enquiry only.
       allow create: if
