@@ -228,7 +228,10 @@
     if(!pendingKey){
       if(!window.crypto?.randomUUID){paperOrderStatus.textContent='A secure order request ID could not be created in this browser.';return;}
       pendingKey=window.crypto.randomUUID();
-      retryPolicy.writePendingPaperOrder(pendingOrderStorage,storageKey,{key:pendingKey,fingerprint});
+      if(!retryPolicy.writePendingPaperOrder(pendingOrderStorage,storageKey,{key:pendingKey,fingerprint})){
+        paperOrderStatus.textContent='Browser session storage is unavailable. The order was not sent because safe retry protection could not be saved.';
+        return;
+      }
     }
     paperOrderSubmitting=true;updatePaperButtons();paperOrderStatus.textContent='Verifying fresh provider quote and processing simulated order…';
     try{
@@ -353,7 +356,10 @@
     const fingerprint=instrumentKey+'|'+side+'|'+lots;
     if(pending&&pending.fingerprint!==fingerprint){optionStatus.textContent='A previous option order response is uncertain for this account. Retry the same contract and lot quantity first.';return;}
     const pendingKey=pending?.key||window.crypto.randomUUID();
-    if(!pending)retryPolicy.writePendingPaperOrder(pendingOrderStorage,storageKey,{fingerprint,key:pendingKey});
+    if(!pending&&!retryPolicy.writePendingPaperOrder(pendingOrderStorage,storageKey,{fingerprint,key:pendingKey})){
+      optionStatus.textContent='Browser session storage is unavailable. The option order was not sent because safe retry protection could not be saved.';
+      return;
+    }
     derivativeOrderSubmitting=true;optionButton.disabled=true;optionStatus.textContent='Verifying live option quote and placing simulated '+type+' '+side+'…';
     try{
       const token=await connector.getIdToken();
