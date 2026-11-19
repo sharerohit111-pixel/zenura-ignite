@@ -217,7 +217,7 @@
       }
     }catch(error){if(request===derivativePortfolioRequest&&connector.getUserId()===uid)status.textContent=error.message||'Derivative valuation unavailable';}
   }
-  async function refreshPaperViews(){{await Promise.all([loadPaperPortfolio(),loadPaperHistory(),loadDerivativePortfolio()]);}
+  async function refreshPaperViews(){await Promise.all([loadPaperPortfolio(),loadPaperHistory(),loadDerivativePortfolio()]);}
   paperRefresh.addEventListener('click',refreshPaperViews);
 
   let paperOrderSubmitting=false;
