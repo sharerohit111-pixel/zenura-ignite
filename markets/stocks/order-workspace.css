@@ -5,7 +5,7 @@
 .paper-order-type button.active{border-color:#287e70;background:#123c37;color:#70e8c8;box-shadow:0 0 18px #1bb58b1c}
 .paper-order-type button:focus-visible,.paper-order-tabs button:focus-visible,.paper-language-toggle:focus-visible{outline:2px solid #70e8c8;outline-offset:2px}
 .paper-ticket-field{display:grid;gap:7px;color:#91a7bb;font-size:10px;font-weight:700}
-.paper-ticket-field input{box-sizing:border-box;width:100%;min-height:43px;padding:11px 12px;border:1px solid rgba(120,160,200,.3);border-radius:9px;background:rgba(3,12,25,.72);color:#eaf3fa;font:600 14px inherit;font-variant-numeric:tabular-nums}
+.paper-ticket-field input{box-sizing:border-box;width:100%;min-height:43px;padding:11px 12px;border:1px solid rgba(120,160,200,.3);border-radius:9px;background:rgba(3,12,25,.72);color:#eaf3fa;font:inherit;font-size:14px;font-weight:600;font-variant-numeric:tabular-nums}
 .paper-ticket-field input:disabled{opacity:.45}
 .paper-ticket-field input[readonly]{color:#9bb2c5;background:#0b1a29}
 .paper-ticket-estimate{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:11px 12px;border:1px solid #203b54;border-radius:10px;background:#0a1928;color:#8fa8bc;font-size:10px}
