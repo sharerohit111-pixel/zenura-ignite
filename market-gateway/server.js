@@ -256,7 +256,7 @@ app.post("/paper/orders",async(req,res)=>{
     const orderRef=db.collection("indianPaperOrders").doc(orderId);
     const priorOrder=await orderRef.get();
     if(priorOrder.exists){
-      const prior=priorOrder.data();assertIdempotentReplay(prior,requestFingerprint);
+      const prior=priorOrder.data();if(prior?.uid!==decoded.uid)return res.status(409).json({error:"Stored paper order does not belong to the authenticated account."});assertIdempotentReplay(prior,requestFingerprint);
       const currentAccount=await paperAccountRef(decoded.uid).get();
       const current=readReplayAccountState(currentAccount);
       res.set("Cache-Control","private, no-store");
@@ -383,6 +383,7 @@ app.post("/paper/derivative/orders",async(req,res)=>{
     const priorOrder=await orderRef.get();
     if(priorOrder.exists){
       const prior=priorOrder.data();
+      if(prior?.uid!==decoded.uid)return res.status(409).json({error:"Stored derivative order does not belong to the authenticated account."});
       assertIdempotentReplay(prior,requestFingerprint);
       const current=readReplayAccountState(await accountRef.get());
       res.set("Cache-Control","private, no-store");
