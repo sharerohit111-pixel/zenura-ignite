@@ -15,6 +15,15 @@ function accountState(data){
     !positions||typeof positions!=="object"||Array.isArray(positions)||
     !reservedPositions||typeof reservedPositions!=="object"||Array.isArray(reservedPositions))
     fail("Paper account reservation state is invalid.");
+  for(const [key,position] of Object.entries(positions)){
+    if(!key||!position||typeof position!=="object"||Array.isArray(position)||
+      !Number.isSafeInteger(position.quantity)||position.quantity<0||position.quantity>1000000)
+      fail("Paper account contains an invalid position.");
+  }
+  for(const [key,value] of Object.entries(reservedPositions)){
+    if(!key||!Number.isSafeInteger(value)||value<0||value>(positions[key]?.quantity??0))
+      fail("Paper account contains invalid reserved share quantities.");
+  }
   return {positions,reservedPositions,reservedCashPaise,reservedMarginPaise};
 }
 function nextVersion(account){
@@ -58,6 +67,10 @@ async function placePendingLimitOrder({db,accountRef,orderRef,uid,order,serverTi
     const patch={updatedAt:serverTimestamp(),version:nextVersion(account)};
     const stored={...order,createdAt:serverTimestamp(),updatedAt:serverTimestamp()};
     if(order.side==="BUY"){
+      if(!Object.prototype.hasOwnProperty.call(state.positions,order.instrumentKey)){
+        const openPositions=Object.values(state.positions).filter(position=>position.quantity>0).length;
+        if(openPositions>=50)fail("Paper portfolio is limited to 50 open positions.");
+      }
       const available=account.cashPaise-state.reservedCashPaise-state.reservedMarginPaise;
       if(available<reserve)fail("Insufficient unreserved virtual cash for this LIMIT BUY.");
       patch.reservedCashPaise=state.reservedCashPaise+reserve;
