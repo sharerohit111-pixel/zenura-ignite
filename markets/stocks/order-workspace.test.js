@@ -3,6 +3,7 @@ const test=require("node:test");
 const assert=require("node:assert/strict");
 const fs=require("node:fs");
 const path=require("node:path");
+const {execFileSync}=require("node:child_process");
 
 const root=path.resolve(__dirname,"../..");
 const html=fs.readFileSync(path.join(__dirname,"index.html"),"utf8");
@@ -73,4 +74,8 @@ test("responsive and bilingual UI states are present",()=>{
   assert.match(css,/@media\(max-width:760px\)/);
   assert.match(css,/@media\(max-width:420px\)/);
   assert.match(css,/paper-cancel-button/);
+});
+
+test("order workspace JavaScript parses in the configured Node runtime",()=>{
+  assert.doesNotThrow(()=>execFileSync(process.execPath,["--check",path.join(__dirname,"order-workspace.js")],{stdio:"pipe"}));
 });
