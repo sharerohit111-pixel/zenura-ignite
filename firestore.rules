@@ -13,13 +13,17 @@ service cloud.firestore {
       allow read: if request.auth != null && (request.auth.uid == uid || isZenuraAdmin());
       allow create, update: if isZenuraAdmin()
         && request.resource.data.keys().hasOnly([
-          "uid", "status", "planId", "currentPeriodStart", "currentPeriodEnd",
-          "autoRenew", "provider", "updatedAt"
+          "uid", "email", "displayName", "status", "planId", "currentPeriodStart", "currentPeriodEnd",
+          "autoRenew", "provider", "paymentId", "approvedBy", "updatedAt"
         ])
         && request.resource.data.keys().hasAll([
           "uid", "status", "planId", "currentPeriodStart", "currentPeriodEnd",
           "autoRenew", "provider", "updatedAt"
         ])
+        && (!("email" in request.resource.data) || request.resource.data.email is string)
+        && (!("displayName" in request.resource.data) || request.resource.data.displayName is string)
+        && (!("paymentId" in request.resource.data) || request.resource.data.paymentId is string)
+        && (!("approvedBy" in request.resource.data) || request.resource.data.approvedBy is string)
         && request.resource.data.uid == uid
         && request.resource.data.status == "premium"
         && request.resource.data.planId in ["month_1", "month_3", "month_6", "year_1"]
@@ -41,9 +45,10 @@ service cloud.firestore {
       }
       allow create: if request.auth != null
         && request.resource.data.keys().hasOnly([
-          "uid", "email", "planId", "planLabel", "amount", "days",
+          "uid", "email", "displayName", "planId", "planLabel", "amount", "days",
           "utr", "status", "createdAt"
         ])
+        && (!("displayName" in request.resource.data) || (request.resource.data.displayName is string && request.resource.data.displayName.size() <= 120))
         && request.resource.data.keys().hasAll([
           "uid", "email", "planId", "planLabel", "amount", "days",
           "utr", "status", "createdAt"
@@ -73,6 +78,11 @@ service cloud.firestore {
     }
     match /users/{uid} {
       allow read: if request.auth != null && request.auth.uid == uid;
+      allow write: if false;
+    }
+    // Backward-compatible read for accounts whose older admin approvals used nested entitlements.
+    match /users/{uid}/private/entitlement {
+      allow read: if request.auth != null && (request.auth.uid == uid || isZenuraAdmin());
       allow write: if false;
     }
 
