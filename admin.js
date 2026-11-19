@@ -32,11 +32,13 @@ async function setupCatalogueAdmin(auth){
    const heading=document.createElement("h3");heading.textContent="Category: "+(category.name||category.id);section.append(heading);
    section.append(field("Category name",category.name,v=>{category.name=v;heading.textContent="Category: "+v;sync()}));
    section.append(field("Category description",category.description,v=>{category.description=v;sync()}));
+   section.append(field("Category icon",category.icon,v=>{category.icon=v;sync()}));
    (category.products||[]).forEach((product,pi)=>{
     const card=document.createElement("article");card.className="catalogue-edit-product";
     const h=document.createElement("h4");h.textContent=product.name||"New product";card.append(h);
     card.append(field("Product name",product.name,v=>{product.name=v;h.textContent=v||"New product";sync()}));
     card.append(field("Product description",product.desc,v=>{product.desc=v;sync()}));
+    const visibility=document.createElement("label");visibility.className="catalogue-visibility";const visible=document.createElement("input");visible.type="checkbox";visible.checked=product.visible!==false;visible.addEventListener("change",()=>{product.visible=visible.checked;sync()});visibility.append(visible,document.createTextNode(" Show on public website"));card.append(visibility);
     const plans=document.createElement("div");plans.className="catalogue-edit-plans";
     for(const [key,label] of [["silver","Silver Plan"],["gold","Golden Plan"]]){
      product[key]=product[key]||{price:0,features:[]};const plan=product[key],box=document.createElement("div");box.className="catalogue-edit-plan";
@@ -50,8 +52,10 @@ async function setupCatalogueAdmin(auth){
     section.append(card);
    });
    const add=document.createElement("button");add.type="button";add.className="secondary";add.textContent="+ Add product to "+(category.name||"category");add.addEventListener("click",()=>{category.products.push({id:"new-product-"+Date.now(),name:"New product",icon:"✦",desc:"",silver:{price:0,features:[]},gold:{price:0,features:[]}});sync();renderVisualEditor()});section.append(add);
+   const removeCategory=document.createElement("button");removeCategory.type="button";removeCategory.className="secondary";removeCategory.textContent="Remove category";removeCategory.addEventListener("click",()=>{data.splice(ci,1);sync();renderVisualEditor()});section.append(removeCategory);
    editor.append(section);
   });
+  const addCategory=document.createElement("button");addCategory.type="button";addCategory.className="primary";addCategory.textContent="+ Add category";addCategory.addEventListener("click",()=>{data.push({id:"new-category-"+Date.now(),name:"New category",icon:"✦",description:"",products:[]});sync();renderVisualEditor()});editor.append(addCategory);
   function sync(){area.value=JSON.stringify(data,null,2)}
  }
  async function loadSaved(){try{const snap=await fs.getDoc(ref);area.value=JSON.stringify(snap.exists()?snap.data().categories:DEFAULT_SOLUTIONS,null,2);renderVisualEditor();say(snap.exists()?(snap.data().published?"Saved catalogue loaded (published).":"Saved catalogue is hidden."):"No saved catalogue yet. Defaults loaded; publish to make them live.")}catch(e){say("Load failed: "+e.message)}}
