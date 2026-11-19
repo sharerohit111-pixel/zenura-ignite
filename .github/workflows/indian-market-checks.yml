@@ -104,4 +104,6 @@ jobs:
       - name: Build gateway Docker image
         run: docker build --tag zenura-indian-market-gateway:ci market-gateway
       - name: Verify gateway image runs as non-root
-        run: test "$(docker image inspect zenura-indian-market-gateway:ci --format '{{.Config.User}}')" = "node"
+        run: |
+          test "$(docker image inspect zenura-indian-market-gateway:ci --format '{{.Config.User}}')" = "node"
+          docker run --rm --entrypoint node zenura-indian-market-gateway:ci -e "if (process.getuid() === 0) { throw new Error('Gateway container process is running as root'); } console.log('Gateway container UID:', process.getuid());"
