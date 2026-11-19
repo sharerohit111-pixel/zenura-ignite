@@ -13,7 +13,9 @@ test("does not block Google and other federated providers", () => {
   assert.equal(isVerifiedPasswordAccount({token:{firebase:{sign_in_provider:"google.com"},email_verified:false}}), true);
 });
 
-test("rejects missing authentication context", () => {
+test("rejects missing authentication context or provider", () => {
   assert.equal(isVerifiedPasswordAccount(null), false);
   assert.equal(isVerifiedPasswordAccount({}), false);
+  assert.equal(isVerifiedPasswordAccount({token:{email_verified:true}}), false);
+  assert.equal(isVerifiedPasswordAccount({token:{firebase:{sign_in_provider:""},email_verified:true}}), false);
 });
