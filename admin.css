@@ -5,3 +5,8 @@
 .catalogue-visibility{display:flex;align-items:center;gap:9px;color:#d8e7fa;margin:12px 0;font-size:13px}
 .catalogue-visibility input{width:18px;height:18px;accent-color:#35e4ff}
 #digital-products-admin{max-width:none}
+
+.upload-field input[type=file]{display:block;width:100%;padding:12px;border:1px dashed #526b99;border-radius:9px;background:#080f21;color:#f5f8ff;margin-top:5px}
+.upload-note{display:block;color:#8ea9ce;font-size:12px;margin-top:5px}
+.media-preview{display:block;max-width:100%;max-height:220px;object-fit:contain;border:1px solid #526b99;border-radius:10px;margin:12px 0;background:#050916}
+.digital-product-video{display:block;width:100%;max-height:360px;margin:18px 0;border-radius:12px;background:#000}
