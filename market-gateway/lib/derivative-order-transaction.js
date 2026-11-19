@@ -44,6 +44,7 @@ async function executeLongOptionTransaction({
     const [accountSnap,existingOrder]=await Promise.all([tx.get(accountRef),tx.get(orderRef)]);
     if(existingOrder.exists){
       const prior=existingOrder.data();
+      if(prior?.uid!==uid)fail("Stored derivative order does not belong to the authenticated account.",409);
       assertIdempotentReplay(prior,requestFingerprint);
       const current=readReplayAccountState(accountSnap);
       result={orderId,order:prior,cashPaise:current.cashPaise,realizedPnlPaise:current.realizedPnlPaise,idempotentReplay:true,simulationOnly:true};
