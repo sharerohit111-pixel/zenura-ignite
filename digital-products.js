@@ -2,7 +2,7 @@ import {DEFAULT_DIGITAL_PRODUCTS} from "./digital-products-data.js";
 import {db} from "./firebase-client.js";
 import {doc,getDoc} from "https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore.js";
 const esc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-const safeUrl=value=>{try{const url=new URL(String(value||""));return url.protocol==="https:"?url.href:""}catch{return ""}};
+const safeUrl=value=>{try{const raw=String(value||"").trim();if(!raw)return "";if(raw.startsWith("./")||raw.startsWith("/"))return raw;const url=new URL(raw);return url.protocol==="https:"?url.href:""}catch{return ""}};
 const root=document.querySelector(".products-grid");
 let products=DEFAULT_DIGITAL_PRODUCTS;
 let cataloguePublished=false;
