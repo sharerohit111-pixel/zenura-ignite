@@ -64,8 +64,15 @@ if (card && connectButton) {
         ? await createUserWithEmailAndPassword(auth, email.value.trim(), password.value)
         : await signInWithEmailAndPassword(auth, email.value.trim(), password.value);
       if (creating) {
-        try { await sendEmailVerification(credential.user); } catch (_) {}
-        message.textContent = "Account created. Check your email for verification, then connect Upstox.";
+        try {
+          await sendEmailVerification(credential.user);
+          message.textContent = "Account created. Verification email sent. Verify your email, then sign in and connect Upstox.";
+        } catch (verificationError) {
+          const verificationCode = verificationError?.code || "";
+          message.textContent = verificationCode === "auth/too-many-requests"
+            ? "Account created, but verification email was rate-limited. Wait before requesting another email."
+            : "Account created, but the verification email could not be sent. Check Firebase Email Templates and try again later.";
+        }
       } else {
         message.textContent = "Signed in. You can now connect your Upstox account.";
       }
