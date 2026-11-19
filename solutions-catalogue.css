@@ -1,0 +1,58 @@
+/* ZENURA IGNITE — customer solutions catalogue (isolated module) */
+.solutions-section{padding:96px 0 78px;border-top:1px solid #28456c55}
+.solutions-heading{display:grid;grid-template-columns:1fr .78fr;gap:48px;align-items:end;margin:18px 0 28px}
+.solutions-heading h2{font:700 clamp(40px,5.2vw,60px)/1.04 'Space Grotesk';letter-spacing:-2.2px;margin:18px 0}
+.solutions-heading h2 em{font-style:normal;color:var(--cyan);text-shadow:0 0 24px #35e4ff55}
+.solutions-heading>p{font-size:14px;line-height:1.85;color:var(--muted);margin:0 0 20px}
+.catalogue-toolbar{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;margin:20px 0}
+.catalogue-filters{display:flex;gap:8px;flex-wrap:wrap}
+.catalogue-filter,.catalogue-admin-trigger{border:1px solid #41638e;background:#101c36;color:#c9d9f1;padding:9px 14px;border-radius:999px;font:600 11px 'DM Sans';cursor:pointer}
+.catalogue-filter.active,.catalogue-filter:hover{border-color:var(--cyan);background:#12314a;color:#5ceaff;box-shadow:0 0 16px #35e4ff20}
+.catalogue-admin-trigger{border-color:#8065b9;color:#d8c5ff;background:#241b3d}
+.catalogue-category{margin:30px 0 36px}
+.catalogue-category-head{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+.catalogue-category-head h3{font:700 21px 'Space Grotesk';margin:0}
+.catalogue-category-head p{color:var(--muted);font-size:11px;margin:4px 0 0}
+.catalogue-category-icon{width:42px;height:42px;display:grid;place-items:center;border:1px solid #3c83a9;border-radius:13px;background:#102641;color:#54e8ff;font-size:21px}
+.catalogue-products{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+.solution-product{border:1px solid #385b83;border-radius:17px;overflow:hidden;background:linear-gradient(145deg,#111f40ed,#090f22);display:flex;flex-direction:column;min-width:0;box-shadow:inset 0 0 22px #2d6dff10}
+.solution-product-top{padding:18px 18px 12px;background:radial-gradient(circle at 90% 0,#23628a55,transparent 48%)}
+.solution-product-icon{font-size:23px}
+.solution-product h4{font:700 17px 'Space Grotesk';margin:9px 0 5px}
+.solution-product-top p{font-size:11px;line-height:1.65;color:var(--muted);margin:0}
+.solution-plans{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:0 12px 12px;flex:1}
+.solution-plan{border:1px solid #426080;border-radius:12px;padding:11px 10px;background:#0c1830}
+.solution-plan.gold{border-color:#aa8546;background:linear-gradient(145deg,#382b17aa,#15182a)}
+.solution-plan-label{font:700 9px 'Space Grotesk';letter-spacing:1.1px;color:#b8cce8}
+.solution-plan.gold .solution-plan-label{color:#ffd27a}
+.solution-plan-price{font:700 17px 'Space Grotesk';margin:7px 0 3px;color:#fff}
+.solution-plan-caption{font-size:9px;color:#9cabc5}
+.solution-plan ul{padding:8px 0 0 14px;margin:0;color:#bac9df;font-size:9px;line-height:1.65}
+.solution-plan li{margin:3px 0}
+.solution-product-actions{padding:0 14px 15px}
+.solution-detail-btn{width:100%;border:1px solid #43cce8;border-radius:9px;background:#102b43;color:#67e8ff;padding:10px;font:700 11px 'DM Sans';cursor:pointer}
+.solution-detail-btn:hover{background:#16405b}
+.solutions-note{font-size:10px;line-height:1.7;color:#8b9bb7;text-align:center;max-width:850px;margin:22px auto 0}
+.solution-empty{padding:30px;text-align:center;border:1px dashed #456080;border-radius:15px;color:var(--muted)}
+.solution-modal-backdrop{position:fixed;inset:0;z-index:80;background:#020611d9;display:none;align-items:center;justify-content:center;padding:18px}
+.solution-modal-backdrop.open{display:flex}
+.solution-modal{width:min(720px,100%);max-height:90vh;overflow:auto;border:1px solid #4b80b4;border-radius:18px;background:linear-gradient(145deg,#101f3d,#080e20);box-shadow:0 24px 90px #000b;padding:22px;color:#f5f8ff}
+.solution-modal-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px}
+.solution-modal-head h3{font:700 21px 'Space Grotesk';margin:0}
+.solution-modal-close{border:1px solid #55718f;border-radius:9px;background:#14233d;color:#fff;padding:7px 11px;cursor:pointer}
+.solution-modal-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.solution-modal label{display:grid;gap:6px;color:#b9cce6;font-size:11px;margin:10px 0}
+.solution-modal input,.solution-modal textarea,.solution-modal select{width:100%;border:1px solid #49668c;border-radius:9px;background:#071226;color:#fff;padding:10px;font:12px 'DM Sans'}
+.solution-modal textarea{min-height:95px;resize:vertical}
+.solution-modal .wide{grid-column:1/-1}
+.solution-modal-actions{display:flex;gap:9px;flex-wrap:wrap;margin-top:14px}
+.solution-modal-actions button{border:1px solid #4b9ab7;border-radius:9px;background:#12334b;color:#70eaff;padding:10px 14px;font-weight:700;cursor:pointer}
+.solution-modal-actions .danger{border-color:#9d5260;background:#351722;color:#ffb8c1}
+.solution-admin-note{padding:11px;border:1px solid #8065b9;border-radius:10px;background:#241b3d;color:#d7c5fa;font-size:10px;line-height:1.6;margin-bottom:14px}
+.solution-detail-features{padding-left:20px;color:#c7d6ec;line-height:1.8;font-size:12px}
+.solution-detail-plans{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:16px}
+.solution-detail-plans>div{padding:14px;border:1px solid #48678a;border-radius:12px;background:#0b1830}
+.solution-detail-plans .gold{border-color:#b28b4c}
+.solution-detail-plans h4{margin:0 0 6px}
+@media(max-width:850px){.catalogue-products{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:600px){.solutions-section{padding:68px 0 54px}.solutions-heading{grid-template-columns:1fr;gap:0}.solutions-heading h2{font-size:42px}.solutions-heading>p{font-size:12px}.catalogue-products{grid-template-columns:1fr}.solution-modal{padding:16px}.solution-modal-grid,.solution-detail-plans{grid-template-columns:1fr}.solution-modal .wide{grid-column:auto}.catalogue-category-head h3{font-size:18px}}
