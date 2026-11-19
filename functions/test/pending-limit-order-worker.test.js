@@ -18,7 +18,7 @@ function harness(order,account,extraOrders=[]){
    }};
    const collectionRef={doc:id=>{
     const orderDocRef=ref(name+"/"+id);
-    return {...orderDocRef,get:async()=>{const value=records.get(orderDocRef.path);return {exists:value!==undefined,data:()=>structuredClone(value)};}};
+    return {...orderDocRef,get:async()=>{const value=records.get(orderDocRef.path);return {id:orderDocRef.id,exists:value!==undefined,data:()=>structuredClone(value)};}};
    }};
    let afterId=null,limitValue=50;
    let query={where(){return this;},orderBy(){return this;},startAfter(snapshot){afterId=snapshot.id;return this;},limit(value){limitValue=value;return this;},get:async()=>{
