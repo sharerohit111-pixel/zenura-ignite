@@ -21,7 +21,7 @@ test("excludes stale holdings from totals and marks partial valuation",()=>{
  assert.equal(result.positions[1].valuationStatus,"stale_or_unavailable");
 });
 test("rejects unsafe aggregate values and invalid account data",()=>{
- assert.throws(()=>buildPortfolioValuation({positions:[["NSE_EQ|ABC",{quantity:1000000,averagePricePaise:Number.MAX_SAFE_INTEGER}]],quotes:[{instrument_token:"NSE_EQ|ABC",last_price:1,last_trade_time:now}],cashPaise:0,now}),/safe calculation limits/);
+ assert.throws(()=>buildPortfolioValuation({positions:[["NSE_EQ|ABC",{quantity:1000000,averagePricePaise:Number.MAX_SAFE_INTEGER}]],quotes:[{instrument_token:"NSE_EQ|ABC",last_price:1,last_trade_time:now}],cashPaise:0,now}),/invalid cost basis/);
  assert.throws(()=>buildPortfolioValuation({positions:pos,quotes:[],cashPaise:-1,now}),/Invalid portfolio valuation input/);
 });
 test("rejects invalid positions and more than fifty holdings",()=>{
