@@ -20,7 +20,7 @@ function setup({account=initial,priorOrder=null,accountExists=true}={}){
  const writes=[];
  const snaps={
   [uid]:{exists:accountExists,data:()=>({...account,positions:{...(account?.positions||{})}})},
-  [orderId]:{exists:!!priorOrder,data:()=>priorOrder}
+  [orderId]:{exists:!!priorOrder,data:()=>priorOrder?(priorOrder.uid===undefined?{...priorOrder,uid}:priorOrder):priorOrder}
  };
  const db={runTransaction:async callback=>callback({
   get:async ref=>snaps[ref.id],
@@ -393,5 +393,12 @@ test("rejects a new option order when another stored derivative position is malf
  const derivativePositions={["NSE_FO|BROKEN"]:{instrumentType:"CE",netQuantity:65,averagePricePaise:100,costBasisPaise:1}};
  const {common,writes}=setup({account:{...initial,derivativePositions}});
  await assert.rejects(executeLongOptionBuyTransaction(common),error=>error.status===409&&/invalid cost basis/.test(error.message));
+ assert.equal(writes.length,0);
+});
+
+test("rejects replay of a derivative order owned by a different account",async()=>{
+ const fingerprint=require("../lib/order-idempotency").makeOrderFingerprint({instrumentKey:instrument.instrument_key,side:"BUY",quantity:65});
+ const {common,writes}=setup({priorOrder:{uid:"user-2",requestFingerprint:fingerprint,status:"FILLED"}});
+ await assert.rejects(executeLongOptionBuyTransaction(common),{status:409});
  assert.equal(writes.length,0);
 });
