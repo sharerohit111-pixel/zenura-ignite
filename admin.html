@@ -26,6 +26,15 @@
         <p id="catalogue-status" class="error" role="status"></p>
       </section>
 
+      <section class="panel" id="digital-products-admin" hidden>
+        <h2>Digital Products Manager</h2>
+        <p>Manage ZENURA IGNITE and Railway Mitra product images, descriptions, feature lists and public visibility.</p>
+        <div class="filters"><button id="products-load" class="secondary">Load saved products</button><button id="products-defaults" class="secondary">Load default products</button></div>
+        <div id="digital-products-editor" class="catalogue-visual-editor"></div>
+        <details class="advanced-json"><summary>Advanced JSON editor</summary><textarea id="digital-products-json" spellcheck="false" style="width:100%;min-height:260px;background:#080f21;color:#eaf3ff;border:1px solid #526b99;border-radius:10px;padding:14px;font:12px/1.55 monospace"></textarea></details>
+        <div class="filters"><button id="products-publish" class="primary">Publish product details</button><button id="products-hide" class="secondary">Hide product details</button></div>
+        <p id="digital-products-status" class="error" role="status"></p>
+      </section>
       <div class="toolbar"><div><p id="identity"></p><h2>Enquiry inbox</h2></div><button id="logout" class="secondary">Sign out</button></div>
       <div class="stats"><article><small>Total</small><b id="total">0</b></article><article><small>New</small><b id="new-count">0</b></article><article><small>In progress</small><b id="progress-count">0</b></article><article><small>Completed</small><b id="done-count">0</b></article></div>
       <div class="filters"><input id="search" type="search" placeholder="Search name, contact or service"><select id="status-filter"><option value="all">All statuses</option><option value="new">New</option><option value="in-progress">In progress</option><option value="completed">Completed</option></select></div>
