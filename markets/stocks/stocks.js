@@ -453,27 +453,29 @@
   }
   timeframeButtons.forEach(button=>button.addEventListener('click',()=>{activeTimeframe=button.dataset.timeframe;timeframeButtons.forEach(x=>x.classList.toggle('active',x===button));loadCandles();}));
   function setFeedStatus(heading,message){const h=document.querySelector('.chart-placeholder b'),s=document.querySelector('.chart-placeholder span');if(h)h.textContent=heading;if(s)s.textContent=message;}
-  function scheduleReconnect(item){
-    if(selected?.instrument_key!==item.instrument_key||reconnectTimer)return;
+  function scheduleReconnect(item,uid){
+    const connector=window.ZENURA_MARKET_CONNECTOR;
+    if(!uid||connector?.getUserId?.()!==uid||selected?.instrument_key!==item.instrument_key||reconnectTimer)return;
     const retry=window.ZenuraReconnectPolicy.nextReconnectDelay(reconnectAttempt);reconnectAttempt=retry.nextAttempt;
     const delay=window.ZenuraReconnectPolicy.jitteredReconnectDelay(retry.delayMs)??retry.delayMs;
     setFeedStatus('Live feed disconnected','Reconnecting in '+Math.round(delay/1000)+'s…');
-    reconnectTimer=setTimeout(()=>{reconnectTimer=null;if(selected?.instrument_key===item.instrument_key)select(item,true);},delay);
+    reconnectTimer=setTimeout(()=>{reconnectTimer=null;if(connector?.getUserId?.()===uid&&selected?.instrument_key===item.instrument_key)select(item,true);},delay);
   }
   async function select(item,isReconnect=false){
+    const connector=window.ZENURA_MARKET_CONNECTOR,uid=connector?.getUserId?.();
     clearFeedTimers();
     if(streamAbort){streamAbort.abort();streamAbort=null;}
     selected=item;if(!isReconnect)resetOptionChain('Underlying changed. Load the option chain for the selected instrument.');if(futuresMarginStatus)futuresMarginStatus.textContent=item.instrument_type==='FUT'?'Selected '+(item.trading_symbol||'futures contract')+'. Request a fresh broker margin preview.':'Select a verified futures contract from the Futures watchlist.';updateFuturesMarginButton();chartRequest++;lastQuoteText='';if(!isReconnect)reconnectAttempt=0;title.textContent=item.trading_symbol||item.name;symbol.textContent=item.instrument_key;price.textContent='—';
     setFeedStatus('Waiting for verified live quote','Connecting to Upstox V3 feed. Prices will appear only when received from the provider.');
     render(items);updatePaperButtons();renderSavedWatchlist();loadCandles();
-    const connector=window.ZENURA_MARKET_CONNECTOR;
-    if(!gateway||!connector?.getIdToken){setFeedStatus('Market gateway not configured','Sign in and configure the deployed market gateway to start live quotes.');return;}
+    if(!gateway||!connector?.getIdToken||!uid){setFeedStatus('Market gateway not configured','Sign in and configure the deployed market gateway to start live quotes.');return;}
     const controller=new AbortController();streamAbort=controller;
     let reader=null;
     try{
       const token=await connector.getIdToken();
-      if(controller.signal.aborted||selected?.instrument_key!==item.instrument_key)return;
+      if(controller.signal.aborted||connector.getUserId()!==uid||selected?.instrument_key!==item.instrument_key)return;
       const response=await fetch(gateway+'/stream',{method:'POST',signal:controller.signal,headers:{Authorization:'Bearer '+token,'Content-Type':'application/json',Accept:'text/event-stream'},body:JSON.stringify({instrumentKeys:[item.instrument_key],mode:'ltpc'})});
+      if(controller.signal.aborted||connector.getUserId()!==uid||selected?.instrument_key!==item.instrument_key)return;
       if(!response.ok){
         if(!window.ZenuraReconnectPolicy.shouldRetryFeedStatus(response.status)){
           if(response.status===401||response.status===403){
@@ -488,13 +490,14 @@
       if(!response.body)throw new Error('Live feed stream is not supported by this browser.');
       reader=response.body.getReader();const decoder=new TextDecoder();let buffer='';
       const processEvent=event=>{
+          if(connector.getUserId()!==uid||selected?.instrument_key!==item.instrument_key)return;
           const eventName=event.event,dataText=event.data;
           try{
             const data=JSON.parse(dataText);
             if(eventName==='status'&&data.connecting){setFeedStatus('Connecting to live feed','Waiting for the Upstox websocket handshake.');return;}
             if(eventName==='status'&&data.connected===true){setFeedStatus('Live feed connected','Upstox websocket is open. Waiting for the first market quote.');return;}
             if(eventName==='status'&&data.connected===false){if(staleTimer){clearTimeout(staleTimer);staleTimer=null;}price.textContent=lastQuoteText?'STALE · '+lastQuoteText:'—';setFeedStatus('Live feed disconnected','The Upstox stream closed. Reconnecting automatically.');return;}
-            if(eventName==='error'){if(staleTimer){clearTimeout(staleTimer);staleTimer=null;}price.textContent=lastQuoteText?'STALE · '+lastQuoteText:'—';setFeedStatus('Live feed error',data.message||'The provider stream reported an error.');if(window.ZenuraReconnectPolicy.shouldReconnectAfterFeedError(eventName))scheduleReconnect(item);return;}
+            if(eventName==='error'){if(staleTimer){clearTimeout(staleTimer);staleTimer=null;}price.textContent=lastQuoteText?'STALE · '+lastQuoteText:'—';setFeedStatus('Live feed error',data.message||'The provider stream reported an error.');if(window.ZenuraReconnectPolicy.shouldReconnectAfterFeedError(eventName))scheduleReconnect(item,uid);return;}
             const feed=data.feeds?.[item.instrument_key],quote=window.ZenuraLiveQuote?.extractFreshQuote(feed);
             if(quote){
               // A fresh quote proves the existing stream recovered; cancel any pending reconnect.
@@ -502,22 +505,22 @@
               reconnectAttempt=0;
               lastQuoteText='₹'+(quote.pricePaise/100).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});price.textContent=lastQuoteText;
               if(staleTimer)clearTimeout(staleTimer);
-              staleTimer=setTimeout(()=>{if(selected?.instrument_key===item.instrument_key){price.textContent='STALE · '+lastQuoteText;setFeedStatus('Live quote is stale','No fresh provider quote received for 15 seconds. Do not use this price for paper orders.');scheduleReconnect(item);}},15000);
+              staleTimer=setTimeout(()=>{if(connector.getUserId()===uid&&selected?.instrument_key===item.instrument_key){price.textContent='STALE · '+lastQuoteText;setFeedStatus('Live quote is stale','No fresh provider quote received for 15 seconds. Do not use this price for paper orders.');scheduleReconnect(item,uid);}},15000);
               setFeedStatus('Live quote connected','Last traded price received from Upstox V3. Chart history is a separate integration.');
             }
           }catch(_){}
       };
       while(true){
         const {value,done}=await reader.read();
-        if(controller.signal.aborted||selected?.instrument_key!==item.instrument_key)break;
+        if(controller.signal.aborted||connector.getUserId()!==uid||selected?.instrument_key!==item.instrument_key)break;
         const chunk=decoder.decode(value||new Uint8Array(),{stream:!done});
         const parsed=window.ZenuraSseParser.parseSseChunk(buffer,chunk,{final:done});
         buffer=parsed.buffer;parsed.events.forEach(processEvent);
         if(done)break;
       }
-      if(selected?.instrument_key===item.instrument_key&&!controller.signal.aborted)scheduleReconnect(item);
+      if(connector.getUserId()===uid&&selected?.instrument_key===item.instrument_key&&!controller.signal.aborted)scheduleReconnect(item,uid);
     }catch(error){
-      if(!controller.signal.aborted&&error.name!=='AbortError'&&selected?.instrument_key===item.instrument_key){setFeedStatus('Live feed unavailable',error.message||'Live feed connection failed.');scheduleReconnect(item);}
+      if(!controller.signal.aborted&&error.name!=='AbortError'&&connector.getUserId()===uid&&selected?.instrument_key===item.instrument_key){setFeedStatus('Live feed unavailable',error.message||'Live feed connection failed.');scheduleReconnect(item,uid);}
     }finally{
       if(reader){try{await reader.cancel();}catch(_){}}
       if(streamAbort===controller)streamAbort=null;
