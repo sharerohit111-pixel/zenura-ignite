@@ -35,7 +35,6 @@ service cloud.firestore {
         && request.resource.data.updatedAt == request.time;
       allow delete: if false;
     }
-
     // A signed-in customer may submit their own UTR. Only the verified admin can review it.
     match /payments/{paymentId} {
       function validPlan(data) {
@@ -49,7 +48,7 @@ service cloud.firestore {
           "uid", "email", "displayName", "planId", "planLabel", "amount", "days",
           "utr", "status", "createdAt"
         ])
-        && (!( "displayName" in request.resource.data) || (request.resource.data.displayName is string && request.resource.data.displayName.size() <= 120))
+        && (!("displayName" in request.resource.data) || (request.resource.data.displayName is string && request.resource.data.displayName.size() <= 120))
         && request.resource.data.keys().hasAll([
           "uid", "email", "planId", "planLabel", "amount", "days",
           "utr", "status", "createdAt"
@@ -71,14 +70,12 @@ service cloud.firestore {
         && request.resource.data.reviewedAt == request.time;
       allow delete: if false;
     }
-
     match /paymentOrders/{orderId} {
       allow read, write: if false;
     }
     match /razorpayEvents/{eventId} {
       allow read, write: if false;
     }
-
     // Indian-market OAuth state, broker credentials and stream leases are server-only.
     match /upstoxOAuthStates/{stateId} { allow read, write: if false; }
     match /upstoxConnections/{uid} { allow read, write: if false; }
