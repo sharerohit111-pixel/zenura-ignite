@@ -138,6 +138,12 @@
   if (typeof MutationObserver !== 'undefined') new MutationObserver(keepLimitDisabled).observe(buy, {attributes:true,attributeFilter:['disabled']});
   if (typeof MutationObserver !== 'undefined') new MutationObserver(keepLimitDisabled).observe(sell, {attributes:true,attributeFilter:['disabled']});
   window.addEventListener('zenura-market-auth-ready', keepLimitDisabled);
+  [buy, sell].forEach(button => button.addEventListener('click', event => {
+    if (selectedType === 'LIMIT') {
+      event.preventDefault(); event.stopImmediatePropagation();
+      showMessage(limitNotice, translate('LIMIT orders are not enabled by the current backend API. No order was sent.'), 'warning');
+    }
+  }, true));
   qty?.addEventListener('input', updateEstimate);
   limitPrice?.addEventListener('input', updateEstimate);
   const selectedPrice = $('selected-price');
