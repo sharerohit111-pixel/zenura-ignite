@@ -171,7 +171,7 @@ async function fetchFreshPendingLimitQuote(order) {
   return {pricePaise,timestampMs};
 }
 exports.processPendingPaperLimitOrders = onSchedule(
-  {schedule:"*/1 9-15 * * 1-5",timeZone:"Asia/Kolkata",region:REGION,secrets:[TOKEN_ENCRYPTION_KEY],maxInstances:1,timeoutSeconds:540},
+  {schedule:"*/1 9-15 * * 1-5",timeZone:"Asia/Kolkata",region:REGION,secrets:[TOKEN_ENCRYPTION_KEY],maxInstances:1,concurrency:1,timeoutSeconds:540},
   async event => {
     const now=Date.now();
     if(!isIndianCashMarketOpen(now)){
