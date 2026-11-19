@@ -1,7 +1,7 @@
 /* ZENURA IGNITE — central, extensible website language system */
 (function () {
   'use strict';
-  const STORAGE_KEY = 'zenura-site-language';
+  const STORAGE_KEY = 'zenura-site-language-v2';
   const translations = {
     'Home':'होम','About':'परिचय','Services':'सेवाएँ','Our Approach':'हमारा तरीका','Portfolio':'पोर्टफोलियो','Pricing':'कीमत','Contact':'संपर्क',
     'NEXT-GENERATION DIGITAL STUDIO':'नई पीढ़ी का डिजिटल स्टूडियो',
