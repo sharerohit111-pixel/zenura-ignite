@@ -110,7 +110,7 @@
     $('ziQrSubmit').disabled=true;
     $('ziQrMessage').textContent='Submitting payment reference…';
     try {
-      const duplicate=await db.collection('payments').where('utr','==',utr).limit(1).get();
+      const duplicate=await db.collection('payments').where('uid','==',user.uid).where('utr','==',utr).limit(1).get();
       if(!duplicate.empty)throw new Error('This UTR has already been submitted. Contact support if this is your own earlier request.');
       await db.collection('payments').add({
         uid:user.uid,email:user.email||'',planId:plan.id,planLabel:plan.label,
@@ -141,10 +141,10 @@
     ensureModal();open();
     $('ziQrPrice').textContent='ADMIN · UPI PAYMENT APPROVALS';
     $('ziQrCanvas').innerHTML='';
-    $('ziQrUtr').parentElement.hidden=true;$('ziQrSubmit').hidden=true;
+    $('ziQrUtr').hidden=true;$('ziQrUtr').previousElementSibling.hidden=true;$('ziQrSubmit').hidden=true;
     $('ziQrIntro').textContent='Approve only after matching the UTR and exact amount against the actual bank / UPI account credit. A screenshot or UTR alone is not proof.';
     const admin=$('ziQrAdmin');admin.hidden=false;admin.innerHTML='<button id="ziQrAdminRefresh" type="button">REFRESH REQUESTS</button><div id="ziQrAdminList" class="zi-muted">Loading…</div>';
-    $('ziQrClose').onclick=()=>{close();$('ziQrUtr').parentElement.hidden=false;$('ziQrSubmit').hidden=false;};
+    $('ziQrClose').onclick=()=>{close();$('ziQrUtr').hidden=false;$('ziQrUtr').previousElementSibling.hidden=false;$('ziQrSubmit').hidden=false;};
     $('ziQrAdminRefresh').onclick=loadAdminRequests;
     await loadAdminRequests();
   }
