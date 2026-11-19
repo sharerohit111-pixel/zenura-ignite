@@ -38,6 +38,8 @@
 
   const translations = {
     'Paper Trading Order Ticket':'पेपर ट्रेडिंग ऑर्डर टिकट',
+    'VIRTUAL CASH':'वर्चुअल नकद','REALIZED P&L':'वास्तविक P&L','DATE & TIME':'तारीख और समय','STOCK':'शेयर','SIDE':'प्रकार','TYPE':'ऑर्डर प्रकार','QTY':'मात्रा','EXECUTION PRICE':'एक्जीक्यूशन कीमत','ACTION':'कार्रवाई',
+    'Pending & Order Book':'पेंडिंग और ऑर्डर बुक','Order History':'ऑर्डर हिस्ट्री','Portfolio & P&L':'पोर्टफोलियो और P&L',
     'MARKET':'मार्केट','LIMIT':'लिमिट','Reference / live price':'संदर्भ / लाइव कीमत',
     'Limit price (₹)':'लिमिट कीमत (₹)','Quantity':'मात्रा',
     'Estimated order value':'अनुमानित ऑर्डर मूल्य','BUY':'खरीदें','SELL':'बेचें',
@@ -66,6 +68,7 @@
       const type = button.dataset.orderType;
       button.textContent = translate(type);
     });
+    tabs.forEach(button => { const key = button.dataset.orderFilter === 'OPEN' ? 'OPEN / PENDING' : button.dataset.orderFilter; button.textContent = translate(key); });
     renderOrders();
     renderTrades();
   }
