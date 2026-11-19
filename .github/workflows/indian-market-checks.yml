@@ -173,7 +173,8 @@ jobs:
               'functions:startUpstoxAuthorization',
               'functions:upstoxOAuthCallback',
               'functions:disconnectUpstoxAccount',
-              'functions:getIndianMarketConnectionStatus'
+              'functions:getIndianMarketConnectionStatus',
+              'functions:processPendingPaperLimitOrders'
             ];
             if (!deploy.startsWith('cd .. && firebase deploy --only ')) {
               throw new Error('Firebase deploy script must use the explicit Indian-market-only allowlist.');
