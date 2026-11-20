@@ -8,19 +8,24 @@ function harness(account,order){
  records.set("accounts/user-1",structuredClone(account));
  if(order)records.set("orders/order-1",structuredClone(order));
  const ref=path=>({id:path.split("/").at(-1),path});
- const db={runTransaction:async callback=>{
-  const writes=[];
-  const tx={
-   get:async r=>{const value=records.get(r.path);return {exists:value!==undefined,data:()=>structuredClone(value)};},
-   create:(r,value)=>writes.push(["create",r.path,structuredClone(value)]),
-   update:(r,value)=>writes.push(["update",r.path,structuredClone(value)])
-  };
-  const result=await callback(tx);
-  for(const [kind,path,value] of writes){
-   if(kind==="create"){if(records.has(path))throw new Error("already exists");records.set(path,value);}
-   else records.set(path,{...records.get(path),...value});
-  }
-  return result;
+ let transactionTail=Promise.resolve();
+ const db={runTransaction:callback=>{
+  const run=transactionTail.then(async()=>{
+   const writes=[];
+   const tx={
+    get:async r=>{const value=records.get(r.path);return {exists:value!==undefined,data:()=>structuredClone(value)};},
+    create:(r,value)=>writes.push(["create",r.path,structuredClone(value)]),
+    update:(r,value)=>writes.push(["update",r.path,structuredClone(value)])
+   };
+   const result=await callback(tx);
+   for(const [kind,path,value] of writes){
+    if(kind==="create"){if(records.has(path))throw new Error("already exists");records.set(path,value);}
+    else records.set(path,{...records.get(path),...value});
+   }
+   return result;
+  });
+  transactionTail=run.catch(()=>{});
+  return run;
  }};
  return {db,accountRef:ref("accounts/user-1"),orderRef:ref("orders/order-1"),records};
 }
@@ -160,4 +165,38 @@ test("rejects foreign-account order access and inconsistent reservations",async(
  await assert.rejects(cancelPendingLimitOrder({db:h.db,accountRef:h.accountRef,orderRef:h.orderRef,uid:"other-user",serverTimestamp:stamp}),TypeError);
  const broken=harness(baseAccount({reservedCashPaise:1}),order);
  await assert.rejects(cancelPendingLimitOrder({db:broken.db,accountRef:broken.accountRef,orderRef:broken.orderRef,uid:"user-1",serverTimestamp:stamp}),{status:409});
+});
+
+
+test("concurrent cancellation and execution serialize with cancellation winning safely",async()=>{
+ const order=baseOrder("BUY",{reservedCashPaise:30000,reservedQuantity:0});
+ const h=harness(baseAccount({reservedCashPaise:30000}),order);
+ const quote={pricePaise:9000,timestampMs:stamp().getTime()};
+ const [cancel,execution]=await Promise.all([
+  cancelPendingLimitOrder({db:h.db,accountRef:h.accountRef,orderRef:h.orderRef,uid:"user-1",serverTimestamp:stamp}),
+  executePendingLimitOrder({db:h.db,accountRef:h.accountRef,orderRef:h.orderRef,uid:"user-1",quote,nowMs:quote.timestampMs+1000,serverTimestamp:stamp})
+ ]);
+ assert.equal(cancel.status,"CANCELLED");
+ assert.equal(execution.status,"CANCELLED");
+ assert.equal(execution.notExecuted,true);
+ assert.equal(h.records.get("orders/order-1").status,"CANCELLED");
+ assert.equal(h.records.get("accounts/user-1").cashPaise,100000);
+ assert.equal(h.records.get("accounts/user-1").reservedCashPaise,0);
+ assert.equal(h.records.get("accounts/user-1").positions["NSE_EQ|ABC"],undefined);
+});
+
+test("concurrent execution and cancellation serialize with fill winning exactly once",async()=>{
+ const order=baseOrder("BUY",{reservedCashPaise:30000,reservedQuantity:0});
+ const h=harness(baseAccount({reservedCashPaise:30000}),order);
+ const quote={pricePaise:9000,timestampMs:stamp().getTime()};
+ const [execution,cancel]=await Promise.all([
+  executePendingLimitOrder({db:h.db,accountRef:h.accountRef,orderRef:h.orderRef,uid:"user-1",quote,nowMs:quote.timestampMs+1000,serverTimestamp:stamp}),
+  cancelPendingLimitOrder({db:h.db,accountRef:h.accountRef,orderRef:h.orderRef,uid:"user-1",serverTimestamp:stamp})
+ ]);
+ assert.equal(execution.status,"FILLED");
+ assert.equal(h.records.get("orders/order-1").status,"FILLED");
+ assert.equal(h.records.get("accounts/user-1").cashPaise,73000);
+ assert.equal(h.records.get("accounts/user-1").reservedCashPaise,0);
+ assert.equal(h.records.get("accounts/user-1").positions["NSE_EQ|ABC"].quantity,3);
+ assert.equal(cancel.status,409);
 });
