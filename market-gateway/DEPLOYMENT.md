@@ -62,7 +62,7 @@ The existing product specification sets a ₹10,00,000 virtual starting capital.
 INDIAN_PAPER_STARTING_CASH_PAISE=100000000
 ```
 
-Do not put this value in client-side code. The gateway deliberately refuses to initialize accounts until the value is explicitly configured.
+Do not put this value in client-side code. The server-side default is ₹10,00,000 when the variable is omitted; set the variable explicitly in each Cloud Run environment to make the intended starting balance auditable. An invalid explicit value causes account initialization to fail closed.
 
 ## 4. Cloud Run gateway
 
