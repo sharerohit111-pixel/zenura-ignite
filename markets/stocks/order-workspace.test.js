@@ -42,6 +42,11 @@ test("MARKET remains on the existing market-order flow and LIMIT uses the verifi
   assert.match(gateway,/Only MARKET and LIMIT paper orders are supported/);
 });
 
+test("Missing account or gateway clears private balance values",()=>{
+  assert.match(source,/if \(!uid \|\| !gateway\) \{\s*\[cashAvailable,cashReserved,sharesAvailable,sharesReserved\]\.forEach\(el => \{ if \(el\) el\.textContent = '—'; \}\)/);
+  assert.match(source,/Market gateway is not configured\./);
+});
+
 test("Uncertain LIMIT HTTP failures retain the idempotency key",()=>{
   assert.match(source,/if \(\[400,401,403,404,422\]\.includes\(response\.status\)\) clearPendingLimit\(uid\)/);
   assert.doesNotMatch(source,/response\.status >= 400 && response\.status < 500\) clearPendingLimit/);
