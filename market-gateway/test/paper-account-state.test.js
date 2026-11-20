@@ -62,7 +62,7 @@ test("does not reset an existing account balance or holdings",async()=>{
 test("repairs only absent legacy maps and margin fields",async()=>{
  const {db,state}=makeDb({currency:"INR",startingCashPaise:1000,cashPaise:700,realizedPnlPaise:10,version:2});
  await ensurePaperAccount({db,ref:{id:"user-1"},startingCashPaise:9999,serverTimestamp:()=>"server-time"});
- assert.deepEqual(state.writes,[["update",{positions:{},derivativePositions:{},reservedMarginPaise:0,reservedCashPaise:0,reservedPositions:{},updatedAt:"server-time"}]]);
+ assert.deepEqual(state.writes,[["update",{positions:{},intradayPositions:{},derivativePositions:{},reservedMarginPaise:0,reservedCashPaise:0,reservedPositions:{},intradayReservedPositions:{},deliveryRealizedPnlPaise:10,intradayRealizedPnlPaise:0,updatedAt:"server-time"}]]);
  assert.equal(state.value.cashPaise,700);
  assert.equal(state.value.startingCashPaise,1000);
 });
