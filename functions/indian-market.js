@@ -146,7 +146,7 @@ async function fetchFreshPendingLimitQuote(order) {
   const expiry=connection?.expiresAt?.toMillis?.();
   if(connection?.status!=="connected"||!connection.tokenCiphertext||!Number.isSafeInteger(expiry)||expiry<=now)
     throw new Error("Upstox connection token is not usable.");
-  const accessToken=decryptPendingUpstoxToken(connection.tokenCiphertext);
+  const accessToken=decryptPendingUpstoxToken(connection.tokenCiphertext,TOKEN_ENCRYPTION_KEY.value());
   const url="https://api.upstox.com/v3/market-quote/quotes?"+new URLSearchParams({instrument_key:order.instrumentKey});
   const response=await fetch(url,{headers:{Authorization:"Bearer "+accessToken,Accept:"application/json"},signal:AbortSignal.timeout(12000)});
   const payload=await response.json().catch(()=>({}));
