@@ -73,12 +73,14 @@ exports.kiranaAddProduct = onCall({ region: REGION, maxInstances: 20 }, async re
   const unit = textValue(req.data?.unit || "piece", "Unit", 20);
   const retailPrice = positiveNumber(req.data?.retailPrice, "retail price");
   const wholesalePrice = req.data?.wholesalePrice == null ? retailPrice : positiveNumber(req.data.wholesalePrice, "wholesale price");
-  const openingStock = Number(req.data?.openingStock || 0);
+  const openingStock = Number(req.data?.openingStock ?? 0);
   if (!Number.isFinite(openingStock) || openingStock < 0 || openingStock > 100000000) throw new HttpsError("invalid-argument", "Invalid opening stock.");
+  const lowStockAt = Number(req.data?.lowStockAt ?? 0);
+  if (!Number.isFinite(lowStockAt) || lowStockAt < 0 || lowStockAt > 100000000) throw new HttpsError("invalid-argument", "Invalid low-stock threshold.");
   const ref = db.collection("kiranaStores").doc(storeId).collection("products").doc();
   await ref.create({
     name, sku, unit, retailPrice, wholesalePrice, stock: openingStock,
-    lowStockAt: Math.max(0, Number(req.data?.lowStockAt || 0)),
+    lowStockAt,
     barcode: String(req.data?.barcode || "").slice(0, 80),
     active: true, createdBy: uid,
     createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp()
