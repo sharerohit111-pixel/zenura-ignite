@@ -53,6 +53,7 @@ test("Pending LIMIT cancellation calls the authenticated backend endpoint",()=>{
   assert.match(source,/\/paper\/orders\/' \+ encodeURIComponent\(orderId\) \+ '\/cancel/);
   assert.match(source,/data\.status !== 'CANCELLED'/);
   assert.match(source,/data\.reservationReleased !== true/);
+  assert.match(source,/catch \(error\) \{\s*if \(connector\.getUserId\(\) !== uid\) return;\s*button\.disabled = false;/);
   assert.match(source,/const headers = await authHeaders\(\);\s*if \(connector\.getUserId\(\) !== uid\) throw new Error\(translate\('Account changed while the order was processing\./);
   assert.match(gateway,/app\.post\(["']\/paper\/orders\/:orderId\/cancel["']/);
   assert.match(limitTransaction,/cancelPendingLimitOrder/);
