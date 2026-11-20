@@ -51,12 +51,12 @@ test("member collection-group lookup is UID-scoped and filters inactive membersh
     });
   });
   const db=env.authenticatedContext("owner-1").firestore();
-  const q=query(collectionGroup(db,"members"),where("uid","==","owner-1"));
+  const q=query(collectionGroup(db,"members"),where("uid","==","owner-1"),where("active","==",true));
   const snap=await assertSucceeds(getDocs(q));
-  assert.equal(snap.size,2);
-  assert.equal(snap.docs.filter(d=>d.data().active===true).length,1);
+  assert.equal(snap.size,1);
+  assert.equal(snap.docs[0].data().active,true);
   const other=env.authenticatedContext("intruder").firestore();
-  await assertFails(getDocs(query(collectionGroup(other,"members"),where("uid","==","owner-1"))));
+  await assertFails(getDocs(query(collectionGroup(other,"members"),where("uid","==","owner-1"),where("active","==",true))));
 });
 
 test("owner can add a product but cannot directly edit stock",async()=>{
