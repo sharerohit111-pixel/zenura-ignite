@@ -342,7 +342,11 @@
 
   async function loadBalances() {
     const connector = window.ZENURA_MARKET_CONNECTOR, uid = connector?.getUserId?.(), seq = ++balanceRequest;
-    if (!uid || !gateway) return;
+    if (!uid || !gateway) {
+      [cashAvailable,cashReserved,sharesAvailable,sharesReserved].forEach(el => { if (el) el.textContent = '—'; });
+      showMessage(ordersStatus, !uid ? translate('Sign in to view private orders.') : translate('Market gateway is not configured.'), 'warning');
+      return;
+    }
     showMessage(ordersStatus, translate('Loading balances…'), 'loading');
     try {
       const headers = await authHeaders();
