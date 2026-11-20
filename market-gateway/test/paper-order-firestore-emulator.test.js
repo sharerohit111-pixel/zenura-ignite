@@ -550,3 +550,45 @@ integrationTest("Firestore emulator serializes scheduled-worker fill against LIM
   }
  }finally{await clean([accountRef,orderRef]);}
 });
+
+integrationTest("Firestore emulator serializes scheduled-worker SELL fill against LIMIT cancellation",async()=>{
+ const id=crypto.randomUUID(),uid="worker-limit-sell-cancel-"+id;
+ const accountRef=db.collection("indianPaperAccounts").doc(uid);
+ const orderRef=db.collection("emulatorPaperOrders").doc("worker-limit-sell-cancel-"+id);
+ const serverTimestamp=()=>FieldValue.serverTimestamp(),nowMs=Date.now();
+ const quote={pricePaise:10500,timestampMs:nowMs-500};
+ await accountRef.set({
+  cashPaise:100000,reservedCashPaise:0,reservedMarginPaise:0,realizedPnlPaise:0,
+  positions:{"NSE_EQ|AAA":{quantity:5,averagePricePaise:8000,costBasisPaise:40000}},
+  reservedPositions:{"NSE_EQ|AAA":2},version:1
+ });
+ await orderRef.set({
+  uid,instrumentKey:"NSE_EQ|AAA",side:"SELL",quantity:2,orderType:"LIMIT",
+  limitPricePaise:10000,status:"PENDING",simulationOnly:true,
+  reservedCashPaise:0,reservedQuantity:2
+ });
+ try{
+  const results=await Promise.allSettled([
+   cancelPendingLimitOrder({db,accountRef,orderRef,uid,serverTimestamp}),
+   executePendingLimitOrderInWorker({db,orderRef,order:(await orderRef.get()).data(),quote,nowMs,serverTimestamp})
+  ]);
+  const [account,order]=await Promise.all([accountRef.get(),orderRef.get()]);
+  const stored=order.data(),state=account.data();
+  assert.ok(["CANCELLED","FILLED"].includes(stored.status));
+  assert.equal(state.reservedPositions["NSE_EQ|AAA"],undefined);
+  if(stored.status==="CANCELLED"){
+   assert.equal(state.cashPaise,100000);
+   assert.equal(state.positions["NSE_EQ|AAA"].quantity,5);
+   assert.equal(state.positions["NSE_EQ|AAA"].costBasisPaise,40000);
+   assert.equal(state.realizedPnlPaise,0);
+   assert.ok(results.some(result=>result.status==="fulfilled"&&result.value?.status==="CANCELLED"));
+  }else{
+   assert.equal(state.cashPaise,121000);
+   assert.equal(state.positions["NSE_EQ|AAA"].quantity,3);
+   assert.equal(state.positions["NSE_EQ|AAA"].costBasisPaise,24000);
+   assert.equal(state.realizedPnlPaise,5000);
+   assert.equal(stored.realizedPnlPaise,5000);
+   assert.ok(results.some(result=>result.status==="fulfilled"&&result.value==="FILLED"));
+  }
+ }finally{await clean([accountRef,orderRef]);}
+});
