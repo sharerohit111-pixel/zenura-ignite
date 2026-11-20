@@ -189,14 +189,16 @@ test("concurrent execution and cancellation serialize with fill winning exactly 
  const order=baseOrder("BUY",{reservedCashPaise:30000,reservedQuantity:0});
  const h=harness(baseAccount({reservedCashPaise:30000}),order);
  const quote={pricePaise:9000,timestampMs:stamp().getTime()};
- const [execution,cancel]=await Promise.all([
+ const [execution,cancel]=await Promise.allSettled([
   executePendingLimitOrder({db:h.db,accountRef:h.accountRef,orderRef:h.orderRef,uid:"user-1",quote,nowMs:quote.timestampMs+1000,serverTimestamp:stamp}),
   cancelPendingLimitOrder({db:h.db,accountRef:h.accountRef,orderRef:h.orderRef,uid:"user-1",serverTimestamp:stamp})
  ]);
- assert.equal(execution.status,"FILLED");
+ assert.equal(execution.status,"fulfilled");
+ assert.equal(execution.value.status,"FILLED");
  assert.equal(h.records.get("orders/order-1").status,"FILLED");
  assert.equal(h.records.get("accounts/user-1").cashPaise,73000);
  assert.equal(h.records.get("accounts/user-1").reservedCashPaise,0);
  assert.equal(h.records.get("accounts/user-1").positions["NSE_EQ|ABC"].quantity,3);
- assert.equal(cancel.status,409);
+ assert.equal(cancel.status,"rejected");
+ assert.equal(cancel.reason.status,409);
 });
