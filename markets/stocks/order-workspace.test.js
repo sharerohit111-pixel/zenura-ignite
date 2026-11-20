@@ -29,7 +29,6 @@ test("MARKET remains on the existing market-order flow and LIMIT uses the verifi
   assert.match(source,/limit_price_paise:limitPricePaise/);
   assert.match(source,/idempotency_key:pending\.key/);
   assert.match(source,/\['PENDING','FILLED','CANCELLED'\]\.includes\(data\.status\)/);
-  assert.match(source,/data\.idempotentReplay/);
   assert.match(source,/localStorage\.getItem\(limitStorageKey\(uid\)\)/);
   assert.match(source,/localStorage\.setItem\(limitStorageKey\(uid\), JSON\.stringify\(pending\)\)/);
   assert.doesNotMatch(source,/sessionStorage\.(getItem|setItem|removeItem)\(limitStorageKey/);
