@@ -198,7 +198,7 @@
       }
       pending = {key:window.crypto.randomUUID(),fingerprint};
       if (!savePendingLimit(uid,pending)) {
-        showMessage(status, 'Session storage unavailable. No LIMIT order was sent because safe retry protection could not be saved.', 'error'); return;
+        showMessage(status, 'Browser storage unavailable. No LIMIT order was sent because safe retry protection could not be saved.', 'error'); return;
       }
     }
     limitSubmitting = true;
@@ -217,12 +217,17 @@
         if (response.status >= 400 && response.status < 500) clearPendingLimit(uid);
         throw new Error(data.error || 'LIMIT order could not be submitted.');
       }
-      if (data.status !== 'PENDING' || data.orderType !== 'LIMIT' || typeof data.orderId !== 'string') {
+      if (!['PENDING','FILLED','CANCELLED'].includes(data.status) || data.orderType !== 'LIMIT' || typeof data.orderId !== 'string') {
         throw new Error('LIMIT order response could not be verified. Retry the same order to safely check its result.');
       }
       clearPendingLimit(uid);
       await refreshAll();
-      showMessage(status, translate('LIMIT order submitted and reservation confirmed.'), 'success');
+      const resultMessage = data.status === 'PENDING'
+        ? 'LIMIT order submitted and reservation confirmed.'
+        : data.status === 'FILLED'
+          ? 'LIMIT order was already filled; execution is recorded in Trade History.'
+          : 'LIMIT order was already cancelled; no active reservation remains.';
+      showMessage(status, translate(resultMessage), 'success');
     } catch (error) {
       showMessage(status, error.message || 'LIMIT order submission failed.', 'error');
     } finally {
