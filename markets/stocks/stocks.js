@@ -113,7 +113,7 @@
   });
   const watchRefresh=document.getElementById('watchlist-refresh');
   watchRefresh.addEventListener('click',loadWatchlistQuotes);
-  const paperCash=document.getElementById('paper-cash'),paperRealized=document.getElementById('paper-realized'),paperAccountStatus=document.getElementById('paper-account-status'),paperOrderStatus=document.getElementById('paper-order-status'),paperQuantity=document.getElementById('paper-quantity'),paperBuy=document.getElementById('paper-buy'),paperSell=document.getElementById('paper-sell');
+  const paperProductMode=document.getElementById('paper-product-mode'),paperCash=document.getElementById('paper-cash'),paperRealized=document.getElementById('paper-realized'),paperAccountStatus=document.getElementById('paper-account-status'),paperOrderStatus=document.getElementById('paper-order-status'),paperQuantity=document.getElementById('paper-quantity'),paperBuy=document.getElementById('paper-buy'),paperSell=document.getElementById('paper-sell');
   function inrPaise(value){const amount=Number(value||0)/100,formatted=Math.abs(amount).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});return amount<0?'-₹'+formatted:'₹'+formatted;}
   let paperAccountRequest=0;
   async function loadPaperAccount(){
@@ -123,7 +123,7 @@
       const token=await connector.getIdToken();if(request!==paperAccountRequest||connector.getUserId()!==uid)return;
       const response=await fetch(gateway+'/paper/account',{headers:{Authorization:'Bearer '+token,Accept:'application/json'}});
       const data=await response.json();if(request!==paperAccountRequest||connector.getUserId()!==uid)return;if(!response.ok)throw new Error(data.error||'Paper account unavailable');
-      paperCash.textContent=inrPaise(data.cashPaise);paperRealized.textContent=inrPaise(data.realizedPnlPaise);
+      paperCash.textContent=inrPaise(data.cashPaise);paperRealized.textContent=inrPaise(paperProductMode?.value==='INTRADAY'?(data.intradayRealizedPnlPaise??0):(data.deliveryRealizedPnlPaise??data.realizedPnlPaise));
       paperAccountStatus.textContent='Separate Indian-market virtual account · No real funds';
       updatePaperButtons();
     }catch(error){if(request===paperAccountRequest&&connector.getUserId()===uid)paperAccountStatus.textContent=error.message||'Paper account not ready';}
@@ -138,7 +138,8 @@
     paperPortfolioStatus.textContent='Refreshing verified market valuation…';
     try{
       const token=await connector.getIdToken();if(request!==paperPortfolioRequest||connector.getUserId()!==uid)return;
-      const response=await fetch(gateway+'/paper/portfolio',{headers:{Authorization:'Bearer '+token,Accept:'application/json'}});
+      const product=paperProductMode?.value==='INTRADAY'?'INTRADAY':'DELIVERY';
+      const response=await fetch(gateway+'/paper/portfolio?product='+product,{headers:{Authorization:'Bearer '+token,Accept:'application/json'}});
       const data=await response.json();if(request!==paperPortfolioRequest||connector.getUserId()!==uid)return;if(!response.ok)throw new Error(data.error||'Portfolio valuation unavailable');
       paperMarketValue.textContent=inrPaise(data.marketValuePaise);paperUnrealized.textContent=signedMoney(data.unrealizedPnlPaise);paperEquity.textContent=inrPaise(data.equityPaise);
       paperPortfolioStatus.textContent=data.valuationStatus==='fresh'?'All holdings valued from fresh Upstox quotes.':data.valuationStatus==='no_open_positions'?'No open holdings.':'Some quotes are stale or unavailable; those positions are excluded from totals ('+data.stalePositions+').';
@@ -165,10 +166,10 @@
       const response=await fetch(gateway+'/paper/orders?'+params.toString(),{headers:{Authorization:'Bearer '+token,Accept:'application/json'}});
       const data=await response.json();if(seq!==paperHistoryLoadSeq||connector.getUserId()!==uid)return;if(!response.ok)throw new Error(data.error||'Order history unavailable');
       if(!append)paperHistory.textContent='';
-      if(!data.orders?.length&&!append)tableMessage(paperHistory,7,'No paper orders yet.');
+      if(!data.orders?.length&&!append)tableMessage(paperHistory,8,'No paper orders yet.');
       else data.orders.forEach(order=>{
         const tr=document.createElement('tr'),date=order.createdAt?new Date(order.createdAt).toLocaleString('en-IN'):'—';
-        [date,order.tradingSymbol,order.side,order.orderType||'MARKET',order.quantity,Number.isSafeInteger(order.executionPricePaise)?inrPaise(order.executionPricePaise):'—',order.status+' · SIM'].forEach(v=>{const td=document.createElement('td');td.textContent=String(v);tr.append(td);});
+        [date,order.tradingSymbol,order.product==='INTRADAY'?'INTRADAY':'DELIVERY',order.side,order.orderType||'MARKET',order.quantity,Number.isSafeInteger(order.executionPricePaise)?inrPaise(order.executionPricePaise):'—',order.status+' · SIM'].forEach(v=>{const td=document.createElement('td');td.textContent=String(v);tr.append(td);});
         paperHistory.append(tr);
       });
       paperHistoryCursor=data.nextCursor||null;
@@ -180,6 +181,7 @@
     }finally{if(seq===paperHistoryLoadSeq&&connector.getUserId()===uid){paperHistoryLoading=false;paperHistoryMore.disabled=!paperHistoryHasMore;}}
   }
   paperHistoryMore?.addEventListener('click',()=>loadPaperHistory({append:true}));
+  paperProductMode?.addEventListener('change',()=>{loadPaperAccount();refreshPaperViews();});
   let derivativePortfolioRequest=0;
   async function loadDerivativePortfolio(){
     const connector=window.ZENURA_MARKET_CONNECTOR,uid=connector?.getUserId?.(),request=++derivativePortfolioRequest;
@@ -244,7 +246,9 @@
     const pending=retryPolicy.readPendingPaperOrder(pendingOrderStorage,storageKey);
     let pendingKey=pending?.key||null;
     const instrumentKey=selected.instrument_key,tradingSymbol=selected.trading_symbol||selected.name||selected.instrument_key;
-    const fingerprint=JSON.stringify({instrument_key:instrumentKey,side,quantity:qty});
+    const product=paperProductMode?.value==='INTRADAY'?'INTRADAY':'DELIVERY';
+    const fingerprintPayload={instrument_key:instrumentKey,side,quantity:qty};if(product==='INTRADAY')fingerprintPayload.product=product;
+    const fingerprint=JSON.stringify(fingerprintPayload);
     if(pendingKey&&!retryPolicy.canRetryPendingPaperOrder(pending.fingerprint,fingerprint)){
       paperOrderStatus.textContent='A previous order response is uncertain for this account. Retry the same stock, side and quantity first.';return;
     }
@@ -260,7 +264,7 @@
     try{
       const token=await connector.getIdToken();
       if(connector.getUserId()!==uid)throw new Error('Account changed. Sign back into the original account to safely verify this pending order.');
-      const response=await fetch(gateway+'/paper/orders',{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json',Accept:'application/json'},body:JSON.stringify({instrument_key:instrumentKey,side,quantity:qty,idempotency_key:pendingKey})});
+      const response=await fetch(gateway+'/paper/orders',{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json',Accept:'application/json'},body:JSON.stringify({instrument_key:instrumentKey,side,quantity:qty,product,idempotency_key:pendingKey})});
       const data=await response.json().catch(()=>({}));
       if(connector.getUserId()!==uid)throw new Error('Account changed while the order was processing. Sign back into the original account to verify its result.');
       if(!response.ok){if(response.status>=400&&response.status<500)retryPolicy.clearPendingPaperOrder(pendingOrderStorage,storageKey);throw new Error(data.error||'Paper order rejected');}
@@ -553,7 +557,7 @@
     paperMarketValue.textContent='—';paperUnrealized.textContent='—';paperEquity.textContent='—';
     paperPortfolioStatus.textContent='Sign in to view your private portfolio.';
     tableMessage(paperPositions,6,'Sign in to view holdings.');
-    tableMessage(paperHistory,7,'Sign in to view order history.');
+    tableMessage(paperHistory,8,'Sign in to view order history.');
     if(paperHistoryStatus)paperHistoryStatus.textContent='Sign in required';
     if(paperHistoryMore)paperHistoryMore.disabled=true;
     const derivativeBody=document.getElementById('derivative-positions');
