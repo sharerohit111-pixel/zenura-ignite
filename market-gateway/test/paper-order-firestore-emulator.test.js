@@ -508,14 +508,20 @@ integrationTest("Firestore emulator serializes duplicate scheduled-worker execut
  await accountRef.set({cashPaise:100000,reservedCashPaise:20000,reservedMarginPaise:0,realizedPnlPaise:0,positions:{},reservedPositions:{},version:1});
  await orderRef.set({uid,instrumentKey:"NSE_EQ|AAA",side:"BUY",quantity:2,orderType:"LIMIT",limitPricePaise:10000,status:"PENDING",simulationOnly:true,reservedCashPaise:20000,reservedQuantity:0});
  try{
-  const results=await Promise.all([
-   executePendingLimitOrderInWorker({db,orderRef,order:(await orderRef.get()).data(),quote,nowMs,serverTimestamp:()=>FieldValue.serverTimestamp()}),
-   executePendingLimitOrderInWorker({db,orderRef,order:(await orderRef.get()).data(),quote,nowMs,serverTimestamp:()=>FieldValue.serverTimestamp()})
+  const original=(await orderRef.get()).data();
+  const results=await Promise.allSettled([
+   executePendingLimitOrderInWorker({db,orderRef,order:original,quote,nowMs,serverTimestamp:()=>FieldValue.serverTimestamp()}),
+   executePendingLimitOrderInWorker({db,orderRef,order:original,quote,nowMs,serverTimestamp:()=>FieldValue.serverTimestamp()})
   ]);
   const [account,order]=await Promise.all([accountRef.get(),orderRef.get()]);
   assert.equal(order.data().status,"FILLED");
-  assert.equal(results.filter(value=>value==="FILLED").length,1);
-  assert.equal(results.filter(value=>value==="ALREADY_FILLED").length,1);
+  assert.equal(results.filter(value=>value.status==="fulfilled"&&value.value==="FILLED").length,1);
+  assert.ok(results.every(value=>
+   (value.status==="fulfilled"&&["FILLED","ALREADY_FILLED"].includes(value.value))||
+   (value.status==="rejected"&&[3,10].includes(value.reason?.code))
+  ));
+  const replay=await executePendingLimitOrderInWorker({db,orderRef,order:original,quote,nowMs,serverTimestamp:()=>FieldValue.serverTimestamp()});
+  assert.equal(replay,"ALREADY_FILLED");
   assert.equal(account.data().cashPaise,81000);
   assert.equal(account.data().reservedCashPaise,0);
   assert.equal(account.data().positions["NSE_EQ|AAA"].quantity,2);
