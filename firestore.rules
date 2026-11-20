@@ -229,7 +229,7 @@ service cloud.firestore {
     function kiranaValidSaleLines(storeId, saleId, data) {
       return data.items is list && data.items.size() >= 1 && data.items.size() <= 3
         && data.stockChanges is map
-        && data.stockChanges.size() == data.items.size()
+        && data.stockChanges.keys().size() == data.items.size()
         && kiranaValidSaleLine(storeId, saleId, data, 0)
         && (data.items.size() < 2 || kiranaValidSaleLine(storeId, saleId, data, 1))
         && (data.items.size() < 3 || kiranaValidSaleLine(storeId, saleId, data, 2));
