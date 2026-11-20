@@ -67,7 +67,6 @@ exports.kiranaListMyStores = onCall({ region: REGION }, async req => {
 exports.kiranaAddProduct = onCall({ region: REGION, maxInstances: 20 }, async req => {
   const uid = signedIn(req);
   const storeId = textValue(req.data?.storeId, "Store");
-  await requireMember(storeId, uid, ["owner", "manager"]);
   const name = textValue(req.data?.name, "Product name", 120);
   const sku = textValue(req.data?.sku || ("SKU-" + crypto.randomBytes(4).toString("hex").toUpperCase()), "SKU", 40);
   const unit = textValue(req.data?.unit || "piece", "Unit", 20);
@@ -78,12 +77,19 @@ exports.kiranaAddProduct = onCall({ region: REGION, maxInstances: 20 }, async re
   const lowStockAt = Number(req.data?.lowStockAt ?? 0);
   if (!Number.isFinite(lowStockAt) || lowStockAt < 0 || lowStockAt > 100000000) throw new HttpsError("invalid-argument", "Invalid low-stock threshold.");
   const ref = db.collection("kiranaStores").doc(storeId).collection("products").doc();
-  await ref.create({
-    name, sku, unit, retailPrice, wholesalePrice, stock: openingStock,
-    lowStockAt,
-    barcode: String(req.data?.barcode || "").slice(0, 80),
-    active: true, createdBy: uid,
-    createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp()
+  const storeRef = db.collection("kiranaStores").doc(storeId);
+  await db.runTransaction(async tx => {
+    const memberSnap = await tx.get(storeRef.collection("members").doc(uid));
+    if (!memberSnap.exists || memberSnap.data().active !== true || !["owner", "manager"].includes(memberSnap.data().role)) {
+      throw new HttpsError("permission-denied", "You cannot add products to this store.");
+    }
+    tx.create(ref, {
+      name, sku, unit, retailPrice, wholesalePrice, stock: openingStock,
+      lowStockAt,
+      barcode: String(req.data?.barcode || "").slice(0, 80),
+      active: true, createdBy: uid,
+      createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp()
+    });
   });
   return { productId: ref.id };
 });
