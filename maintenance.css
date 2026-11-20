@@ -1,0 +1,19 @@
+/* ZENURA IGNITE — maintenance and support terms */
+.maintenance-section{padding:88px 0 76px}
+.maintenance-heading{display:grid;grid-template-columns:1fr .9fr;gap:48px;align-items:end;margin:18px 0 28px}
+.maintenance-heading h2{font:700 clamp(42px,5.2vw,62px)/1.05 'Space Grotesk';letter-spacing:-2.3px;margin:18px 0}
+.maintenance-heading h2 em{font-style:normal;color:var(--cyan);text-shadow:0 0 24px #35e4ff55}
+.maintenance-heading>p{font-size:14px;line-height:1.85;color:var(--muted);margin:0 0 20px}
+.maintenance-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:17px}
+.maintenance-card{position:relative;border:1px solid #426eb688;border-radius:19px;padding:26px;background:linear-gradient(145deg,#111f40dd,#0a1024);box-shadow:inset 0 0 25px #2d6dff12}
+.maintenance-number{font:700 9px 'Space Grotesk';letter-spacing:1.8px;color:var(--cyan)}
+.maintenance-icon{width:42px;height:42px;display:grid;place-items:center;border-radius:12px;margin:18px 0 14px;background:#35e4ff14;border:1px solid #35e4ff55;color:var(--cyan);font-size:23px}
+.maintenance-card h3{font:700 21px 'Space Grotesk';margin:0 0 12px}
+.maintenance-card p{font-size:12px;line-height:1.8;color:var(--muted);margin:0}
+.maintenance-card ul{list-style:none;padding:17px 0 0;margin:17px 0 0;border-top:1px solid var(--line);display:grid;gap:12px}
+.maintenance-card li{font-size:12px;line-height:1.65;color:#c4d2e9}
+.maintenance-card li:before{content:"✦";color:var(--cyan);margin-right:9px}
+.maintenance-disclaimer{max-width:900px;margin:24px auto 0;text-align:center;font-size:11px;line-height:1.85;color:#aab8d0}
+.maintenance-cta{display:table;margin:18px auto 0;padding:12px 19px;border:1px solid #35e4ff88;border-radius:10px;color:var(--cyan);font:700 12px 'DM Sans';text-decoration:none;background:#35e4ff0c}
+.maintenance-cta:hover{background:#35e4ff1c;box-shadow:0 0 22px #35e4ff22}
+@media(max-width:650px){.maintenance-section{padding:62px 0 52px}.maintenance-heading{grid-template-columns:1fr;gap:0}.maintenance-heading h2{font-size:43px;margin:15px 0}.maintenance-heading>p{font-size:12px;margin:0 0 20px}.maintenance-grid{grid-template-columns:1fr;gap:13px}.maintenance-card{padding:21px}}
