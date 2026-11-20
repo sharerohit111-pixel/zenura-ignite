@@ -57,6 +57,16 @@ test("Empty trade history has a trade-specific message",()=>{
   assert.match(source,/'No filled trades recorded yet\.':'अभी तक कोई पूरा हुआ ट्रेड दर्ज नहीं है।'/);
 });
 
+test("Every authentication transition clears the previous account before refreshing",()=>{
+  const listener = source.slice(source.indexOf("window.addEventListener('zenura-market-auth-ready'"), source.indexOf("langButton?.addEventListener"));
+  assert.match(listener,/requestSeq\+\+; balanceRequest\+\+;/);
+  assert.match(listener,/currentOrders = \[\]; nextCursor = null; hasMore = false;/);
+  assert.match(listener,/\[cashAvailable,cashReserved,sharesAvailable,sharesReserved\]\.forEach\(el => \{ el\.textContent = '—'; \}\)/);
+  assert.ok(listener.indexOf("currentOrders = [];") < listener.indexOf("refreshAll();"), "Private orders must clear before the next account loads");
+  assert.match(listener,/if \(!event\.detail\?\.signedIn\)[\s\S]*?Sign in to view private orders/);
+  assert.match(listener,/Loading account orders…/);
+});
+
 test("Missing account or gateway clears private balance values",()=>{
   assert.match(source,/if \(!uid \|\| !gateway\) \{\s*\[cashAvailable,cashReserved,sharesAvailable,sharesReserved\]\.forEach\(el => \{ if \(el\) el\.textContent = '—'; \}\)/);
   assert.match(source,/Market gateway is not configured\./);
