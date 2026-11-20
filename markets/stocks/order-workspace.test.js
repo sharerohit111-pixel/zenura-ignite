@@ -71,6 +71,9 @@ test("Available and reserved cash and shares use account reservation fields",()=
 
 test("Order and trade history use backend statuses, execution prices and cursor pagination",()=>{
   assert.match(source,/\/paper\/orders\?/);
+  assert.match(source,/const cursor = append \? nextCursor : null/);
+  assert.match(source,/const headers = await authHeaders\(\);\s*if \(seq !== requestSeq \|\| connector\.getUserId\(\) !== uid\) return;/);
+  assert.match(source,/if \(cursor\) params\.set\('cursor', cursor\)/);
   assert.match(source,/params\.set\('cursor', nextCursor\)/);
   assert.match(source,/order\.executionPricePaise/);
   assert.match(source,/order\.createdAt/);
