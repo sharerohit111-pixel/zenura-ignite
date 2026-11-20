@@ -1,0 +1,37 @@
+name: Validate Mega Kirana Spark Backend
+
+on:
+  push:
+    branches: [feat/kirana-firestore-spark-backend]
+  pull_request:
+    branches: [main]
+    paths:
+      - "kirana-app/**"
+      - "firestore.rules"
+      - "firebase.json"
+      - "tests/firestore/**"
+      - ".github/workflows/validate-kirana-spark.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - name: Check browser module syntax
+        run: |
+          node --input-type=module --check < kirana-app/kirana.js
+          node --input-type=module --check < kirana-app/kirana-firestore.js
+      - name: Install Firebase emulator test dependencies
+        run: npm install --no-save --package-lock=false firebase @firebase/rules-unit-testing firebase-tools
+      - name: Run Firestore security rules tests
+        run: npx firebase emulators:exec --only firestore --project demo-zenura-kirana "node --test tests/firestore/kirana.rules.test.mjs"
