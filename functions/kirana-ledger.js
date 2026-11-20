@@ -62,11 +62,21 @@ exports.kiranaRecordCreditPayment = onCall({region:REGION}, async req=>{
 });
 exports.kiranaGetCustomerLedger = onCall({region:REGION}, async req=>{
   const uid=requireUid(req), storeId=requiredText(req.data?.storeId,"Store"), customerId=requiredText(req.data?.customerId,"Customer");
-  await member(storeId,uid);
-  const customer=db.collection("kiranaStores").doc(storeId).collection("customers").doc(customerId);
-  const [c,entries]=await Promise.all([customer.get(),customer.collection("ledger").orderBy("createdAt","desc").limit(200).get()]);
-  if(!c.exists) throw new HttpsError("not-found","Customer not found.");
-  return {customer:{id:c.id,...c.data()},entries:entries.docs.map(d=>({id:d.id,...d.data()}))};
+  const store=db.collection("kiranaStores").doc(storeId);
+  const customer=store.collection("customers").doc(customerId);
+  let customerData, ledgerEntries=[];
+  await db.runTransaction(async tx=>{
+    const memberSnap=await tx.get(store.collection("members").doc(uid));
+    if(!memberSnap.exists||memberSnap.data().active!==true||!["owner","manager","cashier"].includes(memberSnap.data().role)) throw new HttpsError("permission-denied","Store access denied.");
+    const [customerSnap,entriesSnap]=await Promise.all([
+      tx.get(customer),
+      tx.get(customer.collection("ledger").orderBy("createdAt","desc").limit(200))
+    ]);
+    if(!customerSnap.exists) throw new HttpsError("not-found","Customer not found.");
+    customerData={id:customerSnap.id,...customerSnap.data()};
+    ledgerEntries=entriesSnap.docs.map(d=>({id:d.id,...d.data()}));
+  });
+  return {customer:customerData,entries:ledgerEntries};
 });
 
 exports.kiranaRecordCustomerCredit = onCall({region:REGION}, async req=>{
