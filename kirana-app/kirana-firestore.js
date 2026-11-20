@@ -27,8 +27,8 @@ const rows = snap => snap.docs.map(d => ({id:d.id,...d.data()}));
 
 async function kiranaListMyStores() {
   const u=requireUser();
-  const memberships=await getDocs(query(collectionGroup(db,"members"),where("uid","==",u.uid),where("active","==",true),limit(100)));
-  const stores=await Promise.all(memberships.docs.map(async m=>{
+  const memberships=await getDocs(query(collectionGroup(db,"members"),where("uid","==",u.uid),limit(100)));
+  const stores=await Promise.all(memberships.docs.filter(m=>m.data().active===true).map(async m=>{
     const parent=m.ref.parent.parent;
     if(!parent) return null;
     const s=await getDoc(parent);
