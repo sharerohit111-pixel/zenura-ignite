@@ -11,6 +11,10 @@ function eligible(order,quote,nowMs){
     !Number.isSafeInteger(nowMs)||quote.timestampMs>nowMs||nowMs-quote.timestampMs>15000)return false;
   return order.side==="BUY"?quote.pricePaise<=order.limitPricePaise:quote.pricePaise>=order.limitPricePaise;
 }
+function sameExecutionIntent(original,current){
+  return ["uid","orderType","instrumentKey","side","quantity","limitPricePaise","reservedCashPaise","reservedQuantity"]
+    .every(key=>original?.[key]===current?.[key]);
+}
 function validateAccount(account){
   const positions=account?.positions??{},reservedPositions=account?.reservedPositions??{};
   const reservedCashPaise=account?.reservedCashPaise??0,reservedMarginPaise=account?.reservedMarginPaise??0;
@@ -74,7 +78,7 @@ async function execute({db,orderRef,order,quote,nowMs,serverTimestamp}){
     const [accountSnap,orderSnap]=await Promise.all([tx.get(accountRef),tx.get(orderRef)]);
     if(!orderSnap.exists||!accountSnap.exists)return;
     const currentOrder=orderSnap.data();
-    if(currentOrder.uid!==uid||currentOrder.orderType!=="LIMIT"||currentOrder.simulationOnly!==true)return;
+    if(currentOrder.uid!==uid||currentOrder.orderType!=="LIMIT"||currentOrder.simulationOnly!==true||!sameExecutionIntent(order,currentOrder))return;
     if(currentOrder.status==="FILLED"){outcome="ALREADY_FILLED";return;}
     if(currentOrder.status!=="PENDING")return;
     const now=Date.now();
