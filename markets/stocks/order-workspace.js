@@ -372,6 +372,7 @@
   }
   async function loadOrders({append = false} = {}) {
     const connector = window.ZENURA_MARKET_CONNECTOR, uid = connector?.getUserId?.(), seq = ++requestSeq;
+    const cursor = append ? nextCursor : null;
     if (!uid || !gateway) {
       currentOrders = []; nextCursor = null; hasMore = false;
       showMessage(ordersStatus, translate('Sign in to view private orders.'), 'warning');
@@ -380,8 +381,9 @@
     showMessage(ordersStatus, translate('Loading orders from your private paper account…'), 'loading');
     try {
       const headers = await authHeaders();
+      if (seq !== requestSeq || connector.getUserId() !== uid) return;
       const params = new URLSearchParams({limit:'100'});
-      if (append && nextCursor) params.set('cursor', nextCursor);
+      if (cursor) params.set('cursor', cursor);
       const response = await fetch(gateway + '/paper/orders?' + params.toString(), {headers});
       const data = await response.json();
       if (seq !== requestSeq || connector.getUserId() !== uid) return;
