@@ -438,14 +438,18 @@
   refresh?.addEventListener('click', refreshAll);
   loadMore?.addEventListener('click', () => loadOrders({append:true}));
   window.addEventListener('zenura-market-auth-ready', event => {
+    // Every auth transition may represent a different account. Invalidate in-flight
+    // requests and clear the previous account's private data before loading the next.
+    requestSeq++; balanceRequest++;
+    currentOrders = []; nextCursor = null; hasMore = false;
+    [cashAvailable,cashReserved,sharesAvailable,sharesReserved].forEach(el => { el.textContent = '—'; });
+    if (loadMore) loadMore.hidden = true;
+    renderOrders(); renderTrades();
     if (!event.detail?.signedIn) {
-      requestSeq++; balanceRequest++; currentOrders = []; nextCursor = null; hasMore = false;
-      [cashAvailable,cashReserved,sharesAvailable,sharesReserved].forEach(el => { el.textContent = '—'; });
-      if (loadMore) loadMore.hidden = true;
       showMessage(ordersStatus, translate('Sign in to view private orders.'), 'warning');
-      renderOrders(); renderTrades();
       return;
     }
+    showMessage(ordersStatus, translate('Loading account orders…'), 'info');
     refreshAll();
   });
   langButton?.addEventListener('click', () => {
