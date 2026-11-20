@@ -242,6 +242,7 @@
     showMessage(status, translate('Submitting LIMIT order and reserving virtual funds/shares…'), 'loading');
     try {
       const headers = await authHeaders();
+      if (connector.getUserId() !== uid) throw new Error(translate('Account changed while the order was processing. Sign in again to verify its result.'));
       const response = await fetch(gateway + '/paper/orders', {
         method:'POST',
         headers:{...headers,'Content-Type':'application/json'},
@@ -405,6 +406,7 @@
     button.textContent = translate('CANCELLING…');
     try {
       const headers = await authHeaders();
+      if (connector.getUserId() !== uid) throw new Error(translate('Account changed while the order was processing. Sign in again to verify its result.'));
       const response = await fetch(gateway + '/paper/orders/' + encodeURIComponent(orderId) + '/cancel', {method:'POST',headers});
       const data = await response.json().catch(() => ({}));
       if (connector.getUserId() !== uid) return;
