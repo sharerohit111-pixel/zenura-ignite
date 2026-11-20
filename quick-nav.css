@@ -5,7 +5,7 @@
 .quick-nav a{flex:0 0 auto;display:inline-flex;align-items:center;min-height:32px;padding:7px 13px;border:1px solid transparent;border-radius:22px;color:#c2cde2;font:600 11px 'DM Sans',sans-serif;white-space:nowrap;transition:background .2s,border-color .2s,color .2s}
 .quick-nav a:hover,.quick-nav a:focus-visible{outline:none;color:#fff;background:linear-gradient(100deg,rgba(53,228,255,.13),rgba(163,77,255,.15));border-color:rgba(53,228,255,.48);box-shadow:0 0 14px rgba(53,228,255,.12)}
 @media(min-width:801px){.quick-nav{top:88px}.quick-nav-inner{justify-content:center}}
-@media(max-width:800px){.quick-nav{top:86px}.quick-nav-inner{padding:0 14px;gap:4px;min-height:44px}.quick-nav a{padding:6px 11px;font-size:10px}}
+@media(max-width:800px){.quick-nav{top:86px}.quick-nav-inner{padding:0 14px;gap:4px;min-height:44px;justify-content:space-between}.quick-nav a{padding:6px 9px;font-size:10px}.quick-nav .quick-share{padding:6px 9px;font-size:10px}}.quick-nav-inner{padding:0 14px;gap:4px;min-height:44px}.quick-nav a{padding:6px 11px;font-size:10px}}
 @media(prefers-reduced-motion:reduce){.quick-nav a{transition:none}}
 
 .quick-share{flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:32px;padding:7px 14px;border:1px solid rgba(53,228,255,.5);border-radius:22px;color:#e9fbff;background:linear-gradient(100deg,rgba(53,228,255,.16),rgba(163,77,255,.18));font:700 11px 'DM Sans',sans-serif;white-space:nowrap;cursor:pointer;transition:background .2s,border-color .2s,box-shadow .2s}
@@ -22,3 +22,9 @@
 @media(max-width:800px){#nav .account-user-name{display:block!important;width:100%;max-width:none;margin:4px 0 8px;padding:10px 12px!important;border-radius:9px}}
 
 #nav .account-user-name[hidden]{display:none!important}
+
+.zenura-light-mode .quick-nav{background:rgba(248,250,255,.97);border-color:#d4deed;box-shadow:0 7px 20px #17233a14}
+.zenura-light-mode .quick-nav a{color:#243451}
+.zenura-light-mode .quick-nav a:hover,.zenura-light-mode .quick-nav a:focus-visible{color:#d71920;background:#fff;border-color:#d7192055;box-shadow:0 0 12px #d7192015}
+.zenura-light-mode .quick-share{color:#b91c1c;background:#fff;border-color:#d7192077}
+@media(max-width:600px){.quick-nav-inner{overflow-x:auto;justify-content:flex-start}.quick-nav a{flex:0 0 auto}}
