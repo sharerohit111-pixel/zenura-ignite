@@ -40,6 +40,15 @@ test("MARKET remains on the existing market-order flow and LIMIT uses the verifi
   assert.match(gateway,/Only MARKET and LIMIT paper orders are supported/);
 });
 
+test("Successful LIMIT response keeps its idempotency key until account refresh completes",()=>{
+  const start=source.indexOf("async function submitLimitOrder");
+  const end=source.indexOf("function orderRow",start);
+  const submit=source.slice(start,end);
+  assert.ok(start>=0&&end>start);
+  assert.ok(submit.indexOf("await refreshAll();")>=0);
+  assert.ok(submit.indexOf("clearPendingLimit(uid);")>submit.indexOf("await refreshAll();"));
+});
+
 test("LIMIT mode intercepts BUY/SELL before legacy MARKET handlers",()=>{
   assert.ok(source.includes("[buy, sell].forEach((button, index) => button.addEventListener('click'"));
   assert.ok(source.includes("if (selectedType !== 'LIMIT') return;"));
