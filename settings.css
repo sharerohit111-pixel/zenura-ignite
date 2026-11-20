@@ -31,3 +31,46 @@
 .zenura-compact-layout .cards article,.zenura-compact-layout .maintenance-card,.zenura-compact-layout .price-card{min-height:0;padding:15px}
 .zenura-reduced-motion *, .zenura-reduced-motion *::before, .zenura-reduced-motion *::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
 @media(max-width:600px){.site-settings-panel{max-height:55vh}.setting-row{font-size:12px;padding:9px 2px}}
+
+
+/* Light/day mode: convert the site's blue/cyan accent text to red while retaining the light palette. */
+.zenura-light-mode{
+  --cyan:#e53935;
+  --blue:#d32f2f;
+  --purple:#c62828;
+  --pink:#ef5350;
+}
+.zenura-light-mode .hero h1 em,
+.zenura-light-mode .section h2 em,
+.zenura-light-mode .manifesto h2 em,
+.zenura-light-mode .contact h2 em,
+.zenura-light-mode .brand i,
+.zenura-light-mode .brand .founder-credit em,
+.zenura-light-mode .foot-brand i,
+.zenura-light-mode .footline em,
+.zenura-light-mode .footline a,
+.zenura-light-mode .cards article>b,
+.zenura-light-mode .cards a,
+.zenura-light-mode .strength b,
+.zenura-light-mode .product-link,
+.zenura-light-mode .product-symbol,
+.zenura-light-mode .tag,
+.zenura-light-mode .site-settings-toggle:hover,
+.zenura-light-mode .site-settings-toggle[aria-expanded="true"]{
+  color:#d32f2f!important;
+  text-shadow:none!important;
+}
+.zenura-light-mode .eyebrow b{
+  background:#e53935!important;
+  box-shadow:0 0 10px #e5393555!important;
+}
+.zenura-light-mode .contact input:focus,
+.zenura-light-mode .contact select:focus,
+.zenura-light-mode .contact textarea:focus{
+  border-color:#e53935!important;
+  box-shadow:0 0 0 3px #e5393520,0 0 14px #e5393518!important;
+}
+.zenura-light-mode .site-settings-panel .settings-panel-footer button{
+  color:#d32f2f!important;
+  border-color:#d32f2f66!important;
+}
