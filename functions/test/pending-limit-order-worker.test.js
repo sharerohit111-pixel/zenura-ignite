@@ -236,3 +236,22 @@ test("worker counts a closed legacy entry as a new position at the 50-position l
   assert.equal(h.records.get("indianPaperAccounts/user-1").positions["NSE_EQ|CLOSED"].quantity,0);
  }finally{Date.now=oldNow;}
 });
+
+
+for(const scenario of [
+ {name:"BUY reservation below exact limit value",order:{reservedCashPaise:19999},account:{...baseAccount}},
+ {name:"BUY order with unexpected reserved shares",order:{reservedQuantity:1},account:{...baseAccount}},
+ {name:"SELL order with unexpected cash reservation",order:{side:"SELL",reservedCashPaise:1,reservedQuantity:2},account:{...baseAccount,cashPaise:100000,positions:{"NSE_EQ|ABC":{quantity:3,averagePricePaise:8000,costBasisPaise:24000}},reservedCashPaise:0,reservedPositions:{"NSE_EQ|ABC":2}}}
+]){
+ test(`worker rejects ${scenario.name}`,async()=>{
+  const order={...baseOrder,...scenario.order};
+  const h=harness(order,scenario.account),oldNow=Date.now;Date.now=()=>now;
+  try{
+   const summary=await processPendingLimitOrders({db:h.db,fetchQuote:async()=>({pricePaise:order.side==="SELL"?11000:9500,timestampMs:now-500}),nowMs:now,serverTimestamp:stamp});
+   assert.equal(summary.filled,0);
+   assert.equal(summary.failed,1);
+   assert.equal(h.records.get("indianPaperOrders/order-1").status,"PENDING");
+   assert.equal(h.records.get("indianPaperAccounts/user-1").reservedCashPaise,scenario.account.reservedCashPaise);
+  }finally{Date.now=oldNow;}
+ });
+}
