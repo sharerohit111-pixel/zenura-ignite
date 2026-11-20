@@ -130,3 +130,6 @@ body.sidebar-open{overflow:hidden}
 .brand-spark i{width:30px!important;height:30px!important;margin:0!important;border-radius:50%;font-size:16px!important;color:#f2f7ff;background:linear-gradient(145deg,#174eaa,#704bd0);box-shadow:0 0 14px #438cff66}
 @media(prefers-reduced-motion:reduce){.header nav#nav,.sidebar-backdrop{transition:none}}
 @media(max-width:600px){.header nav#nav{padding-top:max(16px,env(safe-area-inset-top))!important;padding-bottom:max(24px,env(safe-area-inset-bottom))!important}}
+
+.catalogue-intro,.commercial-intro{padding:18px 20px;border:1px solid #426eb688;border-radius:14px;background:linear-gradient(120deg,#102347bb,#10132ccc);color:#b9c9df;font-size:13px;line-height:1.7}
+.zenura-light-mode .catalogue-intro,.zenura-light-mode .commercial-intro{background:#fff;color:#52617a;border-color:#cbd6e8}
