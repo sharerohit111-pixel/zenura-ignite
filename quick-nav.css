@@ -12,3 +12,7 @@
 .quick-share svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 .quick-share:hover,.quick-share:focus-visible{outline:none;border-color:#35e4ff;box-shadow:0 0 16px rgba(53,228,255,.22)}
 .quick-share:disabled{opacity:.65;cursor:wait}
+
+.account-nav-link{display:inline-flex!important;align-items:center;justify-content:center;border:1px solid rgba(53,228,255,.58)!important;border-radius:999px;padding:8px 15px!important;color:#e8fbff!important;background:linear-gradient(100deg,rgba(53,228,255,.15),rgba(163,77,255,.17));font-weight:700;white-space:nowrap}
+.account-nav-link:hover,.account-nav-link:focus-visible{outline:none;border-color:#35e4ff!important;box-shadow:0 0 15px rgba(53,228,255,.2)}
+.account-nav-link[aria-busy="true"]{opacity:.65;pointer-events:none}

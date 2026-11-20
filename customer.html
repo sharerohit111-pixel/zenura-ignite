@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#070b19">
+<title>Customer Account | ZENURA IGNITE</title><link rel="stylesheet" href="customer.css?v=1">
+</head>
+<body>
+<header class="top"><a href="index.html" class="brand">✦ ZENURA IGNITE <small>TECHNOLOGIES</small></a><a href="index.html">Back to website</a></header>
+<main class="shell">
+<section class="intro"><p class="eyebrow">ZENURA / CUSTOMER SPACE</p><h1>Your digital <em>workspace.</em></h1><p>Sign in to manage your profile, enquiries and purchases.</p></section>
+<section id="auth-card" class="panel auth-card">
+<div class="tabs"><button type="button" class="tab active" data-mode="signin">Sign In</button><button type="button" class="tab" data-mode="signup">Create Account</button></div>
+<form id="auth-form">
+<label id="name-wrap" hidden>Full name<input id="full-name" type="text" autocomplete="name" maxlength="100" placeholder="Your name"></label>
+<label>Email address<input id="email" type="email" autocomplete="email" required maxlength="160" placeholder="you@example.com"></label>
+<label>Password<input id="password" type="password" autocomplete="current-password" minlength="8" required placeholder="At least 8 characters"></label>
+<button class="primary" id="submit-auth" type="submit">Sign In</button>
+<button class="google" id="google-auth" type="button">Continue with Google</button>
+<button class="text-button" id="forgot" type="button">Forgot password?</button>
+<p class="notice" id="auth-message" role="status" aria-live="polite"></p>
+</form>
+<p class="fine">By continuing, you agree to use your account responsibly. Your account does not provide administrator access.</p>
+</section>
+<section id="verify-card" class="panel" hidden><h2>Verify your email</h2><p>We sent a verification link to <strong id="verify-email"></strong>. Verify your email, then sign in again.</p><button id="resend-verification" class="primary" type="button">Resend verification email</button><button id="verify-refresh" class="google" type="button">I have verified — refresh</button><p class="notice" id="verify-message" role="status"></p></section>
+<section id="dashboard" hidden>
+<div class="welcome panel"><div><p class="eyebrow">CUSTOMER DASHBOARD</p><h2>Welcome, <em id="customer-name">Customer</em></h2><p id="customer-email"></p></div><button id="signout" class="google" type="button">Sign Out</button></div>
+<div class="grid">
+<section class="panel"><h3>My Profile</h3><form id="profile-form"><label>Full name<input id="profile-name" maxlength="100" required></label><label>Phone (optional)<input id="profile-phone" type="tel" maxlength="20" placeholder="Contact number"></label><button class="primary" type="submit">Save Profile</button><p id="profile-message" class="notice" role="status"></p></form></section>
+<section class="panel"><h3>My Purchases & Payments</h3><p class="muted">Your payment submissions and their review status appear here.</p><div id="payments"><p class="muted">Loading your records…</p></div></section>
+<section class="panel full"><h3>My Enquiries</h3><p class="muted">For now, project enquiries submitted through the website are handled by our team. Keep your enquiry email for reference.</p><a class="secondary-link" href="index.html#contact">Submit a project enquiry ↗</a></section>
+</div>
+</section>
+</main>
+<footer>© <span id="year"></span> ZENURA IGNITE TECHNOLOGIES · Developed by Rohit Kumar</footer>
+<script type="module" src="customer.js?v=1"></script>
+</body></html>
