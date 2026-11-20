@@ -334,14 +334,14 @@
     const filled = currentOrders.filter(order => String(order.status).toUpperCase() === 'FILLED');
     if (!filled.length) {
       const tr = document.createElement('tr'), td = document.createElement('td');
-      td.colSpan = 6; td.textContent = translate('No filled trades recorded yet.');
+      td.colSpan = 7; td.textContent = translate('No filled trades recorded yet.');
       tr.append(td); tradeBody.append(tr); return;
     }
     filled.forEach(order => {
       const tr = document.createElement('tr');
       const created = Number.isFinite(order.createdAt) ? new Date(order.createdAt) : null;
       const when = created && !Number.isNaN(created.getTime()) ? created.toLocaleString('en-IN', {dateStyle:'medium',timeStyle:'short'}) : '—';
-      [when,order.tradingSymbol,translate(String(order.side || '')),order.quantity,money(order.executionPricePaise),translate(String(order.orderType || 'MARKET'))].forEach(value => {
+      [when,order.tradingSymbol,order.product === 'INTRADAY' ? 'INTRADAY' : 'DELIVERY',translate(String(order.side || '')),order.quantity,money(order.executionPricePaise),translate(String(order.orderType || 'MARKET'))].forEach(value => {
         const td = document.createElement('td'); td.textContent = String(value ?? '—'); tr.append(td);
       });
       tradeBody.append(tr);
