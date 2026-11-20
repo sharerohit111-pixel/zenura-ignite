@@ -56,3 +56,19 @@ $("addCustomerBtn").onclick=async()=>{try{const name=prompt("Customer name");if(
 $("addCreditBtn").onclick=async()=>{try{const customerId=$("creditCustomer").value,amount=Number($("creditAmount").value),invoiceId=$("creditInvoice").value.trim();if(!customerId||!(amount>0)||!invoiceId){message("Choose customer, amount and invoice reference.",true);return;}await api("kiranaRecordCustomerCredit")({storeId:activeStore,customerId,amount,invoiceId});$("creditAmount").value="";$("creditInvoice").value="";await loadCustomers();message("Udhar entry recorded against the customer.");}catch(e){message(e.message,true);}};
 $("receivePaymentBtn").onclick=async()=>{try{const customerId=$("paymentCustomer").value,amount=Number($("customerPaymentAmount").value);if(!customerId||!(amount>0)){message("Choose customer and enter payment amount.",true);return;}await api("kiranaRecordCreditPayment")({storeId:activeStore,customerId,amount,paymentMode:$("customerPaymentMode").value});$("customerPaymentAmount").value="";await loadCustomers();message("Customer payment recorded and balance updated.");}catch(e){message(e.message,true);}};
 document.querySelectorAll(".tab").forEach(b=>b.onclick=()=>{showTab(b.dataset.tab);if(b.dataset.tab==="customers")loadCustomers().catch(e=>message(e.message,true));});
+
+$("paymentMode").onchange=()=>{$("billCustomerWrap").hidden=$("paymentMode").value!=="credit";if($("paymentMode").value==="credit")loadCustomers().catch(e=>message(e.message,true));};
+const originalCompleteBill = $("completeBillBtn").onclick;
+$("completeBillBtn").onclick=async()=>{
+ if($("paymentMode").value==="credit"&&!$("billCustomer").value){message("Udhar bill ke liye customer select karein.",true);return;}
+ if(!bill.length){message("Add at least one product to the bill.",true);return;}
+ try{
+  const payload={storeId:activeStore,items:bill.map(x=>({productId:x.productId,quantity:x.quantity,priceType:x.priceType})),paymentMode:$("paymentMode").value};
+  if(payload.paymentMode==="credit")payload.customerId=$("billCustomer").value;
+  const r=await api("kiranaCreateSale")(payload);
+  bill=[];renderBill();await loadProducts();if(payload.paymentMode==="credit")await loadCustomers();
+  message("Bill "+r.data.invoiceNo+" saved. Total "+money(r.data.total)+(payload.paymentMode==="credit"?" customer udhar ledger mein add ho gaya.":" Stock updated."));
+ }catch(e){message(e.message,true);}
+};
+const priorTabHandlers = document.querySelectorAll(".tab");
+priorTabHandlers.forEach(b=>b.addEventListener("click",()=>{if(b.dataset.tab==="billing"&&$("paymentMode").value==="credit")loadCustomers().catch(e=>message(e.message,true));}));
