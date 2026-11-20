@@ -76,7 +76,7 @@ async function kiranaCreateSale(data) {
     old.quantity+=qty; combined.set(key,old);
   }
   const items=[...combined.values()];
-  if(items.length>4) throw new Error("A bill can contain up to 4 different products in this free release.");
+  if(items.length>3) throw new Error("A bill can contain up to 3 different products in this free release.");
   if(new Set(items.map(x=>x.productId)).size!==items.length) throw new Error("Use one price type per product in a single bill.");
   const paymentMode=["cash","upi","card","credit"].includes(data.paymentMode)?data.paymentMode:"cash";
   const customerId=paymentMode==="credit"?requireText(data.customerId,"Customer"):"";
