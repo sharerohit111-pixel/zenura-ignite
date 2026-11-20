@@ -19,8 +19,16 @@ function accountState(data){
     fail("Paper account reservation state is invalid.");
   for(const [key,position] of Object.entries(positions)){
     if(!key||!position||typeof position!=="object"||Array.isArray(position)||
-      !Number.isSafeInteger(position.quantity)||position.quantity<0||position.quantity>1000000)
-      fail("Paper account contains an invalid position.");
+      !Number.isSafeInteger(position.quantity)||position.quantity<0||position.quantity>1000000||
+      !Number.isSafeInteger(position.averagePricePaise)||position.averagePricePaise<0||
+      (position.quantity>0&&position.averagePricePaise<1))
+      fail("Paper account contains a malformed cash-equity position.");
+    const legacyCost=position.quantity*position.averagePricePaise;
+    const costBasis=position.costBasisPaise===undefined?legacyCost:position.costBasisPaise;
+    if(!Number.isSafeInteger(legacyCost)||!Number.isSafeInteger(costBasis)||costBasis<0||
+      (position.quantity>0&&costBasis<1)||(position.quantity===0&&costBasis!==0)||
+      (position.quantity>0&&Math.round(costBasis/position.quantity)!==position.averagePricePaise))
+      fail("Paper account contains an invalid cash-equity cost basis.");
   }
   for(const [key,value] of Object.entries(reservedPositions)){
     if(!key||!Number.isSafeInteger(value)||value<0||value>(positions[key]?.quantity??0))
