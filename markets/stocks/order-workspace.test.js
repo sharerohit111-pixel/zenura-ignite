@@ -24,10 +24,10 @@ test("Paper Trading page loads isolated order workspace assets",()=>{
 });
 
 test("Every order-workspace JavaScript ID reference exists exactly once in the page",()=>{
-  const pageIds = [...html.matchAll(/\\bid=["']([^"']+)["']/g)].map(match => match[1]);
+  const pageIds = [...html.matchAll(/\bid=["']([^"']+)["']/g)].map(match => match[1]);
   const uniqueIds = new Set(pageIds);
   assert.equal(uniqueIds.size, pageIds.length, "HTML contains duplicate IDs");
-  const referencedIds = [...source.matchAll(/\\$\\('([^']+)'\\)/g)].map(match => match[1]);
+  const referencedIds = [...source.matchAll(/\$\('([^']+)'\)/g)].map(match => match[1]);
   for (const id of new Set(referencedIds)) {
     assert.ok(uniqueIds.has(id), "Missing HTML element for JavaScript ID: " + id);
   }
