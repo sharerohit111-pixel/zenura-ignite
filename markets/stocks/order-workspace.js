@@ -251,7 +251,9 @@
       const data = await response.json().catch(() => ({}));
       if (connector.getUserId() !== uid) throw new Error(translate('Account changed while the order was processing. Sign in again to verify its result.'));
       if (!response.ok) {
-        if (response.status >= 400 && response.status < 500) clearPendingLimit(uid);
+        // Keep the idempotency key for timeout, conflict, rate-limit and server errors:
+        // the server may already have accepted the order even when the response is uncertain.
+        if ([400,401,403,404,422].includes(response.status)) clearPendingLimit(uid);
         throw new Error(data.error || translate('LIMIT order could not be submitted.'));
       }
       if (!['PENDING','FILLED','CANCELLED'].includes(data.status) || data.orderType !== 'LIMIT' || typeof data.orderId !== 'string') {
