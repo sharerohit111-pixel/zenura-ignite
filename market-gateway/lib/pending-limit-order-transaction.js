@@ -42,17 +42,27 @@ function nextVersion(account){
   return version+1;
 }
 function releaseReservation(account,order){
+  if(!order||typeof order!=="object"||Array.isArray(order)||
+    !["BUY","SELL"].includes(order.side)||typeof order.instrumentKey!=="string"||!order.instrumentKey||
+    !Number.isSafeInteger(order.quantity)||order.quantity<1||order.quantity>1000000||
+    !Number.isSafeInteger(order.limitPricePaise)||order.limitPricePaise<1)
+    fail("Pending LIMIT order reservation metadata is invalid.");
+  const expectedBuyReserve=order.limitPricePaise*order.quantity;
+  if(!Number.isSafeInteger(expectedBuyReserve)||expectedBuyReserve<1)
+    fail("Pending LIMIT order reservation value is invalid.");
   const state=accountState(account);
   const reservedPositions={...state.reservedPositions};
   let reservedCashPaise=state.reservedCashPaise;
   if(order.side==="BUY"){
     const amount=order.reservedCashPaise;
-    if(!Number.isSafeInteger(amount)||amount<1||reservedCashPaise<amount)fail("BUY reservation is missing or inconsistent.");
+    if(amount!==expectedBuyReserve||order.reservedQuantity!==0||reservedCashPaise<amount)
+      fail("BUY reservation is missing or inconsistent.");
     reservedCashPaise-=amount;
   }else{
     const amount=order.reservedQuantity;
     const current=reservedPositions[order.instrumentKey]??0;
-    if(!Number.isSafeInteger(amount)||amount<1||current<amount)fail("SELL share reservation is missing or inconsistent.");
+    if(amount!==order.quantity||order.reservedCashPaise!==0||current<amount)
+      fail("SELL share reservation is missing or inconsistent.");
     if(current===amount)delete reservedPositions[order.instrumentKey];
     else reservedPositions[order.instrumentKey]=current-amount;
   }
