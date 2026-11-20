@@ -57,7 +57,7 @@ function updateCard(card,p){
  if(link){link.removeAttribute("href");link.dataset.productDetail=id;link.textContent="View product details & images ↗";link.setAttribute("role","button");}
 }
 async function load(){
- try{const snap=await getDoc(doc(db,"publicCatalog","digitalProducts"));if(snap.exists()&&snap.data().published&&Array.isArray(snap.data().products)){const saved=snap.data().products.filter(p=>p.visible!==false);products=saved.map(p=>{const fallback=DEFAULT_DIGITAL_PRODUCTS.find(d=>String(d.id)===String(p.id));return fallback?{...fallback,...p,imageUrl:fallback.imageUrl,gallery:fallback.gallery||[]}:p});}}
+ try{const snap=await getDoc(doc(db,"publicCatalog","digitalProducts"));if(snap.exists()&&snap.data().published&&Array.isArray(snap.data().products)){const saved=snap.data().products.filter(p=>p.visible!==false);products=saved.map(p=>{const fallback=DEFAULT_DIGITAL_PRODUCTS.find(d=>String(d.id)===String(p.id));return fallback?{...fallback,...p,websiteUrl:p.websiteUrl||fallback.websiteUrl,imageUrl:fallback.imageUrl,gallery:fallback.gallery||[]}:p});}}
  catch(e){console.warn("Product samples are using built-in defaults.",e)}
  if(root){const cards=[...root.querySelectorAll(".product-card")];products.forEach((p,i)=>{const card=cards.find(x=>x.querySelector("h3")?.textContent.trim().toLowerCase()===String(p.name||"").trim().toLowerCase())||cards[i];if(card)updateCard(card,p)});bind();}
 }
