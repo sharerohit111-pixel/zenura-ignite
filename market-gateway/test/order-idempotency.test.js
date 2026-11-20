@@ -106,3 +106,36 @@ test("closed legacy positions do not bypass the 50-open-position cap",()=>{
  );
  assert.equal(result.positions["NSE_EQ|CLOSED"].quantity,1);
 });
+
+test("Intraday fingerprints are distinct while Delivery retains the legacy fingerprint",()=>{
+ const legacy=makeOrderFingerprint(request);
+ assert.equal(makeOrderFingerprint({...request,product:"DELIVERY"}),legacy);
+ assert.equal(makeOrderFingerprint({...request,product:"INTRADAY"}),makeOrderFingerprint({...request,product:"INTRADAY"}));
+ assert.notEqual(makeOrderFingerprint({...request,product:"INTRADAY"}),legacy);
+ assert.throws(()=>makeOrderFingerprint({...request,product:"intraday"}),{status:400});
+});
+test("Intraday MARKET fills use isolated holdings and shared virtual cash",()=>{
+ const account={cashPaise:100000,realizedPnlPaise:250,positions:{"NSE_EQ|AAA":{quantity:2,averagePricePaise:1000}},reservedPositions:{},
+  intradayPositions:{},intradayReservedPositions:{},reservedCashPaise:0,reservedMarginPaise:0,version:1};
+ const intradayBuy=buildPaperOrderUpdate(account,{instrumentKey:"NSE_EQ|AAA",side:"BUY",quantity:3,pricePaise:500,product:"INTRADAY"});
+ assert.equal(intradayBuy.cashPaise,98500);
+ assert.equal(intradayBuy.positions["NSE_EQ|AAA"].quantity,2);
+ assert.equal(intradayBuy.intradayPositions["NSE_EQ|AAA"].quantity,3);
+ assert.equal(intradayBuy.realizedPnlPaise,250);
+ assert.equal(intradayBuy.deliveryRealizedPnlPaise,250);
+ assert.equal(intradayBuy.intradayRealizedPnlPaise,0);
+ assert.throws(()=>buildPaperOrderUpdate(account,{instrumentKey:"NSE_EQ|AAA",side:"SELL",quantity:1,pricePaise:1200,product:"INTRADAY"}),{status:409});
+ const intradaySell=buildPaperOrderUpdate(intradayBuy,{instrumentKey:"NSE_EQ|AAA",side:"SELL",quantity:2,pricePaise:700,product:"INTRADAY"});
+ assert.equal(intradaySell.intradayPositions["NSE_EQ|AAA"].quantity,1);
+ assert.equal(intradaySell.positions["NSE_EQ|AAA"].quantity,2);
+ assert.equal(intradaySell.intradayRealizedPnlPaise,400);
+ assert.equal(intradaySell.realizedPnlPaise,650);
+});
+test("Delivery fills keep legacy position maps and attribute legacy P&L to Delivery",()=>{
+ const account={cashPaise:10000,realizedPnlPaise:300,positions:{"NSE_EQ|AAA":{quantity:2,averagePricePaise:1000}},reservedPositions:{},version:1};
+ const next=buildPaperOrderUpdate(account,{instrumentKey:"NSE_EQ|AAA",side:"SELL",quantity:1,pricePaise:1200});
+ assert.equal(next.positions["NSE_EQ|AAA"].quantity,1);
+ assert.equal(next.deliveryRealizedPnlPaise,500);
+ assert.equal(next.intradayRealizedPnlPaise,undefined);
+ assert.equal(next.realizedPnlPaise,500);
+});
