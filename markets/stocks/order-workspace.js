@@ -343,6 +343,7 @@
     showMessage(ordersStatus, translate('Loading balances…'), 'loading');
     try {
       const headers = await authHeaders();
+      if (seq !== balanceRequest || connector.getUserId() !== uid) return;
       const response = await fetch(gateway + '/paper/account', {headers});
       const account = await response.json();
       if (seq !== balanceRequest || connector.getUserId() !== uid) return;
