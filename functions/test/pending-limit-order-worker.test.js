@@ -221,3 +221,18 @@ for(const field of ["positions","reservedPositions"]){
   }finally{Date.now=oldNow;}
  });
 }
+
+test("worker counts a closed legacy entry as a new position at the 50-position limit",async()=>{
+ const positions=Object.fromEntries(Array.from({length:50},(_,i)=>[
+  `NSE_EQ|OPEN${i}`,{quantity:1,averagePricePaise:1000,costBasisPaise:1000}
+ ]));
+ positions["NSE_EQ|CLOSED"]={quantity:0,averagePricePaise:0,costBasisPaise:0};
+ const h=harness(baseOrder,{...baseAccount,positions}),oldNow=Date.now;Date.now=()=>now;
+ try{
+  const summary=await processPendingLimitOrders({db:h.db,fetchQuote:async()=>({pricePaise:9500,timestampMs:now-500}),nowMs:now,serverTimestamp:stamp});
+  assert.equal(summary.filled,0);
+  assert.equal(summary.failed,1);
+  assert.equal(h.records.get("indianPaperOrders/order-1").status,"PENDING");
+  assert.equal(h.records.get("indianPaperAccounts/user-1").positions["NSE_EQ|CLOSED"].quantity,0);
+ }finally{Date.now=oldNow;}
+});
