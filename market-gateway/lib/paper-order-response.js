@@ -1,5 +1,5 @@
 "use strict";
-const ORDER_FIELDS=["tradingSymbol","exchange","side","quantity","executionPricePaise","limitPricePaise","grossPaise","quoteTimestampMs","quoteAgeMs","realizedPnlPaise","orderType","status","simulationOnly"];
+const ORDER_FIELDS=["tradingSymbol","exchange","side","quantity","product","executionPricePaise","limitPricePaise","grossPaise","quoteTimestampMs","quoteAgeMs","realizedPnlPaise","orderType","status","simulationOnly"];
 function publicPaperOrder(order,{orderId,cashPaise,realizedPnlTotalPaise,idempotentReplay=false}={}){
  const result={};
  for(const field of ORDER_FIELDS)if(order?.[field]!==undefined)result[field]=order[field];
