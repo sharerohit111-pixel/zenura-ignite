@@ -56,10 +56,10 @@ exports.kiranaCreateStore = onCall({ region: REGION, maxInstances: 10 }, async r
 
 exports.kiranaListMyStores = onCall({ region: REGION }, async req => {
   const uid = signedIn(req);
-  const memberships = await db.collectionGroup("members").where("uid", "==", uid).where("active", "==", true).get();
+  const memberships = await db.collectionGroup("members").where("uid", "==", uid).get();
   const rows = await Promise.all(memberships.docs.map(async m => {
     const store = await m.ref.parent.parent.get();
-    return store.exists ? { storeId: store.id, name: store.data().name, role: m.data().role } : null;
+    return store.exists && m.data().active === true ? { storeId: store.id, name: store.data().name, role: m.data().role } : null;
   }));
   return { stores: rows.filter(Boolean) };
 });
