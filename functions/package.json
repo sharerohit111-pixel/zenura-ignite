@@ -8,7 +8,7 @@
   "scripts": {
     "emulate": "firebase emulators:start --only functions,firestore",
     "deploy": "cd .. && firebase deploy --only functions:startUpstoxAuthorization,functions:upstoxOAuthCallback,functions:disconnectUpstoxAccount,functions:getIndianMarketConnectionStatus",
-    "deploy:limit-worker": "cd .. && firebase deploy --only functions:processPendingPaperLimitOrders"
+    "deploy:limit-worker": "cd .. && node -e \"const p=process.env.FIREBASE_STAGING_PROJECT_ID;if(!p||p==='zenura-ignite-technologies')throw new Error('Set FIREBASE_STAGING_PROJECT_ID to a dedicated non-production Firebase project.');\" && firebase deploy --project \"$FIREBASE_STAGING_PROJECT_ID\" --only functions:processPendingPaperLimitOrders"
   },
   "dependencies": {
     "firebase-admin": "^13.0.0",
