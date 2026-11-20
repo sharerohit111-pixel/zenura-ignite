@@ -151,16 +151,16 @@
   function limitStorageKey(uid) { return 'zenura-paper-limit-pending-v1:' + uid; }
   function readPendingLimit(uid) {
     try {
-      const raw = sessionStorage.getItem(limitStorageKey(uid));
+      const raw = localStorage.getItem(limitStorageKey(uid));
       return raw ? JSON.parse(raw) : null;
     } catch (_) { return null; }
   }
   function savePendingLimit(uid, pending) {
-    try { sessionStorage.setItem(limitStorageKey(uid), JSON.stringify(pending)); return true; }
+    try { localStorage.setItem(limitStorageKey(uid), JSON.stringify(pending)); return true; }
     catch (_) { return false; }
   }
   function clearPendingLimit(uid) {
-    try { sessionStorage.removeItem(limitStorageKey(uid)); } catch (_) {}
+    try { localStorage.removeItem(limitStorageKey(uid)); } catch (_) {}
   }
   async function submitLimitOrder(side) {
     if (limitSubmitting) return;
