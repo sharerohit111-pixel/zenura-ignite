@@ -3,7 +3,7 @@
 const test=require("node:test");
 const assert=require("node:assert/strict");
 const crypto=require("node:crypto");
-const {decryptPendingUpstoxToken}=require("./upstox-token-decrypt");
+const {decryptPendingUpstoxToken}=require("../lib/upstox-token-decrypt");
 
 function encrypt(value,key){
   const iv=crypto.randomBytes(12);
