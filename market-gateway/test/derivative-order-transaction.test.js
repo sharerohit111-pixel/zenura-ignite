@@ -99,6 +99,17 @@ test("rejects missing account and insufficient virtual cash without writes",asyn
  await assert.rejects(executeLongOptionBuyTransaction(poor.common),{status:409});
  assert.equal(poor.writes.length,0);
 });
+test("option BUY cannot consume cash reserved by pending equity LIMIT orders",async()=>{
+ const reserved=setup({account:{...initial,reservedCashPaise:950000}});
+ await assert.rejects(executeLongOptionBuyTransaction(reserved.common),{status:409});
+ assert.equal(reserved.writes.length,0);
+ const enough=setup({account:{...initial,reservedCashPaise:900000}});
+ const result=await executeLongOptionBuyTransaction(enough.common);
+ assert.equal(result.cashPaise,916354);
+ assert.equal(enough.writes[1][2].cashPaise,916354);
+ assert.equal(enough.writes[1][2].reservedCashPaise,undefined,
+   "the derivative transaction must not overwrite the existing LIMIT reservation field");
+});
 test("rejects futures, stale quotes and mismatched idempotency references",async()=>{
  for(const patch of [
   {instrument:{...instrument,instrument_type:"FUT",strike_price:0}},
