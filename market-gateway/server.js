@@ -258,7 +258,7 @@ app.post("/paper/orders",async(req,res)=>{
         limitPricePaise=Number(req.body.limit_price_paise);
       }else{
         const rawPrice=String(req.body?.limit_price??"");
-        if(!/^\\d{1,8}(?:\\.\\d{1,2})?$/.test(rawPrice))return res.status(400).json({error:"LIMIT orders require limit_price (INR, up to 2 decimals) or limit_price_paise."});
+        if(!/^\d{1,8}(?:\.\d{1,2})?$/.test(rawPrice))return res.status(400).json({error:"LIMIT orders require limit_price (INR, up to 2 decimals) or limit_price_paise."});
         limitPricePaise=Math.round(Number(rawPrice)*100);
       }
       if(!Number.isSafeInteger(limitPricePaise)||limitPricePaise<1)return res.status(400).json({error:"A valid positive LIMIT price is required."});
