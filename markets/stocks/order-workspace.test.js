@@ -28,6 +28,7 @@ test("MARKET remains on the existing market-order flow and LIMIT uses the verifi
   assert.match(source,/order_type:'LIMIT'/);
   assert.match(source,/limit_price_paise:limitPricePaise/);
   assert.match(source,/idempotency_key:pending\.key/);
+  assert.match(source,/const headers = await authHeaders\(\);\s*if \(connector\.getUserId\(\) !== uid\) throw new Error\(translate\('Account changed while the order was processing\./);
   assert.match(source,/\['PENDING','FILLED','CANCELLED'\]\.includes\(data\.status\)/);
   assert.match(source,/return \{storageError:true\}/);
   assert.match(source,/pending\?\.storageError/);
@@ -52,6 +53,7 @@ test("Pending LIMIT cancellation calls the authenticated backend endpoint",()=>{
   assert.match(source,/\/paper\/orders\/' \+ encodeURIComponent\(orderId\) \+ '\/cancel/);
   assert.match(source,/data\.status !== 'CANCELLED'/);
   assert.match(source,/data\.reservationReleased !== true/);
+  assert.match(source,/const headers = await authHeaders\(\);\s*if \(connector\.getUserId\(\) !== uid\) throw new Error\(translate\('Account changed while the order was processing\./);
   assert.match(gateway,/app\.post\(["']\/paper\/orders\/:orderId\/cancel["']/);
   assert.match(limitTransaction,/cancelPendingLimitOrder/);
 });
