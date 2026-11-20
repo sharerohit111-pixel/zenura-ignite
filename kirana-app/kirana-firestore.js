@@ -43,7 +43,7 @@ async function kiranaCreateStore(data) {
   const s=doc(collection(db,"kiranaStores")), m=memberRef(s.id,u.uid), registry=doc(db,"kiranaUsers",u.uid), batch=writeBatch(db);
   batch.set(s,{name,phone,address,ownerUid:u.uid,status:"active",currency:"INR",timezone:"Asia/Kolkata",createdAt:serverTimestamp(),updatedAt:serverTimestamp()});
   batch.set(m,{uid:u.uid,role:"owner",active:true,permissions:["products","billing","customers","reports","settings"],createdAt:serverTimestamp()});
-  batch.set(registry,{storeIds:arrayUnion(s.id),createdAt:serverTimestamp(),updatedAt:serverTimestamp()},{merge:true});
+  batch.set(registry,{storeIds:arrayUnion(s.id),updatedAt:serverTimestamp()},{merge:true});
   await batch.commit();
   return {storeId:s.id,name};
 }
