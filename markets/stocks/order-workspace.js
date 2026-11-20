@@ -256,8 +256,8 @@
       if (!['PENDING','FILLED','CANCELLED'].includes(data.status) || data.orderType !== 'LIMIT' || typeof data.orderId !== 'string') {
         throw new Error(translate('LIMIT order response could not be verified. Retry the same order to safely check its result.'));
       }
-      await refreshAll();
       clearPendingLimit(uid);
+      await refreshAll();
       const resultMessage = data.status === 'PENDING'
         ? 'LIMIT order submitted and reservation confirmed.'
         : data.status === 'FILLED'
