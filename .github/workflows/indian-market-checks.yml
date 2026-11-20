@@ -2,7 +2,7 @@ name: Validate Indian Market Code
 
 on:
   pull_request:
-    branches: ["main"]
+    branches: ["main", "reconcile/indian-stock-market-main-sync"]
     paths:
       - "markets/stocks/**"
       - "crypto/index.html"
@@ -112,6 +112,8 @@ jobs:
           }
           console.log('Product catalogue pages reference existing local assets.');
           NODE
+      - name: Run Paper Trading order workspace regression tests
+        run: node --test markets/stocks/order-workspace.test.js
       - name: Check browser module syntax
         run: node --check markets/stocks/stocks.js
       - name: Check SSE parser syntax
