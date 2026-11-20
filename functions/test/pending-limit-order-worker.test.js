@@ -65,6 +65,24 @@ test("scheduled worker fills eligible fresh BUY limit order atomically",async()=
  }finally{Date.now=oldNow;}
 });
 
+test("worker accepts a fresh quote timestamped after the scan began",async()=>{
+ const h=harness(baseOrder,baseAccount),oldNow=Date.now;
+ try{
+  const summary=await processPendingLimitOrders({
+   db:h.db,
+   fetchQuote:async()=>{
+    Date.now=()=>now+1000;
+    return {pricePaise:9500,timestampMs:now+500};
+   },
+   nowMs:now,serverTimestamp:stamp
+  });
+  assert.equal(summary.filled,1);
+  assert.equal(summary.notEligible,0);
+  assert.equal(h.records.get("indianPaperOrders/order-1").status,"FILLED");
+  assert.equal(h.records.get("indianPaperAccounts/user-1").reservedCashPaise,0);
+ }finally{Date.now=oldNow;}
+});
+
 test("worker never fills stale or limit-unreached quotes",async()=>{
  const h=harness(baseOrder,baseAccount),oldNow=Date.now;Date.now=()=>now;
  try{
