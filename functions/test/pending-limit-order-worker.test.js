@@ -206,3 +206,18 @@ test("worker rejects malformed unrelated positions before filling a LIMIT order"
   assert.equal(h.records.get("indianPaperAccounts/user-1").reservedCashPaise,20000);
  }finally{Date.now=oldNow;}
 });
+
+for(const field of ["positions","reservedPositions"]){
+ test(`worker rejects an explicitly null account ${field} map`,async()=>{
+  const invalidAccount={...baseAccount,[field]:null};
+  const h=harness(baseOrder,invalidAccount),oldNow=Date.now;Date.now=()=>now;
+  try{
+   const summary=await processPendingLimitOrders({db:h.db,fetchQuote:async()=>({pricePaise:9500,timestampMs:now-500}),nowMs:now,serverTimestamp:stamp});
+   assert.equal(summary.filled,0);
+   assert.equal(summary.failed,1);
+   assert.equal(h.records.get("indianPaperOrders/order-1").status,"PENDING");
+   assert.equal(h.records.get("indianPaperAccounts/user-1")[field],null);
+   assert.equal(h.records.get("indianPaperAccounts/user-1").reservedCashPaise,20000);
+  }finally{Date.now=oldNow;}
+ });
+}
