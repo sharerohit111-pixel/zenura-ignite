@@ -9,8 +9,8 @@ function productModal(p){
  document.getElementById("digital-product-modal")?.remove();
  const el=document.createElement("div");el.id="digital-product-modal";el.className="digital-product-backdrop";
  const images=[p.imageUrl,...(p.gallery||[])].map(assetUrl).filter(Boolean);
- const hero=images[0]?'<img class="digital-product-hero" src="'+esc(images[0])+'" alt="'+esc(p.name)+'" loading="lazy">':'<div class="digital-product-placeholder"><span>'+esc(p.name)+'</span><small>ZENURA IGNITE TECHNOLOGIES</small></div>';
- el.innerHTML='<article class="digital-product-dialog" role="dialog" aria-modal="true" aria-label="'+esc(p.name)+'"><button class="digital-product-close" type="button" aria-label="Close">×</button>'+hero+'<div class="digital-product-body"><small class="tag">'+esc(p.category||"PRODUCT SAMPLE")+'</small><h2>'+esc(p.name)+'</h2><h3>'+esc(p.subtitle||"")+'</h3><p>'+esc(p.description||"")+'</p><div class="digital-product-details">'+esc(p.details||"")+'</div><h4>Key Features</h4><ul class="digital-product-features">'+(p.features||[]).map(x=>'<li>'+esc(x)+'</li>').join("")+'</ul>'+(images.length>1?'<div class="digital-product-gallery">'+images.slice(1).map(src=>'<img src="'+esc(src)+'" alt="'+esc(p.name)+' feature image" loading="lazy" decoding="async">').join("")+'</div>':'')+'<div class="product-tags">'+(p.tags||[]).map(x=>'<span>'+esc(x)+'</span>').join("")+'</div>'+(p.videoUrl?'<video class="digital-product-video" controls playsinline preload="metadata" src="'+esc(p.videoUrl)+'">Your browser does not support video.</video>':'')+(p.websiteUrl?'<a class="product-link" href="'+esc(p.websiteUrl)+'" target="_blank" rel="noopener">Open Live Demo ↗</a>':'')+'</div></article>';
+ const hero=images[0]?'<img class="digital-product-hero" src="'+esc(images[0])+'" alt="'+esc(p.name)+'" loading="eager">':'<div class="digital-product-placeholder"><span>'+esc(p.name)+'</span><small>ZENURA IGNITE TECHNOLOGIES</small></div>';
+ el.innerHTML='<article class="digital-product-dialog" role="dialog" aria-modal="true" aria-label="'+esc(p.name)+'"><button class="digital-product-close" type="button" aria-label="Close">×</button>'+hero+'<div class="digital-product-body"><small class="tag">'+esc(p.category||"PRODUCT SAMPLE")+'</small><h2>'+esc(p.name)+'</h2><h3>'+esc(p.subtitle||"")+'</h3><p>'+esc(p.description||"")+'</p><div class="digital-product-details">'+esc(p.details||"")+'</div><h4>Key Features</h4><ul class="digital-product-features">'+(p.features||[]).map(x=>'<li>'+esc(x)+'</li>').join("")+'</ul>'+(images.length>1?'<div class="digital-product-gallery">'+images.slice(1).map(src=>'<img src="'+esc(src)+'" alt="'+esc(p.name)+' feature image" loading="eager" decoding="async">').join("")+'</div>':'')+'<div class="product-tags">'+(p.tags||[]).map(x=>'<span>'+esc(x)+'</span>').join("")+'</div>'+(p.videoUrl?'<video class="digital-product-video" controls playsinline preload="metadata" src="'+esc(p.videoUrl)+'">Your browser does not support video.</video>':'')+(p.websiteUrl?'<a class="product-link" href="'+esc(p.websiteUrl)+'" target="_blank" rel="noopener">Open Live Demo ↗</a>':'')+'</div></article>';
  document.body.append(el);
  const close=()=>el.remove();el.querySelector(".digital-product-close").addEventListener("click",close);el.addEventListener("click",e=>{if(e.target===el)close()});
 }
@@ -52,6 +52,13 @@ function updateCard(card,p){
   art.prepend(img);art.classList.add("has-product-image");
  }
  const title=content.querySelector("h3");if(title)title.textContent=p.name||"";
+ let gallery=card.querySelector(".product-card-gallery");
+ const galleryImages=[p.imageUrl,...(p.gallery||[])].map(assetUrl).filter(Boolean);
+ if(galleryImages.length){
+  if(!gallery){gallery=document.createElement("div");gallery.className="product-card-gallery";card.append(gallery);}
+  gallery.setAttribute("aria-label",(p.name||"Product")+" image gallery");
+  gallery.innerHTML='<div class="product-card-gallery-heading">SCREEN GALLERY <span>'+galleryImages.length+' IMAGES</span></div><div class="product-card-gallery-track">'+galleryImages.map((src,index)=>'<button type="button" class="product-card-gallery-thumb" aria-label="Open '+esc(p.name)+' image '+(index+1)+' of '+galleryImages.length+'"><img src="'+esc(src)+'" alt="'+esc(p.name)+' screenshot '+(index+1)+'" loading="eager" decoding="async"></button>').join("")+'</div>';
+ }else if(gallery){gallery.remove();}
  const subtitle=content.querySelector(".product-subtitle");if(subtitle)subtitle.textContent=p.subtitle||"";
  const paragraphs=content.querySelectorAll(":scope > p:not(.product-subtitle)");if(paragraphs[0])paragraphs[0].textContent=p.description||"";
  const tags=content.querySelector(".product-tags");if(tags)tags.innerHTML=(p.tags||[]).map(x=>"<span>"+esc(x)+"</span>").join("");
