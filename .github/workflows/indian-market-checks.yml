@@ -184,10 +184,12 @@ jobs:
               if (!targets.includes(target)) throw new Error('Missing deployment target: ' + target);
             }
             if (targets.includes(limitWorker)) throw new Error('Scheduled LIMIT worker must stay out of the default deploy script.');
-            if (!limitDeploy.includes('firebase deploy --only ' + limitWorker)) {
-              throw new Error('Scheduled LIMIT worker must have a separate explicit deploy script.');
+            if (!limitDeploy.includes('FIREBASE_STAGING_PROJECT_ID') ||
+                !limitDeploy.includes('firebase deploy --project "$FIREBASE_STAGING_PROJECT_ID" --only ' + limitWorker) ||
+                !limitDeploy.includes("p==='zenura-ignite-technologies'")) {
+              throw new Error('LIMIT worker deploy must require an explicit non-production staging project.');
             }
-            console.log('Default Firebase deploy is restricted to four OAuth Functions; LIMIT worker deploy is separate.');
+            console.log('Default Firebase deploy is restricted to four OAuth Functions; LIMIT worker deploy requires an explicit non-production staging project.');
           "
       - name: Install Firebase Functions test dependencies
         run: npm install --prefix functions --ignore-scripts --no-audit --no-fund
