@@ -74,3 +74,36 @@
   color:#d32f2f!important;
   border-color:#d32f2f66!important;
 }
+
+
+/* Definitive light/day accent override — higher specificity than the original site theme. */
+html.zenura-light-mode .hero h1 em,
+html.zenura-light-mode .section h2 em,
+html.zenura-light-mode .manifesto h2 em,
+html.zenura-light-mode .contact h2 em,
+html.zenura-light-mode .brand b i,
+html.zenura-light-mode .brand .founder-credit em,
+html.zenura-light-mode .foot-brand b i,
+html.zenura-light-mode .footline em,
+html.zenura-light-mode .footline a,
+html.zenura-light-mode .cards article>b,
+html.zenura-light-mode .cards a,
+html.zenura-light-mode .strength b,
+html.zenura-light-mode .product-link,
+html.zenura-light-mode .product-symbol,
+html.zenura-light-mode .tag,
+html.zenura-light-mode .eyebrow span,
+html.zenura-light-mode .site-settings-toggle:hover,
+html.zenura-light-mode .site-settings-toggle[aria-expanded="true"]{
+  color:#d71920!important;
+  -webkit-text-fill-color:#d71920!important;
+  text-shadow:none!important;
+}
+html.zenura-light-mode .eyebrow b{
+  background:#d71920!important;
+  box-shadow:0 0 10px #d7192044!important;
+}
+html.zenura-light-mode .cards article:hover,
+html.zenura-light-mode .cards a:hover{
+  border-color:#d71920!important;
+}
