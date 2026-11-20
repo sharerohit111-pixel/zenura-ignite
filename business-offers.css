@@ -1,0 +1,29 @@
+/* ZENURA IGNITE — ready-to-customise offers and package price labels */
+.business-offer-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin:28px 0 30px}
+.business-offer-card{min-width:0;display:flex;flex-direction:column;padding:23px;border:1px solid #426eb688;border-radius:19px;background:linear-gradient(145deg,#111f40ed,#090f22);box-shadow:inset 0 0 25px #2d6dff12;transition:transform .2s ease,border-color .2s ease,box-shadow .2s ease}
+.business-offer-card:hover{transform:translateY(-4px);border-color:#4bdff5;box-shadow:0 12px 34px #0003,0 0 22px #35e4ff18}
+.business-offer-kicker{font:700 9px 'Space Grotesk';letter-spacing:1.5px;color:var(--cyan)}
+.business-offer-icon{display:grid;place-items:center;width:43px;height:43px;margin:17px 0 11px;border:1px solid #3e83a9;border-radius:13px;background:#102641;color:#54e8ff;font-size:22px}
+.business-offer-card h3{font:700 20px/1.25 'Space Grotesk';margin:0 0 5px;color:#f3f7ff}
+.business-offer-subtitle{font-size:12px;color:var(--muted);margin:0 0 16px}
+.business-offer-prices{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:15px}
+.business-offer-prices>div{padding:11px 10px;border:1px solid #426080;border-radius:11px;background:#0c1830;display:flex;flex-direction:column;gap:5px}
+.business-offer-prices small{font-size:9px;color:#a9bad3}
+.business-offer-prices strong{font:700 16px 'Space Grotesk';color:#fff;white-space:nowrap}
+.business-offer-card ul{list-style:none;padding:14px 0 18px;margin:0 0 18px;border-top:1px solid var(--line);display:grid;gap:11px;flex:1}
+.business-offer-card li{position:relative;padding-left:18px;font-size:11px;line-height:1.6;color:#c4d2e9}
+.business-offer-card li:before{content:"✦";position:absolute;left:0;color:var(--cyan)}
+.business-offer-cta{display:flex;justify-content:center;align-items:center;min-height:43px;padding:11px 16px;border:1px solid #3dcce8;border-radius:999px;background:linear-gradient(100deg,#12344d,#17274b);color:#70eaff;text-decoration:none;font:700 12px 'DM Sans';transition:filter .2s ease,transform .2s ease}
+.business-offer-cta:hover{filter:brightness(1.2);transform:translateY(-1px)}
+.package-starting-price{margin:0 0 12px;color:var(--cyan);font:700 12px/1.55 'DM Sans';letter-spacing:.1px}
+.zenura-light-mode .business-offer-card{background:linear-gradient(145deg,#fff,#f1f5fc);border-color:#c6d4e8;box-shadow:0 8px 24px #233d6610}
+.zenura-light-mode .business-offer-card h3{color:#1b2942}
+.zenura-light-mode .business-offer-prices>div{background:#f4f7fc;border-color:#cbd7e8}
+.zenura-light-mode .business-offer-prices small{color:#63718a}
+.zenura-light-mode .business-offer-prices strong{color:#1b2942}
+.zenura-light-mode .business-offer-card li{color:#52617a}
+.zenura-light-mode .business-offer-cta{background:#eaf5ff;color:#12647f}
+.zenura-light-mode .package-starting-price{color:#c52c45}
+@media(max-width:850px){.business-offer-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:600px){.business-offer-grid{grid-template-columns:minmax(0,1fr);gap:13px;margin:22px 0 25px}.business-offer-card{padding:20px}.business-offer-card h3{font-size:19px}.business-offer-prices strong{font-size:15px}.package-starting-price{font-size:11px}}
+@media(prefers-reduced-motion:reduce){.business-offer-card,.business-offer-cta{transition:none}}
