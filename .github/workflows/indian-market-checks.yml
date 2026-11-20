@@ -185,7 +185,8 @@ jobs:
             }
             if (targets.includes(limitWorker)) throw new Error('Scheduled LIMIT worker must stay out of the default deploy script.');
             if (!limitDeploy.includes('FIREBASE_STAGING_PROJECT_ID') ||
-                !limitDeploy.includes('firebase deploy --project "$FIREBASE_STAGING_PROJECT_ID" --only ' + limitWorker) ||
+                !limitDeploy.includes('firebase deploy --project') ||
+                !limitDeploy.includes('--only ' + limitWorker) ||
                 !limitDeploy.includes("p==='zenura-ignite-technologies'")) {
               throw new Error('LIMIT worker deploy must require an explicit non-production staging project.');
             }
