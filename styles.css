@@ -209,3 +209,36 @@ body{overflow-x:clip}
 /* Sidebar is a direct body child so it is anchored to the viewport, not the sticky header. */
 body > nav#nav{position:fixed!important;inset:0 0 0 auto!important;right:0!important;left:auto!important;margin:0!important;transform:translateX(110%);}
 body > nav#nav.open{right:0!important;left:auto!important;transform:translateX(0)!important;}
+
+
+/* Keep the mobile navigation trigger on the RIGHT of the brand, in the same header row. */
+.header{
+  display:grid!important;
+  grid-template-columns:minmax(0,1fr) 48px!important;
+  align-items:center!important;
+  column-gap:12px!important;
+  height:86px!important;
+  min-height:86px!important;
+}
+.header>.brand{grid-column:1;grid-row:1;min-width:0;width:max-content;max-width:100%}
+.header>.actions{
+  grid-column:2!important;
+  grid-row:1!important;
+  justify-self:end!important;
+  align-self:center!important;
+  width:44px!important;
+  min-width:44px!important;
+  margin:0!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:flex-end!important;
+}
+.header>.actions>#menu{
+  display:grid!important;
+  width:44px!important;
+  height:44px!important;
+  margin:0!important;
+}
+@media(max-width:600px){
+  .header{padding-left:15px!important;padding-right:15px!important}
+}
