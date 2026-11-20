@@ -4,6 +4,7 @@ const test=require("node:test");
 const assert=require("node:assert/strict");
 const {Firestore,FieldValue}=require("@google-cloud/firestore");
 const {executePaperOrderTransaction}=require("../lib/paper-order-transaction");
+const {placePendingLimitOrder,cancelPendingLimitOrder,executePendingLimitOrder}=require("../lib/pending-limit-order-transaction");
 const {consumeMarginPreviewSlot}=require("../lib/margin-preview-rate-limit");
 const {mergeWatchlistUpdate}=require("../lib/watchlists");
 
@@ -23,6 +24,45 @@ async function seedAccount(accountRef,cashPaise,positions={}){
 async function clean(refs){
  await Promise.all(refs.map(ref=>ref.delete().catch(()=>{})));
 }
+integrationTest("Firestore emulator serializes concurrent LIMIT cancellation and execution",async()=>{
+ const id=crypto.randomUUID(),uid="limit-race-user-"+id;
+ const accountRef=db.collection("emulatorPaperAccounts").doc(uid);
+ const orderRef=db.collection("emulatorPaperOrders").doc("limit-"+id);
+ const serverTimestamp=()=>FieldValue.serverTimestamp();
+ const nowMs=Date.now();
+ await accountRef.set({cashPaise:100000,reservedCashPaise:0,reservedMarginPaise:0,realizedPnlPaise:0,positions:{},reservedPositions:{},version:1});
+ try{
+  await placePendingLimitOrder({
+   db,accountRef,orderRef,uid,
+   order:{uid,instrumentKey:"NSE_EQ|AAA",tradingSymbol:"AAA",exchange:"NSE",side:"BUY",quantity:2,orderType:"LIMIT",limitPricePaise:10000,status:"PENDING",simulationOnly:true},
+   serverTimestamp
+  });
+  const quote={pricePaise:9000,timestampMs:nowMs-500};
+  const results=await Promise.allSettled([
+   cancelPendingLimitOrder({db,accountRef,orderRef,uid,serverTimestamp}),
+   executePendingLimitOrder({db,accountRef,orderRef,uid,quote,nowMs,serverTimestamp})
+  ]);
+  const [account,order]=await Promise.all([accountRef.get(),orderRef.get()]);
+  const stored=order.data(),state=account.data();
+  assert.equal(order.exists,true);
+  assert.ok(["CANCELLED","FILLED"].includes(stored.status));
+  if(stored.status==="CANCELLED"){
+   assert.equal(results[0].status,"fulfilled");
+   assert.equal(state.reservedCashPaise,0);
+   assert.equal(state.cashPaise,100000);
+   assert.equal(state.positions["NSE_EQ|AAA"],undefined);
+   assert.ok(results[1].status==="fulfilled"&&results[1].value.status==="CANCELLED"||
+     results[1].status==="rejected"&&results[1].reason.status===409);
+  }else{
+   assert.equal(results[1].status,"fulfilled");
+   assert.equal(state.reservedCashPaise,0);
+   assert.equal(state.cashPaise,82000);
+   assert.equal(state.positions["NSE_EQ|AAA"].quantity,2);
+   assert.ok(results[0].status==="rejected"&&results[0].reason.status===409);
+  }
+ }finally{await clean([accountRef,orderRef]);}
+});
+
 integrationTest("Firestore emulator serializes concurrent duplicate orders into one fill",async()=>{
  const id=crypto.randomUUID(),uid="emulator-user-"+id;
  const common=makeOrder({uid,accountId:uid,orderId:"order-"+id,fingerprint:"same-fingerprint"});
