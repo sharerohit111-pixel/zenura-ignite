@@ -224,7 +224,8 @@ test("Intraday market fill persists only the Intraday holdings map and mode P&L"
  assert.equal(writes[0][2].product,"INTRADAY");
  assert.equal(writes[1][2].cashPaise,9000);
  assert.equal(writes[1][2].intradayPositions["NSE_EQ|AAA"].quantity,2);
- assert.deepEqual(writes[1][2].positions,initial.positions);
+ assert.equal(Object.hasOwn(writes[1][2],"positions"),false);
+ assert.deepEqual(initial.positions,{"NSE_EQ|AAA":{quantity:2,averagePricePaise:1000}});
  assert.equal(writes[1][2].intradayRealizedPnlPaise,0);
  assert.equal(writes[1][2].realizedPnlPaise,125);
  assert.equal(result.meta.cashPaise,9000);
