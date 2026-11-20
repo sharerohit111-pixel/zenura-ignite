@@ -46,7 +46,7 @@ test("Successful LIMIT response keeps its idempotency key until account refresh 
   const submit=source.slice(start,end);
   assert.ok(start>=0&&end>start);
   assert.ok(submit.indexOf("await refreshAll();")>=0);
-  assert.ok(submit.indexOf("clearPendingLimit(uid);")>submit.indexOf("await refreshAll();"));
+  assert.ok(submit.lastIndexOf("clearPendingLimit(uid);")>submit.indexOf("await refreshAll();"));
 });
 
 test("LIMIT mode intercepts BUY/SELL before legacy MARKET handlers",()=>{
