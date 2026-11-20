@@ -7,6 +7,7 @@ const { defineSecret } = require("firebase-functions/params");
 const { onCall, onRequest, HttpsError } = require("firebase-functions/v2/https");
 const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { processPendingLimitOrders } = require("./lib/pending-limit-order-worker");
+const { isPendingLimitWorkerEnabled } = require("./lib/pending-limit-worker-gate");
 const logger = require("firebase-functions/logger");
 const { connectionStatus } = require("./lib/upstox-connection-status");
 const { disconnectUpstoxAccount: disconnectUpstoxAccountForUser, isOAuthGenerationCurrent, connectionGeneration } = require("./lib/upstox-disconnect");
@@ -169,6 +170,10 @@ async function fetchFreshPendingLimitQuote(order) {
 exports.processPendingPaperLimitOrders = onSchedule(
   {schedule:"*/1 9-15 * * 1-5",timeZone:"Asia/Kolkata",region:REGION,secrets:[TOKEN_ENCRYPTION_KEY],maxInstances:1,concurrency:1,timeoutSeconds:540},
   async event => {
+    if(!isPendingLimitWorkerEnabled()){
+      logger.info("Pending LIMIT worker remains disabled; explicit opt-in is required.");
+      return;
+    }
     const now=Date.now();
     if(!isIndianCashMarketOpen(now)){
       logger.info("Pending LIMIT worker skipped outside Indian cash-market session.");
