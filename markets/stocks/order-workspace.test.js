@@ -51,6 +51,7 @@ test("LIMIT mode intercepts BUY/SELL before legacy MARKET handlers",()=>{
 
 test("Pending LIMIT cancellation calls the authenticated backend endpoint",()=>{
   assert.match(source,/\/paper\/orders\/' \+ encodeURIComponent\(orderId\) \+ '\/cancel/);
+  assert.match(source,/data\.orderId !== orderId \|\| data\.status !== 'CANCELLED'/);
   assert.match(source,/data\.status !== 'CANCELLED'/);
   assert.match(source,/data\.reservationReleased !== true/);
   assert.match(source,/catch \(error\) \{\s*if \(connector\.getUserId\(\) !== uid\) return;\s*button\.disabled = false;/);
