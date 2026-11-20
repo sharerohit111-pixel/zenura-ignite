@@ -67,7 +67,31 @@
     'Cancellation is available only for pending LIMIT orders.':'रद्द करने की सुविधा केवल पेंडिंग LIMIT ऑर्डर के लिए उपलब्ध है।',
     'Loading orders from your private paper account…':'आपके निजी पेपर अकाउंट से ऑर्डर लोड हो रहे हैं…',
     'No paper orders recorded yet.':'अभी कोई पेपर ऑर्डर दर्ज नहीं है।',
-    'Loading balances…':'बैलेंस लोड हो रहा है…','Balances and reservations refreshed from your private paper account.':'आपके निजी पेपर अकाउंट का बैलेंस और आरक्षण अपडेट हुआ।','Trade history includes only backend orders with FILLED status.':'ट्रेड हिस्ट्री में केवल बैकएंड के FILLED ऑर्डर शामिल हैं।','Loading older orders…':'पुराने ऑर्डर लोड हो रहे हैं…','orders loaded from backend.':'ऑर्डर बैकएंड से लोड हुए।'
+    'Loading balances…':'बैलेंस लोड हो रहा है…','Balances and reservations refreshed from your private paper account.':'आपके निजी पेपर अकाउंट का बैलेंस और आरक्षण अपडेट हुआ।','Trade history includes only backend orders with FILLED status.':'ट्रेड हिस्ट्री में केवल बैकएंड के FILLED ऑर्डर शामिल हैं।','Loading older orders…':'पुराने ऑर्डर लोड हो रहे हैं…','orders loaded from backend.':'ऑर्डर बैकएंड से लोड हुए।',
+    'MARKET orders use the existing server-verified Upstox quote flow. Displayed price is indicative only.':'MARKET ऑर्डर मौजूदा सत्यापित Upstox भाव प्रक्रिया से चलते हैं। दिखाया गया भाव केवल संकेतात्मक है।',
+    'Enter a whole-number quantity between 1 and 1,000,000.':'1 से 1,000,000 के बीच पूर्ण संख्या में मात्रा दर्ज करें।',
+    'Enter a valid positive limit price (maximum 2 decimal places).':'सही धनात्मक लिमिट कीमत दर्ज करें (अधिकतम 2 दशमलव स्थान)।',
+    'Enter a valid limit price.':'सही लिमिट कीमत दर्ज करें।',
+    'Saved LIMIT retry data is unreadable. No order was sent; resolve browser storage before placing another LIMIT order.':'सहेजा गया LIMIT retry डेटा पढ़ा नहीं जा सका। कोई ऑर्डर नहीं भेजा गया; नया LIMIT ऑर्डर देने से पहले ब्राउज़र स्टोरेज ठीक करें।',
+    'Secure order request ID unavailable in this browser. No order was sent.':'इस ब्राउज़र में सुरक्षित ऑर्डर अनुरोध ID उपलब्ध नहीं है। कोई ऑर्डर नहीं भेजा गया।',
+    'Browser storage unavailable. No LIMIT order was sent because safe retry protection could not be saved.':'ब्राउज़र स्टोरेज उपलब्ध नहीं है। सुरक्षित retry सुरक्षा सहेजी नहीं जा सकी, इसलिए LIMIT ऑर्डर नहीं भेजा गया।',
+    'Submitting LIMIT order and reserving virtual funds/shares…':'LIMIT ऑर्डर भेजा जा रहा है और वर्चुअल नकद/शेयर आरक्षित किए जा रहे हैं…',
+    'Account changed while the order was processing. Sign in again to verify its result.':'ऑर्डर प्रक्रिया के दौरान अकाउंट बदल गया। परिणाम की पुष्टि के लिए दोबारा साइन इन करें।',
+    'LIMIT order could not be submitted.':'LIMIT ऑर्डर जमा नहीं हो सका।',
+    'LIMIT order response could not be verified. Retry the same order to safely check its result.':'LIMIT ऑर्डर के जवाब की पुष्टि नहीं हो सकी। परिणाम सुरक्षित रूप से जाँचने के लिए उसी ऑर्डर को दोबारा भेजें।',
+    'LIMIT order was already filled; execution is recorded in Trade History.':'LIMIT ऑर्डर पहले ही पूरा हो चुका है; निष्पादन Trade History में दर्ज है।',
+    'LIMIT order was already cancelled; no active reservation remains.':'LIMIT ऑर्डर पहले ही रद्द हो चुका है; अब कोई सक्रिय आरक्षण नहीं है।',
+    'LIMIT order submission failed.':'LIMIT ऑर्डर जमा करने में विफलता हुई।',
+    'CANCELLING…':'रद्द किया जा रहा है…',
+    'Pending LIMIT order could not be cancelled.':'पेंडिंग LIMIT ऑर्डर रद्द नहीं हो सका।',
+    'Cancellation response could not be verified. Refresh order history before retrying.':'रद्द करने के जवाब की पुष्टि नहीं हो सकी। दोबारा प्रयास से पहले ऑर्डर हिस्ट्री रीफ्रेश करें।',
+    'Order cancellation failed.':'ऑर्डर रद्द करने में विफलता हुई।',
+    'Account balance unavailable.':'अकाउंट बैलेंस उपलब्ध नहीं है।',
+    'Account cash reservation data is invalid.':'अकाउंट के नकद आरक्षण का डेटा अमान्य है।',
+    'Share reservation data is invalid.':'शेयर आरक्षण का डेटा अमान्य है।',
+    'Order history unavailable.':'ऑर्डर हिस्ट्री उपलब्ध नहीं है।',
+    'Could not load orders.':'ऑर्डर लोड नहीं हो सके।',
+    'Could not load balances.':'बैलेंस लोड नहीं हो सका।'
   };
   const translate = value => language === 'hi' ? (translations[value] || value) : value;
 
@@ -124,7 +148,7 @@
       status.textContent = translate('LIMIT orders are sent to your private paper account and reserve virtual cash or shares.');
     } else {
       limitNotice.hidden = true;
-      status.textContent = 'MARKET orders use the existing server-verified Upstox quote flow. Displayed price is indicative only.';
+      status.textContent = translate('MARKET orders use the existing server-verified Upstox quote flow. Displayed price is indicative only.');
     }
     updateEstimate();
   }
@@ -185,19 +209,19 @@
     const quantity = Number(qty.value);
     const price = Number(limitPrice.value);
     if (!Number.isSafeInteger(quantity) || quantity < 1 || quantity > 1000000) {
-      showMessage(status, 'Enter a whole-number quantity between 1 and 1,000,000.', 'error'); return;
+      showMessage(status, translate('Enter a whole-number quantity between 1 and 1,000,000.'), 'error'); return;
     }
     if (!Number.isFinite(price) || price <= 0 || price > 99999999 || !/^\d{1,8}(?:\.\d{1,2})?$/.test(limitPrice.value.trim())) {
-      showMessage(status, 'Enter a valid positive limit price (maximum 2 decimal places).', 'error'); return;
+      showMessage(status, translate('Enter a valid positive limit price (maximum 2 decimal places).'), 'error'); return;
     }
     const limitPricePaise = Math.round(price * 100);
     if (!Number.isSafeInteger(limitPricePaise) || limitPricePaise < 1) {
-      showMessage(status, 'Enter a valid limit price.', 'error'); return;
+      showMessage(status, translate('Enter a valid limit price.'), 'error'); return;
     }
     const fingerprint = JSON.stringify({instrument_key:instrument.instrumentKey,side,quantity,limit_price_paise:limitPricePaise});
     let pending = readPendingLimit(uid);
     if (pending?.storageError) {
-      showMessage(status, 'Saved LIMIT retry data is unreadable. No order was sent; resolve browser storage before placing another LIMIT order.', 'error');
+      showMessage(status, translate('Saved LIMIT retry data is unreadable. No order was sent; resolve browser storage before placing another LIMIT order.'), 'error');
       return;
     }
     if (pending && pending.fingerprint !== fingerprint) {
@@ -206,16 +230,16 @@
     }
     if (!pending) {
       if (!window.crypto?.randomUUID) {
-        showMessage(status, 'Secure order request ID unavailable in this browser. No order was sent.', 'error'); return;
+        showMessage(status, translate('Secure order request ID unavailable in this browser. No order was sent.'), 'error'); return;
       }
       pending = {key:window.crypto.randomUUID(),fingerprint};
       if (!savePendingLimit(uid,pending)) {
-        showMessage(status, 'Browser storage unavailable. No LIMIT order was sent because safe retry protection could not be saved.', 'error'); return;
+        showMessage(status, translate('Browser storage unavailable. No LIMIT order was sent because safe retry protection could not be saved.'), 'error'); return;
       }
     }
     limitSubmitting = true;
     [buy,sell].forEach(button => button.setAttribute('aria-busy','true'));
-    showMessage(status, 'Submitting LIMIT order and reserving virtual funds/shares…', 'loading');
+    showMessage(status, translate('Submitting LIMIT order and reserving virtual funds/shares…'), 'loading');
     try {
       const headers = await authHeaders();
       const response = await fetch(gateway + '/paper/orders', {
@@ -224,24 +248,24 @@
         body:JSON.stringify({instrument_key:instrument.instrumentKey,side,quantity,order_type:'LIMIT',limit_price_paise:limitPricePaise,idempotency_key:pending.key})
       });
       const data = await response.json().catch(() => ({}));
-      if (connector.getUserId() !== uid) throw new Error('Account changed while the order was processing. Sign in again to verify its result.');
+      if (connector.getUserId() !== uid) throw new Error(translate('Account changed while the order was processing. Sign in again to verify its result.'));
       if (!response.ok) {
         if (response.status >= 400 && response.status < 500) clearPendingLimit(uid);
-        throw new Error(data.error || 'LIMIT order could not be submitted.');
+        throw new Error(data.error || translate('LIMIT order could not be submitted.'));
       }
       if (!['PENDING','FILLED','CANCELLED'].includes(data.status) || data.orderType !== 'LIMIT' || typeof data.orderId !== 'string') {
-        throw new Error('LIMIT order response could not be verified. Retry the same order to safely check its result.');
+        throw new Error(translate('LIMIT order response could not be verified. Retry the same order to safely check its result.'));
       }
       clearPendingLimit(uid);
       await refreshAll();
       const resultMessage = data.status === 'PENDING'
         ? 'LIMIT order submitted and reservation confirmed.'
         : data.status === 'FILLED'
-          ? 'LIMIT order was already filled; execution is recorded in Trade History.'
-          : 'LIMIT order was already cancelled; no active reservation remains.';
+          ? translate('LIMIT order was already filled; execution is recorded in Trade History.')
+          : translate('LIMIT order was already cancelled; no active reservation remains.');
       showMessage(status, translate(resultMessage), 'success');
     } catch (error) {
-      showMessage(status, error.message || 'LIMIT order submission failed.', 'error');
+      showMessage(status, error.message || translate('LIMIT order submission failed.'), 'error');
     } finally {
       limitSubmitting = false;
       [buy,sell].forEach(button => button.removeAttribute('aria-busy'));
@@ -321,10 +345,10 @@
       const response = await fetch(gateway + '/paper/account', {headers});
       const account = await response.json();
       if (seq !== balanceRequest || connector.getUserId() !== uid) return;
-      if (!response.ok) throw new Error(account.error || 'Account balance unavailable.');
+      if (!response.ok) throw new Error(account.error || translate('Account balance unavailable.'));
       const reservedCash = Number.isSafeInteger(account.reservedCashPaise) ? account.reservedCashPaise : 0;
       const reservedMargin = Number.isSafeInteger(account.reservedMarginPaise) ? account.reservedMarginPaise : 0;
-      if (!Number.isSafeInteger(account.cashPaise) || account.cashPaise < reservedCash + reservedMargin) throw new Error('Account cash reservation data is invalid.');
+      if (!Number.isSafeInteger(account.cashPaise) || account.cashPaise < reservedCash + reservedMargin) throw new Error(translate('Account cash reservation data is invalid.'));
       cashAvailable.textContent = money(account.cashPaise - reservedCash - reservedMargin);
       cashReserved.textContent = money(reservedCash) + (reservedMargin ? ' + ' + money(reservedMargin) + ' margin' : '');
       const positions = account.positions && typeof account.positions === 'object' ? account.positions : {};
@@ -333,7 +357,7 @@
       for (const [key, position] of Object.entries(positions)) {
         const quantity = Number.isSafeInteger(position?.quantity) ? position.quantity : 0;
         const reservedQuantity = Number.isSafeInteger(reservations[key]) ? reservations[key] : 0;
-        if (reservedQuantity > quantity) throw new Error('Share reservation data is invalid.');
+        if (reservedQuantity > quantity) throw new Error(translate('Share reservation data is invalid.'));
         held += quantity; reserved += reservedQuantity;
       }
       sharesAvailable.textContent = (held - reserved).toLocaleString('en-IN');
@@ -342,7 +366,7 @@
     } catch (error) {
       if (seq !== balanceRequest || connector.getUserId() !== uid) return;
       [cashAvailable,cashReserved,sharesAvailable,sharesReserved].forEach(el => { el.textContent = '—'; });
-      showMessage(ordersStatus, error.message || 'Could not load balances.', 'error');
+      showMessage(ordersStatus, error.message || translate('Could not load balances.'), 'error');
     }
   }
   async function loadOrders({append = false} = {}) {
@@ -360,7 +384,7 @@
       const response = await fetch(gateway + '/paper/orders?' + params.toString(), {headers});
       const data = await response.json();
       if (seq !== requestSeq || connector.getUserId() !== uid) return;
-      if (!response.ok) throw new Error(data.error || 'Order history unavailable.');
+      if (!response.ok) throw new Error(data.error || translate('Order history unavailable.'));
       const incoming = Array.isArray(data.orders) ? data.orders : [];
       currentOrders = append ? currentOrders.concat(incoming) : incoming;
       nextCursor = data.nextCursor || null; hasMore = !!data.hasMore && !!nextCursor;
@@ -370,7 +394,7 @@
       renderOrders(); renderTrades();
     } catch (error) {
       if (seq !== requestSeq || connector.getUserId() !== uid) return;
-      showMessage(ordersStatus, error.message || 'Could not load orders.', 'error');
+      showMessage(ordersStatus, error.message || translate('Could not load orders.'), 'error');
       if (!append) { currentOrders = []; renderOrders(); renderTrades(); }
     }
   }
@@ -378,22 +402,22 @@
     const connector = window.ZENURA_MARKET_CONNECTOR, uid = connector?.getUserId?.();
     if (!uid || !gateway || button.disabled) return;
     button.disabled = true;
-    button.textContent = language === 'hi' ? 'रद्द हो रहा है…' : 'CANCELLING…';
+    button.textContent = translate('CANCELLING…');
     try {
       const headers = await authHeaders();
       const response = await fetch(gateway + '/paper/orders/' + encodeURIComponent(orderId) + '/cancel', {method:'POST',headers});
       const data = await response.json().catch(() => ({}));
       if (connector.getUserId() !== uid) return;
-      if (!response.ok) throw new Error(data.error || 'Pending LIMIT order could not be cancelled.');
+      if (!response.ok) throw new Error(data.error || translate('Pending LIMIT order could not be cancelled.'));
       if (data.status !== 'CANCELLED' || data.reservationReleased !== true && data.idempotentReplay !== true) {
-        throw new Error('Cancellation response could not be verified. Refresh order history before retrying.');
+        throw new Error(translate('Cancellation response could not be verified. Refresh order history before retrying.'));
       }
       await refreshAll();
       showMessage(ordersStatus, translate('Order cancelled and reservation released.'), 'success');
     } catch (error) {
       button.disabled = false;
       button.textContent = translate('Cancel');
-      showMessage(ordersStatus, error.message || 'Order cancellation failed.', 'error');
+      showMessage(ordersStatus, error.message || translate('Order cancellation failed.'), 'error');
     }
   }
   async function refreshAll() { await Promise.all([loadBalances(), loadOrders()]); }
