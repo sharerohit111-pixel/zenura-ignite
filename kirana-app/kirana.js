@@ -39,7 +39,7 @@ $("storeSelect").onchange=async()=>{activeStore=$("storeSelect").value;$("roleLa
 $("newStoreBtn").onclick=async()=>{const name=prompt("New store name");if(!name?.trim())return;const phone=prompt("Store mobile");if(!phone?.trim())return;await api("kiranaCreateStore")({name,phone,address:prompt("Store address")||"Not added"});await loadStores();message("New store workspace created.");};
 $("addProductBtn").onclick=async()=>{try{await addProduct();}catch(e){message(e.message,true);}};
 $("addLineBtn").onclick=()=>{const p=products.find(x=>x.id===$("billProduct").value);const quantity=Number($("billQty").value);if(!p||!(quantity>0)||quantity>p.stock){message("Choose a product and valid quantity within available stock.",true);return;}const priceType=$("priceType").value;bill.push({productId:p.id,name:p.name,quantity,price:priceType==="wholesale"?p.wholesalePrice:p.retailPrice,priceType});renderBill();};
-$("completeBillBtn").onclick=async()=>{if(!bill.length){message("Add at least one product to the bill.",true);return;}try{const r=await api("kiranaCreateSale")({storeId:activeStore,items:bill.map(x=>({productId:x.productId,quantity:x.quantity,priceType:x.priceType})),paymentMode:$("paymentMode").value});bill=[];renderBill();await loadProducts();message("Bill "+r.data.invoiceNo+" saved. Total "+money(r.data.total)+". Stock updated.");}catch(e){message(e.message,true);}};
+
 document.querySelectorAll(".tab").forEach(b=>b.onclick=()=>showTab(b.dataset.tab));
 onAuthStateChanged(auth,async u=>{user=u;$("userLabel").textContent=u?.displayName||u?.email||"Not signed in";$("signInBtn").hidden=!!u;$("signOutBtn").hidden=!u;if(!u){$("workspace").hidden=true;$("signedOut").hidden=false;message("Sign in to create or open your store workspace.");return;}try{message("Loading your secure store workspace…");await loadStores();message("Signed in as "+u.email+". Your store data is isolated from other stores.");}catch(e){message(e.message||"Could not load your store.",true);}});
 
@@ -49,7 +49,7 @@ async function loadCustomers(){
  const r=await api("kiranaListCustomers")({storeId:activeStore});customers=r.data.customers||[];
  const rows=customers.map(c=>'<article class="productrow"><div><b>'+escapeHtml(c.name)+'</b><small>'+escapeHtml(c.phone||"No mobile added")+'</small></div><div><b>'+money(c.creditBalance)+'</b><small>Outstanding udhar</small></div><div><button class="outline" data-pay="'+c.id+'">Receive payment</button></div></article>');
  $("customerList").innerHTML=rows.join("")||'<p class="muted">No customers yet. Add your first customer.</p>';
- for(const id of ["creditCustomer","paymentCustomer"]){$(id).innerHTML=customers.map(c=>'<option value="'+c.id+'">'+escapeHtml(c.name)+' — Due '+money(c.creditBalance)+'</option>').join("");}
+ for(const id of ["creditCustomer","paymentCustomer","billCustomer"]){$(id).innerHTML=customers.map(c=>'<option value="'+c.id+'">'+escapeHtml(c.name)+' — Due '+money(c.creditBalance)+'</option>').join("");}
  document.querySelectorAll("[data-pay]").forEach(b=>b.onclick=()=>{$("paymentCustomer").value=b.dataset.pay;$("customerPaymentAmount").focus();});
 }
 $("addCustomerBtn").onclick=async()=>{try{const name=prompt("Customer name");if(!name?.trim())return;const phone=prompt("Mobile number (optional)")||"";await api("kiranaAddCustomer")({storeId:activeStore,name,phone});await loadCustomers();message("Customer saved.");}catch(e){message(e.message,true);}};
@@ -58,7 +58,6 @@ $("receivePaymentBtn").onclick=async()=>{try{const customerId=$("paymentCustomer
 document.querySelectorAll(".tab").forEach(b=>b.onclick=()=>{showTab(b.dataset.tab);if(b.dataset.tab==="customers")loadCustomers().catch(e=>message(e.message,true));});
 
 $("paymentMode").onchange=()=>{$("billCustomerWrap").hidden=$("paymentMode").value!=="credit";if($("paymentMode").value==="credit")loadCustomers().catch(e=>message(e.message,true));};
-const originalCompleteBill = $("completeBillBtn").onclick;
 $("completeBillBtn").onclick=async()=>{
  if($("paymentMode").value==="credit"&&!$("billCustomer").value){message("Udhar bill ke liye customer select karein.",true);return;}
  if(!bill.length){message("Add at least one product to the bill.",true);return;}
