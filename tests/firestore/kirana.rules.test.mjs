@@ -83,3 +83,35 @@ test("POS sale and stock decrement must be atomic and price-accurate",async()=>{
   const saved=await getDoc(product);
   assert.equal(saved.data().stock,8);
 });
+
+test("credit sale atomically updates stock, customer balance, and ledger",async()=>{
+  const db=await createOwnedStore();
+  const product=doc(db,"kiranaStores/store-1/products/p1");
+  const customer=doc(db,"kiranaStores/store-1/customers/c1");
+  await assertSucceeds(setDoc(product,{
+    name:"Rice",sku:"RICE-1",unit:"kg",retailPrice:60,wholesalePrice:55,
+    stock:10,lowStockAt:2,barcode:"",active:true,createdBy:"owner-1",
+    createdAt:serverTimestamp(),updatedAt:serverTimestamp()
+  }));
+  await assertSucceeds(setDoc(customer,{
+    name:"Asha",phone:"9876543210",creditBalance:0,totalCredit:0,totalPaid:0,
+    active:true,createdBy:"owner-1",createdAt:serverTimestamp(),updatedAt:serverTimestamp()
+  }));
+  const batch=writeBatch(db);
+  batch.update(product,{stock:8,lastSaleId:"sale-credit-1",updatedAt:serverTimestamp()});
+  batch.update(customer,{creditBalance:120,totalCredit:120,lastLedgerId:"sale-credit-1",updatedAt:serverTimestamp()});
+  batch.set(doc(db,"kiranaStores/store-1/customers/c1/ledger/sale-credit-1"),{
+    type:"credit_sale",amount:120,invoiceId:"KRN-CREDIT-1",saleId:"sale-credit-1",
+    createdBy:"owner-1",createdAt:serverTimestamp(),note:"Counter billing credit sale"
+  });
+  batch.set(doc(db,"kiranaStores/store-1/sales/sale-credit-1"),{
+    saleId:"sale-credit-1",invoiceNo:"KRN-CREDIT-1",
+    items:[{productId:"p1",name:"Rice",sku:"RICE-1",unit:"kg",quantity:2,price:60,priceType:"retail",amount:120}],
+    stockChanges:{p1:2},subtotal:120,tax:0,discount:0,total:120,
+    paymentMode:"credit",customerId:"c1",customerName:"Asha",
+    createdBy:"owner-1",createdAt:serverTimestamp(),status:"completed"
+  });
+  await assertSucceeds(batch.commit());
+  const savedCustomer=await getDoc(customer);
+  assert.equal(savedCustomer.data().creditBalance,120);
+});
