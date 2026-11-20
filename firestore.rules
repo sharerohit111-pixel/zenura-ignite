@@ -214,7 +214,7 @@ service cloud.firestore {
         && line.productId is string
         && line.quantity is number && line.quantity > 0
         && line.priceType in ["retail", "wholesale"]
-        && before.exists() && after.exists()
+        && exists(kiranaProductPath(storeId, line.productId)) && existsAfter(kiranaProductPath(storeId, line.productId))
         && before.data.active == true
         && before.data.stock >= line.quantity
         && line.name == before.data.name
@@ -389,7 +389,7 @@ service cloud.firestore {
 
     // Collection-group membership query: every result is constrained to the signed-in UID.
     match /{path=**}/members/{memberId} {
-      allow list: if request.auth != null && memberId == request.auth.uid
+      allow list: if request.auth != null
         && resource.data.uid == request.auth.uid && resource.data.active == true;
     }
 
