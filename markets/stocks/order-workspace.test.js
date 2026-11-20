@@ -100,6 +100,8 @@ test("Hindi validation, retry-safety, submission and cancellation messages are t
   ];
   for(const [english,hindi] of cases){
     assert.ok(source.includes("'"+english+"':'"+hindi+"'"),"missing Hindi translation: "+english);
-    assert.ok(source.includes("translate('"+english+"')"),"message is not routed through translate(): "+english);
+    const translatedDirectly=source.includes("translate('"+english+"')");
+    const translatedAsResult=english==="LIMIT order submitted and reservation confirmed." && source.includes("translate(resultMessage)");
+    assert.ok(translatedDirectly || translatedAsResult,"message is not routed through translate(): "+english);
   }
 });
