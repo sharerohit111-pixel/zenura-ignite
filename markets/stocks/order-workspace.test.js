@@ -42,6 +42,11 @@ test("MARKET remains on the existing market-order flow and LIMIT uses the verifi
   assert.match(gateway,/Only MARKET and LIMIT paper orders are supported/);
 });
 
+test("Empty trade history has a trade-specific message",()=>{
+  assert.match(source,/No filled trades recorded yet\./);
+  assert.match(source,/'No filled trades recorded yet\.':'अभी तक कोई पूरा हुआ ट्रेड दर्ज नहीं है।'/);
+});
+
 test("Missing account or gateway clears private balance values",()=>{
   assert.match(source,/if \(!uid \|\| !gateway\) \{\s*\[cashAvailable,cashReserved,sharesAvailable,sharesReserved\]\.forEach\(el => \{ if \(el\) el\.textContent = '—'; \}\)/);
   assert.match(source,/Market gateway is not configured\./);
