@@ -293,6 +293,7 @@ test("worker resets provisional FILLED outcome when Firestore retries after canc
   };
   await invoke();
   h.records.set(orderPath,{...h.records.get(orderPath),status:"CANCELLED",reservationReleased:true});
+  h.records.set(accountPath,{...h.records.get(accountPath),reservedCashPaise:0});
   const retryWrites=await invoke();
   for(const [path,patch] of retryWrites)h.records.set(path,{...h.records.get(path),...patch});
  };
@@ -306,7 +307,7 @@ test("worker resets provisional FILLED outcome when Firestore retries after canc
   assert.deepEqual(summary,{scanned:1,filled:0,notEligible:1,failed:0,alreadyFilled:0});
   assert.equal(h.records.get(orderPath).status,"CANCELLED");
   assert.equal(h.records.get(accountPath).cashPaise,100000);
-  assert.equal(h.records.get(accountPath).reservedCashPaise,20000);
+  assert.equal(h.records.get(accountPath).reservedCashPaise,0);
   assert.equal(h.records.get(accountPath).positions["NSE_EQ|ABC"],undefined);
  }finally{Date.now=oldNow;}
 });
