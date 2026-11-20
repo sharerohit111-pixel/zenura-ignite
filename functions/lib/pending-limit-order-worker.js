@@ -16,7 +16,8 @@ function sameExecutionIntent(original,current){
     .every(key=>original?.[key]===current?.[key]);
 }
 function validateAccount(account){
-  const positions=account?.positions??{},reservedPositions=account?.reservedPositions??{};
+  const positions=account?.positions===undefined?{}:account.positions;
+  const reservedPositions=account?.reservedPositions===undefined?{}:account.reservedPositions;
   const reservedCashPaise=account?.reservedCashPaise??0,reservedMarginPaise=account?.reservedMarginPaise??0;
   if(!account||!Number.isSafeInteger(account.cashPaise)||account.cashPaise<0||
     !Number.isSafeInteger(account.realizedPnlPaise??0)||
@@ -24,7 +25,9 @@ function validateAccount(account){
     !Number.isSafeInteger(reservedMarginPaise)||reservedMarginPaise<0||
     reservedCashPaise+reservedMarginPaise>account.cashPaise||
     !positions||typeof positions!=="object"||Array.isArray(positions)||
-    !reservedPositions||typeof reservedPositions!=="object"||Array.isArray(reservedPositions))
+    (account.positions!==undefined&&(!account.positions||typeof account.positions!=="object"||Array.isArray(account.positions)))||
+    !reservedPositions||typeof reservedPositions!=="object"||Array.isArray(reservedPositions)||
+    (account.reservedPositions!==undefined&&(!account.reservedPositions||typeof account.reservedPositions!=="object"||Array.isArray(account.reservedPositions))))
     invalid("Paper account reservation state is invalid.");
   for(const [key,position] of Object.entries(positions)){
     if(!key||!position||typeof position!=="object"||Array.isArray(position)||
