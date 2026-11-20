@@ -7,6 +7,36 @@ service cloud.firestore {
         && request.auth.token.email_verified == true;
     }
 
+    // Customer profiles are private: each customer can access only their own profile.
+    // Profile fields never include roles or permissions; admin access remains email-verified only.
+    match /customerProfiles/{uid} {
+      allow get: if request.auth != null && (request.auth.uid == uid || isZenuraAdmin());
+      allow list: if isZenuraAdmin();
+      allow create: if request.auth != null
+        && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(["uid", "email", "displayName", "phone", "createdAt", "updatedAt"])
+        && request.resource.data.keys().hasAll(["uid", "email", "displayName", "phone", "createdAt", "updatedAt"])
+        && request.resource.data.uid == uid
+        && request.resource.data.email == request.auth.token.email
+        && request.resource.data.displayName is string
+        && request.resource.data.displayName.size() >= 2
+        && request.resource.data.displayName.size() <= 100
+        && request.resource.data.phone is string
+        && request.resource.data.phone.size() <= 20
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time;
+      allow update: if request.auth != null
+        && request.auth.uid == uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["displayName", "phone", "updatedAt"])
+        && request.resource.data.displayName is string
+        && request.resource.data.displayName.size() >= 2
+        && request.resource.data.displayName.size() <= 100
+        && request.resource.data.phone is string
+        && request.resource.data.phone.size() <= 20
+        && request.resource.data.updatedAt == request.time;
+      allow delete: if false;
+    }
+
     // Premium entitlement writes are restricted to the verified ZENURA administrator.
     // The QR payment flow requires manual bank-credit verification before activation.
     match /entitlements/{uid} {
