@@ -293,7 +293,7 @@ app.post("/paper/orders",async(req,res)=>{
         serverTimestamp:()=>FieldValue.serverTimestamp()
       });
       res.set("Cache-Control","private, no-store");
-      return res.status(201).json(result);
+      return res.status(result.idempotentReplay?200:201).json(result);
     }
     const accessToken=decryptToken(connectionData.tokenCiphertext);
     const quoteUrl="https://api.upstox.com/v3/market-quote/quotes?"+new URLSearchParams({instrument_key:instrumentKey});
