@@ -50,7 +50,10 @@ test("does not reset an existing account balance or holdings",async()=>{
  const original={currency:"INR",startingCashPaise:100000000,cashPaise:45000000,positions:{"NSE_EQ|ABC":{quantity:5,averagePricePaise:10000}},derivativePositions:{},reservedMarginPaise:0,reservedCashPaise:0,reservedPositions:{},realizedPnlPaise:2500,version:7};
  const {db,state}=makeDb(original);
  await ensurePaperAccount({db,ref:{id:"user-1"},startingCashPaise:999999999,serverTimestamp:()=>"new-time"});
- assert.deepEqual(state.writes,[]);
+ assert.equal(state.writes.length,1);
+ assert.equal(state.writes[0][0],"update");
+ assert.equal(state.writes[0][1].deliveryRealizedPnlPaise,2500);
+ assert.equal(state.writes[0][1].intradayRealizedPnlPaise,0);
  assert.equal(state.value.cashPaise,45000000);
  assert.equal(state.value.version,7);
  assert.equal(state.value.positions["NSE_EQ|ABC"].quantity,5);
