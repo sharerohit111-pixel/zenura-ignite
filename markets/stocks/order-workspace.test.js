@@ -164,3 +164,12 @@ test("Hindi validation, retry-safety, submission and cancellation messages are t
     assert.ok(translatedDirectly || translatedAsResult,"message is not routed through translate(): "+english);
   }
 });
+
+
+test("Paper Trading controls expose visible keyboard focus and touch-sized buttons",()=>{
+  assert.match(css,/\.stocks-page button:focus-visible/);
+  assert.match(css,/\.stocks-page a:focus-visible/);
+  assert.match(css,/\.stocks-page input:focus-visible/);
+  assert.match(css,/\.stocks-page select:focus-visible/);
+  assert.match(css,/@media\(pointer:coarse\)\{\.stocks-page button\{min-height:44px\}\}/);
+});
