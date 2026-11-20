@@ -132,6 +132,28 @@ test("stale or not-yet-reached quotes leave order and reservations untouched",as
  assert.equal(h.records.get("orders/order-1").status,"PENDING");
 });
 
+test("cancel after a completed LIMIT fill is rejected without changing the filled position",async()=>{
+ const order=baseOrder("BUY",{status:"FILLED",reservedCashPaise:0,reservedQuantity:0,reservationReleased:true});
+ const account=baseAccount({cashPaise:73000,positions:{"NSE_EQ|ABC":{quantity:3,averagePricePaise:9000,costBasisPaise:27000}},version:3});
+ const h=harness(account,order);
+ await assert.rejects(cancelPendingLimitOrder({db:h.db,accountRef:h.accountRef,orderRef:h.orderRef,uid:"user-1",serverTimestamp:stamp}),{status:409});
+ assert.equal(h.records.get("accounts/user-1").positions["NSE_EQ|ABC"].quantity,3);
+ assert.equal(h.records.get("accounts/user-1").cashPaise,73000);
+ assert.equal(h.records.get("orders/order-1").status,"FILLED");
+});
+
+test("a cancelled LIMIT order cannot execute later or alter released reservations",async()=>{
+ const order=baseOrder("BUY",{status:"CANCELLED",reservedCashPaise:30000,reservedQuantity:0,reservationReleased:true});
+ const account=baseAccount({reservedCashPaise:0,version:3});
+ const h=harness(account,order);
+ const result=await executePendingLimitOrder({db:h.db,accountRef:h.accountRef,orderRef:h.orderRef,uid:"user-1",quote:{pricePaise:9000,timestampMs:stamp().getTime()},nowMs:stamp().getTime(),serverTimestamp:stamp});
+ assert.equal(result.status,"CANCELLED");
+ assert.equal(result.notExecuted,true);
+ assert.equal(h.records.get("accounts/user-1").cashPaise,100000);
+ assert.equal(h.records.get("accounts/user-1").reservedCashPaise,0);
+ assert.equal(h.records.get("orders/order-1").status,"CANCELLED");
+});
+
 test("rejects foreign-account order access and inconsistent reservations",async()=>{
  const order=baseOrder("BUY",{reservedCashPaise:30000,reservedQuantity:0});
  const h=harness(baseAccount({reservedCashPaise:30000}),order);
