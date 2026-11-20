@@ -152,8 +152,16 @@
   function readPendingLimit(uid) {
     try {
       const raw = localStorage.getItem(limitStorageKey(uid));
-      return raw ? JSON.parse(raw) : null;
-    } catch (_) { return null; }
+      if (!raw) return null;
+      const pending = JSON.parse(raw);
+      if (!pending || typeof pending !== 'object' ||
+          typeof pending.fingerprint !== 'string' ||
+          typeof pending.key !== 'string' ||
+          !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(pending.key)) {
+        return {storageError:true};
+      }
+      return pending;
+    } catch (_) { return {storageError:true}; }
   }
   function savePendingLimit(uid, pending) {
     try { localStorage.setItem(limitStorageKey(uid), JSON.stringify(pending)); return true; }
@@ -188,6 +196,10 @@
     }
     const fingerprint = JSON.stringify({instrument_key:instrument.instrumentKey,side,quantity,limit_price_paise:limitPricePaise});
     let pending = readPendingLimit(uid);
+    if (pending?.storageError) {
+      showMessage(status, 'Saved LIMIT retry data is unreadable. No order was sent; resolve browser storage before placing another LIMIT order.', 'error');
+      return;
+    }
     if (pending && pending.fingerprint !== fingerprint) {
       showMessage(status, translate('A previous LIMIT order response is uncertain. Retry with the same stock, side, quantity and price before changing the ticket.'), 'warning');
       return;
