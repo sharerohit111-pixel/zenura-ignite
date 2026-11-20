@@ -1,6 +1,6 @@
 import { auth, db } from "../firebase-client.js";
 import {
-  collection, collectionGroup, doc, getDoc, getDocs, query, where, limit,
+  collection, doc, getDoc, getDocs, query, where, limit, arrayUnion,
   writeBatch, addDoc, runTransaction, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore.js";
 
@@ -27,11 +27,12 @@ const rows = snap => snap.docs.map(d => ({id:d.id,...d.data()}));
 
 async function kiranaListMyStores() {
   const u=requireUser();
-  const memberships=await getDocs(query(collectionGroup(db,"members"),where("uid","==",u.uid),where("active","==",true),limit(100)));
-  const stores=await Promise.all(memberships.docs.map(async m=>{
-    const parent=m.ref.parent.parent;
-    if(!parent) return null;
-    const s=await getDoc(parent);
+  const registry=await getDoc(doc(db,"kiranaUsers",u.uid));
+  const ids=registry.exists()&&Array.isArray(registry.data().storeIds)?registry.data().storeIds.slice(0,100):[];
+  const stores=await Promise.all(ids.map(async storeId=>{
+    const m=await getDoc(memberRef(storeId,u.uid));
+    if(!m.exists()||m.data().active!==true) return null;
+    const s=await getDoc(storeRef(storeId));
     return s.exists() ? {storeId:s.id,name:s.data().name,role:m.data().role} : null;
   }));
   return {stores:stores.filter(Boolean)};
@@ -39,9 +40,10 @@ async function kiranaListMyStores() {
 async function kiranaCreateStore(data) {
   const u=requireUser(), name=requireText(data.name,"Store name",100);
   const phone=requireText(data.phone,"Store mobile",20), address=String(data.address||"Not added").trim().slice(0,250)||"Not added";
-  const s=doc(collection(db,"kiranaStores")), m=memberRef(s.id,u.uid), batch=writeBatch(db);
+  const s=doc(collection(db,"kiranaStores")), m=memberRef(s.id,u.uid), registry=doc(db,"kiranaUsers",u.uid), batch=writeBatch(db);
   batch.set(s,{name,phone,address,ownerUid:u.uid,status:"active",currency:"INR",timezone:"Asia/Kolkata",createdAt:serverTimestamp(),updatedAt:serverTimestamp()});
   batch.set(m,{uid:u.uid,role:"owner",active:true,permissions:["products","billing","customers","reports","settings"],createdAt:serverTimestamp()});
+  batch.set(registry,{storeIds:arrayUnion(s.id),createdAt:serverTimestamp(),updatedAt:serverTimestamp()},{merge:true});
   await batch.commit();
   return {storeId:s.id,name};
 }
