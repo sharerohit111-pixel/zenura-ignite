@@ -25,12 +25,16 @@ async function member(storeId, uid, roles=["owner","manager","cashier"]) {
 }
 exports.kiranaAddCustomer = onCall({region:REGION}, async req=>{
   const uid=requireUid(req), storeId=requiredText(req.data?.storeId,"Store");
-  await member(storeId,uid,["owner","manager","cashier"]);
   const name=requiredText(req.data?.name,"Customer name");
   const phone=String(req.data?.phone||"").trim();
   if(phone && !/^[0-9+ -]{7,20}$/.test(phone)) throw new HttpsError("invalid-argument","Enter a valid customer mobile number.");
   const ref=db.collection("kiranaStores").doc(storeId).collection("customers").doc();
-  await ref.create({name,phone,creditBalance:0,totalCredit:0,totalPaid:0,active:true,createdAt:FieldValue.serverTimestamp(),updatedAt:FieldValue.serverTimestamp()});
+  const store=db.collection("kiranaStores").doc(storeId);
+  await db.runTransaction(async tx=>{
+    const m=await tx.get(store.collection("members").doc(uid));
+    if(!m.exists||m.data().active!==true||!["owner","manager","cashier"].includes(m.data().role)) throw new HttpsError("permission-denied","Store access denied.");
+    tx.create(ref,{name,phone,creditBalance:0,totalCredit:0,totalPaid:0,active:true,createdAt:FieldValue.serverTimestamp(),updatedAt:FieldValue.serverTimestamp()});
+  });
   return {customerId:ref.id};
 });
 exports.kiranaListCustomers = onCall({region:REGION}, async req=>{
