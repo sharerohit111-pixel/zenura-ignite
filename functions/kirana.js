@@ -105,6 +105,8 @@ exports.kiranaCreateSale = onCall({ region: REGION, maxInstances: 30 }, async re
     quantity: positiveNumber(item?.quantity, "quantity"),
     priceType: item?.priceType === "wholesale" ? "wholesale" : "retail"
   }));
+  const paymentMode = ["cash", "upi", "card", "credit"].includes(req.data?.paymentMode) ? req.data.paymentMode : "cash";
+  const customerId = paymentMode === "credit" ? textValue(req.data?.customerId, "Customer") : "";
   const storeRef = db.collection("kiranaStores").doc(storeId);
   const saleRef = storeRef.collection("sales").doc();
   const productRefs = [...new Set(normalized.map(x => storeRef.collection("products").doc(x.productId)))];
@@ -117,6 +119,9 @@ exports.kiranaCreateSale = onCall({ region: REGION, maxInstances: 30 }, async re
     }
     const productSnaps = [];
     for (const ref of productRefs) productSnaps.push(await tx.get(ref));
+    const customerRef = customerId ? storeRef.collection("customers").doc(customerId) : null;
+    const customerSnap = customerRef ? await tx.get(customerRef) : null;
+    if (customerRef && (!customerSnap.exists || customerSnap.data().active !== true)) throw new HttpsError("not-found", "Selected customer is unavailable.");
     const byId = new Map(productSnaps.map(s => [s.id, s]));
     const lines = normalized.map(item => {
       const snap = byId.get(item.productId);
@@ -127,17 +132,24 @@ exports.kiranaCreateSale = onCall({ region: REGION, maxInstances: 30 }, async re
       return { productId: snap.id, name: p.name, sku: p.sku, unit: p.unit, quantity: item.quantity, price, amount: Math.round(item.quantity * price * 100) / 100 };
     });
     total = Math.round(lines.reduce((sum, line) => sum + line.amount, 0) * 100) / 100;
-    for (const line of lines) tx.update(storeRef.collection("products").doc(line.productId), {
-      stock: byId.get(line.productId).data().stock - line.quantity,
-      updatedAt: FieldValue.serverTimestamp()
-    });
+    for (const ref of productRefs) {
+      const snap = byId.get(ref.id);
+      const soldQty = lines.filter(line => line.productId === ref.id).reduce((sum, line) => sum + line.quantity, 0);
+      if (snap.data().stock < soldQty) throw new HttpsError("failed-precondition", "Insufficient combined stock for " + snap.data().name + ".");
+      tx.update(ref, { stock: snap.data().stock - soldQty, updatedAt: FieldValue.serverTimestamp() });
+    }
     invoiceNo = "KRN-" + Date.now().toString(36).toUpperCase() + "-" + crypto.randomBytes(2).toString("hex").toUpperCase();
     tx.create(saleRef, {
       invoiceNo, items: lines, subtotal: total, tax: 0, discount: 0, total,
-      paymentMode: ["cash", "upi", "card", "credit"].includes(req.data?.paymentMode) ? req.data.paymentMode : "cash",
-      customerName: String(req.data?.customerName || "Walk-in Customer").slice(0, 100),
+      paymentMode, customerId: customerId || null,
+      customerName: customerSnap ? customerSnap.data().name : String(req.data?.customerName || "Walk-in Customer").slice(0, 100),
       createdBy: uid, createdAt: FieldValue.serverTimestamp(), status: "completed"
     });
+    if (customerRef) {
+      const ledgerRef = customerRef.collection("ledger").doc("sale_" + saleRef.id);
+      tx.update(customerRef, { creditBalance: FieldValue.increment(total), totalCredit: FieldValue.increment(total), updatedAt: FieldValue.serverTimestamp() });
+      tx.create(ledgerRef, { type: "credit_sale", amount: total, invoiceId, saleId: saleRef.id, createdBy: uid, createdAt: FieldValue.serverTimestamp(), note: "Counter billing credit sale" });
+    }
   });
   return { saleId: saleRef.id, invoiceNo, total };
 });
