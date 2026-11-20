@@ -7,7 +7,9 @@
   },
   "scripts": {
     "emulate": "firebase emulators:start --only functions,firestore",
-    "deploy": "firebase deploy --only functions,firestore:rules"
+    "deploy": "firebase deploy --only functions,firestore:rules",
+    "test:syntax": "node --check index.js && node --check kirana.js && node --check kirana-ledger.js",
+    "test": "npm run test:syntax"
   },
   "dependencies": {
     "firebase-admin": "^13.0.0",
