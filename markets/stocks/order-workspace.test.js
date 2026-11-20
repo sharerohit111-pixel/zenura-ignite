@@ -41,10 +41,11 @@ test("MARKET remains on the existing market-order flow and LIMIT uses the verifi
 });
 
 test("LIMIT mode intercepts BUY/SELL before legacy MARKET handlers",()=>{
-  assert.match(source,/\[buy, sell\]\.forEach\(\(button, index\) => button\.addEventListener\('click',[\s\S]*?selectedType !== 'LIMIT'/);
-  assert.match(source,/event\.stopImmediatePropagation\(\)/);
-  assert.match(source,/\}, true\)\);/);
-  assert.match(source,/submitLimitOrder\(index === 0 \? 'BUY' : 'SELL'\)/);
+  assert.ok(source.includes("[buy, sell].forEach((button, index) => button.addEventListener('click'"));
+  assert.ok(source.includes("if (selectedType !== 'LIMIT') return;"));
+  assert.ok(source.includes("event.stopImmediatePropagation()"));
+  assert.ok(source.includes("}, true));"));
+  assert.ok(source.includes("submitLimitOrder(index === 0 ? 'BUY' : 'SELL')"));
 });
 
 test("Pending LIMIT cancellation calls the authenticated backend endpoint",()=>{
