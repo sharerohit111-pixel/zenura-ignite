@@ -273,3 +273,40 @@ for(const scenario of [
   }finally{Date.now=oldNow;}
  });
 }
+
+test("worker resets provisional FILLED outcome when Firestore retries after cancellation",async()=>{
+ const h=harness(baseOrder,baseAccount),oldNow=Date.now;
+ Date.now=()=>now;
+ const orderPath="indianPaperOrders/order-1",accountPath="indianPaperAccounts/user-1";
+ h.db.runTransaction=async callback=>{
+  const invoke=async()=>{
+   const writes=[];
+   const tx={
+    get:async ref=>{
+     const value=h.records.get(ref.path);
+     return {exists:value!==undefined,data:()=>structuredClone(value)};
+    },
+    update:(ref,patch)=>writes.push([ref.path,structuredClone(patch)])
+   };
+   await callback(tx);
+   return writes;
+  };
+  await invoke();
+  h.records.set(orderPath,{...h.records.get(orderPath),status:"CANCELLED",reservationReleased:true});
+  const retryWrites=await invoke();
+  for(const [path,patch] of retryWrites)h.records.set(path,{...h.records.get(path),...patch});
+ };
+ try{
+  const summary=await processPendingLimitOrders({
+   db:h.db,
+   fetchQuote:async()=>({pricePaise:9500,timestampMs:now-500}),
+   nowMs:now,
+   serverTimestamp:stamp
+  });
+  assert.deepEqual(summary,{scanned:1,filled:0,notEligible:1,failed:0,alreadyFilled:0});
+  assert.equal(h.records.get(orderPath).status,"CANCELLED");
+  assert.equal(h.records.get(accountPath).cashPaise,100000);
+  assert.equal(h.records.get(accountPath).reservedCashPaise,20000);
+  assert.equal(h.records.get(accountPath).positions["NSE_EQ|ABC"],undefined);
+ }finally{Date.now=oldNow;}
+});
