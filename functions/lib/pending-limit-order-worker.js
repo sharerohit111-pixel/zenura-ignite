@@ -67,8 +67,10 @@ function calculateFill(account,order,pricePaise){
   if(order.side==="BUY"){
     if(!(positions[order.instrumentKey]?.quantity>0)&&Object.values(positions).filter(position=>position?.quantity>0).length>=50)
       invalid("Paper portfolio is limited to 50 open positions.");
-    const reserve=order.reservedCashPaise;
-    if(!Number.isSafeInteger(reserve)||reserve<grossPaise||reservedCashPaise<reserve)invalid("LIMIT BUY cash reservation is inconsistent.");
+    const reserve=order.reservedCashPaise,expectedReserve=order.limitPricePaise*order.quantity;
+    if(!Number.isSafeInteger(expectedReserve)||!Number.isSafeInteger(reserve)||reserve!==expectedReserve||
+      order.reservedQuantity!==0||reservedCashPaise<reserve)
+      invalid("LIMIT BUY cash reservation is inconsistent.");
     reservedCashPaise-=reserve;
     cashPaise-=grossPaise;
     const nextQty=quantity+order.quantity,nextCost=costBasis+grossPaise;
@@ -76,7 +78,8 @@ function calculateFill(account,order,pricePaise){
     positions[order.instrumentKey]={quantity:nextQty,averagePricePaise:Math.round(nextCost/nextQty),costBasisPaise:nextCost};
   }else if(order.side==="SELL"){
     const reserved=order.reservedQuantity,currentReserved=reservedPositions[order.instrumentKey]??0;
-    if(!Number.isSafeInteger(reserved)||reserved!==order.quantity||currentReserved<reserved||quantity<reserved)invalid("LIMIT SELL share reservation is inconsistent.");
+    if(order.reservedCashPaise!==0||!Number.isSafeInteger(reserved)||reserved!==order.quantity||
+      currentReserved<reserved||quantity<reserved)invalid("LIMIT SELL share reservation is inconsistent.");
     if(currentReserved===reserved)delete reservedPositions[order.instrumentKey];else reservedPositions[order.instrumentKey]=currentReserved-reserved;
     const allocated=quantity===order.quantity?costBasis:Number((BigInt(costBasis)*BigInt(order.quantity)+BigInt(Math.floor(quantity/2)))/BigInt(quantity));
     const remaining=costBasis-allocated,remainingQty=quantity-order.quantity;
