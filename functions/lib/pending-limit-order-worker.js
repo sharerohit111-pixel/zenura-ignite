@@ -26,6 +26,10 @@ function validateAccount(account){
     !positions||typeof positions!=="object"||Array.isArray(positions)||
     !reservedPositions||typeof reservedPositions!=="object"||Array.isArray(reservedPositions))
     invalid("Paper account reservation state is invalid.");
+  for(const [key,value] of Object.entries(reservedPositions)){
+    if(!key||!Number.isSafeInteger(value)||value<0||value>(positions[key]?.quantity??0))
+      invalid("Paper account contains invalid reserved share quantities.");
+  }
   return {positions,reservedPositions,reservedCashPaise,reservedMarginPaise};
 }
 function nextVersion(account){
