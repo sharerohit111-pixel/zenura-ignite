@@ -454,6 +454,7 @@
   });
   langButton?.addEventListener('click', () => {
     language = language === 'en' ? 'hi' : 'en';
+    document.documentElement.lang = language;
     document.querySelectorAll('[data-paper-en]').forEach(el => {
       const english = el.getAttribute('data-paper-en');
       const textNode = [...el.childNodes].find(node => node.nodeType === 3);
