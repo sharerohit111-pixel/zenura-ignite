@@ -78,7 +78,7 @@ async function placePendingLimitOrder({db,accountRef,orderRef,uid,order,serverTi
     const patch={updatedAt:serverTimestamp(),version:nextVersion(account)};
     const stored={...order,createdAt:serverTimestamp(),updatedAt:serverTimestamp()};
     if(order.side==="BUY"){
-      if(!Object.prototype.hasOwnProperty.call(state.positions,order.instrumentKey)){
+      if(!(state.positions[order.instrumentKey]?.quantity>0)){
         const openPositions=Object.values(state.positions).filter(position=>position.quantity>0).length;
         if(openPositions>=50)fail("Paper portfolio is limited to 50 open positions.");
       }
