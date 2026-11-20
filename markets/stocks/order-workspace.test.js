@@ -70,6 +70,10 @@ test("Available and reserved cash and shares use account reservation fields",()=
   assert.match(accountState,/reservedPositions/);
 });
 
+test("Balance request checks the account session again after token retrieval",()=>{
+  assert.match(source,/const headers = await authHeaders\(\);\s*if \(seq !== balanceRequest \|\| connector\.getUserId\(\) !== uid\) return;\s*const response = await fetch\(gateway \+ '\/paper\/account'/);
+});
+
 test("Order and trade history use backend statuses, execution prices and cursor pagination",()=>{
   assert.match(source,/\/paper\/orders\?/);
   assert.match(source,/const cursor = append \? nextCursor : null/);
