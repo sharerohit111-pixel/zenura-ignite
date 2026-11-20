@@ -732,3 +732,43 @@ integrationTest("Firestore emulator refuses worker fills with mismatched LIMIT r
   }finally{await clean([accountRef,orderRef]);}
  }
 });
+
+
+integrationTest("Firestore emulator serializes worker LIMIT execution against user cancellation",async()=>{
+ const id=crypto.randomUUID(),uid="worker-limit-race-user-"+id;
+ const accountRef=db.collection("indianPaperAccounts").doc(uid);
+ const orderRef=db.collection("indianPaperOrders").doc("worker-limit-race-"+id);
+ const serverTimestamp=()=>FieldValue.serverTimestamp();
+ await accountRef.set({
+  cashPaise:100000,reservedCashPaise:0,reservedMarginPaise:0,realizedPnlPaise:0,
+  positions:{},reservedPositions:{},version:1
+ });
+ try{
+  await placePendingLimitOrder({
+   db,accountRef,orderRef,uid,
+   order:{uid,instrumentKey:"NSE_EQ|AAA",tradingSymbol:"AAA",exchange:"NSE",side:"BUY",quantity:2,orderType:"LIMIT",limitPricePaise:10000,status:"PENDING",simulationOnly:true},
+   serverTimestamp
+  });
+  const order=(await orderRef.get()).data();
+  const nowMs=Date.now(),quote={pricePaise:9000,timestampMs:nowMs-500};
+  const results=await Promise.allSettled([
+   cancelPendingLimitOrder({db,accountRef,orderRef,uid,serverTimestamp}),
+   executePendingLimitOrderInWorker({db,orderRef,order,quote,nowMs,serverTimestamp})
+  ]);
+  const [account,storedOrder]=await Promise.all([accountRef.get(),orderRef.get()]);
+  const state=account.data(),stored=storedOrder.data();
+  assert.ok(["CANCELLED","FILLED"].includes(stored.status));
+  assert.equal(state.reservedCashPaise,0);
+  if(stored.status==="CANCELLED"){
+   assert.equal(state.cashPaise,100000);
+   assert.equal(state.positions["NSE_EQ|AAA"],undefined);
+   assert.ok(results[0].status==="fulfilled");
+   assert.ok(results[1].status==="fulfilled"&&results[1].value!=="FILLED");
+  }else{
+   assert.equal(state.cashPaise,82000);
+   assert.equal(state.positions["NSE_EQ|AAA"].quantity,2);
+   assert.ok(results[1].status==="fulfilled"&&results[1].value==="FILLED");
+   assert.ok(results[0].status==="rejected"&&results[0].reason.status===409);
+  }
+ }finally{await clean([accountRef,orderRef]);}
+});
