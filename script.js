@@ -1,4 +1,7 @@
 const menu=document.getElementById('menu'),nav=document.getElementById('nav'),backdrop=document.getElementById('sidebar-backdrop'),closeButton=document.getElementById('sidebar-close');
+// Keep the drawer outside the sticky, backdrop-filtered header so fixed positioning
+// is anchored to the browser viewport on both mobile and desktop.
+if(nav && nav.parentElement !== document.body) document.body.appendChild(nav);
 function setMenuOpen(open){
   if(!nav||!menu)return;
   nav.classList.toggle('open',open);

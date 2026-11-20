@@ -103,7 +103,7 @@
 .header{z-index:50}
 .header .actions #menu{width:44px;height:44px;display:grid;place-items:center;padding:0;border:1px solid #35e4ff66;border-radius:12px;background:#10203d;color:#42e8ff;font-size:24px;box-shadow:0 0 16px #35e4ff20}
 .header .actions #menu:focus-visible,.sidebar-heading button:focus-visible{outline:3px solid #35e4ff;outline-offset:3px}
-.header nav#nav{
+body > nav#nav{
  position:fixed!important;top:0!important;right:0!important;left:auto!important;
  width:min(360px,88vw)!important;height:100dvh!important;max-height:100dvh!important;
  min-width:0!important;padding:18px 16px 28px!important;margin:0!important;
@@ -115,21 +115,21 @@
  transform:translateX(110%);visibility:hidden;pointer-events:none;
  transition:transform .28s ease,visibility .28s ease;
 }
-.header nav#nav.open{display:flex!important;transform:translateX(0);visibility:visible;pointer-events:auto}
-.header nav#nav>a{display:flex!important;align-items:center;min-height:43px;padding:11px 13px!important;border-radius:9px;color:#e6efff!important;font-size:13px!important}
-.header nav#nav>a:hover,.header nav#nav>a:focus-visible{background:#1c3158!important;color:#43e6ff!important;outline:none}
+body > nav#nav.open{display:flex!important;transform:translateX(0);visibility:visible;pointer-events:auto}
+body > nav#nav>a{display:flex!important;align-items:center;min-height:43px;padding:11px 13px!important;border-radius:9px;color:#e6efff!important;font-size:13px!important}
+body > nav#nav>a:hover,body > nav#nav>a:focus-visible{background:#1c3158!important;color:#43e6ff!important;outline:none}
 .sidebar-heading{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:7px 4px 16px;margin-bottom:8px;border-bottom:1px solid #426eaa66;color:#f3f7ff;font:700 15px 'Space Grotesk'}
 .sidebar-heading button{width:36px;height:36px;border:1px solid #46648d;border-radius:10px;background:#142342;color:#fff;font-size:23px;cursor:pointer}
 .sidebar-backdrop{position:fixed;inset:0;z-index:101;border:0;background:#020713a8;opacity:0;visibility:hidden;pointer-events:none;transition:opacity .25s ease,visibility .25s ease}
 .sidebar-backdrop.visible{opacity:1;visibility:visible;pointer-events:auto}
 body.sidebar-open{overflow:hidden}
-.header nav#nav .account-user-name{margin-top:10px!important}
-.header nav#nav .site-settings-toggle{min-height:43px!important;text-align:left!important;padding:11px 13px!important;color:#eaf4ff!important;border-radius:9px}
-.header nav#nav .site-settings-panel{margin:3px 0 8px!important;max-height:42vh!important}
-.header nav#nav .admin-nav-link{margin-top:7px;border-top:1px solid #426eaa66;border-radius:0!important;padding-top:16px!important;color:#55eaff!important}
+body > nav#nav .account-user-name{margin-top:10px!important}
+body > nav#nav .site-settings-toggle{min-height:43px!important;text-align:left!important;padding:11px 13px!important;color:#eaf4ff!important;border-radius:9px}
+body > nav#nav .site-settings-panel{margin:3px 0 8px!important;max-height:42vh!important}
+body > nav#nav .admin-nav-link{margin-top:7px;border-top:1px solid #426eaa66;border-radius:0!important;padding-top:16px!important;color:#55eaff!important}
 .brand-spark i{width:30px!important;height:30px!important;margin:0!important;border-radius:50%;font-size:16px!important;color:#f2f7ff;background:linear-gradient(145deg,#174eaa,#704bd0);box-shadow:0 0 14px #438cff66}
-@media(prefers-reduced-motion:reduce){.header nav#nav,.sidebar-backdrop{transition:none}}
-@media(max-width:600px){.header nav#nav{padding-top:max(16px,env(safe-area-inset-top))!important;padding-bottom:max(24px,env(safe-area-inset-bottom))!important}}
+@media(prefers-reduced-motion:reduce){body > nav#nav,.sidebar-backdrop{transition:none}}
+@media(max-width:600px){body > nav#nav{padding-top:max(16px,env(safe-area-inset-top))!important;padding-bottom:max(24px,env(safe-area-inset-bottom))!important}}
 
 .catalogue-intro,.commercial-intro{padding:18px 20px;border:1px solid #426eb688;border-radius:14px;background:linear-gradient(120deg,#102347bb,#10132ccc);color:#b9c9df;font-size:13px;line-height:1.7}
 .zenura-light-mode .catalogue-intro,.zenura-light-mode .commercial-intro{background:#fff;color:#52617a;border-color:#cbd6e8}
@@ -205,3 +205,7 @@ body{overflow-x:clip}
 @media(max-width:480px){.site-footer{padding:38px 20px 20px!important}.footer-main{grid-template-columns:1fr 1fr;gap:27px 16px}.footer-brand-column{grid-column:1/-1}.footer-link-column h3{font-size:13px}.footer-link-column a{font-size:11px}.footer-legal{gap:13px 18px}.site-footer .footline{gap:12px}.footer-legal>span{width:100%}}
 
 .legal-page{padding-top:70px;padding-bottom:80px;max-width:900px}.legal-page h1{font:700 clamp(38px,6vw,58px)/1.1 'Space Grotesk';margin:22px 0 8px}.legal-updated{color:var(--muted);font-size:13px;margin-bottom:38px}.legal-page section{padding:20px 0;border-top:1px solid var(--line)}.legal-page h2{font:700 19px 'Space Grotesk';margin:0 0 10px}.legal-page section p{color:var(--muted);line-height:1.85;font-size:14px;margin:0}.legal-contact{margin-top:30px;display:flex;gap:15px;flex-wrap:wrap}.legal-contact a{color:var(--cyan);font-weight:700}.legal-footer{border-top:1px solid var(--line);padding:22px max(22px,calc((100vw - 900px)/2));display:flex;justify-content:space-between;gap:14px;flex-wrap:wrap;color:var(--muted);font-size:12px}.legal-footer strong{color:var(--cyan)}.zenura-light-mode .legal-page section p{color:#52617a}.zenura-light-mode .legal-page h2{color:#1c2941}
+
+/* Sidebar is a direct body child so it is anchored to the viewport, not the sticky header. */
+body > nav#nav{position:fixed!important;inset:0 0 0 auto!important;right:0!important;left:auto!important;margin:0!important;transform:translateX(110%);}
+body > nav#nav.open{right:0!important;left:auto!important;transform:translateX(0)!important;}
