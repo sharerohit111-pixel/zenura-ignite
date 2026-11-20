@@ -178,10 +178,10 @@ jobs:
             ];
             const limitWorker = 'functions:processPendingPaperLimitOrders';
             const limitDeploy = scripts['deploy:limit-worker'] || '';
-            if (!deploy.startsWith('cd .. && firebase deploy --only ')) {
-              throw new Error('Firebase deploy script must use the explicit Indian-market-only allowlist.');
+            if (!deploy.startsWith('cd .. && test -n "$FIREBASE_STAGING_PROJECT_ID" && test "$FIREBASE_STAGING_PROJECT_ID" != "zenura-ignite-technologies" && firebase deploy --project "$FIREBASE_STAGING_PROJECT_ID" --only ')) {
+              throw new Error('OAuth deploy script must require an explicit non-production staging project and allowlist.');
             }
-            const targets = (deploy.split('--only ')[1] || '').split(',');
+            const targets = (deploy.split('--only ').pop() || '').split(',');
             if (targets.length !== required.length || targets.some(target => !/^functions:[A-Za-z0-9]+$/.test(target))) {
               throw new Error('Only the four OAuth Functions may be deployed by the default script.');
             }
