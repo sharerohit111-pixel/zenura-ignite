@@ -107,3 +107,18 @@ html.zenura-light-mode .cards article:hover,
 html.zenura-light-mode .cards a:hover{
   border-color:#d71920!important;
 }
+
+
+/* Light-mode sidebar, drawer, and settings contrast */
+html.zenura-light-mode .header nav#nav{background:linear-gradient(165deg,#fff,#f0f4fb)!important;border-left-color:#c9d5e6!important;box-shadow:-22px 0 60px #17233a26!important}
+html.zenura-light-mode .sidebar-heading{color:#17223b;border-color:#cbd6e8}
+html.zenura-light-mode .sidebar-heading button{background:#fff;color:#243451;border-color:#cbd6e8}
+html.zenura-light-mode .header nav#nav>a{color:#243451!important}
+html.zenura-light-mode .header nav#nav>a:hover,html.zenura-light-mode .header nav#nav>a:focus-visible{background:#feecec!important;color:#c51e24!important}
+html.zenura-light-mode .header .actions #menu{background:#fff;color:#c51e24;border-color:#d7192077;box-shadow:0 0 12px #d7192015}
+html.zenura-light-mode .header nav#nav .site-settings-toggle{color:#243451!important}
+html.zenura-light-mode .header nav#nav .site-settings-panel{background:#fff;border-color:#cbd6e8}
+html.zenura-light-mode .header nav#nav .settings-panel-heading,html.zenura-light-mode .header nav#nav .setting-row{color:#243451}
+html.zenura-light-mode .header nav#nav .setting-row select{background:#f4f6fb;color:#17223b;border-color:#cbd6e8}
+html.zenura-light-mode .header nav#nav .settings-panel-footer small{color:#64748b}
+html.zenura-light-mode .header nav#nav .admin-nav-link{color:#c51e24!important;border-color:#cbd6e8}
