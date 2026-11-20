@@ -271,7 +271,7 @@ service cloud.firestore {
         allow get: if request.auth != null && memberId == request.auth.uid
           && resource.data.uid == request.auth.uid;
         allow list: if request.auth != null && memberId == request.auth.uid
-          && resource.data.uid == request.auth.uid && resource.data.active == true;
+          && resource.data.uid == request.auth.uid;
         allow create: if request.auth != null && memberId == request.auth.uid
           && request.resource.data.keys().hasOnly(["uid", "role", "active", "permissions", "createdAt"])
           && request.resource.data.uid == request.auth.uid
