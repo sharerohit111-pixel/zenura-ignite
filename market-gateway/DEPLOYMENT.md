@@ -8,12 +8,16 @@ The checked-in .firebaserc default points to the production Firebase project zen
 2. Confirm that this ID is not zenura-ignite-technologies and that the project is not shared with the Crypto or production app.
 3. In the staging Firebase Console, enable **Google** and **Email/Password** sign-in and add only the staging website host to Authorized domains.
 4. Confirm the staging web app configuration, Firestore rules and required indexes are deliberately configured for that staging project. Do not change the checked-in production web configuration as part of staging setup.
-5. Authenticate the Firebase CLI, then deploy only the four OAuth connection Functions to the explicitly selected staging project:
+5. Authenticate the Firebase CLI, then create the four OAuth secrets in that same staging project and deploy only the four connection Functions. Every secret operation must explicitly target staging; never let the Firebase CLI select the `.firebaserc` production default:
 
 ```sh
 export FIREBASE_STAGING_PROJECT_ID=YOUR_VERIFIED_STAGING_PROJECT_ID
 test -n "$FIREBASE_STAGING_PROJECT_ID"
 test "$FIREBASE_STAGING_PROJECT_ID" != "zenura-ignite-technologies"
+firebase functions:secrets:set UPSTOX_CLIENT_ID --project "$FIREBASE_STAGING_PROJECT_ID"
+firebase functions:secrets:set UPSTOX_CLIENT_SECRET --project "$FIREBASE_STAGING_PROJECT_ID"
+firebase functions:secrets:set UPSTOX_REDIRECT_URI --project "$FIREBASE_STAGING_PROJECT_ID"
+firebase functions:secrets:set UPSTOX_TOKEN_ENCRYPTION_KEY --project "$FIREBASE_STAGING_PROJECT_ID"
 npm run --prefix functions deploy
 ```
 
@@ -35,21 +39,21 @@ firebase deploy --project "$FIREBASE_STAGING_PROJECT_ID" --only firestore:rules,
 
 ## 2. Upstox OAuth secrets
 
-Create a fresh 32-byte encryption key locally and store it only in Secret Manager:
+Create a fresh 32-byte encryption key locally and store it only in Secret Manager. For staging, every secret operation must explicitly target `FIREBASE_STAGING_PROJECT_ID`; do not use the production project or CLI default:
 
 ```sh
 openssl rand -base64 32
-firebase functions:secrets:set UPSTOX_CLIENT_ID
-firebase functions:secrets:set UPSTOX_CLIENT_SECRET
-firebase functions:secrets:set UPSTOX_REDIRECT_URI
-firebase functions:secrets:set UPSTOX_TOKEN_ENCRYPTION_KEY
+firebase functions:secrets:set UPSTOX_CLIENT_ID --project "$FIREBASE_STAGING_PROJECT_ID"
+firebase functions:secrets:set UPSTOX_CLIENT_SECRET --project "$FIREBASE_STAGING_PROJECT_ID"
+firebase functions:secrets:set UPSTOX_REDIRECT_URI --project "$FIREBASE_STAGING_PROJECT_ID"
+firebase functions:secrets:set UPSTOX_TOKEN_ENCRYPTION_KEY --project "$FIREBASE_STAGING_PROJECT_ID"
 ```
 
-Set `UPSTOX_REDIRECT_URI` to the exact deployed callback URL:
+Set the staging `UPSTOX_REDIRECT_URI` to the exact callback URL for the staging project (not production):
 
-`https://asia-south1-zenura-ignite-technologies.cloudfunctions.net/upstoxOAuthCallback`
+`https://asia-south1-${FIREBASE_STAGING_PROJECT_ID}.cloudfunctions.net/upstoxOAuthCallback`
 
-Register that exact URL in the Upstox Developer app. Use the same generated encryption key in the gateway's Secret Manager environment variable. Never commit the key or paste it into browser configuration.
+Register that exact staging URL in the staging Upstox Developer app. Use the same staging-only generated encryption key in the staging gateway's Secret Manager environment variable. Never reuse production OAuth credentials or encryption keys, commit a key, or paste it into browser configuration.
 
 ### Upstox token lifecycle
 
@@ -77,7 +81,28 @@ Deploy `market-gateway/` as a separate Cloud Run service with Node.js 22. Config
 
 After deployment, set the exact Cloud Run HTTPS URL in the `market-gateway-url` meta tag in `markets/stocks/index.html`. Do not point the frontend at a placeholder or unverified URL.
 
-### Reproducible Cloud Run deployment
+### Staging Cloud Run deployment (separate project only)
+
+After the staging Firebase project and staging-only secrets are verified, deploy the gateway with an explicit project flag. Replace the staging host and service-account placeholders with verified staging values. Do not run this against production.
+
+```sh
+: "${FIREBASE_STAGING_PROJECT_ID:?Set the verified staging project ID}"
+test "$FIREBASE_STAGING_PROJECT_ID" != "zenura-ignite-technologies"
+gcloud run deploy zenura-indian-market-gateway-staging \
+  --project "$FIREBASE_STAGING_PROJECT_ID" \
+  --source market-gateway \
+  --region asia-south1 \
+  --platform managed \
+  --allow-unauthenticated \
+  --service-account "YOUR_STAGING_GATEWAY_SERVICE_ACCOUNT@$FIREBASE_STAGING_PROJECT_ID.iam.gserviceaccount.com" \
+  --set-env-vars "ALLOWED_ORIGINS=https://YOUR_STAGING_WEB_HOST,INDIAN_PAPER_STARTING_CASH_PAISE=100000000,MAX_INSTRUMENT_KEYS=100" \
+  --set-secrets UPSTOX_TOKEN_ENCRYPTION_KEY=UPSTOX_TOKEN_ENCRYPTION_KEY:latest
+```
+
+The staging runtime service account must have only the required staging Firestore access and Secret Manager access. Confirm the named secret exists in the staging project and contains the staging encryption key. Verify the returned staging URL and `/health`; do not update the production frontend's gateway URL. Configure a separate staging frontend with the staging Firebase web configuration and exact staging gateway URL. No staging resource is assumed to exist until verified in Google Cloud.
+### Reproducible production Cloud Run deployment — NOT AUTHORIZED
+
+The following production commands are reference documentation only. Do not execute them as part of staging preparation or this PR's current approval.
 
 Run these commands from the repository root after replacing the service-account placeholder with a dedicated service account that has the required Firestore access and Secret Manager access. Do not grant project Owner or Editor.
 
