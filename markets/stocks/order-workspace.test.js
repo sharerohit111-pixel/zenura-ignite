@@ -28,6 +28,9 @@ test("MARKET remains on the existing market-order flow and LIMIT uses the verifi
   assert.match(source,/order_type:'LIMIT'/);
   assert.match(source,/limit_price_paise:limitPricePaise/);
   assert.match(source,/idempotency_key:pending\.key/);
+  assert.match(source,/localStorage\.getItem\(limitStorageKey\(uid\)\)/);
+  assert.match(source,/localStorage\.setItem\(limitStorageKey\(uid\), JSON\.stringify\(pending\)\)/);
+  assert.doesNotMatch(source,/sessionStorage\.(getItem|setItem|removeItem)\(limitStorageKey/);
   assert.match(gateway,/orderType==="LIMIT"/);
   assert.match(gateway,/placePendingLimitOrder/);
   assert.match(gateway,/Only MARKET and LIMIT paper orders are supported/);
