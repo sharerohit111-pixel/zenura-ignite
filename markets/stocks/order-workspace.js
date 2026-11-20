@@ -266,6 +266,7 @@
           : translate('LIMIT order was already cancelled; no active reservation remains.');
       showMessage(status, translate(resultMessage), 'success');
     } catch (error) {
+      if (connector.getUserId() !== uid) return;
       showMessage(status, error.message || translate('LIMIT order submission failed.'), 'error');
     } finally {
       limitSubmitting = false;
