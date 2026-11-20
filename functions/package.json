@@ -7,7 +7,8 @@
   },
   "scripts": {
     "emulate": "firebase emulators:start --only functions,firestore",
-    "deploy": "cd .. && firebase deploy --only functions:startUpstoxAuthorization,functions:upstoxOAuthCallback,functions:disconnectUpstoxAccount,functions:getIndianMarketConnectionStatus,functions:processPendingPaperLimitOrders"
+    "deploy": "cd .. && firebase deploy --only functions:startUpstoxAuthorization,functions:upstoxOAuthCallback,functions:disconnectUpstoxAccount,functions:getIndianMarketConnectionStatus",
+    "deploy:limit-worker": "cd .. && firebase deploy --only functions:processPendingPaperLimitOrders"
   },
   "dependencies": {
     "firebase-admin": "^13.0.0",
