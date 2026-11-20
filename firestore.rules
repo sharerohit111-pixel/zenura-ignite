@@ -107,6 +107,24 @@ service cloud.firestore {
       allow delete: if isZenuraAdmin();
     }
 
+
+    // Public engagement model settings: only the verified administrator may publish pricing and terms.
+    match /publicCatalog/commercialModels {
+      allow get, list: if resource.data.published == true || isZenuraAdmin();
+      allow create, update: if isZenuraAdmin()
+        && request.resource.data.keys().hasOnly(["models", "published", "updatedAt", "updatedBy"])
+        && request.resource.data.keys().hasAll(["models", "published", "updatedAt", "updatedBy"])
+        && request.resource.data.models is list
+        && request.resource.data.models.size() == 3
+        && request.resource.data.published is bool
+        && request.resource.data.updatedBy == request.auth.token.email
+        && request.resource.data.updatedAt == request.time
+        && request.resource.data.models[0].keys().hasOnly(["id", "title", "description", "priceLabel", "billingLabel", "features", "active"])
+        && request.resource.data.models[1].keys().hasOnly(["id", "title", "description", "priceLabel", "billingLabel", "features", "active"])
+        && request.resource.data.models[2].keys().hasOnly(["id", "title", "description", "priceLabel", "billingLabel", "features", "active"]);
+      allow delete: if isZenuraAdmin();
+    }
+
     match /enquiries/{enquiryId} {
       // Public website visitors may submit a validated enquiry only.
       allow create: if
