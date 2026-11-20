@@ -168,7 +168,7 @@
       if(!data.orders?.length&&!append)tableMessage(paperHistory,7,'No paper orders yet.');
       else data.orders.forEach(order=>{
         const tr=document.createElement('tr'),date=order.createdAt?new Date(order.createdAt).toLocaleString('en-IN'):'—';
-        [date,order.tradingSymbol,order.side,order.orderType||'MARKET',order.quantity,inrPaise(order.executionPricePaise),order.status+' · SIM'].forEach(v=>{const td=document.createElement('td');td.textContent=String(v);tr.append(td);});
+        [date,order.tradingSymbol,order.side,order.orderType||'MARKET',order.quantity,Number.isSafeInteger(order.executionPricePaise)?inrPaise(order.executionPricePaise):'—',order.status+' · SIM'].forEach(v=>{const td=document.createElement('td');td.textContent=String(v);tr.append(td);});
         paperHistory.append(tr);
       });
       paperHistoryCursor=data.nextCursor||null;
