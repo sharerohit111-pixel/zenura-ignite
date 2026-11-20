@@ -467,18 +467,21 @@ app.post("/paper/derivative/orders",async(req,res)=>{
 
 app.get("/paper/portfolio",async(req,res)=>{
   try{
-    const decoded=await authenticate(req),accountSnap=await paperAccountRef(decoded.uid).get();
+    const decoded=await authenticate(req),product=normalizeProductMode(req.query?.product);
+    if(product===null)return res.status(400).json({error:"product must be DELIVERY or INTRADAY."});
+    const accountSnap=await paperAccountRef(decoded.uid).get();
     if(!accountSnap.exists)return res.status(404).json({error:"Indian paper account has not been initialized."});
-    const account=accountSnap.data();
+    const account=accountSnap.data(),fields=require("./lib/product-mode").getProductPositionFieldNames(product);
     let allPositions;
-    try{allPositions=readStoredPaperPositions(account);}catch(error){return res.status(error.status||409).json({error:error.message});}
-    if(!Number.isSafeInteger(account.cashPaise)||account.cashPaise<0||!Number.isSafeInteger(account.realizedPnlPaise??0))return res.status(409).json({error:"Paper account contains invalid balance data."});
+    try{allPositions=readStoredPaperPositions(account,product);}catch(error){return res.status(error.status||409).json({error:error.message});}
+    const realizedPnlPaise=account[fields.realizedPnlField]===undefined?(product==="DELIVERY"?(account.realizedPnlPaise??0):0):account[fields.realizedPnlField];
+    if(!Number.isSafeInteger(account.cashPaise)||account.cashPaise<0||!Number.isSafeInteger(realizedPnlPaise))return res.status(409).json({error:"Paper account contains invalid balance data."});
     if(allPositions.some(([,p])=>!p||!Number.isSafeInteger(p.quantity)||p.quantity<0||p.quantity>1000000||!Number.isSafeInteger(p.averagePricePaise)||p.averagePricePaise<0||(p.quantity>0&&p.averagePricePaise<1)))return res.status(409).json({error:"Paper portfolio contains an invalid position; valuation stopped to protect account totals."});
     const positions=allPositions.filter(([,p])=>p.quantity>0);
     if(positions.length>50)return res.status(409).json({error:"Portfolio contains more than 50 open positions; contact support before refreshing valuation."});
     if(!positions.length){
       res.set("Cache-Control","private, no-store");
-      return res.json({positions:[],cashPaise:account.cashPaise,marketValuePaise:0,unrealizedPnlPaise:0,equityPaise:account.cashPaise,realizedPnlPaise:account.realizedPnlPaise||0,valuationStatus:"no_open_positions"});
+      return res.json({product,positions:[],cashPaise:account.cashPaise,marketValuePaise:0,unrealizedPnlPaise:0,equityPaise:account.cashPaise,realizedPnlPaise,valuationStatus:"no_open_positions",stalePositions:0,simulationOnly:true});
     }
     const connection=await db.collection("upstoxConnections").doc(decoded.uid).get();
     if(!connection.exists)return res.status(403).json({error:"Upstox account is not connected."});
@@ -490,9 +493,9 @@ app.get("/paper/portfolio",async(req,res)=>{
     const quotePayload=await readProviderJson(quoteResponse);
     if(!quoteResponse.ok)return res.status(502).json({error:"Portfolio market valuation could not be retrieved.",providerStatus:quoteResponse.status});
     const quotes=Object.values(quotePayload?.data||{});
-    const valuation=buildPortfolioValuation({positions,quotes,cashPaise:account.cashPaise,realizedPnlPaise:account.realizedPnlPaise??0,instruments:instrumentCache,now:Date.now(),maxAgeMs:60000});
+    const valuation=buildPortfolioValuation({positions,quotes,cashPaise:account.cashPaise,realizedPnlPaise,instruments:instrumentCache,now:Date.now(),maxAgeMs:60000});
     res.set("Cache-Control","private, no-store");
-    res.json(valuation);
+    res.json({...valuation,product});
   }catch(error){res.status(errorStatus(error)).json({error:error.status?error.message:"Portfolio valuation could not be loaded."});}
 });
 
@@ -575,7 +578,7 @@ app.get("/paper/orders",async(req,res)=>{
       query=query.startAfter(cursorSnap);
     }
     const snap=await query.limit(limit+1).get(),hasMore=snap.docs.length>limit,docs=snap.docs.slice(0,limit);
-    const orders=docs.map(doc=>{const order=doc.data();return {id:doc.id,tradingSymbol:order.tradingSymbol,exchange:order.exchange,side:order.side,quantity:order.quantity,executionPricePaise:order.executionPricePaise,limitPricePaise:order.limitPricePaise??null,grossPaise:order.grossPaise,realizedPnlPaise:order.realizedPnlPaise,orderType:order.orderType,status:order.status,simulationOnly:order.simulationOnly,createdAt:order.createdAt?.toMillis?.()||null};});
+    const orders=docs.map(doc=>{const order=doc.data();return {id:doc.id,tradingSymbol:order.tradingSymbol,exchange:order.exchange,side:order.side,quantity:order.quantity,product:normalizeProductMode(order.product)??"DELIVERY",executionPricePaise:order.executionPricePaise,limitPricePaise:order.limitPricePaise??null,grossPaise:order.grossPaise,realizedPnlPaise:order.realizedPnlPaise,orderType:order.orderType,status:order.status,simulationOnly:order.simulationOnly,createdAt:order.createdAt?.toMillis?.()||null};});
     res.set("Cache-Control","private, no-store");
     res.json({orders,hasMore,nextCursor:hasMore?docs[docs.length-1].id:null,simulationOnly:true});
   }catch(error){res.status(errorStatus(error)).json({error:error.status?error.message:"Paper order history could not be loaded."});}
