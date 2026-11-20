@@ -41,12 +41,13 @@ exports.kiranaListCustomers = onCall({region:REGION}, async req=>{
 });
 exports.kiranaRecordCreditPayment = onCall({region:REGION}, async req=>{
   const uid=requireUid(req), storeId=requiredText(req.data?.storeId,"Store"), customerId=requiredText(req.data?.customerId,"Customer");
-  await member(storeId,uid,["owner","manager","cashier"]);
   const amount=moneyAmount(req.data?.amount,"payment amount");
   const mode=["cash","upi","card","bank"].includes(req.data?.paymentMode)?req.data.paymentMode:"cash";
   const store=db.collection("kiranaStores").doc(storeId), customer=store.collection("customers").doc(customerId), payment=customer.collection("ledger").doc();
   await db.runTransaction(async tx=>{
-    const c=await tx.get(customer);
+    const memberRef=store.collection("members").doc(uid);
+    const [m,c]=await Promise.all([tx.get(memberRef),tx.get(customer)]);
+    if(!m.exists||m.data().active!==true||!["owner","manager","cashier"].includes(m.data().role)) throw new HttpsError("permission-denied","Store access denied.");
     if(!c.exists||c.data().active!==true) throw new HttpsError("not-found","Customer not found.");
     const balance=Number(c.data().creditBalance||0);
     if(amount>balance) throw new HttpsError("failed-precondition","Payment cannot exceed the outstanding balance.");
@@ -66,13 +67,14 @@ exports.kiranaGetCustomerLedger = onCall({region:REGION}, async req=>{
 
 exports.kiranaRecordCustomerCredit = onCall({region:REGION}, async req=>{
   const uid=requireUid(req), storeId=requiredText(req.data?.storeId,"Store"), customerId=requiredText(req.data?.customerId,"Customer");
-  await member(storeId,uid,["owner","manager","cashier"]);
   const amount=moneyAmount(req.data?.amount,"credit amount"), invoiceId=requiredText(req.data?.invoiceId,"Invoice reference",80);
   const safeInvoiceId=invoiceId.replace(/[^A-Za-z0-9_-]/g,"_");
   if(!safeInvoiceId || !/[A-Za-z0-9]/.test(safeInvoiceId)) throw new HttpsError("invalid-argument","Invoice reference must contain a letter or number.");
   const store=db.collection("kiranaStores").doc(storeId), customer=store.collection("customers").doc(customerId), entry=customer.collection("ledger").doc("sale_"+safeInvoiceId);
   await db.runTransaction(async tx=>{
-    const [c,e]=await Promise.all([tx.get(customer),tx.get(entry)]);
+    const memberRef=store.collection("members").doc(uid);
+    const [m,c,e]=await Promise.all([tx.get(memberRef),tx.get(customer),tx.get(entry)]);
+    if(!m.exists||m.data().active!==true||!["owner","manager","cashier"].includes(m.data().role)) throw new HttpsError("permission-denied","Store access denied.");
     if(!c.exists||c.data().active!==true) throw new HttpsError("not-found","Customer not found.");
     if(e.exists) throw new HttpsError("already-exists","This invoice is already recorded in the ledger.");
     tx.update(customer,{creditBalance:FieldValue.increment(amount),totalCredit:FieldValue.increment(amount),updatedAt:FieldValue.serverTimestamp()});
