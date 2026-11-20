@@ -130,7 +130,9 @@ jobs:
           const fs = require('node:fs');
           const schedule = fs.readFileSync('functions/indian-market.js', 'utf8');
           const worker = fs.readFileSync('functions/lib/pending-limit-order-worker.js', 'utf8');
+          const gate = fs.readFileSync('functions/lib/pending-limit-worker-gate.js', 'utf8');
           const tests = 'functions/test/pending-limit-order-worker.test.js';
+          const gateTests = 'functions/test/pending-limit-worker-gate.test.js';
           for (const token of [
             'exports.processPendingPaperLimitOrders',
             'onSchedule(',
@@ -149,7 +151,10 @@ jobs:
             if (!worker.includes(token)) throw new Error('LIMIT worker safety check missing: ' + token);
           }
           if (!fs.existsSync(tests)) throw new Error('Scheduled LIMIT worker tests are missing.');
-          console.log('Scheduled LIMIT worker wiring, quote freshness and tests are present.');
+          if (!schedule.includes('if(!isPendingLimitWorkerEnabled())')) throw new Error('Scheduled LIMIT worker must be disabled unless explicitly opted in.');
+          if (!gate.includes('ZENURA_ENABLE_PAPER_LIMIT_WORKER==="true"')) throw new Error('Scheduled LIMIT worker opt-in must require the exact true value.');
+          if (!fs.existsSync(gateTests)) throw new Error('Scheduled LIMIT worker opt-in regression tests are missing.');
+          console.log('Scheduled LIMIT worker wiring, quote freshness, disabled-by-default gate and tests are present.');
           NODE
       - name: Validate Firebase configuration and indexes
         run: |
