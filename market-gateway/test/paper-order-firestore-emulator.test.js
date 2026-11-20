@@ -613,3 +613,25 @@ integrationTest("Firestore emulator counts a closed legacy cash position as new 
   assert.equal(order.exists,false);
  }finally{await clean([accountRef,orderRef]);}
 });
+
+integrationTest("Firestore emulator rejects explicitly null account maps when placing LIMIT orders",async()=>{
+ for(const field of ["positions","reservedPositions"]){
+  const uid="limit-null-map-"+field+"-"+crypto.randomUUID();
+  const accountRef=db.collection("emulatorPaperAccounts").doc(uid);
+  const orderRef=db.collection("emulatorPaperOrders").doc(crypto.randomUUID());
+  const account={cashPaise:100000,reservedCashPaise:0,reservedMarginPaise:0,realizedPnlPaise:0,positions:{},reservedPositions:{},version:1};
+  account[field]=null;
+  await accountRef.set(account);
+  try{
+   await assert.rejects(placePendingLimitOrder({
+    db,accountRef,orderRef,uid,
+    order:{uid,requestFingerprint:crypto.randomUUID(),instrumentKey:"NSE_EQ|AAA",tradingSymbol:"AAA",exchange:"NSE",side:"BUY",quantity:1,orderType:"LIMIT",limitPricePaise:10000,status:"PENDING",simulationOnly:true},
+    serverTimestamp:()=>FieldValue.serverTimestamp()
+   }),/Paper account reservation state is invalid/);
+   const [storedAccount,storedOrder]=await Promise.all([accountRef.get(),orderRef.get()]);
+   assert.equal(storedAccount.data()[field],null);
+   assert.equal(storedAccount.data().reservedCashPaise,0);
+   assert.equal(storedOrder.exists,false);
+  }finally{await clean([accountRef,orderRef]);}
+ }
+});
