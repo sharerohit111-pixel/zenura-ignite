@@ -20,18 +20,22 @@ function harness(order,account,extraOrders=[]){
     const orderDocRef=ref(name+"/"+id);
     return {...orderDocRef,get:async()=>{const value=records.get(orderDocRef.path);return {id:orderDocRef.id,exists:value!==undefined,data:()=>structuredClone(value)};}};
    }};
-   let afterId=null,limitValue=50;
-   let query={where(){return this;},orderBy(){return this;},startAfter(snapshot){afterId=snapshot.id;return this;},limit(value){limitValue=value;return this;},get:async()=>{
-    const docs=[];
-    for(const [path,value] of records)if(path.startsWith("indianPaperOrders/")&&value.status==="PENDING"&&value.orderType==="LIMIT"){
-      const id=path.split("/").at(-1);
-      if(!afterId||id>afterId)docs.push({id,ref:ref(path),data:()=>structuredClone(value)});
+   const makeQuery=(afterId=null,limitValue=50)=>({
+    where(){return this;},orderBy(){return this;},
+    startAfter(snapshot){return makeQuery(snapshot.id,limitValue);},
+    limit(value){return makeQuery(afterId,value);},
+    get:async()=>{
+     const docs=[];
+     for(const [path,value] of records)if(path.startsWith("indianPaperOrders/")&&value.status==="PENDING"&&value.orderType==="LIMIT"){
+       const id=path.split("/").at(-1);
+       if(!afterId||id>afterId)docs.push({id,ref:ref(path),data:()=>structuredClone(value)});
+     }
+     docs.sort((a,b)=>a.id.localeCompare(b.id));
+     const page=docs.slice(0,limitValue);
+     return {docs:page,size:page.length,empty:page.length===0};
     }
-    docs.sort((a,b)=>a.id.localeCompare(b.id));
-    const page=docs.slice(0,limitValue);
-    return {docs:page,size:page.length,empty:page.length===0};
-   }};
-   return Object.assign(collectionRef,query);
+   });
+   return Object.assign(collectionRef,makeQuery());
   },
   runTransaction:async callback=>{
    const writes=[];
