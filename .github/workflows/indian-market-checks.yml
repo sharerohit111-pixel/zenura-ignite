@@ -111,6 +111,8 @@ jobs:
           NODE
       - name: Check browser module syntax
         run: node --check markets/stocks/stocks.js
+      - name: Check chart theme module syntax
+        run: node --check markets/stocks/chart-theme.js
       - name: Check SSE parser syntax
         run: node --check markets/stocks/sse-parser.js
       - name: Check email authentication module syntax
