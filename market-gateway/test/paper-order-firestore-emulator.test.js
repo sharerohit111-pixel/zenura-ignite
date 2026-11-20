@@ -412,3 +412,88 @@ integrationTest("Firestore emulator preserves concurrent updates to different wa
   assert.deepEqual(data.watchlists.Banking,["NSE_EQ|BANKA2"]);
  }finally{await ref.delete().catch(()=>{});}
 });
+
+
+integrationTest("Firestore emulator atomically reserves and fills a LIMIT BUY",async()=>{
+ const id=crypto.randomUUID(),uid="limit-buy-emulator-"+id;
+ const accountRef=db.collection("emulatorPaperAccounts").doc(uid);
+ const orderRef=db.collection("emulatorPaperOrders").doc("limit-buy-"+id);
+ const serverTimestamp=()=>FieldValue.serverTimestamp();
+ await accountRef.set({cashPaise:100000,reservedCashPaise:0,reservedMarginPaise:0,realizedPnlPaise:0,positions:{},reservedPositions:{},version:1});
+ try{
+  const placed=await placePendingLimitOrder({db,accountRef,orderRef,uid,order:{uid,instrumentKey:"NSE_EQ|AAA",tradingSymbol:"AAA",exchange:"NSE",side:"BUY",quantity:2,orderType:"LIMIT",limitPricePaise:10000,status:"PENDING",simulationOnly:true},serverTimestamp});
+  assert.equal(placed.status,"PENDING");
+  let account=(await accountRef.get()).data();
+  assert.equal(account.cashPaise,100000);
+  assert.equal(account.reservedCashPaise,20000);
+  assert.deepEqual(account.reservedPositions,{});
+  const filled=await executePendingLimitOrder({db,accountRef,orderRef,uid,quote:{pricePaise:9000,timestampMs:Date.now()-500},nowMs:Date.now(),serverTimestamp});
+  assert.equal(filled.status,"FILLED");
+  account=(await accountRef.get()).data();
+  assert.equal(account.cashPaise,82000);
+  assert.equal(account.reservedCashPaise,0);
+  assert.equal(account.positions["NSE_EQ|AAA"].quantity,2);
+  assert.equal((await orderRef.get()).data().reservationReleased,true);
+ }finally{await clean([accountRef,orderRef]);}
+});
+
+integrationTest("Firestore emulator atomically reserves and fills a LIMIT SELL",async()=>{
+ const id=crypto.randomUUID(),uid="limit-sell-emulator-"+id;
+ const accountRef=db.collection("emulatorPaperAccounts").doc(uid);
+ const orderRef=db.collection("emulatorPaperOrders").doc("limit-sell-"+id);
+ const serverTimestamp=()=>FieldValue.serverTimestamp();
+ await accountRef.set({cashPaise:100000,reservedCashPaise:0,reservedMarginPaise:0,realizedPnlPaise:0,positions:{"NSE_EQ|AAA":{quantity:5,averagePricePaise:8000}},reservedPositions:{},version:1});
+ try{
+  const placed=await placePendingLimitOrder({db,accountRef,orderRef,uid,order:{uid,instrumentKey:"NSE_EQ|AAA",tradingSymbol:"AAA",exchange:"NSE",side:"SELL",quantity:2,orderType:"LIMIT",limitPricePaise:10000,status:"PENDING",simulationOnly:true},serverTimestamp});
+  assert.equal(placed.reservedQuantity,2);
+  let account=(await accountRef.get()).data();
+  assert.deepEqual(account.reservedPositions,{"NSE_EQ|AAA":2});
+  const filled=await executePendingLimitOrder({db,accountRef,orderRef,uid,quote:{pricePaise:11000,timestampMs:Date.now()-500},nowMs:Date.now(),serverTimestamp});
+  assert.equal(filled.status,"FILLED");
+  account=(await accountRef.get()).data();
+  assert.equal(account.cashPaise,122000);
+  assert.equal(account.positions["NSE_EQ|AAA"].quantity,3);
+  assert.deepEqual(account.reservedPositions,{});
+  assert.equal((await orderRef.get()).data().reservationReleased,true);
+ }finally{await clean([accountRef,orderRef]);}
+});
+
+integrationTest("Firestore emulator leaves stale LIMIT quotes pending without changing reservations",async()=>{
+ const id=crypto.randomUUID(),uid="limit-stale-emulator-"+id;
+ const accountRef=db.collection("emulatorPaperAccounts").doc(uid);
+ const orderRef=db.collection("emulatorPaperOrders").doc("limit-stale-"+id);
+ const serverTimestamp=()=>FieldValue.serverTimestamp(),nowMs=Date.now();
+ await accountRef.set({cashPaise:100000,reservedCashPaise:0,reservedMarginPaise:0,realizedPnlPaise:0,positions:{},reservedPositions:{},version:1});
+ try{
+  await placePendingLimitOrder({db,accountRef,orderRef,uid,order:{uid,instrumentKey:"NSE_EQ|AAA",tradingSymbol:"AAA",exchange:"NSE",side:"BUY",quantity:2,orderType:"LIMIT",limitPricePaise:10000,status:"PENDING",simulationOnly:true},serverTimestamp});
+  const before=(await accountRef.get()).data();
+  const result=await executePendingLimitOrder({db,accountRef,orderRef,uid,quote:{pricePaise:9000,timestampMs:nowMs-16000},nowMs,serverTimestamp});
+  const [account,order]=await Promise.all([accountRef.get(),orderRef.get()]);
+  assert.equal(result.status,"PENDING");
+  assert.equal(result.notExecuted,true);
+  assert.equal(order.data().status,"PENDING");
+  assert.equal(account.data().cashPaise,before.cashPaise);
+  assert.equal(account.data().reservedCashPaise,before.reservedCashPaise);
+  assert.equal(account.data().positions["NSE_EQ|AAA"],undefined);
+ }finally{await clean([accountRef,orderRef]);}
+});
+
+integrationTest("Firestore emulator makes repeated LIMIT cancellation release reservations only once",async()=>{
+ const id=crypto.randomUUID(),uid="limit-cancel-emulator-"+id;
+ const accountRef=db.collection("emulatorPaperAccounts").doc(uid);
+ const orderRef=db.collection("emulatorPaperOrders").doc("limit-cancel-"+id);
+ const serverTimestamp=()=>FieldValue.serverTimestamp();
+ await accountRef.set({cashPaise:100000,reservedCashPaise:0,reservedMarginPaise:0,realizedPnlPaise:0,positions:{},reservedPositions:{},version:1});
+ try{
+  await placePendingLimitOrder({db,accountRef,orderRef,uid,order:{uid,instrumentKey:"NSE_EQ|AAA",tradingSymbol:"AAA",exchange:"NSE",side:"BUY",quantity:2,orderType:"LIMIT",limitPricePaise:10000,status:"PENDING",simulationOnly:true},serverTimestamp});
+  const first=await cancelPendingLimitOrder({db,accountRef,orderRef,uid,serverTimestamp});
+  const second=await cancelPendingLimitOrder({db,accountRef,orderRef,uid,serverTimestamp});
+  const [account,order]=await Promise.all([accountRef.get(),orderRef.get()]);
+  assert.equal(first.reservationReleased,true);
+  assert.equal(second.idempotentReplay,true);
+  assert.equal(account.data().cashPaise,100000);
+  assert.equal(account.data().reservedCashPaise,0);
+  assert.equal(order.data().status,"CANCELLED");
+  assert.equal(order.data().reservationReleased,true);
+ }finally{await clean([accountRef,orderRef]);}
+});
