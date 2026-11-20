@@ -58,6 +58,7 @@
     'PARTIALLY_FILLED':'आंशिक रूप से पूरा','FILLED':'पूरे हुए','REJECTED':'अस्वीकृत',
     'BUY':'खरीदें','SELL':'बेचें','Not available':'उपलब्ध नहीं',
     'No orders match this filter.':'इस फ़िल्टर में कोई ऑर्डर नहीं है।',
+    'No filled trades recorded yet.':'अभी तक कोई पूरा हुआ ट्रेड दर्ज नहीं है।',
     'Sign in to view private orders.':'निजी ऑर्डर देखने के लिए साइन इन करें।',
     'Select a verified NSE/BSE cash equity first.':'पहले सत्यापित NSE/BSE कैश इक्विटी चुनें।',
     'LIMIT orders are sent to your private paper account and reserve virtual cash or shares.':'LIMIT ऑर्डर आपके निजी पेपर अकाउंट में भेजे जाते हैं और वर्चुअल नकद या शेयर आरक्षित करते हैं।',
@@ -321,7 +322,7 @@
     const filled = currentOrders.filter(order => String(order.status).toUpperCase() === 'FILLED');
     if (!filled.length) {
       const tr = document.createElement('tr'), td = document.createElement('td');
-      td.colSpan = 6; td.textContent = translate('No orders match this filter.');
+      td.colSpan = 6; td.textContent = translate('No filled trades recorded yet.');
       tr.append(td); tradeBody.append(tr); return;
     }
     filled.forEach(order => {
