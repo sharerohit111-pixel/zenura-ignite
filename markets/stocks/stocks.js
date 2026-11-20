@@ -177,7 +177,7 @@
       if(paperHistoryStatus)paperHistoryStatus.textContent=paperHistoryHasMore?'Showing '+paperHistory.children.length+' orders':'All available orders loaded';
       paperHistoryMore.disabled=!paperHistoryHasMore;
     }catch(error){
-      if(seq===paperHistoryLoadSeq&&connector.getUserId()===uid){if(paperHistoryStatus)paperHistoryStatus.textContent='Could not load order history';if(!append)tableMessage(paperHistory,7,error.message||'Could not load order history.');}
+      if(seq===paperHistoryLoadSeq&&connector.getUserId()===uid){if(paperHistoryStatus)paperHistoryStatus.textContent='Could not load order history';if(!append)tableMessage(paperHistory,8,error.message||'Could not load order history.');}
     }finally{if(seq===paperHistoryLoadSeq&&connector.getUserId()===uid){paperHistoryLoading=false;paperHistoryMore.disabled=!paperHistoryHasMore;}}
   }
   paperHistoryMore?.addEventListener('click',()=>loadPaperHistory({append:true}));
