@@ -169,20 +169,25 @@ jobs:
               'functions:startUpstoxAuthorization',
               'functions:upstoxOAuthCallback',
               'functions:disconnectUpstoxAccount',
-              'functions:getIndianMarketConnectionStatus',
-              'functions:processPendingPaperLimitOrders'
+              'functions:getIndianMarketConnectionStatus'
             ];
+            const limitWorker = 'functions:processPendingPaperLimitOrders';
+            const limitDeploy = scripts['deploy:limit-worker'] || '';
             if (!deploy.startsWith('cd .. && firebase deploy --only ')) {
               throw new Error('Firebase deploy script must use the explicit Indian-market-only allowlist.');
             }
             const targets = (deploy.split('--only ')[1] || '').split(',');
             if (targets.length !== required.length || targets.some(target => !/^functions:[A-Za-z0-9]+$/.test(target))) {
-              throw new Error('Only the five explicit Indian-market Functions may be deployed by this script.');
+              throw new Error('Only the four OAuth Functions may be deployed by the default script.');
             }
             for (const target of required) {
               if (!targets.includes(target)) throw new Error('Missing deployment target: ' + target);
             }
-            console.log('Firebase deploy scope is restricted to the five Indian-market Functions.');
+            if (targets.includes(limitWorker)) throw new Error('Scheduled LIMIT worker must stay out of the default deploy script.');
+            if (!limitDeploy.includes('firebase deploy --only ' + limitWorker)) {
+              throw new Error('Scheduled LIMIT worker must have a separate explicit deploy script.');
+            }
+            console.log('Default Firebase deploy is restricted to four OAuth Functions; LIMIT worker deploy is separate.');
           "
       - name: Install Firebase Functions test dependencies
         run: npm install --prefix functions --ignore-scripts --no-audit --no-fund
