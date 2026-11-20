@@ -61,7 +61,18 @@ async function placePendingLimitOrder({db,accountRef,orderRef,uid,order,serverTi
   let result;
   await db.runTransaction(async tx=>{
     const [accountSnap,orderSnap]=await Promise.all([tx.get(accountRef),tx.get(orderRef)]);
-    if(orderSnap.exists)fail("LIMIT order idempotency key already exists.",409);
+    if(orderSnap.exists){
+      const prior=orderSnap.data();
+      if(prior?.uid!==uid||prior?.simulationOnly!==true||prior?.orderType!=="LIMIT")
+        fail("Stored LIMIT order does not belong to this account.",409);
+      if(typeof order.requestFingerprint!=="string"||!order.requestFingerprint||
+        prior.requestFingerprint!==order.requestFingerprint)
+        fail("Idempotency key was already used for a different LIMIT order.",409);
+      result={orderId:orderRef.id,status:prior.status,orderType:"LIMIT",side:prior.side,
+        reservedCashPaise:prior.reservedCashPaise??0,reservedQuantity:prior.reservedQuantity??0,
+        idempotentReplay:true};
+      return;
+    }
     if(!accountSnap.exists)fail("Paper account is not initialized.");
     const account=accountSnap.data(),state=accountState(account);
     const patch={updatedAt:serverTimestamp(),version:nextVersion(account)};
