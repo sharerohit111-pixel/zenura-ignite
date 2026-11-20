@@ -1,6 +1,8 @@
 name: Validate Mega Kirana Spark Backend
 
 on:
+  push:
+    branches: [feat/kirana-firestore-spark-backend]
   pull_request:
     branches: [main]
     paths:
