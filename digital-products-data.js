@@ -36,7 +36,7 @@ export const DEFAULT_DIGITAL_PRODUCTS = [
    "Practice environment without real-money trading"
   ],
   tags:["Paper Trading","Paper Investing","Virtual Portfolio","Market Charts","Analytics"],
-  websiteUrl:"",
+  websiteUrl:"https://sharerohit111-pixel.github.io/zenura-ignite/crypto/",
   visible:true
  },
  {
@@ -88,7 +88,7 @@ export const DEFAULT_DIGITAL_PRODUCTS = [
    "App Settings, Backup, Privacy and Install support"
   ],
   tags:["Railway Tools","Calculators","P-Way Engineering","Rules & Manuals","LDCE / GDCE Exam Prep"],
-  websiteUrl:"",
+  websiteUrl:"https://railwaymitra.com",
   visible:true
  }
 ];
