@@ -417,6 +417,7 @@
       await refreshAll();
       showMessage(ordersStatus, translate('Order cancelled and reservation released.'), 'success');
     } catch (error) {
+      if (connector.getUserId() !== uid) return;
       button.disabled = false;
       button.textContent = translate('Cancel');
       showMessage(ordersStatus, error.message || translate('Order cancellation failed.'), 'error');
