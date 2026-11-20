@@ -130,20 +130,7 @@ exports.getIndianMarketConnectionStatus = onCall(
   }
 );
 
-function decryptPendingUpstoxToken(envelope) {
-  if(!envelope||typeof envelope!=="object"||Array.isArray(envelope)||envelope.v!==1)
-    throw new Error("Invalid encrypted Upstox token envelope.");
-  const key=decodeUpstoxEncryptionKey(TOKEN_ENCRYPTION_KEY.value());
-  const decode=(value,length)=>{if(typeof value!=="string"||!value)throw new Error("Invalid encrypted token field.");const b=Buffer.from(value,"base64");if(b.toString("base64")!==value||(length&&b.length!==length))throw new Error("Invalid encrypted token field.");return b;};
-  const iv=decode(envelope.iv,12),tag=decode(envelope.tag,16),data=decode(envelope.data);
-  if(data.length<1||data.length>16384)throw new Error("Invalid encrypted token payload.");
-  const decipher=crypto.createDecipheriv("aes-256-gcm",key,iv);
-  decipher.setAuthTag(tag);
-  const plain=Buffer.concat([decipher.update(data),decipher.final()]);
-  const token=plain.toString("utf8");
-  if(!token.trim()||/[\\u0000-\\u001f\\u007f]/.test(token)||!Buffer.from(token,"utf8").equals(plain))throw new Error("Invalid decrypted Upstox token.");
-  return token;
-}
+const {decryptPendingUpstoxToken}=require("./lib/upstox-token-decrypt");
 function isIndianCashMarketOpen(nowMs) {
   const parts=new Intl.DateTimeFormat("en-GB",{timeZone:"Asia/Kolkata",weekday:"short",hour:"2-digit",minute:"2-digit",hourCycle:"h23"}).formatToParts(new Date(nowMs));
   const get=type=>parts.find(part=>part.type===type)?.value;
