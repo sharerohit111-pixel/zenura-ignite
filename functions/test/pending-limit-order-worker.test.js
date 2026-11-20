@@ -118,6 +118,20 @@ test("scheduled worker fills eligible fresh SELL limit order and releases reserv
  }finally{Date.now=oldNow;}
 });
 
+test("worker rejects inconsistent reserved share state without filling a SELL order",async()=>{
+ const sellOrder={...baseOrder,side:"SELL",reservedCashPaise:0,reservedQuantity:2};
+ const invalidAccount={...baseAccount,cashPaise:100000,positions:{"NSE_EQ|ABC":{quantity:3,averagePricePaise:8000,costBasisPaise:24000}},reservedCashPaise:0,reservedPositions:{"NSE_EQ|ABC":"2"}};
+ const h=harness(sellOrder,invalidAccount),oldNow=Date.now;Date.now=()=>now;
+ try{
+  const summary=await processPendingLimitOrders({db:h.db,fetchQuote:async()=>({pricePaise:11000,timestampMs:now-500}),nowMs:now,serverTimestamp:stamp});
+  assert.equal(summary.filled,0);
+  assert.equal(summary.failed,1);
+  assert.equal(h.records.get("indianPaperOrders/order-1").status,"PENDING");
+  assert.equal(h.records.get("indianPaperAccounts/user-1").reservedPositions["NSE_EQ|ABC"],"2");
+  assert.equal(h.records.get("indianPaperAccounts/user-1").positions["NSE_EQ|ABC"].quantity,3);
+ }finally{Date.now=oldNow;}
+});
+
 test("worker refuses to apply a quote after the order instrument changes",async()=>{
  const h=harness(baseOrder,baseAccount),oldNow=Date.now;Date.now=()=>now;
  try{
