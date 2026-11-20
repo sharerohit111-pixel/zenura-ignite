@@ -79,6 +79,22 @@ test("worker isolates a failed quote provider request and continues the batch",a
  assert.equal(h.records.get("indianPaperOrders/order-1").status,"PENDING");
 });
 
+test("failed quote request is retried after cursor wrap without releasing its reservation",async()=>{
+ const h=harness(baseOrder,baseAccount),oldNow=Date.now;Date.now=()=>now;
+ try{
+  const failed=await processPendingLimitOrders({db:h.db,fetchQuote:async()=>{throw new Error("temporary provider outage");},nowMs:now,serverTimestamp:stamp,maxOrders:1});
+  assert.equal(failed.failed,1);
+  assert.equal(h.records.get("indianPaperOrders/order-1").status,"PENDING");
+  assert.equal(h.records.get("indianPaperAccounts/user-1").reservedCashPaise,20000);
+  assert.equal(h.records.get("indianMarketWorkerState/pendingLimitOrders").cursorOrderId,"order-1");
+  const recovered=await processPendingLimitOrders({db:h.db,fetchQuote:async()=>({pricePaise:9500,timestampMs:now-500}),nowMs:now,serverTimestamp:stamp,maxOrders:1});
+  assert.equal(recovered.filled,1);
+  assert.equal(h.records.get("indianPaperOrders/order-1").status,"FILLED");
+  assert.equal(h.records.get("indianPaperAccounts/user-1").reservedCashPaise,0);
+  assert.equal(h.records.get("indianPaperAccounts/user-1").positions["NSE_EQ|ABC"].quantity,2);
+ }finally{Date.now=oldNow;}
+});
+
 test("worker does not execute orders outside pending paper LIMIT state",async()=>{
  const h=harness({...baseOrder,status:"CANCELLED"},baseAccount);
  const summary=await processPendingLimitOrders({db:h.db,fetchQuote:async()=>{throw new Error("must not fetch");},nowMs:now,serverTimestamp:stamp});
