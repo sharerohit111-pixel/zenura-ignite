@@ -50,6 +50,10 @@ test("LIMIT mode intercepts BUY/SELL before legacy MARKET handlers",()=>{
   assert.ok(source.includes("submitLimitOrder(index === 0 ? 'BUY' : 'SELL')"));
 });
 
+test("LIMIT submission errors do not overwrite another signed-in account's status",()=>{
+  assert.match(source,/catch \(error\) \{\s*if \(connector\.getUserId\(\) !== uid\) return;\s*showMessage\(status, error\.message \|\| translate\('LIMIT order submission failed\.'/);
+});
+
 test("Pending LIMIT cancellation calls the authenticated backend endpoint",()=>{
   assert.match(source,/\/paper\/orders\/' \+ encodeURIComponent\(orderId\) \+ '\/cancel/);
   assert.match(source,/data\.orderId !== orderId \|\| data\.status !== 'CANCELLED'/);
