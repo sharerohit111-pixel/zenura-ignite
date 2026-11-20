@@ -224,26 +224,19 @@ service cloud.firestore {
         && after.data.lastSaleId == saleId;
     }
     function kiranaValidSaleLines(storeId, saleId, data) {
-      return data.items is list && data.items.size() >= 1 && data.items.size() <= 4
+      return data.items is list && data.items.size() >= 1 && data.items.size() <= 3
         && data.stockChanges is map
         && data.stockChanges.size() == data.items.size()
         && kiranaValidSaleLine(storeId, saleId, data, 0)
         && (data.items.size() < 2 || kiranaValidSaleLine(storeId, saleId, data, 1))
         && (data.items.size() < 3 || kiranaValidSaleLine(storeId, saleId, data, 2))
-        && (data.items.size() < 4 || kiranaValidSaleLine(storeId, saleId, data, 3))
-        ;
+        && (data.items.size() < 3 || kiranaValidSaleLine(storeId, saleId, data, 2));
     }
     function kiranaValidSaleTotal(data) {
       return data.total == data.items[0].amount
         + (data.items.size() > 1 ? data.items[1].amount : 0)
         + (data.items.size() > 2 ? data.items[2].amount : 0)
-        + (data.items.size() > 3 ? data.items[3].amount : 0)
-        + (data.items.size() > 4 ? data.items[4].amount : 0)
-        + (data.items.size() > 5 ? data.items[5].amount : 0)
-        + (data.items.size() > 6 ? data.items[6].amount : 0)
-        + (data.items.size() > 7 ? data.items[7].amount : 0)
-        + (data.items.size() > 8 ? data.items[8].amount : 0)
-        + (data.items.size() > 9 ? data.items[9].amount : 0);
+        + (data.items.size() > 2 ? data.items[2].amount : 0);
     }
     function kiranaValidSaleCredit(storeId, saleId, data) {
       return data.paymentMode != "credit"
