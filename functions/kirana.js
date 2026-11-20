@@ -109,7 +109,7 @@ exports.kiranaCreateSale = onCall({ region: REGION, maxInstances: 30 }, async re
   const customerId = paymentMode === "credit" ? textValue(req.data?.customerId, "Customer") : "";
   const storeRef = db.collection("kiranaStores").doc(storeId);
   const saleRef = storeRef.collection("sales").doc();
-  const productRefs = [...new Set(normalized.map(x => storeRef.collection("products").doc(x.productId)))];
+  const productRefs = [...new Map(normalized.map(x => [x.productId, storeRef.collection("products").doc(x.productId)])).values()];
   let invoiceNo = "";
   let total = 0;
   await db.runTransaction(async tx => {
