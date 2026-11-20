@@ -52,11 +52,16 @@ async function executeLongOptionTransaction({
     }
     if(!accountSnap.exists)fail("Derivative paper account is not initialized.",409);
     const account=accountSnap.data();
+    const reservedCashPaise=account.reservedCashPaise===undefined?0:account.reservedCashPaise;
+    const reservedMarginPaise=account.reservedMarginPaise===undefined?0:account.reservedMarginPaise;
     if(!Number.isSafeInteger(account.cashPaise)||account.cashPaise<0||
        !Number.isSafeInteger(account.realizedPnlPaise??0)||
        !Number.isSafeInteger(account.version)||account.version<1||
        account.version>=Number.MAX_SAFE_INTEGER||
-       (account.reservedMarginPaise!==undefined&&account.reservedMarginPaise!==0))
+       !Number.isSafeInteger(reservedCashPaise)||reservedCashPaise<0||
+       !Number.isSafeInteger(reservedMarginPaise)||reservedMarginPaise<0||
+       reservedCashPaise+reservedMarginPaise>account.cashPaise||
+       reservedMarginPaise!==0)
       fail("Derivative paper account contains invalid or unsupported balance data.",409);
     if(account.derivativePositions!==undefined&&
        (!account.derivativePositions||typeof account.derivativePositions!=="object"||
@@ -139,8 +144,8 @@ async function executeLongOptionTransaction({
        !Number.isSafeInteger(orderRealizedPnlPaise))
       fail("Net realized option P&L or cost basis exceeds supported calculation limits.",409);
     const cashPaise=account.cashPaise+fill.cashDeltaPaise-charges.totalChargesPaise;
-    if(!Number.isSafeInteger(cashPaise)||cashPaise<0)
-      fail("Insufficient derivative paper cash for this option premium.",409);
+    if(!Number.isSafeInteger(cashPaise)||cashPaise<reservedCashPaise+reservedMarginPaise)
+      fail("Insufficient unreserved derivative paper cash for this option premium.",409);
     if(fill.netQuantity>0)derivativePositions[contract.instrumentKey]={
       instrumentType:contract.instrumentType,netQuantity:fill.netQuantity,
       averagePricePaise,costBasisPaise,exchange:contract.exchange,
