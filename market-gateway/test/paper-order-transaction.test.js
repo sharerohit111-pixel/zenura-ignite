@@ -212,3 +212,20 @@ test("rejects an existing order owned by a different account before replay",asyn
  await assert.rejects(executePaperOrderTransaction(common),{status:409});
  assert.equal(writes.length,0);
 });
+
+test("Intraday market fill persists only the Intraday holdings map and mode P&L",async()=>{
+ const initial={cashPaise:10000,realizedPnlPaise:125,positions:{"NSE_EQ|AAA":{quantity:2,averagePricePaise:1000}},reservedPositions:{},
+  intradayPositions:{},intradayReservedPositions:{},deliveryRealizedPnlPaise:125,intradayRealizedPnlPaise:0,version:3};
+ const {common,writes}=setup(undefined,initial);
+ common.order.product="INTRADAY";
+ common.order.side="BUY";common.order.quantity=2;common.pricePaise=500;
+ const result=await executePaperOrderTransaction(common);
+ assert.equal(writes.length,2);
+ assert.equal(writes[0][2].product,"INTRADAY");
+ assert.equal(writes[1][2].cashPaise,9000);
+ assert.equal(writes[1][2].intradayPositions["NSE_EQ|AAA"].quantity,2);
+ assert.deepEqual(writes[1][2].positions,initial.positions);
+ assert.equal(writes[1][2].intradayRealizedPnlPaise,0);
+ assert.equal(writes[1][2].realizedPnlPaise,125);
+ assert.equal(result.meta.cashPaise,9000);
+});
