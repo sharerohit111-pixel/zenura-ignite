@@ -217,6 +217,9 @@ service cloud.firestore {
         && before.exists() && after.exists()
         && before.data.active == true
         && before.data.stock >= line.quantity
+        && line.name == before.data.name
+        && line.sku == before.data.sku
+        && line.unit == before.data.unit
         && line.price == (line.priceType == "wholesale" ? before.data.wholesalePrice : before.data.retailPrice)
         && line.amount == math.round(line.quantity * line.price * 100) / 100
         && data.stockChanges[line.productId] == line.quantity
@@ -229,13 +232,11 @@ service cloud.firestore {
         && data.stockChanges.size() == data.items.size()
         && kiranaValidSaleLine(storeId, saleId, data, 0)
         && (data.items.size() < 2 || kiranaValidSaleLine(storeId, saleId, data, 1))
-        && (data.items.size() < 3 || kiranaValidSaleLine(storeId, saleId, data, 2))
         && (data.items.size() < 3 || kiranaValidSaleLine(storeId, saleId, data, 2));
     }
     function kiranaValidSaleTotal(data) {
       return data.total == data.items[0].amount
         + (data.items.size() > 1 ? data.items[1].amount : 0)
-        + (data.items.size() > 2 ? data.items[2].amount : 0)
         + (data.items.size() > 2 ? data.items[2].amount : 0);
     }
     function kiranaValidSaleCredit(storeId, saleId, data) {
