@@ -635,3 +635,24 @@ integrationTest("Firestore emulator rejects explicitly null account maps when pl
   }finally{await clean([accountRef,orderRef]);}
  }
 });
+
+integrationTest("Firestore emulator rejects malformed unrelated positions before reserving a LIMIT order",async()=>{
+ const uid="limit-bad-position-"+crypto.randomUUID();
+ const accountRef=db.collection("emulatorPaperAccounts").doc(uid);
+ const orderRef=db.collection("emulatorPaperOrders").doc(crypto.randomUUID());
+ await accountRef.set({
+  cashPaise:100000,reservedCashPaise:0,reservedMarginPaise:0,realizedPnlPaise:0,
+  positions:{"NSE_EQ|BROKEN":{quantity:2,averagePricePaise:0,costBasisPaise:0}},
+  reservedPositions:{},version:1
+ });
+ try{
+  await assert.rejects(placePendingLimitOrder({
+   db,accountRef,orderRef,uid,
+   order:{uid,requestFingerprint:crypto.randomUUID(),instrumentKey:"NSE_EQ|AAA",tradingSymbol:"AAA",exchange:"NSE",side:"BUY",quantity:1,orderType:"LIMIT",limitPricePaise:10000,status:"PENDING",simulationOnly:true},
+   serverTimestamp:()=>FieldValue.serverTimestamp()
+  }),/malformed cash-equity position|invalid cash-equity cost basis/);
+  const [storedAccount,storedOrder]=await Promise.all([accountRef.get(),orderRef.get()]);
+  assert.equal(storedAccount.data().reservedCashPaise,0);
+  assert.equal(storedOrder.exists,false);
+ }finally{await clean([accountRef,orderRef]);}
+});
