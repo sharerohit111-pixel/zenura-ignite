@@ -28,6 +28,31 @@ const stamp=()=>new Date("2026-11-20T10:00:00Z");
 const baseOrder=(side="BUY",patch={})=>({uid:"user-1",instrumentKey:"NSE_EQ|ABC",tradingSymbol:"ABC",exchange:"NSE",side,quantity:3,orderType:"LIMIT",limitPricePaise:10000,status:"PENDING",simulationOnly:true,...patch});
 const baseAccount=(patch={})=>({cashPaise:100000,realizedPnlPaise:0,positions:{},reservedCashPaise:0,reservedMarginPaise:0,reservedPositions:{},version:1,...patch});
 
+test("same LIMIT idempotency key replays the committed order without reserving twice",async()=>{
+ const fingerprint="limit-buy-abc-3-10000";
+ const order=baseOrder("BUY",{requestFingerprint:fingerprint});
+ const h=harness(baseAccount(),null);
+ const args={db:h.db,accountRef:h.accountRef,orderRef:h.orderRef,uid:"user-1",order,serverTimestamp:stamp};
+ const first=await placePendingLimitOrder(args);
+ assert.equal(first.status,"PENDING");
+ assert.equal(first.idempotentReplay,undefined);
+ const replay=await placePendingLimitOrder(args);
+ assert.equal(replay.idempotentReplay,true);
+ assert.equal(replay.orderId,first.orderId);
+ assert.equal(h.records.get("accounts/user-1").reservedCashPaise,30000);
+ assert.equal(h.records.get("accounts/user-1").version,2);
+});
+
+test("LIMIT idempotency key cannot replay a different order payload",async()=>{
+ const h=harness(baseAccount(),null);
+ const first=baseOrder("BUY",{requestFingerprint:"fingerprint-one"});
+ await placePendingLimitOrder({db:h.db,accountRef:h.accountRef,orderRef:h.orderRef,uid:"user-1",order:first,serverTimestamp:stamp});
+ const changed=baseOrder("BUY",{quantity:4,requestFingerprint:"fingerprint-two"});
+ await assert.rejects(placePendingLimitOrder({db:h.db,accountRef:h.accountRef,orderRef:h.orderRef,uid:"user-1",order:changed,serverTimestamp:stamp}),{status:409});
+ assert.equal(h.records.get("accounts/user-1").reservedCashPaise,30000);
+ assert.equal(h.records.get("accounts/user-1").version,2);
+});
+
 test("LIMIT BUY reserves virtual cash atomically and rejects overspending",async()=>{
  const h=harness(baseAccount(),null);
  const result=await placePendingLimitOrder({db:h.db,accountRef:h.accountRef,orderRef:h.orderRef,uid:"user-1",order:baseOrder(),serverTimestamp:stamp});
