@@ -42,6 +42,12 @@ test("MARKET remains on the existing market-order flow and LIMIT uses the verifi
   assert.match(gateway,/Only MARKET and LIMIT paper orders are supported/);
 });
 
+test("Uncertain LIMIT HTTP failures retain the idempotency key",()=>{
+  assert.match(source,/if \(\[400,401,403,404,422\]\.includes\(response\.status\)\) clearPendingLimit\(uid\)/);
+  assert.doesNotMatch(source,/response\.status >= 400 && response\.status < 500\) clearPendingLimit/);
+  assert.match(source,/timeout, conflict, rate-limit and server errors/);
+});
+
 test("LIMIT mode intercepts BUY/SELL before legacy MARKET handlers",()=>{
   assert.ok(source.includes("[buy, sell].forEach((button, index) => button.addEventListener('click'"));
   assert.ok(source.includes("if (selectedType !== 'LIMIT') return;"));
