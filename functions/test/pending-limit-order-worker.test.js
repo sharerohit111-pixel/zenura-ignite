@@ -118,6 +118,34 @@ test("scheduled worker fills eligible fresh SELL limit order and releases reserv
  }finally{Date.now=oldNow;}
 });
 
+test("worker refuses to apply a quote after the order instrument changes",async()=>{
+ const h=harness(baseOrder,baseAccount),oldNow=Date.now;Date.now=()=>now;
+ try{
+  const summary=await processPendingLimitOrders({db:h.db,fetchQuote:async()=>{
+   h.records.set("indianPaperOrders/order-1",{...baseOrder,instrumentKey:"NSE_EQ|XYZ"});
+   return {pricePaise:9500,timestampMs:now-500};
+  },nowMs:now,serverTimestamp:stamp});
+  assert.equal(summary.filled,0);
+  assert.equal(summary.notEligible,1);
+  assert.equal(h.records.get("indianPaperOrders/order-1").status,"PENDING");
+  assert.equal(h.records.get("indianPaperAccounts/user-1").reservedCashPaise,20000);
+ }finally{Date.now=oldNow;}
+});
+
+test("worker refuses to apply a quote after the order side or limit changes",async()=>{
+ const h=harness(baseOrder,baseAccount),oldNow=Date.now;Date.now=()=>now;
+ try{
+  const summary=await processPendingLimitOrders({db:h.db,fetchQuote:async()=>{
+   h.records.set("indianPaperOrders/order-1",{...baseOrder,side:"SELL",limitPricePaise:9000});
+   return {pricePaise:9500,timestampMs:now-500};
+  },nowMs:now,serverTimestamp:stamp});
+  assert.equal(summary.filled,0);
+  assert.equal(summary.notEligible,1);
+  assert.equal(h.records.get("indianPaperOrders/order-1").status,"PENDING");
+  assert.equal(h.records.get("indianPaperAccounts/user-1").reservedCashPaise,20000);
+ }finally{Date.now=oldNow;}
+});
+
 test("worker rejects future-dated quotes without releasing reservations",async()=>{
  const h=harness(baseOrder,baseAccount),oldNow=Date.now;Date.now=()=>now;
  try{
