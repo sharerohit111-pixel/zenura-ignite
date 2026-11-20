@@ -7,4 +7,4 @@ function render(models){if(!root)return;const visible=models.filter(m=>m.active!
  root.querySelectorAll("[data-commercial-model]").forEach(link=>link.addEventListener("click",()=>{const model=link.dataset.commercialModel;const form=document.getElementById("form");if(form){const details=form.elements.message;const line="Preferred engagement model: "+model;if(details&&!details.value.includes(line))details.value=(details.value?details.value+"\n":"")+line;const type=form.elements.projectType;if(type&&type.value==="")type.value="Other";}}));
 }
 async function load(){try{const snap=await getDoc(doc(db,"publicCatalog","commercialModels"));if(snap.exists()&&snap.data().published&&Array.isArray(snap.data().models))render(snap.data().models);else render(defaults)}catch(e){console.warn("Engagement models are using safe defaults.",e);render(defaults)}}
-load();
+render(defaults); // render usable fallback cards immediately, then refresh from Firebase\nload();\n
