@@ -16,6 +16,7 @@ const { isUsableUpstoxTokenResponse } = require("./lib/upstox-token-response");
 const { isUsableUpstoxOAuthCallback } = require("./lib/upstox-oauth-callback-input");
 const { decodeUpstoxEncryptionKey } = require("./lib/upstox-encryption-key");
 const { isVerifiedPasswordAccount } = require("./lib/upstox-email-verification");
+const { parseUpstoxV3Quote } = require("./lib/upstox-v3-quote");
 const db = getFirestore();
 const CLIENT_ID = defineSecret("UPSTOX_CLIENT_ID");
 const CLIENT_SECRET = defineSecret("UPSTOX_CLIENT_SECRET");
@@ -162,13 +163,8 @@ async function fetchFreshPendingLimitQuote(order) {
   const response=await fetch(url,{headers:{Authorization:"Bearer "+accessToken,Accept:"application/json"},signal:AbortSignal.timeout(12000)});
   const payload=await response.json().catch(()=>({}));
   if(!response.ok)throw new Error("Upstox quote request failed with status "+response.status+".");
-  const entry=Object.values(payload?.data||{}).find(value=>value?.instrument_token===order.instrumentKey);
-  const price=Number(entry?.last_price),timestampMs=Number(entry?.last_trade_time);
-  const pricePaise=Math.round(price*100),age=Date.now()-timestampMs;
-  if(!Number.isSafeInteger(timestampMs)||timestampMs<1||!Number.isFinite(price)||price<=0||
-    !Number.isSafeInteger(pricePaise)||pricePaise<1||age<0||age>15000)
-    throw new Error("Upstox quote is missing, stale, future-dated, or invalid.");
-  return {pricePaise,timestampMs};
+  return parseUpstoxV3Quote(payload,order.instrumentKey,Date.now());
+
 }
 exports.processPendingPaperLimitOrders = onSchedule(
   {schedule:"*/1 9-15 * * 1-5",timeZone:"Asia/Kolkata",region:REGION,secrets:[TOKEN_ENCRYPTION_KEY],maxInstances:1,concurrency:1,timeoutSeconds:540},
