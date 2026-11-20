@@ -37,7 +37,7 @@ jobs:
 
       - name: Validate Cloud Functions syntax
         working-directory: functions
-        run: npm run test:syntax
+        run: node --check index.js && node --check kirana.js && node --check kirana-ledger.js
 
       - name: Install Firebase CLI
         run: npm install --global firebase-tools
