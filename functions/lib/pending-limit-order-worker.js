@@ -98,6 +98,7 @@ async function execute({db,orderRef,order,quote,nowMs,serverTimestamp}){
   const accountRef=db.collection("indianPaperAccounts").doc(uid);
   let outcome="NOT_ELIGIBLE";
   await db.runTransaction(async tx=>{
+    outcome="NOT_ELIGIBLE";
     const [accountSnap,orderSnap]=await Promise.all([tx.get(accountRef),tx.get(orderRef)]);
     if(!orderSnap.exists||!accountSnap.exists)return;
     const currentOrder=orderSnap.data();
