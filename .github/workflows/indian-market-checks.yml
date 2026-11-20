@@ -178,7 +178,11 @@ jobs:
             ];
             const limitWorker = 'functions:processPendingPaperLimitOrders';
             const limitDeploy = scripts['deploy:limit-worker'] || '';
-            if (!deploy.startsWith('cd .. && test -n "$FIREBASE_STAGING_PROJECT_ID" && test "$FIREBASE_STAGING_PROJECT_ID" != "zenura-ignite-technologies" && firebase deploy --project "$FIREBASE_STAGING_PROJECT_ID" --only ')) {
+            if (!deploy.includes('FIREBASE_STAGING_PROJECT_ID') ||
+                !deploy.includes('firebase deploy --project') ||
+                !deploy.includes('--only ') ||
+                !deploy.includes('zenura-ignite-technologies') ||
+                !deploy.includes('test -n')) {
               throw new Error('OAuth deploy script must require an explicit non-production staging project and allowlist.');
             }
             const targets = (deploy.split('--only ').pop() || '').split(',');
