@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import test, { before, after, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { initializeTestEnvironment, assertSucceeds, assertFails } from "@firebase/rules-unit-testing";
-import { doc, setDoc, getDoc, writeBatch, serverTimestamp, collection, collectionGroup, query, where, getDocs } from "firebase/firestore";
+import { doc, setDoc, getDoc, writeBatch, serverTimestamp, collection, getDocs } from "firebase/firestore";
 
 let env;
 before(async()=>{
@@ -25,6 +25,7 @@ async function createOwnedStore(uid="owner-1") {
   batch.set(doc(db,"kiranaStores/store-1/members/"+uid),{
     uid,role:"owner",active:true,permissions:["products","billing","customers"],createdAt:serverTimestamp()
   });
+  batch.set(doc(db,"kiranaUsers/"+uid),{storeIds:["store-1"],updatedAt:serverTimestamp()});
   await assertSucceeds(batch.commit());
   return db;
 }
@@ -43,20 +44,14 @@ test("another signed-in user cannot read a store or its products",async()=>{
   await assertFails(getDoc(doc(other,"kiranaStores/store-1/products/p1")));
 });
 
-test("member collection-group lookup is UID-scoped and filters inactive memberships",async()=>{
+test("per-user store registry is private to its owner",async()=>{
   await createOwnedStore();
-  await env.withSecurityRulesDisabled(async context=>{
-    await setDoc(doc(context.firestore(),"kiranaStores/store-2/members/owner-1"),{
-      uid:"owner-1",role:"owner",active:false,createdAt:new Date()
-    });
-  });
   const db=env.authenticatedContext("owner-1").firestore();
-  const q=query(collectionGroup(db,"members"),where("uid","==","owner-1"),where("active","==",true));
-  const snap=await assertSucceeds(getDocs(q));
-  assert.equal(snap.size,1);
-  assert.equal(snap.docs[0].data().active,true);
+  const registry=await assertSucceeds(getDoc(doc(db,"kiranaUsers/owner-1")));
+  assert.deepEqual(registry.data().storeIds,["store-1"]);
   const other=env.authenticatedContext("intruder").firestore();
-  await assertFails(getDocs(query(collectionGroup(other,"members"),where("uid","==","owner-1"),where("active","==",true))));
+  await assertFails(getDoc(doc(other,"kiranaUsers/owner-1")));
+  await assertFails(setDoc(doc(other,"kiranaUsers/owner-1"),{storeIds:["store-1"],updatedAt:serverTimestamp()}));
 });
 
 test("owner can add a product but cannot directly edit stock",async()=>{
