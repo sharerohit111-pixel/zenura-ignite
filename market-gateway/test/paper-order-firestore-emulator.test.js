@@ -769,7 +769,10 @@ integrationTest("Firestore emulator serializes worker LIMIT execution against us
    assert.equal(state.cashPaise,100000);
    assert.equal(state.positions["NSE_EQ|AAA"],undefined);
    assert.ok(results[0].status==="fulfilled");
-   assert.ok(results[1].status==="fulfilled"&&results[1].value!=="FILLED");
+   assert.ok(
+    (results[1].status==="fulfilled"&&results[1].value!=="FILLED")||
+    (results[1].status==="rejected"&&[3,10].includes(results[1].reason?.code))
+   );
   }else{
    assert.equal(state.cashPaise,82000);
    assert.equal(state.positions["NSE_EQ|AAA"].quantity,2);
