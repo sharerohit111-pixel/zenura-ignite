@@ -33,7 +33,7 @@ jobs:
 
       - name: Install backend dependencies
         working-directory: functions
-        run: npm ci
+        run: npm install --no-audit --no-fund
 
       - name: Validate Cloud Functions syntax
         working-directory: functions
