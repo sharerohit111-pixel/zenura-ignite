@@ -187,7 +187,8 @@ jobs:
             if (!limitDeploy.includes('FIREBASE_STAGING_PROJECT_ID') ||
                 !limitDeploy.includes('firebase deploy --project') ||
                 !limitDeploy.includes('--only ' + limitWorker) ||
-                !limitDeploy.includes("p==='zenura-ignite-technologies'")) {
+                !limitDeploy.includes('zenura-ignite-technologies') ||
+                !limitDeploy.includes('throw new Error')) {
               throw new Error('LIMIT worker deploy must require an explicit non-production staging project.');
             }
             console.log('Default Firebase deploy is restricted to four OAuth Functions; LIMIT worker deploy requires an explicit non-production staging project.');
