@@ -411,7 +411,7 @@
       const data = await response.json().catch(() => ({}));
       if (connector.getUserId() !== uid) return;
       if (!response.ok) throw new Error(data.error || translate('Pending LIMIT order could not be cancelled.'));
-      if (data.status !== 'CANCELLED' || data.reservationReleased !== true && data.idempotentReplay !== true) {
+      if (data.orderId !== orderId || data.status !== 'CANCELLED' || data.reservationReleased !== true && data.idempotentReplay !== true) {
         throw new Error(translate('Cancellation response could not be verified. Refresh order history before retrying.'));
       }
       await refreshAll();
