@@ -31,4 +31,5 @@ function detail(found){if(!found)return;const {p,c}=found;modal('<div class="sol
  document.getElementById("request-solution").addEventListener("click",()=>{const form=document.getElementById("form");if(form){const message=form.elements.message;const line="I am interested in: "+p.name+" ("+c.name+"). Please share Silver/Golden plan and one-time/annual rental details.";if(message)message.value=(message.value?message.value+"\n":"")+line;const type=form.elements.projectType;if(type)type.value="Custom Software";}document.getElementById("contact")?.scrollIntoView({behavior:"smooth"});document.getElementById("solution-modal-backdrop")?.remove()});
 }
 async function load(){try{const snap=await getDoc(doc(db,"publicCatalog","businessSolutions"));if(snap.exists()&&snap.data().published&&Array.isArray(snap.data().categories))categories=migrateLegacyPricing(snap.data().categories);}catch(e){console.warn("Business catalogue is showing its built-in public fallback.",e)}render()}
-render(); // show built-in catalogue immediately; Firebase can refresh it after loading\nload();\n
+render(); // show built-in catalogue immediately; Firebase can refresh it after loading
+load();
