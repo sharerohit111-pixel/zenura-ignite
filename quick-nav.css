@@ -7,3 +7,8 @@
 @media(min-width:801px){.quick-nav{top:88px}.quick-nav-inner{justify-content:center}}
 @media(max-width:800px){.quick-nav{top:86px}.quick-nav-inner{padding:0 14px;gap:4px;min-height:44px}.quick-nav a{padding:6px 11px;font-size:10px}}
 @media(prefers-reduced-motion:reduce){.quick-nav a{transition:none}}
+
+.quick-share{flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:32px;padding:7px 14px;border:1px solid rgba(53,228,255,.5);border-radius:22px;color:#e9fbff;background:linear-gradient(100deg,rgba(53,228,255,.16),rgba(163,77,255,.18));font:700 11px 'DM Sans',sans-serif;white-space:nowrap;cursor:pointer;transition:background .2s,border-color .2s,box-shadow .2s}
+.quick-share svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.quick-share:hover,.quick-share:focus-visible{outline:none;border-color:#35e4ff;box-shadow:0 0 16px rgba(53,228,255,.22)}
+.quick-share:disabled{opacity:.65;cursor:wait}
