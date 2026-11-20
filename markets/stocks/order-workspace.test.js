@@ -63,7 +63,7 @@ test("Order and trade history use backend statuses, execution prices and cursor 
 
 test("Backend scheduled worker checks pending LIMIT orders every minute",()=>{
   assert.match(worker,/processPendingPaperLimitOrders/);
-  assert.match(worker,/schedule:"\\*\\/1 9-15 \\* \\* 1-5"/);
+  assert.ok(worker.includes('schedule:"*/1 9-15 * * 1-5"'));
   assert.match(worker,/isIndianCashMarketOpen\(now\)/);
   assert.match(worker,/processPendingLimitOrders/);
 });
