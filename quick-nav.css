@@ -20,3 +20,5 @@
 .account-user-name{display:inline-flex!important;align-items:center;max-width:190px;padding:8px 13px!important;margin:0 0 4px;border:1px solid rgba(53,228,255,.42);border-radius:12px;color:#65edff!important;background:rgba(53,228,255,.09);font-size:12px;font-weight:800;white-space:normal;overflow-wrap:anywhere}
 .account-user-name[hidden]{display:none!important}
 @media(max-width:800px){#nav .account-user-name{display:block!important;width:100%;max-width:none;margin:4px 0 8px;padding:10px 12px!important;border-radius:9px}}
+
+#nav .account-user-name[hidden]{display:none!important}
