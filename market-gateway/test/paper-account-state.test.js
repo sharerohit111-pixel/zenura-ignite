@@ -15,7 +15,7 @@ function makeDb(existing){
 
 test("normalizes a valid INR paper account with empty optional maps",()=>{
  const result=normalizePaperAccountState({currency:"INR",startingCashPaise:100000000,cashPaise:100000000});
- assert.deepEqual(result,{currency:"INR",startingCashPaise:100000000,cashPaise:100000000,positions:{},derivativePositions:{},reservedMarginPaise:0,reservedCashPaise:0,reservedPositions:{},realizedPnlPaise:0,updatedAt:null});
+ assert.deepEqual(result,{currency:"INR",startingCashPaise:100000000,cashPaise:100000000,positions:{},intradayPositions:{},derivativePositions:{},reservedMarginPaise:0,reservedCashPaise:0,reservedPositions:{},intradayReservedPositions:{},realizedPnlPaise:0,deliveryRealizedPnlPaise:0,intradayRealizedPnlPaise:0,updatedAt:null});
 });
 
 test("normalizes Firestore timestamp without exposing account internals",()=>{
@@ -43,7 +43,7 @@ test("initializes a missing account once with INR virtual cash and empty positio
  await ensurePaperAccount({db,ref:{id:"user-1"},startingCashPaise:100000000,serverTimestamp:()=>"server-time"});
  assert.equal(state.writes.length,1);
  assert.equal(state.writes[0][0],"create");
- assert.deepEqual(state.value,{currency:"INR",startingCashPaise:100000000,cashPaise:100000000,positions:{},derivativePositions:{},reservedMarginPaise:0,reservedCashPaise:0,reservedPositions:{},realizedPnlPaise:0,createdAt:"server-time",updatedAt:"server-time",version:1});
+ assert.deepEqual(state.value,{currency:"INR",startingCashPaise:100000000,cashPaise:100000000,positions:{},intradayPositions:{},derivativePositions:{},reservedMarginPaise:0,reservedCashPaise:0,reservedPositions:{},intradayReservedPositions:{},realizedPnlPaise:0,deliveryRealizedPnlPaise:0,intradayRealizedPnlPaise:0,createdAt:"server-time",updatedAt:"server-time",version:1});
 });
 
 test("does not reset an existing account balance or holdings",async()=>{
@@ -74,4 +74,16 @@ test("refuses to create an account without a valid configured virtual balance",a
 
 test("rejects incomplete transaction dependencies",async()=>{
  await assert.rejects(ensurePaperAccount({db:{},ref:{id:"user-1"},startingCashPaise:1000,serverTimestamp:()=>0}),TypeError);
+});
+
+test("normalizes and validates separate Intraday holdings and reservations",()=>{
+ const base={currency:"INR",startingCashPaise:10000,cashPaise:9000,positions:{"NSE_EQ|A":{quantity:2}},intradayPositions:{"NSE_EQ|A":{quantity:3}},
+  reservedPositions:{"NSE_EQ|A":1},intradayReservedPositions:{"NSE_EQ|A":2},realizedPnlPaise:50};
+ const result=normalizePaperAccountState(base);
+ assert.deepEqual(result.intradayPositions,base.intradayPositions);
+ assert.deepEqual(result.intradayReservedPositions,base.intradayReservedPositions);
+ assert.equal(result.deliveryRealizedPnlPaise,50);
+ assert.equal(result.intradayRealizedPnlPaise,0);
+ assert.equal(normalizePaperAccountState({...base,intradayReservedPositions:{"NSE_EQ|A":4}}),null);
+ assert.equal(normalizePaperAccountState({...base,intradayPositions:[]}),null);
 });
