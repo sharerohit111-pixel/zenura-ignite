@@ -87,3 +87,19 @@ test("responsive and bilingual UI states are present",()=>{
 test("order workspace JavaScript parses in the configured Node runtime",()=>{
   assert.doesNotThrow(()=>execFileSync(process.execPath,["--check",path.join(__dirname,"order-workspace.js")],{stdio:"pipe"}));
 });
+
+test("Hindi validation, retry-safety, submission and cancellation messages are translated",()=>{
+  const cases=[
+    ["Enter a whole-number quantity between 1 and 1,000,000.","1 से 1,000,000 के बीच पूर्ण संख्या में मात्रा दर्ज करें।"],
+    ["Enter a valid positive limit price (maximum 2 decimal places).","सही धनात्मक लिमिट कीमत दर्ज करें (अधिकतम 2 दशमलव स्थान)।"],
+    ["Saved LIMIT retry data is unreadable. No order was sent; resolve browser storage before placing another LIMIT order.","सहेजा गया LIMIT retry डेटा पढ़ा नहीं जा सका। कोई ऑर्डर नहीं भेजा गया; नया LIMIT ऑर्डर देने से पहले ब्राउज़र स्टोरेज ठीक करें।"],
+    ["LIMIT order submitted and reservation confirmed.","LIMIT ऑर्डर जमा हुआ और आरक्षण की पुष्टि हुई।"],
+    ["Pending LIMIT order could not be cancelled.","पेंडिंग LIMIT ऑर्डर रद्द नहीं हो सका।"],
+    ["Order cancellation failed.","ऑर्डर रद्द करने में विफलता हुई।"],
+    ["Order history unavailable.","ऑर्डर हिस्ट्री उपलब्ध नहीं है।"]
+  ];
+  for(const [english,hindi] of cases){
+    assert.ok(source.includes("'"+english+"':'"+hindi+"'"),"missing Hindi translation: "+english);
+    assert.ok(source.includes("translate('"+english+"')"),"message is not routed through translate(): "+english);
+  }
+});
