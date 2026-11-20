@@ -158,3 +158,6 @@ exports.authorizePaperOrder=onCall({region:"asia-south1"},async req=>{
 
 // Separate, tenant-isolated Mega Kirana backend module.
 Object.assign(exports, require("./kirana"));
+
+// Customer and credit-ledger services for Mega Kirana.
+Object.assign(exports, require('./kirana-ledger'));
