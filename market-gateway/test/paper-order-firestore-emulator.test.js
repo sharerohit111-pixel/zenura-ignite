@@ -656,3 +656,33 @@ integrationTest("Firestore emulator rejects malformed unrelated positions before
   assert.equal(storedOrder.exists,false);
  }finally{await clean([accountRef,orderRef]);}
 });
+
+integrationTest("Firestore emulator refuses to release mismatched LIMIT reservation metadata",async()=>{
+ const cases=[
+  {side:"BUY",quantity:2,limitPricePaise:10000,reservedCashPaise:10000,reservedQuantity:0,
+   cashPaise:100000,reservedAccountCash:10000,positions:{},reservedPositions:{}},
+  {side:"SELL",quantity:2,limitPricePaise:10000,reservedCashPaise:0,reservedQuantity:1,
+   cashPaise:100000,reservedAccountCash:0,positions:{"NSE_EQ|AAA":{quantity:3,averagePricePaise:8000,costBasisPaise:24000}},reservedPositions:{"NSE_EQ|AAA":1}}
+ ];
+ for(const item of cases){
+  const uid="limit-reservation-mismatch-"+crypto.randomUUID();
+  const accountRef=db.collection("emulatorPaperAccounts").doc(uid);
+  const orderRef=db.collection("emulatorPaperOrders").doc(crypto.randomUUID());
+  await accountRef.set({
+   cashPaise:item.cashPaise,reservedCashPaise:item.reservedAccountCash,reservedMarginPaise:0,
+   realizedPnlPaise:0,positions:item.positions,reservedPositions:item.reservedPositions,version:1
+  });
+  await orderRef.set({
+   uid,instrumentKey:"NSE_EQ|AAA",side:item.side,quantity:item.quantity,
+   orderType:"LIMIT",limitPricePaise:item.limitPricePaise,status:"PENDING",simulationOnly:true,
+   reservedCashPaise:item.reservedCashPaise,reservedQuantity:item.reservedQuantity
+  });
+  try{
+   await assert.rejects(cancelPendingLimitOrder({db,accountRef,orderRef,uid,serverTimestamp:()=>FieldValue.serverTimestamp()}),/reservation is missing or inconsistent/);
+   const [storedAccount,storedOrder]=await Promise.all([accountRef.get(),orderRef.get()]);
+   assert.equal(storedAccount.data().reservedCashPaise,item.reservedAccountCash);
+   assert.deepEqual(storedAccount.data().reservedPositions,item.reservedPositions);
+   assert.equal(storedOrder.data().status,"PENDING");
+  }finally{await clean([accountRef,orderRef]);}
+ }
+});
