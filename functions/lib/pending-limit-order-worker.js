@@ -65,7 +65,7 @@ function calculateFill(account,order,pricePaise){
   if(!Number.isSafeInteger(quantity)||quantity<0||!Number.isSafeInteger(average)||average<0||
     !Number.isSafeInteger(costBasis)||costBasis<0||(quantity>0&&(average<1||costBasis<1||Math.round(costBasis/quantity)!==average)))invalid("Existing paper position is invalid.");
   if(order.side==="BUY"){
-    if(!Object.prototype.hasOwnProperty.call(positions,order.instrumentKey)&&Object.values(positions).filter(position=>position?.quantity>0).length>=50)
+    if(!(positions[order.instrumentKey]?.quantity>0)&&Object.values(positions).filter(position=>position?.quantity>0).length>=50)
       invalid("Paper portfolio is limited to 50 open positions.");
     const reserve=order.reservedCashPaise;
     if(!Number.isSafeInteger(reserve)||reserve<grossPaise||reservedCashPaise<reserve)invalid("LIMIT BUY cash reservation is inconsistent.");
