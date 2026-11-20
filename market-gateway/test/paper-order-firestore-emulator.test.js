@@ -686,3 +686,49 @@ integrationTest("Firestore emulator refuses to release mismatched LIMIT reservat
   }finally{await clean([accountRef,orderRef]);}
  }
 });
+
+
+integrationTest("Firestore emulator refuses worker fills with mismatched LIMIT reservation metadata",async()=>{
+ const cases=[
+  {
+   side:"BUY",quantity:2,limitPricePaise:10000,reservedCashPaise:10000,reservedQuantity:0,
+   cashPaise:100000,reservedAccountCash:20000,
+   positions:{},reservedPositions:{},
+   expected:/LIMIT BUY cash reservation is inconsistent/
+  },
+  {
+   side:"SELL",quantity:2,limitPricePaise:10000,reservedCashPaise:0,reservedQuantity:1,
+   cashPaise:100000,reservedAccountCash:0,
+   positions:{"NSE_EQ|AAA":{quantity:5,averagePricePaise:8000,costBasisPaise:40000}},
+   reservedPositions:{"NSE_EQ|AAA":2},
+   expected:/LIMIT SELL share reservation is inconsistent/
+  }
+ ];
+ for(const item of cases){
+  const uid="worker-limit-reservation-mismatch-"+crypto.randomUUID();
+  const accountRef=db.collection("indianPaperAccounts").doc(uid);
+  const orderRef=db.collection("emulatorPaperOrders").doc("worker-limit-"+crypto.randomUUID());
+  const nowMs=Date.now(),quote={pricePaise:item.side==="BUY"?9500:10500,timestampMs:nowMs-500};
+  await accountRef.set({
+   cashPaise:item.cashPaise,reservedCashPaise:item.reservedAccountCash,reservedMarginPaise:0,
+   realizedPnlPaise:0,positions:item.positions,reservedPositions:item.reservedPositions,version:1
+  });
+  await orderRef.set({
+   uid,instrumentKey:"NSE_EQ|AAA",side:item.side,quantity:item.quantity,
+   orderType:"LIMIT",limitPricePaise:item.limitPricePaise,status:"PENDING",simulationOnly:true,
+   reservedCashPaise:item.reservedCashPaise,reservedQuantity:item.reservedQuantity
+  });
+  try{
+   const before=(await accountRef.get()).data();
+   const order=(await orderRef.get()).data();
+   await assert.rejects(
+    executePendingLimitOrderInWorker({db,orderRef,order,quote,nowMs,serverTimestamp:()=>FieldValue.serverTimestamp()}),
+    item.expected
+   );
+   const [after,storedOrder]=await Promise.all([accountRef.get(),orderRef.get()]);
+   assert.deepEqual(after.data(),before);
+   assert.equal(storedOrder.data().status,"PENDING");
+   assert.equal(storedOrder.data().reservationReleased,undefined);
+  }finally{await clean([accountRef,orderRef]);}
+ }
+});
