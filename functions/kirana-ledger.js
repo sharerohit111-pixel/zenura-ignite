@@ -57,3 +57,19 @@ exports.kiranaGetCustomerLedger = onCall({region:REGION}, async req=>{
   if(!c.exists) throw new HttpsError("not-found","Customer not found.");
   return {customer:{id:c.id,...c.data()},entries:entries.docs.map(d=>({id:d.id,...d.data()}))};
 });
+
+exports.kiranaRecordCustomerCredit = onCall({region:REGION}, async req=>{
+  const uid=requireUid(req), storeId=requiredText(req.data?.storeId,"Store"), customerId=requiredText(req.data?.customerId,"Customer");
+  await member(storeId,uid,["owner","manager","cashier"]);
+  const amount=Number(req.data?.amount), invoiceId=requiredText(req.data?.invoiceId,"Invoice reference",80);
+  if(!Number.isFinite(amount)||amount<=0||amount>10000000) throw new HttpsError("invalid-argument","Enter a valid credit amount.");
+  const store=db.collection("kiranaStores").doc(storeId), customer=store.collection("customers").doc(customerId), entry=customer.collection("ledger").doc("sale_"+invoiceId.replace(/[^A-Za-z0-9_-]/g,"_"));
+  await db.runTransaction(async tx=>{
+    const [c,e]=await Promise.all([tx.get(customer),tx.get(entry)]);
+    if(!c.exists||c.data().active!==true) throw new HttpsError("not-found","Customer not found.");
+    if(e.exists) throw new HttpsError("already-exists","This invoice is already recorded in the ledger.");
+    tx.update(customer,{creditBalance:FieldValue.increment(amount),totalCredit:FieldValue.increment(amount),updatedAt:FieldValue.serverTimestamp()});
+    tx.create(entry,{type:"credit_sale",amount,invoiceId,createdBy:uid,createdAt:FieldValue.serverTimestamp(),note:String(req.data?.note||"").slice(0,200)});
+  });
+  return {entryId:entry.id};
+});
