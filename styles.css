@@ -242,3 +242,104 @@ body > nav#nav.open{right:0!important;left:auto!important;transform:translateX(0
 @media(max-width:600px){
   .header{padding-left:15px!important;padding-right:15px!important}
 }
+
+
+/* Reference-matched right-side navigation drawer.
+   Keep the header visible; let the drawer occupy the space below it. */
+:root{--zenura-header-height:86px}
+.header{position:sticky!important;top:0!important;z-index:103!important}
+.header .actions #menu{justify-self:end!important}
+.sidebar-backdrop{
+  inset:var(--zenura-header-height) 0 0!important;
+  z-index:101!important;
+}
+body.sidebar-open{overflow:hidden!important}
+body>nav#nav{
+  position:fixed!important;
+  top:var(--zenura-header-height)!important;
+  right:0!important;
+  bottom:0!important;
+  left:auto!important;
+  width:min(440px,64vw)!important;
+  height:auto!important;
+  max-height:calc(100dvh - var(--zenura-header-height))!important;
+  min-height:0!important;
+  padding:18px 18px max(22px,env(safe-area-inset-bottom))!important;
+  display:flex!important;
+  flex-direction:column!important;
+  align-items:stretch!important;
+  gap:5px!important;
+  overflow-x:hidden!important;
+  overflow-y:auto!important;
+  -webkit-overflow-scrolling:touch!important;
+  overscroll-behavior-y:contain!important;
+  touch-action:pan-y!important;
+  background:linear-gradient(160deg,#111f3d 0%,#0b1530 100%)!important;
+  border:1px solid #426eaa!important;
+  border-right:0!important;
+  border-radius:22px 0 0 22px!important;
+  box-shadow:-18px 16px 55px #0009!important;
+  z-index:102!important;
+  transform:translateX(105%)!important;
+  visibility:hidden!important;
+  pointer-events:none!important;
+  transition:transform .28s ease,visibility .28s ease!important;
+}
+body>nav#nav.open{
+  display:flex!important;
+  transform:translateX(0)!important;
+  visibility:visible!important;
+  pointer-events:auto!important;
+}
+body>nav#nav .sidebar-heading{
+  position:sticky!important;
+  top:-18px!important;
+  z-index:4!important;
+  flex:0 0 auto!important;
+  min-height:54px!important;
+  margin:0 0 8px!important;
+  padding:8px 4px 13px!important;
+  background:linear-gradient(160deg,#111f3d 0%,#0d1932 100%)!important;
+  font-size:17px!important;
+}
+body>nav#nav>a{
+  flex:0 0 auto!important;
+  display:flex!important;
+  align-items:center!important;
+  width:100%!important;
+  min-height:55px!important;
+  padding:13px 14px!important;
+  border-radius:11px!important;
+  font-size:16px!important;
+  line-height:1.35!important;
+  white-space:normal!important;
+  overflow-wrap:anywhere!important;
+}
+body>nav#nav .account-user-name,
+body>nav#nav .account-nav-link,
+body>nav#nav .admin-nav-link{
+  min-height:52px!important;
+}
+body>nav#nav .site-settings-toggle{
+  flex:0 0 auto!important;
+  min-height:54px!important;
+  font-size:16px!important;
+}
+body>nav#nav .site-settings-panel{
+  flex:0 0 auto!important;
+  max-height:none!important;
+  height:auto!important;
+  overflow:visible!important;
+}
+@media(max-width:600px){
+  :root{--zenura-header-height:86px}
+  body>nav#nav{
+    width:min(440px,72vw)!important;
+    padding-left:16px!important;
+    padding-right:16px!important;
+  }
+  body>nav#nav>a{min-height:53px!important;font-size:15px!important}
+}
+@media(prefers-reduced-motion:reduce){
+  body>nav#nav,.sidebar-backdrop{transition:none!important}
+}
