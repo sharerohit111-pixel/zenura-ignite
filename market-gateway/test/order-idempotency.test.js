@@ -89,3 +89,20 @@ test("rejects malformed reserved cash and share reservations",()=>{
  for(const patch of [{reservedCashPaise:-1},{reservedCashPaise:10001},{reservedPositions:[]},{reservedPositions:{"NSE_EQ|AAA":1}}])
   assert.throws(()=>buildPaperOrderUpdate({...base,...patch},{instrumentKey:"NSE_EQ|AAA",side:"BUY",quantity:1,pricePaise:100}),{status:409});
 });
+
+test("closed legacy positions do not bypass the 50-open-position cap",()=>{
+ const positions=Object.fromEntries(Array.from({length:50},(_,i)=>[
+  `NSE_EQ|OPEN${i}`,{quantity:1,averagePricePaise:100,costBasisPaise:100}
+ ]));
+ positions["NSE_EQ|CLOSED"]={quantity:0,averagePricePaise:0,costBasisPaise:0};
+ assert.throws(()=>buildPaperOrderUpdate(
+  {cashPaise:100000,realizedPnlPaise:0,positions,version:1},
+  {instrumentKey:"NSE_EQ|CLOSED",side:"BUY",quantity:1,pricePaise:100}
+ ),{status:409});
+ const belowLimit={...positions};delete belowLimit["NSE_EQ|OPEN49"];
+ const result=buildPaperOrderUpdate(
+  {cashPaise:100000,realizedPnlPaise:0,positions:belowLimit,version:1},
+  {instrumentKey:"NSE_EQ|CLOSED",side:"BUY",quantity:1,pricePaise:100}
+ );
+ assert.equal(result.positions["NSE_EQ|CLOSED"].quantity,1);
+});
