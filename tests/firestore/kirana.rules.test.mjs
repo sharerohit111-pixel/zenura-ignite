@@ -43,12 +43,20 @@ test("another signed-in user cannot read a store or its products",async()=>{
   await assertFails(getDoc(doc(other,"kiranaStores/store-1/products/p1")));
 });
 
-test("member collection-group lookup returns only the caller's membership",async()=>{
+test("member collection-group lookup is UID-scoped and filters inactive memberships",async()=>{
   await createOwnedStore();
+  await env.withSecurityRulesDisabled(async context=>{
+    await setDoc(doc(context.firestore(),"kiranaStores/store-2/members/owner-1"),{
+      uid:"owner-1",role:"owner",active:false,createdAt:new Date()
+    });
+  });
   const db=env.authenticatedContext("owner-1").firestore();
-  const q=query(collectionGroup(db,"members"),where("uid","==","owner-1"),where("active","==",true));
+  const q=query(collectionGroup(db,"members"),where("uid","==","owner-1"));
   const snap=await assertSucceeds(getDocs(q));
-  assert.equal(snap.size,1);
+  assert.equal(snap.size,2);
+  assert.equal(snap.docs.filter(d=>d.data().active===true).length,1);
+  const other=env.authenticatedContext("intruder").firestore();
+  await assertFails(getDocs(query(collectionGroup(other,"members"),where("uid","==","owner-1"))));
 });
 
 test("owner can add a product but cannot directly edit stock",async()=>{
