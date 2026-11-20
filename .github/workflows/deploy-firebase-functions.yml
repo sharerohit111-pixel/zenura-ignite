@@ -7,7 +7,6 @@ on:
       - main
     paths:
       - "functions/**"
-      - "firebase.json"
       - ".github/workflows/deploy-firebase-functions.yml"
 
 permissions:
