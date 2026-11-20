@@ -54,3 +54,12 @@ test("rejects inconsistent exact cash-equity cost basis",()=>{
  const invalid=[["NSE_EQ|ABC",{quantity:2,averagePricePaise:101,costBasisPaise:199}]];
  assert.throws(()=>buildPortfolioValuation({positions:invalid,quotes:[],cashPaise:0,now}),/invalid cost basis/);
 });
+
+test("reads Delivery and Intraday holdings from isolated account maps",()=>{
+ const account={positions:{"NSE_EQ|DEL":{quantity:2,averagePricePaise:100}},intradayPositions:{"NSE_EQ|INTRA":{quantity:3,averagePricePaise:200}}};
+ assert.deepEqual(readStoredPaperPositions(account),[[ "NSE_EQ|DEL",account.positions["NSE_EQ|DEL"] ]]);
+ assert.deepEqual(readStoredPaperPositions(account,"DELIVERY"),[[ "NSE_EQ|DEL",account.positions["NSE_EQ|DEL"] ]]);
+ assert.deepEqual(readStoredPaperPositions(account,"INTRADAY"),[[ "NSE_EQ|INTRA",account.intradayPositions["NSE_EQ|INTRA"] ]]);
+ assert.throws(()=>readStoredPaperPositions(account,"intraday"),{status:400});
+ assert.throws(()=>readStoredPaperPositions({...account,intradayPositions:[]},"INTRADAY"),{status:409});
+});
