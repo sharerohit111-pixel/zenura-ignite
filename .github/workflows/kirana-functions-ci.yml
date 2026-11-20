@@ -27,4 +27,4 @@ jobs:
         run: npm install --package-lock=false --ignore-scripts
       - name: Check JavaScript syntax
         working-directory: functions
-        run: npm test
+        run: npm test && node --check ../kirana-app/kirana.js
