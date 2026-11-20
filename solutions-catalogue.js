@@ -15,7 +15,7 @@ const PRODUCT_IMAGES = {
  "school": "https://cdnbbsr.s3waas.gov.in/s3kv022d8f5be5f02d39ca6a6e1b5f720b/uploads/2024/03/2026061859.png"
 };
 let categories=clone(DEFAULT_SOLUTIONS),active="all";
-function migrateLegacyPricing(saved){const defaults=new Map(DEFAULT_SOLUTIONS.flatMap(c=>c.products.map(p=>[p.id,p])));return saved.map(c=>({...c,products:(c.products||[]).map(p=>{const d=defaults.get(p.id);if(!d)return p;const next={...p};for(const key of ["silver","gold"]){const old=next[key]||{},base=d[key]||{};next[key]={...base,...old,oneTimePrice:old.oneTimePrice??old.price??base.oneTimePrice??0,annualPrice:old.annualPrice??base.annualPrice??0};}return next;})}));}
+function migrateLegacyPricing(saved){const defaults=new Map(DEFAULT_SOLUTIONS.flatMap(c=>c.products.map(p=>[p.id,p])));return saved.map(c=>({...c,products:(c.products||[]).map(p=>{const d=defaults.get(p.id);if(!d)return p;const next={...p};for(const key of ["silver","gold"]){const old=next[key]||{},base=d[key]||{};next[key]={...base,...old,oneTimePrice:old.oneTimePrice??base.oneTimePrice??old.price??0,annualPrice:old.annualPrice??base.annualPrice??0};}return next;})}));}
 function render(){
  const visible=categories.filter(c=>c.products?.some(p=>p.visible!==false));
  root.innerHTML='<div class="catalogue-toolbar"><div class="catalogue-filters"><button class="catalogue-filter '+(active==="all"?"active":"")+'" data-cat="all">All sectors</button>'+visible.map(c=>'<button class="catalogue-filter '+(active===c.id?"active":"")+'" data-cat="'+esc(c.id)+'">'+esc(c.name)+'</button>').join("")+'</div></div>'+
