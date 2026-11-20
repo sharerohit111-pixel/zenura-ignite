@@ -1,6 +1,7 @@
 (() => {
-  const button = document.getElementById('website-share');
-  if (!button) return;
+  const buttons = Array.from(document.querySelectorAll('#website-share, #footer-share'));
+  if (!buttons.length) return;
+  buttons.forEach(button => {
   const originalLabel = button.querySelector('span:last-child')?.textContent || 'Share';
   const label = button.querySelector('span:last-child');
   const setLabel = (value) => { if (label) label.textContent = value; };
@@ -50,5 +51,6 @@
         window.setTimeout(() => setLabel(originalLabel), 2200);
       }
     }
+  });
   });
 })();
