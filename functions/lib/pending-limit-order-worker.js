@@ -137,7 +137,10 @@ async function processPendingLimitOrders({db,fetchQuote,nowMs=Date.now(),serverT
       const order=doc.data();
       try{
         const quote=await fetchQuote(order);
-        const result=await execute({db,orderRef:doc.ref,order,quote,nowMs,serverTimestamp});
+        // Quotes are fetched after the scan starts; validate against the post-fetch clock,
+        // otherwise a fresh trade timestamp newer than the scan start is rejected as future-dated.
+        const quoteNowMs=Math.max(nowMs,Date.now());
+        const result=await execute({db,orderRef:doc.ref,order,quote,nowMs:quoteNowMs,serverTimestamp});
         if(result==="FILLED")summary.filled++;
         else if(result==="ALREADY_FILLED")summary.alreadyFilled++;
         else summary.notEligible++;
