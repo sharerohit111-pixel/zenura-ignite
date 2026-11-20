@@ -1,0 +1,30 @@
+/* Mobile scroll stability: prevent Android overscroll from exposing a white canvas.
+   Keep the existing gradients, theme classes and native touch scrolling intact. */
+html{
+  min-height:100%;
+  background-color:#070b19!important;
+  overscroll-behavior-y:none;
+  -webkit-tap-highlight-color:transparent;
+}
+body{
+  min-height:100%;
+  background-color:#070b19!important;
+  overscroll-behavior-y:none;
+  -webkit-overflow-scrolling:touch;
+}
+/* Keep the page's native finger scrolling; avoid extra scripted easing on phones. */
+@media (max-width:800px){
+  html{scroll-behavior:auto!important}
+  body{
+    overflow-x:hidden!important;
+    overscroll-behavior-x:none;
+  }
+  /* Reduce expensive repaint work while scrolling without removing the visual theme. */
+  .header{
+    -webkit-backdrop-filter:none;
+    backdrop-filter:none;
+  }
+}
+@media (prefers-reduced-motion:reduce){
+  html{scroll-behavior:auto!important}
+}
