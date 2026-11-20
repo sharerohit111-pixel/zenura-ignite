@@ -5,6 +5,7 @@ const assert=require("node:assert/strict");
 const {Firestore,FieldValue}=require("@google-cloud/firestore");
 const {executePaperOrderTransaction}=require("../lib/paper-order-transaction");
 const {placePendingLimitOrder,cancelPendingLimitOrder,executePendingLimitOrder}=require("../lib/pending-limit-order-transaction");
+const {executePendingLimitOrderInWorker}=require("../../functions/lib/pending-limit-order-worker");
 const {consumeMarginPreviewSlot}=require("../lib/margin-preview-rate-limit");
 const {mergeWatchlistUpdate}=require("../lib/watchlists");
 
@@ -495,5 +496,57 @@ integrationTest("Firestore emulator makes repeated LIMIT cancellation release re
   assert.equal(account.data().reservedCashPaise,0);
   assert.equal(order.data().status,"CANCELLED");
   assert.equal(order.data().reservationReleased,true);
+ }finally{await clean([accountRef,orderRef]);}
+});
+
+
+integrationTest("Firestore emulator serializes duplicate scheduled-worker executions into one LIMIT fill",async()=>{
+ const id=crypto.randomUUID(),uid="worker-limit-duplicate-"+id;
+ const accountRef=db.collection("indianPaperAccounts").doc(uid);
+ const orderRef=db.collection("emulatorPaperOrders").doc("worker-limit-"+id);
+ const nowMs=Date.now(),quote={pricePaise:9500,timestampMs:nowMs-500};
+ await accountRef.set({cashPaise:100000,reservedCashPaise:20000,reservedMarginPaise:0,realizedPnlPaise:0,positions:{},reservedPositions:{},version:1});
+ await orderRef.set({uid,instrumentKey:"NSE_EQ|AAA",side:"BUY",quantity:2,orderType:"LIMIT",limitPricePaise:10000,status:"PENDING",simulationOnly:true,reservedCashPaise:20000,reservedQuantity:0});
+ try{
+  const results=await Promise.all([
+   executePendingLimitOrderInWorker({db,orderRef,order:(await orderRef.get()).data(),quote,nowMs,serverTimestamp:()=>FieldValue.serverTimestamp()}),
+   executePendingLimitOrderInWorker({db,orderRef,order:(await orderRef.get()).data(),quote,nowMs,serverTimestamp:()=>FieldValue.serverTimestamp()})
+  ]);
+  const [account,order]=await Promise.all([accountRef.get(),orderRef.get()]);
+  assert.equal(order.data().status,"FILLED");
+  assert.equal(results.filter(value=>value==="FILLED").length,1);
+  assert.equal(results.filter(value=>value==="ALREADY_FILLED").length,1);
+  assert.equal(account.data().cashPaise,81000);
+  assert.equal(account.data().reservedCashPaise,0);
+  assert.equal(account.data().positions["NSE_EQ|AAA"].quantity,2);
+ }finally{await clean([accountRef,orderRef]);}
+});
+
+integrationTest("Firestore emulator serializes scheduled-worker fill against LIMIT cancellation",async()=>{
+ const id=crypto.randomUUID(),uid="worker-limit-cancel-"+id;
+ const accountRef=db.collection("indianPaperAccounts").doc(uid);
+ const orderRef=db.collection("emulatorPaperOrders").doc("worker-limit-cancel-"+id);
+ const serverTimestamp=()=>FieldValue.serverTimestamp(),nowMs=Date.now();
+ const quote={pricePaise:9500,timestampMs:nowMs-500};
+ await accountRef.set({cashPaise:100000,reservedCashPaise:20000,reservedMarginPaise:0,realizedPnlPaise:0,positions:{},reservedPositions:{},version:1});
+ await orderRef.set({uid,instrumentKey:"NSE_EQ|AAA",side:"BUY",quantity:2,orderType:"LIMIT",limitPricePaise:10000,status:"PENDING",simulationOnly:true,reservedCashPaise:20000,reservedQuantity:0});
+ try{
+  const results=await Promise.allSettled([
+   cancelPendingLimitOrder({db,accountRef,orderRef,uid,serverTimestamp}),
+   executePendingLimitOrderInWorker({db,orderRef,order:(await orderRef.get()).data(),quote,nowMs,serverTimestamp})
+  ]);
+  const [account,order]=await Promise.all([accountRef.get(),orderRef.get()]);
+  const stored=order.data(),state=account.data();
+  assert.ok(["CANCELLED","FILLED"].includes(stored.status));
+  assert.equal(state.reservedCashPaise,0);
+  if(stored.status==="CANCELLED"){
+   assert.equal(state.cashPaise,100000);
+   assert.equal(state.positions["NSE_EQ|AAA"],undefined);
+   assert.ok(results.some(result=>result.status==="fulfilled"&&result.value?.status==="CANCELLED"));
+  }else{
+   assert.equal(state.cashPaise,81000);
+   assert.equal(state.positions["NSE_EQ|AAA"].quantity,2);
+   assert.ok(results.some(result=>result.status==="fulfilled"&&result.value==="FILLED"));
+  }
  }finally{await clean([accountRef,orderRef]);}
 });
