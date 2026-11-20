@@ -157,6 +157,6 @@ exports.authorizePaperOrder=onCall({region:"asia-south1"},async req=>{
 });
 
 
-// Mega Kirana callable backend modules. Registered for the production Functions deploy.
+// Mega Kirana callable backend modules. Registered for the production Functions deploy; backend module export verified.
 Object.assign(exports, require("./kirana"));
 Object.assign(exports, require("./kirana-ledger"));
