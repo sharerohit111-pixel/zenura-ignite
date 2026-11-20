@@ -29,7 +29,6 @@ integrationTest("Firestore emulator serializes concurrent LIMIT cancellation and
  const accountRef=db.collection("emulatorPaperAccounts").doc(uid);
  const orderRef=db.collection("emulatorPaperOrders").doc("limit-"+id);
  const serverTimestamp=()=>FieldValue.serverTimestamp();
- const nowMs=Date.now();
  await accountRef.set({cashPaise:100000,reservedCashPaise:0,reservedMarginPaise:0,realizedPnlPaise:0,positions:{},reservedPositions:{},version:1});
  try{
   await placePendingLimitOrder({
@@ -37,6 +36,7 @@ integrationTest("Firestore emulator serializes concurrent LIMIT cancellation and
    order:{uid,instrumentKey:"NSE_EQ|AAA",tradingSymbol:"AAA",exchange:"NSE",side:"BUY",quantity:2,orderType:"LIMIT",limitPricePaise:10000,status:"PENDING",simulationOnly:true},
    serverTimestamp
   });
+  const nowMs=Date.now();
   const quote={pricePaise:9000,timestampMs:nowMs-500};
   const results=await Promise.allSettled([
    cancelPendingLimitOrder({db,accountRef,orderRef,uid,serverTimestamp}),
