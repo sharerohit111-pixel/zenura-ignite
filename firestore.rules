@@ -181,5 +181,217 @@ service cloud.firestore {
         && request.resource.data.createdAt == request.time;
       allow read, update, delete: if isZenuraAdmin();
     }
+
+    // Mega Kirana — Spark-plan Firestore backend.
+    function kiranaMemberPath(storeId, uid) {
+      return /databases/$(database)/documents/kiranaStores/$(storeId)/members/$(uid);
+    }
+    function kiranaIsMember(storeId) {
+      return request.auth != null
+        && exists(kiranaMemberPath(storeId, request.auth.uid))
+        && get(kiranaMemberPath(storeId, request.auth.uid)).data.uid == request.auth.uid
+        && get(kiranaMemberPath(storeId, request.auth.uid)).data.active == true;
+    }
+    function kiranaHasRole(storeId, roles) {
+      return kiranaIsMember(storeId)
+        && get(kiranaMemberPath(storeId, request.auth.uid)).data.role in roles;
+    }
+    function kiranaProductPath(storeId, productId) {
+      return /databases/$(database)/documents/kiranaStores/$(storeId)/products/$(productId);
+    }
+    function kiranaCustomerPath(storeId, customerId) {
+      return /databases/$(database)/documents/kiranaStores/$(storeId)/customers/$(customerId);
+    }
+    function kiranaLedgerPath(storeId, customerId, entryId) {
+      return /databases/$(database)/documents/kiranaStores/$(storeId)/customers/$(customerId)/ledger/$(entryId);
+    }
+    function kiranaValidSaleLine(storeId, saleId, data, index) {
+      let line = data.items[index];
+      let before = get(kiranaProductPath(storeId, line.productId));
+      let after = getAfter(kiranaProductPath(storeId, line.productId));
+      return line.keys().hasOnly(["productId", "name", "sku", "unit", "quantity", "price", "priceType", "amount"])
+        && line.keys().hasAll(["productId", "name", "quantity", "price", "priceType", "amount"])
+        && line.productId is string
+        && line.quantity is number && line.quantity > 0
+        && line.priceType in ["retail", "wholesale"]
+        && exists(kiranaProductPath(storeId, line.productId)) && existsAfter(kiranaProductPath(storeId, line.productId))
+        && before.data.active == true
+        && before.data.stock >= line.quantity
+        && line.name == before.data.name
+        && line.sku == before.data.sku
+        && line.unit == before.data.unit
+        && line.price == (line.priceType == "wholesale" ? before.data.wholesalePrice : before.data.retailPrice)
+        && line.amount == math.round(line.quantity * line.price * 100) / 100
+        && data.stockChanges[line.productId] == line.quantity
+        && after.data.stock == before.data.stock - line.quantity
+        && after.data.lastSaleId == saleId;
+    }
+    function kiranaValidSaleLines(storeId, saleId, data) {
+      return data.items is list && data.items.size() >= 1 && data.items.size() <= 3
+        && data.stockChanges is map
+        && data.stockChanges.keys().size() == data.items.size()
+        && kiranaValidSaleLine(storeId, saleId, data, 0)
+        && (data.items.size() < 2 || kiranaValidSaleLine(storeId, saleId, data, 1))
+        && (data.items.size() < 3 || kiranaValidSaleLine(storeId, saleId, data, 2));
+    }
+    function kiranaValidSaleTotal(data) {
+      return data.total == math.round((data.items[0].amount
+        + (data.items.size() > 1 ? data.items[1].amount : 0)
+        + (data.items.size() > 2 ? data.items[2].amount : 0)) * 100) / 100;
+    }
+    function kiranaValidSaleCredit(storeId, saleId, data) {
+      return data.paymentMode != "credit"
+        ? data.customerId == null
+        : data.customerId is string
+          && exists(kiranaCustomerPath(storeId, data.customerId))
+          && get(kiranaCustomerPath(storeId, data.customerId)).data.active == true
+          && getAfter(kiranaCustomerPath(storeId, data.customerId)).data.lastLedgerId == saleId
+          && getAfter(kiranaCustomerPath(storeId, data.customerId)).data.creditBalance
+            == math.round((get(kiranaCustomerPath(storeId, data.customerId)).data.creditBalance + data.total) * 100) / 100
+          && getAfter(kiranaLedgerPath(storeId, data.customerId, saleId)).data.type == "credit_sale"
+          && getAfter(kiranaLedgerPath(storeId, data.customerId, saleId)).data.amount == data.total;
+    }
+
+    match /kiranaStores/{storeId} {
+      allow create: if request.auth != null
+        && request.resource.data.keys().hasOnly(["name", "phone", "address", "ownerUid", "status", "currency", "timezone", "createdAt", "updatedAt"])
+        && request.resource.data.name is string && request.resource.data.name.size() >= 2 && request.resource.data.name.size() <= 100
+        && request.resource.data.phone is string && request.resource.data.phone.size() >= 7 && request.resource.data.phone.size() <= 20
+        && request.resource.data.address is string && request.resource.data.address.size() <= 250
+        && request.resource.data.ownerUid == request.auth.uid
+        && request.resource.data.status == "active"
+        && request.resource.data.currency == "INR"
+        && request.resource.data.timezone == "Asia/Kolkata"
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time;
+      allow get: if kiranaIsMember(storeId);
+      allow list, update, delete: if false;
+
+      match /members/{memberId} {
+        allow get: if request.auth != null && memberId == request.auth.uid
+          && resource.data.uid == request.auth.uid;
+        allow list: if request.auth != null && memberId == request.auth.uid
+          && resource.data.uid == request.auth.uid && resource.data.active == true;
+        allow create: if request.auth != null && memberId == request.auth.uid
+          && request.resource.data.keys().hasOnly(["uid", "role", "active", "permissions", "createdAt"])
+          && request.resource.data.uid == request.auth.uid
+          && request.resource.data.role == "owner"
+          && request.resource.data.active == true
+          && request.resource.data.permissions is list
+          && request.resource.data.createdAt == request.time
+          && getAfter(/databases/$(database)/documents/kiranaStores/$(storeId)).data.ownerUid == request.auth.uid;
+        allow update, delete: if false;
+      }
+
+      match /products/{productId} {
+        allow get, list: if kiranaIsMember(storeId);
+        allow create: if kiranaHasRole(storeId, ["owner", "manager"])
+          && request.resource.data.keys().hasOnly(["name", "sku", "unit", "retailPrice", "wholesalePrice", "stock", "lowStockAt", "barcode", "active", "createdBy", "createdAt", "updatedAt"])
+          && request.resource.data.name is string && request.resource.data.name.size() >= 1 && request.resource.data.name.size() <= 120
+          && request.resource.data.sku is string && request.resource.data.sku.size() <= 40
+          && request.resource.data.unit is string && request.resource.data.unit.size() <= 20
+          && request.resource.data.retailPrice is number && request.resource.data.retailPrice > 0
+          && request.resource.data.wholesalePrice is number && request.resource.data.wholesalePrice > 0
+          && request.resource.data.stock is number && request.resource.data.stock >= 0
+          && request.resource.data.lowStockAt is number && request.resource.data.lowStockAt >= 0
+          && request.resource.data.barcode is string && request.resource.data.barcode.size() <= 80
+          && request.resource.data.active == true
+          && request.resource.data.createdBy == request.auth.uid
+          && request.resource.data.createdAt == request.time
+          && request.resource.data.updatedAt == request.time;
+        allow update: if kiranaHasRole(storeId, ["owner", "manager", "cashier"])
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["stock", "lastSaleId", "updatedAt"])
+          && request.resource.data.stock is number && request.resource.data.stock >= 0
+          && request.resource.data.updatedAt == request.time
+          && request.resource.data.lastSaleId is string
+          && existsAfter(/databases/$(database)/documents/kiranaStores/$(storeId)/sales/$(request.resource.data.lastSaleId))
+          && getAfter(/databases/$(database)/documents/kiranaStores/$(storeId)/sales/$(request.resource.data.lastSaleId)).data.createdBy == request.auth.uid
+          && getAfter(/databases/$(database)/documents/kiranaStores/$(storeId)/sales/$(request.resource.data.lastSaleId)).data.stockChanges[productId] == resource.data.stock - request.resource.data.stock;
+        allow delete: if false;
+      }
+
+      match /sales/{saleId} {
+        allow get, list: if kiranaIsMember(storeId);
+        allow create: if kiranaHasRole(storeId, ["owner", "manager", "cashier"])
+          && request.resource.data.keys().hasOnly(["saleId", "invoiceNo", "items", "stockChanges", "subtotal", "tax", "discount", "total", "paymentMode", "customerId", "customerName", "createdBy", "createdAt", "status"])
+          && request.resource.data.saleId == saleId
+          && request.resource.data.invoiceNo is string
+          && request.resource.data.items is list
+          && request.resource.data.stockChanges is map
+          && request.resource.data.subtotal is number
+          && request.resource.data.tax == 0
+          && request.resource.data.discount == 0
+          && request.resource.data.total is number && request.resource.data.total > 0
+          && request.resource.data.subtotal == request.resource.data.total
+          && request.resource.data.paymentMode in ["cash", "upi", "card", "credit"]
+          && request.resource.data.customerName is string
+          && request.resource.data.createdBy == request.auth.uid
+          && request.resource.data.createdAt == request.time
+          && request.resource.data.status == "completed"
+          && kiranaValidSaleLines(storeId, saleId, request.resource.data)
+          && kiranaValidSaleTotal(request.resource.data)
+          && kiranaValidSaleCredit(storeId, saleId, request.resource.data);
+        allow update, delete: if false;
+      }
+
+      match /customers/{customerId} {
+        allow get, list: if kiranaIsMember(storeId);
+        allow create: if kiranaHasRole(storeId, ["owner", "manager", "cashier"])
+          && request.resource.data.keys().hasOnly(["name", "phone", "creditBalance", "totalCredit", "totalPaid", "active", "createdBy", "createdAt", "updatedAt"])
+          && request.resource.data.name is string && request.resource.data.name.size() >= 1 && request.resource.data.name.size() <= 120
+          && request.resource.data.phone is string && request.resource.data.phone.size() <= 20
+          && request.resource.data.creditBalance == 0
+          && request.resource.data.totalCredit == 0
+          && request.resource.data.totalPaid == 0
+          && request.resource.data.active == true
+          && request.resource.data.createdBy == request.auth.uid
+          && request.resource.data.createdAt == request.time
+          && request.resource.data.updatedAt == request.time;
+        allow update: if kiranaHasRole(storeId, ["owner", "manager", "cashier"])
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["creditBalance", "totalCredit", "totalPaid", "lastLedgerId", "updatedAt"])
+          && request.resource.data.creditBalance is number && request.resource.data.creditBalance >= 0
+          && request.resource.data.totalCredit is number && request.resource.data.totalCredit >= resource.data.totalCredit
+          && request.resource.data.totalPaid is number && request.resource.data.totalPaid >= resource.data.totalPaid
+          && request.resource.data.updatedAt == request.time
+          && request.resource.data.lastLedgerId is string
+          && existsAfter(kiranaLedgerPath(storeId, customerId, request.resource.data.lastLedgerId))
+          && getAfter(kiranaLedgerPath(storeId, customerId, request.resource.data.lastLedgerId)).data.createdBy == request.auth.uid
+          && (
+            (getAfter(kiranaLedgerPath(storeId, customerId, request.resource.data.lastLedgerId)).data.type in ["credit_sale", "manual_credit"]
+              && request.resource.data.creditBalance == math.round((resource.data.creditBalance + getAfter(kiranaLedgerPath(storeId, customerId, request.resource.data.lastLedgerId)).data.amount) * 100) / 100
+              && request.resource.data.totalCredit == math.round((resource.data.totalCredit + getAfter(kiranaLedgerPath(storeId, customerId, request.resource.data.lastLedgerId)).data.amount) * 100) / 100
+              && request.resource.data.totalPaid == resource.data.totalPaid)
+            ||
+            (getAfter(kiranaLedgerPath(storeId, customerId, request.resource.data.lastLedgerId)).data.type == "payment"
+              && request.resource.data.creditBalance == math.round((resource.data.creditBalance - getAfter(kiranaLedgerPath(storeId, customerId, request.resource.data.lastLedgerId)).data.amount) * 100) / 100
+              && request.resource.data.totalCredit == resource.data.totalCredit
+              && request.resource.data.totalPaid == math.round((resource.data.totalPaid + getAfter(kiranaLedgerPath(storeId, customerId, request.resource.data.lastLedgerId)).data.amount) * 100) / 100)
+          );
+        allow delete: if false;
+
+        match /ledger/{entryId} {
+          allow get, list: if kiranaIsMember(storeId);
+          allow create: if kiranaHasRole(storeId, ["owner", "manager", "cashier"])
+            && request.resource.data.keys().hasOnly(["type", "amount", "invoiceId", "saleId", "mode", "createdBy", "createdAt", "note"])
+            && request.resource.data.type in ["credit_sale", "manual_credit", "payment"]
+            && request.resource.data.amount is number && request.resource.data.amount > 0
+            && request.resource.data.createdBy == request.auth.uid
+            && request.resource.data.createdAt == request.time
+            && getAfter(kiranaCustomerPath(storeId, customerId)).data.lastLedgerId == entryId
+            && (
+              (request.resource.data.type in ["credit_sale", "manual_credit"] && request.resource.data.invoiceId is string)
+              || (request.resource.data.type == "payment" && request.resource.data.mode in ["cash", "upi", "card", "bank"])
+            );
+          allow update, delete: if false;
+        }
+      }
+    }
+
+    // Collection-group membership query: every result is constrained to the signed-in UID.
+    match /{path=**}/members/{memberId} {
+      allow list: if request.auth != null
+        && resource.data.uid == request.auth.uid && resource.data.active == true;
+    }
+
   }
 }

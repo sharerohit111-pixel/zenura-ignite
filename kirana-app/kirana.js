@@ -1,8 +1,7 @@
 import { auth, googleProvider } from "../firebase-client.js";
-import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-functions.js";
+import { kiranaApi } from "./kirana-firestore.js";
 import { onAuthStateChanged, signInWithPopup, signOut } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-auth.js";
-const functions = getFunctions(undefined, "asia-south1");
-const api = name => httpsCallable(functions, name);
+const api = name => async payload => ({data: await kiranaApi[name](payload)});
 const $ = id => document.getElementById(id);
 let user = null, stores = [], activeStore = "", products = [], bill = [];
 function message(text, bad=false){$("message").textContent=text;$("message").className="message"+(bad?" error":"");}

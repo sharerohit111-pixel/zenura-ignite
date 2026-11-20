@@ -76,7 +76,7 @@ async function kiranaCreateSale(data) {
     old.quantity+=qty; combined.set(key,old);
   }
   const items=[...combined.values()];
-  if(items.length>10) throw new Error("A bill can contain up to 10 different products in this free release.");
+  if(items.length>3) throw new Error("A bill can contain up to 3 different products in this free release.");
   if(new Set(items.map(x=>x.productId)).size!==items.length) throw new Error("Use one price type per product in a single bill.");
   const paymentMode=["cash","upi","card","credit"].includes(data.paymentMode)?data.paymentMode:"cash";
   const customerId=paymentMode==="credit"?requireText(data.customerId,"Customer"):"";
@@ -107,7 +107,7 @@ async function kiranaCreateSale(data) {
     if(customer){
       const c=customerSnap.data(), nextBalance=Math.round((Number(c.creditBalance||0)+total)*100)/100;
       tx.update(customer,{creditBalance:nextBalance,totalCredit:Math.round((Number(c.totalCredit||0)+total)*100)/100,lastLedgerId:saleId,updatedAt:serverTimestamp()});
-      tx.set(ledgerRef(storeId,customerId,saleId),{type:"credit_sale",amount:total,invoiceId,saleId,createdBy:u.uid,createdAt:serverTimestamp(),note:"Counter billing credit sale"});
+      tx.set(ledgerRef(storeId,customerId,saleId),{type:"credit_sale",amount:total,invoiceId:invoiceNo,saleId,createdBy:u.uid,createdAt:serverTimestamp(),note:"Counter billing credit sale"});
     }
   });
   return {saleId,invoiceNo,total};
