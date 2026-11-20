@@ -592,3 +592,24 @@ integrationTest("Firestore emulator serializes scheduled-worker SELL fill agains
   }
  }finally{await clean([accountRef,orderRef]);}
 });
+
+integrationTest("Firestore emulator counts a closed legacy cash position as new at the 50-position LIMIT cap",async()=>{
+ const id=crypto.randomUUID(),uid="limit-position-cap-"+id;
+ const accountRef=db.collection("emulatorPaperAccounts").doc(uid);
+ const orderRef=db.collection("emulatorPaperOrders").doc("limit-position-cap-"+id);
+ const positions=Object.fromEntries(Array.from({length:50},(_,i)=>[
+  `NSE_EQ|OPEN${i}`,{quantity:1,averagePricePaise:100,costBasisPaise:100}
+ ]));
+ positions["NSE_EQ|CLOSED"]={quantity:0,averagePricePaise:0,costBasisPaise:0};
+ await accountRef.set({cashPaise:100000,reservedCashPaise:0,reservedMarginPaise:0,realizedPnlPaise:0,positions,reservedPositions:{},version:1});
+ try{
+  await assert.rejects(placePendingLimitOrder({
+   db,accountRef,orderRef,uid,
+   order:{uid,instrumentKey:"NSE_EQ|CLOSED",tradingSymbol:"CLOSED",exchange:"NSE",side:"BUY",quantity:1,orderType:"LIMIT",limitPricePaise:100,status:"PENDING",simulationOnly:true},
+   serverTimestamp:()=>FieldValue.serverTimestamp()
+  }),error=>error.status===409&&/50 open positions/.test(error.message));
+  const [account,order]=await Promise.all([accountRef.get(),orderRef.get()]);
+  assert.equal(account.data().reservedCashPaise,0);
+  assert.equal(order.exists,false);
+ }finally{await clean([accountRef,orderRef]);}
+});
