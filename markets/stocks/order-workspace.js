@@ -153,16 +153,6 @@
     updateEstimate();
   }
   typeButtons.forEach(button => button.addEventListener('click', () => setOrderType(button.dataset.orderType)));
-  // The legacy MARKET handlers are registered by stocks.js before this module.
-  // Capture the click first so LIMIT mode cannot accidentally submit a MARKET order.
-  document.addEventListener('click', event => {
-    if (selectedType !== 'LIMIT' || !(event.target instanceof Element)) return;
-    const orderButton = event.target.closest('#paper-buy, #paper-sell');
-    if (!orderButton) return;
-    event.preventDefault();
-    event.stopImmediatePropagation();
-    showMessage(status, translate('Use the LIMIT order controls below to submit a limit order.'), 'warning');
-  }, true);
   qty?.addEventListener('input', updateEstimate);
   limitPrice?.addEventListener('input', updateEstimate);
   const selectedPrice = $('selected-price');
