@@ -8,11 +8,17 @@ The checked-in Firebase Web App config in `firebase-config.js` identifies the de
 2. In Authentication → Sign-in method, enable **Google** and **Email/Password**.
 3. In Authentication → Settings → Authorized domains, add the production website host (for example `zenuraignite.com`) and any deliberate preview host.
 4. Confirm the web app in this project matches the public config in `firebase-config.js`.
-5. Install Firebase CLI and authenticate against the intended project. First deploy only the four Indian-market Functions from the repository root:
+5. Install Firebase CLI and authenticate against the intended project. For the initial OAuth connection rollout, deploy only the four connection Functions from the repository root:
 
 ```sh
 firebase use default
 firebase deploy --only functions:startUpstoxAuthorization,functions:upstoxOAuthCallback,functions:disconnectUpstoxAccount,functions:getIndianMarketConnectionStatus
+```
+
+The scheduled `processPendingPaperLimitOrders` worker is deliberately excluded from this initial rollout. Keep it undeployed in production until the dedicated staging LIMIT-order end-to-end tests, quote-freshness checks, cancellation/reservation checks and operational monitoring have passed and a separate deployment approval is given. For an explicitly approved staging test only, deploy that single worker with:
+
+```sh
+firebase deploy --only functions:processPendingPaperLimitOrders
 ```
 
 Do **not** use `--only functions` for the initial Indian-market rollout: that can redeploy the existing Premium/Razorpay Functions as well. Firestore rules and indexes are project-wide resources, not isolated per feature. Review the complete current production rules/indexes and verify that existing Crypto/Premium entitlements and payment access remain intact before separately deploying them:
