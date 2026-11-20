@@ -40,6 +40,7 @@ const {consumeMarginPreviewSlot}=require("./lib/margin-preview-rate-limit");
 const {authenticateFirebaseRequest}=require("./lib/firebase-auth");
 const {normalizePaperAccountState,ensurePaperAccount}=require("./lib/paper-account-state");
 const {paperStartingCashPaise}=require("./lib/paper-account-config");
+const {parseLimitPricePaise}=require("./lib/limit-price");
 initializeApp();
 const db=getFirestore();
 const app=express();
@@ -257,9 +258,8 @@ app.post("/paper/orders",async(req,res)=>{
       if(req.body?.limit_price_paise!==undefined){
         limitPricePaise=Number(req.body.limit_price_paise);
       }else{
-        const rawPrice=String(req.body?.limit_price??"");
-        if(!/^\d{1,8}(?:\.\d{1,2})?$/.test(rawPrice))return res.status(400).json({error:"LIMIT orders require limit_price (INR, up to 2 decimals) or limit_price_paise."});
-        limitPricePaise=Math.round(Number(rawPrice)*100);
+        limitPricePaise=parseLimitPricePaise(req.body?.limit_price);
+        if(limitPricePaise===null)return res.status(400).json({error:"LIMIT orders require limit_price (INR, up to 2 decimals) or limit_price_paise."});
       }
       if(!Number.isSafeInteger(limitPricePaise)||limitPricePaise<1)return res.status(400).json({error:"A valid positive LIMIT price is required."});
     }
