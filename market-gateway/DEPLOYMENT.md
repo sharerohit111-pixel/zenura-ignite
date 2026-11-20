@@ -1,35 +1,37 @@
 # Indian Market deployment runbook
 
-The checked-in Firebase Web App config in `firebase-config.js` identifies the dedicated Indian-market Firebase project as `zenura-ignite-technologies`. The root `.firebaserc` now pins Firebase CLI deployments to that project. The Crypto app's separate Firebase project is not selected by this branch.
+The checked-in .firebaserc default points to the production Firebase project zenura-ignite-technologies. **Never rely on that default for testing.** All staging deployment commands must pass an explicit, separately verified non-production project ID. The deployment scripts below refuse the production project. No staging project or live provider credentials are assumed to exist until independently verified.
 
-## 1. Firebase project and Authentication
+## 1. Firebase staging project and Authentication
 
-1. Confirm the Firebase Console project ID is exactly `zenura-ignite-technologies`.
-2. In Authentication → Sign-in method, enable **Google** and **Email/Password**.
-3. In Authentication → Settings → Authorized domains, add the production website host (for example `zenuraignite.com`) and any deliberate preview host.
-4. Confirm the web app in this project matches the public config in `firebase-config.js`.
-5. Install Firebase CLI and authenticate against the intended project. For the initial OAuth connection rollout, deploy only the four connection Functions from the repository root:
-
-```sh
-firebase use default
-firebase deploy --only functions:startUpstoxAuthorization,functions:upstoxOAuthCallback,functions:disconnectUpstoxAccount,functions:getIndianMarketConnectionStatus
-```
-
-The scheduled `processPendingPaperLimitOrders` worker is deliberately excluded from this initial rollout. Keep it undeployed in production until the dedicated staging LIMIT-order end-to-end tests, quote-freshness checks, cancellation/reservation checks and operational monitoring have passed and a separate deployment approval is given. For an explicitly approved staging test only, deploy that single worker with a dedicated non-production Firebase project ID. The command refuses the configured production project and never falls back to the .firebaserc default:
+1. Create or verify a dedicated non-production Firebase project and Firestore database. Record its exact project ID as FIREBASE_STAGING_PROJECT_ID.
+2. Confirm that this ID is not zenura-ignite-technologies and that the project is not shared with the Crypto or production app.
+3. In the staging Firebase Console, enable **Google** and **Email/Password** sign-in and add only the staging website host to Authorized domains.
+4. Confirm the staging web app configuration, Firestore rules and required indexes are deliberately configured for that staging project. Do not change the checked-in production web configuration as part of staging setup.
+5. Authenticate the Firebase CLI, then deploy only the four OAuth connection Functions to the explicitly selected staging project:
 
 ```sh
-FIREBASE_STAGING_PROJECT_ID=YOUR_STAGING_PROJECT_ID npm run --prefix functions deploy:limit-worker
+export FIREBASE_STAGING_PROJECT_ID=YOUR_VERIFIED_STAGING_PROJECT_ID
+test -n "$FIREBASE_STAGING_PROJECT_ID"
+test "$FIREBASE_STAGING_PROJECT_ID" != "zenura-ignite-technologies"
+npm run --prefix functions deploy
 ```
 
-Do not run this until the staging project exists, its Firestore database and required secrets are configured, and separate staging deployment approval has been recorded. Replace the placeholder only with the verified staging project ID.
+The deploy script passes --project "$FIREBASE_STAGING_PROJECT_ID" explicitly and refuses to run when the variable is missing or points at production. Do not use firebase use default or rely on .firebaserc for staging.
 
-Do **not** use `--only functions` for the initial Indian-market rollout: that can redeploy the existing Premium/Razorpay Functions as well. Firestore rules and indexes are project-wide resources, not isolated per feature. Review the complete current production rules/indexes and verify that existing Crypto/Premium entitlements and payment access remain intact before separately deploying them:
+The scheduled processPendingPaperLimitOrders worker is deliberately excluded. Keep it undeployed until staging OAuth, account isolation, quote-freshness, LIMIT placement/fill/cancel, reservation-release and operational monitoring checks pass, and separate staging worker-deployment approval is recorded. If approved, deploy only that worker to the same verified staging project:
 
 ```sh
-firebase deploy --only firestore:rules,firestore:indexes
+npm run --prefix functions deploy:limit-worker
 ```
 
-Prefer a staging project first. Confirm the selected Firebase project ID before every deploy; stop if it is not the intended project.
+Do not run either command until the staging project exists, its Firestore database and required secrets are configured, and staging deployment approval has been recorded. No production deployment is authorized by this runbook. Production rollout requires a separate explicit approval and a separately reviewed deployment plan.
+
+Do **not** use --only functions: that can redeploy existing Premium/Razorpay Functions. Firestore rules and indexes are project-wide resources, not isolated per feature. Review the complete rules/indexes and verify existing Crypto/Premium entitlements before deploying any rules or indexes, even to staging. Always pass the explicit staging project ID:
+
+```sh
+firebase deploy --project "$FIREBASE_STAGING_PROJECT_ID" --only firestore:rules,firestore:indexes
+```
 
 ## 2. Upstox OAuth secrets
 
