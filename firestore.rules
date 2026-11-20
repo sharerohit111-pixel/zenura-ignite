@@ -224,19 +224,14 @@ service cloud.firestore {
         && after.data.lastSaleId == saleId;
     }
     function kiranaValidSaleLines(storeId, saleId, data) {
-      return data.items is list && data.items.size() >= 1 && data.items.size() <= 10
+      return data.items is list && data.items.size() >= 1 && data.items.size() <= 4
         && data.stockChanges is map
         && data.stockChanges.size() == data.items.size()
         && kiranaValidSaleLine(storeId, saleId, data, 0)
         && (data.items.size() < 2 || kiranaValidSaleLine(storeId, saleId, data, 1))
         && (data.items.size() < 3 || kiranaValidSaleLine(storeId, saleId, data, 2))
         && (data.items.size() < 4 || kiranaValidSaleLine(storeId, saleId, data, 3))
-        && (data.items.size() < 5 || kiranaValidSaleLine(storeId, saleId, data, 4))
-        && (data.items.size() < 6 || kiranaValidSaleLine(storeId, saleId, data, 5))
-        && (data.items.size() < 7 || kiranaValidSaleLine(storeId, saleId, data, 6))
-        && (data.items.size() < 8 || kiranaValidSaleLine(storeId, saleId, data, 7))
-        && (data.items.size() < 9 || kiranaValidSaleLine(storeId, saleId, data, 8))
-        && (data.items.size() < 10 || kiranaValidSaleLine(storeId, saleId, data, 9));
+        ;
     }
     function kiranaValidSaleTotal(data) {
       return data.total == data.items[0].amount
@@ -258,7 +253,7 @@ service cloud.firestore {
           && get(kiranaCustomerPath(storeId, data.customerId)).data.active == true
           && getAfter(kiranaCustomerPath(storeId, data.customerId)).data.lastLedgerId == saleId
           && getAfter(kiranaCustomerPath(storeId, data.customerId)).data.creditBalance
-            == get(kiranaCustomerPath(storeId, data.customerId)).data.creditBalance + data.total
+            == math.round((get(kiranaCustomerPath(storeId, data.customerId)).data.creditBalance + data.total) * 100) / 100
           && getAfter(kiranaLedgerPath(storeId, data.customerId, saleId)).data.type == "credit_sale"
           && getAfter(kiranaLedgerPath(storeId, data.customerId, saleId)).data.amount == data.total;
     }
@@ -369,14 +364,14 @@ service cloud.firestore {
           && getAfter(kiranaLedgerPath(storeId, customerId, request.resource.data.lastLedgerId)).data.createdBy == request.auth.uid
           && (
             (getAfter(kiranaLedgerPath(storeId, customerId, request.resource.data.lastLedgerId)).data.type in ["credit_sale", "manual_credit"]
-              && request.resource.data.creditBalance == resource.data.creditBalance + getAfter(kiranaLedgerPath(storeId, customerId, request.resource.data.lastLedgerId)).data.amount
-              && request.resource.data.totalCredit == resource.data.totalCredit + getAfter(kiranaLedgerPath(storeId, customerId, request.resource.data.lastLedgerId)).data.amount
+              && request.resource.data.creditBalance == math.round((resource.data.creditBalance + getAfter(kiranaLedgerPath(storeId, customerId, request.resource.data.lastLedgerId)).data.amount) * 100) / 100
+              && request.resource.data.totalCredit == math.round((resource.data.totalCredit + getAfter(kiranaLedgerPath(storeId, customerId, request.resource.data.lastLedgerId)).data.amount) * 100) / 100
               && request.resource.data.totalPaid == resource.data.totalPaid)
             ||
             (getAfter(kiranaLedgerPath(storeId, customerId, request.resource.data.lastLedgerId)).data.type == "payment"
-              && request.resource.data.creditBalance == resource.data.creditBalance - getAfter(kiranaLedgerPath(storeId, customerId, request.resource.data.lastLedgerId)).data.amount
+              && request.resource.data.creditBalance == math.round((resource.data.creditBalance - getAfter(kiranaLedgerPath(storeId, customerId, request.resource.data.lastLedgerId)).data.amount) * 100) / 100
               && request.resource.data.totalCredit == resource.data.totalCredit
-              && request.resource.data.totalPaid == resource.data.totalPaid + getAfter(kiranaLedgerPath(storeId, customerId, request.resource.data.lastLedgerId)).data.amount)
+              && request.resource.data.totalPaid == math.round((resource.data.totalPaid + getAfter(kiranaLedgerPath(storeId, customerId, request.resource.data.lastLedgerId)).data.amount) * 100) / 100)
           );
         allow delete: if false;
 
