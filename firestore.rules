@@ -252,6 +252,23 @@ service cloud.firestore {
           && getAfter(kiranaLedgerPath(storeId, data.customerId, saleId)).data.amount == data.total;
     }
 
+    // Per-user store registry avoids collection-group queries and their composite-index requirement.
+    match /kiranaUsers/{uid} {
+      allow get: if request.auth != null && request.auth.uid == uid;
+      allow list: if false;
+      allow create: if request.auth != null && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(["storeIds", "updatedAt"])
+        && request.resource.data.storeIds is list
+        && request.resource.data.storeIds.size() <= 100
+        && request.resource.data.updatedAt == request.time;
+      allow update: if request.auth != null && request.auth.uid == uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["storeIds", "updatedAt"])
+        && request.resource.data.storeIds is list
+        && request.resource.data.storeIds.size() <= 100
+        && request.resource.data.updatedAt == request.time;
+      allow delete: if false;
+    }
+
     match /kiranaStores/{storeId} {
       allow create: if request.auth != null
         && request.resource.data.keys().hasOnly(["name", "phone", "address", "ownerUid", "status", "currency", "timezone", "createdAt", "updatedAt"])
@@ -385,12 +402,6 @@ service cloud.firestore {
           allow update, delete: if false;
         }
       }
-    }
-
-    // Collection-group membership query: every result is constrained to the signed-in UID.
-    match /{path=**}/members/{memberId} {
-      allow list: if request.auth != null
-        && resource.data.uid == request.auth.uid && resource.data.active == true;
     }
 
   }
