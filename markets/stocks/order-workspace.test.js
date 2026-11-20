@@ -40,12 +40,11 @@ test("MARKET remains on the existing market-order flow and LIMIT uses the verifi
   assert.match(gateway,/Only MARKET and LIMIT paper orders are supported/);
 });
 
-test("LIMIT mode intercepts legacy MARKET BUY/SELL click handlers",()=>{
-  assert.ok(source.includes("document.addEventListener('click'"));
-  assert.ok(source.includes("selectedType !== 'LIMIT'"));
-  assert.ok(source.includes("event.target.closest('#paper-buy, #paper-sell')"));
-  assert.ok(source.includes("event.stopImmediatePropagation()"));
-  assert.ok(source.includes("Use the LIMIT order controls below to submit a limit order."));
+test("LIMIT mode intercepts BUY/SELL before legacy MARKET handlers",()=>{
+  assert.match(source,/\[buy, sell\]\.forEach\(\(button, index\) => button\.addEventListener\('click',[\s\S]*?selectedType !== 'LIMIT'/);
+  assert.match(source,/event\.stopImmediatePropagation\(\)/);
+  assert.match(source,/\}, true\)\);/);
+  assert.match(source,/submitLimitOrder\(index === 0 \? 'BUY' : 'SELL'\)/);
 });
 
 test("Pending LIMIT cancellation calls the authenticated backend endpoint",()=>{
