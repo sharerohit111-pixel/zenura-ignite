@@ -235,9 +235,9 @@ service cloud.firestore {
         && (data.items.size() < 3 || kiranaValidSaleLine(storeId, saleId, data, 2));
     }
     function kiranaValidSaleTotal(data) {
-      return data.total == data.items[0].amount
+      return data.total == math.round((data.items[0].amount
         + (data.items.size() > 1 ? data.items[1].amount : 0)
-        + (data.items.size() > 2 ? data.items[2].amount : 0);
+        + (data.items.size() > 2 ? data.items[2].amount : 0)) * 100) / 100;
     }
     function kiranaValidSaleCredit(storeId, saleId, data) {
       return data.paymentMode != "credit"
