@@ -5,7 +5,7 @@ const {evaluatePendingLimitOrder}=require("./pending-limit-order");
 
 function fail(message,status=409){throw Object.assign(new Error(message),{status});}
 function accountState(data){
-  const positions=data?.positions??{},reservedPositions=data?.reservedPositions??{};
+  const positions=data?.positions===undefined?{}:data.positions,reservedPositions=data?.reservedPositions===undefined?{}:data.reservedPositions;
   const reservedCashPaise=data?.reservedCashPaise??0,reservedMarginPaise=data?.reservedMarginPaise??0;
   if(!data||!Number.isSafeInteger(data.cashPaise)||data.cashPaise<0||
     !Number.isSafeInteger(data.realizedPnlPaise??0)||
@@ -13,7 +13,9 @@ function accountState(data){
     !Number.isSafeInteger(reservedMarginPaise)||reservedMarginPaise<0||
     reservedCashPaise+reservedMarginPaise>data.cashPaise||
     !positions||typeof positions!=="object"||Array.isArray(positions)||
-    !reservedPositions||typeof reservedPositions!=="object"||Array.isArray(reservedPositions))
+    (data.positions!==undefined&&(!data.positions||typeof data.positions!=="object"||Array.isArray(data.positions)))||
+    !reservedPositions||typeof reservedPositions!=="object"||Array.isArray(reservedPositions)||
+    (data.reservedPositions!==undefined&&(!data.reservedPositions||typeof data.reservedPositions!=="object"||Array.isArray(data.reservedPositions))))
     fail("Paper account reservation state is invalid.");
   for(const [key,position] of Object.entries(positions)){
     if(!key||!position||typeof position!=="object"||Array.isArray(position)||
