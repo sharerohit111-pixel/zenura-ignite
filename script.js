@@ -2,6 +2,7 @@ const menu=document.getElementById('menu'),nav=document.getElementById('nav'),ba
 function setMenuOpen(open){
   if(!nav||!menu)return;
   nav.classList.toggle('open',open);
+  if(open) nav.scrollTop=0;
   document.body.classList.toggle('sidebar-open',open);
   menu.setAttribute('aria-expanded',String(open));
   menu.setAttribute('aria-label',open?'Close navigation menu':'Open navigation menu');
