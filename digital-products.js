@@ -23,6 +23,8 @@ function bind(){
  if(!root||root.dataset.productSamplesBound==="true")return;
  root.dataset.productSamplesBound="true";
  root.addEventListener("click",event=>{
+  const demo=event.target.closest("[data-live-demo]");
+  if(demo)return;
   const link=event.target.closest("[data-product-detail]");
   const card=event.target.closest(".product-card");
   if(link){event.preventDefault();event.stopPropagation();openProductFromCard(link.closest(".product-card"));return;}
@@ -55,9 +57,14 @@ function updateCard(card,p){
  const tags=content.querySelector(".product-tags");if(tags)tags.innerHTML=(p.tags||[]).map(x=>"<span>"+esc(x)+"</span>").join("");
  const link=content.querySelector(".product-link");
  if(link){link.removeAttribute("href");link.dataset.productDetail=id;link.textContent="View product details & images ↗";link.setAttribute("role","button");}
+ let demoLink=content.querySelector(".product-live-demo");
+ if(p.websiteUrl){
+  if(!demoLink){demoLink=document.createElement("a");demoLink.className="product-link product-live-demo";demoLink.dataset.liveDemo="true";content.append(demoLink);}
+  demoLink.href=p.websiteUrl;demoLink.target="_blank";demoLink.rel="noopener noreferrer";demoLink.textContent="Open Live Demo ↗";demoLink.setAttribute("aria-label","Open "+(p.name||"product")+" live demo in a new tab");
+ }else if(demoLink){demoLink.remove();}
 }
 async function load(){
- try{const snap=await getDoc(doc(db,"publicCatalog","digitalProducts"));if(snap.exists()&&snap.data().published&&Array.isArray(snap.data().products)){const saved=snap.data().products.filter(p=>p.visible!==false);products=saved.map(p=>{const fallback=DEFAULT_DIGITAL_PRODUCTS.find(d=>String(d.id)===String(p.id));return fallback?{...fallback,...p,websiteUrl:p.websiteUrl||fallback.websiteUrl,imageUrl:fallback.imageUrl,gallery:fallback.gallery||[]}:p});}}
+ try{const snap=await getDoc(doc(db,"publicCatalog","digitalProducts"));if(snap.exists()&&snap.data().published&&Array.isArray(snap.data().products)){const saved=snap.data().products.filter(p=>p.visible!==false);products=saved.map(p=>{const fallback=DEFAULT_DIGITAL_PRODUCTS.find(d=>String(d.id)===String(p.id));return fallback?{...fallback,...p,websiteUrl:fallback.websiteUrl,imageUrl:fallback.imageUrl,gallery:fallback.gallery||[]}:p});}}
  catch(e){console.warn("Product samples are using built-in defaults.",e)}
  if(root){const cards=[...root.querySelectorAll(".product-card")];products.forEach((p,i)=>{const card=cards.find(x=>x.querySelector("h3")?.textContent.trim().toLowerCase()===String(p.name||"").trim().toLowerCase())||cards[i];if(card)updateCard(card,p)});bind();}
 }
