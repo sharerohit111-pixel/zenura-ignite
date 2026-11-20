@@ -148,7 +148,7 @@ exports.kiranaCreateSale = onCall({ region: REGION, maxInstances: 30 }, async re
     if (customerRef) {
       const ledgerRef = customerRef.collection("ledger").doc("sale_" + saleRef.id);
       tx.update(customerRef, { creditBalance: FieldValue.increment(total), totalCredit: FieldValue.increment(total), updatedAt: FieldValue.serverTimestamp() });
-      tx.create(ledgerRef, { type: "credit_sale", amount: total, invoiceId, saleId: saleRef.id, createdBy: uid, createdAt: FieldValue.serverTimestamp(), note: "Counter billing credit sale" });
+      tx.create(ledgerRef, { type: "credit_sale", amount: total, invoiceId: invoiceNo, saleId: saleRef.id, createdBy: uid, createdAt: FieldValue.serverTimestamp(), note: "Counter billing credit sale" });
     }
   });
   return { saleId: saleRef.id, invoiceNo, total };
