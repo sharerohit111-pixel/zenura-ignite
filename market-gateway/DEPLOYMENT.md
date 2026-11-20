@@ -15,11 +15,13 @@ firebase use default
 firebase deploy --only functions:startUpstoxAuthorization,functions:upstoxOAuthCallback,functions:disconnectUpstoxAccount,functions:getIndianMarketConnectionStatus
 ```
 
-The scheduled `processPendingPaperLimitOrders` worker is deliberately excluded from this initial rollout. Keep it undeployed in production until the dedicated staging LIMIT-order end-to-end tests, quote-freshness checks, cancellation/reservation checks and operational monitoring have passed and a separate deployment approval is given. For an explicitly approved staging test only, deploy that single worker with:
+The scheduled `processPendingPaperLimitOrders` worker is deliberately excluded from this initial rollout. Keep it undeployed in production until the dedicated staging LIMIT-order end-to-end tests, quote-freshness checks, cancellation/reservation checks and operational monitoring have passed and a separate deployment approval is given. For an explicitly approved staging test only, deploy that single worker with a dedicated non-production Firebase project ID. The command refuses the configured production project and never falls back to the .firebaserc default:
 
 ```sh
-firebase deploy --only functions:processPendingPaperLimitOrders
+FIREBASE_STAGING_PROJECT_ID=YOUR_STAGING_PROJECT_ID npm run --prefix functions deploy:limit-worker
 ```
+
+Do not run this until the staging project exists, its Firestore database and required secrets are configured, and separate staging deployment approval has been recorded. Replace the placeholder only with the verified staging project ID.
 
 Do **not** use `--only functions` for the initial Indian-market rollout: that can redeploy the existing Premium/Razorpay Functions as well. Firestore rules and indexes are project-wide resources, not isolated per feature. Review the complete current production rules/indexes and verify that existing Crypto/Premium entitlements and payment access remain intact before separately deploying them:
 
