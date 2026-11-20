@@ -12,8 +12,7 @@ on:
       - "admin.css"
       - "digital-products-data.js"
       - "digital-products.js"
-      - "digital-products-catalogue.js"
-      - "digital-products.css"
+      - "products.css"
       - "firebase-client.js"
       - "firebase-config.js"
       - "storage.rules"
@@ -46,8 +45,7 @@ on:
       - "admin.css"
       - "digital-products-data.js"
       - "digital-products.js"
-      - "digital-products-catalogue.js"
-      - "digital-products.css"
+      - "products.css"
       - "firebase-client.js"
       - "firebase-config.js"
       - "storage.rules"
@@ -95,7 +93,6 @@ jobs:
           node --input-type=module --check < solutions-catalogue.js
           node --input-type=module --check < admin.js
           node --input-type=module --check < digital-products.js
-          node --input-type=module --check < digital-products-catalogue.js
           node --input-type=module --check < firebase-client.js
       - name: Validate product catalogue page local assets
         run: |
@@ -162,8 +159,7 @@ jobs:
           test -s storage.rules
           node -e "const r=require('node:fs').readFileSync('storage.rules','utf8'); for (const token of ['isZenuraAdmin()', 'request.resource.contentType.matches(\'image/.*\')', '10 * 1024 * 1024', '100 * 1024 * 1024']) if (!r.includes(token)) throw new Error('Storage rules missing required media restriction: '+token)"
           test -s digital-products-data.js
-          test -s digital-products-catalogue.js
-          test -s digital-products.css
+          test -s products.css
       - name: Guard Firebase deployment scope
         run: |
           node -e "
@@ -181,12 +177,12 @@ jobs:
             }
             const targets = (deploy.split('--only ')[1] || '').split(',');
             if (targets.length !== required.length || targets.some(target => !/^functions:[A-Za-z0-9]+$/.test(target))) {
-              throw new Error('Only the four explicit Indian-market Functions may be deployed by this script.');
+              throw new Error('Only the five explicit Indian-market Functions may be deployed by this script.');
             }
             for (const target of required) {
               if (!targets.includes(target)) throw new Error('Missing deployment target: ' + target);
             }
-            console.log('Firebase deploy scope is restricted to the four Indian-market Functions.');
+            console.log('Firebase deploy scope is restricted to the five Indian-market Functions.');
           "
       - name: Install Firebase Functions test dependencies
         run: npm install --prefix functions --ignore-scripts --no-audit --no-fund
