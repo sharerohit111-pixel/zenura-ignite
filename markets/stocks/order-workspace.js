@@ -11,6 +11,8 @@
 
   const typeButtons = [...ticket.querySelectorAll('[data-order-type]')];
   const limitPrice = $('paper-limit-price');
+  const productMode = $('paper-product-mode');
+  const selectedProduct = () => productMode?.value === 'INTRADAY' ? 'INTRADAY' : 'DELIVERY';
   const referencePrice = $('paper-reference-price');
   const qty = $('paper-quantity');
   const buy = $('paper-buy');
@@ -125,7 +127,13 @@
     estimate.textContent = validQty && validPrice ? money(Math.round(price * 100) * quantity) : '—';
   }
   function setOrderType(type) {
+    if (type === 'LIMIT' && selectedProduct() === 'INTRADAY') {
+      type = 'MARKET';
+      showMessage(status, 'Intraday LIMIT orders are not enabled yet. Choose Delivery for LIMIT orders.', 'warning');
+    }
     selectedType = type;
+    const limitButton = typeButtons.find(button => button.dataset.orderType === 'LIMIT');
+    if (limitButton) limitButton.disabled = selectedProduct() === 'INTRADAY';
     typeButtons.forEach(button => {
       const active = button.dataset.orderType === type;
       button.classList.toggle('active', active);
@@ -154,6 +162,7 @@
     updateEstimate();
   }
   typeButtons.forEach(button => button.addEventListener('click', () => setOrderType(button.dataset.orderType)));
+  productMode?.addEventListener('change', () => { if (selectedProduct() === 'INTRADAY' && selectedType === 'LIMIT') setOrderType('MARKET'); else setOrderType(selectedType); refreshAll(); });
   qty?.addEventListener('input', updateEstimate);
   limitPrice?.addEventListener('input', updateEstimate);
   const selectedPrice = $('selected-price');
@@ -219,7 +228,10 @@
     if (!Number.isSafeInteger(limitPricePaise) || limitPricePaise < 1) {
       showMessage(status, translate('Enter a valid limit price.'), 'error'); return;
     }
-    const fingerprint = JSON.stringify({instrument_key:instrument.instrumentKey,side,quantity,limit_price_paise:limitPricePaise});
+    const product = selectedProduct();
+    const fingerprintPayload = {instrument_key:instrument.instrumentKey,side,quantity,limit_price_paise:limitPricePaise};
+    if (product === 'INTRADAY') fingerprintPayload.product = product;
+    const fingerprint = JSON.stringify(fingerprintPayload);
     let pending = readPendingLimit(uid);
     if (pending?.storageError) {
       showMessage(status, translate('Saved LIMIT retry data is unreadable. No order was sent; resolve browser storage before placing another LIMIT order.'), 'error');
@@ -247,7 +259,7 @@
       const response = await fetch(gateway + '/paper/orders', {
         method:'POST',
         headers:{...headers,'Content-Type':'application/json'},
-        body:JSON.stringify({instrument_key:instrument.instrumentKey,side,quantity,order_type:'LIMIT',limit_price_paise:limitPricePaise,idempotency_key:pending.key})
+        body:JSON.stringify({instrument_key:instrument.instrumentKey,side,quantity,product,order_type:'LIMIT',limit_price_paise:limitPricePaise,idempotency_key:pending.key})
       });
       const data = await response.json().catch(() => ({}));
       if (connector.getUserId() !== uid) throw new Error(translate('Account changed while the order was processing. Sign in again to verify its result.'));
@@ -289,7 +301,7 @@
     const when = created && !Number.isNaN(created.getTime()) ? created.toLocaleString('en-IN', {dateStyle:'medium',timeStyle:'short'}) : '—';
     const execution = Number.isSafeInteger(order.executionPricePaise) ? money(order.executionPricePaise) : '—';
     const limit = Number.isSafeInteger(order.limitPricePaise) ? money(order.limitPricePaise) : '—';
-    const values = [when,order.tradingSymbol,translate(String(order.side || '')),translate(String(order.orderType || 'MARKET')),order.quantity,limit,execution,translate(String(order.status || ''))];
+    const values = [when,order.tradingSymbol,order.product === 'INTRADAY' ? 'INTRADAY' : 'DELIVERY',translate(String(order.side || '')),translate(String(order.orderType || 'MARKET')),order.quantity,limit,execution,translate(String(order.status || ''))];
     values.forEach(value => { const td = document.createElement('td'); td.textContent = String(value ?? '—'); tr.append(td); });
     const action = document.createElement('td');
     if (order.orderType === 'LIMIT' && order.status === 'PENDING' && typeof order.id === 'string') {
@@ -311,7 +323,7 @@
     });
     if (!filtered.length) {
       const tr = document.createElement('tr'), td = document.createElement('td');
-      td.colSpan = 9; td.textContent = translate('No orders match this filter.');
+      td.colSpan = 10; td.textContent = translate('No orders match this filter.');
       tr.append(td); ordersBody.append(tr); return;
     }
     filtered.forEach(order => ordersBody.append(orderRow(order)));
@@ -361,8 +373,8 @@
       if (!Number.isSafeInteger(account.cashPaise) || account.cashPaise < reservedCash + reservedMargin) throw new Error(translate('Account cash reservation data is invalid.'));
       cashAvailable.textContent = money(account.cashPaise - reservedCash - reservedMargin);
       cashReserved.textContent = money(reservedCash) + (reservedMargin ? ' + ' + money(reservedMargin) + ' margin' : '');
-      const positions = account.positions && typeof account.positions === 'object' ? account.positions : {};
-      const reservations = account.reservedPositions && typeof account.reservedPositions === 'object' ? account.reservedPositions : {};
+      const positions = (selectedProduct() === 'INTRADAY' ? account.intradayPositions : account.positions) && typeof (selectedProduct() === 'INTRADAY' ? account.intradayPositions : account.positions) === 'object' ? (selectedProduct() === 'INTRADAY' ? account.intradayPositions : account.positions) : {};
+      const reservations = (selectedProduct() === 'INTRADAY' ? account.intradayReservedPositions : account.reservedPositions) && typeof (selectedProduct() === 'INTRADAY' ? account.intradayReservedPositions : account.reservedPositions) === 'object' ? (selectedProduct() === 'INTRADAY' ? account.intradayReservedPositions : account.reservedPositions) : {};
       let held = 0, reserved = 0;
       for (const [key, position] of Object.entries(positions)) {
         const quantity = Number.isSafeInteger(position?.quantity) ? position.quantity : 0;
