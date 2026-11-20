@@ -138,6 +138,7 @@ test("responsive and bilingual UI states are present",()=>{
   assert.match(html,/id="paper-language-toggle"/);
   assert.match(source,/language === 'en' \? 'हिन्दी' : 'English'/);
   assert.match(source,/document\.documentElement\.lang = language/);
+  assert.match(source,/setAttribute\('aria-label', language === 'hi'/);
   assert.match(source,/dataset\.state = kind/);
   assert.match(css,/@media\(max-width:760px\)/);
   assert.match(css,/@media\(max-width:420px\)/);
