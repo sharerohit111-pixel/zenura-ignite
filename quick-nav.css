@@ -16,3 +16,7 @@
 .account-nav-link{display:inline-flex!important;align-items:center;justify-content:center;border:1px solid rgba(53,228,255,.58)!important;border-radius:999px;padding:8px 15px!important;color:#e8fbff!important;background:linear-gradient(100deg,rgba(53,228,255,.15),rgba(163,77,255,.17));font-weight:700;white-space:nowrap}
 .account-nav-link:hover,.account-nav-link:focus-visible{outline:none;border-color:#35e4ff!important;box-shadow:0 0 15px rgba(53,228,255,.2)}
 .account-nav-link[aria-busy="true"]{opacity:.65;pointer-events:none}
+
+.account-user-name{display:inline-flex!important;align-items:center;max-width:190px;padding:8px 13px!important;margin:0 0 4px;border:1px solid rgba(53,228,255,.42);border-radius:12px;color:#65edff!important;background:rgba(53,228,255,.09);font-size:12px;font-weight:800;white-space:normal;overflow-wrap:anywhere}
+.account-user-name[hidden]{display:none!important}
+@media(max-width:800px){#nav .account-user-name{display:block!important;width:100%;max-width:none;margin:4px 0 8px;padding:10px 12px!important;border-radius:9px}}
