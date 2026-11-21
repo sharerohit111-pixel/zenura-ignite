@@ -343,3 +343,23 @@ body>nav#nav .site-settings-panel{
 @media(prefers-reduced-motion:reduce){
   body>nav#nav,.sidebar-backdrop{transition:none!important}
 }
+
+
+/* Business photo showcase placed directly below the hero strength strip */
+.business-showcase{padding-top:88px;padding-bottom:28px}
+.showcase-heading{max-width:760px;margin:0 auto 30px;text-align:center}
+.showcase-heading h2{font:700 clamp(34px,4.5vw,56px)/1.08 'Space Grotesk',sans-serif;letter-spacing:-1.8px;margin:18px 0 14px}
+.showcase-heading h2 em{font-style:normal;color:var(--cyan);text-shadow:0 0 22px #35e4ff55}
+.showcase-heading p{max-width:680px;margin:0 auto;color:var(--muted);font-size:14px;line-height:1.8}
+.showcase-gallery{display:grid;grid-template-columns:1.25fr 1fr 1fr;grid-template-rows:220px 220px;gap:14px}
+.showcase-photo{position:relative;min-width:0;min-height:0;margin:0;overflow:hidden;border:1px solid #4b78b5;border-radius:18px;background:#101a35;box-shadow:0 12px 34px #0005,inset 0 0 20px #35e4ff12}
+.showcase-photo.showcase-large{grid-row:span 2}
+.showcase-photo img{display:block;width:100%;height:100%;min-height:220px;object-fit:cover;transition:transform .55s ease,filter .55s ease;filter:saturate(.92) contrast(1.03)}
+.showcase-photo:hover img{transform:scale(1.055);filter:saturate(1.08) contrast(1.05)}
+.showcase-photo:after{content:"";position:absolute;inset:35% 0 0;background:linear-gradient(transparent,#030817eF);pointer-events:none}
+.showcase-photo figcaption{position:absolute;z-index:1;left:17px;right:12px;bottom:16px;display:grid;gap:4px}
+.showcase-photo figcaption b{font:700 16px 'Space Grotesk',sans-serif;color:#fff}
+.showcase-photo figcaption span{font-size:11px;color:#d3e0f5}
+@media(max-width:800px){.business-showcase{padding-top:70px}.showcase-gallery{grid-template-columns:1fr 1fr;grid-template-rows:210px 180px 180px}.showcase-photo.showcase-large{grid-row:auto;grid-column:span 2}.showcase-photo img{min-height:180px}}
+@media(max-width:600px){.business-showcase{padding-top:62px;padding-bottom:8px}.showcase-heading{margin-bottom:22px}.showcase-heading h2{font-size:34px;letter-spacing:-1.2px}.showcase-heading p{font-size:12px;line-height:1.7}.showcase-gallery{gap:9px;grid-template-rows:190px 150px 150px}.showcase-photo{border-radius:13px}.showcase-photo img{min-height:150px}.showcase-photo.showcase-large img{min-height:190px}.showcase-photo figcaption{left:10px;bottom:10px}.showcase-photo figcaption b{font-size:12px}.showcase-photo figcaption span{font-size:9px}}
+@media(prefers-reduced-motion:reduce){.showcase-photo img{transition:none}}
