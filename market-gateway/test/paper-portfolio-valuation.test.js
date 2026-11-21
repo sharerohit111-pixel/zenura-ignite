@@ -21,7 +21,7 @@ test("excludes stale holdings from totals and marks partial valuation",()=>{
  assert.equal(result.positions[1].valuationStatus,"stale_or_unavailable");
 });
 test("rejects unsafe aggregate values and invalid account data",()=>{
- assert.throws(()=>buildPortfolioValuation({positions:[["NSE_EQ|ABC",{quantity:1000000,averagePricePaise:Number.MAX_SAFE_INTEGER}]],quotes:[{instrument_token:"NSE_EQ|ABC",last_price:1,last_trade_time:now}],cashPaise:0,now}),/safe calculation limits/);
+ assert.throws(()=>buildPortfolioValuation({positions:[["NSE_EQ|ABC",{quantity:1000000,averagePricePaise:1,costBasisPaise:1000000}]],quotes:[{instrument_token:"NSE_EQ|ABC",last_price:100000000,last_trade_time:now}],cashPaise:0,now}),/safe calculation limits/);
  assert.throws(()=>buildPortfolioValuation({positions:pos,quotes:[],cashPaise:-1,now}),/Invalid portfolio valuation input/);
 });
 test("rejects invalid positions and more than fifty holdings",()=>{
@@ -53,4 +53,13 @@ test("values equity unrealized P&L from exact paise cost basis",()=>{
 test("rejects inconsistent exact cash-equity cost basis",()=>{
  const invalid=[["NSE_EQ|ABC",{quantity:2,averagePricePaise:101,costBasisPaise:199}]];
  assert.throws(()=>buildPortfolioValuation({positions:invalid,quotes:[],cashPaise:0,now}),/invalid cost basis/);
+});
+
+test("reads Delivery and Intraday holdings from isolated account maps",()=>{
+ const account={positions:{"NSE_EQ|DEL":{quantity:2,averagePricePaise:100}},intradayPositions:{"NSE_EQ|INTRA":{quantity:3,averagePricePaise:200}}};
+ assert.deepEqual(readStoredPaperPositions(account),[[ "NSE_EQ|DEL",account.positions["NSE_EQ|DEL"] ]]);
+ assert.deepEqual(readStoredPaperPositions(account,"DELIVERY"),[[ "NSE_EQ|DEL",account.positions["NSE_EQ|DEL"] ]]);
+ assert.deepEqual(readStoredPaperPositions(account,"INTRADAY"),[[ "NSE_EQ|INTRA",account.intradayPositions["NSE_EQ|INTRA"] ]]);
+ assert.throws(()=>readStoredPaperPositions(account,"intraday"),{status:400});
+ assert.throws(()=>readStoredPaperPositions({...account,intradayPositions:[]},"INTRADAY"),{status:409});
 });

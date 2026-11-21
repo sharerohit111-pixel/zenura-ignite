@@ -7,7 +7,8 @@
   },
   "scripts": {
     "emulate": "firebase emulators:start --only functions,firestore",
-    "deploy": "firebase deploy --only functions,firestore:rules"
+    "deploy": "cd .. && test -n \"$FIREBASE_STAGING_PROJECT_ID\" && test \"$FIREBASE_STAGING_PROJECT_ID\" != \"zenura-ignite-technologies\" && firebase deploy --project \"$FIREBASE_STAGING_PROJECT_ID\" --only functions:startUpstoxAuthorization,functions:upstoxOAuthCallback,functions:disconnectUpstoxAccount,functions:getIndianMarketConnectionStatus",
+    "deploy:limit-worker": "cd .. && test -n \"$FIREBASE_STAGING_PROJECT_ID\" && test \"$FIREBASE_STAGING_PROJECT_ID\" != \"zenura-ignite-technologies\" && firebase deploy --project \"$FIREBASE_STAGING_PROJECT_ID\" --only functions:processPendingPaperLimitOrders"
   },
   "dependencies": {
     "firebase-admin": "^13.0.0",
