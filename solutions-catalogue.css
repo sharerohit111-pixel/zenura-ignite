@@ -63,3 +63,7 @@
 @media(max-width:700px){.solution-product-image-wrap{height:145px}}
 
 .solution-plan-prices{display:grid;gap:7px;margin:8px 0 5px}.solution-plan-prices>div{display:flex;align-items:baseline;justify-content:space-between;gap:5px}.solution-plan-prices small{font-size:9px;color:#a9bad3}.solution-plan-prices strong{font:700 13px "Space Grotesk";color:#fff;white-space:nowrap}.solution-plan.gold .solution-plan-prices strong{color:#ffe0a0}.solution-detail-plans p{font-size:12px;color:#b9c9df;margin:5px 0}.solution-detail-plans p b{color:#fff;font-size:15px}
+
+.pricing-disclosure{max-width:900px;padding:16px 18px;border:1px solid #365d82;border-radius:14px;background:linear-gradient(135deg,#10213d,#0a142a);text-align:left;color:#b9c9df;font-size:11px;line-height:1.75}
+.pricing-disclosure strong{display:block;color:#63e7ff;font:700 13px 'Space Grotesk';margin-bottom:7px}
+.pricing-disclosure p{margin:6px 0 0}
