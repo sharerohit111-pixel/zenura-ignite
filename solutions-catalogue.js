@@ -12,7 +12,12 @@ const PRODUCT_IMAGES = {
  "small-mall": "https://static.hiamag.com/styles/autox754/public/article/01/08/2017/5723006-788243592.jpg",
  "garage": "https://www.capricorn.coop/-/media/project/csl/capricorn/articles/feature-images/tatbiz-workshop-design-caphubfeature.jpg?h=450&hash=820D2938C10EA00FA0834D261812F2C4&iar=0&w=720",
  "coaching": "https://www.pw.live/offline-centres/_next/image?q=75&url=https%3A%2F%2Fstatic.pw.live%2F5eb393ee95fab7468a79d189%2FADMIN%2F88a70f46-392c-47c5-b3ad-556f84ab9a17.jpg&w=1200",
- "school": "https://cdnbbsr.s3waas.gov.in/s3kv022d8f5be5f02d39ca6a6e1b5f720b/uploads/2024/03/2026061859.png"
+ "school": "https://cdnbbsr.s3waas.gov.in/s3kv022d8f5be5f02d39ca6a6e1b5f720b/uploads/2024/03/2026061859.png",
+ "clinic": "https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?auto=format&fit=crop&w=1200&q=80",
+ "car-wash": "https://images.unsplash.com/photo-1607860108855-64acf2078ed9?auto=format&fit=crop&w=1200&q=80",
+ "hotel": "https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=1200&q=80",
+ "restaurant": "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=1200&q=80",
+ "banquet": "https://images.unsplash.com/photo-1519167758481-83f550bb49b3?auto=format&fit=crop&w=1200&q=80"
 };
 let categories=clone(DEFAULT_SOLUTIONS),active="all";
 function migrateLegacyPricing(saved){const defaults=new Map(DEFAULT_SOLUTIONS.flatMap(c=>c.products.map(p=>[p.id,p])));return saved.map(c=>({...c,products:(c.products||[]).map(p=>{const d=defaults.get(p.id);if(!d)return p;const next={...p};for(const key of ["silver","gold"]){const old=next[key]||{},base=d[key]||{};next[key]={...base,...old,oneTimePrice:old.oneTimePrice??base.oneTimePrice??old.price??0,annualPrice:old.annualPrice??base.annualPrice??0};}return next;})}));}
