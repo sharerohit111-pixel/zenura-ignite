@@ -1,4 +1,4 @@
-name: Deploy Firebase Firestore Rules
+name: Deploy Firebase Security Rules
 
 on:
   workflow_dispatch:
@@ -7,6 +7,7 @@ on:
       - main
     paths:
       - "firestore.rules"
+      - "storage.rules"
       - "firebase.json"
       - ".github/workflows/deploy-firebase-rules.yml"
 
@@ -34,7 +35,7 @@ jobs:
       - name: Install Firebase CLI
         run: npm install --global firebase-tools
 
-      - name: Deploy Firestore security rules
+      - name: Deploy Firestore and Storage security rules
         env:
           GOOGLE_APPLICATION_CREDENTIALS: ${{ steps.auth.outputs.credentials_file_path }}
-        run: firebase deploy --only firestore:rules --project zenura-ignite-technologies --non-interactive
+        run: firebase deploy --only firestore:rules,storage --project zenura-ignite-technologies --non-interactive

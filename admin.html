@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="theme-color" content="#070b19"><title>ZENURA Admin | Enquiries</title>
-  <link rel="stylesheet" href="admin.css?v=6"><link rel="stylesheet" href="commercial-models.css?v=1">
+  <link rel="stylesheet" href="admin.css?v=5">
 </head>
 <body>
   <header class="top"><a href="index.html">← ZENURA IGNITE TECHNOLOGIES</a><span>PRIVATE ADMIN</span></header>
@@ -23,10 +23,9 @@
           <button type="button" class="admin-tab" data-admin-tab="enquiries">✉ Enquiry Inbox</button>
           <button type="button" class="admin-tab" data-admin-tab="digital-products">◈ Product Samples</button>
           <button type="button" class="admin-tab" data-admin-tab="business-solutions">▤ Our Products & Services</button>
-          <button type="button" class="admin-tab" data-admin-tab="commercial-models">₹ Sales & Rental Models</button>
         </aside>
         <div class="admin-content">
-          <section class="admin-pane active" data-admin-pane="overview"><div class="panel admin-welcome"><h2>Welcome to ZENURA Admin</h2><p>Choose a category from the sidebar. Each section has its own tools and settings.</p><div class="admin-shortcuts"><button type="button" class="secondary" data-go-tab="enquiries">Open Enquiry Inbox</button><button type="button" class="secondary" data-go-tab="digital-products">Manage Product Samples</button><button type="button" class="secondary" data-go-tab="business-solutions">Manage Our Products & Services</button><button type="button" class="secondary" data-go-tab="commercial-models">Manage Sales & Rental Models</button></div></div></section>
+          <section class="admin-pane active" data-admin-pane="overview"><div class="panel admin-welcome"><h2>Welcome to ZENURA Admin</h2><p>Choose a category from the sidebar. Each section has its own tools and settings.</p><div class="admin-shortcuts"><button type="button" class="secondary" data-go-tab="enquiries">Open Enquiry Inbox</button><button type="button" class="secondary" data-go-tab="digital-products">Manage Product Samples</button><button type="button" class="secondary" data-go-tab="business-solutions">Manage Our Products & Services</button></div></div></section>
           <section class="admin-pane" data-admin-pane="business-solutions">
       <section class="panel admin-section" id="solutions-admin" hidden>
         <h2>Business Solutions Catalogue</h2>
@@ -50,18 +49,7 @@
         <p id="digital-products-status" class="error" role="status"></p>
       </section>
           </section>
-          <section class="admin-pane" data-admin-pane="commercial-models">
-      <section class="panel admin-section" id="commercial-models-admin" hidden>
-        <h2>Sales, Annual Rental & Custom Development</h2>
-        <p>Configure the three commercial models shown on the public website. Keep a model inactive until its pricing and service terms are ready.</p>
-        <div class="commercial-admin-toolbar"><button id="commercial-load" class="secondary" type="button">Load saved settings</button><button id="commercial-defaults" class="secondary" type="button">Load safe defaults</button></div>
-        <div id="commercial-models-editor" class="catalogue-visual-editor"></div>
-        <details class="advanced-json"><summary>Advanced JSON editor</summary><textarea id="commercial-models-json" spellcheck="false" style="width:100%;min-height:260px;background:#080f21;color:#eaf3ff;border:1px solid #526b99;border-radius:10px;padding:14px;font:12px/1.55 monospace"></textarea></details>
-        <div class="commercial-admin-toolbar"><button id="commercial-publish" class="primary" type="button">Publish engagement models</button><button id="commercial-hide" class="secondary" type="button">Hide from public website</button></div>
-        <p id="commercial-models-status" class="error" role="status"></p>
-      </section>
-    </section>
-<section class="admin-pane" data-admin-pane="enquiries">
+          <section class="admin-pane" data-admin-pane="enquiries">
       <div class="toolbar"><div><p id="identity"></p><h2>Enquiry inbox</h2></div><button id="logout" class="secondary">Sign out</button></div>
       <div class="stats"><article><small>Total</small><b id="total">0</b></article><article><small>New</small><b id="new-count">0</b></article><article><small>In progress</small><b id="progress-count">0</b></article><article><small>Completed</small><b id="done-count">0</b></article></div>
       <div class="filters"><input id="search" type="search" placeholder="Search name, contact or service"><select id="status-filter"><option value="all">All statuses</option><option value="new">New</option><option value="in-progress">In progress</option><option value="completed">Completed</option></select></div>

@@ -198,8 +198,6 @@
     title: {}
   };
 
-  Object.assign(translations, {'Company':'कंपनी','Explore':'एक्सप्लोर करें','Plans & support':'प्लान और सहायता','About us':'हमारे बारे में','Our products':'हमारे उत्पाद','Website development':'वेबसाइट विकास','Mobile app development':'मोबाइल ऐप विकास','Cloud & deployment':'क्लाउड और डिप्लॉयमेंट','Maintenance & support':'मेंटेनेंस और सहायता','Business solutions':'बिजनेस समाधान','Engagement models':'बिजनेस मॉडल','Pricing & plans':'कीमत और प्लान','Request a quote':'कोटेशन माँगें','Email support':'ईमेल सहायता','Information':'जानकारी','Privacy policy':'गोपनीयता नीति','Terms & conditions':'नियम और शर्तें','Enquiries':'पूछताछ','All rights reserved.':'सर्वाधिकार सुरक्षित।','Share this website':'यह वेबसाइट शेयर करें','Websites, mobile apps and custom software shaped around your goals.':'आपके लक्ष्यों के अनुसार वेबसाइट, मोबाइल ऐप और कस्टम सॉफ्टवेयर।'});
-
   function getLanguage() {
     try { return localStorage.getItem(STORAGE_KEY) === 'hi' ? 'hi' : 'en'; }
     catch (_) { return 'en'; }
