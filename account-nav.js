@@ -2,6 +2,8 @@ import { isFirebaseConfigured } from "./firebase-config.js";
 
 const link = document.getElementById("account-nav-link");
 const nav = document.getElementById("nav");
+const adminLink = document.getElementById("admin-nav-link");
+if (adminLink) adminLink.hidden = true;
 if (link && nav && isFirebaseConfigured()) {
   let nameTag = document.getElementById("account-user-name");
   if (!nameTag) {
@@ -32,11 +34,13 @@ if (link && nav && isFirebaseConfigured()) {
   ]);
 
   onAuthStateChanged(auth, async user => {
+    // The private admin entry is visible only to the verified owner account.
+    if (adminLink) adminLink.hidden = !(user && user.emailVerified && user.email?.toLowerCase() === "sharerohit111@gmail.com");
     if (!user) {
       signedOutLabel();
       return;
     }
-    let displayName = user.displayName || "";
+    let displayName = user.email?.toLowerCase() === "sharerohit111@gmail.com" ? "Administrator" : (user.displayName || "");
     try {
       const profile = await getDoc(doc(db, "customerProfiles", user.uid));
       if (profile.exists()) displayName = profile.data().displayName || displayName;
