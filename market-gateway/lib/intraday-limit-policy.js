@@ -94,6 +94,11 @@ function isEligibleIntradayLimitOrder(order,quote,nowMs,session){
      ||normalized.sessionDate!==`${now.year}-${String(now.month).padStart(2,"0")}-${String(now.day).padStart(2,"0")}`)return false;
   const createdMinute=created.hour*60+created.minute;
   if(createdMinute<normalized.openMinute||createdMinute>=normalized.closeMinute)return false;
+  const quoteClock=marketClockParts(quote.tradeTimeMs);
+  const quoteDate=`${quoteClock.year}-${String(quoteClock.month).padStart(2,"0")}-${String(quoteClock.day).padStart(2,"0")}`;
+  const quoteMinute=quoteClock.hour*60+quoteClock.minute;
+  if(quoteDate!==normalized.sessionDate
+     ||quoteMinute<normalized.openMinute||quoteMinute>=normalized.closeMinute)return false;
   return order.side==="BUY"?quote.pricePaise<=order.limit_price_paise:quote.pricePaise>=order.limit_price_paise;
 }
 
