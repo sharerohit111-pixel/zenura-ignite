@@ -93,6 +93,47 @@ BEGIN
      AND product='INTRADAY' AND instrument_key='NSE_EQ|INTRA_LIMIT_CI';
   IF v_qty<>0 THEN RAISE EXCEPTION 'Intraday SELL cancellation did not release shares'; END IF;
 
+  -- BUY fill executes below limit, consumes actual gross and releases full reserve.
+  PERFORM public.submit_paper_intraday_limit_order(
+    '22222222-2222-4222-8222-222222222222',repeat('1',64),
+    '11111111-1111-4111-8111-111111111111',repeat('2',64),
+    'NSE_EQ|INTRA_FILL_BUY','INTRA_FILL_BUY','NSE','BUY',2,10000
+  );
+  v_now_ms:=floor(extract(epoch from clock_timestamp())*1000)::bigint;
+  v_result:=public.execute_paper_intraday_limit_fill(
+    repeat('1',64),9900,v_now_ms-1000,1000,v_now_ms
+  );
+  IF v_result->>'status'<>'FILLED' OR (v_result->>'gross_paise')::bigint<>19800
+     OR (v_result->>'reserved_cash_paise')::bigint<>0 THEN
+    RAISE EXCEPTION 'Intraday LIMIT BUY fill did not atomically debit gross and release reserve';
+  END IF;
+  v_result:=public.execute_paper_intraday_limit_fill(
+    repeat('1',64),9900,v_now_ms-1000,1000,v_now_ms
+  );
+  IF (v_result->>'already_filled')::boolean IS NOT TRUE THEN
+    RAISE EXCEPTION 'Intraday LIMIT BUY fill retry was not idempotent';
+  END IF;
+
+  -- SELL fill realizes P&L and releases only the shares reserved by this order.
+  PERFORM public.submit_paper_intraday_limit_order(
+    '22222222-2222-4222-8222-222222222222',repeat('3',64),
+    '33333333-3333-4333-8333-333333333333',repeat('4',64),
+    'NSE_EQ|INTRA_LIMIT_CI','INTRA_LIMIT_CI','NSE','SELL',3,11000
+  );
+  v_now_ms:=floor(extract(epoch from clock_timestamp())*1000)::bigint;
+  v_result:=public.execute_paper_intraday_limit_fill(
+    repeat('3',64),11000,v_now_ms-1000,1000,v_now_ms
+  );
+  IF v_result->>'status'<>'FILLED' OR (v_result->>'realized_pnl_paise')::bigint<>3000 THEN
+    RAISE EXCEPTION 'Intraday LIMIT SELL fill did not realize expected gross P&L';
+  END IF;
+  SELECT quantity,reserved_quantity INTO v_qty,v_reserved
+   FROM public.paper_equity_positions WHERE user_id='22222222-2222-4222-8222-222222222222'
+     AND product='INTRADAY' AND instrument_key='NSE_EQ|INTRA_LIMIT_CI';
+  IF v_qty<>7 OR v_reserved<>0 THEN
+    RAISE EXCEPTION 'Intraday LIMIT SELL fill did not update quantity and release shares';
+  END IF;
+
   PERFORM public.submit_paper_intraday_limit_order(
     '22222222-2222-4222-8222-222222222222',repeat('e',64),
     'cccccccc-cccc-4ccc-8ccc-cccccccccccc',repeat('f',64),
