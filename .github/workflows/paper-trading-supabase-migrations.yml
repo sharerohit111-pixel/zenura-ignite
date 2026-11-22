@@ -1153,7 +1153,7 @@ jobs:
                   AND tablename IN ('paper_accounts','paper_equity_positions',
                     'paper_derivative_positions','paper_orders',
                     'paper_derivative_orders','paper_watchlists')
-                  AND qual LIKE '%current_paper_user_id()%') <> 6 THEN
+                  AND qual LIKE '%auth.uid()%') <> 6 THEN
               RAISE EXCEPTION 'Expected six user-scoped SELECT policies were not found';
             END IF;
             IF has_function_privilege('anon','public.rls_auto_enable()','EXECUTE')
@@ -1163,12 +1163,6 @@ jobs:
             END IF;
             IF NOT has_function_privilege('postgres','public.rls_auto_enable()','EXECUTE') THEN
               RAISE EXCEPTION 'RLS auto-enable function owner execution was unexpectedly revoked';
-            END IF;
-            IF has_function_privilege('anon','public.current_paper_user_id()','EXECUTE')
-               OR NOT has_function_privilege('authenticated','public.current_paper_user_id()','EXECUTE')
-               OR NOT has_function_privilege('service_role','public.current_paper_user_id()','EXECUTE')
-               OR has_table_privilege('anon','public.paper_user_identity_map','SELECT') THEN
-              RAISE EXCEPTION 'Firebase identity resolver grants are not private and least-privilege';
             END IF;
             IF has_table_privilege('authenticated','public.paper_accounts','INSERT')
                OR has_table_privilege('authenticated','public.paper_accounts','UPDATE')
@@ -1220,7 +1214,7 @@ jobs:
             END;
           END
           $$;
-          SELECT set_config('request.jwt.claims','{"sub":"firebase-test-user-two","role":"authenticated"}',false);
+          SELECT set_config('request.jwt.claims','{"sub":"22222222-2222-4222-8222-222222222222","role":"authenticated"}',false);
           DO $$
           BEGIN
             IF (SELECT count(*) FROM public.paper_accounts) <> 1
