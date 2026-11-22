@@ -71,6 +71,13 @@ test("Manual production deployment keeps the leased LIMIT worker active in the g
  assert.doesNotMatch(deployWorkflow,/gcloud run jobs deploy|gcloud scheduler jobs create|firebase deploy|firebase functions:deploy|service_account_key:/i);
 });
 
+test("Equity protective create/list APIs validate user ownership and verified cash instruments",()=>{
+ assert.match(server,/app\.post\("\/paper\/protective-orders"/);
+ assert.match(server,/create_paper_equity_protective_order/);
+ assert.match(server,/app\.get\("\/paper\/protective-orders"/);
+ assert.match(server,/instrument\.instrument_type==="EQ"/);
+ assert.match(server,/\["NSE_EQ","BSE_EQ"\]\.includes\(instrument\.segment\)/);
+});
 test("Protective-order cancellation API is authenticated and delegates to the owner-bound RPC",()=>{
  assert.match(server,/app\.post\("\/paper\/protective-orders\/:orderId\/cancel"/);
  assert.match(server,/userDb\.rpc\("cancel_paper_protective_order"/);
