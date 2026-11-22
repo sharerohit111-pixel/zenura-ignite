@@ -89,9 +89,9 @@ test("brokerage override is included in GST base and zero brokerage is supported
  const standard=calculateLongOptionTradeCharges({grossPaise:81250,exchange:"NSE",side:"BUY",brokeragePaise:2000});
  const zero=calculateLongOptionTradeCharges({grossPaise:81250,exchange:"NSE",side:"BUY",brokeragePaise:0});
  assert.equal(standard.gstPaise,365);
- assert.equal(zero.gstPaise,6);
+ assert.equal(zero.gstPaise,5);
  assert.equal(zero.brokeragePaise,0);
- assert.equal(zero.totalChargesPaise,standard.totalChargesPaise-2359);
+ assert.equal(zero.totalChargesPaise,standard.totalChargesPaise-2360);
 });
 
 test("rejects unsafe integer turnover and brokerage boundaries",()=>{
