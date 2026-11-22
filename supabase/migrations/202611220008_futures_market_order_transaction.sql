@@ -123,6 +123,9 @@ begin
    for update;
   v_has_position := found;
   if v_has_position then
+    if v_position.product<>p_product then
+      raise exception 'An open futures position cannot switch between Intraday and Delivery products.' using errcode='23514';
+    end if;
     v_old_qty := v_position.net_quantity;
     v_old_abs := abs(v_old_qty);
     v_old_avg := v_position.average_price_paise;
@@ -185,11 +188,11 @@ begin
      where user_id=p_user_id and instrument_key=p_instrument_key;
   else
     insert into public.paper_futures_positions(
-      user_id,instrument_key,trading_symbol,exchange,segment,expiry,
+      user_id,instrument_key,trading_symbol,exchange,segment,expiry,product,
       lot_size,tick_size_paise,net_quantity,average_price_paise,
       reserved_margin_paise,realized_pnl_paise,updated_at
     ) values (
-      p_user_id,p_instrument_key,p_trading_symbol,p_exchange,p_segment,p_expiry,
+      p_user_id,p_instrument_key,p_trading_symbol,p_exchange,p_segment,p_expiry,p_product,
       p_lot_size,p_tick_size_paise,v_new_qty,v_new_avg,
       v_new_margin,v_realized,now()
     )
@@ -198,6 +201,7 @@ begin
       exchange=excluded.exchange,
       segment=excluded.segment,
       expiry=excluded.expiry,
+      product=excluded.product,
       lot_size=excluded.lot_size,
       tick_size_paise=excluded.tick_size_paise,
       net_quantity=excluded.net_quantity,
