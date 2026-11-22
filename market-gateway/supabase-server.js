@@ -935,6 +935,23 @@ async function start(){
   await loadProto();
   app.listen(PORT,"0.0.0.0",()=>console.log("Supabase-native ZENURA market gateway listening on",PORT));
   refreshInstrumentCache().catch(error=>console.error("Initial instrument refresh failed:",error.message));
+  if(process.env.PAPER_LIMIT_WORKER_ENABLED==="true"){
+    const intervalMs=Math.max(1000,Math.min(10000,Number(process.env.PAPER_LIMIT_WORKER_INTERVAL_MS)||2000));
+    let workerBusy=false;
+    const runWorker=async()=>{
+      if(workerBusy)return;
+      workerBusy=true;
+      try{
+        const result=await runPaperLimitWorker({maxOrders:50});
+        if(result.filled||result.failed)console.log("Paper LIMIT worker cycle",JSON.stringify(result));
+      }catch(error){console.error("Paper LIMIT worker cycle failed:",error.message);}
+      finally{workerBusy=false;}
+    };
+    runWorker().catch(()=>{});
+    const workerTimer=setInterval(runWorker,intervalMs);
+    workerTimer.unref?.();
+    console.log("Paper LIMIT worker enabled; interval",intervalMs,"ms");
+  }
 }
 if(require.main===module)start().catch(error=>{console.error("Supabase gateway startup failed:",error.message);process.exit(1);});
 module.exports={app,start,runPaperLimitWorker};
