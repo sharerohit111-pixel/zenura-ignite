@@ -324,3 +324,8 @@ All testing remains confined to GitHub Actions disposable PostgreSQL. No connect
 - The six authenticated user-read policies now wrap `auth.uid()` in a scalar `SELECT` to avoid per-row re-evaluation on large scans.
 - Expanded CI asserts those function search-path settings and all six user-scoped policies, and exercises two-tenant RLS reads for accounts, equity positions, derivative positions, equity orders, derivative orders and watchlists. It also attempts a cross-tenant watchlist insert and expects denial.
 - These assertions are being added to the audit branch's disposable PostgreSQL workflow; they are not yet a completed run and do not replace testing with Supabase's real Auth/PostgREST roles or Database Advisors.
+
+
+### Data API exposure note (current Supabase platform behavior)
+
+RLS and SQL grants are separate from whether a table is exposed through the Supabase Data API. Supabase's October 30, 2026 breaking change makes new public-schema tables opt-in rather than automatically exposed. The migrations deliberately do not attempt to alter project-level Data API exposure settings; before an eventual app cutover, verify only the intended read tables are exposed and keep privileged transaction/provider tables unexposed. The actual project's settings remain untouched.
