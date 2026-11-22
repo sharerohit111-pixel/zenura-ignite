@@ -1542,10 +1542,11 @@ jobs:
           DECLARE
             v_now bigint:=floor(extract(epoch from clock_timestamp())*1000)::bigint;
             v_result jsonb;
+            v_execution_id text:=md5(gen_random_uuid()::text)||md5(gen_random_uuid()::text);
           BEGIN
             v_result:=public.execute_paper_equity_protective_fill(
               'abababab-abab-4bab-8bab-abababababab',
-              repeat('a',64),repeat('b',64),9000,v_now,v_now
+              v_execution_id,repeat('b',64),9000,v_now,v_now
             );
             IF v_result->>'status'<>'FILLED'
                OR (v_result->>'realized_pnl_paise')::bigint<>4000 THEN
@@ -1553,7 +1554,7 @@ jobs:
             END IF;
             v_result:=public.execute_paper_equity_protective_fill(
               'abababab-abab-4bab-8bab-abababababab',
-              repeat('a',64),repeat('b',64),9000,v_now,v_now
+              v_execution_id,repeat('b',64),9000,v_now,v_now
             );
             IF (v_result->>'idempotent_replay')::boolean IS NOT TRUE THEN
               RAISE EXCEPTION 'Equity protective retry was not idempotent';
@@ -1564,7 +1565,7 @@ jobs:
               RAISE EXCEPTION 'Equity protective fill did not reduce position exactly once';
             END IF;
             IF (SELECT count(*) FROM public.paper_orders
-                WHERE order_id=repeat('a',64) AND status='FILLED')<>1 THEN
+                WHERE order_id=v_execution_id AND status='FILLED')<>1 THEN
               RAISE EXCEPTION 'Equity protective fill did not create one canonical filled order';
             END IF;
           END
