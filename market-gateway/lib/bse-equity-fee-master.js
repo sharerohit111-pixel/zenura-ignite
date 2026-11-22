@@ -72,7 +72,7 @@ function parseBseStandardizedScripMaster(csvText,{sourceDate}={}){
       ||!/^\d{2}[A-Z0-9]{10}$/.test(record.isin)
       ||!record.groupName||record.groupName.length>3
       ||!["Y","N"].includes(record.exclusiveFlag))
-      throw new Error("BSE active equity row "+(line+1)+" has invalid scrip, ISIN, group or exclusive metadata.");
+      throw new Error("BSE active equity row "+(line+1)+" has invalid scrip, ISIN, group or exclusive metadata: "+JSON.stringify({scripCode:record.scripCode,instrumentCode:record.instrumentCode,groupName:record.groupName,isin:record.isin,exclusiveFlag:record.exclusiveFlag,fieldCount:cells.length}));
     const prior=byIsin.get(record.isin);
     if(prior){
       if(prior.groupName!==record.groupName||prior.exclusiveFlag!==record.exclusiveFlag)
