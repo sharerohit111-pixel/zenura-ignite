@@ -165,7 +165,7 @@ BEGIN
   -- BSE Intraday LIMIT uses its own verified session and the same group-specific fee resolver.
   v_result:=public.submit_paper_intraday_limit_order(
     '66666666-6666-4666-8666-666666666666',repeat('6',64),
-    '66666666-6666-4666-8666-666666666666',repeat('7',64),
+    '66666666-6666-4666-8666-666666666667',repeat('7',64),
     'BSE_EQ|INE002A01018','RELIANCE','BSE','BUY',2,100000
   );
   SELECT reserved_cash_paise INTO v_reserved FROM public.paper_accounts
