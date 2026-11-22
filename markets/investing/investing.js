@@ -221,6 +221,7 @@
   }
   async function submitOrder(side){
     if(!selected||!lastQuote)return;
+    if(selected.exchange!=="NSE"){safeText(orderStatus,"BSE Paper Investing orders are disabled until exact scrip-group charges are verified.");return;}
     const uid=connector()?.getUserId?.(),quantity=Number(quantityInput.value);
     if(!uid||!Number.isSafeInteger(quantity)||quantity<1||quantity>1000000){safeText(orderStatus,"Enter a valid quantity and sign in.");return;}
     const fingerprint=[selected.instrument_key,side,quantity].join("|");
