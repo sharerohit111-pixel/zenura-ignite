@@ -51,6 +51,19 @@ $$;
 revoke all on function public._paper_nse_cash_equity_charges(bigint,text,text)
   from public,anon,authenticated,service_role;
 
+-- Do not strand pre-migration gross-only reservations. Drain/cancel all open
+-- LIMIT orders before this forward-only accounting change is applied.
+DO $limit_fee_migration_preflight$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM public.paper_orders
+     WHERE order_type='LIMIT' AND status IN ('PENDING','PARTIALLY_FILLED')
+  ) THEN
+    RAISE EXCEPTION 'Cancel or expire all open LIMIT orders before applying fee-inclusive LIMIT settlement';
+  END IF;
+END
+$limit_fee_migration_preflight$;
+
 create or replace function public.submit_paper_limit_order(
   p_user_id uuid,
   p_order_id text,
