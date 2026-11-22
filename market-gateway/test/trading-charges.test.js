@@ -235,3 +235,8 @@ test("NSE intraday schedule version tracks the 1 March 2026 transaction schedule
  const c=calculateEquityIntradayCharges({grossPaise:100000,exchange:"NSE",side:"BUY"});
  assert.equal(c.scheduleVersion,"2026-03-01");
 });
+
+test("NSE delivery SELL fails closed when minimum charges consume all proceeds",()=>{
+ const {calculateEquityDeliveryCharges}=require("../lib/trading-charges");
+ assert.throws(()=>calculateEquityDeliveryCharges({grossPaise:1,exchange:"NSE",side:"SELL"}),{status:422});
+});
