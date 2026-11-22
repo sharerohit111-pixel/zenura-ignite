@@ -11,12 +11,12 @@ const TABLES=Object.freeze({
 function httpError(message,status){return Object.assign(new Error(message),{status});}
 function bearerToken(request){
   const value=request?.get?.("authorization")||"";
-  const match=/^Bearer ([^\\s,]+)$/i.exec(value);
+  const match=/^Bearer ([^\s,]+)$/i.exec(value);
   if(!match)throw httpError("Sign in required",401);
   return match[1];
 }
 function createSupabasePaperReadTransport(options={}){
-  const base=String(options.supabaseUrl||"").replace(/\\/+$/,"");
+  const base=String(options.supabaseUrl||"").replace(/\/+$/,"");
   const publishableKey=options.publishableKey;
   const identityAdapter=options.identityAdapter;
   const fetchImpl=options.fetchImpl||globalThis.fetch;
@@ -34,6 +34,7 @@ function createSupabasePaperReadTransport(options={}){
     if(!Number.isInteger(offset)||offset<0||offset>1000000)throw httpError("Read offset is invalid",400);
     const token=bearerToken(request);
     const identity=await identityAdapter.resolveIdentity({request,auth});
+    if(!identity||typeof identity.supabaseUserId!=="string"||!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(identity.supabaseUserId))throw httpError("Resolved Paper Trading identity is invalid",503);
     const url=new URL(base+"/rest/v1/"+table);
     url.searchParams.set("select","*");
     url.searchParams.set("user_id","eq."+identity.supabaseUserId);
