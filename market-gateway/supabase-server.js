@@ -408,7 +408,8 @@ app.post("/paper/protective-orders/:orderId/cancel",async(req,res)=>{
   try{
     const {user}=await auth(req),orderId=String(req.params.orderId||"");
     if(!/^[0-9a-f-]{36}$/i.test(orderId))return res.status(400).json({error:"Invalid protective order id."});
-    const result=await runtime.callUserRpc(user,"cancel_paper_protective_order",{p_protective_order_id:orderId});
+    const {data:result,error}=await userDb.rpc("cancel_paper_protective_order",{p_protective_order_id:orderId,p_user_id:user.id});
+    if(error)throw Object.assign(new Error("Protective order cancellation could not be completed."),{status:409});
     res.set("Cache-Control","private, no-store").json({
       orderId,status:result?.status||"UNKNOWN",
       cancelled:result?.cancelled===true,
