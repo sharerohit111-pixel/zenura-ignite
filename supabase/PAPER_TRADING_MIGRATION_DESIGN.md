@@ -165,3 +165,29 @@ Added `supabase/migrations/202611220004_paper_account_initialization.sql`:
 - It is SECURITY DEFINER with a fixed search path and executable only by `service_role`. The trusted backend must derive the user ID from a verified session; do not accept an arbitrary browser-supplied user ID.
 
 This remains a draft. It has not been executed against staging or tested under concurrent calls. Account provisioning for migrated Firebase users must be handled by a separate controlled migration path, not by resetting their existing balances to the new-user default.
+
+
+## Options CE/PE transaction audit — next implementation gate (2026-11-22)
+
+The core schema currently provides:
+- `paper_derivative_positions`: one net long position per user/instrument, CE/PE type, expiry, net quantity, average premium and cost basis.
+- `paper_derivative_orders`: MARKET-only order history with CE/PE, BUY/SELL, quantity, lots, lot size, premium execution price, quote timestamp/age, gross premium, charges, total debit, net credit, realized P&L, cash delta and charge breakdown.
+- Derivative positions and order history have own-user SELECT policies; writes remain server-only.
+
+### Why an execution RPC is not added in this pass
+
+A correct derivative transaction must reproduce the existing application's precise rules for:
+1. BUY premium debit, SELL credit, and whether SELL is allowed only against an existing long position (no naked short/options margin).
+2. Quantity-versus-lots consistency and instrument-master lot-size validation.
+3. Average premium/cost-basis allocation on partial SELL and realized P&L.
+4. Brokerage, STT, exchange transaction charges, GST, SEBI charges, stamp duty and rounding rules—or the current product's explicit exclusions.
+5. Cash delta, total debit/net credit and charges-breakdown semantics.
+6. Fresh quote validation and idempotent retry behavior.
+
+The currently inspected Firebase source files cover Upstox OAuth and the equity pending-LIMIT worker; they did not expose the derivative execution implementation or its exact fee/math contract. GitHub code search did not return the derivative implementation, so those rules remain unverified. Do not infer them from column names.
+
+### Required source audit before implementing
+
+Retrieve the exact current derivative order handler, derivative math/charges helper, instrument validation and tests from the integration branch. Then create parity fixtures from existing behavior and implement a single account-locking, idempotent SQL transaction for CE/PE. Do not enable naked short positions or change charges policy without explicit evidence from current code/product requirements.
+
+No Options transaction RPC has been added in this pass. No database changes were applied. This is an intentional safety gate, not a claim that Options migration is complete.
