@@ -39,3 +39,10 @@ test("Paper Investing responsive styles include compact tablet and mobile layout
  assert.match(css,/@media\s*\(max-width:\s*1050px\)/);
  assert.match(css,/@media\s*\(max-width:\s*700px\)/);
 });
+
+test("Professional chart maps LINE to line and freehand tool to native brush",()=>{
+ const chart=fs.readFileSync(path.join(root,"../stocks/chart-engine.js"),"utf8");
+ assert.match(chart,/chartType==="LINE"\?"line"/);
+ assert.match(chart,/brush:"BRUSH"/);
+ assert.match(migration,/'BRUSH'/);
+});
