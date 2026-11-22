@@ -79,7 +79,8 @@ function createSupabaseRuntime(options = {}) {
     authenticateRequest,
     createUserClient,
     callUserRpc,
-    // Intentionally expose no raw service-role key or service client.
+    // Server-only privileged client; never imported by browser modules.
+    serviceDb: serviceClient,
     projectUrl: supabaseUrl
   });
 }
