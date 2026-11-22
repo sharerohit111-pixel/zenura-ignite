@@ -112,3 +112,46 @@ test("Firebase BigInt partial-close reference vectors conserve fee-inclusive bas
  assert.equal(remaining2,32926);
  assert.equal(remaining2+second+first,98778);
 });
+
+test("NSE futures BUY applies 2026 brokerage, exchange, SEBI, stamp and GST charges",()=>{
+ const {calculateFuturesTradeCharges}=require("../lib/trading-charges");
+ const c=calculateFuturesTradeCharges({grossPaise:100000000,exchange:"NSE",side:"BUY"});
+ assert.equal(c.brokeragePaise,2000);
+ assert.equal(c.exchangeTransactionPaise,1830);
+ assert.equal(c.ipftPaise,0);
+ assert.equal(c.sebiPaise,100);
+ assert.equal(c.stampDutyPaise,2000);
+ assert.equal(c.sttPaise,0);
+ assert.equal(c.gstPaise,689);
+ assert.equal(c.totalChargesPaise,6619);
+ assert.equal(c.scheduleVersion,"2026-04-01");
+});
+test("NSE futures SELL applies the 0.05 percent STT rate effective April 2026",()=>{
+ const {calculateFuturesTradeCharges}=require("../lib/trading-charges");
+ const c=calculateFuturesTradeCharges({grossPaise:100000000,exchange:"NSE",side:"SELL"});
+ assert.equal(c.sttPaise,50000);
+ assert.equal(c.stampDutyPaise,0);
+ assert.equal(c.exchangeTransactionPaise,1830);
+ assert.equal(c.gstPaise,689);
+ assert.equal(c.totalChargesPaise,54619);
+});
+test("BSE futures schedule does not apply NSE exchange transaction charges",()=>{
+ const {calculateFuturesTradeCharges}=require("../lib/trading-charges");
+ const c=calculateFuturesTradeCharges({grossPaise:100000000,exchange:"BSE",side:"BUY"});
+ assert.equal(c.exchangeTransactionPaise,0);
+ assert.equal(c.totalChargesPaise,4460);
+});
+test("futures brokerage is the lower of 0.05 percent or Rs 20 per executed order",()=>{
+ const {calculateFuturesTradeCharges}=require("../lib/trading-charges");
+ const small=calculateFuturesTradeCharges({grossPaise:100000,exchange:"NSE",side:"BUY"});
+ const large=calculateFuturesTradeCharges({grossPaise:100000000,exchange:"NSE",side:"BUY"});
+ assert.equal(small.brokeragePaise,50);
+ assert.equal(large.brokeragePaise,2000);
+});
+test("futures charge calculator rejects invalid turnover, side, exchange and unsafe values",()=>{
+ const {calculateFuturesTradeCharges}=require("../lib/trading-charges");
+ assert.throws(()=>calculateFuturesTradeCharges({grossPaise:0,exchange:"NSE"}),/turnover/);
+ assert.throws(()=>calculateFuturesTradeCharges({grossPaise:1000,exchange:"MCX"}),/NSE and BSE/);
+ assert.throws(()=>calculateFuturesTradeCharges({grossPaise:1000,exchange:"NSE",side:"HOLD"}),/side/);
+ assert.throws(()=>calculateFuturesTradeCharges({grossPaise:Number.MAX_SAFE_INTEGER+1,exchange:"NSE"}),/turnover/);
+});
