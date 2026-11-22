@@ -60,6 +60,8 @@ Use a dedicated Google Cloud project and a dedicated runtime service account. Th
 - `SUPABASE_PUBLISHABLE_KEY=<Supabase publishable key>`
 - `UPSTOX_REDIRECT_URI=https://market-api.zenuraignite.com/upstox/oauth/callback`
 - `ZENURA_APP_REDIRECT_URI=https://zenuraignite.com/markets/stocks/`
+- `MARKET_DATA_RIGHTS_APPROVED=true` only after written approval is received
+- `MARKET_DATA_RIGHTS_REFERENCE` containing the Upstox/licensed-vendor approval reference
 - `ALLOWED_ORIGINS=https://zenuraignite.com`
 - `MAX_INSTRUMENT_KEYS=100`
 - `INDIAN_PAPER_STARTING_CASH_PAISE=100000000` (documented product default; runtime account RPC remains authoritative)
@@ -132,7 +134,7 @@ Configure these GitHub Actions **variables**:
 - `UPSTOX_REDIRECT_URI` (must exactly equal `MARKET_GATEWAY_URL/upstox/oauth/callback`)
 - `ZENURA_APP_REDIRECT_URI=https://zenuraignite.com/markets/stocks/`
 
-Create the four Google Secret Manager secrets checked by the workflow: `zenura-supabase-service-role`, `zenura-upstox-encryption-key`, `zenura-upstox-client-id`, and `zenura-upstox-client-secret`. Grant the gateway and worker runtime service accounts only the Secret Manager access they need. The scheduler service account needs `roles/run.invoker` on the LIMIT Cloud Run Job. Configure the custom gateway domain and Upstox callback before dispatching the workflow. The workflow deliberately does not deploy from a draft feature branch.
+Review [MARKET-DATA-COMPLIANCE.md](./MARKET-DATA-COMPLIANCE.md) first. The production workflow fails closed unless written market-data rights approval is recorded.\n\nCreate the four Google Secret Manager secrets checked by the workflow: `zenura-supabase-service-role`, `zenura-upstox-encryption-key`, `zenura-upstox-client-id`, and `zenura-upstox-client-secret`. Grant the gateway and worker runtime service accounts only the Secret Manager access they need. The scheduler service account needs `roles/run.invoker` on the LIMIT Cloud Run Job. Configure the custom gateway domain and Upstox callback before dispatching the workflow. The workflow deliberately does not deploy from a draft feature branch.
 
 ## 5. Scheduled Supabase Paper LIMIT worker
 
