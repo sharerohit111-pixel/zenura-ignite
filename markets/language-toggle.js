@@ -3,10 +3,8 @@
   const KEY="zenura-language-v1";
   const HI=Object.freeze({
     "ZENURA IGNITE · Indian Stock Market":"ZENURA IGNITE · भारतीय शेयर बाजार",
-    "ZENURA IGNITE · Paper Investing":"ZENURA IGNITE · पेपर निवेश",
-    "ZENURA IGNITE · Paper Trading & Paper Investing":"ZENURA IGNITE · पेपर ट्रेडिंग और पेपर निवेश",
-    "Paper Trading":"पेपर ट्रेडिंग","Paper Investing":"पेपर निवेश",
-    "PAPER TRADING":"पेपर ट्रेडिंग","PAPER INVESTING":"पेपर निवेश",
+    "Paper Trading":"पेपर ट्रेडिंग",
+    "PAPER TRADING":"पेपर ट्रेडिंग",
     "← ALL MARKETS":"← सभी मार्केट","INDIAN STOCK MARKET":"भारतीय शेयर बाजार",
     "NSE · BSE · DERIVATIVES":"NSE · BSE · डेरिवेटिव्स",
     "Indian Market":"भारतीय बाजार","Terminal":"टर्मिनल",
