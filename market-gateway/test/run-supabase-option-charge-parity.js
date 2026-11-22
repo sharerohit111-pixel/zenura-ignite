@@ -56,7 +56,7 @@ const queries = fixture.vectors.map((vector) => {
     'netCreditPaise',CASE WHEN side='SELL' THEN gross-(brokerage+exchange_fee+ipft+sebi+stamp+gst+stt) ELSE NULL END
   )::text
   FROM totals`;
-}).join("\nUNION ALL\n");
+});
 
 for (let i = 0; i < fixture.vectors.length; i += 1) {
   const vector = fixture.vectors[i];
