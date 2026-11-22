@@ -8,6 +8,7 @@ on:
       - "market-gateway/test/trading-charges.test.js"
       - "market-gateway/test/derivative-order-transaction.test.js"
       - "market-gateway/test/derivative-contract.test.js"
+      - "supabase/tests/**"
   workflow_dispatch:
 
 jobs:
@@ -178,6 +179,8 @@ jobs:
           $$;
           RESET ROLE;
           SQL
+      - name: Verify authenticated table grants and RLS watchlist isolation
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/rls_permissions.sql
       - name: Exercise MARKET idempotency and LIMIT reservation lifecycle
         run: |
           psql -v ON_ERROR_STOP=1 <<'SQL'
