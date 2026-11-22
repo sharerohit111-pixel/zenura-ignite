@@ -1484,6 +1484,44 @@ jobs:
           $$;
           RESET ROLE;
           SQL
+      - name: Verify equity protective fill RPC is server-only and schema-complete
+        run: |
+          psql -v ON_ERROR_STOP=1 <<'SQL'
+          DO $protective_rpc$
+          BEGIN
+            IF to_regprocedure('public.execute_paper_equity_protective_fill(uuid,text,text,bigint,bigint,bigint)') IS NULL THEN
+              RAISE EXCEPTION 'Equity protective fill RPC is missing';
+            END IF;
+            IF has_function_privilege('anon',
+                 'public.execute_paper_equity_protective_fill(uuid,text,text,bigint,bigint,bigint)','EXECUTE')
+               OR has_function_privilege('authenticated',
+                 'public.execute_paper_equity_protective_fill(uuid,text,text,bigint,bigint,bigint)','EXECUTE')
+               OR NOT has_function_privilege('service_role',
+                 'public.execute_paper_equity_protective_fill(uuid,text,text,bigint,bigint,bigint)','EXECUTE') THEN
+              RAISE EXCEPTION 'Equity protective fill RPC is not restricted to service_role';
+            END IF;
+            IF NOT (SELECT relrowsecurity FROM pg_class WHERE oid=to_regclass('public.paper_protective_orders')) THEN
+              RAISE EXCEPTION 'Protective order RLS is disabled';
+            END IF;
+            IF NOT EXISTS (
+              SELECT 1 FROM information_schema.columns
+              WHERE table_schema='public' AND table_name='paper_protective_orders'
+                AND column_name='execution_order_id'
+            ) OR NOT EXISTS (
+              SELECT 1 FROM pg_indexes
+              WHERE schemaname='public' AND indexname='paper_protective_orders_execution_order_idx'
+            ) THEN
+              RAISE EXCEPTION 'Protective execution idempotency schema is incomplete';
+            END IF;
+            IF COALESCE(array_to_string((
+              SELECT proconfig FROM pg_proc
+              WHERE oid=to_regprocedure('public.execute_paper_equity_protective_fill(uuid,text,text,bigint,bigint,bigint)')
+            ),','),'') NOT LIKE '%search_path=""%' THEN
+              RAISE EXCEPTION 'Protective fill RPC must pin an empty search_path';
+            END IF;
+          END
+          $protective_rpc$;
+          SQL
       - name: Verify expected schema and RPC registration
         run: |
           psql -v ON_ERROR_STOP=1 <<'SQL'
