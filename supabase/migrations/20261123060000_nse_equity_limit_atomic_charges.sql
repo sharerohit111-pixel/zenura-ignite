@@ -17,8 +17,8 @@ declare
   v_total bigint;
 begin
   if p_gross_paise is null or p_gross_paise<1 or p_gross_paise>9007199254740991
-     or p_product not in ('DELIVERY','INTRADAY')
-     or p_side not in ('BUY','SELL') then
+     or p_product is null or p_product not in ('DELIVERY','INTRADAY')
+     or p_side is null or p_side not in ('BUY','SELL') then
     raise exception using errcode='22023',message='Invalid NSE cash-equity charge request';
   end if;
   v_brokerage:=case when p_product='DELIVERY' then 2000::bigint
