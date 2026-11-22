@@ -51,7 +51,7 @@ begin
        or x.source_reference is null or length(btrim(x.source_reference)) not between 1 and 500
        or x.verified_at is null or x.verified_at>now()
        or (x.exchange='NSE' and lower(x.source_reference) !~ '^https://([a-z0-9-]+\.)*nseindia\.com(/|$)')
-       or (x.exchange='BSE' and lower(x.source_reference) !~ '^https?://([a-z0-9-]+\.)*bseindia\.com(/|$)')
+       or (x.exchange='BSE' and lower(x.source_reference) !~ '^https://([a-z0-9-]+\.)*bseindia\.com(/|$)')
        or (x.is_trading_day is true and (
           x.session_kind not in ('REGULAR','SPECIAL')
           or x.open_minute is null or x.close_minute is null
