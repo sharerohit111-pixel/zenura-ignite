@@ -5,7 +5,7 @@
 - `.github/workflows/audit-supabase-role-rls-security.yml` is a manual (`workflow_dispatch`) audit-only workflow.
 - It checks out this isolated audit branch, then checks out the current draft source branch for PR #70 read-only.
 - It applies the five draft migrations to a disposable PostgreSQL 16 service container only.
-- `scripts/ci/supabase-role-rls-security.sql` checks service-role-only RPC execution, absence of PUBLIC/anon/authenticated RPC execution, RLS enabled on all 13 draft tables, server-owned table write grants, authenticated read grants, and owner-scoped account/watchlist behavior.
+- `scripts/ci/supabase-role-rls-security.sql` checks service-role-only RPC execution, absence of PUBLIC/anon/authenticated RPC execution, RLS enabled on all 13 draft tables, server-owned table write grants, authenticated SELECT grants and owner-scoped SELECT policies across all six user-readable tables, plus runtime two-user account/watchlist isolation. Watchlist runtime checks cover cross-user insert/update/delete denial and own-row update/delete; the second user's row is seeded by the harness administrator.
 
 ## How to run
 
@@ -21,6 +21,6 @@ The workflow and SQL assertion files were committed and fetched back from GitHub
 
 ## Known limits
 
-This first security harness tests the role/ACL boundary, RLS enablement, account read isolation and watchlist owner checks. It does not yet prove cross-user isolation for every individual read table, nor does it test concurrent transaction races, Firebase parity, or the trusted HTTP adapter's Firebase-token-to-Supabase-UUID mapping. Those remain separate follow-up stages.
+This first security harness tests the role/ACL boundary, RLS enablement, account read isolation and watchlist CRUD ownership. For equity/derivative positions and cash/derivative orders, it verifies the owner-scoped SELECT policy and grants structurally, but does not yet seed and exercise cross-user rows for each table. It also does not test concurrent transaction races, Firebase parity, or the trusted HTTP adapter's Firebase-token-to-Supabase-UUID mapping. Those remain separate follow-up stages.
 
 No PR #70 SQL or workflow was edited. No PR was created or merged. No production database or Firebase resource was changed.
