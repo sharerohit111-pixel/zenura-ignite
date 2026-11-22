@@ -259,3 +259,174 @@ grant execute on function public.expire_paper_intraday_limit_orders(integer)
 
 comment on function public.expire_paper_intraday_limit_orders(integer) is
   'Service-role worker only. Expires pending Intraday LIMIT orders at session close, outside the session, on a new IST date, or when trusted session data is absent.';
+
+
+-- Atomic Intraday LIMIT fill. Uses the same gross-only equity accounting contract
+-- as execute_paper_market_order; no unsupported fee schedule is invented here.
+create or replace function public.execute_paper_intraday_limit_fill(
+  p_order_id text,
+  p_execution_price_paise bigint,
+  p_quote_timestamp_ms bigint,
+  p_quote_age_ms bigint,
+  p_now_ms bigint
+) returns jsonb
+language plpgsql security definer set search_path=''
+as $$
+declare
+  v_order public.paper_orders%rowtype;
+  v_account public.paper_accounts%rowtype;
+  v_position public.paper_equity_positions%rowtype;
+  v_session public.paper_exchange_sessions%rowtype;
+  v_now timestamptz:=clock_timestamp();
+  v_now_ms bigint;
+  v_age bigint;
+  v_gross bigint;
+  v_allocated_cost bigint;
+  v_remaining_cost bigint;
+  v_remaining_qty integer;
+  v_new_qty integer;
+  v_new_cost bigint;
+  v_cash bigint;
+  v_reserved_cash bigint;
+  v_realized bigint:=0;
+  v_aggregate_realized bigint;
+  v_intraday_realized bigint;
+  v_today date;
+  v_minute integer;
+begin
+  if p_order_id is null or p_order_id !~ '^[a-f0-9]{64}$'
+     or p_execution_price_paise is null or p_execution_price_paise<=0
+     or p_quote_timestamp_ms is null or p_quote_timestamp_ms<=0
+     or p_quote_age_ms is null or p_quote_age_ms<0 or p_quote_age_ms>15000
+     or p_now_ms is null or p_now_ms<=0 then
+    raise exception using errcode='22023',message='Invalid Intraday LIMIT fill request';
+  end if;
+  v_now_ms:=floor(extract(epoch from v_now)*1000)::bigint;
+  v_age:=v_now_ms-p_quote_timestamp_ms;
+  if v_age<0 or v_age>15000 or abs(v_age-p_quote_age_ms)>2000
+     or abs(v_now_ms-p_now_ms)>2000 then
+    raise exception using errcode='22023',message='Intraday LIMIT quote is stale or caller clock is invalid';
+  end if;
+
+  select * into v_order from public.paper_orders where order_id=p_order_id;
+  if not found or v_order.product<>'INTRADAY' or v_order.order_type<>'LIMIT' then
+    raise exception using errcode='P0002',message='Intraday LIMIT order not found';
+  end if;
+  select * into v_account from public.paper_accounts where user_id=v_order.user_id for update;
+  if not found then raise exception using errcode='P0002',message='Paper account is not initialized'; end if;
+  select * into v_order from public.paper_orders where order_id=p_order_id for update;
+  if v_order.status='FILLED' then
+    return jsonb_build_object('order_id',p_order_id,'status','FILLED','already_filled',true,'simulation_only',true);
+  end if;
+  if v_order.status<>'PENDING' or v_order.reservation_released is true then
+    raise exception using errcode='23514',message='Intraday LIMIT order is not fillable';
+  end if;
+
+  v_today:=(v_now at time zone 'Asia/Kolkata')::date;
+  v_minute:=extract(hour from v_now at time zone 'Asia/Kolkata')::integer*60
+            +extract(minute from v_now at time zone 'Asia/Kolkata')::integer;
+  select * into v_session from public.paper_exchange_sessions
+   where exchange=v_order.exchange and session_date=v_today and is_trading_day is true
+     and session_kind in ('REGULAR','SPECIAL') and verified_at<=v_now
+     and length(btrim(source_reference))>0;
+  if not found or v_minute<v_session.open_minute or v_minute>=v_session.close_minute
+     or (v_order.created_at at time zone 'Asia/Kolkata')::date<>v_today then
+    raise exception using errcode='23514',message='Intraday LIMIT fill is outside its verified exchange session';
+  end if;
+  if (v_order.side='BUY' and p_execution_price_paise>v_order.limit_price_paise)
+     or (v_order.side='SELL' and p_execution_price_paise<v_order.limit_price_paise) then
+    raise exception using errcode='23514',message='Execution price does not satisfy the Intraday LIMIT price';
+  end if;
+
+  v_gross:=p_execution_price_paise::numeric*v_order.quantity::numeric;
+  if v_gross<=0 or v_gross>9007199254740991 then
+    raise exception using errcode='22003',message='Intraday LIMIT fill value exceeds supported limits';
+  end if;
+  v_cash:=v_account.cash_paise;
+  v_reserved_cash:=v_account.reserved_cash_paise;
+  v_aggregate_realized:=v_account.realized_pnl_paise;
+  v_intraday_realized:=v_account.intraday_realized_pnl_paise;
+
+  select * into v_position from public.paper_equity_positions
+   where user_id=v_order.user_id and product='INTRADAY'
+     and instrument_key=v_order.instrument_key for update;
+  if v_order.side='BUY' then
+    if v_order.reserved_cash_paise<=0
+       or v_order.reserved_cash_paise<>v_order.limit_price_paise::numeric*v_order.quantity::numeric
+       or v_reserved_cash<v_order.reserved_cash_paise
+       or v_cash-v_reserved_cash-v_account.reserved_margin_paise+v_order.reserved_cash_paise<v_gross then
+      raise exception using errcode='23514',message='Intraday LIMIT BUY cash reservation is inconsistent';
+    end if;
+    if found then
+      if v_position.quantity+v_order.quantity>1000000 then
+        raise exception using errcode='22003',message='Intraday position quantity exceeds supported limit';
+      end if;
+      v_new_qty:=v_position.quantity+v_order.quantity;
+      v_new_cost:=v_position.cost_basis_paise+v_gross;
+      if v_new_cost>9007199254740991 then
+        raise exception using errcode='22003',message='Intraday position cost exceeds supported limit';
+      end if;
+      update public.paper_equity_positions set quantity=v_new_qty,
+        cost_basis_paise=v_new_cost,average_price_paise=round(v_new_cost::numeric/v_new_qty)::bigint,
+        trading_symbol=coalesce(v_order.trading_symbol,trading_symbol),
+        exchange=coalesce(v_order.exchange,exchange),updated_at=v_now
+       where user_id=v_order.user_id and product='INTRADAY' and instrument_key=v_order.instrument_key;
+    else
+      insert into public.paper_equity_positions(user_id,product,instrument_key,trading_symbol,
+        exchange,quantity,average_price_paise,cost_basis_paise,reserved_quantity,updated_at)
+      values(v_order.user_id,'INTRADAY',v_order.instrument_key,v_order.trading_symbol,
+        v_order.exchange,v_order.quantity,p_execution_price_paise,v_gross,0,v_now);
+    end if;
+    v_cash:=v_cash-v_gross;
+    v_reserved_cash:=v_reserved_cash-v_order.reserved_cash_paise;
+  else
+    if not found or v_order.reserved_quantity<>v_order.quantity
+       or v_position.reserved_quantity<v_order.reserved_quantity
+       or v_order.reserved_cash_paise<>0 then
+      raise exception using errcode='23514',message='Intraday LIMIT SELL share reservation is inconsistent';
+    end if;
+    v_allocated_cost:=case when v_order.quantity=v_position.quantity then v_position.cost_basis_paise
+      else floor((v_position.cost_basis_paise::numeric*v_order.quantity
+        +floor(v_position.quantity/2))/v_position.quantity)::bigint end;
+    v_remaining_cost:=v_position.cost_basis_paise-v_allocated_cost;
+    v_remaining_qty:=v_position.quantity-v_order.quantity;
+    v_realized:=v_gross-v_allocated_cost;
+    if v_remaining_qty=0 then
+      delete from public.paper_equity_positions where user_id=v_order.user_id
+        and product='INTRADAY' and instrument_key=v_order.instrument_key;
+    else
+      update public.paper_equity_positions set quantity=v_remaining_qty,
+        cost_basis_paise=v_remaining_cost,
+        average_price_paise=round(v_remaining_cost::numeric/v_remaining_qty)::bigint,
+        reserved_quantity=reserved_quantity-v_order.reserved_quantity,updated_at=v_now
+       where user_id=v_order.user_id and product='INTRADAY' and instrument_key=v_order.instrument_key;
+    end if;
+    v_cash:=v_cash+v_gross;
+    v_aggregate_realized:=v_aggregate_realized+v_realized;
+    v_intraday_realized:=v_intraday_realized+v_realized;
+  end if;
+  if v_cash<0 or v_cash>9007199254740991
+     or v_reserved_cash<0 or v_reserved_cash+v_account.reserved_margin_paise>v_cash
+     or abs(v_aggregate_realized)>9007199254740991
+     or abs(v_intraday_realized)>9007199254740991 then
+    raise exception using errcode='22003',message='Intraday LIMIT account totals exceed supported limits';
+  end if;
+
+  update public.paper_accounts set cash_paise=v_cash,reserved_cash_paise=v_reserved_cash,
+    realized_pnl_paise=v_aggregate_realized,intraday_realized_pnl_paise=v_intraday_realized,
+    version=version+1,updated_at=v_now where user_id=v_order.user_id;
+  update public.paper_orders set status='FILLED',execution_price_paise=p_execution_price_paise,
+    gross_paise=v_gross,realized_pnl_paise=v_realized,quote_timestamp_ms=p_quote_timestamp_ms,
+    quote_age_ms=v_age,reservation_released=true,worker_execution=true,
+    filled_at=v_now,updated_at=v_now where order_id=p_order_id;
+  return jsonb_build_object('order_id',p_order_id,'status','FILLED',
+    'execution_price_paise',p_execution_price_paise,'gross_paise',v_gross,
+    'realized_pnl_paise',v_realized,'cash_paise',v_cash,
+    'reserved_cash_paise',v_reserved_cash,'simulation_only',true);
+end;
+$$;
+
+revoke all on function public.execute_paper_intraday_limit_fill(text,bigint,bigint,bigint,bigint)
+  from public,anon,authenticated;
+grant execute on function public.execute_paper_intraday_limit_fill(text,bigint,bigint,bigint,bigint)
+  to service_role;
