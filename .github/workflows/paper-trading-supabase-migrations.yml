@@ -1017,6 +1017,26 @@ jobs:
         run: |
           set -euo pipefail
           psql -v ON_ERROR_STOP=1 <<'SQL'
+          DO $freshness$
+          BEGIN
+            IF NOT public._paper_quote_age_is_fresh(1000,15999) THEN
+              RAISE EXCEPTION '14,999ms quote must be accepted';
+            END IF;
+            IF NOT public._paper_quote_age_is_fresh(1000,16000) THEN
+              RAISE EXCEPTION '15,000ms quote must be accepted';
+            END IF;
+            IF public._paper_quote_age_is_fresh(1000,16001) THEN
+              RAISE EXCEPTION '15,001ms quote must be rejected';
+            END IF;
+            IF public._paper_quote_age_is_fresh(1001,1000) THEN
+              RAISE EXCEPTION 'Future quote must be rejected';
+            END IF;
+            IF public._paper_quote_age_is_fresh(NULL,1000)
+               OR public._paper_quote_age_is_fresh(1000,NULL) THEN
+              RAISE EXCEPTION 'Null quote clock values must be rejected';
+            END IF;
+          END;
+          $freshness$;
           SET ROLE service_role;
           SELECT public.initialize_paper_trading_account('12121212-1212-4212-8212-121212121212');
           RESET ROLE;
