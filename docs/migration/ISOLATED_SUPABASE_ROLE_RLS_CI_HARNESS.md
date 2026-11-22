@@ -51,3 +51,8 @@ The concurrency script now issues each MARKET RPC call after `SET ROLE service_r
 The concurrency harness MARKET RPC call was cross-checked against PR #70 draft migration `202611220002_paper_order_transactions.sql`. The declared 13-argument order matches the harness: user UUID, order ID, idempotency UUID, request fingerprint, instrument key, trading symbol, exchange, side, product, quantity, execution price paise, quote timestamp milliseconds, and quote age milliseconds. The migration requires a 64-character lowercase-hex order ID and request fingerprint, a positive execution price, and quote age from 0 through 15,000 ms; the synthetic fixtures meet those checks. The initializer is the one-UUID `initialize_paper_trading_account(uuid)` RPC and provisions the disposable test account with ₹10,00,000 in virtual cash.
 
 This is a source review only. The SQL and shell harness have not yet been executed by the workflow, so runtime compatibility remains unverified.
+
+
+### SECURITY DEFINER hardening assertion
+
+The role/RLS SQL assertions also verify that each of the six exposed RPCs is declared `SECURITY DEFINER` and has the pinned `search_path=pg_catalog, public` configuration. This guards against accidentally widening the callable surface or resolving attacker-controlled objects through an unsafe function search path. This assertion is source-reviewed but still awaits the isolated PostgreSQL workflow run.
