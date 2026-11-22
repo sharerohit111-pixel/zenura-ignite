@@ -10,7 +10,7 @@ create table if not exists public.bse_equity_fee_master (
   instrument_status char(1) not null check (instrument_status in ('A','S','I')),
   instrument_type char(1) not null check (instrument_type in ('E','D','C')),
   source_sha256 text not null check (source_sha256 ~ '^[a-f0-9]{64}$'),
-  source_reference text not null check (position('bseindia.com' in lower(source_reference))>0),
+  source_reference text not null check (lower(source_reference) ~ '^https?://([a-z0-9-]+\.)*bseindia\.com(/|$)'),
   imported_at timestamptz not null default now(),
   primary key(source_date,isin),
   check (isin=upper(isin)),
@@ -215,7 +215,7 @@ revoke all on function public._paper_cash_equity_charges(text,text,bigint,text,t
   from public,anon,authenticated,service_role;
 
      or p_source_reference is null
-     or lower(p_source_reference) !~ '^https?://([a-z0-9-]+\\.)*bseindia\\.com(/|$)' then
+     or lower(p_source_reference) !~ '^https?://([a-z0-9-]+\.)*bseindia\.com(/|$)' then
     raise exception using errcode='22023',message='BSE master provenance is invalid';
   end if;
   if p_rows is null or jsonb_typeof(p_rows)<>'array' then
@@ -552,7 +552,7 @@ revoke all on function public._paper_cash_equity_charges(text,text,bigint,text,t
   from public,anon,authenticated,service_role;
 
      or p_source_reference is null
-     or lower(p_source_reference) !~ '^https?://([a-z0-9-]+\\.)*bseindia\\.com(/|$)' then
+     or lower(p_source_reference) !~ '^https?://([a-z0-9-]+\.)*bseindia\.com(/|$)' then
     raise exception using errcode='22023',message='BSE master provenance is invalid';
   end if;
   if p_rows is null or jsonb_typeof(p_rows)<>'array' then
