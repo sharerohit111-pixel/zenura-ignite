@@ -39,6 +39,12 @@ test("rejects invalid dates, malformed rows and conflicting duplicate ISIN class
   const one=makeRow(),two=makeRow({code:"500326",symbol:"OTHER",group:"B"});
   assert.throws(()=>parseBseStandardizedScripMaster([one,two].map(x=>x.join(",")).join("\n"),{sourceDate:"2026-11-23"}),/Conflicting BSE fee classifications/);
 });
+test("rejects malformed characters after a quoted BSE CSV field",()=>{
+  const malformed=makeRow({name:'"ACME"suffix'}).join(",");
+  assert.throws(()=>parseBseStandardizedScripMaster(malformed,{sourceDate:"2026-11-23"}),/characters after a quoted field/);
+  const stray=makeRow({name:'AC"ME'}).join(",");
+  assert.throws(()=>parseBseStandardizedScripMaster(stray,{sourceDate:"2026-11-23"}),/quote placement/);
+});
 test("BSE fee schedule applies group and exclusive flag rules",()=>{
   assert.equal(bseRatePerCrore("A","N"),375);
   assert.equal(bseRatePerCrore("B","Y"),375);
