@@ -205,6 +205,57 @@ jobs:
             IF v_result->>'status' <> 'FILLED' OR v_reserved <> 0 OR v_cash <> 99902000 THEN
               RAISE EXCEPTION 'LIMIT BUY fill cash or reservation result is incorrect';
             END IF;
+            -- LIMIT SELL must reserve shares, reject stale quotes, and release on cancel.
+            PERFORM public.submit_paper_limit_order(
+              '22222222-2222-4222-8222-222222222222',
+              repeat('5',64),
+              '77777777-7777-4777-8777-777777777777',
+              repeat('6',64),'NSE_EQ|TEST001','TEST001','NSE',
+              'SELL',2,12500
+            );
+            SELECT quantity,reserved_quantity INTO v_qty,v_reserved
+              FROM public.paper_equity_positions
+             WHERE user_id='22222222-2222-4222-8222-222222222222'
+               AND product='DELIVERY' AND instrument_key='NSE_EQ|TEST001';
+            IF v_qty <> 5 OR v_reserved <> 2 THEN
+              RAISE EXCEPTION 'LIMIT SELL did not reserve the expected shares';
+            END IF;
+            BEGIN
+              PERFORM public.execute_paper_limit_fill(repeat('5',64),13000,1000000,15001,1015001);
+              RAISE EXCEPTION 'Stale LIMIT quote was unexpectedly accepted';
+            EXCEPTION WHEN SQLSTATE '22023' THEN
+              NULL;
+            END;
+            PERFORM public.cancel_paper_limit_order(
+              '22222222-2222-4222-8222-222222222222',repeat('5',64)
+            );
+            SELECT quantity,reserved_quantity INTO v_qty,v_reserved
+              FROM public.paper_equity_positions
+             WHERE user_id='22222222-2222-4222-8222-222222222222'
+               AND product='DELIVERY' AND instrument_key='NSE_EQ|TEST001';
+            IF v_qty <> 5 OR v_reserved <> 0 THEN
+              RAISE EXCEPTION 'LIMIT SELL cancellation did not release reserved shares';
+            END IF;
+            -- A second LIMIT SELL fills at a better price and realizes allocated gain.
+            PERFORM public.submit_paper_limit_order(
+              '22222222-2222-4222-8222-222222222222',
+              repeat('7',64),
+              '88888888-8888-4888-8888-888888888888',
+              repeat('8',64),'NSE_EQ|TEST001','TEST001','NSE',
+              'SELL',2,12500
+            );
+            v_result := public.execute_paper_limit_fill(repeat('7',64),13000,1000000,100,1000100);
+            SELECT quantity,reserved_quantity INTO v_qty,v_reserved
+              FROM public.paper_equity_positions
+             WHERE user_id='22222222-2222-4222-8222-222222222222'
+               AND product='DELIVERY' AND instrument_key='NSE_EQ|TEST001';
+            SELECT cash_paise INTO v_cash FROM public.paper_accounts
+             WHERE user_id='22222222-2222-4222-8222-222222222222';
+            IF v_result->>'status' <> 'FILLED' OR v_qty <> 3 OR v_reserved <> 0
+               OR v_cash <> 99928000
+               OR (v_result->>'realized_pnl_paise')::bigint <> 6000 THEN
+              RAISE EXCEPTION 'LIMIT SELL fill position, cash, reservation or P&L is incorrect';
+            END IF;
           END
           $$;
           RESET ROLE;
