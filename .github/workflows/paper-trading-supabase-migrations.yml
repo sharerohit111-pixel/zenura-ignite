@@ -565,7 +565,7 @@ jobs:
           SELECT public.initialize_paper_trading_account('66666666-6666-4666-8666-666666666666');
           SELECT public.initialize_paper_trading_account('77777777-7777-4777-8777-777777777777');
           RESET ROLE;
-          DO $
+          DO $$
           DECLARE
             v_buy jsonb;
             v_sell jsonb;
@@ -624,7 +624,7 @@ jobs:
               RAISE EXCEPTION 'Tiny-premium negative-net-credit vector mismatch: %',v_breakdown;
             END IF;
           END
-          $;
+          $$;
           SQL
       - name: Exercise concurrent duplicate Options requests
         run: |
