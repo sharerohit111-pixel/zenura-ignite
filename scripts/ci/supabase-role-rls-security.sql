@@ -102,9 +102,10 @@ INSERT INTO auth.users(id) VALUES
 SET ROLE service_role;
 SELECT public.initialize_paper_trading_account('11111111-1111-4111-8111-111111111111');
 SELECT public.initialize_paper_trading_account('22222222-2222-4222-8222-222222222222');
+RESET ROLE;
+-- Seed user B's row as the harness administrator; authenticated user A must not touch it.
 INSERT INTO public.paper_watchlists(user_id,name,instrument_keys)
 VALUES ('22222222-2222-4222-8222-222222222222','My Stocks',ARRAY['NSE_EQ|USERB']);
-RESET ROLE;
 
 -- Authenticated user A sees only A's account and can only write A's watchlist.
 BEGIN;
