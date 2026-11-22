@@ -1,7 +1,8 @@
 "use strict";
 const test=require("node:test");
 const assert=require("node:assert/strict");
-const {marketClockParts,isIntradaySessionOpen,isIntradayOrderExpired,isEligibleIntradayLimitOrder}=require("../lib/intraday-limit-policy");
+const {marketClockParts,normalizeMarketSession,isIntradaySessionOpen,isIntradayOrderExpired,isEligibleIntradayLimitOrder}=require("../lib/intraday-limit-policy");
+const normalSession={isTradingDay:true,openMinute:9*60+15,closeMinute:15*60+30};
 
 const epoch=iso=>Date.parse(iso);
 const order={order_type:"LIMIT",status:"PENDING",simulation_only:true,product:"INTRADAY",
@@ -15,11 +16,13 @@ test("market clock uses Indian Standard Time and handles midnight correctly",()=
 });
 test("intraday session requires an explicit exchange trading-day decision",()=>{
  assert.equal(isIntradaySessionOpen(epoch("2026-11-23T03:45:00.000Z")),false);
- assert.equal(isIntradaySessionOpen(epoch("2026-11-23T03:45:00.000Z"),{isTradingDay:true}),true);
+ assert.equal(isIntradaySessionOpen(epoch("2026-11-23T03:45:00.000Z"),{isTradingDay:true}),false);
+ assert.equal(isIntradaySessionOpen(epoch("2026-11-23T03:45:00.000Z"),{isTradingDay:true,openMinute:600,closeMinute:900}),false);
+ assert.equal(isIntradaySessionOpen(epoch("2026-11-23T03:45:00.000Z"),normalSession),true);
  assert.equal(isIntradaySessionOpen(epoch("2026-11-23T03:44:59.000Z"),{isTradingDay:true}),false);
  assert.equal(isIntradaySessionOpen(epoch("2026-11-23T10:00:00.000Z"),{isTradingDay:true}),false);
  assert.equal(isIntradaySessionOpen(epoch("2026-11-22T04:30:00.000Z"),{isTradingDay:true}),false);
- assert.equal(isIntradaySessionOpen(epoch("2026-11-23T03:45:00.000Z"),{isTradingDay:false}),false);
+ assert.equal(isIntradaySessionOpen(epoch("2026-11-23T03:45:00.000Z"),{isTradingDay:false,openMinute:555,closeMinute:930}),false);
 });
 test("intraday LIMIT eligibility requires fresh quote, active session and exact side threshold",()=>{
  const now=epoch("2026-11-23T04:30:01.000Z");
@@ -39,6 +42,7 @@ test("intraday pending orders expire at 15:30 IST and never carry to another ses
 });
 test("malformed timestamps and non-pending orders fail closed",()=>{
  assert.throws(()=>marketClockParts(NaN),TypeError);
+ assert.equal(normalizeMarketSession({isTradingDay:true,openMinute:930,closeMinute:555}),null);
  assert.equal(isIntradayOrderExpired({...order,created_at:"bad"},epoch("2026-11-23T10:00:00.000Z")),false);
  assert.equal(isEligibleIntradayLimitOrder({...order,status:"CANCELLED"},quote,epoch("2026-11-23T04:30:01.000Z"),{isTradingDay:true}),false);
 });
