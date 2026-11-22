@@ -308,7 +308,7 @@ A separate hardening branch, `audit/supabase-paper-trading-hardening-2026-11-22`
 
 ### Remaining test gates
 
-- Run the updated workflow on this audit branch and inspect the full job result/logs; no success is claimed until GitHub reports it.
+- Completed: GitHub Actions run #30 / 44991611079 passed on PostgreSQL 16.16; rerun CI after any subsequent SQL or workflow change.
 - Add deterministic multi-session LIMIT cancel-vs-fill race coverage and concurrent LIMIT duplicate-submit coverage.
 - Add broader RLS row-isolation tests for positions, orders, derivative data and watchlists under two authenticated JWT subjects; the current CI role check is not a substitute for a full Supabase Auth emulator.
 - Add option negative/future quote, off-tick, expiry-boundary, mismatched-idempotency, insufficient-cash, 50-position-cap and repeated-partial-close conservation fixtures.
@@ -323,7 +323,7 @@ All testing remains confined to GitHub Actions disposable PostgreSQL. No connect
 - All six `SECURITY DEFINER` trading/account RPCs now use an empty `search_path` (`set search_path = ''`); every application table reference is schema-qualified. This follows current Supabase function-security guidance and reduces object-shadowing risk.
 - The six authenticated user-read policies now wrap `auth.uid()` in a scalar `SELECT` to avoid per-row re-evaluation on large scans.
 - Expanded CI asserts those function search-path settings and all six user-scoped policies, and exercises two-tenant RLS reads for accounts, equity positions, derivative positions, equity orders, derivative orders and watchlists. It also attempts a cross-tenant watchlist insert and expects denial.
-- These assertions are being added to the audit branch's disposable PostgreSQL workflow; they are not yet a completed run and do not replace testing with Supabase's real Auth/PostgREST roles or Database Advisors.
+- These assertions passed in GitHub Actions run #30 / 44991611079; they do not replace testing with Supabase's real Auth/PostgREST roles or Database Advisors.
 
 
 ### Data API exposure note (current Supabase platform behavior)
