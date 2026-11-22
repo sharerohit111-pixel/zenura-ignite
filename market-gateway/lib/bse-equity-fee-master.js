@@ -126,7 +126,7 @@ function calculateBseEquityCharges({grossPaise,product,side,groupName,exclusiveF
     netCreditPaise,exchange:"BSE",product,side,segment:"EQUITY_CASH",
     scripGroup:String(groupName).trim().toUpperCase(),exclusiveFlag:String(exclusiveFlag).trim().toUpperCase(),
     exchangeRatePaisePerCrore:ratePerCrore,ipftIncludedInExchangeCharge:true,
-    scheduleVersion:"2022-12-01",sourceDate:sourceDate||null,
+    scheduleVersion:"BSE-2025-04-29",sourceDate:sourceDate||null,
     indicative:true,simulationOnly:true
   };
 }
