@@ -132,7 +132,7 @@ function calculateBseEquityCharges({grossPaise,product,side,groupName,exclusiveF
     exchangeRateRupeesPerCrore:ratePerCrore,exchangeRatePaisePerCrore:ratePerCrore*100,
     ipftIncludedInExchangeCharge:true,bseIpfIncluded:true,
     scheduleVersion:"BSE-2025-04-29",sourceDate:sourceDate||null,
-    indicative:true,simulationOnly:true
+    simulationBillingBasis:"indicative_per_fill_allocation",indicative:true,simulationOnly:true
   };
 }
 module.exports={
