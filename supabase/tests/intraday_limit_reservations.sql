@@ -163,9 +163,9 @@ BEGIN
 END
 $intraday_limit_checks$;
 
-DELETE FROM public.paper_orders WHERE order_id IN (repeat('a',64),repeat('c',64),repeat('e',64));
+DELETE FROM public.paper_orders WHERE order_id IN (repeat('a',64),repeat('c',64),repeat('e',64),repeat('1',64),repeat('3',64));
 DELETE FROM public.paper_equity_positions
  WHERE user_id='22222222-2222-4222-8222-222222222222'
-   AND product='INTRADAY' AND instrument_key='NSE_EQ|INTRA_LIMIT_CI';
+   AND product='INTRADAY' AND instrument_key IN ('NSE_EQ|INTRA_LIMIT_CI','NSE_EQ|INTRA_FILL_BUY');
 DELETE FROM public.paper_exchange_sessions
  WHERE source_reference='CI verified session fixture';
