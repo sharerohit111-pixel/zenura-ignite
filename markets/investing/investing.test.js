@@ -167,3 +167,12 @@ test("Chart library loading has a second CDN and a bounded timeout",()=>{
  assert.match(engine,/setTimeout\(failAttempt,8000\)/);
  assert.match(engine,/attemptFinished/);
 });
+
+test("Professional chart supports weekly and monthly history with daily Investing default",()=>{
+ const engine=fs.readFileSync(path.join(root,"../stocks/chart-engine.js"),"utf8");
+ assert.match(engine,/"1W":\{type:"week",span:1,unit:"weeks"/);
+ assert.match(engine,/"1M":\{type:"month",span:1,unit:"months"/);
+ assert.match(html,/data-timeframe="1W"/);assert.match(html,/data-timeframe="1M"/);
+ const investing=fs.readFileSync(path.join(root,"investing.js"),"utf8");
+ assert.match(investing,/activeTimeframe="1D"/);
+});
