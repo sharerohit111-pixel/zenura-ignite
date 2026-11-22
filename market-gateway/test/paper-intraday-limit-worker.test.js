@@ -85,6 +85,25 @@ test("fresh threshold-crossed NSE quote uses the atomic Intraday fill RPC",async
   assert.equal(db.calls.some(x=>x.name==="release_paper_market_worker_lease"),true);
 });
 
+test("fresh BSE quote uses the BSE-verified session and atomic Intraday LIMIT fill RPC",async()=>{
+  const bseInstrument={instrument_key:"BSE_EQ|INE002A01018",instrument_type:"EQ",segment:"BSE_EQ",exchange:"BSE"};
+  const bseOrder={...pendingOrder(),order_id:"b".repeat(64),instrument_key:bseInstrument.instrument_key,
+    trading_symbol:"RELIANCE",exchange:"BSE"};
+  const db=makeDb({orders:[bseOrder]});
+  const run=createPaperIntradayLimitWorker(deps(db.serviceDb,{
+    ensureInstrumentCache:async()=>[bseInstrument],
+    readProviderJson:async()=>({data:{quote:{instrument_token:bseInstrument.instrument_key}}}),
+    normalizeProviderQuote:()=>({pricePaise:9900,tradeTimeMs:Date.now()-1000,quoteAgeMs:1000}),
+    loadSession:async(_serviceDb,exchange)=>({exchange,sessionDate:marketDateString(Date.now()),
+      isTradingDay:true,openMinute:0,closeMinute:1440})
+  }));
+  const result=await run();
+  assert.equal(result.scanned,1);
+  assert.equal(result.filled,1);
+  const fill=db.calls.find(x=>x.name==="execute_paper_intraday_limit_fill");
+  assert.ok(fill);
+  assert.equal(fill.args.p_order_id,"b".repeat(64));
+});
 test("expiry failure aborts before instrument, quote or order processing",async()=>{
   const db=makeDb({orders:[pendingOrder()],failExpiry:true});
   let cacheLoads=0;
