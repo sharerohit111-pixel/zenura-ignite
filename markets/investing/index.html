@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#07111f"><meta name="market-gateway-url" content="">
+<title>ZENURA IGNITE · Paper Investing</title>
+<link rel="stylesheet" href="../markets.css">
+<link rel="stylesheet" href="../stocks/stocks.css">
+<link rel="stylesheet" href="../stocks/chart-theme.css">
+<link rel="stylesheet" href="./investing.css">
+</head>
+<body class="stocks-page investing-page">
+<main class="stocks-shell">
+<header class="topbar">
+  <div class="brand"><small>ZENURA IGNITE</small><h1>Paper Investing</h1><span>Long-term virtual investing · NSE/BSE cash equities</span></div>
+  <nav class="product-mode-nav" aria-label="Product mode">
+    <a href="../stocks/">PAPER TRADING</a><a class="active" href="./">PAPER INVESTING</a>
+  </nav>
+</header>
+<section class="connection panel" id="connection">
+  <div class="connection-copy"><small>SECURE MARKET CONNECTION</small><h2 id="connection-title">SIGN IN REQUIRED</h2><p id="connection-sub">Supabase-native authentication. Firebase is not used by this new market app.</p></div>
+  <div class="connection-actions"><button id="upstox-connect" type="button">CONNECT UPSTOX</button><button id="upstox-disconnect" type="button" hidden>DISCONNECT</button></div>
+</section>
+<section class="investing-intro panel">
+  <div><small>SEPARATE VIRTUAL LEDGER</small><h2>Build a long-term virtual portfolio</h2><p>Paper Investing uses its own virtual cash, positions, orders and performance history. It never places real exchange orders.</p></div>
+  <div class="investing-capital"><span>STARTING VIRTUAL CAPITAL</span><b id="investing-starting-cash">₹10,00,000</b><small>Per new Paper Investing account</small></div>
+</section>
+<section class="investing-grid">
+  <aside class="panel investing-search-panel">
+    <div class="panel-head"><div><small>OFFICIAL INSTRUMENT MASTER</small><h2>Find Stocks</h2></div><span class="pill muted">NSE · BSE</span></div>
+    <label class="search-label" for="investing-search">Search by company or symbol</label>
+    <input id="investing-search" type="search" autocomplete="off" placeholder="e.g. RELIANCE, TCS, HDFCBANK">
+    <div id="investing-search-results" class="investing-search-results" aria-live="polite"><p>Search the official NSE/BSE instrument master.</p></div>
+    <div class="panel-head watchlist-head"><div><small>YOUR SAVED SYMBOLS</small><h3>Watchlist</h3></div><button id="investing-watchlist-refresh" type="button">REFRESH</button></div>
+    <div id="investing-watchlist" class="investing-watchlist"><p>Sign in to load your watchlist.</p></div>
+  </aside>
+  <section class="panel investing-chart-panel">
+    <div class="panel-head"><div><small>PROFESSIONAL TECHNICAL CHART</small><h2 id="investing-symbol-title">Select a stock</h2><span id="investing-symbol-sub">Live quotes only after Upstox connection</span></div><b id="investing-live-price">—</b></div>
+    <div class="chart-tools">
+      <div class="chart-timeframes" id="chart-timeframes">
+        <button type="button" data-timeframe="1m">1M</button><button type="button" data-timeframe="5m" class="active">5M</button>
+        <button type="button" data-timeframe="15m">15M</button><button type="button" data-timeframe="1h">1H</button><button type="button" data-timeframe="1D">1D</button>
+      </div><span id="chart-status">Professional chart · Upstox V3</span>
+    </div>
+    <div id="market-chart" class="chart-placeholder"><b>Professional chart ready</b><span>Select an NSE/BSE stock to load historical candles and verified live ticks.</span></div>
+    <div class="chart-toolbar" aria-label="Professional chart controls">
+      <div class="chart-display-controls"><label for="chart-type-select">Chart</label><select id="chart-type-select"><option value="CANDLE">Candlestick</option><option value="OHLC">OHLC Bars</option><option value="AREA">Area</option><option value="LINE">Line</option></select></div>
+      <div class="chart-indicator-controls">
+        <select id="chart-indicator-select" aria-label="Technical indicator">
+          <option value="MA">Moving Average</option><option value="EMA">Exponential MA</option><option value="SMA">Simple MA</option><option value="BOLL">Bollinger Bands</option>
+          <option value="VWAP">VWAP</option><option value="RSI">RSI</option><option value="MACD">MACD</option><option value="STOCH">Stochastic</option>
+          <option value="KDJ">KDJ</option><option value="ATR">ATR</option><option value="ADX">ADX / DMI</option><option value="SUPERTREND">Supertrend</option>
+          <option value="MFI">Money Flow Index</option><option value="CCI">CCI</option><option value="OBV">OBV</option><option value="VOL">Volume</option>
+          <option value="WR">Williams %R</option><option value="SAR">Parabolic SAR</option><option value="TRIX">TRIX</option><option value="DMI">Directional Movement</option>
+        </select><button type="button" id="chart-add-indicator">ADD INDICATOR</button>
+      </div>
+      <div class="chart-drawing-controls">
+        <button type="button" data-drawing="straightLine">Trendline</button><button type="button" data-drawing="horizontalStraightLine">Horizontal</button>
+        <button type="button" data-drawing="verticalStraightLine">Vertical</button><button type="button" data-drawing="rayLine">Ray</button>
+        <button type="button" data-drawing="parallelStraightLine">Channel</button><button type="button" data-drawing="fibonacciLine">Fibonacci</button>
+        <button type="button" data-drawing="zenuraFibExtension">Fib Ext.</button><button type="button" data-drawing="zenuraRectangle">Rectangle</button>
+        <button type="button" data-drawing="zenuraCircle">Circle</button><button type="button" data-drawing="zenuraArrow">Arrow</button>
+        <button type="button" data-drawing="simpleAnnotation">Text</button><button type="button" data-drawing="brush">Brush</button><button type="button" data-drawing="segment">Measure</button>
+      </div>
+      <div class="chart-template-controls"><input id="chart-template-name" maxlength="60" placeholder="Chart template name"><button type="button" id="chart-save-template">SAVE TEMPLATE</button><select id="chart-template-select"><option value="">Saved templates</option></select><button type="button" id="chart-load-template">LOAD</button></div>
+      <div class="chart-edit-controls"><button type="button" id="chart-undo">UNDO</button><button type="button" id="chart-redo">REDO</button><button type="button" id="chart-remove-last">DELETE LAST</button></div>
+    </div>
+  </section>
+  <aside class="panel investing-ticket-panel">
+    <div class="panel-head"><div><small>LONG-TERM EQUITY</small><h2>Investing Order</h2></div><span class="pill muted">MARKET</span></div>
+    <label class="paper-ticket-field">Quantity <input id="investing-quantity" type="number" min="1" max="1000000" step="1" value="1" inputmode="numeric"></label>
+    <div class="investing-price-row"><span>Verified reference price</span><b id="investing-reference-price">—</b></div>
+    <div class="investing-actions"><button type="button" id="investing-buy" disabled>VIRTUAL BUY</button><button type="button" id="investing-sell" disabled>VIRTUAL SELL</button></div>
+    <p id="investing-order-status" role="status">Sign in, connect Upstox and select a stock.</p>
+    <p class="portfolio-status">Paper Investing currently supports NSE cash-equity market orders. BSE orders remain blocked until exact scrip-group charges are available. No real money or exchange orders are used.</p>
+  </aside>
+</section>
+<section class="panel investing-account-panel">
+  <div class="panel-head"><div><small>YOUR PRIVATE INVESTING ACCOUNT</small><h2>Portfolio &amp; Performance</h2></div><button id="investing-refresh" type="button">REFRESH</button></div>
+  <div class="portfolio-metrics">
+    <div><small>VIRTUAL CASH</small><b id="investing-cash">—</b></div>
+    <div><small>MARKET VALUE</small><b id="investing-market-value">—</b></div>
+    <div><small>UNREALIZED P&amp;L</small><b id="investing-unrealized">—</b></div>
+    <div><small>TOTAL EQUITY</small><b id="investing-equity">—</b></div>
+  </div>
+  <p id="investing-portfolio-status" class="portfolio-status">Portfolio valuation requires a connected market feed.</p>
+  <div class="table-scroll"><table class="paper-table"><thead><tr><th>STOCK</th><th>QTY</th><th>AVG COST</th><th>LTP</th><th>VALUE</th><th>UNREALIZED P&amp;L</th></tr></thead><tbody id="investing-positions"><tr><td colspan="6">No positions loaded.</td></tr></tbody></table></div>
+</section>
+<section class="panel investing-history-panel">
+  <div class="panel-head"><div><small>SEPARATE INVESTING LEDGER</small><h2>Investing Order History</h2></div><span id="investing-orders-status">Latest orders</span></div>
+  <div class="table-scroll"><table class="paper-table"><thead><tr><th>DATE &amp; TIME</th><th>STOCK</th><th>SIDE</th><th>QTY</th><th>PRICE</th><th>CHARGES</th><th>STATUS</th></tr></thead><tbody id="investing-orders"><tr><td colspan="7">No orders loaded.</td></tr></tbody></table></div>
+</section>
+<footer><span>Paper Investing only · No exchange orders</span><span>Powered by ZENURA IGNITE Technologies · Rohit Kumar — Founder &amp; Developer</span></footer>
+</main>
+<button type="button" id="paper-chart-theme-toggle" class="chart-theme-toggle">LIGHT CHART</button>
+<button type="button" id="paper-language-toggle" class="paper-language-toggle">हिन्दी</button>
+<script src="../stocks/sse-parser.js"></script><script src="../stocks/live-quote.js"></script>
+<script src="../stocks/chart-indicators.js"></script><script src="../stocks/chart-engine.js"></script>
+<script src="./investing.js"></script><script src="../stocks/chart-theme.js"></script>
+<script type="module" src="../stocks/connect.js"></script><script type="module" src="../stocks/email-auth.js"></script>
+</body></html>
