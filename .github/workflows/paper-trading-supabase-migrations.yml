@@ -119,7 +119,7 @@ jobs:
               repeat('a',64),
               '33333333-3333-4333-8333-333333333333',
               repeat('b',64),'NSE_EQ|TEST001','TEST001','NSE',
-              'BUY','DELIVERY',10,10000,1000000,100
+              'BUY','DELIVERY',10,10000,floor(extract(epoch from clock_timestamp())*1000)::bigint,0
             );
             IF v_result->>'status' <> 'FILLED'
                OR (v_result->>'cash_paise')::bigint <> 99900000 THEN
@@ -130,7 +130,7 @@ jobs:
               repeat('a',64),
               '33333333-3333-4333-8333-333333333333',
               repeat('b',64),'NSE_EQ|TEST001','TEST001','NSE',
-              'BUY','DELIVERY',10,10000,1000000,100
+              'BUY','DELIVERY',10,10000,floor(extract(epoch from clock_timestamp())*1000)::bigint,0
             );
             IF (v_result->>'idempotent_replay')::boolean IS NOT TRUE THEN
               RAISE EXCEPTION 'MARKET retry was not idempotent';
@@ -147,7 +147,7 @@ jobs:
                 repeat('c',64),
                 '33333333-3333-4333-8333-333333333333',
                 repeat('d',64),'NSE_EQ|TEST001','TEST001','NSE',
-                'BUY','DELIVERY',10,10000,1000000,100
+                'BUY','DELIVERY',10,10000,floor(extract(epoch from clock_timestamp())*1000)::bigint,0
               );
               RAISE EXCEPTION 'Changed MARKET fingerprint was unexpectedly accepted';
             EXCEPTION WHEN unique_violation THEN
@@ -159,7 +159,7 @@ jobs:
               repeat('e',64),
               '44444444-4444-4444-8444-444444444444',
               repeat('f',64),'NSE_EQ|TEST001','TEST001','NSE',
-              'SELL','DELIVERY',5,12000,1000000,100
+              'SELL','DELIVERY',5,12000,floor(extract(epoch from clock_timestamp())*1000)::bigint,0
             );
             SELECT quantity INTO v_qty FROM public.paper_equity_positions
              WHERE user_id='22222222-2222-4222-8222-222222222222'
@@ -259,6 +259,119 @@ jobs:
           END
           $$;
           RESET ROLE;
+          SQL
+      - name: Reject stale, future and caller-age-mismatched MARKET quotes
+        run: |
+          psql -v ON_ERROR_STOP=1 <<'SQL'
+          DO $
+          DECLARE
+            v_now bigint := floor(extract(epoch from clock_timestamp())*1000)::bigint;
+          BEGIN
+            BEGIN
+              PERFORM public.execute_paper_market_order(
+                '22222222-2222-4222-8222-222222222222',repeat('a',64),
+                '12121212-1212-4212-8212-121212121212',repeat('b',64),
+                'NSE_EQ|FUTURE','FUTURE','NSE','BUY','DELIVERY',1,10000,v_now+10000,0
+              );
+              RAISE EXCEPTION 'Future MARKET quote was accepted';
+            EXCEPTION WHEN SQLSTATE '22023' THEN NULL;
+            END;
+            BEGIN
+              PERFORM public.execute_paper_market_order(
+                '22222222-2222-4222-8222-222222222222',repeat('c',64),
+                '13131313-1313-4313-8313-131313131313',repeat('d',64),
+                'NSE_EQ|STALE','STALE','NSE','BUY','DELIVERY',1,10000,v_now-16000,16000
+              );
+              RAISE EXCEPTION 'Stale MARKET quote was accepted';
+            EXCEPTION WHEN SQLSTATE '22023' THEN NULL;
+            END;
+            BEGIN
+              PERFORM public.execute_paper_market_order(
+                '22222222-2222-4222-8222-222222222222',repeat('e',64),
+                '14141414-1414-4414-8414-141414141414',repeat('f',64),
+                'NSE_EQ|AGE','AGE','NSE','BUY','DELIVERY',1,10000,v_now,9000
+              );
+              RAISE EXCEPTION 'Caller-supplied MARKET quote age mismatch was accepted';
+            EXCEPTION WHEN SQLSTATE '22023' THEN NULL;
+            END;
+          END
+          $;
+          SQL
+      - name: Exercise concurrent duplicate MARKET requests
+        run: |
+          set -euo pipefail
+          psql -v ON_ERROR_STOP=1 <<'SQL'
+          INSERT INTO auth.users(id) VALUES ('33333333-3333-4333-8333-333333333333')
+            ON CONFLICT DO NOTHING;
+          SET ROLE service_role;
+          SELECT public.initialize_paper_trading_account('33333333-3333-4333-8333-333333333333');
+          RESET ROLE;
+          SQL
+          run_duplicate() {
+            psql -v ON_ERROR_STOP=1 <<'SQL'
+          SET ROLE service_role;
+          SELECT public.execute_paper_market_order(
+            '33333333-3333-4333-8333-333333333333',repeat('d',64),
+            '15151515-1515-4515-8515-151515151515',repeat('e',64),
+            'NSE_EQ|RACE','RACE','NSE','BUY','DELIVERY',10,10000,
+            floor(extract(epoch from clock_timestamp())*1000)::bigint,0
+          );
+          RESET ROLE;
+          SQL
+          }
+          run_duplicate &
+          run_duplicate &
+          wait
+          psql -v ON_ERROR_STOP=1 <<'SQL'
+          DO $
+          BEGIN
+            IF (SELECT count(*) FROM public.paper_orders
+                WHERE user_id='33333333-3333-4333-8333-333333333333'
+                  AND idempotency_key='15151515-1515-4515-8515-151515151515') <> 1 THEN
+              RAISE EXCEPTION 'Concurrent duplicate MARKET requests created more than one order';
+            END IF;
+            IF (SELECT cash_paise FROM public.paper_accounts
+                WHERE user_id='33333333-3333-4333-8333-333333333333') <> 99900000 THEN
+              RAISE EXCEPTION 'Concurrent duplicate MARKET requests debited cash more than once';
+            END IF;
+          END
+          $;
+          SQL
+      - name: Verify RLS and privileged RPC boundaries
+        run: |
+          psql -v ON_ERROR_STOP=1 <<'SQL'
+          DO $
+          DECLARE
+            t text;
+            protected_tables text[] := ARRAY[
+              'paper_user_identity_map','paper_accounts','paper_equity_positions',
+              'paper_derivative_positions','paper_orders','paper_derivative_orders',
+              'paper_watchlists','upstox_connections','upstox_oauth_states',
+              'upstox_connection_controls','paper_market_stream_leases',
+              'paper_market_worker_state','paper_margin_preview_limits'
+            ];
+          BEGIN
+            FOREACH t IN ARRAY protected_tables LOOP
+              IF NOT (SELECT relrowsecurity FROM pg_class WHERE oid=to_regclass('public.'||t)) THEN
+                RAISE EXCEPTION 'RLS is disabled on %',t;
+              END IF;
+            END LOOP;
+            IF has_table_privilege('authenticated','public.paper_accounts','INSERT')
+               OR has_table_privilege('authenticated','public.paper_accounts','UPDATE')
+               OR has_table_privilege('authenticated','public.paper_accounts','DELETE')
+               OR has_table_privilege('anon','public.paper_accounts','SELECT') THEN
+              RAISE EXCEPTION 'Unexpected browser-role privilege on protected account data';
+            END IF;
+            IF has_function_privilege('authenticated',
+              'public.execute_paper_market_order(uuid,text,uuid,text,text,text,text,text,text,integer,bigint,bigint,bigint)','EXECUTE')
+               OR has_function_privilege('anon',
+              'public.execute_paper_market_order(uuid,text,uuid,text,text,text,text,text,text,integer,bigint,bigint,bigint)','EXECUTE')
+               OR NOT has_function_privilege('service_role',
+              'public.execute_paper_market_order(uuid,text,uuid,text,text,text,text,text,text,integer,bigint,bigint,bigint)','EXECUTE') THEN
+              RAISE EXCEPTION 'MARKET RPC execution grants are not server-only';
+            END IF;
+          END
+          $;
           SQL
       - name: Exercise long option transactions
         run: |
