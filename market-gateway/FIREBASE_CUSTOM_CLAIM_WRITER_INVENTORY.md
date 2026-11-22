@@ -32,6 +32,22 @@ The active gateway verifier only checks the Firebase ID token and revocation sta
 not inject `role: "authenticated"`; the Supabase adapter therefore remains intentionally
 fail-closed until the role claim is provisioned through an approved mechanism.
 
+
+## Firebase project-ID boundary discovered during review
+
+The repository contains two different public Firebase Web App project IDs:
+
+- Root `firebase-config.js`: `zenura-ignite-technologies`. The market-gateway production deployment guide also names `zenura-ignite-technologies` as the production project. This is the intended project for the Indian Paper Trading Firestore collections covered by this migration.
+- `crypto/firebase-config.js`: `zenura-ignite`. This is a separate crypto-area client configuration and must not be silently treated as the source for the Indian Paper Trading migration.
+
+The read-only role audit and Firestore export must use the explicitly confirmed project that owns
+`indianPaperAccounts`, `indianPaperOrders`, `indianDerivativeOrders` and
+`indianMarketWatchlists`. Repository configuration and deployment documentation point to
+`zenura-ignite-technologies`, but before running against a live project the operator must
+verify the Firebase Console project and the actual deployed gateway runtime project. Do not
+run the audit against both projects or merge their user counts/data without a separate scope
+decision. The other project may contain a separate app's users and must remain out of scope.
+
 ## Required external checks
 
 Before any write, the project owner/operator must confirm:
