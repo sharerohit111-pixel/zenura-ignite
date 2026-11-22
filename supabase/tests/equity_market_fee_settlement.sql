@@ -33,7 +33,9 @@ BEGIN
      OR v_order.cash_delta_paise<>-102379
      OR v_order.charges_breakdown->>'schedule_version'<>'2026-03-01'
      OR v_order.charges_breakdown->>'indicative'<>'true' THEN
-    RAISE EXCEPTION 'Delivery BUY fee-inclusive cash, cost basis or history mismatch';
+    RAISE EXCEPTION 'Delivery BUY mismatch: cash %, basis %, qty %, gross %, charges %, delta %, breakdown %, result %',
+      v_cash,v_basis,v_qty,v_order.gross_paise,v_order.charges_paise,v_order.cash_delta_paise,
+      v_order.charges_breakdown,v_result;
   END IF;
   -- Same idempotency key returns the stored charge snapshot without another debit.
   v_result:=public.execute_paper_market_order(
