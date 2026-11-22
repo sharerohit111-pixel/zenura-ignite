@@ -33,8 +33,8 @@ function parseCsvRows(input){
       else field+=ch;
     }else if(afterQuote){
       if(ch===",")finishField();
-      else if(ch==="\\n"||ch==="\\r"){
-        if(ch==="\\r"&&input[i+1]==="\\n")i++;
+      else if(ch==="\n"||ch==="\r"){
+        if(ch==="\r"&&input[i+1]==="\n")i++;
         finishRow();
       }else throw new Error("Malformed BSE CSV characters after a quoted field.");
     }else if(ch==='"'){
@@ -42,8 +42,8 @@ function parseCsvRows(input){
       quoted=true;
     }else if(ch===","){
       finishField();
-    }else if(ch==="\\n"||ch==="\\r"){
-      if(ch==="\\r"&&input[i+1]==="\\n")i++;
+    }else if(ch==="\n"||ch==="\r"){
+      if(ch==="\r"&&input[i+1]==="\n")i++;
       finishRow();
     }else field+=ch;
   }
