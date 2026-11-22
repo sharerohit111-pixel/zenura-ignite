@@ -37,13 +37,20 @@ function groupOrdersByUser(orders){
 }
 
 
+function isPositiveCryptoDecimal(value){
+  if(typeof value==="number")return Number.isFinite(value)&&value>0;
+  if(typeof value!=="string"||! /^(?:0|[1-9]\\d*)(?:\\.\\d{1,12})?$/.test(value))return false;
+  const parsed=Number(value);
+  return Number.isFinite(parsed)&&parsed>0;
+}
+
 function isEligibleCryptoLimitOrder(order,quote,nowMs){
   if(!order||typeof order!=="object"||order.order_type!=="LIMIT"||order.status!=="PENDING"
-     ||order.simulation_only!==true||!/^([A-Z0-9]{2,12})USDT$/.test(order.symbol||"")
+     ||order.simulation_only!==true||typeof order.symbol!=="string"||!/^([A-Z0-9]{2,12})USDT$/.test(order.symbol)
      ||typeof order.user_id!=="string"||!order.user_id
      ||!["BUY","SELL"].includes(order.side)
-     ||!Number.isFinite(Number(order.quantity))||Number(order.quantity)<=0||!Number.isFinite(Number(order.limit_price))||Number(order.limit_price)<=0
-     ||!quote||!Number.isFinite(quote.priceUsdt)||quote.priceUsdt<=0
+     ||!isPositiveCryptoDecimal(order.quantity)||!isPositiveCryptoDecimal(order.limit_price)
+     ||!quote||typeof quote.priceUsdt!=="number"||!Number.isFinite(quote.priceUsdt)||quote.priceUsdt<=0
      ||!Number.isSafeInteger(quote.tradeTimeMs)||quote.tradeTimeMs<1
      ||!Number.isSafeInteger(nowMs)||nowMs<1||quote.tradeTimeMs>nowMs
      ||nowMs-quote.tradeTimeMs>15000)return false;
