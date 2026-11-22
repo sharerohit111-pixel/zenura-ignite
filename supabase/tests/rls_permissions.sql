@@ -79,3 +79,8 @@ END
 $rls_privileges$;
 
 RESET ROLE;
+
+-- Keep the focused permission test isolated from the later shared-tenant RLS suite.
+DELETE FROM public.paper_watchlists
+ WHERE (user_id='11111111-1111-4111-8111-111111111111' AND name IN ('My Stocks','Banking'))
+    OR (user_id='22222222-2222-4222-8222-222222222222' AND name='My Stocks');
