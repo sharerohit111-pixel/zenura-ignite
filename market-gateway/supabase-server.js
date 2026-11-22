@@ -820,7 +820,6 @@ app.post("/stream",async(req,res)=>{
 
 async function runPaperLimitWorker({maxOrders=50}={}){
   if(!Number.isInteger(maxOrders)||maxOrders<1||maxOrders>100)throw new TypeError("Paper LIMIT worker batch size is invalid.");
-  if(!instrumentCache.length||Date.now()-instrumentCacheUpdatedAt>6*60*60*1000)await refreshInstrumentCache();
   const leaseToken=crypto.randomUUID(),leaseNow=Date.now();
   const lease=await serviceDb.rpc("acquire_paper_market_worker_lease",{
     p_state_key:"paper_limit_orders",p_lease_token:leaseToken,p_now_ms:leaseNow,p_ttl_ms:120000
@@ -829,6 +828,7 @@ async function runPaperLimitWorker({maxOrders=50}={}){
   if(lease?.data!==true)return {locked:true,scanned:0,filled:0,notEligible:0,failed:0,alreadyFilled:0};
   const summary={locked:false,scanned:0,filled:0,notEligible:0,failed:0,alreadyFilled:0};
   try{
+    if(!instrumentCache.length||Date.now()-instrumentCacheUpdatedAt>6*60*60*1000)await refreshInstrumentCache();
     const stateResult=await serviceDb.from("paper_market_worker_state")
       .select("cursor_created_at,cursor_order_id").eq("state_key","paper_limit_orders").maybeSingle();
     if(stateResult.error)throw new Error("Paper LIMIT worker cursor could not be read.");
