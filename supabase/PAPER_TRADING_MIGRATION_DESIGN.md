@@ -90,3 +90,16 @@ The original draft was not applied. A second pass inspected the live gateway hel
 
 
 A further field-level pass aligned the stream lease columns with the actual helper: `acquireStreamLease` / `renewStreamLease` persist epoch-millisecond integers (`expiresAtMs`, `updatedAtMs`), not Firestore timestamp objects. The SQL draft now uses bigint millisecond columns and indexes the expiry field. The cash-equity order constraint also explicitly preserves the current rule that Intraday LIMIT orders are not enabled.
+
+
+## OAuth and worker lifecycle audit
+
+The Upstox Firebase implementation is in `functions/indian-market.js`, not in the market-gateway HTTP server. It was inspected along with its helper modules. The migration draft now additionally represents:
+
+- OAuth state lifecycle: state is generated from 32 random bytes, expires after 10 minutes, is atomically marked used before token exchange, and carries a connection generation. The Supabase design stores a hash of the raw state rather than the raw state itself.
+- Connection generation control: disconnect deletes the encrypted connection, revokes the active stream lease, and increments a generation so a late OAuth callback cannot re-connect an account after disconnect.
+- Connection metadata: connected status, AES-256-GCM token envelope, token type, provider, authorization time and expiry.
+- Market stream lease lifecycle: epoch-millisecond expiry/update fields and a revoked flag.
+- Pending LIMIT worker cursor: the Firebase worker stores its scan cursor in `indianMarketWorkerState/pendingLimitOrders`; a server-only worker-state table is included, with a partial index for pending LIMIT orders.
+
+The OAuth callback and disconnect operations require multi-row atomic behavior. The eventual Supabase implementation must use trusted server-side RPC/transaction functions and must not expose OAuth state, connection controls, worker cursors, encryption envelopes, or secrets to authenticated browser clients.
