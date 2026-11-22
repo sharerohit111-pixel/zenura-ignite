@@ -66,3 +66,24 @@ Paper Investing is out of scope. No real exchange/broker order is submitted by t
 5. Run automated parity, concurrency, ownership/RLS, stale-quote, retry, and rollback tests.
 6. Only after a separate cutover approval, connect a staging frontend. Production Firebase/Cloud Run remains available until the new backend passes acceptance.
 
+
+
+## Second-pass compatibility audit (2026-11-22)
+
+The original draft was not applied. A second pass inspected the live gateway helpers and corrected the schema draft for the following contracts:
+
+- Firestore account state is one shared cash balance with separate `positions`, `intradayPositions`, `derivativePositions`, `reservedPositions`, and `intradayReservedPositions` maps. The relational design stores the two equity product maps in `paper_equity_positions` keyed by `product`, with per-position `reserved_quantity`; shared cash and product-specific realized P&L remain on `paper_accounts`.
+- LIMIT orders persist reservation values and later update status, execution price, quote time/age, fill/cancel timestamps, and reservation-release state. Those columns are now represented.
+- Long CE/PE option orders persist verified contract metadata, quote freshness, lot size, charges breakdown, cash delta, and realized P&L. Those fields are now represented. Futures margin preview remains preview-only and does not create a position or reserve cash.
+- The encrypted Upstox token is an AES-256-GCM envelope object (`v`, `iv`, `tag`, `data`), not a plain text token. The schema now uses JSONB for the envelope and stores the connected status and expiry. The encryption key must remain in server-side secret storage.
+- The current Firebase identity uses a Firebase UID string; it must not be cast to Supabase's UUID. A private `paper_user_identity_map` is included to map provisioned Supabase Auth UUIDs to legacy Firebase UIDs during the staged identity migration.
+- The current Firestore gateway does not persist the original UUID idempotency key in the order document; it persists a deterministic SHA-256 order ID and request fingerprint. The SQL keeps the idempotency key nullable for imported legacy records and uses partial unique indexes for new records if/when the new service persists keys.
+- The first-pass SQL had a trailing comma in the derivative-order table definition; this is fixed in the draft.
+
+### Still not cleared for application
+
+1. Find and audit the exact Upstox OAuth authorization/callback/token-save implementation and its state lifecycle before finalizing `upstox_oauth_states`.
+2. Inspect all remaining Firestore writers/readers for account, connection, stream lease, margin preview, and watchlist collections.
+3. Design and test PostgreSQL RPC/transaction functions for market order, pending LIMIT reserve/fill/cancel, option order, and account initialization. Table DDL alone does not reproduce Firestore's atomic transaction semantics.
+4. Validate RLS, service-role-only writes, indexes, and the Firebase UID to Supabase Auth identity cutover.
+5. Apply nothing to the Supabase project until the draft passes review and the user explicitly approves the staging migration.
