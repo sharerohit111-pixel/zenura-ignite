@@ -32,7 +32,7 @@ begin
      or p_idempotency_key is null or p_request_fingerprint is null
      or p_request_fingerprint !~ '^[a-f0-9]{64}$'
      or p_instrument_key is null or length(p_instrument_key) not between 1 and 100
-     or p_side not in ('BUY','SELL')
+     or p_side is null or p_side not in ('BUY','SELL')
      or p_quantity is null or p_quantity not between 1 and 1000000
      or p_limit_price_paise is null or p_limit_price_paise <= 0 then
     raise exception using errcode='22023', message='Invalid paper LIMIT order request';
@@ -43,6 +43,12 @@ begin
    where user_id=p_user_id for update;
   if not found then
     raise exception using errcode='P0002', message='Paper account is not initialized';
+  end if;
+  if v_account.cash_paise < 0 or v_account.reserved_cash_paise < 0
+     or v_account.reserved_margin_paise < 0
+     or v_account.reserved_cash_paise + v_account.reserved_margin_paise > v_account.cash_paise
+     or v_account.version < 1 then
+    raise exception using errcode='23514', message='Invalid account reservations or balance';
   end if;
 
   select * into v_existing from public.paper_orders
