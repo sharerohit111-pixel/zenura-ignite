@@ -822,7 +822,7 @@ async function runPaperLimitWorker({maxOrders=50}={}){
   if(!Number.isInteger(maxOrders)||maxOrders<1||maxOrders>100)throw new TypeError("Paper LIMIT worker batch size is invalid.");
   const leaseToken=crypto.randomUUID(),leaseNow=Date.now();
   const lease=await serviceDb.rpc("acquire_paper_market_worker_lease",{
-    p_state_key:"paper_limit_orders",p_lease_token:leaseToken,p_now_ms:leaseNow,p_ttl_ms:120000
+    p_state_key:"paper_limit_orders",p_lease_token:leaseToken,p_now_ms:leaseNow,p_ttl_ms:240000
   });
   if(lease?.error)throw new Error("Paper LIMIT worker lease could not be acquired.");
   if(lease?.data!==true)return {locked:true,scanned:0,filled:0,notEligible:0,failed:0,alreadyFilled:0};
