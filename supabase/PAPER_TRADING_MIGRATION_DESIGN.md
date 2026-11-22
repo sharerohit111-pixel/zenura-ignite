@@ -430,3 +430,16 @@ GitHub Actions run **#55 / 44999830275** completed with **success** on disposabl
 - The 50-open-position boundary: the 51st distinct contract was rejected without a partial order; an add-on BUY to an already-open contract remained allowed at the cap.
 
 The Firebase JS transaction reference test includes a separate add-on BUY vector for exact fee-inclusive basis, average price and cash. The SQL tests run in a disposable PostgreSQL harness with minimal Supabase-compatible auth roles. They are not live Supabase Auth/PostgREST tests, full end-to-end Firebase-vs-SQL runtime differential execution, Database Advisors review, or production certification. Existing golden vectors and deterministic partial-close vectors remain selected parity fixtures; the complete matrix above is still an open audit gate. No actual Supabase project, Firebase backend, production data/settings, PR #28, or integration branch was modified. PR #71 and PR #70 remain Draft and open; no PR was merged.
+
+
+### Verification result — 2026-11-22 (audit CI run #60)
+
+GitHub Actions run **#60 / 45000258176** completed with **success** on disposable PostgreSQL. All **24 numbered verification steps** passed. The new contract/time coverage includes:
+
+- Firebase reference `derivative-contract.test.js` executed in CI: CE/PE and NSE_FO/BSE_FO combinations, tick-size normalization and off-tick rejection, expiry timestamp normalization across India-local midnight, unsafe numeric/time inputs, and the expiry-day 15:30 Asia/Kolkata cutoff immediately before, exactly at, and one millisecond after the cutoff.
+- SQL option RPC: successful CE and PE fills on NSE_FO; a 14-second-old quote accepted with a safe margin; a 16-second-old quote rejected; mismatched exchange/segment, zero tick size, off-tick execution price, caller-clock skew beyond two seconds, and expired contract rejected.
+- Existing selected SQL charge vectors, transaction and concurrency checks, add-on BUY/cash rollback/50-position limit, RLS/RPC privilege boundaries, tenant isolation, and schema/RPC registration all passed again.
+
+The exact expiry-cutoff boundary is currently asserted in the Firebase JavaScript contract helper test. The SQL RPC uses PostgreSQL `clock_timestamp()` internally, so its CI test covers expired-vs-future dates and runtime quote/clock tolerances rather than trying to fake the database clock at the exact expiry millisecond. Quote-age SQL tests use 14,000 ms and 16,000 ms fixtures to leave a timing margin; they do not claim exact 14,999/15,000/15,001 ms SQL boundary equivalence. The broader parity matrix remains open.
+
+This remains disposable PostgreSQL CI with minimal Supabase-compatible auth roles, not live Supabase Auth/PostgREST integration, full Firebase-vs-SQL runtime differential certification, Database Advisors review, or production certification. No connected Supabase project, Firebase backend, production data/settings, PR #28, or integration branch was modified. PR #71 and PR #70 remain Draft and open; no PR was merged.
