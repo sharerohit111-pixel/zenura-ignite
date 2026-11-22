@@ -100,3 +100,20 @@ This section supersedes the earlier BSE fail-closed status notes above.
 - Draft PR #83 remains open and unmerged. The BSE fee-master, BSE settlement, session-import and verified-session guard migrations are not applied to the linked production Supabase project. No customer data was changed.
 - BSE is not operationally enabled merely by these code changes: a complete current official BSE scrip-master snapshot and verified NSE/BSE session snapshots must be imported first. The public real-time data rights/legal gate, gateway deployment configuration and staging rehearsal remain unchanged.
 
+## Latest continuation checkpoint — 2026-11-23
+
+- Hardened both BSE scrip-master and NSE/BSE exchange-session CSV parsers to reject non-whitespace trailing characters after a closing quoted field, while retaining escaped quotes and multiline quoted-field handling.
+- Added regression cases for malformed quote suffixes and misplaced quotes in both import formats.
+- Added a regression guard for the BSE standardized scrip-master 2026 CAS marker at field 24, ensuring it does not shift the existing group, exclusive-flag or instrument-type interpretation.
+- GitHub Actions run [45081167072](https://github.com/sharerohit111-pixel/zenura-ignite/actions/runs/45081167072) passed on commit `e4df4bbbc694fd4496cec57def7aac19cdb83373`. The full job completed all 50 numbered validation steps successfully, including production-image build, Firebase-absence check, full gateway regression suite, disposable PostgreSQL migration rehearsal, BSE fee-master/session imports, RLS, account isolation, fee settlement and concurrency/race checks.
+- PR #83 remains draft, open and unmerged. No production migration, gateway deployment, BSE master import or customer-data change was performed.
+
+### Next safe engineering gates
+
+1. Obtain and validate complete current official BSE scrip-master and verified NSE/BSE session-calendar snapshots before enabling BSE fee-dependent orders or Intraday LIMIT workers in any shared environment.
+2. Complete a separately approved Supabase staging rehearsal with preflight confirmation that no pending/partially-filled LIMIT orders would block the forward-only fee migration; capture rollback and account/order reconciliation evidence.
+3. Close futures/options ledger reconciliation gaps and explicitly keep Futures LIMIT, F&O protective exits and untested partial-fill behavior disabled.
+4. Complete equity protective-order creation UI/API end-to-end validation before enabling the opt-in worker.
+5. Obtain written provider market-data permission and Indian legal review before public real-time data access or production deployment.
+
+Do not infer operational readiness from green disposable-database CI. The empty frontend gateway URL, disabled opt-in workers, unimported verified exchange snapshots, missing staging evidence and unresolved data-rights gate remain release blockers.
