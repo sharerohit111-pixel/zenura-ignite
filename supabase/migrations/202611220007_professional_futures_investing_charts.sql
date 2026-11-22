@@ -9,6 +9,7 @@ create table if not exists public.paper_futures_positions (
   exchange text not null check (exchange in ('NSE','BSE')),
   segment text not null check (segment in ('NSE_FO','BSE_FO')),
   expiry date not null,
+  product text not null check (product in ('INTRADAY','DELIVERY')),
   lot_size integer not null check (lot_size > 0),
   tick_size_paise integer not null check (tick_size_paise > 0),
   net_quantity integer not null check (net_quantity <> 0 and abs(net_quantity) <= 1000000),
