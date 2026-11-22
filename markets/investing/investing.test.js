@@ -44,6 +44,11 @@ test("Paper Investing client uses authenticated Supabase session and idempotent 
  assert.match(js,/\/paper\/investing\/orders/);assert.match(js,/ZenuraProfessionalChart\.mount/);
  assert.doesNotMatch(js,/firebase/i);
 });
+test("Paper Investing safely blocks BSE order execution until exact scrip-group fees exist",()=>{
+ assert.match(js,/selected\.exchange==="NSE"/);
+ assert.match(js,/selected\.exchange!=="NSE"/);
+ assert.match(js,/BSE Paper Investing orders are disabled/);
+});
 test("Paper Investing clears private state and rejects late responses after account changes",()=>{
  assert.match(js,/function clearPrivateSession\(\)/);
  assert.match(js,/dataRequestSeq\+\+/);
