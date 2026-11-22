@@ -12,7 +12,7 @@ functions, or switch application traffic.
 - indianPaperOrders/{sha256-order-id}: equity MARKET and Delivery LIMIT order history.
 - indianDerivativeOrders/{sha256-order-id}: long CE/PE option history, charges and quote data.
 - indianMarketWatchlists/{firebaseUid}: named per-user watchlists.
-- Firebase Auth users are exported separately as safe identity metadata for UID mapping.
+- Firebase Auth users are exported separately as UID-only records. The transformer uses these UIDs solely to validate that Firestore references have matching Auth identities; contact details, provider identities and sign-in metadata are not exported.
 
 The allowlist excludes upstoxConnections because it contains encrypted broker-token
 envelopes. OAuth state, connection-control, stream lease, worker cursor, margin-preview
