@@ -57,11 +57,19 @@ function isEligibleIntradayLimitOrder(order,quote,nowMs,session){
      ||![ "BUY","SELL" ].includes(order.side)
      ||!Number.isSafeInteger(order.quantity)||order.quantity<1||order.quantity>1000000
      ||!Number.isSafeInteger(order.limit_price_paise)||order.limit_price_paise<1
+     ||typeof order.created_at!=="string"||!Number.isFinite(Date.parse(order.created_at))
      ||!quote||!Number.isSafeInteger(quote.pricePaise)||quote.pricePaise<1
      ||!Number.isSafeInteger(quote.tradeTimeMs)||quote.tradeTimeMs<1
      ||!Number.isSafeInteger(nowMs)||nowMs<1||quote.tradeTimeMs>nowMs
      ||nowMs-quote.tradeTimeMs>15000
      ||!isIntradaySessionOpen(nowMs,session))return false;
+  const normalized=normalizeMarketSession(session);
+  const createdMs=Date.parse(order.created_at);
+  if(createdMs>nowMs)return false;
+  const created=marketClockParts(createdMs),now=marketClockParts(nowMs);
+  if(created.year!==now.year||created.month!==now.month||created.day!==now.day)return false;
+  const createdMinute=created.hour*60+created.minute;
+  if(createdMinute<normalized.openMinute||createdMinute>=normalized.closeMinute)return false;
   return order.side==="BUY"?quote.pricePaise<=order.limit_price_paise:quote.pricePaise>=order.limit_price_paise;
 }
 
