@@ -45,7 +45,7 @@
 
   const translations = {
     'Paper Trading Order Ticket':'पेपर ट्रेडिंग ऑर्डर टिकट',
-    'VIRTUAL CASH':'वर्चुअल नकद','REALIZED P&L':'वास्तविक P&L','DATE & TIME':'तारीख और समय','STOCK':'शेयर','SIDE':'प्रकार','TYPE':'ऑर्डर प्रकार','QTY':'मात्रा','EXECUTION PRICE':'एक्जीक्यूशन कीमत','ACTION':'कार्रवाई','Limit Price':'लिमिट कीमत','Order':'ऑर्डर','Status':'स्थिति',
+    'VIRTUAL CASH':'वर्चुअल नकद','REALIZED P&L':'वास्तविक P&L','DATE & TIME':'तारीख और समय','STOCK':'शेयर','SIDE':'प्रकार','TYPE':'ऑर्डर प्रकार','QTY':'मात्रा','EXECUTION PRICE':'एक्जीक्यूशन कीमत','CHARGES':'शुल्क','ACTION':'कार्रवाई','Limit Price':'लिमिट कीमत','Order':'ऑर्डर','Status':'स्थिति',
     'Pending & Order Book':'पेंडिंग और ऑर्डर बुक',
     'Reference / live price':'संदर्भ / लाइव कीमत','Limit price (₹)':'लिमिट कीमत (₹)',
     'Quantity':'मात्रा','Estimated order value':'अनुमानित ऑर्डर मूल्य',
@@ -301,7 +301,9 @@
     const when = created && !Number.isNaN(created.getTime()) ? created.toLocaleString('en-IN', {dateStyle:'medium',timeStyle:'short'}) : '—';
     const execution = Number.isSafeInteger(order.executionPricePaise) ? money(order.executionPricePaise) : '—';
     const limit = Number.isSafeInteger(order.limitPricePaise) ? money(order.limitPricePaise) : '—';
-    const values = [when,order.tradingSymbol,order.product === 'INTRADAY' ? 'INTRADAY' : 'DELIVERY',translate(String(order.side || '')),translate(String(order.orderType || 'MARKET')),order.quantity,limit,execution,translate(String(order.status || ''))];
+    const charges = order.chargesBreakdown?.schedule_version ? money(order.chargesPaise) : '—';
+    const realized = Number.isSafeInteger(order.realizedPnlPaise) ? money(order.realizedPnlPaise) : '—';
+    const values = [when,order.tradingSymbol,order.product === 'INTRADAY' ? 'INTRADAY' : 'DELIVERY',translate(String(order.side || '')),translate(String(order.orderType || 'MARKET')),order.quantity,limit,execution,charges,realized,translate(String(order.status || ''))];
     values.forEach(value => { const td = document.createElement('td'); td.textContent = String(value ?? '—'); tr.append(td); });
     const action = document.createElement('td');
     if (order.orderType === 'LIMIT' && order.status === 'PENDING' && typeof order.id === 'string') {
@@ -323,7 +325,7 @@
     });
     if (!filtered.length) {
       const tr = document.createElement('tr'), td = document.createElement('td');
-      td.colSpan = 10; td.textContent = translate('No orders match this filter.');
+      td.colSpan = 12; td.textContent = translate('No orders match this filter.');
       tr.append(td); ordersBody.append(tr); return;
     }
     filtered.forEach(order => ordersBody.append(orderRow(order)));
@@ -334,14 +336,14 @@
     const filled = currentOrders.filter(order => String(order.status).toUpperCase() === 'FILLED');
     if (!filled.length) {
       const tr = document.createElement('tr'), td = document.createElement('td');
-      td.colSpan = 7; td.textContent = translate('No filled trades recorded yet.');
+      td.colSpan = 9; td.textContent = translate('No filled trades recorded yet.');
       tr.append(td); tradeBody.append(tr); return;
     }
     filled.forEach(order => {
       const tr = document.createElement('tr');
       const created = Number.isFinite(order.createdAt) ? new Date(order.createdAt) : null;
       const when = created && !Number.isNaN(created.getTime()) ? created.toLocaleString('en-IN', {dateStyle:'medium',timeStyle:'short'}) : '—';
-      [when,order.tradingSymbol,order.product === 'INTRADAY' ? 'INTRADAY' : 'DELIVERY',translate(String(order.side || '')),order.quantity,money(order.executionPricePaise),translate(String(order.orderType || 'MARKET'))].forEach(value => {
+      [when,order.tradingSymbol,order.product === 'INTRADAY' ? 'INTRADAY' : 'DELIVERY',translate(String(order.side || '')),order.quantity,money(order.executionPricePaise),order.chargesBreakdown?.schedule_version ? money(order.chargesPaise) : '—',Number.isSafeInteger(order.realizedPnlPaise) ? money(order.realizedPnlPaise) : '—',translate(String(order.orderType || 'MARKET'))].forEach(value => {
         const td = document.createElement('td'); td.textContent = String(value ?? '—'); tr.append(td);
       });
       tradeBody.append(tr);
