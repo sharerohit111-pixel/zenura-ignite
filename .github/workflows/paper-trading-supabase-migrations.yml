@@ -565,7 +565,7 @@ jobs:
           SET ROLE service_role;
           SELECT public.initialize_paper_trading_account('88888888-8888-4888-8888-888888888888');
           RESET ROLE;
-          DO $
+          DO $parity$
           DECLARE
             v_result jsonb;
             v_qty bigint;
@@ -642,7 +642,7 @@ jobs:
               RAISE EXCEPTION 'Final close failed to consume the remaining fee-inclusive basis exactly';
             END IF;
           END
-          $;
+          $parity$;
           SQL
       - name: Verify SQL charges and rounding against Firebase golden vectors
         run: |
