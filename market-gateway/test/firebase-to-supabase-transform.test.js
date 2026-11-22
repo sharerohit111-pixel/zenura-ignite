@@ -48,8 +48,16 @@ test("maps derivative charge and cash metadata",()=>{
  const record={documentId:"a".repeat(64),data:{uid:"legacy-user",requestFingerprint:"b".repeat(64),instrumentKey:"NSE_FO|ABC",side:"BUY",quantity:25,instrumentType:"CE",lots:1,lotSize:25,status:"FILLED",executionPricePaise:500,quoteTimestampMs:1000,quoteAgeMs:100,grossPaise:12500,chargesPaise:500,totalDebitPaise:13000,realizedPnlPaise:0,cashDeltaPaise:-13000,chargesBreakdown:{brokerage:200},createdAt:"2026-11-20T10:00:00Z"}};
  const r=transformDerivativeOrder(record,map);
  assert.equal(r.instrument_type,"CE");
+ assert.equal(r.strike_price,null,"legacy orders without strike metadata remain importable as NULL");
  assert.equal(r.cash_delta_paise,-13000);
  assert.equal(r.charges_breakdown.brokerage,200);
+});
+test("preserves finite positive option strike price and rejects unsafe values",()=>{
+ const base={documentId:"a".repeat(64),data:{uid:"legacy-user",requestFingerprint:"b".repeat(64),instrumentKey:"NSE_FO|ABC",side:"BUY",quantity:25,instrumentType:"CE",lots:1,lotSize:25,status:"FILLED",executionPricePaise:500,quoteTimestampMs:1000,quoteAgeMs:100,grossPaise:12500,chargesPaise:500,totalDebitPaise:13000,realizedPnlPaise:0,cashDeltaPaise:-13000,chargesBreakdown:{},createdAt:"2026-11-20T10:00:00Z"}};
+ assert.equal(transformDerivativeOrder({...base,data:{...base.data,strikePrice:25000}},map).strike_price,25000);
+ for(const strikePrice of [0,-1,NaN,Infinity,-Infinity,"25000"]){
+  assert.throws(()=>transformDerivativeOrder({...base,data:{...base.data,strikePrice}},map),/finite positive number/);
+ }
 });
 test("migrates four named watchlists and legacy instrumentKeys",()=>{
  const record={documentId:"legacy-user",data:{instrumentKeys:["A","A"],watchlists:{Banking:["B"],NIFTY:["C"],"F&O":["D"]},updatedAt:"2026-11-20T10:00:00Z"}};
