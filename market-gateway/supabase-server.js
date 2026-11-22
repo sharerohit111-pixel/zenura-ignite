@@ -930,6 +930,13 @@ async function runPaperProtectiveWorker({maxOrders=20}={}){
         }
       }catch(error){
         summary.failed+=userOrders.length;
+        const checkedAt=new Date().toISOString();
+        for(const order of userOrders){
+          const marked=await serviceDb.from("paper_protective_orders")
+            .update({worker_checked_at:checkedAt})
+            .eq("order_id",order.order_id).eq("status","ACTIVE");
+          if(marked.error)summary.failed++;
+        }
         console.warn("Protective user batch skipped",{userId,errorName:error?.name||"Error",status:error?.status||500});
       }
     };
