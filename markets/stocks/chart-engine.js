@@ -52,7 +52,7 @@
           else{script.remove();index++;if(index<sources.length)attempt();else if(!settled){settled=true;libraryPromise=null;reject(new Error("Chart engine loaded without its API."));}}
         };
         script.onerror=failAttempt;
-        timeout=setTimeout(failAttempt,8000);
+        timeout=setTimeout(failAttempt,6000);
         document.head.appendChild(script);
       };
       attempt();
@@ -253,7 +253,7 @@
     });
     const response=await fetch(current.gateway+"/candles?"+params,{
       headers:{Authorization:"Bearer "+token,Accept:"application/json"},
-      cache:"no-store",signal:AbortSignal.timeout(20000)
+      cache:"no-store",signal:AbortSignal.timeout(15000)
     });
     if(!response.ok)throw new Error("Historical candles unavailable ("+response.status+").");
     const payload=await response.json();
