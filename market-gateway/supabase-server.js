@@ -404,6 +404,51 @@ app.post("/paper/orders/:orderId/cancel",async(req,res)=>{
     res.set("Cache-Control","private, no-store").json({orderId,status:result?.status||"CANCELLED",cashPaise:result?.cash_paise??null,reservedCashPaise:result?.reserved_cash_paise??null,simulationOnly:true});
   }catch(error){sendError(res,error,"LIMIT order cancellation failed.");}
 });
+app.post("/paper/protective-orders",async(req,res)=>{
+  try{
+    const {user,userDb}=await auth(req);
+    const orderId=String(req.body?.order_id||""),instrumentKey=String(req.body?.instrument_key||"");
+    const product=String(req.body?.product||"").toUpperCase(),triggerType=String(req.body?.trigger_type||"").toUpperCase();
+    const triggerPricePaise=Number(req.body?.trigger_price_paise),quantity=Number(req.body?.quantity);
+    if(!isUuid(orderId)||!instrumentKey||instrumentKey.length>100
+       ||!["DELIVERY","INTRADAY"].includes(product)||!["STOP_LOSS","TARGET"].includes(triggerType)
+       ||!Number.isSafeInteger(triggerPricePaise)||triggerPricePaise<1
+       ||!Number.isSafeInteger(quantity)||quantity<1||quantity>1000000)
+      return res.status(400).json({error:"Invalid equity protective order details."});
+    if(!instrumentCache.length||Date.now()-instrumentCacheUpdatedAt>6*60*60*1000)await refreshInstrumentCache();
+    const instrument=instrumentCache.find(item=>item.instrument_key===instrumentKey
+      &&item.instrument_type==="EQ"&&["NSE_EQ","BSE_EQ"].includes(item.segment));
+    if(!instrument)return res.status(400).json({error:"Select a verified NSE/BSE cash equity instrument."});
+    const {data,error}=await userDb.rpc("create_paper_equity_protective_order",{
+      p_order_id:orderId,p_user_id:user.id,p_instrument_key:instrumentKey,p_product:product,
+      p_trigger_type:triggerType,p_trigger_price_paise:triggerPricePaise,p_quantity:quantity
+    });
+    if(error)throw Object.assign(new Error("Equity protective order could not be created."),{status:409});
+    const order=data?.order||{};
+    res.set("Cache-Control","private, no-store").status(data?.idempotent_replay?200:201).json({
+      orderId:order.order_id||orderId,instrumentKey:order.instrument_key||instrumentKey,
+      tradingSymbol:instrument.trading_symbol,product:order.product||product,side:"SELL",
+      triggerType:order.trigger_type||triggerType,triggerDirection:order.trigger_direction,
+      triggerPricePaise:order.trigger_price_paise??triggerPricePaise,quantity:order.quantity??quantity,
+      status:order.status||"ACTIVE",idempotentReplay:data?.idempotent_replay===true,simulationOnly:true
+    });
+  }catch(error){sendError(res,error,"Equity protective order could not be created.");}
+});
+app.get("/paper/protective-orders",async(req,res)=>{
+  try{
+    const {user,userDb}=await auth(req),raw=String(req.query.limit??"50");
+    if(!/^\\d+$/.test(raw)||Number(raw)<1)return res.status(400).json({error:"Protective order limit must be from 1 to 100."});
+    const {data,error}=await userDb.from("paper_protective_orders").select("order_id,instrument_key,product,side,trigger_type,trigger_direction,trigger_price_paise,quantity,status,created_at,filled_at,cancelled_at,execution_price_paise")
+      .eq("user_id",user.id).order("created_at",{ascending:false}).limit(Math.min(Number(raw),100));
+    if(error)throw Object.assign(new Error("Protective order history could not be loaded."),{status:503});
+    const orders=(data||[]).map(order=>({orderId:order.order_id,instrumentKey:order.instrument_key,product:order.product,
+      side:order.side,triggerType:order.trigger_type,triggerDirection:order.trigger_direction,
+      triggerPricePaise:order.trigger_price_paise,quantity:order.quantity,status:order.status,
+      executionPricePaise:order.execution_price_paise,createdAt:order.created_at,
+      filledAt:order.filled_at,cancelledAt:order.cancelled_at,simulationOnly:true}));
+    res.set("Cache-Control","private, no-store").json({orders,simulationOnly:true});
+  }catch(error){sendError(res,error,"Protective order history could not be loaded.");}
+});
 app.post("/paper/protective-orders/:orderId/cancel",async(req,res)=>{
   try{
     const {user}=await auth(req),orderId=String(req.params.orderId||"");
