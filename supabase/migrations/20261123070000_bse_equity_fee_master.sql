@@ -195,7 +195,7 @@ begin
     'scrip_code',v_master.scrip_code,'isin',v_master.isin,
     'master_source_date',v_master.source_date,'master_source_sha256',v_master.source_sha256,
     'master_source_reference',v_master.source_reference,
-    'indicative',true,'simulation_only',true
+    'simulation_billing_basis','indicative_per_fill_allocation','indicative',true,'simulation_only',true
   );
 end;
 $$;
