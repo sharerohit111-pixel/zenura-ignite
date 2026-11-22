@@ -77,8 +77,8 @@ async function placeOrder({ symbol, side, quantity }) {
 async function placeLimitOrder({ symbol, side, quantity, limitPrice }) {
   if (!supportedSymbols.has(symbol) || !["BUY", "SELL"].includes(side)) throw new Error("Select a supported crypto spot market and order side.");
   if (!Number.isFinite(quantity) || quantity <= 0 || !Number.isFinite(limitPrice) || limitPrice <= 0) throw new Error("Enter a valid LIMIT quantity and price.");
-  const quantityText = quantity.toFixed(12).replace(/0+$/, "").replace(/\\.$/, "");
-  const limitPriceText = limitPrice.toFixed(8).replace(/0+$/, "").replace(/\\.$/, "");
+  const quantityText = quantity.toFixed(12).replace(/0+$/, "").replace(/\.$/, "");
+  const limitPriceText = limitPrice.toFixed(8).replace(/0+$/, "").replace(/\.$/, "");
   if (!pendingLimitOrder || pendingLimitOrder.symbol !== symbol || pendingLimitOrder.side !== side
       || pendingLimitOrder.quantity !== quantityText || pendingLimitOrder.limitPrice !== limitPriceText) {
     pendingLimitOrder = { symbol, side, quantity: quantityText, limitPrice: limitPriceText, key: crypto.randomUUID() };
