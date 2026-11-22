@@ -34,21 +34,23 @@
       let index=0,settled=false;
       const attempt=()=>{
         const script=document.createElement("script");
-        let timeout;
+        let timeout,attemptFinished=false;
         const cleanup=()=>{if(timeout)clearTimeout(timeout);script.onload=null;script.onerror=null;};
-        const fallback=()=>{
-          cleanup();script.remove();index++;
+        const failAttempt=()=>{
+          if(attemptFinished)return;
+          attemptFinished=true;cleanup();script.remove();index++;
           if(index<sources.length){attempt();return;}
           if(!settled){settled=true;libraryPromise=null;reject(new Error("Professional chart engine could not be loaded from either CDN. Check the network and retry."));}
         };
         script.src=sources[index];script.async=true;script.crossOrigin="anonymous";script.referrerPolicy="no-referrer";
         script.onload=()=>{
-          cleanup();
+          if(attemptFinished)return;
+          attemptFinished=true;cleanup();
           if(root.klinecharts&&!settled){settled=true;resolve(root.klinecharts);}
-          else fallback();
+          else{script.remove();index++;if(index<sources.length)attempt();else if(!settled){settled=true;libraryPromise=null;reject(new Error("Chart engine loaded without its API."));}}
         };
-        script.onerror=fallback;
-        timeout=setTimeout(fallback,8000);
+        script.onerror=failAttempt;
+        timeout=setTimeout(failAttempt,8000);
         document.head.appendChild(script);
       };
       attempt();
