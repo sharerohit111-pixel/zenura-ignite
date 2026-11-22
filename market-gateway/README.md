@@ -55,3 +55,8 @@ All private endpoints validate the Supabase access token. User-facing reads/writ
 - Configure exact CORS origins and verify the Upstox developer-console callback URL matches `UPSTOX_REDIRECT_URI` byte-for-byte.
 
 See [DEPLOYMENT.md](./DEPLOYMENT.md) for the Supabase + Cloud Run deployment runbook.
+
+
+## Market-data compliance
+
+Review [MARKET-DATA-COMPLIANCE.md](./MARKET-DATA-COMPLIANCE.md) before public release. Per-user Upstox OAuth does not itself establish public redistribution rights; the production deployment workflow requires written market-data rights approval.
