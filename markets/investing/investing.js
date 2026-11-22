@@ -8,7 +8,7 @@
   const buyButton=$("investing-buy"),sellButton=$("investing-sell"),quantityInput=$("investing-quantity");
   const positionsBody=$("investing-positions"),ordersBody=$("investing-orders");
   const timeframeButtons=[...document.querySelectorAll("#chart-timeframes [data-timeframe]")];
-  let selected=null,activeTimeframe="5m",searchSequence=0,searchTimer=null,streamAbort=null,reconnectTimer=null,staleTimer=null,reconnectAttempt=0,lastQuote=null;
+  let selected=null,activeTimeframe="5m",searchSequence=0,searchTimer=null,searchAbort=null,streamAbort=null,reconnectTimer=null,staleTimer=null,reconnectAttempt=0,lastQuote=null;
   let authUserId=null,watchlistItems=[],streamSequence=0,dataRequestSeq=0;
   const pendingKey="zenura-paper-investing-order-v1";
   function fmt(value){return "₹"+(Number(value||0)/100).toLocaleString("en-IN",{minimumFractionDigits:2,maximumFractionDigits:2});}
@@ -43,16 +43,19 @@
   }
   async function searchStocks(){
     const sequence=++searchSequence,q=searchInput.value.trim();
+    if(searchAbort){searchAbort.abort();searchAbort=null;}
     if(!q){renderSearch([],"Search the official NSE/BSE stock instrument master.");return;}
     if(!gateway){renderSearch([],"Secure market gateway deployment is pending.");return;}
+    const controller=new AbortController();searchAbort=controller;
     try{
       const params=new URLSearchParams({kind:"equities",q,limit:"50"});
-      const response=await fetch(gateway+"/instruments?"+params,{headers:{Accept:"application/json"},cache:"public"});
+      const response=await fetch(gateway+"/instruments?"+params,{headers:{Accept:"application/json"},cache:"public",signal:controller.signal});
       const payload=await response.json().catch(()=>({}));
-      if(sequence!==searchSequence)return;
+      if(sequence!==searchSequence||controller.signal.aborted)return;
       if(!response.ok)throw new Error(payload.error||"Stock search is unavailable.");
       renderSearch(payload.results||[]);
-    }catch(error){if(sequence===searchSequence)renderSearch([],error.message);}
+    }catch(error){if(sequence===searchSequence&&!controller.signal.aborted)renderSearch([],error.message);}
+    finally{if(searchAbort===controller)searchAbort=null;}
   }
   async function loadWatchlist(){
     const uid=connector()?.getUserId?.();
@@ -277,7 +280,7 @@
     const language=event.detail?.language||window.ZenuraLanguage?.getLanguage?.()||"en";
     safeText($("paper-chart-theme-toggle"),window.ZenuraChartTheme?.actionLabel(document.body.dataset.chartTheme||"dark",language)||"CHART THEME");
   });
-  window.addEventListener("pagehide",clearStream,{once:true});
+  window.addEventListener("pagehide",()=>{if(searchAbort)searchAbort.abort();clearStream();},{once:true});
   if(!gateway){safeText(orderStatus,"Market gateway URL is not configured. Supabase sign-in is available, but live investing needs the deployed gateway.");}
   if(connector()?.getUserId?.())refreshAll();
   renderSearch([],"Search the official NSE/BSE stock instrument master.");
