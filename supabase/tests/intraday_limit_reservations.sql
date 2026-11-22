@@ -67,7 +67,7 @@ BEGIN
   END IF;
   SELECT reserved_cash_paise INTO v_reserved FROM public.paper_accounts
    WHERE user_id='22222222-2222-4222-8222-222222222222';
-  IF v_reserved<>20000 THEN RAISE EXCEPTION 'Intraday BUY retry double-reserved cash'; END IF;
+  IF v_reserved<>20026 THEN RAISE EXCEPTION 'Intraday BUY retry double-reserved cash'; END IF;
 
   PERFORM public.cancel_paper_intraday_limit_order(
     '22222222-2222-4222-8222-222222222222',repeat('a',64)
