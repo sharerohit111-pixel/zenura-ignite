@@ -14,7 +14,7 @@ const {isUuid,makeOrderId,makeOrderFingerprint}=require("./lib/order-idempotency
 const {normalizeProductMode}=require("./lib/product-mode");
 const {parseLimitPricePaise}=require("./lib/limit-price");
 const {normalizeProviderQuote}=require("./lib/provider-quote");
-const {isEligiblePaperLimitOrder,normalizeWorkerCursor,groupOrdersByUser}=require("./lib/paper-limit-worker");
+const {isEligiblePaperLimitOrder,isEligibleCryptoLimitOrder,normalizeWorkerCursor,groupOrdersByUser}=require("./lib/paper-limit-worker");
 const {buildPortfolioValuation}=require("./lib/paper-portfolio-valuation");
 const {calculateDerivativePortfolio}=require("./lib/derivative-portfolio");
 const {validateDerivativeContract}=require("./lib/derivative-contract");
@@ -1073,6 +1073,105 @@ async function runPaperLimitWorker({maxOrders=50}={}){
   }
 }
 
+
+async function runPaperCryptoLimitWorker({maxOrders=50}={}){
+  if(!Number.isInteger(maxOrders)||maxOrders<1||maxOrders>100)throw new TypeError("Crypto LIMIT worker batch size is invalid.");
+  const leaseToken=crypto.randomUUID(),now=Date.now();
+  const lease=await serviceDb.rpc("acquire_paper_crypto_limit_worker_lease",{
+    p_lease_token:leaseToken,p_now_ms:now,p_ttl_ms:60000
+  });
+  if(lease?.error)throw new Error("Crypto LIMIT worker lease could not be acquired.");
+  if(lease?.data!==true)return {locked:true,scanned:0,filled:0,notEligible:0,failed:0};
+  const summary={locked:false,scanned:0,filled:0,notEligible:0,failed:0};
+  try{
+    const state=await serviceDb.from("paper_crypto_limit_worker_state")
+      .select("cursor_created_at,cursor_order_id").eq("state_key","crypto_limit_orders").maybeSingle();
+    if(state.error)throw new Error("Crypto LIMIT worker cursor could not be read.");
+    let cursor=state.data||{};
+    const loadBatch=position=>{
+      let query=serviceDb.from("paper_crypto_orders")
+        .select("order_id,user_id,symbol,base_asset,side,order_type,status,quantity,limit_price,simulation_only,created_at")
+        .eq("order_type","LIMIT").eq("status","PENDING").eq("simulation_only",true)
+        .order("created_at",{ascending:true}).order("order_id",{ascending:true}).limit(maxOrders);
+      if(position.cursor_created_at&&position.cursor_order_id)
+        query=query.or("created_at.gt."+position.cursor_created_at+",and(created_at.eq."+position.cursor_created_at+",order_id.gt."+position.cursor_order_id+")");
+      return query;
+    };
+    let batch=await loadBatch(cursor);
+    if(batch.error)throw new Error("Pending crypto LIMIT orders could not be scanned.");
+    if(!(batch.data||[]).length&&(cursor.cursor_created_at||cursor.cursor_order_id)){
+      cursor={cursor_created_at:null,cursor_order_id:null};
+      const reset=await serviceDb.from("paper_crypto_limit_worker_state")
+        .update({cursor_created_at:null,cursor_order_id:null,updated_at:new Date().toISOString()})
+        .eq("state_key","crypto_limit_orders").eq("lease_token",leaseToken);
+      if(reset.error)throw new Error("Crypto LIMIT worker cursor could not be reset.");
+      batch=await loadBatch(cursor);
+      if(batch.error)throw new Error("Pending crypto LIMIT orders could not be rescanned.");
+    }
+    const orders=batch.data||[];summary.scanned=orders.length;
+    let fxRate=null;
+    const quoteCache=new Map();
+    for(const order of orders){
+      try{
+        if(!CRYPTO_SYMBOLS.has(order.symbol)||order.base_asset!==order.symbol.slice(0,-4)){
+          summary.notEligible++;continue;
+        }
+        let quote=quoteCache.get(order.symbol);
+        if(!quote){
+          const response=await fetchProvider("https://api.binance.com/api/v3/trades?"+new URLSearchParams({symbol:order.symbol,limit:"1"}),{headers:{Accept:"application/json"}},5000);
+          if(!response.ok)throw new Error("Binance crypto LIMIT quote request failed.");
+          const trades=await response.json(),trade=Array.isArray(trades)?trades[0]:null;
+          quote={priceUsdt:Number(trade?.price),tradeTimeMs:Number(trade?.time)};
+          quoteCache.set(order.symbol,quote);
+        }
+        const nowMs=Date.now();
+        if(!isEligibleCryptoLimitOrder(order,quote,nowMs)){summary.notEligible++;continue;}
+        if(fxRate===null){
+          const fx=await fetchProvider("https://open.er-api.com/v6/latest/USD",{headers:{Accept:"application/json"}},5000);
+          if(!fx.ok)throw new Error("USD/INR reference rate unavailable for crypto LIMIT fill.");
+          const fxData=await fx.json();fxRate=Number(fxData?.rates?.INR);
+          if(fxData?.result!=="success"||!Number.isFinite(fxRate)||fxRate<40||fxRate>200)
+            throw new Error("Invalid USD/INR reference rate for crypto LIMIT fill.");
+        }
+        const gross=Number(order.quantity)*quote.priceUsdt*fxRate;
+        if(!Number.isFinite(gross)||gross<=0||gross>1000000000000){summary.notEligible++;continue;}
+        const fee=Number((gross*0.001).toFixed(8));
+        const filled=await serviceDb.rpc("fill_paper_crypto_limit_order",{
+          p_user_id:order.user_id,p_order_id:order.order_id,
+          p_execution_price:quote.priceUsdt.toFixed(8),p_fx_rate_inr:fxRate.toFixed(8),
+          p_fee:fee.toFixed(8),p_quote_timestamp_ms:quote.tradeTimeMs
+        });
+        if(filled?.error){
+          if(["23514","22023","P0002","55000"].includes(filled.error.code))summary.notEligible++;
+          else{summary.failed++;console.warn("Crypto LIMIT fill RPC failed",{orderId:order.order_id,code:filled.error.code||"unknown"});}
+        }else if(filled?.data?.order?.status==="FILLED")summary.filled++;
+        else summary.notEligible++;
+      }catch(error){
+        summary.failed++;
+        console.warn("Crypto LIMIT order processing failed",{orderId:order.order_id,errorName:error?.name||"Error"});
+      }
+    }
+    if(orders.length){
+      const last=orders[orders.length-1];
+      const saved=await serviceDb.from("paper_crypto_limit_worker_state")
+        .update({cursor_created_at:last.created_at,cursor_order_id:last.order_id,updated_at:new Date().toISOString()})
+        .eq("state_key","crypto_limit_orders").eq("lease_token",leaseToken);
+      if(saved.error)throw new Error("Crypto LIMIT worker cursor could not be saved.");
+    }else{
+      const saved=await serviceDb.from("paper_crypto_limit_worker_state")
+        .update({cursor_created_at:null,cursor_order_id:null,updated_at:new Date().toISOString()})
+        .eq("state_key","crypto_limit_orders").eq("lease_token",leaseToken);
+      if(saved.error)throw new Error("Crypto LIMIT worker cursor could not be reset.");
+    }
+    return summary;
+  }finally{
+    const released=await serviceDb.rpc("release_paper_crypto_limit_worker_lease",{
+      p_lease_token:leaseToken,p_now_ms:Date.now()
+    });
+    if(released?.error)console.warn("Crypto LIMIT worker lease release failed",{code:released.error.code||"unknown"});
+  }
+}
+
 async function start(){
   if(!ENC_KEY||!UPSTOX_CLIENT_ID||!UPSTOX_CLIENT_SECRET||!UPSTOX_REDIRECT_URI){
     throw new Error("Supabase gateway secrets and Upstox OAuth configuration are required.");
@@ -1099,11 +1198,17 @@ async function start(){
       if(workerBusy||Date.now()<nextWorkerRunAt)return;
       workerBusy=true;
       try{
-        const result=await runPaperLimitWorker({maxOrders:10});
+        const [result,cryptoResult]=await Promise.all([
+          runPaperLimitWorker({maxOrders:10}),runPaperCryptoLimitWorker({maxOrders:25})
+        ]);
         paperLimitWorkerStatus.lastRunAt=Date.now();
-        paperLimitWorkerStatus.lastCycle={scanned:result.scanned,filled:result.filled,failed:result.failed,locked:result.locked,cycleError:false};
+        paperLimitWorkerStatus.lastCycle={
+          scanned:result.scanned+cryptoResult.scanned,filled:result.filled+cryptoResult.filled,
+          failed:result.failed+cryptoResult.failed,locked:result.locked&&cryptoResult.locked,
+          crypto:cryptoResult,cycleError:false
+        };
         workerBackoffMs=intervalMs;nextWorkerRunAt=Date.now()+intervalMs;
-        if(result.filled||result.failed)console.log("Paper LIMIT worker cycle",JSON.stringify(result));
+        if(result.filled||result.failed||cryptoResult.filled||cryptoResult.failed)console.log("Paper LIMIT worker cycle",JSON.stringify({equity:result,crypto:cryptoResult}));
       }catch(error){
         paperLimitWorkerStatus.lastRunAt=Date.now();
         paperLimitWorkerStatus.lastCycle={scanned:0,filled:0,failed:1,locked:false,cycleError:true};
@@ -1119,4 +1224,4 @@ async function start(){
   }
 }
 if(require.main===module)start().catch(error=>{console.error("Supabase gateway startup failed:",error.message);process.exit(1);});
-module.exports={app,start,runPaperLimitWorker};
+module.exports={app,start,runPaperLimitWorker,runPaperCryptoLimitWorker};
