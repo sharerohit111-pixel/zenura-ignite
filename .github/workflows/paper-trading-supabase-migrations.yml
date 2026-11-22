@@ -7,6 +7,7 @@ on:
       - ".github/workflows/paper-trading-supabase-migrations.yml"
       - "market-gateway/test/trading-charges.test.js"
       - "market-gateway/test/derivative-order-transaction.test.js"
+      - "market-gateway/test/derivative-contract.test.js"
   workflow_dispatch:
 
 jobs:
@@ -38,6 +39,8 @@ jobs:
         run: node --test market-gateway/test/trading-charges.test.js
       - name: Run Firebase reference option transaction tests
         run: node --test market-gateway/test/derivative-order-transaction.test.js
+      - name: Run Firebase reference derivative contract validation tests
+        run: node --test market-gateway/test/derivative-contract.test.js
       - name: Prepare minimal Supabase-compatible auth roles
         run: |
           psql -v ON_ERROR_STOP=1 <<'SQL'
@@ -953,6 +956,101 @@ jobs:
             END;
           END
           $$;
+          SQL
+      - name: Verify SQL option contract and quote-age boundaries
+        run: |
+          set -euo pipefail
+          psql -v ON_ERROR_STOP=1 <<'SQL'
+          INSERT INTO auth.users(id) VALUES ('12121212-1212-4212-8212-121212121212')
+            ON CONFLICT DO NOTHING;
+          SET ROLE service_role;
+          SELECT public.initialize_paper_trading_account('12121212-1212-4212-8212-121212121212');
+          RESET ROLE;
+          DO $contract$
+          DECLARE
+            v_now bigint := floor(extract(epoch from clock_timestamp())*1000)::bigint;
+            v_result jsonb;
+          BEGIN
+            -- Both CE and PE are accepted for matching NSE_FO identity.
+            v_result:=public.execute_paper_long_option_order(
+              '12121212-1212-4212-8212-121212121212',repeat('1',64),
+              '51515151-5151-4151-8151-515151515151',repeat('a',64),
+              'NSE_FO|PARITYCE','PARITYCE','NSE','NSE_FO','CE',
+              current_date+10,22000,25,5,1,'BUY',1285,v_now-14000,v_now
+            );
+            v_result:=public.execute_paper_long_option_order(
+              '12121212-1212-4212-8212-121212121212',repeat('2',64),
+              '52525252-5252-4252-8252-525252525252',repeat('b',64),
+              'NSE_FO|PARITYPE','PARITYPE','NSE','NSE_FO','PE',
+              current_date+10,22000,25,5,1,'BUY',1285,v_now-14000,v_now
+            );
+            -- A quote safely older than 15 seconds must fail.
+            BEGIN
+              PERFORM public.execute_paper_long_option_order(
+                '12121212-1212-4212-8212-121212121212',repeat('3',64),
+                '53535353-5353-4353-8353-535353535353',repeat('c',64),
+                'NSE_FO|STALE16','STALE16','NSE','NSE_FO','CE',
+                current_date+10,22000,25,5,1,'BUY',1285,v_now-16000,v_now
+              );
+              RAISE EXCEPTION '16-second-old Options quote was unexpectedly accepted';
+            EXCEPTION WHEN SQLSTATE '22023' THEN NULL;
+            END;
+            -- Exchange and segment must agree.
+            BEGIN
+              PERFORM public.execute_paper_long_option_order(
+                '12121212-1212-4212-8212-121212121212',repeat('4',64),
+                '54545454-5454-4454-8454-545454545454',repeat('d',64),
+                'NSE_FO|BADVENUE','BADVENUE','BSE','NSE_FO','CE',
+                current_date+10,22000,25,5,1,'BUY',1285,v_now,v_now
+              );
+              RAISE EXCEPTION 'Mismatched exchange/segment was unexpectedly accepted';
+            EXCEPTION WHEN SQLSTATE '22023' THEN NULL;
+            END;
+            -- Tick size must be positive and execution price must be tick-aligned.
+            BEGIN
+              PERFORM public.execute_paper_long_option_order(
+                '12121212-1212-4212-8212-121212121212',repeat('5',64),
+                '55555555-5555-4555-8555-555555555555',repeat('e',64),
+                'NSE_FO|BADTICK','BADTICK','NSE','NSE_FO','CE',
+                current_date+10,22000,25,0,1,'BUY',1285,v_now,v_now
+              );
+              RAISE EXCEPTION 'Zero tick size was unexpectedly accepted';
+            EXCEPTION WHEN SQLSTATE '22023' THEN NULL;
+            END;
+            BEGIN
+              PERFORM public.execute_paper_long_option_order(
+                '12121212-1212-4212-8212-121212121212',repeat('6',64),
+                '56565656-5656-4656-8656-565656565656',repeat('f',64),
+                'NSE_FO|OFFTICK2','OFFTICK2','NSE','NSE_FO','CE',
+                current_date+10,22000,25,5,1,'BUY',1286,v_now,v_now
+              );
+              RAISE EXCEPTION 'Off-tick option price was unexpectedly accepted';
+            EXCEPTION WHEN SQLSTATE '22023' THEN NULL;
+            END;
+            -- The database rejects a caller clock outside the +/-2s tolerance.
+            BEGIN
+              PERFORM public.execute_paper_long_option_order(
+                '12121212-1212-4212-8212-121212121212',repeat('7',64),
+                '57575757-5757-4757-8757-575757575757',repeat('1',64),
+                'NSE_FO|CLOCKSKEW','CLOCKSKEW','NSE','NSE_FO','CE',
+                current_date+10,22000,25,5,1,'BUY',1285,v_now,v_now+2001
+              );
+              RAISE EXCEPTION 'Caller clock skew above two seconds was unexpectedly accepted';
+            EXCEPTION WHEN SQLSTATE '22023' THEN NULL;
+            END;
+            -- Expired contracts must fail independent of quote freshness.
+            BEGIN
+              PERFORM public.execute_paper_long_option_order(
+                '12121212-1212-4212-8212-121212121212',repeat('8',64),
+                '58585858-5858-4858-8858-585858585858',repeat('2',64),
+                'NSE_FO|EXPIRED2','EXPIRED2','NSE','NSE_FO','PE',
+                current_date-1,22000,25,5,1,'BUY',1285,v_now,v_now
+              );
+              RAISE EXCEPTION 'Expired option contract was unexpectedly accepted';
+            EXCEPTION WHEN SQLSTATE '22023' THEN NULL;
+            END;
+          END
+          $contract$;
           SQL
       - name: Verify RLS and privileged RPC boundaries
         run: |
