@@ -53,7 +53,9 @@ test("BSE fee schedule applies group and exclusive flag rules",()=>{
 });
 test("BSE Delivery BUY charges use scrip-group exchange rate and no separate IPFT",()=>{
   const c=calculateBseEquityCharges({grossPaise:1000000000,product:"DELIVERY",side:"BUY",groupName:"A",exclusiveFlag:"N",sourceDate:"2026-11-23"});
-  assert.equal(c.exchangeTransactionPaise,375);
+  assert.equal(c.exchangeTransactionPaise,37500);
+  assert.equal(c.exchangeRateRupeesPerCrore,375);
+  assert.equal(c.exchangeRatePaisePerCrore,37500);
   assert.equal(c.brokeragePaise,2000);
   assert.equal(c.sebiPaise,1000);
   assert.equal(c.stampDutyPaise,150000);
@@ -66,7 +68,7 @@ test("BSE Delivery BUY charges use scrip-group exchange rate and no separate IPF
 });
 test("BSE Intraday SELL uses group fee, STT and net proceeds",()=>{
   const c=calculateBseEquityCharges({grossPaise:1000000000,product:"INTRADAY",side:"SELL",groupName:"E",exclusiveFlag:"Y"});
-  assert.equal(c.exchangeTransactionPaise,275);
+  assert.equal(c.exchangeTransactionPaise,27500);
   assert.equal(c.brokeragePaise,2000);
   assert.equal(c.sttPaise,250000);
   assert.equal(c.stampDutyPaise,0);
