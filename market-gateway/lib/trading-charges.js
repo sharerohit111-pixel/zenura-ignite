@@ -78,4 +78,28 @@ function calculateFuturesTradeCharges({grossPaise,exchange,side="BUY",brokerageC
   };
 }
 
-module.exports={calculateLongOptionTradeCharges,calculateLongOptionBuyCharges:args=>calculateLongOptionTradeCharges({...args,side:"BUY"}),calculateFuturesTradeCharges,DEFAULT_BROKERAGE_PAISE};
+
+function calculateEquityDeliveryCharges({grossPaise,exchange,side="BUY"}){
+  if(!Number.isSafeInteger(grossPaise)||grossPaise<1)
+    throw Object.assign(new Error("A valid equity delivery turnover is required."),{status:400});
+  if(!["BUY","SELL"].includes(side))throw Object.assign(new Error("Equity delivery side must be BUY or SELL."),{status:400});
+  const market=String(exchange||"").toUpperCase();
+  if(market!=="NSE")throw Object.assign(new Error("BSE delivery transaction charges depend on the official scrip group; this order is blocked until that exact group rate is available."),{status:422});
+  const brokeragePaise=2000;
+  const exchangeTransactionPaise=roundPaise(grossPaise*0.0000307);
+  const ipftPaise=roundPaise(grossPaise*0.000000001);
+  const sebiPaise=roundPaise(grossPaise*0.000001);
+  const sttPaise=roundPaise(grossPaise*0.001);
+  const stampDutyPaise=side==="BUY"?roundPaise(grossPaise*0.00015):0;
+  const dpChargesPaise=side==="SELL"?2000:0;
+  const gstPaise=roundPaise((brokeragePaise+exchangeTransactionPaise+ipftPaise+dpChargesPaise)*GST);
+  const totalChargesPaise=brokeragePaise+exchangeTransactionPaise+ipftPaise+sebiPaise+sttPaise+stampDutyPaise+dpChargesPaise+gstPaise;
+  if(!Number.isSafeInteger(totalChargesPaise)||!Number.isSafeInteger(grossPaise+totalChargesPaise))
+    throw Object.assign(new Error("Equity delivery charges exceed supported calculation limits."),{status:400});
+  return {grossPaise,brokeragePaise,exchangeTransactionPaise,ipftPaise,sebiPaise,sttPaise,
+    stampDutyPaise,dpChargesPaise,gstPaise,totalChargesPaise,exchange:market,side,
+    segment:"EQUITY_DELIVERY",scheduleVersion:"2026-03-01",indicative:true,simulationOnly:true,
+    note:"NSE delivery schedule; DP charge is estimated per sell order. BSE scrip-group charges are not estimated."};
+}
+
+module.exports={calculateLongOptionTradeCharges,calculateLongOptionBuyCharges:args=>calculateLongOptionTradeCharges({...args,side:"BUY"}),calculateFuturesTradeCharges,calculateEquityDeliveryCharges,DEFAULT_BROKERAGE_PAISE};
