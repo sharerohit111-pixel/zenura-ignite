@@ -9,6 +9,7 @@ const docker=fs.readFileSync(path.join(root,"Dockerfile"),"utf8");
 const server=fs.readFileSync(path.join(root,"supabase-server.js"),"utf8");
 const client=fs.readFileSync(path.join(root,"../markets/stocks/supabase-client.js"),"utf8");
 const deploy=fs.readFileSync(path.join(root,"DEPLOYMENT.md"),"utf8");
+const workflow=fs.readFileSync(path.join(root,"../.github/workflows/deploy-supabase-market-gateway.yml"),"utf8");
 test("Cloud Run and npm default entrypoints run the Supabase-native gateway",()=>{
  assert.equal(pkg.main,"supabase-server.js");
  assert.equal(pkg.scripts.start,"node supabase-server.js");
@@ -37,4 +38,14 @@ test("Docker image builds from repository root and includes shared non-Firebase 
  assert.match(docker,/COPY functions\/lib\//);
  assert.match(docker,/node:22-slim/);
  assert.match(pkg.dependencies["@supabase/supabase-js"],/^2\.119\.2$/);
+});
+
+test("Production gateway deployment is manual, main-only and uses WIF plus Secret Manager",()=>{
+ assert.match(workflow,/workflow_dispatch/);
+ assert.match(workflow,/github\.ref == 'refs\/heads\/main'/);
+ assert.match(workflow,/google-github-actions\/auth@v2/);
+ assert.match(workflow,/docker build --pull -f market-gateway\/Dockerfile/);
+ assert.match(workflow,/--set-secrets/);
+ assert.match(workflow,/MARKET_GATEWAY_URL/);
+ assert.doesNotMatch(workflow,/firebase deploy|firebase functions:deploy/i);
 });
