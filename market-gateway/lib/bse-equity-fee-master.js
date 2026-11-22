@@ -67,12 +67,15 @@ function parseBseStandardizedScripMaster(csvText,{sourceDate}={}){
       exclusiveFlag:String(cells[FIELD.exclusiveFlag]||"").trim().toUpperCase(),
       status,instrumentType,sourceDate
     };
-    if(!/^\d{1,12}$/.test(record.scripCode)
-      ||!record.instrumentCode||record.instrumentCode.length>12
-      ||!/^\d{2}[A-Z0-9]{10}$/.test(record.isin)
-      ||!record.groupName||record.groupName.length>3
-      ||!["Y","N"].includes(record.exclusiveFlag))
-      throw new Error("BSE active equity row "+(line+1)+" has invalid scrip, ISIN, group or exclusive metadata: "+JSON.stringify({scripCode:record.scripCode,instrumentCode:record.instrumentCode,groupName:record.groupName,isin:record.isin,exclusiveFlag:record.exclusiveFlag,fieldCount:cells.length}));
+    const invalid={
+      scripCode:! /^[0-9]{1,12}$/.test(record.scripCode),
+      instrumentCode:!record.instrumentCode||record.instrumentCode.length>12,
+      isin:! /^[A-Z]{2}[A-Z0-9]{10}$/.test(record.isin),
+      groupName:!record.groupName||record.groupName.length>3,
+      exclusiveFlag:!["Y","N"].includes(record.exclusiveFlag)
+    };
+    if(Object.values(invalid).some(Boolean))
+      throw new Error("BSE active equity row "+(line+1)+" has invalid scrip metadata: "+JSON.stringify({invalid,record,fieldCount:cells.length}));
     const prior=byIsin.get(record.isin);
     if(prior){
       if(prior.groupName!==record.groupName||prior.exclusiveFlag!==record.exclusiveFlag)
