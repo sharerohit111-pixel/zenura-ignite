@@ -55,7 +55,8 @@ test("Manual production deployment uses OIDC and deploys both Supabase gateway a
  assert.match(deployWorkflow,/workflow_dispatch/);
  assert.match(deployWorkflow,/id-token:\s*write/);
  assert.match(deployWorkflow,/workload_identity_provider/);
- assert.match(deployWorkflow,/gcloud run deploy zenura-market-gateway/);
+ assert.match(deployWorkflow,/gcloud run deploy/);
+ assert.match(deployWorkflow,/SERVICE:\s*zenura-market-gateway/);
  assert.match(deployWorkflow,/paper-limit-worker\.js/);
  assert.match(deployWorkflow,/zenura-paper-limit-worker-every-minute/);
  assert.match(deployWorkflow,/github\.ref == 'refs\/heads\/main'/);
