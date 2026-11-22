@@ -89,7 +89,7 @@ test("Equity protective create/list APIs validate user ownership and verified ca
  assert.match(server,/create_paper_equity_protective_order/);
  assert.match(server,/app\.get\("\/paper\/protective-orders"/);
  assert.match(server,/item\.instrument_type==="EQ"/);
- assert.match(server,/\["NSE_EQ","BSE_EQ"\]\.includes\(instrument\.segment\)/);
+ assert.match(server,/\["NSE_EQ","BSE_EQ"\]\.includes\(item\.segment\)/);
 });
 test("Protective-order cancellation API is authenticated and delegates to the owner-bound RPC",()=>{
  assert.match(server,/app\.post\("\/paper\/protective-orders\/:orderId\/cancel"/);
