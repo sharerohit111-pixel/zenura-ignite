@@ -1969,6 +1969,100 @@ jobs:
           END
           $crypto_limit_lifecycle$;
           SQL
+      - name: Exercise concurrent Crypto LIMIT idempotency and fill-cancel race
+        run: |
+          set -euo pipefail
+          create_duplicate_crypto_limit() {
+            psql -v ON_ERROR_STOP=1 -At <<'SQL'
+          SELECT public.create_paper_crypto_limit_order(
+            '33333333-3333-4333-8333-333333333333',
+            'aaaaaaaa-3333-4333-8333-333333333334',
+            'bbbbbbbb-3333-4333-8333-333333333334',repeat('d',64),
+            'ETHUSDT','ETH','BUY',0.001,3000,85,0.255
+          );
+          SQL
+          }
+          create_duplicate_crypto_limit >/tmp/crypto-limit-submit-a.log &
+          submit_a=$!
+          create_duplicate_crypto_limit >/tmp/crypto-limit-submit-b.log &
+          submit_b=$!
+          wait "$submit_a"
+          wait "$submit_b"
+          psql -v ON_ERROR_STOP=1 <<'SQL'
+          DO $crypto_limit_duplicate$
+          DECLARE v_orders bigint; v_reserved numeric(24,8);
+          BEGIN
+            SELECT count(*) INTO v_orders FROM public.paper_crypto_orders
+             WHERE user_id='33333333-3333-4333-8333-333333333333'
+               AND idempotency_key='bbbbbbbb-3333-4333-8333-333333333334';
+            SELECT reserved_cash INTO v_reserved FROM public.paper_crypto_accounts
+             WHERE user_id='33333333-3333-4333-8333-333333333333';
+            IF v_orders<>1 OR v_reserved<>255.255 THEN
+              RAISE EXCEPTION 'Concurrent Crypto LIMIT submissions duplicated order or reserve: orders %, reserve %',
+                v_orders,v_reserved;
+            END IF;
+          END
+          $crypto_limit_duplicate$;
+          SQL
+          fill_crypto_limit() {
+            psql -v ON_ERROR_STOP=1 -At <<'SQL'
+          SELECT public.fill_paper_crypto_limit_order(
+            '33333333-3333-4333-8333-333333333333',
+            'aaaaaaaa-3333-4333-8333-333333333334',2900,85,0.2465,
+            floor(extract(epoch from clock_timestamp())*1000)::bigint
+          );
+          SQL
+          }
+          cancel_crypto_limit() {
+            psql -v ON_ERROR_STOP=1 -At <<'SQL'
+          SELECT public.cancel_paper_crypto_limit_order(
+            '33333333-3333-4333-8333-333333333333',
+            'aaaaaaaa-3333-4333-8333-333333333334'
+          );
+          SQL
+          }
+          set +e
+          fill_crypto_limit >/tmp/crypto-limit-fill-race.log 2>&1 &
+          fill_pid=$!
+          cancel_crypto_limit >/tmp/crypto-limit-cancel-race.log 2>&1 &
+          cancel_pid=$!
+          wait "$fill_pid"; fill_status=$?
+          wait "$cancel_pid"; cancel_status=$?
+          set -e
+          if [ "$fill_status" -eq "$cancel_status" ]; then
+            echo "Expected exactly one Crypto LIMIT fill/cancel transition to win."
+            cat /tmp/crypto-limit-fill-race.log /tmp/crypto-limit-cancel-race.log
+            exit 1
+          fi
+          psql -v ON_ERROR_STOP=1 <<'SQL'
+          DO $crypto_limit_race$
+          DECLARE
+            v_status text;
+            v_reserved numeric(24,8);
+            v_ledger bigint;
+            v_qty numeric(30,12);
+          BEGIN
+            SELECT status INTO v_status FROM public.paper_crypto_orders
+             WHERE order_id='aaaaaaaa-3333-4333-8333-333333333334';
+            SELECT reserved_cash INTO v_reserved FROM public.paper_crypto_accounts
+             WHERE user_id='33333333-3333-4333-8333-333333333333';
+            SELECT count(*) INTO v_ledger FROM public.paper_crypto_ledger
+             WHERE order_id='aaaaaaaa-3333-4333-8333-333333333334';
+            SELECT coalesce((SELECT quantity FROM public.paper_crypto_positions
+             WHERE user_id='33333333-3333-4333-8333-333333333333' AND symbol='ETHUSDT'),0)
+             INTO v_qty;
+            IF v_status NOT IN ('FILLED','CANCELLED') OR v_reserved<>0 THEN
+              RAISE EXCEPTION 'Crypto LIMIT fill/cancel race left invalid state: status %, reserve %',v_status,v_reserved;
+            END IF;
+            IF v_status='FILLED' AND (v_ledger<>2 OR v_qty<>0.001) THEN
+              RAISE EXCEPTION 'Filled Crypto LIMIT race has inconsistent ledger or position';
+            END IF;
+            IF v_status='CANCELLED' AND (v_ledger<>0 OR v_qty<>0) THEN
+              RAISE EXCEPTION 'Cancelled Crypto LIMIT race changed cash ledger or position';
+            END IF;
+          END
+          $crypto_limit_race$;
+          SQL
       - name: Verify expected schema and RPC registration
         run: |
           psql -v ON_ERROR_STOP=1 <<'SQL'
