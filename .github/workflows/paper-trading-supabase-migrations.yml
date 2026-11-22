@@ -1223,6 +1223,8 @@ jobs:
           END
           $futures$;
           SQL
+      - name: Exercise futures full close, reversal, margin rejection and idempotent accounting
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/futures_market_order_accounting.sql
       - name: Exercise Supabase Upstox OAuth replay, generation and stream lease controls
         run: |
           psql -v ON_ERROR_STOP=1 <<'SQL'
