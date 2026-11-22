@@ -69,11 +69,11 @@
     const size=period.span*(period.type==="hour"?3600000:60000);
     return Math.floor(timestamp/size)*size;
   }
-  function chartStyles(theme){
+  function chartStyles(theme,chartType=activeChartType){
     const dark=theme!=="light";
     return {
       grid:{horizontal:{color:dark?"#1d2c40":"#e7edf4"},vertical:{color:dark?"#1d2c40":"#e7edf4"}},
-      candle:{type:"candle_solid",bar:{
+      candle:{type:chartType==="OHLC"?"ohlc":(chartType==="AREA"||chartType==="LINE"?"area":"candle_solid"),bar:{
         upColor:"#22c99a",downColor:"#ff5c76",noChangeColor:dark?"#91a0b5":"#778399",
         upBorderColor:"#22c99a",downBorderColor:"#ff5c76",
         upWickColor:"#22c99a",downWickColor:"#ff5c76"
@@ -170,7 +170,7 @@
     const userId=await getSessionUser();if(!userId)return;
     const record={
       user_id:userId,instrument_key:context.instrument.instrument_key,
-      timeframe:context.timeframe,chart_type:"CANDLE",theme:activeTheme,
+      timeframe:context.timeframe,chart_type:activeChartType,theme:activeTheme,
       indicators:[...activeIndicators]
     };
     const {error}=await context.supabase.from("paper_chart_preferences").upsert(record,{onConflict:"user_id,instrument_key"});
@@ -202,7 +202,7 @@
   }
   function setTheme(theme){
     activeTheme=theme==="light"?"light":"dark";
-    if(chart)chart.setStyles(chartStyles(activeTheme));
+    if(chart)chart.setStyles(chartStyles(activeTheme,activeChartType));
   }
   async function mount(options){
     const lib=await loadLibrary();
@@ -214,7 +214,7 @@
       container.textContent="";
       chart=lib.init(container);
       registerCustomOverlays(lib);
-      chart.setStyles(chartStyles(activeTheme));
+      chart.setStyles(chartStyles(activeTheme,activeChartType));
       chart.createIndicator("VOL");
       chart.setDataLoader({
         getBars:async params=>{
@@ -259,6 +259,13 @@
       lastBar=next;barCallback(next);
     });
   }
+  function setChartType(type){
+    if(!["CANDLE","OHLC","AREA","LINE"].includes(type))return false;
+    activeChartType=type;
+    if(chart)chart.setStyles(chartStyles(activeTheme,activeChartType));
+    savePreferences().catch(()=>{});
+    return true;
+  }
   function addIndicator(name){
     if(!chart||!name)return false;
     try{chart.createIndicator(name);activeIndicators.add(name);savePreferences().catch(()=>{});return true;}
@@ -299,6 +306,7 @@
     chart=null;container=null;context=null;barCallback=null;lastBar=null;
   }
   document.addEventListener("zenura-chart-theme-change",event=>setTheme(event.detail?.theme));
+  document.getElementById("chart-type-select")?.addEventListener("change",event=>setChartType(event.target.value));
   document.getElementById("chart-add-indicator")?.addEventListener("click",()=>{
     const name=document.getElementById("chart-indicator-select")?.value;
     if(name)addIndicator(name);
@@ -311,7 +319,7 @@
   document.getElementById("chart-redo")?.addEventListener("click",redo);
   document.getElementById("chart-remove-last")?.addEventListener("click",removeLastDrawing);
   root.ZenuraProfessionalChart=Object.freeze({
-    mount,updateQuote,setTheme,addIndicator,addDrawing,removeLastDrawing,undo,redo,destroy,
+    mount,updateQuote,setTheme,setChartType,addIndicator,addDrawing,removeLastDrawing,undo,redo,destroy,
     normalizeBars,periods:Object.freeze({...PERIODS})
   });
 })(window);
