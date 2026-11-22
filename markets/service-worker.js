@@ -7,7 +7,6 @@ const SHELL=[
  "stocks/sse-parser.js","stocks/live-quote.js","stocks/reconnect-policy.js","stocks/paper-order-retry-policy.js",
  "stocks/chart-indicators.js","stocks/chart-engine.js","stocks/stocks.js","stocks/order-workspace.js","stocks/chart-theme.js",
  "stocks/supabase-client.js","stocks/connect.js","stocks/email-auth.js",
- "investing/","investing/index.html","investing/investing.css","investing/investing.js",
  "manifest.webmanifest","../crypto/icon.svg"
 ].map(path=>new URL(path,BASE).toString());
 self.addEventListener("install",event=>{
