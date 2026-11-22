@@ -81,3 +81,9 @@ test("Production deployment fails closed without written market-data rights appr
  assert.match(marketDataCompliance,/30-day lag/);
  assert.match(marketDataCompliance,/written confirmation from Upstox/);
 });
+
+test("Market-master and LIMIT worker retries use bounded exponential backoff",()=>{
+ assert.match(server,/instrumentRefreshLastAttemptAt&&now-instrumentRefreshLastAttemptAt<30000/);
+ assert.match(server,/workerBackoffMs=Math\.min\(30000,workerBackoffMs\*2\)/);
+ assert.match(server,/nextWorkerRunAt=Date\.now\(\)\+workerBackoffMs/);
+});
