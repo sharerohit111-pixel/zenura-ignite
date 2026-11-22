@@ -30,3 +30,11 @@ test("Deployment guide provisions Supabase and Cloud Run, not Firebase services"
  assert.match(deploy,/Cloud Run/);
  assert.doesNotMatch(deploy,/firebase functions:deploy|firebase deploy|FIREBASE_STAGING_PROJECT_ID/i);
 });
+
+test("Docker image builds from repository root and includes shared non-Firebase modules",()=>{
+ assert.match(docker,/COPY market-gateway\/package\*\.json/);
+ assert.match(docker,/COPY market-gateway\//);
+ assert.match(docker,/COPY functions\/lib\//);
+ assert.match(docker,/node:22-slim/);
+ assert.match(pkg.dependencies["@supabase/supabase-js"],/^2\.119\.2$/);
+});
