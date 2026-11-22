@@ -43,7 +43,15 @@ function createPaperProtectiveWorker({
               &&["NSE_EQ","BSE_EQ"].includes(instrument.segment)
               &&(order.product==="DELIVERY"||order.product==="INTRADAY");
           });
-          summary.notEligible+=userOrders.length-validOrders.length;
+          const validIds=new Set(validOrders.map(order=>order.order_id));
+          const invalidOrders=userOrders.filter(order=>!validIds.has(order.order_id));
+          summary.notEligible+=invalidOrders.length;
+          for(const order of invalidOrders){
+            const marked=await serviceDb.from("paper_protective_orders")
+              .update({worker_checked_at:new Date().toISOString()})
+              .eq("order_id",order.order_id).eq("status","ACTIVE");
+            if(marked.error)summary.failed++;
+          }
           if(!validOrders.length)return;
           const {token}=await getUpstoxAccessToken(userId);
           const keys=[...new Set(validOrders.map(order=>order.instrument_key))];
