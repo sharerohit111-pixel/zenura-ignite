@@ -97,12 +97,14 @@ if (authShade) {
 
     let lastUserId = null;
     let currentUserId = null;
-    window.ZENURA_CRYPTO_CLOUD = { isSignedIn: () => Boolean(currentUserId), getSession: () => supabase.auth.getSession() };
+    let authReady = false;
+    window.ZENURA_CRYPTO_CLOUD = { isReady: () => authReady, isSignedIn: () => Boolean(currentUserId), getSession: () => supabase.auth.getSession() };
     const publish = user => {
       const id = user?.id || null;
       if (id === lastUserId) return;
       lastUserId = id;
       currentUserId = id;
+      authReady = true;
       const email = user?.email || null;
       byId("profileName") && (byId("profileName").textContent = user?.user_metadata?.full_name || email || "Guest User");
       byId("profileEmail") && (byId("profileEmail").textContent = email || "Sign in to connect your account");
