@@ -81,7 +81,7 @@ create table if not exists public.paper_orders (
 create table if not exists public.paper_derivative_orders (
   order_id text primary key check (order_id ~ '^[a-f0-9]{64}$'),
   user_id uuid not null references auth.users(id) on delete cascade,
-  idempotency_key uuid not null,
+  idempotency_key uuid,
   request_fingerprint text not null check (request_fingerprint ~ '^[a-f0-9]{64}$'),
   instrument_key text not null,
   trading_symbol text,
