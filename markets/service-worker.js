@@ -1,7 +1,7 @@
 "use strict";
 const CACHE_NAME="zenura-markets-shell-v1";
 const SHELL=[
- "/markets/","/markets/index.html","/markets/portal.css",
+ "/markets/","/markets/index.html","/markets/portal.css","/markets/pwa-register.js",
  "/markets/stocks/","/markets/stocks/index.html","/markets/stocks/stocks.css",
  "/markets/stocks/order-workspace.css","/markets/stocks/chart-theme.css",
  "/markets/stocks/sse-parser.js","/markets/stocks/live-quote.js",
