@@ -1,17 +1,15 @@
 "use strict";
-const CACHE_NAME="zenura-markets-shell-v1";
+const BASE=new URL("./",self.registration.scope);
+const CACHE_NAME="zenura-markets-shell-v2";
 const SHELL=[
- "/markets/","/markets/index.html","/markets/portal.css","/markets/pwa-register.js",
- "/markets/stocks/","/markets/stocks/index.html","/markets/stocks/stocks.css",
- "/markets/stocks/order-workspace.css","/markets/stocks/chart-theme.css",
- "/markets/stocks/sse-parser.js","/markets/stocks/live-quote.js",
- "/markets/stocks/reconnect-policy.js","/markets/stocks/paper-order-retry-policy.js",
- "/markets/stocks/chart-indicators.js","/markets/stocks/chart-engine.js",
- "/markets/stocks/stocks.js","/markets/stocks/order-workspace.js","/markets/stocks/chart-theme.js",
- "/markets/stocks/supabase-client.js","/markets/stocks/connect.js","/markets/stocks/email-auth.js",
- "/markets/investing/","/markets/investing/index.html","/markets/investing/investing.css","/markets/investing/investing.js",
- "/markets/manifest.webmanifest","/crypto/icon.svg"
-];
+ "", "index.html","portal.css","pwa-register.js",
+ "stocks/","stocks/index.html","stocks/stocks.css","stocks/order-workspace.css","stocks/chart-theme.css",
+ "stocks/sse-parser.js","stocks/live-quote.js","stocks/reconnect-policy.js","stocks/paper-order-retry-policy.js",
+ "stocks/chart-indicators.js","stocks/chart-engine.js","stocks/stocks.js","stocks/order-workspace.js","stocks/chart-theme.js",
+ "stocks/supabase-client.js","stocks/connect.js","stocks/email-auth.js",
+ "investing/","investing/index.html","investing/investing.css","investing/investing.js",
+ "manifest.webmanifest","../crypto/icon.svg"
+].map(path=>new URL(path,BASE).toString());
 self.addEventListener("install",event=>{
  event.waitUntil((async()=>{
   const cache=await caches.open(CACHE_NAME);
@@ -30,8 +28,8 @@ self.addEventListener("fetch",event=>{
  const request=event.request;
  if(request.method!=="GET"||request.headers.has("authorization"))return;
  const url=new URL(request.url);
- if(url.origin!==self.location.origin||!url.pathname.startsWith("/markets/"))return;
- if(url.pathname.startsWith("/markets/api/")||url.searchParams.has("token"))return;
+ if(url.origin!==BASE.origin||!url.pathname.startsWith(BASE.pathname))return;
+ if(url.searchParams.has("token"))return;
  if(request.mode==="navigate"){
   event.respondWith((async()=>{
    try{
@@ -39,7 +37,7 @@ self.addEventListener("fetch",event=>{
     if(response.ok){const cache=await caches.open(CACHE_NAME);cache.put(request,response.clone()).catch(()=>{});}
     return response;
    }catch(_){
-    const cached=await caches.match(request)||await caches.match("/markets/");
+    const cached=await caches.match(request)||await caches.match(new URL("./",BASE).toString());
     return cached||new Response("ZENURA IGNITE is offline. Reconnect to load the latest market terminal.",{status:503,headers:{"Content-Type":"text/plain; charset=utf-8"}});
    }
   })());
