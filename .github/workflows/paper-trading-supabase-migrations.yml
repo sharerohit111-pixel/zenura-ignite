@@ -338,6 +338,113 @@ jobs:
           END
           $$;
           SQL
+      - name: Exercise concurrent LIMIT duplicate submit and fill-cancel race
+        run: |
+          set -euo pipefail
+          psql -v ON_ERROR_STOP=1 <<'SQL'
+          INSERT INTO auth.users(id) VALUES ('44444444-4444-4444-8444-444444444444')
+            ON CONFLICT DO NOTHING;
+          SET ROLE service_role;
+          SELECT public.initialize_paper_trading_account('44444444-4444-4444-8444-444444444444');
+          RESET ROLE;
+          SQL
+          run_submit() {
+            psql -v ON_ERROR_STOP=1 <<'SQL'
+          SET ROLE service_role;
+          SELECT public.submit_paper_limit_order(
+            '44444444-4444-4444-8444-444444444444',repeat('1',64),
+            '17171717-1717-4717-8717-171717171717',repeat('2',64),
+            'NSE_EQ|LIMITRACE','LIMITRACE','NSE','BUY',5,10000
+          );
+          RESET ROLE;
+          SQL
+          }
+          run_submit & pid1=$!
+          run_submit & pid2=$!
+          wait "$pid1"
+          wait "$pid2"
+          psql -v ON_ERROR_STOP=1 <<'SQL'
+          DO $
+          BEGIN
+            IF (SELECT count(*) FROM public.paper_orders
+                WHERE user_id='44444444-4444-4444-8444-444444444444'
+                  AND idempotency_key='17171717-1717-4717-8717-171717171717') <> 1
+               OR (SELECT reserved_cash_paise FROM public.paper_accounts
+                WHERE user_id='44444444-4444-4444-8444-444444444444') <> 50000 THEN
+              RAISE EXCEPTION 'Concurrent LIMIT duplicate submit created duplicate reservation/order';
+            END IF;
+            BEGIN
+              PERFORM public.submit_paper_limit_order(
+                '44444444-4444-4444-8444-444444444444',repeat('1',64),
+                '17171717-1717-4717-8717-171717171717',repeat('3',64),
+                'NSE_EQ|LIMITRACE','LIMITRACE','NSE','BUY',5,10000
+              );
+              RAISE EXCEPTION 'LIMIT idempotency key accepted a changed fingerprint';
+            EXCEPTION WHEN unique_violation THEN NULL;
+            END;
+          END
+          $;
+          SQL
+          run_fill() {
+            psql -v ON_ERROR_STOP=1 <<'SQL'
+          SET ROLE service_role;
+          DO $
+          BEGIN
+            BEGIN
+              PERFORM public.execute_paper_limit_fill(
+                repeat('1',64),10000,
+                floor(extract(epoch from clock_timestamp())*1000)::bigint,0,
+                floor(extract(epoch from clock_timestamp())*1000)::bigint
+              );
+            EXCEPTION WHEN check_violation THEN NULL;
+            END;
+          END
+          $;
+          RESET ROLE;
+          SQL
+          }
+          run_cancel() {
+            psql -v ON_ERROR_STOP=1 <<'SQL'
+          SET ROLE service_role;
+          DO $
+          BEGIN
+            BEGIN
+              PERFORM public.cancel_paper_limit_order(
+                '44444444-4444-4444-8444-444444444444',repeat('1',64)
+              );
+            EXCEPTION WHEN check_violation THEN NULL;
+            END;
+          END
+          $;
+          RESET ROLE;
+          SQL
+          }
+          run_fill & pid3=$!
+          run_cancel & pid4=$!
+          wait "$pid3"
+          wait "$pid4"
+          psql -v ON_ERROR_STOP=1 <<'SQL'
+          DO $
+          DECLARE
+            v_status text;
+            v_cash bigint;
+            v_reserved bigint;
+          BEGIN
+            SELECT status INTO v_status FROM public.paper_orders
+             WHERE order_id=repeat('1',64);
+            SELECT cash_paise,reserved_cash_paise INTO v_cash,v_reserved
+             FROM public.paper_accounts
+             WHERE user_id='44444444-4444-4444-8444-444444444444';
+            IF v_status NOT IN ('FILLED','CANCELLED') OR v_reserved<>0 THEN
+              RAISE EXCEPTION 'LIMIT fill/cancel race left a non-terminal order or leaked reservation';
+            END IF;
+            IF (v_status='FILLED' AND v_cash<>99950000)
+               OR (v_status='CANCELLED' AND v_cash<>100000000) THEN
+              RAISE EXCEPTION 'LIMIT fill/cancel race produced inconsistent cash';
+            END IF;
+          END
+          $;
+          SQL
       - name: Verify RLS and privileged RPC boundaries
         run: |
           psql -v ON_ERROR_STOP=1 <<'SQL'
