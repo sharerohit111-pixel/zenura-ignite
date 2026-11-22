@@ -3,7 +3,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const crypto = require("node:crypto");
-const {decryptUpstoxToken} = require("../lib/upstox-token-crypto");
+const {decryptUpstoxToken,encryptUpstoxToken} = require("../lib/upstox-token-crypto");
 
 function encrypt(value, key) {
   const iv = crypto.randomBytes(12);
@@ -43,4 +43,18 @@ test("rejects authenticated empty, control-character, and invalid UTF-8 plaintex
   for (const value of [Buffer.alloc(0), Buffer.from("\nforged", "utf8"), Buffer.from([0xff, 0xfe])]) {
     assert.throws(() => decryptUpstoxToken(encrypt(value, key), key.toString("base64")));
   }
+});
+
+test("encrypts new Upstox tokens with a fresh AES-256-GCM envelope", () => {
+  const key = crypto.randomBytes(32);
+  const keyValue = key.toString("base64");
+  const token = "new-supabase-upstox-access-token";
+  const first = encryptUpstoxToken(token, keyValue);
+  const second = encryptUpstoxToken(token, keyValue);
+  assert.equal(first.v, 1);
+  assert.notEqual(first.iv, second.iv);
+  assert.equal(decryptUpstoxToken(first, keyValue), token);
+  assert.equal(decryptUpstoxToken(second, keyValue), token);
+  assert.throws(() => encryptUpstoxToken("", keyValue));
+  assert.throws(() => encryptUpstoxToken("bad\\ncontrol", keyValue));
 });
