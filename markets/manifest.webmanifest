@@ -1,8 +1,8 @@
 {
   "id": "./",
-  "name": "ZENURA IGNITE – Paper Trading & Paper Investing",
+  "name": "ZENURA IGNITE – Paper Trading",
   "short_name": "ZENURA IGNITE",
-  "description": "Professional Indian stock market paper trading and virtual investing terminal.",
+  "description": "Professional Indian stock market and cryptocurrency paper trading terminal.",
   "lang": "en-IN",
   "start_url": "./",
   "scope": "./",
@@ -15,6 +15,5 @@
   "icons": [{"src":"../crypto/icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any"}],
   "shortcuts": [
     {"name":"Paper Trading","short_name":"Trading","url":"/markets/stocks/"},
-    {"name":"Paper Investing","short_name":"Investing","url":"/markets/investing/"}
   ]
 }
