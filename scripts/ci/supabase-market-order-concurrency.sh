@@ -23,7 +23,7 @@ RESET ROLE;
 SQL
 
 run_order() {
-  psql -X -v ON_ERROR_STOP=1 -Atc "SELECT public.execute_paper_market_order(
+  psql -X -v ON_ERROR_STOP=1 -Atc "SET ROLE service_role; SELECT public.execute_paper_market_order(
     '$USER_ID',
     '$ORDER_ID',
     '$IDEMPOTENCY_KEY'::uuid,
@@ -71,7 +71,7 @@ END
 SQL
 
 # Reusing the same key for a different request fingerprint must be rejected.
-if psql -X -v ON_ERROR_STOP=1 -Atc "SELECT public.execute_paper_market_order(
+if psql -X -v ON_ERROR_STOP=1 -Atc "SET ROLE service_role; SELECT public.execute_paper_market_order(
   '$USER_ID', '$ORDER_ID', '$IDEMPOTENCY_KEY'::uuid,
   'cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc',
   '$INSTRUMENT', 'Concurrency Test', 'NSE', 'BUY', 'DELIVERY', 1, 10000, 1000000, 0
@@ -90,7 +90,7 @@ KEY_B="55555555-5555-4555-8555-555555555555"
 FP_A="dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
 FP_B="eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
 run_large_order() {
-  psql -X -v ON_ERROR_STOP=1 -Atc "SELECT public.execute_paper_market_order(
+  psql -X -v ON_ERROR_STOP=1 -Atc "SET ROLE service_role; SELECT public.execute_paper_market_order(
     '$USER_ID', '$1', '$2'::uuid, '$3', 'NSE_EQ|CASH_RACE',
     'Cash Race', 'NSE', 'BUY', 'DELIVERY', 1, 60000000, 1000000, 0
   );"
