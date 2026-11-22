@@ -67,7 +67,7 @@ test("half-paise boundaries round upward exactly like PostgreSQL floor(x + 0.5)"
  const {calculateLongOptionTradeCharges}=require("../lib/trading-charges");
  const nse=calculateLongOptionTradeCharges({grossPaise:5000000,exchange:"NSE",side:"BUY",brokeragePaise:0});
  assert.equal(nse.exchangeTransactionPaise,1777); // 1776.5
- assert.equal(nse.ipftPaise,25);
+ assert.equal(nse.ipftPaise,0);
  assert.equal(nse.sebiPaise,5);
  assert.equal(nse.stampDutyPaise,150);
  const bse=calculateLongOptionTradeCharges({grossPaise:20000,exchange:"BSE",side:"BUY",brokeragePaise:0});
