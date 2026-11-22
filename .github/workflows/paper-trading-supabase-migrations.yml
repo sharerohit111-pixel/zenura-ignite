@@ -45,6 +45,10 @@ jobs:
             echo "Firebase authentication dependency remains in the new market app."
             exit 1
           fi
+      - name: Check native Supabase gateway authentication runtime
+        run: |
+          node --check market-gateway/lib/supabase-runtime.js
+          node --test market-gateway/test/supabase-runtime.test.js
       - name: Run Existing transaction reference charge-calculation boundary tests
         run: node --test market-gateway/test/trading-charges.test.js
       - name: Run Existing transaction reference option transaction tests
