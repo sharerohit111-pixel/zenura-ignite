@@ -34,6 +34,12 @@ test("rejects duplicate dates, invalid source hosts, stale timestamps and malfor
  assert.throws(()=>parseExchangeSessionCsv([header,row("BSE","2026-11-23","false",555,930,"CLOSED","https://www.bseindia.com")].join("\n")),/Closed exchange session/);
  assert.throws(()=>parseExchangeSessionCsv([header,row("BSE","2026-11-23","true",555,930,"REGULAR","https://www.bseindia.com",new Date(Date.now()+60000).toISOString())].join("\n")),/verification timestamp/);
 });
+test("rejects trailing characters after a quoted exchange-session CSV field",()=>{
+ const malformed=[header,row("BSE","2026-11-23","true",555,930,"REGULAR",'"https://www.bseindia.com"suffix')].join("\n");
+ assert.throws(()=>parseExchangeSessionCsv(malformed),/characters after a quoted field/);
+ const stray=[header,row("BSE","2026-11-23","true",555,930,"REGULAR",'https://www.bseindia.com"')].join("\n");
+ assert.throws(()=>parseExchangeSessionCsv(stray),/quote placement/);
+});
 test("rejects malformed headers, dates and quoted CSV",()=>{
  assert.throws(()=>parseExchangeSessionCsv("exchange,date\nBSE,2026-11-23"),/header/);
  assert.throws(()=>parseExchangeSessionCsv([header,row("BSE","2026-02-30","true",555,930,"REGULAR","https://www.bseindia.com")].join("\n")),/invalid exchange/);
