@@ -282,3 +282,191 @@ Scope/limitations:
 - It does not connect to or mutate the user's Supabase project and does not access Firebase.
 - It does not yet prove behavioral parity, RLS policy correctness under JWT roles, concurrency, idempotency, cash/position invariants, or provider quote trust.
 - A green workflow must not be represented as production readiness or authorization to cut over.
+
+
+## Database security and transaction hardening — 2026-11-22 (audit branch)
+
+The first disposable PostgreSQL 16 CI run for PR #70 (run 44990636529, job `postgres-migration-smoke`) completed successfully. Its original scope covered ordered DDL application, account initialization retry, a basic account RLS read check, MARKET idempotency, LIMIT reservation/fill/cancel, one CE partial close, and expected table/RPC registration. This is a real CI result, but it is not a concurrency or complete security certification.
+
+A separate hardening branch, `audit/supabase-paper-trading-hardening-2026-11-22`, was created from the verified PR #70 head. It does not modify PR #70, PR #28, or the integration branch.
+
+### Findings and draft fixes
+
+1. **MARKET quote freshness:** the first draft trusted caller-provided `p_quote_age_ms` and did not reject a future `p_quote_timestamp_ms`. The RPC now derives current time from PostgreSQL `clock_timestamp()`, rejects future timestamps and quotes older than 15 seconds, checks caller age within a 2-second tolerance, and persists the database-computed quote age.
+2. **LIMIT submit null-side edge case:** SQL three-valued logic meant a NULL side could fall through the original validation and enter the SELL branch. The RPC now explicitly rejects NULL `p_side`; it also validates account cash/reservation/version invariants before reserving.
+3. **LIMIT fill quote clock:** the worker-supplied `p_now_ms` is now checked against database time (2-second tolerance), quote timestamp is checked against database time, and the stored quote age is database-computed.
+4. **Options quote/expiry clock:** the caller clock is now required to be within 2 seconds of database time. Freshness and the 15:30 Asia/Kolkata expiry cutoff use the database clock rather than trusting the caller timestamp.
+
+### Expanded disposable CI assertions added on the audit branch
+
+- MARKET future quote, stale quote and caller-age mismatch must be rejected before order mutation.
+- Two concurrent identical MARKET requests must produce exactly one order and one cash debit.
+- All 13 tables must have RLS enabled; authenticated/anon roles must not receive account write/public read access; MARKET RPC execution must remain service-role-only.
+- NULL LIMIT side must be rejected without leaving an order row.
+- CE option full close at a one-paise premium must permit a negative net-credit amount when indicative fees exceed turnover and must remove the fully closed position.
+- LIMIT and option fixtures use database-current timestamps so quote checks exercise real clock behavior.
+
+### Remaining test gates
+
+- Completed: GitHub Actions run #30 / 44991611079 passed on PostgreSQL 16.16; rerun CI after any subsequent SQL or workflow change.
+- Add deterministic multi-session LIMIT cancel-vs-fill race coverage and concurrent LIMIT duplicate-submit coverage.
+- Add broader RLS row-isolation tests for positions, orders, derivative data and watchlists under two authenticated JWT subjects; the current CI role check is not a substitute for a full Supabase Auth emulator.
+- Add option negative/future quote, off-tick, expiry-boundary, mismatched-idempotency, insufficient-cash, 50-position-cap and repeated-partial-close conservation fixtures.
+- Differentially compare the SQL fee/rounding outputs against the Firebase JavaScript helper for a full boundary-value matrix.
+- Validate trusted backend UID mapping, request fingerprint derivation and quote/instrument binding before any staging or production cutover.
+
+All testing remains confined to GitHub Actions disposable PostgreSQL. No connected Supabase project was modified. Firebase and PR #28 remain untouched. PR #70 remains Draft.
+
+
+### Additional Supabase security alignment
+
+- All six `SECURITY DEFINER` trading/account RPCs now use an empty `search_path` (`set search_path = ''`); every application table reference is schema-qualified. This follows current Supabase function-security guidance and reduces object-shadowing risk.
+- The six authenticated user-read policies now wrap `auth.uid()` in a scalar `SELECT` to avoid per-row re-evaluation on large scans.
+- Expanded CI asserts those function search-path settings and all six user-scoped policies, and exercises two-tenant RLS reads for accounts, equity positions, derivative positions, equity orders, derivative orders and watchlists. It also attempts a cross-tenant watchlist insert and expects denial.
+- These assertions passed in GitHub Actions run #30 / 44991611079; they do not replace testing with Supabase's real Auth/PostgREST roles or Database Advisors.
+
+
+### Data API exposure note (current Supabase platform behavior)
+
+RLS and SQL grants are separate from whether a table is exposed through the Supabase Data API. Supabase's October 30, 2026 breaking change makes new public-schema tables opt-in rather than automatically exposed. The migrations deliberately do not attempt to alter project-level Data API exposure settings; before an eventual app cutover, verify only the intended read tables are exposed and keep privileged transaction/provider tables unexposed. The actual project's settings remain untouched.
+
+
+### Verification result — 2026-11-22
+
+GitHub Actions run **#30 / 44991611079** completed with **success** on disposable PostgreSQL 16.16. All 17 workflow steps completed successfully, including ordered migration application, MARKET retry/freshness, concurrent MARKET duplicate requests, concurrent LIMIT duplicate submit, LIMIT fill-vs-cancel race, NULL-side rejection, CE partial/full-close and fee behavior, concurrent Options duplicate requests, future/off-tick Options rejection, RLS/search-path/grant checks, two-user row isolation, and cross-tenant watchlist insert denial.
+
+This is verified CI evidence for the committed audit branch. It is not a live Supabase project test, not a Firebase differential test, and not a production-readiness approval. No migration was applied to a connected Supabase project.
+
+The audit branch and PR #71 remain Draft. PR #70 remains Draft and unchanged.
+
+
+### Verification result — 2026-11-22 (latest audit CI)
+
+GitHub Actions run **#40 / 44993236150** completed with **success** on the disposable PostgreSQL test environment. All 18 numbered workflow checks passed, including ordered migration application; MARKET freshness/idempotency and concurrency; LIMIT reservation, duplicate-submit and fill-vs-cancel behavior; NULL-side rejection; Options transaction, fee/rounding golden vectors, concurrent duplicate requests and quote validation; RLS/privileged RPC boundaries; two-user tenant isolation across accounts, positions, orders and watchlists; and expected schema/RPC registration.
+
+The Firebase JavaScript helpers were used as reference inputs for the selected fee/rounding golden vectors; this run is not a full Firebase-vs-SQL differential matrix. The PostgreSQL CI harness uses minimal Supabase-compatible auth roles and is not a live Supabase Auth/PostgREST integration test, Database Advisors review, or production certification. No connected Supabase project was modified. Firebase, PR #28 and the integration branch remain untouched. PR #71 remains Draft; PR #70 remains Draft.
+
+## Firebase-to-SQL differential parity matrix — next audit gate
+
+The current CI golden-vector check covers three selected outcomes (NSE BUY, BSE BUY, and tiny-premium NSE SELL). It does **not** yet prove full numerical or transaction parity. The following matrix is the next isolated test plan. Firebase JavaScript helpers remain the reference implementation; SQL is the candidate. Each case must run against both implementations with identical normalized inputs, then compare every persisted/output field in integer paise.
+
+### Charge calculation matrix
+
+| Case | Input / boundary | Required comparison |
+|---|---|---|
+| NSE BUY baseline | gross 81,250 paise; default brokerage | brokerage, exchange, IPFT, SEBI, stamp, GST, STT=0, total charges and debit |
+| BSE BUY baseline | gross 100,000 paise; default brokerage | BSE rate, zero IPFT, GST and total debit |
+| NSE BUY with IPFT | gross 10,000,000 paise | IPFT=50 paise and inclusion in GST base |
+| Large NSE BUY | gross 100,000,000 paise | exchange=35,530; IPFT=500; GST=6,845 |
+| NSE SELL | gross 97,500 paise | STT=146; stamp=0; exchange=35; GST=366; charges=2,547; net credit=94,953 |
+| Tiny NSE SELL | gross 100 paise | charges exceed gross; negative net credit is preserved |
+| Half-paise rounding boundaries | for each fee component, values immediately below, at, and above an x.5 paise boundary | JS Math.round and SQL numeric rounding must agree exactly |
+| Brokerage override | zero, ordinary, and large safe-integer brokerage | GST base and all totals; reject negative/non-integer/unsafe inputs |
+| Input rejection | gross 0, negative, fractional, unsafe; unsupported exchange/side | both implementations reject, with no state mutation |
+| Safe-integer ceiling | values near MAX_SAFE_INTEGER for turnover, fees, total debit and net settlement | no overflow, precision loss or partial write |
+
+### Transaction and position conservation matrix
+
+| Case | Setup / action | Required invariant |
+|---|---|---|
+| First BUY | no existing position | one filled order; cash decreases by gross + charges; cost basis includes charges |
+| Add-on BUY | existing same contract | quantity and fee-inclusive cost basis add; weighted average follows Firebase rounding |
+| Full SELL close | exact open quantity | position removed; realized P&L equals gross proceeds less closed basis and sell charges |
+| Partial SELL close | close less than open quantity | residual quantity and basis conserve exactly; closed-basis rounding matches JS |
+| Repeated partial SELL | multiple closes ending at zero | sum of closed basis equals original basis; no paise created/lost |
+| SELL without position / oversell | absent or insufficient quantity | reject atomically; cash, position, order count unchanged |
+| Fee-heavy SELL | net proceeds negative | cash and realized P&L both include charges exactly once |
+| Insufficient unreserved cash | cash below premium + charges or reserved cash boundary | reject atomically; reservations remain unchanged |
+| Position cap | 49, 50 and 51 open instruments | 50 may be reached; new 51st rejected; add-on BUY to existing key remains allowed |
+| Malformed stored position | invalid type, quantity, average, basis, metadata | reject before mutation |
+| Idempotency | same key/same fingerprint, same key/different fingerprint, different order id/same key | replay exactly once or reject; never double-debit |
+| Concurrency | simultaneous duplicate BUY; competing BUY/SELL on same account | account lock serializes writes; final quantity/cash/order count are deterministic |
+
+### Contract, quote and time matrix
+
+- CE and PE; NSE_FO and BSE_FO; valid and invalid exchange/segment pairings.
+- Lot size 1 and maximum supported lot size; lots 1 and maximum; quantity exactly at and one above the 1,000,000 limit.
+- Tick-size normalization from provider paise form and legacy decimal-rupee form; execution price one tick below/on/above valid tick; malformed, zero, fractional and non-finite tick values.
+- Expiry date normalization from ISO date and provider epoch timestamp; invalid calendar dates; expiry-day immediately before, exactly at, and immediately after 15:30 Asia/Kolkata; non-expiry day.
+- Quote age 0, 1 ms, 14,999 ms, 15,000 ms and 15,001 ms; future timestamp; quote/instrument-key mismatch; invalid timestamp; caller clock skew at 2,000 ms and 2,001 ms.
+- SQL uses database clock while Firebase helper receives server now; the test harness must freeze/inject a shared reference instant or use a bounded clock fixture, not compare independent wall-clock calls.
+
+### Parity acceptance rules
+
+1. Compare all fee components, gross, debit/credit, cash delta, average price, cost basis, closed basis, order realized P&L, account realized P&L, quantity and idempotent replay result.
+2. For valid requests, require exact integer-paise equality. For invalid requests, require both sides to reject before any account/order/position mutation; compare semantic rejection categories rather than brittle error-message text.
+3. Add property-based generated cases around every rounding boundary and safe-integer limit, with deterministic seeds retained in CI.
+4. Include rollback assertions after every rejected transaction and concurrency assertions after all workers finish.
+5. Keep this matrix as a plan until executable parity fixtures are added and pass. Do not describe this as completed parity.
+
+### Known implementation review points to resolve with executable tests
+
+- JavaScript charge calculation uses binary floating-point Math.round; SQL uses exact numeric plus floor(x + 0.5). The listed half-paise boundary vectors are necessary to establish equality rather than assume it.
+- Firebase partial-close basis uses BigInt integer arithmetic; SQL uses numeric arithmetic. Test quantities both odd and even, and repeated partial closes, for exact conservation.
+- Contract/quote binding is a trusted-server responsibility in the Firebase gateway. The SQL RPC is service-role-only and must only be called by a backend that has independently verified the provider instrument and quote.
+- Current three golden vectors remain smoke tests only; the matrix above is not yet implemented or certified.
+
+
+### Verification result — 2026-11-22 (audit CI run #51)
+
+GitHub Actions run **#51 / 44994067662** completed with **success** on the disposable PostgreSQL test environment. All **20 numbered verification steps** passed. In addition to the earlier transaction, concurrency, quote-freshness, RLS/RPC and tenant-isolation checks, this run passed:
+
+- The Firebase reference charge-calculation boundary suite (Node test file market-gateway/test/trading-charges.test.js), including half-paise rounding, BUY stamp / SELL STT boundaries, brokerage overrides, zero-brokerage GST base and unsafe-integer rejection.
+- The repeated partial-close cost-basis conservation fixture against the Firebase BigInt reference vector: starting fee-inclusive basis 98,778 paise for 75 units; two 25-unit closes each consume 32,926 paise; the final 25-unit close consumes the remaining 32,926 paise; total closed basis equals the original 98,778 paise and the position is removed.
+- SQL fee/rounding golden vectors, including the isolated tiny-premium SELL fixture.
+- Concurrent duplicate Options requests, future/off-tick quote rejection, RLS/privileged RPC boundaries, two-user tenant isolation, and expected schema/RPC registration.
+
+The partial-close fixture is a deterministic reference-vector check, not a full runtime differential execution of every Firebase and SQL transaction path. The charge suite exercises the Firebase JavaScript reference boundaries; SQL is compared through the selected golden-vector fixtures, not through the complete parity matrix above. The full matrix remains an open audit gate.
+
+The CI harness uses disposable PostgreSQL and minimal Supabase-compatible auth roles. It is not a live Supabase Auth/PostgREST integration test, Database Advisors review, or production certification. No connected Supabase project, Firebase backend, production data/settings, PR #28, or integration branch was modified. PR #71 remains Draft and open; PR #70 remains Draft and open. No PR was merged.
+
+
+### Verification result — 2026-11-22 (audit CI run #55)
+
+GitHub Actions run **#55 / 44999830275** completed with **success** on disposable PostgreSQL. All **22 numbered verification steps** passed. This run additionally executed the Firebase reference option transaction test file in CI and added SQL transaction fixtures for:
+
+- Add-on BUY on an existing CE position: the two independent fills accumulated quantity, fee-inclusive cost basis and shared-cash debit exactly.
+- Insufficient unreserved cash: the RPC rejected the order and assertions confirmed no order or position was written and the test account cash remained unchanged.
+- The 50-open-position boundary: the 51st distinct contract was rejected without a partial order; an add-on BUY to an already-open contract remained allowed at the cap.
+
+The Firebase JS transaction reference test includes a separate add-on BUY vector for exact fee-inclusive basis, average price and cash. The SQL tests run in a disposable PostgreSQL harness with minimal Supabase-compatible auth roles. They are not live Supabase Auth/PostgREST tests, full end-to-end Firebase-vs-SQL runtime differential execution, Database Advisors review, or production certification. Existing golden vectors and deterministic partial-close vectors remain selected parity fixtures; the complete matrix above is still an open audit gate. No actual Supabase project, Firebase backend, production data/settings, PR #28, or integration branch was modified. PR #71 and PR #70 remain Draft and open; no PR was merged.
+
+
+### Verification result — 2026-11-22 (audit CI run #60)
+
+GitHub Actions run **#60 / 45000258176** completed with **success** on disposable PostgreSQL. All **24 numbered verification steps** passed. The new contract/time coverage includes:
+
+- Firebase reference `derivative-contract.test.js` executed in CI: CE/PE and NSE_FO/BSE_FO combinations, tick-size normalization and off-tick rejection, expiry timestamp normalization across India-local midnight, unsafe numeric/time inputs, and the expiry-day 15:30 Asia/Kolkata cutoff immediately before, exactly at, and one millisecond after the cutoff.
+- SQL option RPC: successful CE and PE fills on NSE_FO; a 14-second-old quote accepted with a safe margin; a 16-second-old quote rejected; mismatched exchange/segment, zero tick size, off-tick execution price, caller-clock skew beyond two seconds, and expired contract rejected.
+- Existing selected SQL charge vectors, transaction and concurrency checks, add-on BUY/cash rollback/50-position limit, RLS/RPC privilege boundaries, tenant isolation, and schema/RPC registration all passed again.
+
+The exact expiry-cutoff boundary is currently asserted in the Firebase JavaScript contract helper test. The SQL RPC uses PostgreSQL `clock_timestamp()` internally, so its CI test covers expired-vs-future dates and runtime quote/clock tolerances rather than trying to fake the database clock at the exact expiry millisecond. Quote-age SQL tests use 14,000 ms and 16,000 ms fixtures to leave a timing margin; they do not claim exact 14,999/15,000/15,001 ms SQL boundary equivalence. The broader parity matrix remains open.
+
+This remains disposable PostgreSQL CI with minimal Supabase-compatible auth roles, not live Supabase Auth/PostgREST integration, full Firebase-vs-SQL runtime differential certification, Database Advisors review, or production certification. No connected Supabase project, Firebase backend, production data/settings, PR #28, or integration branch was modified. PR #71 and PR #70 remain Draft and open; no PR was merged.
+
+
+### Open parity finding from contract review
+
+The current Firebase-side `validateDerivativeContract` helper validates that `exchange` is either NSE/BSE and `segment` is either NSE_FO/BSE_FO, but it does **not** enforce the pairing (`NSE` ↔ `NSE_FO`, `BSE` ↔ `BSE_FO`). The SQL RPC does enforce that pairing. This is a concrete JS-vs-SQL validation mismatch and remains **unresolved**. It was deliberately not changed in this database/security-only audit branch because the gateway contract helper is backend-owned work; it must be coordinated with the owning gateway-development thread before claiming parity. The SQL negative test confirms the database rejects a mismatched pair, but that alone does not make the two layers equivalent.
+
+## Quote-age boundary and remaining parity findings — 2026-11-22
+
+The option RPC uses the strict predicate `v_quote_age > 15000` after reading PostgreSQL `clock_timestamp()`. Therefore its intended mathematical boundary is: 14,999 ms accepted, 15,000 ms accepted, and 15,001 ms rejected. The existing disposable-PostgreSQL CI fixtures deliberately use 14,000 ms and 16,000 ms safe margins. They do **not** prove the exact 14,999/15,000/15,001 ms runtime boundary: the database clock advances during a test call, so constructing a timestamp from a prior clock read can move a nominal boundary case across the threshold before the function evaluates it. Do not describe the exact SQL boundary as tested. A deterministic boundary test requires a test-only clock seam or a controlled database clock; neither has been introduced because changing production RPC time semantics solely for a test would be unsafe.
+
+The Firebase reference layer has a separate quote-age check. A future differential test must compare both implementations against a single frozen timestamp, not two independently advancing clocks. The current CI proves only the SQL safe-margin behavior and the existing Node reference tests; it is not exact-boundary differential certification.
+
+### Remaining concrete and scoped parity items
+
+1. **Exchange/segment pairing remains unresolved in the gateway helper.** `validateDerivativeContract` accepts NSE or BSE and NSE_FO or BSE_FO independently; it does not enforce NSE ↔ NSE_FO and BSE ↔ BSE_FO. Migration 005 does enforce the pairing. The gateway source is owned by the separate backend-development workstream and was intentionally not changed in this database/security audit. The owning workstream must coordinate the fix and add negative Node tests before end-to-end parity can be claimed.
+2. **Strike-price persistence remains a schema decision.** The option RPC accepts and validates `p_strike_price`, but the current derivative-order history schema does not persist a dedicated strike-price field. Decide whether immutable order history/audit must retain strike price, then align schema, RPC insert, and fixtures before staging.
+3. **Exact quote-age boundary remains unproven.** As described above, the 14s/16s SQL fixtures are safe-margin smoke tests, not proof of the 15s inclusive boundary.
+4. **Trusted quote provenance is still outside SQL.** The RPC receives instrument metadata and quote fields from its caller. The trusted gateway must verify provider provenance, instrument-key equality, and the Firebase UID → Supabase Auth UUID mapping before invoking it.
+5. **No live Supabase certification.** Disposable PostgreSQL role stubs do not reproduce Supabase Auth/PostgREST, actual project grants/advisors, Edge/Cloud Run runtime, or production data. No SQL has been applied to the connected Supabase project.
+
+These are tracked as explicit acceptance gates, not assumed complete. PR #71 remains a draft audit proposal; PR #70 remains a separate draft migration proposal. No merge, live SQL apply, Firebase change, or production setting change is authorized by this review.
+
+### Additional SQL input-validation finding — numeric special values
+
+Static review of migration 005 found that `p_strike_price` is PostgreSQL `numeric`, and the current guard checks only `p_strike_price is null or p_strike_price<=0`. PostgreSQL `numeric` supports special values such as `NaN` (and, on supported versions, infinities); `NaN <= 0` is not a reliable finite-number test. Because the strike is currently not persisted or otherwise used in the RPC, a special numeric value could pass the positive-value check without being caught by a later calculation. The JavaScript reference helper correctly requires a finite positive number.
+
+**Required before staging:** add an explicit finite/special-value rejection for the SQL strike input and disposable-PostgreSQL negative fixtures for `NaN`, `Infinity`, and `-Infinity` where supported. Also decide whether strike price must be stored immutably on `paper_derivative_orders`; if so, add an additive schema change and include it in the order insert and replay/history tests. Neither schema nor RPC behavior was changed in this audit step. This is a static review finding, not a claimed executed exploit or passing test.

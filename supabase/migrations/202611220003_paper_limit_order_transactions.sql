@@ -18,7 +18,7 @@ create or replace function public.submit_paper_limit_order(
 returns jsonb
 language plpgsql
 security definer
-set search_path = pg_catalog, public
+set search_path = ''
 as $$
 declare
   v_account public.paper_accounts%rowtype;
@@ -32,7 +32,7 @@ begin
      or p_idempotency_key is null or p_request_fingerprint is null
      or p_request_fingerprint !~ '^[a-f0-9]{64}$'
      or p_instrument_key is null or length(p_instrument_key) not between 1 and 100
-     or p_side not in ('BUY','SELL')
+     or p_side is null or p_side not in ('BUY','SELL')
      or p_quantity is null or p_quantity not between 1 and 1000000
      or p_limit_price_paise is null or p_limit_price_paise <= 0 then
     raise exception using errcode='22023', message='Invalid paper LIMIT order request';
@@ -43,6 +43,12 @@ begin
    where user_id=p_user_id for update;
   if not found then
     raise exception using errcode='P0002', message='Paper account is not initialized';
+  end if;
+  if v_account.cash_paise < 0 or v_account.reserved_cash_paise < 0
+     or v_account.reserved_margin_paise < 0
+     or v_account.reserved_cash_paise + v_account.reserved_margin_paise > v_account.cash_paise
+     or v_account.version < 1 then
+    raise exception using errcode='23514', message='Invalid account reservations or balance';
   end if;
 
   select * into v_existing from public.paper_orders
@@ -128,7 +134,7 @@ create or replace function public.execute_paper_limit_fill(
 returns jsonb
 language plpgsql
 security definer
-set search_path = pg_catalog, public
+set search_path = ''
 as $$
 declare
   v_order public.paper_orders%rowtype;
@@ -145,6 +151,8 @@ declare
   v_realized bigint;
   v_open_count integer;
   v_has_position boolean := false;
+  v_server_now_ms bigint;
+  v_actual_quote_age_ms bigint;
 begin
   if p_order_id is null or p_order_id !~ '^[a-f0-9]{64}$'
      or p_execution_price_paise is null or p_execution_price_paise <= 0
@@ -154,6 +162,14 @@ begin
      or p_now_ms-p_quote_timestamp_ms > 15000
      or abs((p_now_ms-p_quote_timestamp_ms)-p_quote_age_ms) > 2000 then
     raise exception using errcode='22023', message='Invalid or stale LIMIT execution quote';
+  end if;
+  v_server_now_ms := floor(extract(epoch from clock_timestamp())*1000)::bigint;
+  if abs(v_server_now_ms-p_now_ms)>2000 or p_quote_timestamp_ms>v_server_now_ms then
+    raise exception using errcode='22023', message='LIMIT quote clock is not current or timestamp is in the future';
+  end if;
+  v_actual_quote_age_ms := v_server_now_ms-p_quote_timestamp_ms;
+  if v_actual_quote_age_ms>15000 or abs(v_actual_quote_age_ms-p_quote_age_ms)>2000 then
+    raise exception using errcode='22023', message='LIMIT quote age does not match database time';
   end if;
 
   select * into v_order from public.paper_orders where order_id=p_order_id;
@@ -261,7 +277,7 @@ begin
 
   update public.paper_orders set status='FILLED',execution_price_paise=p_execution_price_paise,
     gross_paise=v_gross,realized_pnl_paise=v_order_realized,
-    quote_timestamp_ms=p_quote_timestamp_ms,quote_age_ms=p_quote_age_ms,
+    quote_timestamp_ms=p_quote_timestamp_ms,quote_age_ms=v_actual_quote_age_ms,
     reservation_released=true,worker_execution=true,filled_at=now(),updated_at=now()
    where order_id=p_order_id;
 
@@ -278,7 +294,7 @@ create or replace function public.cancel_paper_limit_order(
 returns jsonb
 language plpgsql
 security definer
-set search_path = pg_catalog, public
+set search_path = ''
 as $$
 declare
   v_order public.paper_orders%rowtype;

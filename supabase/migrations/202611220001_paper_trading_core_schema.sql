@@ -226,31 +226,31 @@ alter table public.paper_margin_preview_limits enable row level security;
 
 drop policy if exists paper_accounts_select_own on public.paper_accounts;
 create policy paper_accounts_select_own on public.paper_accounts
-  for select to authenticated using (auth.uid() = user_id);
+  for select to authenticated using ((select auth.uid()) = user_id);
 drop policy if exists paper_equity_positions_select_own on public.paper_equity_positions;
 create policy paper_equity_positions_select_own on public.paper_equity_positions
-  for select to authenticated using (auth.uid() = user_id);
+  for select to authenticated using ((select auth.uid()) = user_id);
 drop policy if exists paper_derivative_positions_select_own on public.paper_derivative_positions;
 create policy paper_derivative_positions_select_own on public.paper_derivative_positions
-  for select to authenticated using (auth.uid() = user_id);
+  for select to authenticated using ((select auth.uid()) = user_id);
 drop policy if exists paper_orders_select_own on public.paper_orders;
 create policy paper_orders_select_own on public.paper_orders
-  for select to authenticated using (auth.uid() = user_id);
+  for select to authenticated using ((select auth.uid()) = user_id);
 drop policy if exists paper_derivative_orders_select_own on public.paper_derivative_orders;
 create policy paper_derivative_orders_select_own on public.paper_derivative_orders
-  for select to authenticated using (auth.uid() = user_id);
+  for select to authenticated using ((select auth.uid()) = user_id);
 drop policy if exists paper_watchlists_select_own on public.paper_watchlists;
 create policy paper_watchlists_select_own on public.paper_watchlists
-  for select to authenticated using (auth.uid() = user_id);
+  for select to authenticated using ((select auth.uid()) = user_id);
 drop policy if exists paper_watchlists_insert_own on public.paper_watchlists;
 create policy paper_watchlists_insert_own on public.paper_watchlists
-  for insert to authenticated with check (auth.uid() = user_id);
+  for insert to authenticated with check ((select auth.uid()) = user_id);
 drop policy if exists paper_watchlists_update_own on public.paper_watchlists;
 create policy paper_watchlists_update_own on public.paper_watchlists
-  for update to authenticated using (auth.uid() = user_id) with check (auth.uid() = user_id);
+  for update to authenticated using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
 drop policy if exists paper_watchlists_delete_own on public.paper_watchlists;
 create policy paper_watchlists_delete_own on public.paper_watchlists
-  for delete to authenticated using (auth.uid() = user_id);
+  for delete to authenticated using ((select auth.uid()) = user_id);
 
 -- Sensitive tables have no authenticated/anon grants or user policies.
 revoke all on public.paper_user_identity_map, public.paper_accounts,

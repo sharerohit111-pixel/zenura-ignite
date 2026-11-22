@@ -19,7 +19,7 @@ create or replace function public.execute_paper_market_order(
 returns jsonb
 language plpgsql
 security definer
-set search_path = pg_catalog, public
+set search_path = ''
 as $$
 declare
   v_account public.paper_accounts%rowtype;
@@ -41,6 +41,8 @@ declare
   v_aggregate_realized bigint;
   v_order_realized bigint := 0;
   v_order public.paper_orders%rowtype;
+  v_now_ms bigint;
+  v_actual_quote_age_ms bigint;
 begin
   if p_user_id is null or p_idempotency_key is null
      or p_order_id is null or p_request_fingerprint is null
@@ -52,9 +54,21 @@ begin
      or p_product not in ('DELIVERY','INTRADAY')
      or p_quantity not between 1 and 1000000
      or p_execution_price_paise <= 0
-     or p_quote_timestamp_ms is null or p_quote_age_ms is null or p_quote_age_ms < 0
+     or p_quote_timestamp_ms is null or p_quote_timestamp_ms <= 0
+     or p_quote_age_ms is null or p_quote_age_ms < 0
      or p_quote_age_ms > 15000 then
     raise exception using errcode='22023', message='Invalid or stale paper market order request';
+  end if;
+
+  -- Never trust a caller-supplied quote age or clock: derive freshness from PostgreSQL time.
+  v_now_ms := floor(extract(epoch from clock_timestamp()) * 1000)::bigint;
+  if p_quote_timestamp_ms > v_now_ms then
+    raise exception using errcode='22023', message='Future paper market quote is not valid';
+  end if;
+  v_actual_quote_age_ms := v_now_ms - p_quote_timestamp_ms;
+  if v_actual_quote_age_ms > 15000
+     or abs(v_actual_quote_age_ms - p_quote_age_ms) > 2000 then
+    raise exception using errcode='22023', message='Invalid or stale paper market quote';
   end if;
 
   -- Lock account first: serializes all cash/position/order mutations for this user.
@@ -177,7 +191,7 @@ begin
     p_order_id,p_user_id,p_idempotency_key,p_request_fingerprint,p_instrument_key,
     p_trading_symbol,p_exchange,p_side,p_product,'MARKET','FILLED',p_quantity,
     p_execution_price_paise,v_gross,v_order_realized,p_quote_timestamp_ms,
-    p_quote_age_ms,true,true,now(),now(),now()
+    v_actual_quote_age_ms,true,true,now(),now(),now()
   );
 
   update public.paper_accounts set cash_paise=v_cash,
