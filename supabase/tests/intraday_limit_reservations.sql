@@ -139,6 +139,20 @@ BEGIN
     RAISE EXCEPTION 'Intraday LIMIT SELL fill did not update quantity and release shares';
   END IF;
 
+  -- Reject a LIMIT SELL whose minimum brokerage exceeds its gross turnover.
+  BEGIN
+    PERFORM public.submit_paper_intraday_limit_order(
+      '22222222-2222-4222-8222-222222222222',repeat('8',64),
+      'ffffffff-ffff-4fff-8fff-ffffffffffff',repeat('9',64),
+      'NSE_EQ|INTRA_LIMIT_CI','INTRA_LIMIT_CI','NSE','SELL',1,1
+    );
+    RAISE EXCEPTION 'Tiny Intraday LIMIT SELL with negative net proceeds was accepted';
+  EXCEPTION WHEN SQLSTATE '22003' THEN NULL;
+  END;
+  IF EXISTS(SELECT 1 FROM public.paper_orders WHERE order_id=repeat('8',64)) THEN
+    RAISE EXCEPTION 'Rejected tiny Intraday LIMIT SELL left an order row';
+  END IF;
+
   PERFORM public.submit_paper_intraday_limit_order(
     '22222222-2222-4222-8222-222222222222',repeat('e',64),
     'cccccccc-cccc-4ccc-8ccc-cccccccccccc',repeat('f',64),
