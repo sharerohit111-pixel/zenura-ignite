@@ -3,6 +3,7 @@
   const KEY="zenura-language-v1";
   const HI=Object.freeze({
     "ZENURA IGNITE · Indian Stock Market":"ZENURA IGNITE · भारतीय शेयर बाजार",
+    "ZENURA IGNITE · Paper Investing":"ZENURA IGNITE · पेपर निवेश",
     "Paper Trading":"पेपर ट्रेडिंग","Paper Investing":"पेपर निवेश",
     "PAPER TRADING":"पेपर ट्रेडिंग","PAPER INVESTING":"पेपर निवेश",
     "← ALL MARKETS":"← सभी मार्केट","INDIAN STOCK MARKET":"भारतीय शेयर बाजार",
@@ -72,6 +73,7 @@
     "No orders loaded.":"कोई ऑर्डर लोड नहीं हुआ।","No filled trades loaded.":"कोई पूरा ट्रेड लोड नहीं हुआ।"
   });
   const textState=new WeakMap(),attrState=new WeakMap();
+  const originalTitle=document.title;
   let language="en";
   try{language=localStorage.getItem(KEY)==="hi"?"hi":"en";}catch(_){}
   function translated(source){return language==="hi"?(HI[source]||source):source;}
@@ -112,7 +114,7 @@
   }
   function render(){
     document.documentElement.lang=language==="hi"?"hi":"en";
-    document.title=translated("ZENURA IGNITE · Indian Stock Market");
+    document.title=translated(originalTitle);
     visit(document.body);
     const button=document.getElementById("paper-language-toggle");
     if(button){button.textContent=language==="en"?"हिन्दी":"English";button.setAttribute("aria-label",language==="en"?"Switch to Hindi":"अंग्रेज़ी में बदलें");}
