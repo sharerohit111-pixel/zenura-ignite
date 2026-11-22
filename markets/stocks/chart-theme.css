@@ -106,3 +106,11 @@
   .chart-toolbar select{min-width:130px;flex:1}
   .chart-drawing-controls{margin-right:-8px;padding-right:8px}
 }
+
+.chart-template-controls{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.chart-template-controls input,.chart-template-controls select{min-height:34px;min-width:130px;max-width:100%;padding:7px 10px;border:1px solid #35516d;border-radius:8px;background:#0b1c2c;color:#d8e7f4;font:inherit;font-size:10px}
+.chart-template-controls input{flex:1}
+.chart-template-controls button{min-height:34px;padding:7px 10px;border:1px solid #35516d;border-radius:8px;background:#0b1c2c;color:#d8e7f4;font:inherit;font-size:10px;font-weight:800}
+.stocks-page[data-chart-theme="light"] .chart-template-controls input,
+.stocks-page[data-chart-theme="light"] .chart-template-controls select,
+.stocks-page[data-chart-theme="light"] .chart-template-controls button{background:#f5f9fb;color:#405b70;border-color:#c7d6e1}
