@@ -23,7 +23,7 @@ or Firestore document is modified by this change.
 
 The resolver does not create `auth.users` rows or insert identity mappings. A later
 provisioning job must first select and approve the Supabase Auth identity strategy,
-create the Auth user with a stable UUID, insert the Firebase UID mapping, and then
+create the Auth identity with a stable UUID, insert the Firebase UID mapping, and then
 import the existing paper-account state and history in a transactionally reconciled
 batch. It must preserve balances, positions, reservations, P&L, order IDs, idempotency
 fingerprints, watchlists, encrypted Upstox token envelopes, and connection-generation
@@ -33,7 +33,7 @@ state. New-user initialization must never run for an imported legacy account.
 
 Do not route production traffic to Supabase until:
 - every eligible Firebase UID has exactly one mapping;
-- every mapping references a real Supabase Auth user;
+- every mapping references a real Supabase Auth identity;
 - account and order import counts/checksums reconcile;
 - Firebase-vs-Supabase portfolio and order replay tests pass;
 - the staging gateway passes Auth, RLS, trading, OAuth, stream-lease, worker,
