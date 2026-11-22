@@ -352,7 +352,7 @@ jobs:
             psql -v ON_ERROR_STOP=1 <<'SQL'
           SET ROLE service_role;
           SELECT public.submit_paper_limit_order(
-            '44444444-4444-4444-8444-444444444444',repeat('1',64),
+            '44444444-4444-4444-8444-444444444444',repeat('8',64),
             '17171717-1717-4717-8717-171717171717',repeat('2',64),
             'NSE_EQ|LIMITRACE','LIMITRACE','NSE','BUY',5,10000
           );
@@ -375,7 +375,7 @@ jobs:
             END IF;
             BEGIN
               PERFORM public.submit_paper_limit_order(
-                '44444444-4444-4444-8444-444444444444',repeat('1',64),
+                '44444444-4444-4444-8444-444444444444',repeat('8',64),
                 '17171717-1717-4717-8717-171717171717',repeat('3',64),
                 'NSE_EQ|LIMITRACE','LIMITRACE','NSE','BUY',5,10000
               );
@@ -392,7 +392,7 @@ jobs:
           BEGIN
             BEGIN
               PERFORM public.execute_paper_limit_fill(
-                repeat('1',64),10000,
+                repeat('8',64),10000,
                 floor(extract(epoch from clock_timestamp())*1000)::bigint,0,
                 floor(extract(epoch from clock_timestamp())*1000)::bigint
               );
@@ -410,7 +410,7 @@ jobs:
           BEGIN
             BEGIN
               PERFORM public.cancel_paper_limit_order(
-                '44444444-4444-4444-8444-444444444444',repeat('1',64)
+                '44444444-4444-4444-8444-444444444444',repeat('8',64)
               );
             EXCEPTION WHEN check_violation THEN NULL;
             END;
@@ -431,7 +431,7 @@ jobs:
             v_reserved bigint;
           BEGIN
             SELECT status INTO v_status FROM public.paper_orders
-             WHERE order_id=repeat('1',64);
+             WHERE order_id=repeat('8',64);
             SELECT cash_paise,reserved_cash_paise INTO v_cash,v_reserved
              FROM public.paper_accounts
              WHERE user_id='44444444-4444-4444-8444-444444444444';
