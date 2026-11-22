@@ -64,6 +64,9 @@ The Intraday LIMIT lifecycle is now implemented in the draft integration branch,
 - SQL reservation/fill/expiry tests and worker orchestration tests are present. Additional CI regressions now cover worker lease ownership/exclusivity and concurrent BUY fill-vs-cancel / SELL cancel-vs-fill races.
 - GitHub Actions run [45072069229](https://github.com/sharerohit111-pixel/zenura-ignite/actions/runs/45072069229) passed on commit `fff83799b1a47a18bafa6096c0c760d5d76ed8f5`. This includes the worker-lease ownership/exclusivity SQL regression and the concurrent BUY fill-vs-cancel / SELL cancel-vs-fill regression. The first race-harness attempt exposed Bash expanding PostgreSQL dollar-quote delimiters; the harness now escapes those delimiters and the complete CI run is green.
 
+- A subsequent full GitHub Actions run [45072317000](https://github.com/sharerohit111-pixel/zenura-ignite/actions/runs/45072317000) passed on commit `ce735d456a7fd35cbaf2b2178b3614068491bf15`, including the updated charge-calculation regression suite and the complete market-gateway tests.
+- The NSE charge module now separates the 1 March 2026 transaction component from the ₹0.01/crore IPFT contribution. NSE option IPFT was corrected to ₹0.01/crore rather than the earlier overstated value. These remain indicative standalone calculations and are not yet wired into cash-equity settlement.
+
 Remaining before this slice can be marked release-ready:
 
 1. Rehearse the forward-only migrations and worker lease against a disposable Supabase staging database; do not use the linked production project.
