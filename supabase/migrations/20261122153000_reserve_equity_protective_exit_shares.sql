@@ -2,6 +2,40 @@
 -- Draft integration only. No production schema is changed by this file.
 -- One live protective exit per position is already enforced by the preceding partial unique index.
 
+-- Preserve any pre-existing active draft exits when advancing the schema.
+do $
+begin
+  if exists (
+    select 1
+      from public.paper_protective_orders po
+      join public.paper_equity_positions ep
+        on ep.user_id=po.user_id
+       and ep.instrument_key=po.instrument_key
+       and ep.product=po.product
+     where po.asset_class='EQUITY' and po.side='SELL'
+       and po.status in ('ACTIVE','TRIGGERED')
+     group by ep.user_id,ep.instrument_key,ep.product,ep.quantity,ep.reserved_quantity
+    having ep.quantity-ep.reserved_quantity<sum(po.quantity)
+  ) then
+    raise exception 'Existing protective exits exceed unreserved equity shares; reconcile before applying reservation migration';
+  end if;
+end;
+$;
+
+update public.paper_equity_positions ep
+   set reserved_quantity=ep.reserved_quantity+active_exits.quantity,
+       updated_at=now()
+  from (
+    select user_id,instrument_key,product,sum(quantity)::integer as quantity
+      from public.paper_protective_orders
+     where asset_class='EQUITY' and side='SELL'
+       and status in ('ACTIVE','TRIGGERED')
+     group by user_id,instrument_key,product
+  ) active_exits
+ where ep.user_id=active_exits.user_id
+   and ep.instrument_key=active_exits.instrument_key
+   and ep.product=active_exits.product;
+
 create or replace function public.create_paper_equity_protective_order(
   p_order_id uuid,
   p_user_id uuid,
