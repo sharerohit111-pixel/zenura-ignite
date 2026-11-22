@@ -167,7 +167,7 @@ begin
   end if;
   v_brokerage:=case when p_product='DELIVERY' then 2000::bigint
     else least(2000::bigint,round(p_gross_paise::numeric*0.001)::bigint) end;
-  v_exchange:=round(p_gross_paise::numeric*v_rate/1000000000)::bigint;
+  v_exchange:=round(p_gross_paise::numeric*v_rate*100/1000000000)::bigint;
   v_sebi:=round(p_gross_paise::numeric*0.000001)::bigint;
   v_stt:=case when p_product='DELIVERY' then round(p_gross_paise::numeric*0.001)::bigint
     when p_side='SELL' then round(p_gross_paise::numeric*0.00025)::bigint else 0 end;
@@ -186,7 +186,7 @@ begin
   return jsonb_build_object(
     'schedule_version','BSE-2025-04-29','exchange','BSE','product',p_product,'side',p_side,
     'gross_paise',p_gross_paise,'brokerage_paise',v_brokerage,
-    'exchange_transaction_paise',v_exchange,'exchange_rate_paise_per_crore',v_rate,
+    'exchange_transaction_paise',v_exchange,'exchange_rate_rupees_per_crore',v_rate,'exchange_rate_paise_per_crore',v_rate*100,
     'ipft_paise',0,'bse_ipf_included',true,'sebi_paise',v_sebi,'stt_paise',v_stt,
     'stamp_duty_paise',v_stamp,'dp_charges_paise',v_dp,'gst_paise',v_gst,
     'total_charges_paise',v_total,'total_debit_paise',case when p_side='BUY' then p_gross_paise+v_total else null end,
