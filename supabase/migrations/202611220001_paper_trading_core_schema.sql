@@ -8,8 +8,6 @@
 -- must populate paper_user_identity_map after corresponding Supabase Auth users
 -- are provisioned. Never cast a Firebase UID to UUID.
 
-begin;
-
 create table if not exists public.paper_user_identity_map (
   supabase_user_id uuid primary key references auth.users(id) on delete cascade,
   firebase_uid text not null unique check (length(firebase_uid) between 1 and 128),
@@ -154,7 +152,7 @@ create table if not exists public.upstox_connections (
 );
 
 create table if not exists public.upstox_oauth_states (
-  state_hash text primary key,
+  state_hash text primary key check (state_hash ~ '^[a-f0-9]{64}
   user_id uuid not null references auth.users(id) on delete cascade,
   connection_generation bigint not null default 0 check (connection_generation >= 0),
   used boolean not null default false,
@@ -269,4 +267,118 @@ grant select on public.paper_accounts, public.paper_equity_positions,
   to authenticated;
 grant insert, update, delete on public.paper_watchlists to authenticated;
 
-commit;
+),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  connection_generation bigint not null default 0 check (connection_generation >= 0),
+  used boolean not null default false,
+  used_at timestamptz,
+  expires_at timestamptz not null,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.upstox_connection_controls (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  generation bigint not null default 0 check (generation >= 0),
+  updated_at_ms bigint not null check (updated_at_ms >= 0)
+);
+
+create table if not exists public.paper_market_stream_leases (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  lease_id uuid not null,
+  expires_at_ms bigint not null check (expires_at_ms >= 0),
+  updated_at_ms bigint not null check (updated_at_ms >= 0),
+  revoked boolean not null default false
+);
+
+create table if not exists public.paper_market_worker_state (
+  state_key text primary key,
+  cursor_order_id text,
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.paper_margin_preview_limits (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  last_requested_at_ms bigint not null check (last_requested_at_ms >= 0),
+  updated_at_ms bigint not null check (updated_at_ms >= 0)
+);
+
+create unique index if not exists paper_orders_user_idempotency_idx
+  on public.paper_orders (user_id, idempotency_key) where idempotency_key is not null;
+create unique index if not exists paper_derivative_orders_user_idempotency_idx
+  on public.paper_derivative_orders (user_id, idempotency_key) where idempotency_key is not null;
+create index if not exists paper_orders_user_created_idx
+  on public.paper_orders (user_id, created_at desc, order_id desc);
+create index if not exists paper_orders_user_status_idx
+  on public.paper_orders (user_id, status, created_at desc);
+create index if not exists paper_orders_pending_worker_idx
+  on public.paper_orders (created_at asc, order_id asc) where order_type = 'LIMIT' and status = 'PENDING';
+create index if not exists paper_derivative_orders_user_created_idx
+  on public.paper_derivative_orders (user_id, created_at desc, order_id desc);
+create index if not exists paper_equity_positions_user_product_idx
+  on public.paper_equity_positions (user_id, product);
+create index if not exists paper_derivative_positions_user_idx
+  on public.paper_derivative_positions (user_id);
+create index if not exists upstox_oauth_states_expiry_idx
+  on public.upstox_oauth_states (expires_at);
+create index if not exists paper_market_stream_leases_expiry_idx
+  on public.paper_market_stream_leases (expires_at_ms);
+
+-- Enable RLS on all user-owned data. Trading writes are server-only.
+alter table public.paper_user_identity_map enable row level security;
+alter table public.paper_accounts enable row level security;
+alter table public.paper_equity_positions enable row level security;
+alter table public.paper_derivative_positions enable row level security;
+alter table public.paper_orders enable row level security;
+alter table public.paper_derivative_orders enable row level security;
+alter table public.paper_watchlists enable row level security;
+alter table public.upstox_connections enable row level security;
+alter table public.upstox_oauth_states enable row level security;
+alter table public.upstox_connection_controls enable row level security;
+alter table public.paper_market_stream_leases enable row level security;
+alter table public.paper_market_worker_state enable row level security;
+alter table public.paper_margin_preview_limits enable row level security;
+
+drop policy if exists paper_accounts_select_own on public.paper_accounts;
+create policy paper_accounts_select_own on public.paper_accounts
+  for select to authenticated using (auth.uid() = user_id);
+drop policy if exists paper_equity_positions_select_own on public.paper_equity_positions;
+create policy paper_equity_positions_select_own on public.paper_equity_positions
+  for select to authenticated using (auth.uid() = user_id);
+drop policy if exists paper_derivative_positions_select_own on public.paper_derivative_positions;
+create policy paper_derivative_positions_select_own on public.paper_derivative_positions
+  for select to authenticated using (auth.uid() = user_id);
+drop policy if exists paper_orders_select_own on public.paper_orders;
+create policy paper_orders_select_own on public.paper_orders
+  for select to authenticated using (auth.uid() = user_id);
+drop policy if exists paper_derivative_orders_select_own on public.paper_derivative_orders;
+create policy paper_derivative_orders_select_own on public.paper_derivative_orders
+  for select to authenticated using (auth.uid() = user_id);
+drop policy if exists paper_watchlists_select_own on public.paper_watchlists;
+create policy paper_watchlists_select_own on public.paper_watchlists
+  for select to authenticated using (auth.uid() = user_id);
+drop policy if exists paper_watchlists_insert_own on public.paper_watchlists;
+create policy paper_watchlists_insert_own on public.paper_watchlists
+  for insert to authenticated with check (auth.uid() = user_id);
+drop policy if exists paper_watchlists_update_own on public.paper_watchlists;
+create policy paper_watchlists_update_own on public.paper_watchlists
+  for update to authenticated using (auth.uid() = user_id) with check (auth.uid() = user_id);
+drop policy if exists paper_watchlists_delete_own on public.paper_watchlists;
+create policy paper_watchlists_delete_own on public.paper_watchlists
+  for delete to authenticated using (auth.uid() = user_id);
+
+-- No authenticated/anon access for identity mapping or provider credentials,
+-- OAuth states, stream leases or rate-limit state. Service-role backend only.
+revoke all on public.paper_user_identity_map, public.paper_accounts,
+  public.paper_equity_positions, public.paper_derivative_positions,
+  public.paper_orders, public.paper_derivative_orders, public.paper_watchlists,
+  public.upstox_connections, public.upstox_oauth_states,
+  public.upstox_connection_controls, public.paper_market_stream_leases,
+  public.paper_market_worker_state, public.paper_margin_preview_limits
+  from anon, authenticated;
+
+grant select on public.paper_accounts, public.paper_equity_positions,
+  public.paper_derivative_positions, public.paper_orders,
+  public.paper_derivative_orders, public.paper_watchlists
+  to authenticated;
+grant insert, update, delete on public.paper_watchlists to authenticated;
+
