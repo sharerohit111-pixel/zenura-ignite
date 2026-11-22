@@ -1,0 +1,31 @@
+name: Firebase read-only export tool tests
+
+on:
+  pull_request:
+    paths:
+      - "market-gateway/scripts/firebase-readonly-export.js"
+      - "market-gateway/test/firebase-readonly-export.test.js"
+      - "market-gateway/FIREBASE_READONLY_EXPORT.md"
+      - ".github/workflows/firebase-readonly-export-tests.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  firebase-readonly-export:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install gateway dependencies
+        working-directory: market-gateway
+        run: npm ci
+      - name: Check exporter syntax
+        working-directory: market-gateway
+        run: node --check scripts/firebase-readonly-export.js
+      - name: Run exporter tests
+        working-directory: market-gateway
+        run: node --test test/firebase-readonly-export.test.js
