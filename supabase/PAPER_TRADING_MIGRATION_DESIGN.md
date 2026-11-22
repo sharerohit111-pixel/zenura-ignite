@@ -1,0 +1,68 @@
+# ZENURA IGNITE Paper Trading — Supabase migration design
+
+Status: **Draft only. Not applied to Supabase.**
+Working branch: `migration/supabase-paper-trading-schema-draft-2026-11-22`
+Baseline branch: `integration/paper-trading-backend-main-2026-11-20`
+
+## Scope and safety
+
+This is only the first relational schema draft for the existing Paper Trading module. It does not change the live frontend, Firebase project, Cloud Run service, production credentials, or existing PR #28. The old backend remains the rollback source until parity tests and a separately approved cutover.
+
+Paper Investing is out of scope. No real exchange/broker order is submitted by this simulator.
+
+## Existing behavior verified in the integration branch
+
+- Gateway: `market-gateway/server.js`, Node.js 22, Express, deployed as a long-lived Cloud Run service for Upstox Market Data Feed V3.
+- Authentication: gateway verifies Firebase ID tokens with revocation checking.
+- Firestore collections directly used by the gateway: `upstoxConnections`, `indianPaperAccounts`, `indianPaperOrders`, `indianDerivativeOrders`, and `indianMarketWatchlists`.
+- Other server-managed Firestore state is referenced through helpers for stream leases and futures margin-preview cooldowns.
+- One shared INR virtual cash balance is used across cash equities and long-option simulations. Starting capital is ₹10,00,000 (100,000,000 paise).
+- Cash-equity positions are separated into Delivery (`positions`) and Intraday (`intradayPositions`); share reservations are separated too. Pending LIMIT BUY reserves shared cash. Current API explicitly rejects Intraday LIMIT orders.
+- Long CE/PE BUY and SELL-to-close are supported. Futures margin preview is informational only; futures execution, short options, and real broker orders remain disabled.
+- Watchlists are per-user, named `My Stocks`, `Banking`, `NIFTY`, `F&O`, maximum 50 instrument keys each.
+- Existing cash-equity order IDs are SHA-256 of user UID plus UUID idempotency key. Request fingerprints preserve the legacy Delivery payload. This must remain compatible during migration.
+- Upstox token ciphertext is decrypted only in trusted server code; plaintext access tokens must never reach the browser.
+
+## Draft relational mapping
+
+| Existing Firestore data | Proposed Supabase table |
+|---|---|
+| `indianPaperAccounts/{uid}` | `paper_accounts` + `paper_equity_positions` + `paper_derivative_positions` |
+| `indianPaperOrders/{sha256-id}` | `paper_orders` |
+| `indianDerivativeOrders/{sha256-id}` | `paper_derivative_orders` |
+| `indianMarketWatchlists/{uid}` | `paper_watchlists` (one row per user/list) |
+| `upstoxConnections/{uid}` | `upstox_connections` (encrypted token only) |
+| OAuth state records | `upstox_oauth_states` |
+| Stream lease helper state | `paper_market_stream_leases` |
+| Margin preview cooldown helper state | `paper_margin_preview_limits` |
+
+## Important design decisions
+
+1. Store all money as integer paise; do not use floating-point numeric values for trading arithmetic.
+2. Preserve the single ₹10 lakh shared cash account; do not grant ₹10 lakh separately to Delivery, Intraday, and Derivatives.
+3. Keep Delivery and Intraday equity holdings separate. Keep long-option holdings in a separate table.
+4. Preserve idempotency key and fingerprint uniqueness per user. Never create a second fill on a retry.
+5. Keep Upstox token ciphertext, OAuth state, stream leases, and rate-limit state inaccessible to browser roles.
+6. Enable RLS on all user-data tables. Browser roles receive read access to own account/history/positions and own watchlists only. Trading writes are reserved for a trusted server runtime.
+7. The Upstox WebSocket gateway is long-lived; it must not be moved blindly into a short-lived Edge Function. Keep a dedicated supported runtime for streaming.
+8. The existing Firebase auth identity must be mapped deliberately to Supabase Auth users before any data import. Do not assume Firebase UID equals Supabase UUID.
+9. Existing Firestore documents need an export/transform/import rehearsal and count/checksum reconciliation before cutover.
+
+## Review items before applying
+
+- Confirm exact Upstox OAuth-state document fields and expiry semantics from the Firebase Functions source.
+- Confirm all cash-equity and derivative order fields emitted by every transaction path, including pending LIMIT fill/cancel and legacy records.
+- Confirm whether the target Supabase project already has a custom event trigger/function named `public.rls_auto_enable()`. The current project has zero public tables/migrations/Edge Functions, but the security advisor reports that this SECURITY DEFINER function is executable by `anon` and `authenticated`. It needs a separate, narrowly scoped review before any DDL is applied; do not drop it blindly.
+- Validate every CHECK constraint and index against historical Firestore documents, including null/missing legacy fields.
+- Decide the trusted runtime for authenticated transaction APIs (e.g. the existing Cloud Run gateway migrated to Supabase JWT validation, or a separately deployed long-lived service). Keep service-role keys server-only.
+- Add transactional SQL/RPC implementations and automated tests before switching frontend endpoints. This DDL draft alone is not a working trading backend.
+
+## Rollout order
+
+1. Review this draft and resolve the review items.
+2. Apply schema only to the new empty Supabase project after explicit approval.
+3. Build server-side transactional operations for account initialization, MARKET orders, LIMIT reservation/fill/cancel, option orders, watchlists, and Upstox credential lifecycle.
+4. Build Firebase-to-Supabase identity/data migration rehearsal; preserve legacy order IDs and idempotency semantics.
+5. Run automated parity, concurrency, ownership/RLS, stale-quote, retry, and rollback tests.
+6. Only after a separate cutover approval, connect a staging frontend. Production Firebase/Cloud Run remains available until the new backend passes acceptance.
+
