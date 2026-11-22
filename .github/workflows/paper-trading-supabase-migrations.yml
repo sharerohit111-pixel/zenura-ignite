@@ -50,10 +50,12 @@ jobs:
           node --check markets/stocks/chart-engine.js
           node --check markets/stocks/chart-indicators.js
           node --test markets/stocks/chart-indicators.test.js
-      - name: Check native Supabase gateway authentication runtime
+      - name: Check Supabase-native gateway and token security
         run: |
           node --check market-gateway/lib/supabase-runtime.js
-          node --test market-gateway/test/supabase-runtime.test.js
+          node --check market-gateway/supabase-server.js
+          node --check market-gateway/lib/upstox-token-crypto.js
+          node --test market-gateway/test/supabase-runtime.test.js market-gateway/test/upstox-token-crypto.test.js
       - name: Run Existing transaction reference charge-calculation boundary tests
         run: node --test market-gateway/test/trading-charges.test.js
       - name: Run Existing transaction reference option transaction tests
