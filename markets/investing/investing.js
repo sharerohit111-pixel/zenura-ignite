@@ -210,14 +210,14 @@
     }catch(error){safeText(chartStatus,error.message||"Professional chart could not be loaded.");}
   }
   function pendingOrder(uid,fingerprint){
-    let raw=null;try{raw=sessionStorage.getItem(pendingKey);}catch(_){throw new Error("Browser session storage is unavailable; no order was sent.");}
+    let raw=null;try{raw=localStorage.getItem(pendingKey);}catch(_){throw new Error("Browser storage is unavailable; no order was sent.");}
     if(raw){
       let p;try{p=JSON.parse(raw);}catch(_){throw new Error("A previous investing order response is uncertain. Clear browser session only after checking order history.");}
       if(p.uid!==uid||p.fingerprint!==fingerprint)throw new Error("A previous investing order response is uncertain. Retry the same stock, side and quantity first.");
       return p.key;
     }
     if(!crypto.randomUUID)throw new Error("Secure order request IDs are not available in this browser.");
-    const key=crypto.randomUUID();sessionStorage.setItem(pendingKey,JSON.stringify({uid,fingerprint,key}));return key;
+    const key=crypto.randomUUID();localStorage.setItem(pendingKey,JSON.stringify({uid,fingerprint,key}));return key;
   }
   async function submitOrder(side){
     if(!selected||!lastQuote)return;
@@ -232,7 +232,7 @@
       const data=await api("/paper/investing/orders",{method:"POST",body:JSON.stringify({instrument_key:selected.instrument_key,side,quantity,order_type:"MARKET",idempotency_key:idempotencyKey})});
       if(connector().getUserId()!==uid)throw new Error("Account changed while the order was processing. Sign in to the original account to verify it.");
       if(typeof data.orderId!=="string"||!Number.isSafeInteger(data.executionPricePaise)||data.executionPricePaise<1)throw new Error("Order response could not be verified. Retry the same order to safely check its result.");
-      sessionStorage.removeItem(pendingKey);
+      localStorage.removeItem(pendingKey);
       safeText(orderStatus,side+" "+quantity+" "+(data.tradingSymbol||selected.trading_symbol)+" filled at "+fmt(data.executionPricePaise)+" · Charges "+fmt(data.chargesPaise)+" · Virtual only.");
       await refreshAll();
     }catch(error){
