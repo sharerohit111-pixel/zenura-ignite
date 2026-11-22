@@ -1,4 +1,4 @@
--- Keep the LIMIT worker lease longer than the Cloud Run Job's hard task timeout.
+-- Allow a 240-second in-service worker lease while retaining a strict five-minute maximum.
 create or replace function public.acquire_paper_market_worker_lease(
   p_state_key text,p_lease_token uuid,p_now_ms bigint,p_ttl_ms bigint
 ) returns boolean
