@@ -263,7 +263,7 @@ jobs:
       - name: Reject stale, future and caller-age-mismatched MARKET quotes
         run: |
           psql -v ON_ERROR_STOP=1 <<'SQL'
-          DO $
+          DO $$
           DECLARE
             v_now bigint := floor(extract(epoch from clock_timestamp())*1000)::bigint;
           BEGIN
@@ -295,7 +295,7 @@ jobs:
             EXCEPTION WHEN SQLSTATE '22023' THEN NULL;
             END;
           END
-          $;
+          $$;
           SQL
       - name: Exercise concurrent duplicate MARKET requests
         run: |
@@ -324,7 +324,7 @@ jobs:
           wait "$pid1"
           wait "$pid2"
           psql -v ON_ERROR_STOP=1 <<'SQL'
-          DO $
+          DO $$
           BEGIN
             IF (SELECT count(*) FROM public.paper_orders
                 WHERE user_id='33333333-3333-4333-8333-333333333333'
@@ -336,12 +336,12 @@ jobs:
               RAISE EXCEPTION 'Concurrent duplicate MARKET requests debited cash more than once';
             END IF;
           END
-          $;
+          $$;
           SQL
       - name: Verify RLS and privileged RPC boundaries
         run: |
           psql -v ON_ERROR_STOP=1 <<'SQL'
-          DO $
+          DO $$
           DECLARE
             t text;
             protected_tables text[] := ARRAY[
@@ -372,12 +372,12 @@ jobs:
               RAISE EXCEPTION 'MARKET RPC execution grants are not server-only';
             END IF;
           END
-          $;
+          $$;
           SQL
       - name: Reject null LIMIT side before any reservation or order write
         run: |
           psql -v ON_ERROR_STOP=1 <<'SQL'
-          DO $
+          DO $$
           BEGIN
             BEGIN
               PERFORM public.submit_paper_limit_order(
@@ -392,7 +392,7 @@ jobs:
               RAISE EXCEPTION 'Rejected NULL LIMIT side left an order row behind';
             END IF;
           END
-          $;
+          $$;
           SQL
       - name: Exercise long option transactions
         run: |
