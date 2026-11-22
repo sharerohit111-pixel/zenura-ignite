@@ -162,7 +162,7 @@ create table if not exists public.paper_chart_drawings (
   drawing_type text not null check (drawing_type in (
     'TRENDLINE','HORIZONTAL_LINE','VERTICAL_LINE','RAY','CHANNEL',
     'FIBONACCI_RETRACEMENT','FIBONACCI_EXTENSION','RECTANGLE','CIRCLE',
-    'TEXT','ARROW','PRICE_RANGE','DATE_RANGE'
+    'TEXT','ARROW','BRUSH','PRICE_RANGE','DATE_RANGE'
   )),
   payload jsonb not null,
   is_locked boolean not null default false,
