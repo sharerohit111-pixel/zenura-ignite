@@ -7,9 +7,9 @@ function identityError(message, status, code) {
 }
 
 /**
- * Resolve an already-migrated Firebase identity to its provisioned Supabase Auth UUID.
+ * Resolve an already-migrated Firebase identity to its provisioned internal Supabase UUID.
  *
- * This function deliberately does not create Auth users or paper accounts. Provisioning
+ * This function deliberately does not create duplicate Auth identitys or paper accounts. Provisioning
  * and data import are separate controlled migration steps; silently creating an account
  * here could grant fresh virtual capital to a legacy user or orphan their existing data.
  */
