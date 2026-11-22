@@ -14,24 +14,24 @@
 <header class="topbar">
   <div class="brand"><small>ZENURA IGNITE</small><h1 data-en="Paper Investing" data-hi="पेपर निवेश">Paper Investing</h1><span data-en="Long-term virtual investing · NSE/BSE cash equities" data-hi="दीर्घकालिक वर्चुअल निवेश · NSE/BSE शेयर">Long-term virtual investing · NSE/BSE cash equities</span></div>
   <nav class="product-mode-nav" aria-label="Product mode">
-    <a href="../stocks/">PAPER TRADING</a><a class="active" href="./">PAPER INVESTING</a>
+    <a href="../stocks/" data-en="PAPER TRADING" data-hi="पेपर ट्रेडिंग">PAPER TRADING</a><a class="active" href="./" data-en="PAPER INVESTING" data-hi="पेपर निवेश">PAPER INVESTING</a>
   </nav>
 </header>
 <section class="connection panel" id="connection">
-  <div class="connection-copy"><small data-en="SECURE MARKET CONNECTION" data-hi="सुरक्षित मार्केट कनेक्शन">SECURE MARKET CONNECTION</small><h2 id="connection-title">SIGN IN REQUIRED</h2><p id="connection-sub">Supabase-native authentication. Firebase is not used by this new market app.</p></div>
-  <div class="connection-actions"><button id="upstox-connect" type="button">CONNECT UPSTOX</button><button id="upstox-disconnect" type="button" hidden>DISCONNECT</button></div>
+  <div class="connection-copy"><small data-en="SECURE MARKET CONNECTION" data-hi="सुरक्षित मार्केट कनेक्शन">SECURE MARKET CONNECTION</small><h2 id="connection-title">SIGN IN REQUIRED</h2><p id="connection-sub" data-en="Supabase-native authentication. Firebase is not used by this new market app." data-hi="Supabase आधारित सुरक्षित लॉगिन। इस नए मार्केट ऐप में Firebase का उपयोग नहीं होता।">Supabase-native authentication. Firebase is not used by this new market app.</p></div>
+  <div class="connection-actions"><button id="upstox-connect" type="button" data-en="CONNECT UPSTOX" data-hi="UPSTOX कनेक्ट करें">CONNECT UPSTOX</button><button id="upstox-disconnect" type="button" hidden>DISCONNECT</button></div>
 </section>
 <section class="investing-intro panel">
-  <div><small>SEPARATE VIRTUAL LEDGER</small><h2 data-en="Build a long-term virtual portfolio" data-hi="दीर्घकालिक वर्चुअल पोर्टफोलियो बनाएं">Build a long-term virtual portfolio</h2><p data-en="Paper Investing uses its own virtual cash, positions, orders and performance history. It never places real exchange orders." data-hi="पेपर निवेश का वर्चुअल कैश, होल्डिंग, ऑर्डर और प्रदर्शन रिकॉर्ड अलग रहता है। कोई वास्तविक एक्सचेंज ऑर्डर नहीं भेजा जाता।">Paper Investing uses its own virtual cash, positions, orders and performance history. It never places real exchange orders.</p></div>
-  <div class="investing-capital"><span>STARTING VIRTUAL CAPITAL</span><b id="investing-starting-cash">₹10,00,000</b><small>Per new Paper Investing account</small></div>
+  <div><small data-en="SEPARATE VIRTUAL LEDGER" data-hi="अलग वर्चुअल खाता">SEPARATE VIRTUAL LEDGER</small><h2 data-en="Build a long-term virtual portfolio" data-hi="दीर्घकालिक वर्चुअल पोर्टफोलियो बनाएं">Build a long-term virtual portfolio</h2><p data-en="Paper Investing uses its own virtual cash, positions, orders and performance history. It never places real exchange orders." data-hi="पेपर निवेश का वर्चुअल कैश, होल्डिंग, ऑर्डर और प्रदर्शन रिकॉर्ड अलग रहता है। कोई वास्तविक एक्सचेंज ऑर्डर नहीं भेजा जाता।">Paper Investing uses its own virtual cash, positions, orders and performance history. It never places real exchange orders.</p></div>
+  <div class="investing-capital"><span data-en="STARTING VIRTUAL CAPITAL" data-hi="शुरुआती वर्चुअल पूंजी">STARTING VIRTUAL CAPITAL</span><b id="investing-starting-cash">₹10,00,000</b><small data-en="Per new Paper Investing account" data-hi="हर नए पेपर निवेश खाते के लिए">Per new Paper Investing account</small></div>
 </section>
 <section class="investing-grid">
   <aside class="panel investing-search-panel">
-    <div class="panel-head"><div><small>OFFICIAL INSTRUMENT MASTER</small><h2 data-en="Find Stocks" data-hi="शेयर खोजें">Find Stocks</h2></div><span class="pill muted">NSE · BSE</span></div>
+    <div class="panel-head"><div><small data-en="OFFICIAL INSTRUMENT MASTER" data-hi="आधिकारिक शेयर सूची">OFFICIAL INSTRUMENT MASTER</small><h2 data-en="Find Stocks" data-hi="शेयर खोजें">Find Stocks</h2></div><span class="pill muted">NSE · BSE</span></div>
     <label class="search-label" for="investing-search" data-en="Search by company or symbol" data-hi="कंपनी या सिंबल से खोजें">Search by company or symbol</label>
     <input id="investing-search" type="search" autocomplete="off" placeholder="e.g. RELIANCE, TCS, HDFCBANK">
     <div id="investing-search-results" class="investing-search-results" aria-live="polite"><p>Search the official NSE/BSE instrument master.</p></div>
-    <div class="panel-head watchlist-head"><div><small>YOUR SAVED SYMBOLS</small><h3 data-en="Watchlist" data-hi="वॉचलिस्ट">Watchlist</h3></div><button id="investing-watchlist-refresh" type="button">REFRESH</button></div>
+    <div class="panel-head watchlist-head"><div><small>YOUR SAVED SYMBOLS</small><h3 data-en="Watchlist" data-hi="वॉचलिस्ट">Watchlist</h3></div><button id="investing-watchlist-refresh" type="button" data-en="REFRESH" data-hi="रिफ्रेश">REFRESH</button></div>
     <div id="investing-watchlist" class="investing-watchlist"><p>Sign in to load your watchlist.</p></div>
   </aside>
   <section class="panel investing-chart-panel">
@@ -40,7 +40,7 @@
       <div class="chart-timeframes" id="chart-timeframes">
         <button type="button" data-timeframe="1m">1M</button><button type="button" data-timeframe="5m" class="active">5M</button>
         <button type="button" data-timeframe="15m">15M</button><button type="button" data-timeframe="1h">1H</button><button type="button" data-timeframe="1D">1D</button>
-      </div><span id="chart-status">Professional chart · Upstox V3</span>
+      </div><span id="chart-status" data-en="Professional chart · Upstox V3" data-hi="प्रोफेशनल चार्ट · Upstox V3">Professional chart · Upstox V3</span>
     </div>
     <div id="market-chart" class="chart-placeholder"><b>Professional chart ready</b><span>Select an NSE/BSE stock to load historical candles and verified live ticks.</span></div>
     <div class="chart-toolbar" aria-label="Professional chart controls">
@@ -72,16 +72,16 @@
     </div>
   </section>
   <aside class="panel investing-ticket-panel">
-    <div class="panel-head"><div><small>LONG-TERM EQUITY</small><h2 data-en="Investing Order" data-hi="निवेश ऑर्डर">Investing Order</h2></div><span class="pill muted">MARKET</span></div>
+    <div class="panel-head"><div><small data-en="LONG-TERM EQUITY" data-hi="लंबी अवधि के शेयर">LONG-TERM EQUITY</small><h2 data-en="Investing Order" data-hi="निवेश ऑर्डर">Investing Order</h2></div><span class="pill muted">MARKET</span></div>
     <label class="paper-ticket-field">Quantity <input id="investing-quantity" type="number" min="1" max="1000000" step="1" value="1" inputmode="numeric"></label>
     <div class="investing-price-row"><span data-en="Verified reference price" data-hi="सत्यापित संदर्भ भाव">Verified reference price</span><b id="investing-reference-price">—</b></div>
-    <div class="investing-actions"><button type="button" id="investing-buy" disabled>VIRTUAL BUY</button><button type="button" id="investing-sell" disabled>VIRTUAL SELL</button></div>
+    <div class="investing-actions"><button type="button" id="investing-buy" data-en="VIRTUAL BUY" data-hi="वर्चुअल खरीदें" disabled>VIRTUAL BUY</button><button type="button" id="investing-sell" data-en="VIRTUAL SELL" data-hi="वर्चुअल बेचें" disabled>VIRTUAL SELL</button></div>
     <p id="investing-order-status" role="status">Sign in, connect Upstox and select a stock.</p>
     <p class="portfolio-status">Paper Investing currently supports NSE cash-equity market orders. BSE orders remain blocked until exact scrip-group charges are available. No real money or exchange orders are used.</p>
   </aside>
 </section>
 <section class="panel investing-account-panel">
-  <div class="panel-head"><div><small data-en="YOUR PRIVATE INVESTING ACCOUNT" data-hi="आपका निजी निवेश खाता">YOUR PRIVATE INVESTING ACCOUNT</small><h2 data-en="Portfolio &amp; Performance" data-hi="पोर्टफोलियो और प्रदर्शन">Portfolio &amp; Performance</h2></div><button id="investing-refresh" type="button">REFRESH</button></div>
+  <div class="panel-head"><div><small data-en="YOUR PRIVATE INVESTING ACCOUNT" data-hi="आपका निजी निवेश खाता">YOUR PRIVATE INVESTING ACCOUNT</small><h2 data-en="Portfolio &amp; Performance" data-hi="पोर्टफोलियो और प्रदर्शन">Portfolio &amp; Performance</h2></div><button id="investing-refresh" type="button" data-en="REFRESH" data-hi="रिफ्रेश">REFRESH</button></div>
   <div class="portfolio-metrics">
     <div><small data-en="VIRTUAL CASH" data-hi="वर्चुअल कैश">VIRTUAL CASH</small><b id="investing-cash">—</b></div>
     <div><small data-en="MARKET VALUE" data-hi="बाजार मूल्य">MARKET VALUE</small><b id="investing-market-value">—</b></div>
