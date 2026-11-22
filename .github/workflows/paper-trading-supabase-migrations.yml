@@ -1583,6 +1583,19 @@ jobs:
                   AND product='DELIVERY' AND instrument_key='NSE_EQ|PROTECTIVE_CI')<>6 THEN
               RAISE EXCEPTION 'Equity protective fill did not reduce position exactly once';
             END IF;
+            IF (SELECT cash_paise FROM public.paper_accounts
+                WHERE user_id='12121212-1212-4212-8212-121212121212')<>100036000
+               OR (SELECT realized_pnl_paise FROM public.paper_accounts
+                WHERE user_id='12121212-1212-4212-8212-121212121212')<>4000
+               OR (SELECT delivery_realized_pnl_paise FROM public.paper_accounts
+                WHERE user_id='12121212-1212-4212-8212-121212121212')<>4000 THEN
+              RAISE EXCEPTION 'Equity protective fill did not update account cash and realized P&L exactly once';
+            END IF;
+            IF (SELECT cost_basis_paise FROM public.paper_equity_positions
+                WHERE user_id='12121212-1212-4212-8212-121212121212'
+                  AND product='DELIVERY' AND instrument_key='NSE_EQ|PROTECTIVE_CI')<>48000 THEN
+              RAISE EXCEPTION 'Equity protective fill did not preserve remaining position cost basis';
+            END IF;
             IF (SELECT count(*) FROM public.paper_orders
                 WHERE order_id=v_execution_id AND status='FILLED')<>1 THEN
               RAISE EXCEPTION 'Equity protective fill did not create one canonical filled order';
