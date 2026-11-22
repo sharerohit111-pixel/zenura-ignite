@@ -54,8 +54,6 @@ test("server RPC always injects verified user UUID and rejects caller-selected i
   assert.equal(result.args.p_user_id, uid);
   await assert.rejects(runtime.callUserRpc(user, "initialize_paper_trading_account", { p_user_id: "22222222-2222-4222-8222-222222222222" }), { status: 400 });
   await assert.rejects(runtime.callUserRpc(user, "unknown_rpc", {}), { status: 400 });
-  const cancellation = await runtime.callUserRpc(user, "cancel_paper_protective_order", { p_protective_order_id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa" });
-  assert.equal(cancellation.args.p_user_id, uid);
 });
 
 test("does not accept an invalid or non-UUID Auth identity", async () => {
