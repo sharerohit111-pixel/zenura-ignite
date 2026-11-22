@@ -21,8 +21,11 @@ mapped to My Stocks only when no named My Stocks list exists.
 Run the dedicated unit test from market-gateway:
 node --test test/firebase-to-supabase-transform.test.js
 
-The report includes an explicit dependency-safe import order and `importAllowed: false` if any
-source record fails validation. It is a report only; no importer exists in this change.
+All four source collections (`indianPaperAccounts`, `indianPaperOrders`,
+`indianDerivativeOrders`, `indianMarketWatchlists`) and the Firebase Auth user export must
+be present in the manifest, even when a JSONL file is empty. Missing files or checksum/count
+mismatches stop the transformation. The report includes an explicit dependency-safe import
+order and `importAllowed: false` if any source record fails validation. It is a report only; no importer exists in this change.
 
 Strict validation rejects missing UID mappings, duplicate identity UUIDs, orphaned Auth users,
 malformed paise values, cash over-reservation,
