@@ -1,5 +1,7 @@
 -- Protective exits reserve equity shares against both MARKET and LIMIT SELL paths.
 -- Runs only in the disposable PostgreSQL CI database.
+-- User-facing protective creation is tested under authenticated; order transaction
+-- RPCs are intentionally service_role-only and are tested under service_role.
 
 INSERT INTO auth.users(id) VALUES ('91919191-9191-4919-8919-919191919191') ON CONFLICT DO NOTHING;
 
@@ -23,7 +25,7 @@ SELECT set_config(
   false
 );
 
-DO $protective_reserve_guard$
+DO $protective_create_guard$
 DECLARE
   v_result jsonb;
   v_qty integer;
@@ -37,7 +39,6 @@ BEGIN
   IF v_result->'order'->>'status' <> 'ACTIVE' THEN
     RAISE EXCEPTION 'Protective exit fixture was not created';
   END IF;
-
   SELECT quantity,reserved_quantity INTO v_qty,v_reserved
     FROM public.paper_equity_positions
    WHERE user_id='91919191-9191-4919-8919-919191919191'
@@ -46,7 +47,18 @@ BEGIN
   IF v_qty<>10 OR v_reserved<>4 THEN
     RAISE EXCEPTION 'Protective exit did not reserve its four shares';
   END IF;
+END
+$protective_create_guard$;
+RESET ROLE;
 
+-- The trading RPCs are not executable by authenticated clients. Exercise the
+-- server-side transaction boundary using the service role, as the gateway does.
+SET ROLE service_role;
+DO $protective_reserve_guard$
+DECLARE
+  v_qty integer;
+  v_reserved integer;
+BEGIN
   BEGIN
     PERFORM public.execute_paper_market_order(
       '91919191-9191-4919-8919-919191919191',
@@ -84,7 +96,6 @@ BEGIN
   IF v_qty<>10 OR v_reserved<>4 THEN
     RAISE EXCEPTION 'Rejected SELL requests changed the protective share reservation';
   END IF;
-
   IF EXISTS (SELECT 1 FROM public.paper_orders
       WHERE order_id IN (repeat('a',64),repeat('c',64))) THEN
     RAISE EXCEPTION 'Rejected SELL request left an order row behind';
