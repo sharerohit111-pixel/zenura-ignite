@@ -85,6 +85,17 @@ rejects:
 Synthetic regression tests cover these cases. Existing paise, reservation, cost-basis,
 simulation-only, product/status, order fingerprint, identity mapping and watchlist checks remain.
 
+## Disposable PostgreSQL smoke-test evidence
+
+The PR #74 branch's PostgreSQL 16 GitHub Actions smoke test Run #75 (45004575370) completed
+successfully. Its log confirms migrations 001–005 and the existing 20261122083748 hardening
+migration were applied in order to a disposable CI PostgreSQL instance. The workflow exercised
+account initialization/idempotency, MARKET and LIMIT lifecycle behavior, long-option transaction
+vectors, Firebase JWT identity-map RLS, server-only RPC grants, quote boundaries, concurrency
+scenarios and expected schema/RPC registration. This is useful SQL parser/runtime smoke evidence
+for that exact PR #74 branch, not proof of production readiness or a migration applied to the
+linked Supabase project.
+
 ## Remaining unresolved checks
 
 1. The PR #74 migrations and its PostgreSQL smoke workflow are still Draft; no claim is made
