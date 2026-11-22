@@ -45,3 +45,38 @@ test("normalizes Upstox BOD millisecond expiry to India-local date",()=>{
  const raw={...option(),expiry:expiryMs,tick_size:5};
  assert.equal(validateDerivativeContract(raw,{lots:1,pricePaise:1250,now:Date.UTC(2026,10,18,10)}).expiry,"2026-11-26");
 });
+
+
+test("enforces the expiry-day 15:30 Asia/Kolkata cutoff at the exact millisecond",()=>{
+ const expiry=option();
+ const cutoff=Date.UTC(2026,10,26,10,0,0,0); // 15:30 IST
+ assert.equal(validateDerivativeContract(expiry,{lots:1,pricePaise:1250,now:cutoff-1}).expiry,"2026-11-26");
+ assert.equal(validateDerivativeContract(expiry,{lots:1,pricePaise:1250,now:cutoff}).expiry,"2026-11-26");
+ assert.throws(()=>validateDerivativeContract(expiry,{lots:1,pricePaise:1250,now:cutoff+1}),/Expired/);
+});
+
+test("normalizes expiry timestamps across the India-local midnight boundary",()=>{
+ assert.equal(normalizeExpiryDate(Date.UTC(2026,10,26,18,29,59,999)),"2026-11-26");
+ assert.equal(normalizeExpiryDate(Date.UTC(2026,10,26,18,30,0,0)),"2026-11-27");
+ assert.equal(normalizeExpiryDate(Date.UTC(2026,10,26,18,30,0,1)),"2026-11-27");
+});
+
+test("rejects unsafe or non-integral execution values and malformed time inputs",()=>{
+ for(const pricePaise of [0,-5,1.5,Number.MAX_SAFE_INTEGER+1]){
+  assert.throws(()=>validateDerivativeContract(option(),{lots:1,pricePaise,now}));
+ }
+ for(const badNow of [-1,1.5,Number.MAX_SAFE_INTEGER+1]){
+  assert.throws(()=>validateDerivativeContract(option(),{lots:1,pricePaise:1250,now:badNow}));
+ }
+});
+
+test("supports both NSE and BSE listed CE and PE contracts with valid tick alignment",()=>{
+ for(const [exchange,segment] of [["NSE","NSE_FO"],["BSE","BSE_FO"]]){
+  for(const instrument_type of ["CE","PE"]){
+   const contract={...option(),exchange,segment,instrument_type,
+    instrument_key:segment+"|"+instrument_type,
+    trading_symbol:instrument_type+" TEST",tick_size:5};
+   assert.equal(validateDerivativeContract(contract,{lots:1,pricePaise:1250,now}).instrumentType,instrument_type);
+  }
+ }
+});

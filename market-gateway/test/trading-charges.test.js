@@ -62,3 +62,53 @@ test("NSE option exchange and IPFT charges use the published premium turnover ra
  assert.equal(c.ipftPaise,500);
  assert.equal(c.gstPaise,6845);
 });
+
+test("half-paise boundaries round upward exactly like PostgreSQL floor(x + 0.5)",()=>{
+ const {calculateLongOptionTradeCharges}=require("../lib/trading-charges");
+ const nse=calculateLongOptionTradeCharges({grossPaise:5000000,exchange:"NSE",side:"BUY",brokeragePaise:0});
+ assert.equal(nse.exchangeTransactionPaise,1777); // 1776.5
+ assert.equal(nse.ipftPaise,25);
+ assert.equal(nse.sebiPaise,5);
+ assert.equal(nse.stampDutyPaise,150);
+ const bse=calculateLongOptionTradeCharges({grossPaise:20000,exchange:"BSE",side:"BUY",brokeragePaise:0});
+ assert.equal(bse.exchangeTransactionPaise,7); // 6.5
+});
+
+test("SELL-side STT half-paise boundary rounds upward and BUY stamp duty stays zero",()=>{
+ const {calculateLongOptionTradeCharges}=require("../lib/trading-charges");
+ const sell=calculateLongOptionTradeCharges({grossPaise:1000,exchange:"BSE",side:"SELL",brokeragePaise:0});
+ assert.equal(sell.sttPaise,2); // 1.5
+ assert.equal(sell.stampDutyPaise,0);
+ const buy=calculateLongOptionTradeCharges({grossPaise:50000,exchange:"BSE",side:"BUY",brokeragePaise:0});
+ assert.equal(buy.stampDutyPaise,2); // 1.5
+ assert.equal(buy.sttPaise,0);
+});
+
+test("brokerage override is included in GST base and zero brokerage is supported",()=>{
+ const {calculateLongOptionTradeCharges}=require("../lib/trading-charges");
+ const standard=calculateLongOptionTradeCharges({grossPaise:81250,exchange:"NSE",side:"BUY",brokeragePaise:2000});
+ const zero=calculateLongOptionTradeCharges({grossPaise:81250,exchange:"NSE",side:"BUY",brokeragePaise:0});
+ assert.equal(standard.gstPaise,365);
+ assert.equal(zero.gstPaise,5);
+ assert.equal(zero.brokeragePaise,0);
+ assert.equal(zero.totalChargesPaise,standard.totalChargesPaise-2360);
+});
+
+test("rejects unsafe integer turnover and brokerage boundaries",()=>{
+ const {calculateLongOptionTradeCharges}=require("../lib/trading-charges");
+ assert.throws(()=>calculateLongOptionTradeCharges({grossPaise:Number.MAX_SAFE_INTEGER+1,exchange:"NSE"}),/turnover/);
+ assert.throws(()=>calculateLongOptionTradeCharges({grossPaise:1000,exchange:"NSE",brokeragePaise:Number.MAX_SAFE_INTEGER+1}),/Brokerage/);
+});
+
+test("Firebase BigInt partial-close reference vectors conserve fee-inclusive basis across repeated closes",()=>{
+ const close=(basis,qty,oldQty)=>qty===oldQty?basis:Number((BigInt(basis)*BigInt(qty)+BigInt(Math.floor(oldQty/2)))/BigInt(oldQty));
+ const first=close(98778,25,75);
+ const remaining1=98778-first;
+ const second=close(remaining1,25,50);
+ const remaining2=remaining1-second;
+ assert.equal(first,32926);
+ assert.equal(remaining1,65852);
+ assert.equal(second,32926);
+ assert.equal(remaining2,32926);
+ assert.equal(remaining2+second+first,98778);
+});

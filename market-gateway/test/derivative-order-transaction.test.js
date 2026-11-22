@@ -38,6 +38,7 @@ test("atomically records a long option BUY and debits premium",async()=>{
  assert.equal(writes[0][0],"create");
  assert.equal(writes[0][2].status,"FILLED");
  assert.equal(writes[0][2].grossPaise,81250);
+ assert.equal(writes[0][2].strikePrice,instrument.strike_price);
  assert.equal(writes[1][0],"update");
  assert.equal(writes[1][2].cashPaise,916354);
  assert.equal(writes[0][2].chargesPaise,2396);
@@ -413,3 +414,20 @@ test("rejects replay of a derivative order owned by a different account",async()
  await assert.rejects(executeLongOptionBuyTransaction(common),{status:409});
  assert.equal(writes.length,0);
 });
+
+
+test("add-on BUY accumulates fee-inclusive basis and weighted average exactly",async()=>{
+ const existing={instrumentType:"CE",netQuantity:65,averagePricePaise:1287,costBasisPaise:83646,
+  exchange:"NSE",segment:"NSE_FO",expiry:"2026-11-26",lotSize:65};
+ const account={...initial,cashPaise:916354,
+  derivativePositions:{[instrument.instrument_key]:existing}};
+ const {common,writes}=setup({account});
+ await executeLongOptionBuyTransaction(common);
+ const next=writes[1][2].derivativePositions[instrument.instrument_key];
+ assert.equal(next.netQuantity,130);
+ assert.equal(next.costBasisPaise,167292);
+ assert.equal(next.averagePricePaise,1287);
+ assert.equal(writes[1][2].cashPaise,832708);
+ assert.equal(writes[0][2].totalDebitPaise,83646);
+});
+
