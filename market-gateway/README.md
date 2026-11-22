@@ -39,7 +39,7 @@ npm start
 - `GET /paper/account`, `POST /paper/orders`, `POST /paper/orders/:orderId/cancel`, `GET /paper/orders`, `GET /paper/portfolio`: Paper Trading cash-equity account, market/limit order and portfolio routes.
 - `POST /paper/derivative/margin-preview`, `POST /paper/derivative/orders`, `GET /paper/derivative/orders`, `GET /paper/derivatives/portfolio`: long CE/PE options and futures margin preview. Futures order support is described by the futures endpoints below.
 - `POST /paper/futures/orders`, `GET /paper/futures/orders`, `GET /paper/futures/portfolio`: futures paper orders and portfolio.
-- `GET /paper/investing/account`, `POST /paper/investing/orders`, `GET /paper/investing/orders`, `GET /paper/investing/portfolio`: independent Paper Investing virtual cash, positions and history.
+- Paper Investing endpoints have been retired; the gateway exposes Paper Trading routes only.
 
 All private endpoints validate the Supabase access token. User-facing reads/writes use the user's Supabase session and RLS; server-side service-role access is limited to authentication, secure token storage/coordination and explicitly allowlisted RPCs. All orders are paper simulations: no broker/exchange order is sent. The gateway never sends the Upstox access token to the browser.
 
