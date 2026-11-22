@@ -448,3 +448,19 @@ This remains disposable PostgreSQL CI with minimal Supabase-compatible auth role
 ### Open parity finding from contract review
 
 The current Firebase-side `validateDerivativeContract` helper validates that `exchange` is either NSE/BSE and `segment` is either NSE_FO/BSE_FO, but it does **not** enforce the pairing (`NSE` ↔ `NSE_FO`, `BSE` ↔ `BSE_FO`). The SQL RPC does enforce that pairing. This is a concrete JS-vs-SQL validation mismatch and remains **unresolved**. It was deliberately not changed in this database/security-only audit branch because the gateway contract helper is backend-owned work; it must be coordinated with the owning gateway-development thread before claiming parity. The SQL negative test confirms the database rejects a mismatched pair, but that alone does not make the two layers equivalent.
+
+## Quote-age boundary and remaining parity findings — 2026-11-22
+
+The option RPC uses the strict predicate `v_quote_age > 15000` after reading PostgreSQL `clock_timestamp()`. Therefore its intended mathematical boundary is: 14,999 ms accepted, 15,000 ms accepted, and 15,001 ms rejected. The existing disposable-PostgreSQL CI fixtures deliberately use 14,000 ms and 16,000 ms safe margins. They do **not** prove the exact 14,999/15,000/15,001 ms runtime boundary: the database clock advances during a test call, so constructing a timestamp from a prior clock read can move a nominal boundary case across the threshold before the function evaluates it. Do not describe the exact SQL boundary as tested. A deterministic boundary test requires a test-only clock seam or a controlled database clock; neither has been introduced because changing production RPC time semantics solely for a test would be unsafe.
+
+The Firebase reference layer has a separate quote-age check. A future differential test must compare both implementations against a single frozen timestamp, not two independently advancing clocks. The current CI proves only the SQL safe-margin behavior and the existing Node reference tests; it is not exact-boundary differential certification.
+
+### Remaining concrete and scoped parity items
+
+1. **Exchange/segment pairing remains unresolved in the gateway helper.** `validateDerivativeContract` accepts NSE or BSE and NSE_FO or BSE_FO independently; it does not enforce NSE ↔ NSE_FO and BSE ↔ BSE_FO. Migration 005 does enforce the pairing. The gateway source is owned by the separate backend-development workstream and was intentionally not changed in this database/security audit. The owning workstream must coordinate the fix and add negative Node tests before end-to-end parity can be claimed.
+2. **Strike-price persistence remains a schema decision.** The option RPC accepts and validates `p_strike_price`, but the current derivative-order history schema does not persist a dedicated strike-price field. Decide whether immutable order history/audit must retain strike price, then align schema, RPC insert, and fixtures before staging.
+3. **Exact quote-age boundary remains unproven.** As described above, the 14s/16s SQL fixtures are safe-margin smoke tests, not proof of the 15s inclusive boundary.
+4. **Trusted quote provenance is still outside SQL.** The RPC receives instrument metadata and quote fields from its caller. The trusted gateway must verify provider provenance, instrument-key equality, and the Firebase UID → Supabase Auth UUID mapping before invoking it.
+5. **No live Supabase certification.** Disposable PostgreSQL role stubs do not reproduce Supabase Auth/PostgREST, actual project grants/advisors, Edge/Cloud Run runtime, or production data. No SQL has been applied to the connected Supabase project.
+
+These are tracked as explicit acceptance gates, not assumed complete. PR #71 remains a draft audit proposal; PR #70 remains a separate draft migration proposal. No merge, live SQL apply, Firebase change, or production setting change is authorized by this review.
