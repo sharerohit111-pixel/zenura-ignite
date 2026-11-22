@@ -43,13 +43,31 @@ test("export project selection requires explicit FIREBASE_PROJECT_ID",()=>{
 
 test("removes only its partial snapshot files when a read fails",async()=>{
  const parent=await fs.mkdtemp(path.join(os.tmpdir(),"zenura-export-cleanup-"));
- const output=path.join(parent,"private-export");let collectionCalls=0;
- const db={collection(name){return {orderBy(){return {limit(){return {async get(){
-  collectionCalls++;
-  if(collectionCalls===2)throw new Error("synthetic read failure");
-  return {docs:[{id:"doc-1",ref:{path:name+"/doc-1"},data:()=>({cash:100})}]};
- }}}}}}};
- await assert.rejects(()=>exportSnapshot({db,auth:{listUsers:async()=>({users:[]})},outputDirectory:output,projectId:"synthetic-project"}),/synthetic read failure/);
+ const output=path.join(parent,"private-export");
+ let collectionCalls=0;
+ const db={
+  collection(name){
+   return {
+    orderBy(){
+     return {
+      limit(){
+       return {
+        async get(){
+         collectionCalls++;
+         if(collectionCalls===2)throw new Error("synthetic read failure");
+         return {docs:[{id:"doc-1",ref:{path:name+"/doc-1"},data:()=>({cash:100})}]};
+        }
+       };
+      }
+     };
+    }
+   };
+  }
+ };
+ await assert.rejects(
+  ()=>exportSnapshot({db,auth:{listUsers:async()=>({users:[]})},outputDirectory:output,projectId:"synthetic-project"}),
+  /synthetic read failure/
+ );
  await assert.rejects(()=>fs.access(output),{code:"ENOENT"});
  assert.deepEqual(await fs.readdir(parent),[]);
  await fs.rm(parent,{recursive:true,force:true});
