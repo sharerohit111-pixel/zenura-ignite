@@ -55,7 +55,7 @@ create table if not exists public.paper_derivative_positions (
 create table if not exists public.paper_orders (
   order_id text primary key check (order_id ~ '^[a-f0-9]{64}$'),
   user_id uuid not null references auth.users(id) on delete cascade,
-  idempotency_key uuid not null,
+  idempotency_key uuid,
   request_fingerprint text not null check (request_fingerprint ~ '^[a-f0-9]{64}$'),
   instrument_key text not null,
   trading_symbol text,
@@ -74,7 +74,6 @@ create table if not exists public.paper_orders (
   simulation_only boolean not null default true check (simulation_only is true),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
-  unique (user_id, idempotency_key),
   constraint paper_limit_order_requires_price
     check (order_type <> 'LIMIT' or limit_price_paise is not null)
 );
@@ -103,8 +102,7 @@ create table if not exists public.paper_derivative_orders (
   charges_breakdown jsonb not null default '{}'::jsonb,
   simulation_only boolean not null default true check (simulation_only is true),
   created_at timestamptz not null default now(),
-  unique (user_id, idempotency_key)
-);
+ );
 
 create table if not exists public.paper_watchlists (
   user_id uuid not null references auth.users(id) on delete cascade,
@@ -147,6 +145,10 @@ create table if not exists public.paper_margin_preview_limits (
   last_requested_at timestamptz not null
 );
 
+create unique index if not exists paper_orders_user_idempotency_idx
+  on public.paper_orders (user_id, idempotency_key) where idempotency_key is not null;
+create unique index if not exists paper_derivative_orders_user_idempotency_idx
+  on public.paper_derivative_orders (user_id, idempotency_key) where idempotency_key is not null;
 create index if not exists paper_orders_user_created_idx
   on public.paper_orders (user_id, created_at desc, order_id desc);
 create index if not exists paper_orders_user_status_idx
