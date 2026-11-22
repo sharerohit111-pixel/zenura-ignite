@@ -330,13 +330,14 @@
   async function submitFuturesOrder(side){
     if(futuresOrderSubmitting)return;
     if(!selected||selected.instrument_type!=='FUT'){futuresOrderStatus.textContent='Select a verified futures contract first.';return;}
+    const instrumentKey=selected.instrument_key,tradingSymbol=selected.trading_symbol||selected.name||selected.instrument_key;
     const lots=Number(futuresOrderLots.value),product=futuresOrderProduct.value;
     if(!Number.isSafeInteger(lots)||lots<1||lots>10000){futuresOrderStatus.textContent='Enter whole lots from 1 to 10,000.';return;}
     const connector=window.ZENURA_MARKET_CONNECTOR,uid=connector?.getUserId?.();
     if(!uid||!connector?.getIdToken){futuresOrderStatus.textContent='Sign in before placing a futures paper order.';return;}
     const storageKey=retryPolicy.userScopedStorageKey(futuresPendingStorageKey,uid);
     if(!storageKey){futuresOrderStatus.textContent='Could not identify the signed-in account.';return;}
-    const fingerprint=JSON.stringify({instrument_key:selected.instrument_key,side,lots,product});
+    const fingerprint=JSON.stringify({instrument_key:instrumentKey,side,lots,product});
     const pending=retryPolicy.readPendingPaperOrder(pendingOrderStorage,storageKey);
     let key=pending?.key||null;
     if(key&&!retryPolicy.canRetryPendingPaperOrder(pending.fingerprint,fingerprint)){
@@ -354,13 +355,14 @@
     try{
       const token=await connector.getIdToken();
       if(connector.getUserId()!==uid)throw new Error('Account changed. Sign back into the original account to verify this order.');
-      const response=await fetch(gateway+'/paper/futures/orders',{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json',Accept:'application/json'},body:JSON.stringify({instrument_key:selected.instrument_key,side,lots,product,order_type:'MARKET',idempotency_key:key})});
+      if(selected?.instrument_key!==instrumentKey)throw new Error('Selected futures contract changed. Re-submit the order for the intended contract.');
+      const response=await fetch(gateway+'/paper/futures/orders',{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json',Accept:'application/json'},body:JSON.stringify({instrument_key:instrumentKey,side,lots,product,order_type:'MARKET',idempotency_key:key})});
       const data=await response.json().catch(()=>({}));
       if(connector.getUserId()!==uid)throw new Error('Account changed while the futures order was processing.');
       if(!response.ok){if(response.status>=400&&response.status<500)retryPolicy.clearPendingPaperOrder(pendingOrderStorage,storageKey);throw new Error(data.error||'Futures paper order rejected.');}
       if(typeof data.orderId!=='string'||!Number.isSafeInteger(data.executionPricePaise)||data.executionPricePaise<1)throw new Error('Order response could not be verified. Retry the same order to safely check its result.');
       retryPolicy.clearPendingPaperOrder(pendingOrderStorage,storageKey);
-      futuresOrderStatus.textContent=side+' '+lots+' lot(s) · '+data.tradingSymbol+' filled at '+inrPaise(data.executionPricePaise)+' · Charges '+inrPaise(data.chargesPaise)+' · Entry margin '+inrPaise(data.openingMarginPaise)+' · SIM';
+      futuresOrderStatus.textContent=side+' '+lots+' lot(s) · '+(data.tradingSymbol||tradingSymbol)+' filled at '+inrPaise(data.executionPricePaise)+' · Charges '+inrPaise(data.chargesPaise)+' · Entry margin '+inrPaise(data.openingMarginPaise)+' · SIM';
       await loadPaperAccount();await refreshPaperViews();
     }catch(error){if(connector.getUserId()===uid)futuresOrderStatus.textContent=error.message||'Futures order failed.';}
     finally{futuresOrderSubmitting=false;updateFuturesOrderButtons();}
