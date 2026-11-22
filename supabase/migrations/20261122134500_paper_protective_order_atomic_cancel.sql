@@ -56,5 +56,5 @@ $$;
 
 revoke all on function public.cancel_paper_protective_order(uuid,uuid)
   from public,anon,authenticated;
-grant execute on function public.cancel_paper_protective_order(uuid)
+grant execute on function public.cancel_paper_protective_order(uuid,uuid)
   to authenticated;
