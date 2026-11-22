@@ -260,7 +260,7 @@
     const allowed=!paperOrderSubmitting&&!!selected&&['NSE_EQ','BSE_EQ'].includes(selected.segment)&&selected.instrument_type==='EQ'&&!!window.ZENURA_MARKET_CONNECTOR?.getIdToken&&!!window.ZENURA_MARKET_CONNECTOR?.getUserId?.()&&!!gateway;
     paperBuy.disabled=!allowed;paperSell.disabled=!allowed;
   }
-  const pendingOrderStorage=(()=>{try{return window.sessionStorage;}catch(_){return null;}})();
+  const pendingOrderStorage=(()=>{try{return window.localStorage;}catch(_){return null;}})();
   const paperPendingStorageKey='zenura-indian-paper-order-pending-v1';
   const derivativePendingStorageKey='zenura-indian-derivative-order-pending-v1';
   const retryPolicy=window.ZenuraPaperOrderRetryPolicy;
@@ -289,7 +289,7 @@
       if(!window.crypto?.randomUUID){paperOrderStatus.textContent='A secure order request ID could not be created in this browser.';return;}
       pendingKey=window.crypto.randomUUID();
       if(!retryPolicy.writePendingPaperOrder(pendingOrderStorage,storageKey,{key:pendingKey,fingerprint})){
-        paperOrderStatus.textContent='Browser session storage is unavailable. The order was not sent because safe retry protection could not be saved.';
+        paperOrderStatus.textContent='Browser storage is unavailable. The order was not sent because safe retry protection could not be saved.';
         return;
       }
     }
