@@ -46,7 +46,7 @@ SUPABASE_SERVICE_ROLE_KEY=<server-only-key> \
 npm run import:exchange-sessions -- /secure/path/verified-exchange-sessions.csv
 ```
 
-The importer validates the exchange-specific official host, session window, verification timestamp and duplicate dates, then records the CSV SHA-256. Missing or stale rows keep Intraday LIMIT fail-closed.
+The importer validates the exchange-specific official host, session window, verification timestamp and duplicate dates, then records the CSV SHA-256. **Treat each file as a complete snapshot for every exchange represented in it:** omitted dates for that exchange are invalidated and fail closed, rather than silently reusing an older calendar. Missing or stale rows keep Intraday LIMIT fail-closed.
 
 ## Run and verify
 
