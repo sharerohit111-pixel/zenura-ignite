@@ -437,7 +437,7 @@ app.post("/paper/protective-orders",async(req,res)=>{
 app.get("/paper/protective-orders",async(req,res)=>{
   try{
     const {user,userDb}=await auth(req),raw=String(req.query.limit??"50");
-    if(!/^\\d+$/.test(raw)||Number(raw)<1)return res.status(400).json({error:"Protective order limit must be from 1 to 100."});
+    if(!/^\d+$/.test(raw)||Number(raw)<1)return res.status(400).json({error:"Protective order limit must be from 1 to 100."});
     const {data,error}=await userDb.from("paper_protective_orders").select("order_id,instrument_key,product,side,trigger_type,trigger_direction,trigger_price_paise,quantity,status,created_at,filled_at,cancelled_at,execution_price_paise")
       .eq("user_id",user.id).order("created_at",{ascending:false}).limit(Math.min(Number(raw),100));
     if(error)throw Object.assign(new Error("Protective order history could not be loaded."),{status:503});
