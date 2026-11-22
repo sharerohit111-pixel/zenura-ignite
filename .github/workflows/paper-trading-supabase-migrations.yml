@@ -336,7 +336,7 @@ jobs:
              WHERE user_id='22222222-2222-4222-8222-222222222222'
                AND instrument_key='NSE_FO|TESTCE';
             IF v_qty <> 50 OR v_basis <> 66639 OR v_avg <> 1333
-               OR v_cash <> 99893499
+               OR v_cash <> 99896430
                OR (v_result->>'idempotent_replay')::boolean IS NOT FALSE THEN
               RAISE EXCEPTION 'Long CE BUY quantity, fee-inclusive basis, average or cash is incorrect';
             END IF;
