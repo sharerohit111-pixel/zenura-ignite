@@ -90,7 +90,24 @@ jobs:
           SET ROLE service_role;
           SELECT public.initialize_paper_trading_account('11111111-1111-4111-8111-111111111111');
           RESET ROLE;
-          DO $$
+          DO $identity_map_delete_guard$
+          BEGIN
+            BEGIN
+              DELETE FROM public.paper_user_identity_map
+               WHERE firebase_uid='firebase-test-user-one';
+              RAISE EXCEPTION 'Identity-map deletion unexpectedly removed a linked user identity';
+            EXCEPTION WHEN foreign_key_violation THEN
+              NULL;
+            END;
+            IF NOT EXISTS (
+              SELECT 1 FROM public.paper_accounts
+               WHERE user_id='11111111-1111-4111-8111-111111111111'
+            ) THEN
+              RAISE EXCEPTION 'Identity-map delete guard did not preserve the linked paper account';
+            END IF;
+          END
+          $identity_map_delete_guard$;
+          DO $
           BEGIN
             IF (SELECT cash_paise FROM public.paper_accounts
                 WHERE user_id='11111111-1111-4111-8111-111111111111') <> 76543210 THEN
