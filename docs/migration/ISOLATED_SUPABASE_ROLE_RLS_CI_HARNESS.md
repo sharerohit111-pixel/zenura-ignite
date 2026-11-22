@@ -56,3 +56,15 @@ This is a source review only. The SQL and shell harness have not yet been execut
 ### SECURITY DEFINER hardening assertion
 
 The role/RLS SQL assertions also verify that each of the six exposed RPCs is declared `SECURITY DEFINER` and has the pinned `search_path=pg_catalog, public` configuration. This guards against accidentally widening the callable surface or resolving attacker-controlled objects through an unsafe function search path. This assertion is source-reviewed but still awaits the isolated PostgreSQL workflow run.
+
+### Synthetic RLS fixture column/constraint cross-check — 2026-11-22
+
+Rechecked the role/RLS harness INSERT fixtures against the exact PR #70 draft table definitions for `paper_equity_positions`, `paper_derivative_positions`, `paper_orders`, and `paper_derivative_orders`.
+
+- Equity-position fixture supplies all non-null columns; `trading_symbol`, `exchange`, and `reserved_quantity` are nullable/defaulted as expected.
+- Derivative-position fixture supplies all non-null columns; contract metadata columns are nullable in the base schema.
+- Cash-order fixture supplies every non-null column and satisfies the 64-character order/fingerprint checks plus MARKET/DELIVERY status constraints.
+- Derivative-order fixture supplies every non-null column, including quote age, gross amount, and cash delta; order type/status and charge fields have valid defaults.
+- The minimal `auth.users(id)` harness table satisfies the migration's declared user foreign-key dependency; no additional auth.users columns are referenced by the reviewed migration diff.
+
+This is a static source cross-check only. The isolated GitHub Actions workflow has still not been dispatched, so PostgreSQL parsing, role behavior, RLS runtime assertions, and concurrency results remain unverified.
