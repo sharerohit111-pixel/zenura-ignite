@@ -371,6 +371,7 @@ jobs:
             END IF;
             IF (SELECT count(*) FROM pg_policies
                 WHERE schemaname='public'
+                  AND cmd='SELECT'
                   AND tablename IN ('paper_accounts','paper_equity_positions',
                     'paper_derivative_positions','paper_orders',
                     'paper_derivative_orders','paper_watchlists')
