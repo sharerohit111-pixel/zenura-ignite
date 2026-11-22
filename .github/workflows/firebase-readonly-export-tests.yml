@@ -20,9 +20,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-      - name: Install gateway dependencies
-        working-directory: market-gateway
-        run: npm ci
       - name: Check exporter syntax
         working-directory: market-gateway
         run: node --check scripts/firebase-readonly-export.js
