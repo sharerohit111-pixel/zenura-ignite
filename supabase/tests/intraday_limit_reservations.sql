@@ -7,14 +7,15 @@ DECLARE
 BEGIN
   INSERT INTO public.paper_exchange_sessions(
     exchange,session_date,is_trading_day,open_minute,close_minute,
-    session_kind,source_reference,verified_at
+    session_kind,source_reference,verified_at,source_sha256
   ) VALUES
-    ('NSE',v_date,true,0,1440,'SPECIAL','CI verified session fixture',v_now),
-    ('BSE',v_date,true,0,1440,'SPECIAL','CI verified session fixture',v_now)
+    ('NSE',v_date,true,0,1440,'SPECIAL','CI verified session fixture',v_now,repeat('d',64)),
+    ('BSE',v_date,true,0,1440,'SPECIAL','CI verified session fixture',v_now,repeat('d',64))
   ON CONFLICT(exchange,session_date) DO UPDATE SET
     is_trading_day=excluded.is_trading_day,open_minute=excluded.open_minute,
     close_minute=excluded.close_minute,session_kind=excluded.session_kind,
-    source_reference=excluded.source_reference,verified_at=excluded.verified_at;
+    source_reference=excluded.source_reference,verified_at=excluded.verified_at,
+    source_sha256=excluded.source_sha256;
   INSERT INTO public.paper_equity_positions(
     user_id,product,instrument_key,trading_symbol,exchange,quantity,
     average_price_paise,cost_basis_paise,reserved_quantity
