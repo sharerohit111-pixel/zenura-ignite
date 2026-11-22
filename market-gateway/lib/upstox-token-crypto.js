@@ -38,7 +38,7 @@ function decryptUpstoxToken(box, keyValue) {
 
 function encryptUpstoxToken(token, keyValue) {
   if (typeof token !== "string" || !token.trim() || token.length > 16384
-    || /[\\u0000-\\u001f\\u007f]/.test(token)) {
+    || /[\u0000-\u001f\u007f]/.test(token)) {
     throw new Error("Invalid Upstox token.");
   }
   const key = decodeCanonicalBase64(keyValue, 32, 32);
