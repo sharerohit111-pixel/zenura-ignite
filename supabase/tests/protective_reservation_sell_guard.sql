@@ -88,6 +88,15 @@ BEGIN
     NULL;
   END;
 
+END
+$protective_reserve_guard$;
+RESET ROLE;
+
+DO $protective_reserve_assertions$
+DECLARE
+  v_qty integer;
+  v_reserved integer;
+BEGIN
   SELECT quantity,reserved_quantity INTO v_qty,v_reserved
     FROM public.paper_equity_positions
    WHERE user_id='91919191-9191-4919-8919-919191919191'
@@ -97,12 +106,14 @@ BEGIN
     RAISE EXCEPTION 'Rejected SELL requests changed the protective share reservation';
   END IF;
   IF EXISTS (SELECT 1 FROM public.paper_orders
-      WHERE order_id IN (md5('protective-reservation-market-sell')||md5('protective-reservation-market-sell-unique'),md5('protective-reservation-limit-sell')||md5('protective-reservation-limit-sell-unique'))) THEN
+      WHERE order_id IN (
+        md5('protective-reservation-market-sell')||md5('protective-reservation-market-sell-unique'),
+        md5('protective-reservation-limit-sell')||md5('protective-reservation-limit-sell-unique')
+      )) THEN
     RAISE EXCEPTION 'Rejected SELL request left an order row behind';
   END IF;
 END
-$protective_reserve_guard$;
-RESET ROLE;
+$protective_reserve_assertions$;
 
 DELETE FROM public.paper_protective_orders
  WHERE order_id='92929292-9292-4929-8929-929292929292';
