@@ -1,6 +1,8 @@
 -- Protective exits reserve equity shares against both MARKET and LIMIT SELL paths.
 -- Runs only in the disposable PostgreSQL CI database.
 
+INSERT INTO auth.users(id) VALUES ('91919191-9191-4919-8919-919191919191') ON CONFLICT DO NOTHING;
+
 SET ROLE service_role;
 SELECT public.initialize_paper_trading_account('91919191-9191-4919-8919-919191919191');
 RESET ROLE;
