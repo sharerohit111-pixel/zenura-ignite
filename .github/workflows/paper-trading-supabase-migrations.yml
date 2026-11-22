@@ -284,6 +284,8 @@ jobs:
           SQL
       - name: Exercise Intraday LIMIT reservation, cancellation and session expiry
         run: psql -v ON_ERROR_STOP=1 -f supabase/tests/intraday_limit_reservations.sql
+      - name: Exercise concurrent Intraday LIMIT fill versus cancel row-lock races
+        run: bash supabase/tests/intraday_limit_fill_cancel_race.sh
       - name: Verify authenticated table grants and RLS watchlist isolation
         run: psql -v ON_ERROR_STOP=1 -f supabase/tests/rls_permissions.sql
       - name: Exercise MARKET idempotency and LIMIT reservation lifecycle
