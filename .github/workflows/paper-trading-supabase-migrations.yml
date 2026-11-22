@@ -1521,6 +1521,55 @@ jobs:
             END IF;
           END
           $protective_rpc$;
+          INSERT INTO public.paper_equity_positions(
+            user_id,product,instrument_key,trading_symbol,exchange,quantity,
+            average_price_paise,cost_basis_paise,reserved_quantity
+          ) VALUES (
+            '12121212-1212-4212-8212-121212121212','DELIVERY',
+            'NSE_EQ|PROTECTIVE_CI','PROTECTIVE_CI','NSE',10,8000,80000,0
+          );
+          INSERT INTO public.paper_protective_orders(
+            order_id,user_id,asset_class,instrument_key,product,side,
+            trigger_type,trigger_direction,trigger_price_paise,quantity,status
+          ) VALUES (
+            'abababab-abab-4bab-8bab-abababababab',
+            '12121212-1212-4212-8212-121212121212','EQUITY',
+            'NSE_EQ|PROTECTIVE_CI','DELIVERY','SELL',
+            'STOP_LOSS','AT_OR_BELOW',10000,4,'ACTIVE'
+          );
+          SET ROLE service_role;
+          DO $protective_fill$
+          DECLARE
+            v_now bigint:=floor(extract(epoch from clock_timestamp())*1000)::bigint;
+            v_result jsonb;
+          BEGIN
+            v_result:=public.execute_paper_equity_protective_fill(
+              'abababab-abab-4bab-8bab-abababababab',
+              repeat('a',64),repeat('b',64),9000,v_now,v_now
+            );
+            IF v_result->>'status'<>'FILLED'
+               OR (v_result->>'realized_pnl_paise')::bigint<>4000 THEN
+              RAISE EXCEPTION 'Equity protective fill did not calculate expected realized P&L';
+            END IF;
+            v_result:=public.execute_paper_equity_protective_fill(
+              'abababab-abab-4bab-8bab-abababababab',
+              repeat('a',64),repeat('b',64),9000,v_now,v_now
+            );
+            IF (v_result->>'idempotent_replay')::boolean IS NOT TRUE THEN
+              RAISE EXCEPTION 'Equity protective retry was not idempotent';
+            END IF;
+            IF (SELECT quantity FROM public.paper_equity_positions
+                WHERE user_id='12121212-1212-4212-8212-121212121212'
+                  AND product='DELIVERY' AND instrument_key='NSE_EQ|PROTECTIVE_CI')<>6 THEN
+              RAISE EXCEPTION 'Equity protective fill did not reduce position exactly once';
+            END IF;
+            IF (SELECT count(*) FROM public.paper_orders
+                WHERE order_id=repeat('a',64) AND status='FILLED')<>1 THEN
+              RAISE EXCEPTION 'Equity protective fill did not create one canonical filled order';
+            END IF;
+          END
+          $protective_fill$;
+          RESET ROLE;
           SQL
       - name: Verify expected schema and RPC registration
         run: |
