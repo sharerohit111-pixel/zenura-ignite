@@ -401,6 +401,67 @@ app.post("/crypto/orders",async(req,res)=>{
     });
   }catch(error){sendError(res,error,"Crypto paper order could not be completed.");}
 });
+app.post("/crypto/limit-orders",async(req,res)=>{
+  try{
+    const {user}=await auth(req);
+    const symbol=typeof req.body?.symbol==="string"?req.body.symbol.toUpperCase():"";
+    const side=String(req.body?.side||"").toUpperCase();
+    const quantityRaw=String(req.body?.quantity??"");
+    const limitPriceRaw=String(req.body?.limit_price??"");
+    const idempotencyKey=String(req.body?.idempotency_key||"");
+    if(!CRYPTO_SYMBOLS.has(symbol))return res.status(400).json({error:"Select a supported verified crypto spot symbol."});
+    if(!["BUY","SELL"].includes(side))return res.status(400).json({error:"Only BUY and SELL crypto LIMIT orders are supported."});
+    if(!isUuid(idempotencyKey))return res.status(400).json({error:"A valid UUID idempotency_key is required."});
+    if(!/^(?:0|[1-9]\\d*)(?:\\.\\d{1,12})?$/.test(quantityRaw)||Number(quantityRaw)<=0||!Number.isFinite(Number(quantityRaw))||Number(quantityRaw)>1000000000)
+      return res.status(400).json({error:"Enter a valid crypto quantity with up to 12 decimal places."});
+    if(!/^(?:0|[1-9]\\d*)(?:\\.\\d{1,8})?$/.test(limitPriceRaw)||Number(limitPriceRaw)<=0||!Number.isFinite(Number(limitPriceRaw))||Number(limitPriceRaw)>1000000000)
+      return res.status(400).json({error:"Enter a valid LIMIT price with up to 8 decimal places."});
+    const baseAsset=symbol.slice(0,-4);
+    const fxResponse=await fetchProvider("https://open.er-api.com/v6/latest/USD",{headers:{Accept:"application/json"}},5000);
+    if(!fxResponse.ok)return res.status(502).json({error:"USD/INR reference rate is temporarily unavailable."});
+    const fxData=await fxResponse.json(),fxRate=Number(fxData?.rates?.INR);
+    if(fxData?.result!=="success"||!Number.isFinite(fxRate)||fxRate<40||fxRate>200)
+      return res.status(502).json({error:"A valid USD/INR reference rate is not available."});
+    const gross=Number(quantityRaw)*Number(limitPriceRaw)*fxRate;
+    if(!Number.isFinite(gross)||gross<=0||gross>1000000000000)
+      return res.status(400).json({error:"Crypto LIMIT reservation exceeds supported limits."});
+    const fee=Number((gross*0.001).toFixed(8));
+    const orderId=makeCryptoOrderId(user.id,idempotencyKey);
+    const fingerprint=crypto.createHash("sha256").update(JSON.stringify({
+      userId:user.id,symbol,side,quantity:quantityRaw,orderType:"LIMIT",limitPrice:limitPriceRaw
+    })).digest("hex");
+    await runtime.callUserRpc(user,"initialize_paper_crypto_account",{p_starting_cash_inr:"1000000"});
+    const result=await runtime.callUserRpc(user,"create_paper_crypto_limit_order",{
+      p_order_id:orderId,p_idempotency_key:idempotencyKey,p_request_fingerprint:fingerprint,
+      p_symbol:symbol,p_base_asset:baseAsset,p_side:side,p_quantity:quantityRaw,
+      p_limit_price:limitPriceRaw,p_fx_rate_inr:fxRate.toFixed(8),p_fee:fee.toFixed(8)
+    });
+    const order=result?.order||{};
+    res.set("Cache-Control","private, no-store").status(result?.idempotent_replay?200:201).json({
+      orderId:order.order_id||orderId,status:order.status||"PENDING",orderType:"LIMIT",
+      symbol,side,quantity:quantityRaw,limitPriceUsdt:limitPriceRaw,
+      reservedInr:order.reserved_amount??0,cashBalance:result?.cash_balance,
+      reservedCash:result?.reserved_cash,idempotentReplay:result?.idempotent_replay===true,
+      simulationOnly:true
+    });
+  }catch(error){sendError(res,error,"Crypto LIMIT order could not be created.");}
+});
+app.post("/crypto/limit-orders/:orderId/cancel",async(req,res)=>{
+  try{
+    const {user}=await auth(req);
+    const orderId=String(req.params.orderId||"");
+    if(!isUuid(orderId))return res.status(400).json({error:"A valid crypto order ID is required."});
+    const result=await runtime.callUserRpc(user,"cancel_paper_crypto_limit_order",{
+      p_order_id:orderId
+    });
+    res.set("Cache-Control","private, no-store").json({
+      orderId:result?.order?.order_id||orderId,status:result?.order?.status||"CANCELLED",
+      cancelled:result?.cancelled===true,idempotentReplay:result?.idempotent_replay===true,
+      simulationOnly:true
+    });
+  }catch(error){sendError(res,error,"Crypto LIMIT order could not be cancelled.");}
+});
+
 app.get("/crypto/portfolio",async(req,res)=>{
   try{
     const {user,userDb}=await auth(req);
