@@ -29,7 +29,7 @@
 - Do not apply draft migrations to the linked production Supabase project or import/overwrite customer data.
 - Do not activate a public real-time feed or production gateway until the documented market-data rights gate is satisfied.
 - Do not enable a UI action unless its backend lifecycle and tests exist; fail closed with a clear message instead.
-- Preserve the existing Paper Trading and Paper Investing product surfaces and their data boundaries; this plan is about Indian-market execution priority, not removing either product mode.
+- ZENURA IGNITE has one user-facing mode: Paper Trading. Preserve Indian stock-market and Crypto Paper Trading; Paper Investing is retired.
 
 ## Current verified gaps / release blockers
 
