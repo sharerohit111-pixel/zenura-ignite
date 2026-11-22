@@ -12,7 +12,7 @@ async function loadVerifiedExchangeSession(serviceDb,exchange,nowMs=Date.now()){
      ||!Number.isSafeInteger(nowMs)||nowMs<1) return null;
   const sessionDate=marketDateString(nowMs);
   const result=await serviceDb.from("paper_exchange_sessions")
-    .select("exchange,session_date,is_trading_day,open_minute,close_minute,session_kind,source_reference,verified_at")
+    .select("exchange,session_date,is_trading_day,open_minute,close_minute,session_kind,source_reference,verified_at,source_sha256")
     .eq("exchange",exchange).eq("session_date",sessionDate).maybeSingle();
   if(result?.error)throw Object.assign(new Error("Verified exchange session calendar could not be read."),{status:503});
   if(!result?.data)return null;
