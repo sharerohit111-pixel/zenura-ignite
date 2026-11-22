@@ -39,3 +39,8 @@ No PR #70 SQL or workflow was edited. No PR was created or merged. No production
 ### Additional concurrent cash-reservation race
 
 The same isolated script also races two distinct 60,000,000-paise MARKET BUY requests against the synthetic account. Since the starting balance is 100,000,000 paise and the earlier idempotent test has already spent 10,000 paise, exactly one large order may succeed. The test asserts one successful order and one corresponding debit; both succeeding or both failing is treated as a failure. This is a two-session targeted race check, not a load benchmark. Shell syntax was checked locally with `bash -n`; the PostgreSQL assertions remain pending GitHub Actions execution.
+
+
+### RPC execution role
+
+The concurrency script now issues each MARKET RPC call after `SET ROLE service_role`, including the mismatched-fingerprint rejection check. The harness reads assertions as the disposable database owner, but order mutations execute under the intended backend role rather than relying on PostgreSQL superuser privileges. This still does not replace a real Supabase staging integration test.
