@@ -48,6 +48,7 @@ jobs:
           CREATE ROLE authenticated NOLOGIN;
           CREATE ROLE service_role NOLOGIN BYPASSRLS;
           CREATE SCHEMA auth;
+          -- Simulate the Firebase third-party JWT claims consumed by auth.jwt().
           CREATE FUNCTION auth.jwt()
           RETURNS jsonb
           LANGUAGE sql
