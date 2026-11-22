@@ -5,6 +5,7 @@
 (function(root){
   "use strict";
   const CDN="https://cdn.jsdelivr.net/npm/klinecharts@10.1.1/dist/umd/klinecharts.min.js";
+  const BUILTIN_INDICATORS=new Set(["MA","EMA","SMA","BOLL","BBI","BIAS","BRAR","CR","DMA","PSY","AO","MTM","VR","RSI","MACD","KDJ","CCI","OBV","VOL","WR","SAR","TRIX","DMI","ROC","PVT","VWAP","ATR","ADX","STOCH","SUPERTREND","MFI"]);
   const PERIODS={
     "1m":{type:"minute",span:1,unit:"minutes",interval:1,days:7},
     "5m":{type:"minute",span:5,unit:"minutes",interval:5,days:14},
@@ -185,7 +186,7 @@
       const typeSelect=document.getElementById("chart-type-select");
       if(typeSelect)typeSelect.value=activeChartType;
     }
-    const allowed=new Set(root.klinecharts?.getSupportedIndicators?.()||[]);
+    const allowed=new Set([...BUILTIN_INDICATORS,...(root.klinecharts?.getSupportedIndicators?.()||[])]);
     if(Array.isArray(data?.indicators)){
       for(const name of data.indicators.slice(0,20)){
         if(typeof name!=="string"||!allowed.has(name)||name==="VOL")continue;
