@@ -57,6 +57,7 @@ declare
   v_old_qty bigint := 0;
   v_old_avg bigint := 0;
   v_old_basis bigint := 0;
+  v_old_avg_cost_basis bigint := 0;
   v_new_qty bigint;
   v_new_basis bigint;
   v_new_avg bigint;
@@ -167,7 +168,6 @@ begin
        or v_position.average_price_paise<=0
        or v_position.cost_basis_paise<=0
        or abs(v_position.cost_basis_paise::numeric)>9007199254740991
-       or round(v_position.cost_basis_paise::numeric/v_position.net_quantity)<>v_position.average_price_paise
     then raise exception 'Stored option position metadata or cost basis is invalid.' using errcode='23514'; end if;
     v_old_qty:=v_position.net_quantity;
     v_old_avg:=v_position.average_price_paise;
@@ -217,10 +217,13 @@ begin
   if p_side='BUY' then
     v_new_qty:=v_old_qty+v_quantity;
     v_new_basis:=v_old_basis+v_gross+v_charges;
-    if v_new_qty>1000000 or v_new_basis>9007199254740991 then
+    v_old_avg_cost_basis:=v_old_qty::bigint*v_old_avg;
+    if v_new_qty>1000000 or v_new_basis>9007199254740991
+       or v_old_avg_cost_basis+v_gross>9007199254740991 then
       raise exception 'Option position exceeds supported calculation limits.' using errcode='22003';
     end if;
-    v_new_avg:=floor(v_new_basis::numeric/v_new_qty+0.5)::bigint;
+    -- Average premium excludes transaction charges; cost_basis includes BUY charges.
+    v_new_avg:=floor((v_old_avg_cost_basis+v_gross)::numeric/v_new_qty+0.5)::bigint;
   else
     if v_quantity=v_old_qty then
       v_closed_basis:=v_old_basis;
@@ -230,7 +233,7 @@ begin
     v_new_qty:=v_old_qty-v_quantity;
     v_new_basis:=v_old_basis-v_closed_basis;
     v_order_realized:=v_gross-v_closed_basis-v_charges;
-    if v_new_qty>0 then v_new_avg:=floor(v_new_basis::numeric/v_new_qty+0.5)::bigint;
+    if v_new_qty>0 then v_new_avg:=floor((v_old_avg::numeric*v_old_qty-v_closed_basis+v_order_realized+v_charges)::numeric/v_new_qty+0.5)::bigint;
     else v_new_avg:=0; end if;
   end if;
 
