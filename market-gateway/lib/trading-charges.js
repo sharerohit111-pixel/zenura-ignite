@@ -108,4 +108,41 @@ function calculateEquityDeliveryCharges({grossPaise,exchange,side="BUY"}){
     note:"NSE delivery schedule; DP charge is estimated per sell order. BSE scrip-group charges are not estimated."};
 }
 
-module.exports={calculateLongOptionTradeCharges,calculateLongOptionBuyCharges:args=>calculateLongOptionTradeCharges({...args,side:"BUY"}),calculateFuturesTradeCharges,calculateEquityDeliveryCharges,DEFAULT_BROKERAGE_PAISE};
+/* NSE cash-equity intraday schedule (indicative Upstox-style simulation).
+ * Brokerage: lower of 0.10% turnover or ₹20 per executed order.
+ * STT: 0.025% sell side; stamp duty: 0.003% buy side.
+ * NSE transaction ₹306.99/crore + IPFT ₹0.01/crore; SEBI ₹10/crore.
+ * GST 18% applies to brokerage + exchange transaction + IPFT.
+ * BSE is intentionally blocked until the applicable scrip-group rate is known.
+ */
+function calculateEquityIntradayCharges({grossPaise,exchange,side="BUY",brokerageCapPaise=DEFAULT_BROKERAGE_PAISE}){
+  if(!Number.isSafeInteger(grossPaise)||grossPaise<1)
+    throw Object.assign(new Error("A valid equity intraday turnover is required."),{status:400});
+  if(!["BUY","SELL"].includes(side))
+    throw Object.assign(new Error("Equity intraday side must be BUY or SELL."),{status:400});
+  const market=String(exchange||"").toUpperCase();
+  if(market!=="NSE")
+    throw Object.assign(new Error("BSE intraday charges require the official scrip-group rate; this order is blocked until that rate is available."),{status:422});
+  if(!Number.isSafeInteger(brokerageCapPaise)||brokerageCapPaise<0)
+    throw Object.assign(new Error("Brokerage cap is invalid."),{status:400});
+  const brokeragePaise=Math.min(brokerageCapPaise,roundPaise(grossPaise*0.001));
+  const exchangeTransactionPaise=roundPaise(grossPaise*0.000030699);
+  const ipftPaise=roundPaise(grossPaise*0.000000001);
+  const sebiPaise=roundPaise(grossPaise*0.000001);
+  const sttPaise=side==="SELL"?roundPaise(grossPaise*0.00025):0;
+  const stampDutyPaise=side==="BUY"?roundPaise(grossPaise*0.00003):0;
+  const gstPaise=roundPaise((brokeragePaise+exchangeTransactionPaise+ipftPaise)*GST);
+  const totalChargesPaise=brokeragePaise+exchangeTransactionPaise+ipftPaise+sebiPaise+sttPaise+stampDutyPaise+gstPaise;
+  if(!Number.isSafeInteger(totalChargesPaise)||!Number.isSafeInteger(grossPaise+totalChargesPaise))
+    throw Object.assign(new Error("Equity intraday charges exceed supported calculation limits."),{status:400});
+  return {
+    grossPaise,brokeragePaise,exchangeTransactionPaise,ipftPaise,sebiPaise,
+    sttPaise,stampDutyPaise,gstPaise,totalChargesPaise,exchange:market,side,
+    segment:"EQUITY_INTRADAY",scheduleVersion:"2026-04-01",
+    indicative:true,simulationOnly:true,
+    totalDebitPaise:side==="BUY"?grossPaise+totalChargesPaise:null,
+    netCreditPaise:side==="SELL"?grossPaise-totalChargesPaise:null
+  };
+}
+
+module.exports={calculateLongOptionTradeCharges,calculateLongOptionBuyCharges:args=>calculateLongOptionTradeCharges({...args,side:"BUY"}),calculateFuturesTradeCharges,calculateEquityDeliveryCharges,calculateEquityIntradayCharges,DEFAULT_BROKERAGE_PAISE};
