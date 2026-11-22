@@ -93,6 +93,7 @@ test("Equity protective worker is separately leased, bounded, quote-verified and
 test("Protective scan index only covers active, supported equity SELL exits",()=>{
  const fs=require("node:fs");
  const migration=fs.readFileSync(path.join(root,"../supabase/migrations/20261122141000_equity_protective_worker_scan_index.sql"),"utf8");
+ assert.match(migration,/worker_checked_at timestamptz/);
  assert.match(migration,/where status='ACTIVE' and asset_class='EQUITY' and side='SELL'/);
  assert.match(migration,/product in \('DELIVERY','INTRADAY'\)/);
 });
