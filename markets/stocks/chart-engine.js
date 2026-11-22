@@ -265,6 +265,7 @@
     chart.setSymbol({ticker:options.instrument.trading_symbol||options.instrument.instrument_key,pricePrecision:2,volumePrecision:0});
     const period=PERIODS[options.timeframe]||PERIODS["1m"];
     chart.setPeriod({type:period.type,span:period.span});
+    await loadPreferences();
     await loadSavedDrawings();
     await loadTemplates();
     return chart;
