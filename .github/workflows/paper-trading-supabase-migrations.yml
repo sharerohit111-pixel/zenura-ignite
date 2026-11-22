@@ -102,6 +102,114 @@ jobs:
           $$;
           RESET ROLE;
           SQL
+      - name: Exercise MARKET idempotency and LIMIT reservation lifecycle
+        run: |
+          psql -v ON_ERROR_STOP=1 <<'SQL'
+          SET ROLE service_role;
+          DO $$
+          DECLARE
+            v_result jsonb;
+            v_cash bigint;
+            v_reserved bigint;
+            v_qty integer;
+            v_replay boolean;
+          BEGIN
+            -- MARKET BUY: 10 shares at ₹100; retry must not debit twice.
+            v_result := public.execute_paper_market_order(
+              '22222222-2222-4222-8222-222222222222',
+              repeat('a',64),
+              '33333333-3333-4333-8333-333333333333',
+              repeat('b',64),'NSE_EQ|TEST001','TEST001','NSE',
+              'BUY','DELIVERY',10,10000,1000000,100
+            );
+            IF v_result->>'status' <> 'FILLED'
+               OR (v_result->>'cash_paise')::bigint <> 99900000 THEN
+              RAISE EXCEPTION 'MARKET BUY did not debit expected gross amount';
+            END IF;
+            v_result := public.execute_paper_market_order(
+              '22222222-2222-4222-8222-222222222222',
+              repeat('a',64),
+              '33333333-3333-4333-8333-333333333333',
+              repeat('b',64),'NSE_EQ|TEST001','TEST001','NSE',
+              'BUY','DELIVERY',10,10000,1000000,100
+            );
+            IF (v_result->>'idempotent_replay')::boolean IS NOT TRUE THEN
+              RAISE EXCEPTION 'MARKET retry was not idempotent';
+            END IF;
+            SELECT cash_paise INTO v_cash FROM public.paper_accounts
+             WHERE user_id='22222222-2222-4222-8222-222222222222';
+            IF v_cash <> 99900000 THEN
+              RAISE EXCEPTION 'MARKET idempotent retry debited cash more than once';
+            END IF;
+            -- Same key with a different fingerprint must fail.
+            BEGIN
+              PERFORM public.execute_paper_market_order(
+                '22222222-2222-4222-8222-222222222222',
+                repeat('c',64),
+                '33333333-3333-4333-8333-333333333333',
+                repeat('d',64),'NSE_EQ|TEST001','TEST001','NSE',
+                'BUY','DELIVERY',10,10000,1000000,100
+              );
+              RAISE EXCEPTION 'Changed MARKET fingerprint was unexpectedly accepted';
+            EXCEPTION WHEN unique_violation THEN
+              NULL;
+            END;
+            -- SELL half the position: ₹10,000 realized gain, five shares remain.
+            v_result := public.execute_paper_market_order(
+              '22222222-2222-4222-8222-222222222222',
+              repeat('e',64),
+              '44444444-4444-4444-8444-444444444444',
+              repeat('f',64),'NSE_EQ|TEST001','TEST001','NSE',
+              'SELL','DELIVERY',5,12000,1000000,100
+            );
+            SELECT quantity INTO v_qty FROM public.paper_equity_positions
+             WHERE user_id='22222222-2222-4222-8222-222222222222'
+               AND product='DELIVERY' AND instrument_key='NSE_EQ|TEST001';
+            IF v_qty <> 5 OR (v_result->>'order_realized_pnl_paise')::bigint <> 10000 THEN
+              RAISE EXCEPTION 'MARKET SELL position or realized P&L is incorrect';
+            END IF;
+            -- LIMIT BUY reservation then cancellation must release all reserved cash.
+            v_result := public.submit_paper_limit_order(
+              '22222222-2222-4222-8222-222222222222',
+              repeat('1',64),
+              '55555555-5555-4555-8555-555555555555',
+              repeat('2',64),'NSE_EQ|TEST002','TEST002','NSE',
+              'BUY',2,20000
+            );
+            SELECT reserved_cash_paise INTO v_reserved FROM public.paper_accounts
+             WHERE user_id='22222222-2222-4222-8222-222222222222';
+            IF v_reserved <> 40000 THEN
+              RAISE EXCEPTION 'LIMIT BUY did not reserve expected cash';
+            END IF;
+            PERFORM public.cancel_paper_limit_order(
+              '22222222-2222-4222-8222-222222222222',repeat('1',64)
+            );
+            SELECT reserved_cash_paise INTO v_reserved FROM public.paper_accounts
+             WHERE user_id='22222222-2222-4222-8222-222222222222';
+            IF v_reserved <> 0 THEN
+              RAISE EXCEPTION 'LIMIT BUY cancellation did not release reservation';
+            END IF;
+            -- LIMIT BUY fill at a better price releases reservation and debits actual fill.
+            PERFORM public.submit_paper_limit_order(
+              '22222222-2222-4222-8222-222222222222',
+              repeat('3',64),
+              '66666666-6666-4666-8666-666666666666',
+              repeat('4',64),'NSE_EQ|TEST003','TEST003','NSE',
+              'BUY',2,30000
+            );
+            v_result := public.execute_paper_limit_fill(
+              repeat('3',64),29000,1000000,100,1000100
+            );
+            SELECT reserved_cash_paise,cash_paise INTO v_reserved,v_cash
+              FROM public.paper_accounts
+             WHERE user_id='22222222-2222-4222-8222-222222222222';
+            IF v_result->>'status' <> 'FILLED' OR v_reserved <> 0 OR v_cash <> 99872000 THEN
+              RAISE EXCEPTION 'LIMIT BUY fill cash or reservation result is incorrect';
+            END IF;
+          END
+          $$;
+          RESET ROLE;
+          SQL
       - name: Verify expected schema and RPC registration
         run: |
           psql -v ON_ERROR_STOP=1 <<'SQL'
@@ -136,6 +244,7 @@ jobs:
           END
           $$;
           SQL
+
 
 
 
