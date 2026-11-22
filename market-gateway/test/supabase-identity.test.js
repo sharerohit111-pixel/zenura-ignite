@@ -30,7 +30,7 @@ function fakeSupabase({ data = null, error = null, thrown = null } = {}) {
   return { client, calls };
 }
 
-test("resolves an existing Firebase UID to its Supabase Auth UUID", async () => {
+test("resolves an existing Firebase UID to its internal Supabase UUID", async () => {
   const firebaseUid = "firebase-UID-CaseSensitive-123";
   const { client, calls } = fakeSupabase({
     data: { supabase_user_id: "A1B2C3D4-E5F6-4789-ABCD-0123456789AB" }
