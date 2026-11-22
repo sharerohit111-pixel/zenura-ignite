@@ -43,10 +43,7 @@ function createSupabasePaperTradingIdentityAdapter(options={}){
   async function resolveIdentity({request,auth}={}){
     // Verify and forward the token from the same request object; callers cannot pair
     // a verified decoded token with a different raw Bearer token.
-    const header=request?.get?.("authorization")||"";
-    const match=/^Bearer ([^\\s,]+)$/i.exec(header);
-    if(!match)throw safeError("Sign in required",401);
-    const idToken=match[1];
+    const idToken=bearerToken(request);
     const decodedToken=await authenticateFirebaseRequest(request,auth);
     const firebaseUid=validateFirebaseClaims(decodedToken,firebaseProjectId);
     let response;
