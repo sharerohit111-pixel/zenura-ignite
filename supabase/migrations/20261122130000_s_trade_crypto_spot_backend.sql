@@ -171,7 +171,7 @@ begin
      or p_request_fingerprint is null or p_request_fingerprint !~ '^[a-f0-9]{64}$'
      or p_symbol is null or p_symbol !~ '^[A-Z0-9]{2,20}USDT$'
      or p_base_asset is null or p_base_asset !~ '^[A-Z0-9]{2,12}$'
-     or p_symbol <> (p_base_asset || 'INR')
+     or p_symbol <> (p_base_asset || 'USDT')
      or p_side is null or p_side not in ('BUY','SELL')
      or p_quantity is null or p_quantity <= 0 or p_quantity > 1000000000
      or p_execution_price is null or p_execution_price <= 0 or p_execution_price > 1000000000
@@ -234,7 +234,7 @@ begin
   if p_side = 'BUY' then
     v_total := v_gross + p_fee;
     if v_account.cash_balance - v_account.reserved_cash < v_total then
-      raise exception 'Insufficient virtual USDT balance.' using errcode = '23514';
+      raise exception 'Insufficient virtual INR balance.' using errcode = '23514';
     end if;
     v_new_qty := coalesce(v_position.quantity,0) + p_quantity;
     if v_new_qty > 1000000000 then
@@ -251,8 +251,8 @@ begin
       quantity=excluded.quantity,average_entry_price=excluded.average_entry_price,
       cost_basis=excluded.cost_basis,updated_at=now();
     insert into public.paper_crypto_ledger(user_id,order_id,entry_type,currency,amount,balance_before,balance_after)
-    values (p_user_id,p_order_id,'BUY','USDT',-v_gross,v_balance_before,round(v_balance_before-v_gross,8)),
-           (p_user_id,p_order_id,'FEE','USDT',-p_fee,round(v_balance_before-v_gross,8),v_new_cash);
+    values (p_user_id,p_order_id,'BUY','INR',-v_gross,v_balance_before,round(v_balance_before-v_gross,8)),
+           (p_user_id,p_order_id,'FEE','INR',-p_fee,round(v_balance_before-v_gross,8),v_new_cash);
   else
     if not v_has_position or p_quantity > v_position.quantity then
       raise exception 'Insufficient crypto quantity to sell.' using errcode = '23514';
@@ -272,8 +272,8 @@ begin
       where user_id=p_user_id and symbol=p_symbol;
     end if;
     insert into public.paper_crypto_ledger(user_id,order_id,entry_type,currency,amount,balance_before,balance_after)
-    values (p_user_id,p_order_id,'SELL','USDT',v_gross,v_balance_before,round(v_balance_before+v_gross,8)),
-           (p_user_id,p_order_id,'FEE','USDT',-p_fee,round(v_balance_before+v_gross,8),v_new_cash);
+    values (p_user_id,p_order_id,'SELL','INR',v_gross,v_balance_before,round(v_balance_before+v_gross,8)),
+           (p_user_id,p_order_id,'FEE','INR',-p_fee,round(v_balance_before+v_gross,8),v_new_cash);
   end if;
 
   update public.paper_crypto_accounts
@@ -296,7 +296,7 @@ $$;
 revoke all on function public.initialize_paper_crypto_account(uuid,numeric) from public, anon, authenticated;
 revoke all on function public.execute_paper_crypto_market_order(uuid,uuid,uuid,text,text,text,text,numeric,numeric,numeric,numeric,bigint) from public, anon, authenticated;
 grant execute on function public.initialize_paper_crypto_account(uuid,numeric) to service_role;
-grant execute on function public.execute_paper_crypto_market_order(uuid,uuid,uuid,text,text,text,text,numeric,numeric,numeric,bigint) to service_role;
+grant execute on function public.execute_paper_crypto_market_order(uuid,uuid,uuid,text,text,text,text,numeric,numeric,numeric,numeric,bigint) to service_role;
 
 comment on table public.paper_crypto_accounts is 'INR-denominated simulated crypto cash accounts; crypto pairs are converted using a recorded USD/INR reference rate; no live exchange funds.';
 comment on table public.paper_crypto_positions is 'User-owned simulated spot crypto positions.';
