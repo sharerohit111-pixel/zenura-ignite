@@ -7,7 +7,8 @@ alter table public.paper_protective_orders
   add column if not exists cancelled_at timestamptz;
 
 create or replace function public.cancel_paper_protective_order(
-  p_protective_order_id uuid
+  p_protective_order_id uuid,
+  p_user_id uuid
 ) returns jsonb
 language plpgsql
 security definer
@@ -16,7 +17,7 @@ as $$
 declare
   v_order public.paper_protective_orders%rowtype;
 begin
-  if p_protective_order_id is null or auth.uid() is null then
+  if p_protective_order_id is null or p_user_id is null or auth.uid() is null or p_user_id is distinct from auth.uid() then
     raise exception using errcode='42501', message='Authenticated ownership is required';
   end if;
 
@@ -53,7 +54,7 @@ begin
 end;
 $$;
 
-revoke all on function public.cancel_paper_protective_order(uuid)
+revoke all on function public.cancel_paper_protective_order(uuid,uuid)
   from public,anon,authenticated;
 grant execute on function public.cancel_paper_protective_order(uuid)
   to authenticated;
