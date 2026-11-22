@@ -36,6 +36,15 @@ jobs:
       PGDATABASE: paper_trading_test
     steps:
       - uses: actions/checkout@v4
+      - name: Check native Supabase Auth browser modules
+        run: |
+          node --input-type=module --check < markets/stocks/supabase-client.js
+          node --input-type=module --check < markets/stocks/connect.js
+          node --input-type=module --check < markets/stocks/email-auth.js
+          if grep -Eiq 'firebase-client|firebase-auth|firebase-functions' markets/stocks/supabase-client.js markets/stocks/connect.js markets/stocks/email-auth.js; then
+            echo "Firebase authentication dependency remains in the new market app."
+            exit 1
+          fi
       - name: Run Existing transaction reference charge-calculation boundary tests
         run: node --test market-gateway/test/trading-charges.test.js
       - name: Run Existing transaction reference option transaction tests
