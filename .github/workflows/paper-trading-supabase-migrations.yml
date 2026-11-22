@@ -370,6 +370,21 @@ jobs:
               RAISE EXCEPTION 'BSE Delivery LIMIT was accepted without scrip-group fee inputs';
             EXCEPTION WHEN SQLSTATE '22023' THEN NULL;
             END;
+            -- Reject a LIMIT SELL whose minimum charges exceed gross proceeds.
+            BEGIN
+              PERFORM public.submit_paper_limit_order(
+                '22222222-2222-4222-8222-222222222222',repeat('b',64),
+                'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',repeat('c',64),
+                'NSE_EQ|TEST001','TEST001','NSE','SELL',1,1
+              );
+              RAISE EXCEPTION 'Tiny Delivery LIMIT SELL with negative net proceeds was accepted';
+            EXCEPTION WHEN SQLSTATE '22003' THEN
+              NULL;
+            END;
+            IF EXISTS(SELECT 1 FROM public.paper_orders
+              WHERE order_id='eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee') THEN
+              RAISE EXCEPTION 'Rejected tiny Delivery LIMIT SELL left a persisted order row';
+            END IF;
             -- LIMIT BUY reservation then cancellation must release all reserved cash.
             v_result := public.submit_paper_limit_order(
               '22222222-2222-4222-8222-222222222222',
