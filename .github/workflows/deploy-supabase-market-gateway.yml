@@ -26,8 +26,6 @@ jobs:
       FRONTEND_ORIGIN: ${{ vars.FRONTEND_ORIGIN }}
       UPSTOX_REDIRECT_URI: ${{ vars.UPSTOX_REDIRECT_URI }}
       ZENURA_APP_REDIRECT_URI: ${{ vars.ZENURA_APP_REDIRECT_URI }}
-      WORKER_SERVICE_ACCOUNT: ${{ secrets.GCP_WORKER_SERVICE_ACCOUNT }}
-      SCHEDULER_SERVICE_ACCOUNT: ${{ secrets.GCP_SCHEDULER_SERVICE_ACCOUNT }}
       MARKET_DATA_RIGHTS_APPROVED: ${{ vars.MARKET_DATA_RIGHTS_APPROVED }}
       MARKET_DATA_RIGHTS_REFERENCE: ${{ vars.MARKET_DATA_RIGHTS_REFERENCE }}
     steps:
@@ -37,7 +35,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          for name in PROJECT_ID SERVICE_ACCOUNT WIF_PROVIDER MARKET_GATEWAY_URL FRONTEND_ORIGIN UPSTOX_REDIRECT_URI ZENURA_APP_REDIRECT_URI WORKER_SERVICE_ACCOUNT SCHEDULER_SERVICE_ACCOUNT; do
+          for name in PROJECT_ID SERVICE_ACCOUNT WIF_PROVIDER MARKET_GATEWAY_URL FRONTEND_ORIGIN UPSTOX_REDIRECT_URI ZENURA_APP_REDIRECT_URI ; do
             if [[ -z "${!name}" ]]; then echo "::error::Missing GitHub secret/variable: $name"; exit 1; fi
           done
           if [[ "$MARKET_DATA_RIGHTS_APPROVED" != "true" || -z "$MARKET_DATA_RIGHTS_REFERENCE" ]]; then echo "::error::Public market-data deployment is blocked until written provider/regulatory approval is recorded."; exit 1; fi
@@ -59,7 +57,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          gcloud services enable run.googleapis.com cloudbuild.googleapis.com artifactregistry.googleapis.com cloudscheduler.googleapis.com --project "$PROJECT_ID"
+          gcloud services enable run.googleapis.com artifactregistry.googleapis.com --project "$PROJECT_ID"
 
       - name: Verify required Secret Manager entries exist
         shell: bash
@@ -111,43 +109,7 @@ jobs:
             sleep 5
           done
           echo "::error::Gateway health or the Paper LIMIT worker did not become ready."
-          exit 1 -o gateway-health.json
-          grep -q '"authProvider":"supabase"' gateway-health.json
-
-      - name: Deploy isolated Supabase LIMIT worker Cloud Run Job
-        shell: bash
-        run: |
-          set -euo pipefail
-          gcloud run jobs deploy zenura-paper-limit-worker \
-            --project "$PROJECT_ID" --image "$IMAGE" --region "$REGION" \
-            --command node --args paper-limit-worker.js \
-            --tasks 1 --parallelism 1 --task-timeout 180s --max-retries 0 \
-            --service-account "$WORKER_SERVICE_ACCOUNT" \
-            --set-env-vars "SUPABASE_URL=https://atvbjibhunvzpmfagagm.supabase.co,SUPABASE_PUBLISHABLE_KEY=sb_publishable_kdTDQxlrYkry8mK4Ptlc9w_6oZJEYRQ" \
-            --set-secrets "SUPABASE_SERVICE_ROLE_KEY=zenura-supabase-service-role:latest,UPSTOX_TOKEN_ENCRYPTION_KEY=zenura-upstox-encryption-key:latest"
-          gcloud run jobs add-iam-policy-binding zenura-paper-limit-worker \
-            --project "$PROJECT_ID" --region "$REGION" \
-            --member "serviceAccount:$SCHEDULER_SERVICE_ACCOUNT" --role roles/run.invoker
-
-      - name: Schedule the LIMIT worker every minute
-        shell: bash
-        run: |
-          set -euo pipefail
-          gcloud services enable cloudscheduler.googleapis.com
-          URI="https://run.googleapis.com/v2/projects/$PROJECT_ID/locations/$REGION/jobs/zenura-paper-limit-worker:run"
-          if gcloud scheduler jobs describe zenura-paper-limit-worker-every-minute --location "$REGION" >/dev/null 2>&1; then
-            gcloud scheduler jobs update http zenura-paper-limit-worker-every-minute \
-              --location "$REGION" --schedule "* * * * *" --time-zone "Asia/Kolkata" \
-              --uri "$URI" --http-method POST --message-body "{}" \
-              --update-headers "Content-Type=application/json" \
-              --oauth-service-account-email "$SCHEDULER_SERVICE_ACCOUNT" --attempt-deadline 180s
-          else
-            gcloud scheduler jobs create http zenura-paper-limit-worker-every-minute \
-              --location "$REGION" --schedule "* * * * *" --time-zone "Asia/Kolkata" \
-              --uri "$URI" --http-method POST --message-body "{}" \
-              --update-headers "Content-Type=application/json" \
-              --oauth-service-account-email "$SCHEDULER_SERVICE_ACCOUNT" --attempt-deadline 180s
-          fi
+          exit 1
 
       - name: Update both market modes to the verified gateway origin
         uses: actions/github-script@v7
