@@ -680,7 +680,7 @@ jobs:
             v_avg bigint;
             v_realized bigint;
           BEGIN
-            -- The preceding step leaves ₹99,920,739 cash after the LIMIT SELL fill.
+            -- The preceding step leaves ₹99,913,563 cash after fee-inclusive LIMIT SELL settlement.
             -- Long CE BUY: 2 lots × 25, ₹12.85 premium. Fee-inclusive cost basis.
             v_result := public.execute_paper_long_option_order(
               '22222222-2222-4222-8222-222222222222',
@@ -695,7 +695,7 @@ jobs:
              WHERE user_id='22222222-2222-4222-8222-222222222222'
                AND instrument_key='NSE_FO|TESTCE';
             IF v_qty <> 50 OR v_basis <> 66639 OR v_avg <> 1333
-               OR v_cash <> 99854100
+               OR v_cash <> 99846924
                OR (v_result->>'idempotent_replay')::boolean IS NOT FALSE THEN
               RAISE EXCEPTION 'Long CE BUY mismatch: qty %, basis %, average %, cash %, result %',v_qty,v_basis,v_avg,v_cash,v_result;
             END IF;
@@ -727,9 +727,9 @@ jobs:
               FROM public.paper_accounts
              WHERE user_id='22222222-2222-4222-8222-222222222222';
             IF v_qty <> 25 OR v_basis <> 33319 OR v_avg <> 1333
-               OR (v_result->>'realized_pnl_paise')::bigint <> 11231
-               OR v_cash <> 99889169 OR v_realized <> 11231 THEN
-              RAISE EXCEPTION 'Long option partial close mismatch: qty=%, basis=%, avg=%, order_realized=%, cash=%, account_realized=%', v_qty,v_basis,v_avg,(v_result->>'realized_pnl_paise'),v_cash,v_realized;
+               OR (v_result->>'realized_pnl_paise')::bigint <> 6484
+               OR v_cash <> 99881993 OR v_realized <> 6484 THEN
+              RAISE EXCEPTION 'Long option partial close mismatch: qty=%, basis=%, avg=%, account_realized=%, cash=%, account_realized=%', v_qty,v_basis,v_avg,(v_result->>'realized_pnl_paise'),v_cash,v_realized;
             END IF;
             -- Full close at a one-paise premium: charges exceed turnover, so net credit is negative.
             v_result := public.execute_paper_long_option_order(
