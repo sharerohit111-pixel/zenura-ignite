@@ -3,7 +3,7 @@ const test=require("node:test");
 const assert=require("node:assert/strict");
 const {isEligiblePaperLimitOrder,normalizeWorkerCursor,groupOrdersByUser}=require("../lib/paper-limit-worker");
 
-const base={order_type:"LIMIT",status:"PENDING",simulation_only:true,product:"DELIVERY",
+const base={order_type:"LIMIT",status:"PENDING",simulation_only:true,product:"DELIVERY",exchange:"NSE",
  user_id:"11111111-1111-4111-8111-111111111111",instrument_key:"NSE_EQ|TEST",
  side:"BUY",quantity:10,limit_price_paise:10000};
 const quote={pricePaise:9900,tradeTimeMs:100000,quoteAgeMs:1000};
@@ -15,6 +15,7 @@ test("LIMIT worker fills only matching fresh, pending, simulation-only delivery 
  assert.equal(isEligiblePaperLimitOrder({...base,status:"CANCELLED"},quote,101000),false);
  assert.equal(isEligiblePaperLimitOrder({...base,simulation_only:false},quote,101000),false);
  assert.equal(isEligiblePaperLimitOrder({...base,product:"INTRADAY"},quote,101000),false);
+ assert.equal(isEligiblePaperLimitOrder({...base,exchange:"BSE"},quote,101000),false);
 });
 test("LIMIT worker rejects stale, future-dated and malformed quotes",()=>{
  assert.equal(isEligiblePaperLimitOrder(base,{...quote,tradeTimeMs:85000},101000),false);
