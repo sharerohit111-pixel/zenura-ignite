@@ -13,7 +13,7 @@ create table if not exists public.paper_user_identity_map (
 );
 
 create table if not exists public.paper_accounts (
-  user_id uuid primary key references public.paper_user_identity_map(supabase_user_id) on delete cascade,
+  user_id uuid primary key references public.paper_user_identity_map(supabase_user_id) on delete restrict,
   currency text not null default 'INR' check (currency = 'INR'),
   starting_cash_paise bigint not null default 100000000 check (starting_cash_paise > 0),
   cash_paise bigint not null default 100000000 check (cash_paise >= 0),
@@ -30,7 +30,7 @@ create table if not exists public.paper_accounts (
 );
 
 create table if not exists public.paper_equity_positions (
-  user_id uuid not null references public.paper_user_identity_map(supabase_user_id) on delete cascade,
+  user_id uuid not null references public.paper_user_identity_map(supabase_user_id) on delete restrict,
   product text not null check (product in ('DELIVERY','INTRADAY')),
   instrument_key text not null check (length(instrument_key) between 1 and 100),
   trading_symbol text,
@@ -45,7 +45,7 @@ create table if not exists public.paper_equity_positions (
 );
 
 create table if not exists public.paper_derivative_positions (
-  user_id uuid not null references public.paper_user_identity_map(supabase_user_id) on delete cascade,
+  user_id uuid not null references public.paper_user_identity_map(supabase_user_id) on delete restrict,
   instrument_key text not null check (length(instrument_key) between 1 and 100),
   trading_symbol text,
   segment text,
@@ -62,7 +62,7 @@ create table if not exists public.paper_derivative_positions (
 
 create table if not exists public.paper_orders (
   order_id text primary key check (order_id ~ '^[a-f0-9]{64}$'),
-  user_id uuid not null references public.paper_user_identity_map(supabase_user_id) on delete cascade,
+  user_id uuid not null references public.paper_user_identity_map(supabase_user_id) on delete restrict,
   idempotency_key uuid,
   request_fingerprint text not null check (request_fingerprint ~ '^[a-f0-9]{64}$'),
   instrument_key text not null,
@@ -96,7 +96,7 @@ create table if not exists public.paper_orders (
 
 create table if not exists public.paper_derivative_orders (
   order_id text primary key check (order_id ~ '^[a-f0-9]{64}$'),
-  user_id uuid not null references public.paper_user_identity_map(supabase_user_id) on delete cascade,
+  user_id uuid not null references public.paper_user_identity_map(supabase_user_id) on delete restrict,
   idempotency_key uuid,
   request_fingerprint text not null check (request_fingerprint ~ '^[a-f0-9]{64}$'),
   instrument_key text not null,
@@ -128,7 +128,7 @@ create table if not exists public.paper_derivative_orders (
 );
 
 create table if not exists public.paper_watchlists (
-  user_id uuid not null references public.paper_user_identity_map(supabase_user_id) on delete cascade,
+  user_id uuid not null references public.paper_user_identity_map(supabase_user_id) on delete restrict,
   name text not null check (name in ('My Stocks','Banking','NIFTY','F&O')),
   instrument_keys text[] not null default '{}',
   updated_at timestamptz not null default now(),
@@ -138,7 +138,7 @@ create table if not exists public.paper_watchlists (
 
 -- AES-256-GCM envelope is JSON {v,iv,tag,data}; key remains server-side.
 create table if not exists public.upstox_connections (
-  user_id uuid primary key references public.paper_user_identity_map(supabase_user_id) on delete cascade,
+  user_id uuid primary key references public.paper_user_identity_map(supabase_user_id) on delete restrict,
   status text not null check (status in ('connected','disconnected')),
   token_ciphertext jsonb not null,
   token_type text not null default 'Bearer',
@@ -154,7 +154,7 @@ create table if not exists public.upstox_connections (
 
 create table if not exists public.upstox_oauth_states (
   state_hash text primary key check (state_hash ~ '^[a-f0-9]{64}$'),
-  user_id uuid not null references public.paper_user_identity_map(supabase_user_id) on delete cascade,
+  user_id uuid not null references public.paper_user_identity_map(supabase_user_id) on delete restrict,
   connection_generation bigint not null default 0 check (connection_generation >= 0),
   used boolean not null default false,
   used_at timestamptz,
@@ -163,13 +163,13 @@ create table if not exists public.upstox_oauth_states (
 );
 
 create table if not exists public.upstox_connection_controls (
-  user_id uuid primary key references public.paper_user_identity_map(supabase_user_id) on delete cascade,
+  user_id uuid primary key references public.paper_user_identity_map(supabase_user_id) on delete restrict,
   generation bigint not null default 0 check (generation >= 0),
   updated_at_ms bigint not null check (updated_at_ms >= 0)
 );
 
 create table if not exists public.paper_market_stream_leases (
-  user_id uuid primary key references public.paper_user_identity_map(supabase_user_id) on delete cascade,
+  user_id uuid primary key references public.paper_user_identity_map(supabase_user_id) on delete restrict,
   lease_id uuid not null,
   expires_at_ms bigint not null check (expires_at_ms >= 0),
   updated_at_ms bigint not null check (updated_at_ms >= 0),
@@ -183,7 +183,7 @@ create table if not exists public.paper_market_worker_state (
 );
 
 create table if not exists public.paper_margin_preview_limits (
-  user_id uuid primary key references public.paper_user_identity_map(supabase_user_id) on delete cascade,
+  user_id uuid primary key references public.paper_user_identity_map(supabase_user_id) on delete restrict,
   last_requested_at_ms bigint not null check (last_requested_at_ms >= 0),
   updated_at_ms bigint not null check (updated_at_ms >= 0)
 );
