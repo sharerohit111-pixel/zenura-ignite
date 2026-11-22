@@ -76,9 +76,10 @@ FOR EACH ROW EXECUTE FUNCTION public.test_delay_protective_terminal_update();
 SQL
 
 # Fill takes the row lock first. Cancellation must wait and report FILLED.
-FILL_TS="$(date +%s%3N)"
 psql -v ON_ERROR_STOP=1 -c "SET ROLE service_role; SELECT public.execute_paper_equity_protective_fill(
- 'd1d1d1d1-d1d1-41d1-81d1-d1d1d1d1d1d1','$EXEC_FILL','$(printf 'b%.0s' {1..64})',8500,$FILL_TS,$FILL_TS
+ 'd1d1d1d1-d1d1-41d1-81d1-d1d1d1d1d1d1','$EXEC_FILL','$(printf 'b%.0s' {1..64})',8500,
+ floor(extract(epoch from clock_timestamp())*1000)::bigint,
+ floor(extract(epoch from clock_timestamp())*1000)::bigint
 );" >/tmp/zenura-protective-fill-wins.log 2>&1 &
 FILL_PID=$!
 wait_for_terminal_update_lock "execute_paper_equity_protective_fill"
@@ -111,9 +112,10 @@ RESET ROLE;
 SQL
 CANCEL_PID=$!
 wait_for_terminal_update_lock "cancel_paper_protective_order"
-FILL_TS="$(date +%s%3N)"
 if psql -v ON_ERROR_STOP=1 -c "SET ROLE service_role; SELECT public.execute_paper_equity_protective_fill(
- 'd2d2d2d2-d2d2-42d2-82d2-d2d2d2d2d2d2','$EXEC_CANCEL','$(printf 'd%.0s' {1..64})',8500,$FILL_TS,$FILL_TS
+ 'd2d2d2d2-d2d2-42d2-82d2-d2d2d2d2d2d2','$EXEC_CANCEL','$(printf 'd%.0s' {1..64})',8500,
+ floor(extract(epoch from clock_timestamp())*1000)::bigint,
+ floor(extract(epoch from clock_timestamp())*1000)::bigint
 );" >/tmp/zenura-protective-fill-loses.log 2>&1; then
   echo "Fill unexpectedly succeeded after cancellation won the row lock."
   exit 1
