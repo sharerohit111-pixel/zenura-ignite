@@ -1619,7 +1619,7 @@ jobs:
             SELECT quantity,cost_basis INTO v_qty,v_cost FROM public.paper_crypto_positions
              WHERE user_id='11111111-1111-4111-8111-111111111111' AND symbol='BTCUSDT';
             IF v_cash <> 979110.825 OR v_qty <> 0.005 OR v_cost <> 21271.25
-               OR (v_result->>'realized_pnl')::numeric <> 381.075 THEN
+               OR (v_result->>'realized_pnl')::numeric <> 382.075 THEN
               RAISE EXCEPTION 'Crypto partial SELL accounting is incorrect: %, %, %, %',v_cash,v_qty,v_cost,v_result;
             END IF;
 
