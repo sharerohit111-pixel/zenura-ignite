@@ -87,3 +87,6 @@ The original draft was not applied. A second pass inspected the live gateway hel
 3. Design and test PostgreSQL RPC/transaction functions for market order, pending LIMIT reserve/fill/cancel, option order, and account initialization. Table DDL alone does not reproduce Firestore's atomic transaction semantics.
 4. Validate RLS, service-role-only writes, indexes, and the Firebase UID to Supabase Auth identity cutover.
 5. Apply nothing to the Supabase project until the draft passes review and the user explicitly approves the staging migration.
+
+
+A further field-level pass aligned the stream lease columns with the actual helper: `acquireStreamLease` / `renewStreamLease` persist epoch-millisecond integers (`expiresAtMs`, `updatedAtMs`), not Firestore timestamp objects. The SQL draft now uses bigint millisecond columns and indexes the expiry field. The cash-equity order constraint also explicitly preserves the current rule that Intraday LIMIT orders are not enabled.
