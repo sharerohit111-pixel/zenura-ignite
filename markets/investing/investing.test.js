@@ -12,8 +12,11 @@ const migration=fs.readFileSync(path.join(root,"../../supabase/migrations/202611
 const schema=fs.readFileSync(path.join(root,"../../supabase/migrations/202611220007_professional_futures_investing_charts.sql"),"utf8");
 test("Paper Investing page includes all locally referenced modules and styles",()=>{
  const assetRefs=[
-  ...[...html.matchAll(/<script\\b[^>]*\\bsrc="([^"]+)"/gi)].map(match=>match[1]),
-  ...[...html.matchAll(/<link\\b(?=[^>]*\\brel="stylesheet")(?=[^>]*\\bhref="([^"]+)")[^>]*>/gi)].map(match=>match[1])
+  ...[...html.matchAll(/<script[^>]*src="([^"]+)"/gi)].map(match=>match[1]),
+  ...[...html.matchAll(/<link[^>]*>/gi)].map(match=>{
+   const tag=match[0],rel=tag.match(/\\brel="([^"]+)"/i)?.[1],href=tag.match(/\\bhref="([^"]+)"/i)?.[1];
+   return rel==="stylesheet"?href:null;
+  }).filter(Boolean)
  ];
  for(const ref of assetRefs){
   if(/^https?:|^#|^mailto:/.test(ref))continue;
