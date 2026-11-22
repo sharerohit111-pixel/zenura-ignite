@@ -137,7 +137,7 @@ BEGIN
     INTO v_account_margin,v_account_realized,v_cash
     FROM public.paper_accounts
    WHERE user_id='fefefefe-fefe-4efe-8efe-fefefefefefe';
-  IF v_account_margin<>0 OR v_account_realized<>25000 OR v_cash<>100044000
+  IF v_account_margin<>0 OR v_account_realized<>50000 OR v_cash<>100044000
      OR EXISTS(SELECT 1 FROM public.paper_futures_positions
        WHERE user_id='fefefefe-fefe-4efe-8efe-fefefefefefe'
          AND instrument_key='NSE_FO|FUT_CLOSE_TEST') THEN
