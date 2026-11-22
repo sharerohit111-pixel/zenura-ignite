@@ -10,6 +10,7 @@ const server=fs.readFileSync(path.join(root,"supabase-server.js"),"utf8");
 const client=fs.readFileSync(path.join(root,"../markets/stocks/supabase-client.js"),"utf8");
 const deploy=fs.readFileSync(path.join(root,"DEPLOYMENT.md"),"utf8");
 const deployWorkflow=fs.readFileSync(path.join(root,"../.github/workflows/deploy-supabase-market-gateway.yml"),"utf8");
+const marketDataCompliance=fs.readFileSync(path.join(root,"MARKET-DATA-COMPLIANCE.md"),"utf8");
 const workflow=fs.readFileSync(path.join(root,"../.github/workflows/deploy-supabase-market-gateway.yml"),"utf8");
 test("Cloud Run and npm default entrypoints run the Supabase-native gateway",()=>{
  assert.equal(pkg.main,"supabase-server.js");
@@ -71,4 +72,12 @@ test("Public health response confirms the leased LIMIT worker without exposing s
  assert.match(server,/lastCycle=\{scanned:result\.scanned,filled:result\.filled,failed:result\.failed,locked:result\.locked\}/);
  assert.match(deployWorkflow,/jq -e '\.ok and \.instrumentMasterLoaded and \.limitWorker\.enabled and \.limitWorker\.lastRunAt != null and \.limitWorker\.lastCycle\.failed == 0'/);
  assert.doesNotMatch(server,/health[^\n]*SERVICE_ROLE_KEY|health[^\n]*UPSTOX_CLIENT_SECRET/i);
+});
+
+test("Production deployment fails closed without written market-data rights approval",()=>{
+ assert.match(deployWorkflow,/MARKET_DATA_RIGHTS_APPROVED/);
+ assert.match(deployWorkflow,/MARKET_DATA_RIGHTS_REFERENCE/);
+ assert.match(deployWorkflow,/written provider\/regulatory approval is recorded/);
+ assert.match(marketDataCompliance,/30-day lag/);
+ assert.match(marketDataCompliance,/written confirmation from Upstox/);
 });
