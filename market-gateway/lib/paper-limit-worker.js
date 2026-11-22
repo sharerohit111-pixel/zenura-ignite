@@ -5,6 +5,7 @@ function isEligiblePaperLimitOrder(order,quote,nowMs){
      ||order.simulation_only!==true||order.product!=="DELIVERY"
      ||typeof order.user_id!=="string"||!order.user_id
      ||typeof order.instrument_key!=="string"||!order.instrument_key
+     ||order.exchange!=="NSE"
      ||!["BUY","SELL"].includes(order.side)
      ||!Number.isSafeInteger(order.quantity)||order.quantity<1||order.quantity>1000000
      ||!Number.isSafeInteger(order.limit_price_paise)||order.limit_price_paise<1
