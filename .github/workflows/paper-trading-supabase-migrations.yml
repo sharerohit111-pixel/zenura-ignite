@@ -260,6 +260,130 @@ jobs:
           $$;
           RESET ROLE;
           SQL
+      - name: Exercise LIMIT SELL lifecycle and long option transactions
+        run: |
+          psql -v ON_ERROR_STOP=1 <<'SQL'
+          DO $
+          DECLARE
+            v_result jsonb;
+            v_cash bigint;
+            v_qty bigint;
+            v_basis bigint;
+            v_avg bigint;
+            v_realized bigint;
+          BEGIN
+            -- The preceding step leaves five Delivery shares at ₹100 average.
+            PERFORM public.submit_paper_limit_order(
+              '22222222-2222-4222-8222-222222222222',
+              repeat('5',64),
+              '77777777-7777-4777-8777-777777777777',
+              repeat('6',64),'NSE_EQ|TEST001','TEST001','NSE',
+              'SELL',2,12500
+            );
+            SELECT quantity,reserved_quantity INTO v_qty,v_basis
+              FROM public.paper_equity_positions
+             WHERE user_id='22222222-2222-4222-8222-222222222222'
+               AND product='DELIVERY' AND instrument_key='NSE_EQ|TEST001';
+            IF v_qty <> 5 OR v_basis <> 2 THEN
+              RAISE EXCEPTION 'LIMIT SELL did not reserve the expected shares';
+            END IF;
+            BEGIN
+              PERFORM public.execute_paper_limit_fill(repeat('5',64),13000,1000000,15001,1015001);
+              RAISE EXCEPTION 'Stale LIMIT quote was unexpectedly accepted';
+            EXCEPTION WHEN SQLSTATE '22023' THEN
+              NULL;
+            END;
+            PERFORM public.cancel_paper_limit_order(
+              '22222222-2222-4222-8222-222222222222',repeat('5',64)
+            );
+            SELECT quantity,reserved_quantity INTO v_qty,v_basis
+              FROM public.paper_equity_positions
+             WHERE user_id='22222222-2222-4222-8222-222222222222'
+               AND product='DELIVERY' AND instrument_key='NSE_EQ|TEST001';
+            IF v_qty <> 5 OR v_basis <> 0 THEN
+              RAISE EXCEPTION 'LIMIT SELL cancellation did not release reserved shares';
+            END IF;
+            PERFORM public.submit_paper_limit_order(
+              '22222222-2222-4222-8222-222222222222',
+              repeat('7',64),
+              '88888888-8888-4888-8888-888888888888',
+              repeat('8',64),'NSE_EQ|TEST001','TEST001','NSE',
+              'SELL',2,12500
+            );
+            v_result := public.execute_paper_limit_fill(repeat('7',64),13000,1000000,100,1000100);
+            SELECT quantity,reserved_quantity INTO v_qty,v_basis
+              FROM public.paper_equity_positions
+             WHERE user_id='22222222-2222-4222-8222-222222222222'
+               AND product='DELIVERY' AND instrument_key='NSE_EQ|TEST001';
+            SELECT cash_paise INTO v_cash FROM public.paper_accounts
+             WHERE user_id='22222222-2222-4222-8222-222222222222';
+            IF v_result->>'status' <> 'FILLED' OR v_qty <> 3 OR v_basis <> 0
+               OR v_cash <> 99928000
+               OR (v_result->>'realized_pnl_paise')::bigint <> 6000 THEN
+              RAISE EXCEPTION 'LIMIT SELL fill position, cash, reservation or P&L is incorrect';
+            END IF;
+            -- Long CE BUY: 2 lots × 25, ₹12.85 premium. Fee-inclusive cost basis.
+            v_result := public.execute_paper_long_option_order(
+              '22222222-2222-4222-8222-222222222222',
+              repeat('9',64),'99999999-9999-4999-8999-999999999999',
+              repeat('a',64),'NSE_FO|TESTCE','TESTCE','NSE','NSE_FO','CE',
+              current_date + 10,22000,25,5,2,'BUY',1285,1000000,1000100
+            );
+            SELECT cash_paise INTO v_cash FROM public.paper_accounts
+             WHERE user_id='22222222-2222-4222-8222-222222222222';
+            SELECT net_quantity,cost_basis_paise,average_price_paise
+              INTO v_qty,v_basis,v_avg FROM public.paper_derivative_positions
+             WHERE user_id='22222222-2222-4222-8222-222222222222'
+               AND instrument_key='NSE_FO|TESTCE';
+            IF v_qty <> 50 OR v_basis <> 66639 OR v_avg <> 1333
+               OR v_cash <> 99893499
+               OR (v_result->>'idempotent_replay')::boolean IS NOT FALSE THEN
+              RAISE EXCEPTION 'Long CE BUY quantity, fee-inclusive basis, average or cash is incorrect';
+            END IF;
+            -- Retry must not execute or charge a second time.
+            v_result := public.execute_paper_long_option_order(
+              '22222222-2222-4222-8222-222222222222',
+              repeat('9',64),'99999999-9999-4999-8999-999999999999',
+              repeat('a',64),'NSE_FO|TESTCE','TESTCE','NSE','NSE_FO','CE',
+              current_date + 10,22000,25,5,2,'BUY',1285,1000000,1000100
+            );
+            IF (v_result->>'idempotent_replay')::boolean IS NOT TRUE THEN
+              RAISE EXCEPTION 'Long option retry was not idempotent';
+            END IF;
+            -- Partial close one lot; remaining basis must be conserved exactly.
+            v_result := public.execute_paper_long_option_order(
+              '22222222-2222-4222-8222-222222222222',
+              repeat('b',64),'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+              repeat('c',64),'NSE_FO|TESTCE','TESTCE','NSE','NSE_FO','CE',
+              current_date + 10,22000,25,5,1,'SELL',1500,1000000,1000100
+            );
+            SELECT net_quantity,cost_basis_paise,average_price_paise
+              INTO v_qty,v_basis,v_avg FROM public.paper_derivative_positions
+             WHERE user_id='22222222-2222-4222-8222-222222222222'
+               AND instrument_key='NSE_FO|TESTCE';
+            SELECT cash_paise,realized_pnl_paise INTO v_cash,v_realized
+              FROM public.paper_accounts
+             WHERE user_id='22222222-2222-4222-8222-222222222222';
+            IF v_qty <> 25 OR v_basis <> 33319 OR v_avg <> 1333
+               OR (v_result->>'order_realized_pnl_paise')::bigint <> 1749
+               OR v_cash <> 99928568 OR v_realized <> 7749 THEN
+              RAISE EXCEPTION 'Long option partial close allocation, charges, cash or P&L is incorrect';
+            END IF;
+            -- Stale provider quotes must be rejected before account mutation.
+            BEGIN
+              PERFORM public.execute_paper_long_option_order(
+                '22222222-2222-4222-8222-222222222222',
+                repeat('d',64),'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+                repeat('e',64),'NSE_FO|TESTPE','TESTPE','NSE','NSE_FO','PE',
+                current_date + 10,22000,25,5,1,'BUY',1285,1000000,1016001
+              );
+              RAISE EXCEPTION 'Stale long-option quote was unexpectedly accepted';
+            EXCEPTION WHEN SQLSTATE '22023' THEN
+              NULL;
+            END;
+          END
+          $;
+          SQL
       - name: Verify expected schema and RPC registration
         run: |
           psql -v ON_ERROR_STOP=1 <<'SQL'
