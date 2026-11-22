@@ -5,10 +5,10 @@ const {groupOrdersByUser}=require("./paper-limit-worker");
 const {evaluateProtectiveOrder,isSupportedProtectiveOrder,isPositionCloseable}=require("./protective-order-worker");
 
 function createPaperProtectiveWorker({
-  serviceDb,ensureInstrumentCache,getInstrumentCache,getUpstoxAccessToken,
+  serviceDb,ensureInstrumentCache,getUpstoxAccessToken,
   fetchProvider,readProviderJson,normalizeProviderQuote
 }){
-  for(const [name,fn] of Object.entries({ensureInstrumentCache,getInstrumentCache,getUpstoxAccessToken,fetchProvider,readProviderJson,normalizeProviderQuote})){
+  for(const [name,fn] of Object.entries({ensureInstrumentCache,getUpstoxAccessToken,fetchProvider,readProviderJson,normalizeProviderQuote})){
     if(typeof fn!=="function")throw new TypeError(name+" dependency is required.");
   }
   if(!serviceDb||typeof serviceDb.rpc!=="function"||typeof serviceDb.from!=="function")
