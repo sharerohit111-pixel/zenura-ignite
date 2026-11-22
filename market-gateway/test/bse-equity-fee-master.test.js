@@ -57,6 +57,7 @@ test("BSE Delivery BUY charges use scrip-group exchange rate and no separate IPF
   assert.equal(c.brokeragePaise,2000);
   assert.equal(c.sebiPaise,1000);
   assert.equal(c.stampDutyPaise,150000);
+  assert.equal(c.sttPaise,1000000);
   assert.equal(c.ipftIncludedInExchangeCharge,true);
   assert.equal(c.ipftPaise,0);
   assert.equal(c.scheduleVersion,"BSE-2025-04-29");
