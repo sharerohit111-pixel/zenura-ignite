@@ -11,12 +11,12 @@ language sql
 immutable
 parallel safe
 set search_path = pg_catalog
-as $
+as $quote_age$
   select p_quote_timestamp_ms is not null
      and p_server_now_ms is not null
      and p_quote_timestamp_ms <= p_server_now_ms
      and (p_server_now_ms::numeric-p_quote_timestamp_ms::numeric) between 0 and 15000;
-$;
+$quote_age$;
 revoke all on function public._paper_quote_age_is_fresh(bigint,bigint)
   from public, anon, authenticated, service_role;
 
