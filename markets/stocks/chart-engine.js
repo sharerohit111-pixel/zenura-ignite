@@ -237,6 +237,7 @@
     const period=PERIODS[options.timeframe]||PERIODS["1m"];
     chart.setPeriod({type:period.type,span:period.span});
     await loadSavedDrawings();
+    await loadTemplates();
     return chart;
   }
   function updateQuote(quote){
@@ -258,6 +259,42 @@
       }
       lastBar=next;barCallback(next);
     });
+  }
+  async function loadTemplates(){
+    if(!context?.supabase)return;
+    const userId=await getSessionUser();if(!userId)return;
+    const {data,error}=await context.supabase.from("paper_chart_templates").select("template_id,name").eq("user_id",userId).order("created_at",{ascending:false}).limit(30);
+    if(error){console.warn("Chart templates could not be loaded:",error.message);return;}
+    const select=document.getElementById("chart-template-select");if(!select)return;
+    select.replaceChildren(new Option("Saved templates",""));
+    for(const row of data||[])select.add(new Option(row.name,row.template_id));
+  }
+  async function saveTemplate(name){
+    const clean=String(name||"").trim().slice(0,60);
+    if(!clean||!context?.supabase||!context.instrument)return false;
+    const userId=await getSessionUser();if(!userId)return false;
+    const configuration={chartType:activeChartType,theme:activeTheme,timeframe:context.timeframe,indicators:[...activeIndicators]};
+    const {error}=await context.supabase.from("paper_chart_templates").upsert({user_id:userId,name:clean,configuration},{onConflict:"user_id,name"});
+    if(error)throw error;
+    await loadTemplates();return true;
+  }
+  async function loadTemplate(templateId){
+    if(!context?.supabase||!templateId)return false;
+    const userId=await getSessionUser();if(!userId)return false;
+    const {data,error}=await context.supabase.from("paper_chart_templates").select("configuration").eq("user_id",userId).eq("template_id",templateId).maybeSingle();
+    if(error||!data?.configuration)return false;
+    const config=data.configuration;
+    if(PERIODS[config.timeframe]){
+      context.timeframe=config.timeframe;
+      context.onTimeframeChange?.(config.timeframe);
+      const period=PERIODS[config.timeframe];chart.setPeriod({type:period.type,span:period.span});
+    }
+    if(["CANDLE","OHLC","AREA","LINE"].includes(config.chartType))setChartType(config.chartType);
+    if(config.theme==="light"||config.theme==="dark")setTheme(config.theme);
+    if(Array.isArray(config.indicators)){
+      for(const name of config.indicators.slice(0,20))if(typeof name==="string"&&!activeIndicators.has(name))addIndicator(name);
+    }
+    await savePreferences();return true;
   }
   function setChartType(type){
     if(!["CANDLE","OHLC","AREA","LINE"].includes(type))return false;
@@ -321,6 +358,14 @@
   }
   document.addEventListener("zenura-chart-theme-change",event=>setTheme(event.detail?.theme));
   document.getElementById("chart-type-select")?.addEventListener("change",event=>setChartType(event.target.value));
+  document.getElementById("chart-save-template")?.addEventListener("click",()=>{
+    const input=document.getElementById("chart-template-name");
+    saveTemplate(input?.value).then(saved=>{if(saved&&input)input.value="";}).catch(error=>console.warn("Chart template save failed:",error.message));
+  });
+  document.getElementById("chart-load-template")?.addEventListener("click",()=>{
+    const id=document.getElementById("chart-template-select")?.value;
+    if(id)loadTemplate(id).catch(error=>console.warn("Chart template load failed:",error.message));
+  });
   document.getElementById("chart-add-indicator")?.addEventListener("click",()=>{
     const name=document.getElementById("chart-indicator-select")?.value;
     if(name)addIndicator(name);
@@ -333,7 +378,7 @@
   document.getElementById("chart-redo")?.addEventListener("click",redo);
   document.getElementById("chart-remove-last")?.addEventListener("click",removeLastDrawing);
   root.ZenuraProfessionalChart=Object.freeze({
-    mount,updateQuote,setTheme,setChartType,addIndicator,addDrawing,removeLastDrawing,undo,redo,destroy,
+    mount,updateQuote,setTheme,setChartType,addIndicator,addDrawing,removeLastDrawing,undo,redo,saveTemplate,loadTemplate,destroy,
     normalizeBars,periods:Object.freeze({...PERIODS})
   });
 })(window);
