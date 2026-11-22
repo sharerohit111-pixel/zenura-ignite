@@ -79,6 +79,24 @@ test("Protective-order cancellation API is authenticated and delegates to the ow
  assert.match(runtime,/"cancel_paper_protective_order"/);
  assert.match(runtime,/p_user_id: user\.id/);
 });
+test("Equity protective worker is separately leased, bounded, quote-verified and opt-in only",()=>{
+ assert.match(server,/async function runPaperProtectiveWorker\(\{maxOrders=20\}=\{\}\)/);
+ assert.match(server,/p_state_key:"paper_protective_orders"/);
+ assert.match(server,/execute_paper_equity_protective_fill/);
+ assert.match(server,/evaluateProtectiveOrder\(order,quote,now\)/);
+ assert.match(server,/isPositionCloseable\(order,position\)/);
+ assert.match(server,/normalizeProviderQuote\(entry,order\.instrument_key,\{now,maxAgeMs:15000\}\)/);
+ assert.match(server,/PAPER_PROTECTIVE_WORKER_ENABLED==="true"/);
+ assert.match(server,/protectiveWorker:\{\.\.\.paperProtectiveWorkerStatus\}/);
+ assert.match(server,/release_paper_market_worker_lease/);
+ assert.doesNotMatch(deployWorkflow,/PAPER_PROTECTIVE_WORKER_ENABLED=true/);
+});
+test("Protective scan index only covers active, supported equity SELL exits",()=>{
+ const fs=require("node:fs");
+ const migration=fs.readFileSync(path.join(root,"../supabase/migrations/20261122141000_equity_protective_worker_scan_index.sql"),"utf8");
+ assert.match(migration,/where status='ACTIVE' and asset_class='EQUITY' and side='SELL'/);
+ assert.match(migration,/product in \('DELIVERY','INTRADAY'\)/);
+});
 test("Public health response confirms the leased LIMIT worker without exposing secrets",()=>{
  assert.match(server,/limitWorker:\{\.\.\.paperLimitWorkerStatus\}/);
  assert.match(server,/lastCycle=\{scanned:result\.scanned,filled:result\.filled,failed:result\.failed,locked:result\.locked,cycleError:false\}/);
