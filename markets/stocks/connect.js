@@ -52,6 +52,7 @@ async function api(path, options = {}) {
   return payload;
 }
 let authStateSequence = 0;
+let currentSession = null;
 async function refreshStatus(sequence = authStateSequence) {
   const session = await sessionSnapshot().catch(() => null);
   if (!session?.user) {
@@ -113,8 +114,8 @@ button.addEventListener("click", async () => {
   }
 });
 window.ZENURA_MARKET_CONNECTOR = Object.freeze({
-  isAuthenticated: async () => !!(await sessionSnapshot().catch(() => null))?.user,
-  getUserId: async () => (await sessionSnapshot().catch(() => null))?.user?.id || null,
+  isAuthenticated: () => !!currentSession?.user,
+  getUserId: () => currentSession?.user?.id || null,
   getIdToken: async () => {
     const session = await sessionSnapshot();
     if (!session?.access_token) throw new Error("Sign in to connect the live market feed.");
@@ -127,6 +128,7 @@ window.ZENURA_MARKET_CONNECTOR = Object.freeze({
   }
 });
 supabase.auth.onAuthStateChange((_event, session) => {
+  currentSession = session || null;
   const sequence = ++authStateSequence;
   window.dispatchEvent(new CustomEvent("zenura-market-auth-ready", { detail: { signedIn: !!session?.user } }));
   // Defer network work until after the auth callback returns to avoid auth-lock deadlocks.
