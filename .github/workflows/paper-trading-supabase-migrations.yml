@@ -1076,6 +1076,82 @@ jobs:
           END
           $futures$;
           SQL
+      - name: Exercise Supabase Upstox OAuth replay, generation and stream lease controls
+        run: |
+          psql -v ON_ERROR_STOP=1 <<'SQL'
+          DO $upstox$
+          DECLARE
+            v_now bigint := floor(extract(epoch from clock_timestamp())*1000)::bigint;
+            v_generation bigint;
+            v_state jsonb;
+            v_saved boolean;
+            v_lease_a uuid := 'aaaaaaaa-1111-4111-8111-111111111111';
+            v_lease_b uuid := 'bbbbbbbb-2222-4222-8222-222222222222';
+          BEGIN
+            v_generation := public.begin_upstox_oauth(
+              '44444444-4444-4444-8444-444444444444',repeat('a',64),
+              clock_timestamp()+interval '5 minutes',v_now
+            );
+            IF v_generation<>0 THEN RAISE EXCEPTION 'Initial OAuth connection generation must be zero'; END IF;
+            v_state := public.consume_upstox_oauth_state(repeat('a',64),v_now);
+            IF v_state->>'user_id'<>'44444444-4444-4444-8444-444444444444'
+               OR (v_state->>'connection_generation')::bigint<>0 THEN
+              RAISE EXCEPTION 'OAuth state did not return the expected user and generation';
+            END IF;
+            IF public.consume_upstox_oauth_state(repeat('a',64),v_now) IS NOT NULL THEN
+              RAISE EXCEPTION 'OAuth state replay was accepted';
+            END IF;
+            v_saved := public.save_upstox_connection(
+              '44444444-4444-4444-8444-444444444444',0,
+              '{"v":1,"iv":"a","tag":"b","data":"c"}'::jsonb,'Bearer',
+              clock_timestamp()+interval '1 hour',clock_timestamp(),ARRAY['market_quotes'],v_now
+            );
+            IF NOT v_saved THEN RAISE EXCEPTION 'Current OAuth generation could not save connection'; END IF;
+            v_generation := public.disconnect_upstox_connection('44444444-4444-4444-8444-444444444444',v_now+1);
+            IF v_generation<>1 OR EXISTS(SELECT 1 FROM public.upstox_connections WHERE user_id='44444444-4444-4444-8444-444444444444') THEN
+              RAISE EXCEPTION 'Disconnect did not revoke connection and advance generation';
+            END IF;
+            v_saved := public.save_upstox_connection(
+              '44444444-4444-4444-8444-444444444444',0,
+              '{"v":1,"iv":"a","tag":"b","data":"c"}'::jsonb,'Bearer',
+              clock_timestamp()+interval '1 hour',clock_timestamp(),ARRAY['market_quotes'],v_now+2
+            );
+            IF v_saved THEN RAISE EXCEPTION 'Stale OAuth callback overwrote a disconnected connection'; END IF;
+            v_generation := public.begin_upstox_oauth(
+              '44444444-4444-4444-8444-444444444444',repeat('b',64),
+              clock_timestamp()+interval '5 minutes',v_now+3
+            );
+            IF v_generation<>1 THEN RAISE EXCEPTION 'New OAuth flow did not use current connection generation'; END IF;
+            PERFORM public.consume_upstox_oauth_state(repeat('b',64),v_now+3);
+            v_saved := public.save_upstox_connection(
+              '44444444-4444-4444-8444-444444444444',1,
+              '{"v":1,"iv":"a","tag":"b","data":"c"}'::jsonb,'Bearer',
+              clock_timestamp()+interval '1 hour',clock_timestamp(),ARRAY['market_quotes'],v_now+3
+            );
+            IF NOT v_saved THEN RAISE EXCEPTION 'Fresh OAuth callback failed after reconnect'; END IF;
+            IF NOT public.acquire_paper_market_stream_lease('44444444-4444-4444-8444-444444444444',v_lease_a,v_now,30000) THEN
+              RAISE EXCEPTION 'First market stream lease was not acquired';
+            END IF;
+            IF public.acquire_paper_market_stream_lease('44444444-4444-4444-8444-444444444444',v_lease_b,v_now,30000) THEN
+              RAISE EXCEPTION 'Second concurrent market stream lease was accepted';
+            END IF;
+            IF NOT public.renew_paper_market_stream_lease('44444444-4444-4444-8444-444444444444',v_lease_a,v_now+1000,30000) THEN
+              RAISE EXCEPTION 'Active market stream lease could not be renewed';
+            END IF;
+            IF NOT public.release_paper_market_stream_lease('44444444-4444-4444-8444-444444444444',v_lease_a,v_now+2000) THEN
+              RAISE EXCEPTION 'Active market stream lease could not be released';
+            END IF;
+            IF NOT public.acquire_paper_market_stream_lease('44444444-4444-4444-8444-444444444444',v_lease_b,v_now+2001,30000) THEN
+              RAISE EXCEPTION 'Released market stream lease could not be reacquired';
+            END IF;
+            IF NOT public.consume_paper_margin_preview_slot('44444444-4444-4444-8444-444444444444',v_now,5000)
+               OR public.consume_paper_margin_preview_slot('44444444-4444-4444-8444-444444444444',v_now+100,5000)
+               OR NOT public.consume_paper_margin_preview_slot('44444444-4444-4444-8444-444444444444',v_now+5100,5000) THEN
+              RAISE EXCEPTION 'Margin preview rate limiting did not enforce the cooldown';
+            END IF;
+          END
+          $upstox$;
+          SQL
       - name: Reject future and off-tick Options quotes
         run: |
           psql -v ON_ERROR_STOP=1 <<'SQL'
