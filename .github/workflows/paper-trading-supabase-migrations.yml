@@ -612,7 +612,7 @@ jobs:
               '66666666-6666-4666-8666-666666666666',repeat('e',64),
               '25252525-2525-4525-8525-252525252525',repeat('f',64),
               'NSE_FO|GOLDEN','GOLDEN','NSE','NSE_FO','CE',
-              current_date+10,22000,25,5,1,'SELL',100,
+              current_date+10,22000,1,1,1,'SELL',100,
               floor(extract(epoch from clock_timestamp())*1000)::bigint,
               floor(extract(epoch from clock_timestamp())*1000)::bigint
             );
