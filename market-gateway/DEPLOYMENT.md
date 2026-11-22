@@ -95,7 +95,7 @@ Set the meta value to the exact verified gateway origin, e.g. `https://market-ap
 
 ## 5. Required end-to-end release gates
 
-1. `npm ci`, `npm run check`, `npm test` in `market-gateway/`.
+1. `npm install`, `npm run check`, `npm test` in `market-gateway/`.
 2. Supabase migration/RPC tests on disposable Postgres and live Supabase Auth/RLS integration tests with two isolated test users.
 3. New-user account initialization: ₹10,00,000 Paper Trading and ₹10,00,000 Paper Investing ledgers; repeated initialization must not reset a balance.
 4. Verify instrument master search covers NSE/BSE equities, indices, futures and CE/PE contracts, including expiries, lot sizes and tick sizes.
