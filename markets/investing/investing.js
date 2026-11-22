@@ -264,10 +264,14 @@
     updateOrderButtons();
   }
   window.addEventListener("zenura-market-auth-ready",event=>{
-    clearPrivateSession();
-    if(!event.detail?.signedIn)return;
     const uid=connector()?.getUserId?.();
-    if(uid){authUserId=uid;refreshAll();}
+    if(!event.detail?.signedIn||!uid){
+      if(authUserId)clearPrivateSession();
+      return;
+    }
+    if(uid!==authUserId){
+      clearPrivateSession();authUserId=uid;refreshAll();
+    }
   });
   window.addEventListener("zenura-language-change",event=>{
     const language=event.detail?.language||window.ZenuraLanguage?.getLanguage?.()||"en";
