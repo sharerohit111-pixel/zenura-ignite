@@ -282,6 +282,8 @@ jobs:
           $$;
           RESET ROLE;
           SQL
+      - name: Verify Intraday LIMIT worker lease registration and single-writer isolation
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/intraday_limit_worker_lease.sql
       - name: Exercise Intraday LIMIT reservation, cancellation and session expiry
         run: psql -v ON_ERROR_STOP=1 -f supabase/tests/intraday_limit_reservations.sql
       - name: Exercise concurrent Intraday LIMIT fill versus cancel row-lock races
