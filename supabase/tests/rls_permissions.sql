@@ -25,7 +25,6 @@ BEGIN
   END IF;
 
   IF has_table_privilege('authenticated','public.paper_futures_orders','INSERT')
-     OR has_table_privilege('authenticated','public.paper_investing_accounts','UPDATE')
      OR has_table_privilege('authenticated','public.paper_protective_orders','INSERT')
      OR has_table_privilege('authenticated','public.paper_accounts','INSERT')
      OR has_table_privilege('authenticated','public.paper_accounts','UPDATE')
