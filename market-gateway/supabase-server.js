@@ -823,8 +823,13 @@ async function start(){
   }
   const callbackUrl=new URL(UPSTOX_REDIRECT_URI),appUrl=new URL(APP_REDIRECT_URI);
   if(callbackUrl.protocol!=="https:"||!callbackUrl.pathname.endsWith("/upstox/oauth/callback")
-     ||appUrl.protocol!=="https:"||callbackUrl.username||callbackUrl.password||appUrl.username||appUrl.password){
-    throw new Error("Upstox callback and app redirect must be valid HTTPS URLs.");
+     ||appUrl.protocol!=="https:"||callbackUrl.username||callbackUrl.password||appUrl.username||appUrl.password
+     ||callbackUrl.search||callbackUrl.hash||appUrl.search||appUrl.hash){
+    throw new Error("Upstox callback and app redirect must be clean HTTPS URLs.");
+  }
+  if(!ALLOWED_ORIGINS.length||ALLOWED_ORIGINS.some(origin=>{try{const u=new URL(origin);return u.origin!==origin||u.protocol!=="https:"||u.pathname!=="/"||u.search||u.hash;}catch(_){return true;}})
+     ||!ALLOWED_ORIGINS.includes(appUrl.origin)){
+    throw new Error("ALLOWED_ORIGINS must contain the exact HTTPS origin of ZENURA_APP_REDIRECT_URI.");
   }
   await loadProto();
   app.listen(PORT,"0.0.0.0",()=>console.log("Supabase-native ZENURA market gateway listening on",PORT));
