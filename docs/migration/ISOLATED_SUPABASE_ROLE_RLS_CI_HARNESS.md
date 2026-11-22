@@ -34,3 +34,8 @@ No PR #70 SQL or workflow was edited. No PR was created or merged. No production
 - A subsequent request reusing that idempotency UUID with a different fingerprint must fail.
 - The workflow runs this after the role/RLS assertions, against the same disposable PostgreSQL service. It does not contact Firebase, Supabase production, Upstox, or any external API.
 - This is a targeted two-session race check, not a high-volume load/stress benchmark. It has been authored but not executed yet.
+
+
+### Additional concurrent cash-reservation race
+
+The same isolated script also races two distinct 60,000,000-paise MARKET BUY requests against the synthetic account. Since the starting balance is 100,000,000 paise and the earlier idempotent test has already spent 10,000 paise, exactly one large order may succeed. The test asserts one successful order and one corresponding debit; both succeeding or both failing is treated as a failure. This is a two-session targeted race check, not a load benchmark. Shell syntax was checked locally with `bash -n`; the PostgreSQL assertions remain pending GitHub Actions execution.
