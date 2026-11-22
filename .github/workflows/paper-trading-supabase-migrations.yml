@@ -556,6 +556,94 @@ jobs:
           END
           $$;
           SQL
+      - name: Verify repeated partial-close basis against Firebase BigInt vectors
+        run: |
+          set -euo pipefail
+          psql -v ON_ERROR_STOP=1 <<'SQL'
+          INSERT INTO auth.users(id) VALUES ('88888888-8888-4888-8888-888888888888')
+            ON CONFLICT DO NOTHING;
+          SET ROLE service_role;
+          SELECT public.initialize_paper_trading_account('88888888-8888-4888-8888-888888888888');
+          RESET ROLE;
+          DO $
+          DECLARE
+            v_result jsonb;
+            v_qty bigint;
+            v_basis bigint;
+            v_avg bigint;
+          BEGIN
+            -- Firebase BigInt reference: buy 75 units with fee-inclusive basis 98,778 paise.
+            PERFORM public.execute_paper_long_option_order(
+              '88888888-8888-4888-8888-888888888888',repeat('1',64),
+              '31313131-3131-4131-8131-313131313131',repeat('2',64),
+              'NSE_FO|REPEAT','REPEAT','NSE','NSE_FO','CE',
+              current_date+10,22000,25,5,3,'BUY',1285,
+              floor(extract(epoch from clock_timestamp())*1000)::bigint,
+              floor(extract(epoch from clock_timestamp())*1000)::bigint
+            );
+            SELECT net_quantity,cost_basis_paise,average_price_paise
+              INTO v_qty,v_basis,v_avg FROM public.paper_derivative_positions
+             WHERE user_id='88888888-8888-4888-8888-888888888888'
+               AND instrument_key='NSE_FO|REPEAT';
+            IF v_qty<>75 OR v_basis<>98778 OR v_avg<>1317 THEN
+              RAISE EXCEPTION 'Initial repeated-close reference position mismatch: qty %, basis %, avg %',v_qty,v_basis,v_avg;
+            END IF;
+            -- First partial close: 98,778 × 25 / 75 rounds to 32,926 paise.
+            v_result:=public.execute_paper_long_option_order(
+              '88888888-8888-4888-8888-888888888888',repeat('3',64),
+              '32323232-3232-4232-8232-323232323232',repeat('4',64),
+              'NSE_FO|REPEAT','REPEAT','NSE','NSE_FO','CE',
+              current_date+10,22000,25,5,1,'SELL',1500,
+              floor(extract(epoch from clock_timestamp())*1000)::bigint,
+              floor(extract(epoch from clock_timestamp())*1000)::bigint
+            );
+            IF (v_result->'order'->>'realized_pnl_paise')::bigint<>2143 THEN
+              RAISE EXCEPTION 'First partial-close realized P&L diverges from Firebase BigInt vector';
+            END IF;
+            SELECT net_quantity,cost_basis_paise,average_price_paise
+              INTO v_qty,v_basis,v_avg FROM public.paper_derivative_positions
+             WHERE user_id='88888888-8888-4888-8888-888888888888'
+               AND instrument_key='NSE_FO|REPEAT';
+            IF v_qty<>50 OR v_basis<>65852 OR v_avg<>1317 THEN
+              RAISE EXCEPTION 'First partial-close remainder mismatch: qty %, basis %, avg %',v_qty,v_basis,v_avg;
+            END IF;
+            -- Repeated partial close: half of 65,852 rounds to 32,926 paise.
+            v_result:=public.execute_paper_long_option_order(
+              '88888888-8888-4888-8888-888888888888',repeat('5',64),
+              '33333333-3333-4333-8333-333333333333',repeat('6',64),
+              'NSE_FO|REPEAT','REPEAT','NSE','NSE_FO','CE',
+              current_date+10,22000,25,5,1,'SELL',1500,
+              floor(extract(epoch from clock_timestamp())*1000)::bigint,
+              floor(extract(epoch from clock_timestamp())*1000)::bigint
+            );
+            IF (v_result->'order'->>'realized_pnl_paise')::bigint<>2143 THEN
+              RAISE EXCEPTION 'Second partial-close realized P&L diverges from Firebase BigInt vector';
+            END IF;
+            SELECT net_quantity,cost_basis_paise,average_price_paise
+              INTO v_qty,v_basis,v_avg FROM public.paper_derivative_positions
+             WHERE user_id='88888888-8888-4888-8888-888888888888'
+               AND instrument_key='NSE_FO|REPEAT';
+            IF v_qty<>25 OR v_basis<>32926 OR v_avg<>1317 THEN
+              RAISE EXCEPTION 'Second partial-close remainder mismatch: qty %, basis %, avg %',v_qty,v_basis,v_avg;
+            END IF;
+            -- Final close must consume the exact remaining basis without rounding drift.
+            v_result:=public.execute_paper_long_option_order(
+              '88888888-8888-4888-8888-888888888888',repeat('7',64),
+              '34343434-3434-4434-8434-343434343434',repeat('8',64),
+              'NSE_FO|REPEAT','REPEAT','NSE','NSE_FO','CE',
+              current_date+10,22000,25,5,1,'SELL',1500,
+              floor(extract(epoch from clock_timestamp())*1000)::bigint,
+              floor(extract(epoch from clock_timestamp())*1000)::bigint
+            );
+            IF (v_result->'order'->>'realized_pnl_paise')::bigint<>2143
+               OR EXISTS (SELECT 1 FROM public.paper_derivative_positions
+                 WHERE user_id='88888888-8888-4888-8888-888888888888'
+                   AND instrument_key='NSE_FO|REPEAT') THEN
+              RAISE EXCEPTION 'Final close failed to consume the remaining fee-inclusive basis exactly';
+            END IF;
+          END
+          $;
+          SQL
       - name: Verify SQL charges and rounding against Firebase golden vectors
         run: |
           set -euo pipefail
