@@ -333,6 +333,12 @@ app.put("/watchlist",async(req,res)=>{
 
 
 const CRYPTO_SYMBOLS=new Set(["BTCUSDT","ETHUSDT","BNBUSDT","SOLUSDT","XRPUSDT","ADAUSDT","DOGEUSDT","AVAXUSDT","PAXGUSDT","XAUTUSDT"]);
+function makeCryptoOrderId(userId,idempotencyKey){
+  const hex=crypto.createHash("sha256").update(userId+":"+idempotencyKey).digest("hex").slice(0,32).split("");
+  hex[12]="5";hex[16]=((parseInt(hex[16],16)&3)|8).toString(16);
+  const value=hex.join("");
+  return value.slice(0,8)+"-"+value.slice(8,12)+"-"+value.slice(12,16)+"-"+value.slice(16,20)+"-"+value.slice(20);
+}
 app.get("/crypto/account",async(req,res)=>{
   try{
     const {user,userDb}=await auth(req);
@@ -376,11 +382,9 @@ app.post("/crypto/orders",async(req,res)=>{
     const gross=quantity*price*fxRate;
     if(!Number.isFinite(gross)||gross<=0||gross>1000000000000)return res.status(400).json({error:"Crypto order value is outside supported limits."});
     const fee=Number((gross*0.001).toFixed(8));
-    const orderId=crypto.randomUUID();
+    const orderId=makeCryptoOrderId(user.id,idempotencyKey);
     const fingerprint=crypto.createHash("sha256").update(JSON.stringify({
-      userId:user.id,orderId,idempotencyKey,symbol,side,quantity:quantityRaw,
-      provider:"binance-spot",quoteTimestamp,executionPrice:price.toFixed(8),
-      fxRateInr:fxRate.toFixed(8),fee:fee.toFixed(8)
+      userId:user.id,symbol,side,quantity:quantityRaw
     })).digest("hex");
     const result=await runtime.callUserRpc(user,"execute_paper_crypto_market_order",{
       p_order_id:orderId,p_idempotency_key:idempotencyKey,p_request_fingerprint:fingerprint,
