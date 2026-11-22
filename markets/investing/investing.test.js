@@ -16,6 +16,7 @@ const manifest=JSON.parse(fs.readFileSync(path.join(pwaRoot,"manifest.webmanifes
 const portal=fs.readFileSync(path.join(pwaRoot,"index.html"),"utf8");
 const languageToggle=fs.readFileSync(path.join(pwaRoot,"language-toggle.js"),"utf8");
 const chartTheme=fs.readFileSync(path.join(root,"../stocks/chart-theme.js"),"utf8");
+const chartEngine=fs.readFileSync(path.join(root,"../stocks/chart-engine.js"),"utf8");
 const sharedCss=fs.readFileSync(path.join(root,"../stocks/stocks.css"),"utf8");
 test("Paper Investing page includes all locally referenced modules and styles",()=>{
  const assetRefs=[
@@ -148,6 +149,12 @@ test("Professional chart editing toolbar is styled for desktop and touch screens
  assert.match(sharedCss,/chart-remove-indicator/);
 });
 
+test("Professional chart caches recent candles and discards stale symbol responses",()=>{
+ assert.match(chartEngine,/candleCache=new Map\(\)/);
+ assert.match(chartEngine,/while\(candleCache\.size>100\)/);
+ assert.match(chartEngine,/expiresAt:Date\.now\(\)\+ttl/);
+ assert.match(chartEngine,/context!==current/);
+});
 test("Every install-time PWA shell asset exists in the repository",()=>{
  const match=serviceWorker.match(/const SHELL=\[([\s\S]*?)\]\.map/);
  assert.ok(match,"PWA shell asset list is missing");
