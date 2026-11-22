@@ -8,9 +8,10 @@ async function main(){
   if(!filePath)throw new Error("Usage: node scripts/import-exchange-sessions.js <verified-exchange-sessions.csv>");
   const url=process.env.SUPABASE_URL,key=process.env.SUPABASE_SERVICE_ROLE_KEY;
   if(!url||!key)throw new Error("SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required.");
-  const csv=fs.readFileSync(filePath,"utf8");
+  const sourceBytes=fs.readFileSync(filePath);
+  const csv=sourceBytes.toString("utf8");
   const rows=parseExchangeSessionCsv(csv);
-  const sha256=crypto.createHash("sha256").update(csv,"utf8").digest("hex");
+  const sha256=crypto.createHash("sha256").update(sourceBytes).digest("hex");
   const client=createClient(url,key,{auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false}});
   const {data,error}=await client.rpc("import_paper_exchange_sessions",{p_source_sha256:sha256,p_rows:rows});
   if(error)throw new Error("Exchange session import failed: "+error.message);
