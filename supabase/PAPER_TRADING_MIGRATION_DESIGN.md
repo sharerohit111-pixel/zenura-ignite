@@ -491,8 +491,9 @@ so the migration uses `auth.jwt()->>'sub'` and a private identity map instead:
 - The server-side Firebase-to-Supabase resolver uses the same mapping and fails closed
   for UIDs that have not yet been migrated.
 
-Before enabling client Data API access, register the exact Firebase project ID in
-Supabase Authentication → Third-Party Auth → Firebase and ensure every Firebase token
+Before enabling client Data API access, register Firebase project ID
+`zenura-ignite-technologies` in Supabase Authentication → Third-Party Auth → Firebase
+(the value was read from the existing repository's public Firebase client config) and ensure every Firebase token
 contains `role: authenticated`. Existing Firebase users require a controlled custom
 claims backfill and token refresh; new users require the same claim on account creation.
 Never expose the service-role key to the app. The existing gateway continues to verify
@@ -502,3 +503,6 @@ This removes the need to create synthetic email/phone identities or duplicate Su
 Auth users. The identity map is created/imported as part of the controlled data migration.
 No Firebase custom claims have been changed and no Supabase third-party Auth integration
 has been enabled in the live project by this draft.
+
+
+Official integration reference: https://supabase.com/docs/guides/auth/third-party/firebase-auth
