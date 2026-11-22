@@ -43,8 +43,8 @@ Deno.serve(async (req: Request) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-    const startingCash = Deno.env.get("CRYPTO_STARTING_CASH_INR");
-    const feeRateRaw = Deno.env.get("CRYPTO_TAKER_FEE_RATE");
+    const startingCash = Deno.env.get("CRYPTO_STARTING_CASH_INR") ?? "1000000";
+    const feeRateRaw = Deno.env.get("CRYPTO_TAKER_FEE_RATE") ?? "0.001";
     if (!supabaseUrl || !anonKey || !serviceKey || !startingCash || !feeRateRaw) {
       return json({ error: "Crypto trading service is not configured." }, 503);
     }
