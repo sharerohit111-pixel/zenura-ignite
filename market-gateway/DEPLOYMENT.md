@@ -1,200 +1,129 @@
-# ZENURA IGNITE — Supabase + Cloud Run deployment
+# ZENURA IGNITE — Supabase Market Gateway Deployment
 
-## Architecture and hard boundaries
+## Architecture
 
-- **Authentication:** Supabase Auth (new users only).
-- **Application data:** Supabase Postgres, SQL migrations, RLS and transactional RPCs.
-- **Market provider:** Upstox OAuth and Market Data Feed V3.
-- **Long-lived gateway:** Node.js 22 on Google Cloud Run. Cloud Run is a standalone container runtime, not Firebase.
-- **Frontend:** static ZENURA IGNITE web app.
-- **No Firebase runtime:** this release does not deploy Firebase Functions, use Firebase Auth, use Firestore, import old customer data or depend on Firebase UID mapping. The legacy Firebase gateway file is not the active server entrypoint.
+- **Supabase** is the application backend: native Auth, Postgres, RLS and transactional RPCs.
+- **Cloud Run** hosts one Node.js HTTP/SSE market gateway. It is not Firebase and does not use Firebase Auth, Firestore or Firebase Functions.
+- The same Cloud Run process runs the leased Paper LIMIT worker in the background. There is **no separate Cloud Run Job or Cloud Scheduler** in the current design.
+- Each user authorizes their own Upstox account. The gateway resolves that user's encrypted token only after validating the user's Supabase access token.
+- All orders are virtual paper orders. The app does not submit orders to Upstox or an exchange.
+- The frontend's gateway URL remains blank until a verified gateway is deployed.
 
-Never put the Supabase service-role key, Upstox client secret, Upstox access token or token-encryption key in browser code, GitHub source, build args or public frontend configuration.
+## Important release gate: market-data rights
 
-## 1. Supabase project preparation
+Public real-time market-data deployment is blocked until written Upstox/provider permission and Indian securities counsel's applicability review are recorded. API credentials alone do not prove redistribution/display rights. See [MARKET-DATA-COMPLIANCE.md](./MARKET-DATA-COMPLIANCE.md). The manual deployment workflow fails closed unless `MARKET_DATA_RIGHTS_APPROVED=true` and a written approval reference are present.
 
-Project: `atvbjibhunvzpmfagagm` (Mumbai, ap-south-1).
+Do not bypass this check. If public real-time display is not approved, use a licensed source or implement the required delayed-data mode before launch.
 
-1. Confirm the project is the intended ZENURA IGNITE project.
-2. Apply the reviewed SQL migrations to a disposable Postgres test database first. Run the repository CI migration/RPC tests and Supabase Auth/RLS integration tests before any production migration.
-3. Enable Supabase Auth email/password. Configure the production Site URL and allowed redirect URLs for `https://zenuraignite.com/markets/stocks/` and the Paper Investing route.
-4. Keep email confirmation enabled for production accounts. Configure SMTP/deliverability before public launch.
-5. Verify RLS is enabled on every user-owned table. Test two different Supabase users and prove neither can read or mutate the other's orders, balances, positions, watchlists or chart settings.
-6. Store the Supabase project URL and publishable key as non-secret Cloud Run environment values. Obtain the service-role key from Supabase and store it only in Google Secret Manager.
-7. Do not execute destructive SQL, disable RLS, expose service-role credentials, or apply unreviewed migrations to the live project.
+## Required Google Cloud configuration
 
-The starting virtual capital is ₹10,00,000 (100,000,000 paise) per new account, initialized server-side once. Paper Trading and Paper Investing use distinct account ledgers; no existing customer balances are imported.
+Use a dedicated Google Cloud project in `asia-south1` (Mumbai).
 
-## 2. Upstox OAuth configuration
+1. Enable billing and configure a budget alert before deploying.
+2. Create a deployer/runtime service account. The current workflow uses the same account for image push, Cloud Run deployment and runtime secret access.
+3. Grant the service account:
+   - Artifact Registry Writer
+   - Cloud Run Admin
+   - Service Account User on itself/runtime identity
+   - Secret Manager Secret Accessor on only the four secrets below
+4. Configure GitHub Workload Identity Federation for repository `sharerohit111-pixel/zenura-ignite`, restricted to branch `main`. Do not use a downloaded service-account JSON key.
+5. Create the Artifact Registry repository `zenura` in `asia-south1` (the workflow creates it if missing).
+6. Map the chosen HTTPS gateway domain to the Cloud Run service and configure DNS before deployment.
+7. Register the exact Upstox OAuth callback URL with the Upstox developer application.
 
-Create a dedicated encryption key locally:
+### Secret Manager entries
 
-```sh
-openssl rand -base64 32
-```
+Create these four secrets in the same Google Cloud project:
 
-Store the value only in Google Secret Manager as `UPSTOX_TOKEN_ENCRYPTION_KEY`. Add the Upstox client ID and secret as Secret Manager secrets too.
+- `zenura-supabase-service-role`: the Supabase service-role secret key. Never place this in browser code or GitHub variables.
+- `zenura-upstox-encryption-key`: a strong 32-byte encryption key in the exact encoding expected by the gateway.
+- `zenura-upstox-client-id`: the Upstox API client ID.
+- `zenura-upstox-client-secret`: the Upstox API client secret.
 
-Use a stable HTTPS custom domain for the gateway callback, for example:
+The Supabase publishable key is public and is already configured in the browser client; the workflow passes it to Cloud Run. No service-role or Upstox secret is embedded in the app.
 
-`https://market-api.zenuraignite.com/upstox/oauth/callback`
+## GitHub Actions configuration
 
-Register that exact URL in the Upstox Developer Console and set the same value as `UPSTOX_REDIRECT_URI`. Configure `ZENURA_APP_REDIRECT_URI=https://zenuraignite.com/markets/stocks/`. The OAuth callback consumes a one-time state value and stores the encrypted access token in Supabase; the browser never receives that provider token.
+The workflow `.github/workflows/deploy-supabase-market-gateway.yml` is manual-dispatch only and the job runs only from `main`.
 
-Upstox standard access tokens expire on the provider's daily schedule. There is no assumed refresh-token flow; users must reconnect when expired.
+Configure GitHub Actions **secrets**:
 
-## 3. Cloud Run gateway deployment
+- `GCP_PROJECT_ID`
+- `GCP_SERVICE_ACCOUNT`
+- `GCP_WORKLOAD_IDENTITY_PROVIDER` (full Workload Identity Provider resource name)
 
-Use a dedicated Google Cloud project and a dedicated runtime service account. This is a Cloud Run container deployment; do not run Firebase CLI commands or deploy Firebase Functions for this app.
+Configure GitHub Actions **variables**:
 
-### Required secrets in Secret Manager
+- `MARKET_GATEWAY_URL`: verified HTTPS origin mapped to the Cloud Run service, without a trailing slash.
+- `FRONTEND_ORIGIN`: exact HTTPS frontend origin, without a trailing slash.
+- `UPSTOX_REDIRECT_URI`: exactly `MARKET_GATEWAY_URL/upstox/oauth/callback`.
+- `ZENURA_APP_REDIRECT_URI`: exactly `FRONTEND_ORIGIN/markets/stocks/`.
+- `MARKET_DATA_RIGHTS_APPROVED`: set to `true` only after written provider/legal approval is actually received.
+- `MARKET_DATA_RIGHTS_REFERENCE`: reference to the written approval (document ID or approved record).
 
-- `SUPABASE_SERVICE_ROLE_KEY`
-- `UPSTOX_TOKEN_ENCRYPTION_KEY`
-- `UPSTOX_CLIENT_ID`
-- `UPSTOX_CLIENT_SECRET`
+The workflow validates these values and the four Secret Manager entries before it builds or deploys. It then:
 
-### Required environment values
+1. Builds the Docker image from the repository root (the shared OAuth helpers under `functions/lib` are included).
+2. Deploys `zenura-market-gateway` to Cloud Run.
+3. Runs one warm instance (2 vCPU / 2 GiB) with CPU always allocated.
+4. Enables the leased equity Delivery LIMIT worker at a 2-second polling interval.
+5. Waits for the instrument master and a successful worker cycle in the public health response.
+6. Updates both market-mode HTML pages to use the verified gateway URL.
 
-- `SUPABASE_URL=https://atvbjibhunvzpmfagagm.supabase.co`
-- `SUPABASE_PUBLISHABLE_KEY=<Supabase publishable key>`
-- `UPSTOX_REDIRECT_URI=https://market-api.zenuraignite.com/upstox/oauth/callback`
-- `ZENURA_APP_REDIRECT_URI=https://zenuraignite.com/markets/stocks/`
-- `MARKET_DATA_RIGHTS_APPROVED=true` only after written approval is received
-- `MARKET_DATA_RIGHTS_REFERENCE` containing the Upstox/licensed-vendor approval reference
-- `ALLOWED_ORIGINS=https://zenuraignite.com`
-- `MAX_INSTRUMENT_KEYS=100`
-- `INDIAN_PAPER_STARTING_CASH_PAISE=100000000` (documented product default; runtime account RPC remains authoritative)
+## Runtime and performance settings
 
-Grant the runtime service account only Secret Manager Secret Accessor on the four secrets. The gateway uses Supabase over HTTPS and does not require Firestore IAM, Firebase Admin SDK permissions or Firebase service accounts.
+The deployment uses:
 
-Build from the **repository root** so the image includes the shared, Firebase-independent OAuth validation helpers:
+- `--min 1 --max 5`: keep one instance warm; allow controlled scaling.
+- `--cpu 2 --memory 2Gi`: gateway and chart-data requests.
+- `--no-cpu-throttling`: required because the LIMIT worker runs in the background between HTTP requests.
+- `--concurrency 40`: limit request concurrency per instance.
+- `--timeout 3600`: supports long-lived Upstox V3 SSE streams.
+- `PAPER_LIMIT_WORKER_ENABLED=true` and `PAPER_LIMIT_WORKER_INTERVAL_MS=2000`.
+
+Every instance may start the worker loop, but the Postgres lease ensures only one worker is the active writer. Worker errors and instrument-master refresh failures use bounded exponential backoff. The public `/health` response exposes only safe readiness data: instrument-master availability and worker liveness/cycle counts; it never exposes credentials or user data.
+
+**Cost warning:** one warm 2-vCPU/2-GiB instance with CPU always allocated creates ongoing Google Cloud charges. Keep deployment manual and configure a billing budget/alert first.
+
+## Supabase Auth configuration
+
+Before public testing:
+
+- Set the Supabase Auth Site URL to the actual frontend origin.
+- Add the exact frontend origin and app return URL to the redirect allow-list.
+- Configure production SMTP and verify email delivery/rate limits.
+- Keep email/password or other enabled sign-in methods consistent with the actual UI and privacy policy.
+
+These Auth settings are separate from the Cloud Run deployment workflow and must be verified in the Supabase project dashboard.
+
+## Current order-type coverage
+
+- Paper Trading equity MARKET orders are supported.
+- Equity LIMIT orders are currently supported for **Delivery** and are processed by the in-service worker.
+- Intraday LIMIT and F&O LIMIT are not enabled.
+- Futures and long CE/PE option market-order paths are separate transactional flows.
+- Paper Investing currently supports verified NSE cash-equity MARKET orders. BSE investing execution remains blocked until exact scrip-group charges are available; Investing LIMIT is not enabled.
+- Protective stop-loss/target execution is not complete. The table exists, but do not expose or claim those orders as active until the trigger/fill worker and UI pass transaction, concurrency and failure-recovery tests.
+
+## Manual build reference
+
+The GitHub Actions workflow is the preferred deployment path. For a controlled local build from the repository root:
 
 ```sh
 PROJECT_ID=YOUR_DEDICATED_GCP_PROJECT_ID
 REGION=asia-south1
 IMAGE="$REGION-docker.pkg.dev/$PROJECT_ID/zenura/market-gateway:release"
 
-gcloud artifacts repositories create zenura --project "$PROJECT_ID" --location "$REGION" --repository-format docker
 gcloud auth configure-docker "$REGION-docker.pkg.dev"
 docker build -f market-gateway/Dockerfile -t "$IMAGE" .
 docker push "$IMAGE"
-
-gcloud run deploy zenura-market-gateway \
-  --project "$PROJECT_ID" --image "$IMAGE" --region "$REGION" \
-  --platform managed --allow-unauthenticated \
-  --min 1 --max 5 --cpu 2 --memory 2Gi --concurrency 40 --timeout 3600 --no-cpu-throttling \
-  --service-account YOUR_GATEWAY_SERVICE_ACCOUNT@$PROJECT_ID.iam.gserviceaccount.com \
-  --set-env-vars SUPABASE_URL=https://atvbjibhunvzpmfagagm.supabase.co,SUPABASE_PUBLISHABLE_KEY=YOUR_PUBLISHABLE_KEY,UPSTOX_REDIRECT_URI=YOUR_EXACT_GATEWAY_CALLBACK,ZENURA_APP_REDIRECT_URI=YOUR_EXACT_APP_RETURN_URL,ALLOWED_ORIGINS=YOUR_EXACT_FRONTEND_ORIGIN,MAX_INSTRUMENT_KEYS=100,PAPER_LIMIT_WORKER_ENABLED=true,PAPER_LIMIT_WORKER_INTERVAL_MS=2000 \
-  --set-secrets SUPABASE_SERVICE_ROLE_KEY=zenura-supabase-service-role:latest,UPSTOX_TOKEN_ENCRYPTION_KEY=zenura-upstox-encryption-key:latest,UPSTOX_CLIENT_ID=zenura-upstox-client-id:latest,UPSTOX_CLIENT_SECRET=zenura-upstox-client-secret:latest
 ```
 
-Create the Artifact Registry repository only once; if it already exists, skip that command. The GitHub Actions deployment workflow uses Workload Identity Federation and expects the matching repository secrets and variables listed in the workflow. It performs the image build, Cloud Run deployment, liveness probe and frontend gateway URL update. It is manual-dispatch only and does not deploy on every commit.
+Do not manually deploy around the market-data rights gate or the health checks.
 
-### GitHub deployment configuration
+## Release safety
 
-The workflow is restricted to manual dispatch from the protected `main` branch. Configure these GitHub Actions **secrets**:
-
-- `GCP_PROJECT_ID`: dedicated Google Cloud project ID.
-- `GCP_SERVICE_ACCOUNT`: deployer service account email.
-- `GCP_WORKLOAD_IDENTITY_PROVIDER`: full Workload Identity Provider resource name.
-
-Configure these GitHub Actions **variables**:
-
-- `MARKET_GATEWAY_URL`: verified HTTPS origin mapped to Cloud Run (no trailing slash).
-- `FRONTEND_ORIGIN`: exact HTTPS frontend origin (no trailing slash).
-- `UPSTOX_REDIRECT_URI`: exactly `MARKET_GATEWAY_URL/upstox/oauth/callback`.
-- `ZENURA_APP_REDIRECT_URI`: exactly `FRONTEND_ORIGIN/markets/stocks/`.
-
-The deployer identity needs Artifact Registry Writer, Cloud Run Admin and Service Account User on the runtime identity. Bind the GitHub OIDC principal to the deployer service account with a repository and branch condition limited to `sharerohit111-pixel/zenura-ignite` on `main`. The runtime service account needs Secret Manager Secret Accessor only on the four named secrets.
-
-The workflow deliberately uses one warm Cloud Run instance (2 vCPU / 2 GiB) with CPU always allocated for responsive market streaming and the leased Paper LIMIT worker loop (2-second poll interval). The worker uses a database lease so multiple Cloud Run instances cannot become concurrent writers. The current worker supports equity Delivery LIMIT orders; Intraday/F&O LIMIT and protective stop-loss/target workers remain disabled until their transaction paths are implemented and tested. This creates ongoing Google Cloud charges. Keep the workflow manual, configure a billing budget/alert, and do not run it until the project, secrets, callback URL, DNS and billing are ready. The workflow checks its configuration and Secret Manager entries before building or deploying.
-
-
-For a responsive chart/quote experience, the reference deployment keeps one warm gateway instance, gives it 2 vCPU/2 GiB, allows bounded concurrency and sets a 60-minute request timeout for SSE streams. This has ongoing Cloud Run cost; configure a billing budget and alert, and tune max instances against Upstox account-wide stream limits.
-
-The Cloud Run endpoint is publicly reachable for browser CORS and the Upstox OAuth callback. This does **not** disable application authentication: every private API route verifies the Supabase access token. The startup check refuses to run unless the exact HTTPS frontend origin is present in `ALLOWED_ORIGINS`.
-
-Map `market-api.zenuraignite.com` to the Cloud Run service and verify the custom domain/certificate before registering the callback in Upstox. Confirm the returned Cloud Run URL and `/health` endpoint. Health is only a liveness check; it does not prove authentication, RLS, OAuth, market quotes or order accounting.
-
-## 4. GitHub Actions OIDC deployment
-
-The repository includes a manual production deployment workflow at `.github/workflows/deploy-supabase-market-gateway.yml`. It runs only when manually dispatched from `main`, uses GitHub OIDC/Workload Identity Federation (no downloaded service-account JSON key), builds the gateway image, deploys the Supabase-native Cloud Run service, deploys the isolated LIMIT Cloud Run Job, configures Cloud Scheduler and updates both market pages to the verified gateway URL.
-
-Configure these GitHub Actions **secrets**:
-- `GCP_PROJECT_ID`
-- `GCP_SERVICE_ACCOUNT` (deployment identity)
-- `GCP_WORKLOAD_IDENTITY_PROVIDER`
-- `GCP_WORKER_SERVICE_ACCOUNT`
-- `GCP_SCHEDULER_SERVICE_ACCOUNT`
-
-Configure these GitHub Actions **variables**:
-- `MARKET_GATEWAY_URL` (for example `https://market-api.zenuraignite.com`)
-- `FRONTEND_ORIGIN=https://zenuraignite.com`
-- `UPSTOX_REDIRECT_URI` (must exactly equal `MARKET_GATEWAY_URL/upstox/oauth/callback`)
-- `ZENURA_APP_REDIRECT_URI=https://zenuraignite.com/markets/stocks/`
-
-Review [MARKET-DATA-COMPLIANCE.md](./MARKET-DATA-COMPLIANCE.md) first. The production workflow fails closed unless written market-data rights approval is recorded.
-
-Create the four Google Secret Manager secrets checked by the workflow: `zenura-supabase-service-role`, `zenura-upstox-encryption-key`, `zenura-upstox-client-id`, and `zenura-upstox-client-secret`. Grant the gateway and worker runtime service accounts only the Secret Manager access they need. The scheduler service account needs `roles/run.invoker` on the LIMIT Cloud Run Job. Configure the custom gateway domain and Upstox callback before dispatching the workflow. The workflow deliberately does not deploy from a draft feature branch.
-
-## 5. Scheduled Supabase Paper LIMIT worker
-
-The LIMIT worker is a separate **Cloud Run Job**, not a Firebase Function and not a public HTTP endpoint. It uses the same Supabase service-role secret and encrypted Upstox user tokens as the gateway. A four-minute Postgres lease (longer than the 180-second job timeout) ensures only one worker instance processes the pending LIMIT queue at a time; fills still go through the transactional `execute_paper_limit_fill` RPC.
-
-Deploy the job with one task and one parallel worker:
-
-```sh
-gcloud run jobs deploy zenura-paper-limit-worker \
-  --project YOUR_DEDICATED_GCP_PROJECT_ID \
-  --source market-gateway \
-  --region asia-south1 \
-  --command node --args paper-limit-worker.js \
-  --tasks 1 --parallelism 1 --task-timeout 180s --max-retries 0 \
-  --service-account YOUR_MARKET_WORKER_SERVICE_ACCOUNT@YOUR_DEDICATED_GCP_PROJECT_ID.iam.gserviceaccount.com \
-  --set-env-vars SUPABASE_URL=https://atvbjibhunvzpmfagagm.supabase.co,SUPABASE_PUBLISHABLE_KEY=YOUR_PUBLISHABLE_KEY \
-  --set-secrets SUPABASE_SERVICE_ROLE_KEY=SUPABASE_SERVICE_ROLE_KEY:latest,UPSTOX_TOKEN_ENCRYPTION_KEY=UPSTOX_TOKEN_ENCRYPTION_KEY:latest
-```
-
-Grant the worker service account Secret Manager Secret Accessor only on those two secrets. Grant the Cloud Scheduler service account `roles/run.invoker` on this Cloud Run Job. Enable the Cloud Scheduler API, then schedule one execution each minute:
-
-```sh
-gcloud scheduler jobs create http zenura-paper-limit-worker-every-minute \
-  --project YOUR_DEDICATED_GCP_PROJECT_ID \
-  --location asia-south1 \
-  --schedule "* * * * *" --time-zone "Asia/Kolkata" \
-  --uri "https://run.googleapis.com/v2/projects/YOUR_DEDICATED_GCP_PROJECT_ID/locations/asia-south1/jobs/zenura-paper-limit-worker:run" \
-  --http-method POST --message-body "{}" \
-  --update-headers "Content-Type=application/json" \
-  --oauth-service-account-email YOUR_SCHEDULER_SERVICE_ACCOUNT@YOUR_DEDICATED_GCP_PROJECT_ID.iam.gserviceaccount.com
-```
-
-The worker scans a bounded batch, groups quote requests by user, checks fresh Upstox quotes and instrument-master identity, and asks Postgres to fill only price-eligible pending Delivery LIMIT orders. The SQL function locks the account/order rows and releases the original cash/share reservation in the same transaction. If Upstox credentials are expired, the affected orders remain pending and the user must reconnect. Monitor Cloud Run service logs, worker fill/failure counters and lease contention before enabling this loop in production.
-
-Cloud Scheduler-to-Cloud Run Job execution and the `roles/run.invoker` requirement follow Google's documented job scheduling model. [Cloud Run: execute jobs on a schedule](https://docs.cloud.google.com/run/docs/execute/jobs-on-schedule).
-
-## 6. Frontend gateway configuration
-
-The static pages currently contain an intentionally empty `market-gateway-url` meta value. After Cloud Run and the custom domain are deployed and verified, update both:
-
-- `markets/stocks/index.html`
-- `markets/investing/index.html`
-
-Set the meta value to the exact verified gateway origin, e.g. `https://market-api.zenuraignite.com`. Never commit a placeholder, unverified endpoint or secret. Deploy the frontend only after the gateway health check, CORS and authenticated smoke tests pass.
-
-## 7. Required end-to-end release gates
-
-1. `npm install`, `npm run check`, `npm test` in `market-gateway/`.
-2. Supabase migration/RPC tests on disposable Postgres and live Supabase Auth/RLS integration tests with two isolated test users.
-3. New-user account initialization: ₹10,00,000 Paper Trading and ₹10,00,000 Paper Investing ledgers; repeated initialization must not reset a balance.
-4. Verify instrument master search covers NSE/BSE equities, indices, futures and CE/PE contracts, including expiries, lot sizes and tick sizes.
-5. Verify Upstox OAuth state replay protection, encrypted token storage, expiry handling, disconnect and reconnect.
-6. Verify historical candles, V3 streaming, stale-quote rejection, stream lease renewal, reconnect, backpressure and provider outage behavior.
-7. Verify MARKET and LIMIT equity orders, cash reservation/release, order idempotency, no double fill, insufficient funds/holdings, and cross-user isolation.
-8. Verify Paper Investing buy/sell ledger, charges, weighted average cost, realized/unrealized P&L and retry behavior.
-9. Verify CE/PE and futures contracts, expiry, lot/tick validation, charges, margin controls and all enabled order directions.
-10. Verify chart rendering and performance on low/mid-range Android devices: indicators, drawing tools, templates, resize/orientation, theme switching, language switching and saved chart state.
-11. Verify no uncaught errors, memory leaks, stale subscriptions, runaway polling or duplicate market streams.
-12. Produce signed Android release build, test on real devices, complete Play Store policy/data safety declarations and staged rollout checklist.
-
-Do not call the app production-ready or submit to Google Play until all required gates pass. Play Store review time is separate from engineering and release-preparation time.
+- No legacy customer data is imported.
+- No Firebase production services are changed.
+- Do not put Supabase service-role or Upstox secrets in frontend code, GitHub variables, commits or logs.
+- Do not merge the draft PR, run production deployment, or submit to Google Play until the relevant backend, data-rights, Auth, device-performance and Android release gates pass.
