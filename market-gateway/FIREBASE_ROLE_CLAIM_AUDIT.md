@@ -37,3 +37,7 @@ Run:
     node --test test/firebase-role-claim-audit.test.js
 
 No Supabase request, Firebase custom-claim mutation, deployment, export, or data migration is part of this audit.
+
+## Project selection warning
+
+The repository has two Firebase Web App configurations. The root configuration and the Indian Market Gateway production deployment guide identify `zenura-ignite-technologies` as the intended Indian Paper Trading backend project. `crypto/firebase-config.js` identifies a separate project, `zenura-ignite`. Do not run this audit against the crypto project by mistake. Before executing, verify in Firebase Console and against the deployed gateway runtime that the explicitly selected project owns the Indian Paper Trading collections. The audit never guesses a project from ambient environment variables.
