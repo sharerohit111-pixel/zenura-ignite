@@ -233,7 +233,7 @@ begin
     v_new_qty:=v_old_qty-v_quantity;
     v_new_basis:=v_old_basis-v_closed_basis;
     v_order_realized:=v_gross-v_closed_basis-v_charges;
-    if v_new_qty>0 then v_new_avg:=floor((v_old_avg::numeric*v_old_qty-v_closed_basis+v_order_realized+v_charges)::numeric/v_new_qty+0.5)::bigint;
+    if v_new_qty>0 then v_new_avg:=v_old_avg;
     else v_new_avg:=0; end if;
   end if;
 
