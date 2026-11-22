@@ -2075,6 +2075,8 @@ jobs:
           END
           $crypto_limit_race$;
           SQL
+      - name: Prevent reserved Crypto LIMIT sell quantity from being deleted by MARKET sell
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/crypto_reserved_position_guard.sql
       - name: Verify expected schema and RPC registration
         run: |
           psql -v ON_ERROR_STOP=1 <<'SQL'
