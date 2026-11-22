@@ -82,6 +82,8 @@ jobs:
         run: |
           node --check market-gateway/paper-limit-worker.js
           node --test market-gateway/test/paper-limit-worker.test.js
+          node --check market-gateway/lib/protective-order-worker.js
+          node --test market-gateway/test/protective-order-worker.test.js
       - name: Build production gateway image and verify Firebase is absent
         run: |
           set -euo pipefail
