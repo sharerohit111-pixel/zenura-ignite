@@ -71,6 +71,7 @@ app.use((req,res,next)=>{
 let FeedResponse;
 let instrumentCache=[];
 let instrumentCacheUpdatedAt=0;
+const paperLimitWorkerStatus={enabled:false,intervalMs:null,lastRunAt:null,lastCycle:null};
 const activeUserStreams=new Map();
 function fetchProvider(url,options={},timeoutMs=15000){return fetchProviderWithTimeout(fetch,url,options,timeoutMs);}
 function errorStatus(error){
@@ -131,7 +132,8 @@ async function getQuote(accessToken,instrumentKey){
 app.get("/health",(_req,res)=>res.json({
   ok:true,service:"zenura-supabase-market-gateway",authProvider:"supabase",
   feedProtocol:"upstox-v3",instrumentMasterLoaded:instrumentCache.length>0,
-  instrumentMasterUpdatedAt:instrumentCacheUpdatedAt||null
+  instrumentMasterUpdatedAt:instrumentCacheUpdatedAt||null,
+  limitWorker:{...paperLimitWorkerStatus}
 }));
 
 app.get("/upstox/connection",async(req,res)=>{
@@ -937,14 +939,18 @@ async function start(){
   refreshInstrumentCache().catch(error=>console.error("Initial instrument refresh failed:",error.message));
   if(process.env.PAPER_LIMIT_WORKER_ENABLED==="true"){
     const intervalMs=Math.max(1000,Math.min(10000,Number(process.env.PAPER_LIMIT_WORKER_INTERVAL_MS)||2000));
+    paperLimitWorkerStatus.enabled=true;
+    paperLimitWorkerStatus.intervalMs=intervalMs;
     let workerBusy=false;
     const runWorker=async()=>{
       if(workerBusy)return;
       workerBusy=true;
       try{
         const result=await runPaperLimitWorker({maxOrders:50});
+        paperLimitWorkerStatus.lastRunAt=Date.now();
+        paperLimitWorkerStatus.lastCycle={scanned:result.scanned,filled:result.filled,failed:result.failed,locked:result.locked};
         if(result.filled||result.failed)console.log("Paper LIMIT worker cycle",JSON.stringify(result));
-      }catch(error){console.error("Paper LIMIT worker cycle failed:",error.message);}
+      }catch(error){paperLimitWorkerStatus.lastRunAt=Date.now();console.error("Paper LIMIT worker cycle failed:",error.message);}
       finally{workerBusy=false;}
     };
     runWorker().catch(()=>{});
