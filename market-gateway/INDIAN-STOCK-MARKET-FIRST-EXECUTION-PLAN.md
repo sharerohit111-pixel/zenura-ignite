@@ -62,14 +62,13 @@ The Intraday LIMIT lifecycle is now implemented in the draft integration branch,
 - The gateway accepts Intraday LIMIT only when `PAPER_INTRADAY_LIMIT_WORKER_ENABLED=true`; the default remains disabled and the endpoint fails closed.
 - The first implementation exposed a lease allowlist mismatch: the existing lease RPC accepted only Delivery LIMIT and protective-worker keys. Forward-only migration `20261123043000_intraday_limit_worker_lease_key.sql` now registers the Intraday LIMIT key for acquire/release without changing the other workers.
 - SQL reservation/fill/expiry tests and worker orchestration tests are present. Additional CI regressions now cover worker lease ownership/exclusivity and concurrent BUY fill-vs-cancel / SELL cancel-vs-fill races.
-- The latest commits containing these additional regressions do not yet have an observed GitHub Actions run. Do not mark the new concurrency and lease tests as passed until a run reports success.
+- GitHub Actions run [45072069229](https://github.com/sharerohit111-pixel/zenura-ignite/actions/runs/45072069229) passed on commit `fff83799b1a47a18bafa6096c0c760d5d76ed8f5`. This includes the worker-lease ownership/exclusivity SQL regression and the concurrent BUY fill-vs-cancel / SELL cancel-vs-fill regression. The first race-harness attempt exposed Bash expanding PostgreSQL dollar-quote delimiters; the harness now escapes those delimiters and the complete CI run is green.
 
 Remaining before this slice can be marked release-ready:
 
-1. Observe successful CI for the new lease migration and race tests.
-2. Rehearse the forward-only migrations and worker lease against a disposable Supabase staging database; do not use the linked production project.
-3. Add charge-aware cash/realized-P&L accounting using verified, versioned Indian broker/exchange rates rather than inventing fees. The current Intraday LIMIT fill follows the existing gross-only equity accounting contract.
-4. Validate complete order/trade history and account reconciliation after BUY, SELL, cancellation, expiry and replay.
-5. Keep the UI action and worker disabled until the backend, staging and compliance gates pass.
+1. Rehearse the forward-only migrations and worker lease against a disposable Supabase staging database; do not use the linked production project.
+2. Integrate verified, versioned Indian equity charges into MARKET and LIMIT fills, cash reservations, cost basis, realized/unrealized P&L, and order history. The current equity MARKET and Intraday LIMIT SQL settlement is gross-only; the standalone NSE delivery charge calculator is not yet wired into that settlement path. Do not present gross-only P&L as net P&L.
+3. Validate complete order/trade history and account reconciliation after BUY, SELL, cancellation, expiry and replay, including charge reversals and partial fills.
+4. Keep the UI action and worker disabled until the backend, staging and compliance gates pass.
 
 The existing Delivery LIMIT worker must not be reused as an Intraday implementation by simply removing its product filter. The separate reservation, session-expiry, cancellation and fill invariants are required.
