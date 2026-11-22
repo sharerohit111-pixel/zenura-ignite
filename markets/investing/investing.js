@@ -215,7 +215,10 @@
       sessionStorage.removeItem(pendingKey);
       safeText(orderStatus,side+" "+quantity+" "+(data.tradingSymbol||selected.trading_symbol)+" filled at "+fmt(data.executionPricePaise)+" · Charges "+fmt(data.chargesPaise)+" · Virtual only.");
       await refreshAll();
-    }catch(error){safeText(orderStatus,error.message||"Paper Investing order failed.");}
+    }catch(error){
+      if([400,401,403,404,422].includes(error.status)){try{sessionStorage.removeItem(pendingKey);}catch(_){}}
+      safeText(orderStatus,error.message||"Paper Investing order failed.");
+    }
     finally{updateOrderButtons();}
   }
   searchInput.addEventListener("input",()=>{if(searchTimer)clearTimeout(searchTimer);searchTimer=setTimeout(searchStocks,250);});
