@@ -1,6 +1,25 @@
 -- DRAFT ONLY. Apply only after review, staging tests and explicit approval.
 -- Atomic MARKET BUY/SELL RPC. Uses integer paise and PostgreSQL row locks.
 -- Pending LIMIT and derivatives are intentionally handled by separate RPCs.
+-- Shared deterministic quote-age predicate. Kept non-callable by API roles;
+-- SECURITY DEFINER transaction RPCs invoke it as their owner.
+create or replace function public._paper_quote_age_is_fresh(
+  p_quote_timestamp_ms bigint,
+  p_server_now_ms bigint
+) returns boolean
+language sql
+immutable
+parallel safe
+set search_path = pg_catalog
+as $
+  select p_quote_timestamp_ms is not null
+     and p_server_now_ms is not null
+     and p_quote_timestamp_ms <= p_server_now_ms
+     and (p_server_now_ms::numeric-p_quote_timestamp_ms::numeric) between 0 and 15000;
+$;
+revoke all on function public._paper_quote_age_is_fresh(bigint,bigint)
+  from public, anon, authenticated, service_role;
+
 create or replace function public.execute_paper_market_order(
   p_user_id uuid,
   p_order_id text,
@@ -62,11 +81,8 @@ begin
 
   -- Never trust a caller-supplied quote age or clock: derive freshness from PostgreSQL time.
   v_now_ms := floor(extract(epoch from clock_timestamp()) * 1000)::bigint;
-  if p_quote_timestamp_ms > v_now_ms then
-    raise exception using errcode='22023', message='Future paper market quote is not valid';
-  end if;
   v_actual_quote_age_ms := v_now_ms - p_quote_timestamp_ms;
-  if v_actual_quote_age_ms > 15000
+  if not public._paper_quote_age_is_fresh(p_quote_timestamp_ms,v_now_ms)
      or abs(v_actual_quote_age_ms - p_quote_age_ms) > 2000 then
     raise exception using errcode='22023', message='Invalid or stale paper market quote';
   end if;

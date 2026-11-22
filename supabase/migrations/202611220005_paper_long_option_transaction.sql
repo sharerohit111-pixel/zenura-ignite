@@ -107,7 +107,7 @@ begin
     raise exception 'Option quote clock is not current.' using errcode='22023';
   end if;
   v_quote_age := v_server_now_ms - p_quote_timestamp_ms;
-  if p_quote_timestamp_ms>v_server_now_ms or v_quote_age>15000 then
+  if not public._paper_quote_age_is_fresh(p_quote_timestamp_ms,v_server_now_ms) then
     raise exception 'A matching fresh provider quote is required.' using errcode='22023';
   end if;
 
