@@ -1,7 +1,7 @@
 "use strict";
 const test=require("node:test");
 const assert=require("node:assert/strict");
-const {EXPORT_COLLECTIONS,EXCLUDED_COLLECTIONS,serializeFirestoreValue,sanitizeAuthUser,firestoreDocuments,parseArgs}=require("../scripts/firebase-readonly-export");
+const {EXPORT_COLLECTIONS,EXCLUDED_COLLECTIONS,serializeFirestoreValue,sanitizeAuthUser,firestoreDocuments,resolveProjectId,parseArgs}=require("../scripts/firebase-readonly-export");
 test("export scope is allowlisted and excludes broker credentials and operational state",()=>{
  assert.deepEqual(EXPORT_COLLECTIONS,["customerProfiles","users","indianPaperAccounts","indianPaperOrders","indianDerivativeOrders","indianMarketWatchlists"]);
  assert.ok(EXCLUDED_COLLECTIONS.some(x=>x.startsWith("upstoxConnections")));assert.ok(EXCLUDED_COLLECTIONS.includes("upstoxOAuthStates"));
@@ -26,4 +26,11 @@ test("CLI defaults to dry-run and requires explicit export confirmation",()=>{
  assert.deepEqual(parseArgs([]),{confirm:false,outputDirectory:null,pageSize:400,dryRun:true});
  const args=parseArgs(["--confirm-read-only-export","--out-dir","/tmp/export","--page-size","100"]);
  assert.equal(args.dryRun,false);assert.equal(args.outputDirectory,"/tmp/export");assert.equal(args.pageSize,100);
+});
+
+test("export project selection requires explicit FIREBASE_PROJECT_ID",()=>{
+ assert.equal(resolveProjectId({FIREBASE_PROJECT_ID:"zenura-ignite-technologies",GOOGLE_CLOUD_PROJECT:"wrong-project"}),"zenura-ignite-technologies");
+ assert.throws(()=>resolveProjectId({GOOGLE_CLOUD_PROJECT:"ambient-project"}),/FIREBASE_PROJECT_ID explicitly/);
+ assert.throws(()=>resolveProjectId({GCLOUD_PROJECT:"ambient-project"}),/FIREBASE_PROJECT_ID explicitly/);
+ assert.throws(()=>resolveProjectId({FIREBASE_PROJECT_ID:"   "}),/FIREBASE_PROJECT_ID explicitly/);
 });
