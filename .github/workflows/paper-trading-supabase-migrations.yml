@@ -197,7 +197,7 @@ jobs:
               'BUY',2,30000
             );
             v_result := public.execute_paper_limit_fill(
-              repeat('3',64),29000,1000000,100,1000100
+              repeat('3',64),29000,floor(extract(epoch from clock_timestamp())*1000)::bigint,0,floor(extract(epoch from clock_timestamp())*1000)::bigint
             );
             SELECT reserved_cash_paise,cash_paise INTO v_reserved,v_cash
               FROM public.paper_accounts
@@ -221,7 +221,7 @@ jobs:
               RAISE EXCEPTION 'LIMIT SELL did not reserve the expected shares';
             END IF;
             BEGIN
-              PERFORM public.execute_paper_limit_fill(repeat('5',64),13000,1000000,15001,1015001);
+              PERFORM public.execute_paper_limit_fill(repeat('5',64),13000,floor(extract(epoch from clock_timestamp())*1000)::bigint-15001,15001,floor(extract(epoch from clock_timestamp())*1000)::bigint);
               RAISE EXCEPTION 'Stale LIMIT quote was unexpectedly accepted';
             EXCEPTION WHEN SQLSTATE '22023' THEN
               NULL;
@@ -244,7 +244,7 @@ jobs:
               repeat('8',64),'NSE_EQ|TEST001','TEST001','NSE',
               'SELL',2,12500
             );
-            v_result := public.execute_paper_limit_fill(repeat('7',64),13000,1000000,100,1000100);
+            v_result := public.execute_paper_limit_fill(repeat('7',64),13000,floor(extract(epoch from clock_timestamp())*1000)::bigint,0,floor(extract(epoch from clock_timestamp())*1000)::bigint);
             SELECT quantity,reserved_quantity INTO v_qty,v_reserved
               FROM public.paper_equity_positions
              WHERE user_id='22222222-2222-4222-8222-222222222222'
@@ -412,7 +412,7 @@ jobs:
               '22222222-2222-4222-8222-222222222222',
               repeat('9',64),'99999999-9999-4999-8999-999999999999',
               repeat('a',64),'NSE_FO|TESTCE','TESTCE','NSE','NSE_FO','CE',
-              current_date + 10,22000,25,5,2,'BUY',1285,1000000,1000100
+              current_date + 10,22000,25,5,2,'BUY',1285,floor(extract(epoch from clock_timestamp())*1000)::bigint,floor(extract(epoch from clock_timestamp())*1000)::bigint
             );
             SELECT cash_paise INTO v_cash FROM public.paper_accounts
              WHERE user_id='22222222-2222-4222-8222-222222222222';
@@ -430,7 +430,7 @@ jobs:
               '22222222-2222-4222-8222-222222222222',
               repeat('9',64),'99999999-9999-4999-8999-999999999999',
               repeat('a',64),'NSE_FO|TESTCE','TESTCE','NSE','NSE_FO','CE',
-              current_date + 10,22000,25,5,2,'BUY',1285,1000000,1000100
+              current_date + 10,22000,25,5,2,'BUY',1285,floor(extract(epoch from clock_timestamp())*1000)::bigint,floor(extract(epoch from clock_timestamp())*1000)::bigint
             );
             IF (v_result->>'idempotent_replay')::boolean IS NOT TRUE THEN
               RAISE EXCEPTION 'Long option retry was not idempotent';
@@ -440,7 +440,7 @@ jobs:
               '22222222-2222-4222-8222-222222222222',
               repeat('b',64),'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
               repeat('c',64),'NSE_FO|TESTCE','TESTCE','NSE','NSE_FO','CE',
-              current_date + 10,22000,25,5,1,'SELL',1500,1000000,1000100
+              current_date + 10,22000,25,5,1,'SELL',1500,floor(extract(epoch from clock_timestamp())*1000)::bigint,floor(extract(epoch from clock_timestamp())*1000)::bigint
             );
             SELECT net_quantity,cost_basis_paise,average_price_paise
               INTO v_qty,v_basis,v_avg FROM public.paper_derivative_positions
@@ -459,7 +459,7 @@ jobs:
               '22222222-2222-4222-8222-222222222222',
               repeat('f',64),'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
               repeat('d',64),'NSE_FO|TESTCE','TESTCE','NSE','NSE_FO','CE',
-              current_date + 10,22000,25,1,1,'SELL',1,1000000,1000100
+              current_date + 10,22000,25,1,1,'SELL',1,floor(extract(epoch from clock_timestamp())*1000)::bigint,floor(extract(epoch from clock_timestamp())*1000)::bigint
             );
             IF (v_result->'order'->>'net_credit_paise')::bigint >= 0
                OR EXISTS (SELECT 1 FROM public.paper_derivative_positions
@@ -473,7 +473,7 @@ jobs:
                 '22222222-2222-4222-8222-222222222222',
                 repeat('d',64),'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
                 repeat('e',64),'NSE_FO|TESTPE','TESTPE','NSE','NSE_FO','PE',
-                current_date + 10,22000,25,5,1,'BUY',1285,1000000,1016001
+                current_date + 10,22000,25,5,1,'BUY',1285,floor(extract(epoch from clock_timestamp())*1000)::bigint-16001,floor(extract(epoch from clock_timestamp())*1000)::bigint
               );
               RAISE EXCEPTION 'Stale long-option quote was unexpectedly accepted';
             EXCEPTION WHEN SQLSTATE '22023' THEN
