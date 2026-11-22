@@ -7,6 +7,19 @@ ORDER_CANCEL="d2d2d2d2-d2d2-42d2-82d2-d2d2d2d2d2d2"
 EXEC_FILL="$(printf 'a%.0s' {1..64})"
 EXEC_CANCEL="$(printf 'c%.0s' {1..64})"
 
+wait_for_terminal_update_lock() {
+  local pattern="$1"
+  for _ in {1..60}; do
+    local active
+    active="$(psql -Atqc "SELECT count(*) FROM pg_stat_activity WHERE query LIKE '%${pattern}%' AND wait_event_type='Timeout' AND wait_event='PgSleep';")"
+    if [[ "$active" -ge 1 ]]; then return 0; fi
+    sleep 0.05
+  done
+  echo "Timed out waiting for protective row-lock race stage: ${pattern}" >&2
+  exit 1
+}
+
+
 psql -v ON_ERROR_STOP=1 <<'SQL'
 UPDATE public.paper_accounts
    SET starting_cash_paise=100000000,cash_paise=100000000,
@@ -65,7 +78,7 @@ psql -v ON_ERROR_STOP=1 -c "SET ROLE service_role; SELECT public.execute_paper_e
  'd1d1d1d1-d1d1-41d1-81d1-d1d1d1d1d1d1','$EXEC_FILL','$(printf 'b%.0s' {1..64})',8500,$FILL_TS,$FILL_TS
 );" >/tmp/zenura-protective-fill-wins.log 2>&1 &
 FILL_PID=$!
-sleep 0.2
+wait_for_terminal_update_lock "execute_paper_equity_protective_fill"
 psql -v ON_ERROR_STOP=1 <<'SQL'
 SET ROLE authenticated;
 SELECT set_config('request.jwt.claims','{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated"}',false);
@@ -94,7 +107,7 @@ SELECT public.cancel_paper_protective_order(
 RESET ROLE;
 SQL
 CANCEL_PID=$!
-sleep 0.2
+wait_for_terminal_update_lock "cancel_paper_protective_order"
 FILL_TS="$(date +%s%3N)"
 if psql -v ON_ERROR_STOP=1 -c "SET ROLE service_role; SELECT public.execute_paper_equity_protective_fill(
  'd2d2d2d2-d2d2-42d2-82d2-d2d2d2d2d2d2','$EXEC_CANCEL','$(printf 'd%.0s' {1..64})',8500,$FILL_TS,$FILL_TS
