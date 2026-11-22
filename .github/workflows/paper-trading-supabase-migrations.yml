@@ -58,6 +58,17 @@ jobs:
           $jwt$;
           GRANT USAGE ON SCHEMA auth TO authenticated, service_role;
           GRANT EXECUTE ON FUNCTION auth.jwt() TO authenticated, service_role;
+          CREATE FUNCTION public.rls_auto_enable()
+          RETURNS event_trigger
+          LANGUAGE plpgsql
+          SECURITY DEFINER
+          SET search_path = pg_catalog
+          AS $fixture$
+          BEGIN
+            RETURN;
+          END
+          $fixture$;
+          GRANT EXECUTE ON FUNCTION public.rls_auto_enable() TO PUBLIC;
           SQL
       - name: Apply ordered draft migrations to disposable PostgreSQL
         run: |
@@ -1098,6 +1109,14 @@ jobs:
                     'paper_derivative_orders','paper_watchlists')
                   AND qual LIKE '%current_paper_user_id()%') <> 6 THEN
               RAISE EXCEPTION 'Expected six user-scoped SELECT policies were not found';
+            END IF;
+            IF has_function_privilege('anon','public.rls_auto_enable()','EXECUTE')
+               OR has_function_privilege('authenticated','public.rls_auto_enable()','EXECUTE')
+               OR has_function_privilege('service_role','public.rls_auto_enable()','EXECUTE') THEN
+              RAISE EXCEPTION 'RLS auto-enable event-trigger function remains directly executable by API roles';
+            END IF;
+            IF NOT has_function_privilege('postgres','public.rls_auto_enable()','EXECUTE') THEN
+              RAISE EXCEPTION 'RLS auto-enable function owner execution was unexpectedly revoked';
             END IF;
             IF has_function_privilege('anon','public.current_paper_user_id()','EXECUTE')
                OR NOT has_function_privilege('authenticated','public.current_paper_user_id()','EXECUTE')
