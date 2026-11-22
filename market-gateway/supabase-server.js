@@ -412,9 +412,9 @@ app.post("/crypto/limit-orders",async(req,res)=>{
     if(!CRYPTO_SYMBOLS.has(symbol))return res.status(400).json({error:"Select a supported verified crypto spot symbol."});
     if(!["BUY","SELL"].includes(side))return res.status(400).json({error:"Only BUY and SELL crypto LIMIT orders are supported."});
     if(!isUuid(idempotencyKey))return res.status(400).json({error:"A valid UUID idempotency_key is required."});
-    if(!/^(?:0|[1-9]\\d*)(?:\\.\\d{1,12})?$/.test(quantityRaw)||Number(quantityRaw)<=0||!Number.isFinite(Number(quantityRaw))||Number(quantityRaw)>1000000000)
+    if(!/^(?:0|[1-9]\d*)(?:\.\d{1,12})?$/.test(quantityRaw)||Number(quantityRaw)<=0||!Number.isFinite(Number(quantityRaw))||Number(quantityRaw)>1000000000)
       return res.status(400).json({error:"Enter a valid crypto quantity with up to 12 decimal places."});
-    if(!/^(?:0|[1-9]\\d*)(?:\\.\\d{1,8})?$/.test(limitPriceRaw)||Number(limitPriceRaw)<=0||!Number.isFinite(Number(limitPriceRaw))||Number(limitPriceRaw)>1000000000)
+    if(!/^(?:0|[1-9]\d*)(?:\.\d{1,8})?$/.test(limitPriceRaw)||Number(limitPriceRaw)<=0||!Number.isFinite(Number(limitPriceRaw))||Number(limitPriceRaw)>1000000000)
       return res.status(400).json({error:"Enter a valid LIMIT price with up to 8 decimal places."});
     const baseAsset=symbol.slice(0,-4);
     const fxResponse=await fetchProvider("https://open.er-api.com/v6/latest/USD",{headers:{Accept:"application/json"}},5000);
