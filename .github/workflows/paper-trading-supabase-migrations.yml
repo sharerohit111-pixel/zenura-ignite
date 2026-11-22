@@ -553,6 +553,79 @@ jobs:
           END
           $$;
           SQL
+      - name: Verify SQL charges and rounding against Firebase golden vectors
+        run: |
+          set -euo pipefail
+          psql -v ON_ERROR_STOP=1 <<'SQL'
+          INSERT INTO auth.users(id) VALUES
+            ('66666666-6666-4666-8666-666666666666'),
+            ('77777777-7777-4777-8777-777777777777')
+            ON CONFLICT DO NOTHING;
+          SET ROLE service_role;
+          SELECT public.initialize_paper_trading_account('66666666-6666-4666-8666-666666666666');
+          SELECT public.initialize_paper_trading_account('77777777-7777-4777-8777-777777777777');
+          RESET ROLE;
+          DO $
+          DECLARE
+            v_buy jsonb;
+            v_sell jsonb;
+            v_bse jsonb;
+            v_breakdown jsonb;
+          BEGIN
+            -- Matches trading-charges.test.js: NSE BUY, gross 81,250 paise.
+            v_buy:=public.execute_paper_long_option_order(
+              '66666666-6666-4666-8666-666666666666',repeat('a',64),
+              '23232323-2323-4323-8323-232323232323',repeat('b',64),
+              'NSE_FO|GOLDEN','GOLDEN','NSE','NSE_FO','CE',
+              current_date+10,22000,25,5,1,'BUY',3250,
+              floor(extract(epoch from clock_timestamp())*1000)::bigint,
+              floor(extract(epoch from clock_timestamp())*1000)::bigint
+            );
+            v_breakdown:=v_buy->'order'->'charges_breakdown';
+            IF (v_breakdown->>'exchangeTransactionPaise')::bigint<>29
+               OR (v_breakdown->>'ipftPaise')::bigint<>0
+               OR (v_breakdown->>'sebiPaise')::bigint<>0
+               OR (v_breakdown->>'stampDutyPaise')::bigint<>2
+               OR (v_breakdown->>'gstPaise')::bigint<>365
+               OR (v_breakdown->>'totalChargesPaise')::bigint<>2396
+               OR (v_breakdown->>'totalDebitPaise')::bigint<>83646 THEN
+              RAISE EXCEPTION 'NSE BUY charge vector diverges from Firebase JS golden values: %',v_breakdown;
+            END IF;
+            -- Matches trading-charges.test.js: BSE BUY, gross 100,000 paise.
+            v_bse:=public.execute_paper_long_option_order(
+              '77777777-7777-4777-8777-777777777777',repeat('c',64),
+              '24242424-2424-4424-8424-242424242424',repeat('d',64),
+              'BSE_FO|GOLDEN','GOLDEN','BSE','BSE_FO','PE',
+              current_date+10,22000,25,5,1,'BUY',4000,
+              floor(extract(epoch from clock_timestamp())*1000)::bigint,
+              floor(extract(epoch from clock_timestamp())*1000)::bigint
+            );
+            v_breakdown:=v_bse->'order'->'charges_breakdown';
+            IF (v_breakdown->>'exchangeTransactionPaise')::bigint<>33
+               OR (v_breakdown->>'totalChargesPaise')::bigint<>2402
+               OR (v_breakdown->>'gstPaise')::bigint<>366
+               OR (v_breakdown->>'totalDebitPaise')::bigint<>102402 THEN
+              RAISE EXCEPTION 'BSE BUY charge vector diverges from Firebase JS golden values: %',v_breakdown;
+            END IF;
+            -- Tiny-premium close: gross 100 paise, fixed charges exceed proceeds.
+            v_sell:=public.execute_paper_long_option_order(
+              '66666666-6666-4666-8666-666666666666',repeat('e',64),
+              '25252525-2525-4525-8525-252525252525',repeat('f',64),
+              'NSE_FO|GOLDEN','GOLDEN','NSE','NSE_FO','CE',
+              current_date+10,22000,25,5,1,'SELL',100,
+              floor(extract(epoch from clock_timestamp())*1000)::bigint,
+              floor(extract(epoch from clock_timestamp())*1000)::bigint
+            );
+            v_breakdown:=v_sell->'order'->'charges_breakdown';
+            IF (v_breakdown->>'grossPaise')::bigint<>100
+               OR (v_breakdown->>'netCreditPaise')::bigint>=0
+               OR (v_breakdown->>'stampDutyPaise')::bigint<>0
+               OR (v_breakdown->>'totalChargesPaise')::bigint<=100 THEN
+              RAISE EXCEPTION 'Tiny-premium negative-net-credit vector mismatch: %',v_breakdown;
+            END IF;
+          END
+          $;
+          SQL
       - name: Exercise concurrent duplicate Options requests
         run: |
           set -euo pipefail
