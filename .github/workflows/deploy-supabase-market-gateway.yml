@@ -52,6 +52,12 @@ jobs:
       - name: Set up Google Cloud SDK
         uses: google-github-actions/setup-gcloud@v2
 
+      - name: Enable required Google Cloud APIs
+        shell: bash
+        run: |
+          set -euo pipefail
+          gcloud services enable run.googleapis.com cloudbuild.googleapis.com artifactregistry.googleapis.com cloudscheduler.googleapis.com --project "$PROJECT_ID"
+
       - name: Verify required Secret Manager entries exist
         shell: bash
         run: |
@@ -94,7 +100,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          curl --fail --silent --show-error --retry 10 --retry-delay 5 "$MARKET_GATEWAY_URL/health"
+          curl --fail --silent --show-error --retry 10 --retry-delay 5 "$MARKET_GATEWAY_URL/health" -o gateway-health.json
+          grep -q '"authProvider":"supabase"' gateway-health.json
 
       - name: Deploy isolated Supabase LIMIT worker Cloud Run Job
         shell: bash
