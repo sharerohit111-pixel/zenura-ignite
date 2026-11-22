@@ -22,7 +22,7 @@
     simpleTag:"TEXT",brush:"TEXT",segment:"PRICE_RANGE",priceLine:"HORIZONTAL_LINE"
   };
   let libraryPromise=null,chart=null,container=null,context=null,barCallback=null,lastBar=null;
-  let pendingQuote=null,framePending=false,activeTheme="dark",suppressRemove=false;
+  let pendingQuote=null,framePending=false,activeTheme=(document.body?.dataset?.chartTheme||"dark"),suppressRemove=false;
   const overlayRows=new Map(),undoStack=[],redoStack=[],activeIndicators=new Set();
 
   function loadLibrary(){
@@ -206,6 +206,7 @@
   }
   async function mount(options){
     const lib=await loadLibrary();
+    root.ZenuraChartIndicators?.register(lib);
     if(!container||container!==options.container){
       if(chart){try{lib.dispose(container);}catch(_){}}
       container=options.container;
