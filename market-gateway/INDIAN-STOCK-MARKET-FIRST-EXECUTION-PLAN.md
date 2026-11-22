@@ -117,3 +117,12 @@ This section supersedes the earlier BSE fail-closed status notes above.
 5. Obtain written provider market-data permission and Indian legal review before public real-time data access or production deployment.
 
 Do not infer operational readiness from green disposable-database CI. The empty frontend gateway URL, disabled opt-in workers, unimported verified exchange snapshots, missing staging evidence and unresolved data-rights gate remain release blockers.
+
+## Protective-order UI integration checkpoint — 2026-11-23
+
+- Added isolated frontend module `markets/stocks/protective-orders.js` and loaded it from the Indian stock terminal without changing the existing MARKET/LIMIT order workspace.
+- The module provides authenticated create/list/cancel flows for NSE/BSE cash-equity Delivery and Intraday protective exits, Stop-Loss/Target trigger input, account-scoped retry idempotency, account-switch clearing, safe text-only rendering and Hindi/English synchronization.
+- Creation controls remain disabled unless the authenticated gateway reports `workerEnabled=true`; the gateway itself rejects creation with HTTP 503 when its protective worker is disabled. The backend independently verifies that the selected instrument is an official NSE/BSE cash equity.
+- Added dedicated UI contract tests and included the new module in the JavaScript syntax-check command.
+- GitHub Actions run [45081736573](https://github.com/sharerohit111-pixel/zenura-ignite/actions/runs/45081736573) passed on commit `cf9c7d37c787fbdce50b5bf363c4ca38b348161c`. All 50 numbered validation steps passed, including the full gateway regression suite, disposable PostgreSQL migrations, BSE/session import tests, protective fill/cancel concurrency race and schema/RLS checks.
+- The UI integration does not enable the worker or constitute a browser-to-staging end-to-end rehearsal. Keep the worker disabled until the staging trigger/cancel flow, data-rights and release gates are reviewed.
