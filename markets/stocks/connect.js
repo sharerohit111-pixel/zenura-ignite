@@ -1,6 +1,9 @@
 /* Native Supabase Auth connector for the ZENURA IGNITE Indian Market workspace. */
 import { supabase } from "./supabase-client.js";
 
+// Shared only with same-origin chart persistence; authenticated requests still use the user session and RLS.
+window.ZENURA_SUPABASE = supabase;
+
 const button = document.getElementById("upstox-connect");
 const disconnectButton = document.getElementById("upstox-disconnect");
 const card = document.getElementById("connection");
