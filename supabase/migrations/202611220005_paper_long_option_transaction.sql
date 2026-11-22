@@ -66,6 +66,7 @@ declare
   v_open_count bigint;
   v_fingerprint text;
   v_order jsonb;
+  v_server_now_ms bigint;
 begin
   if p_user_id is null or p_idempotency_key is null
      or p_order_id !~ '^[a-f0-9]{64}$'
@@ -99,15 +100,20 @@ begin
     raise exception 'Contract value exceeds safe integer paise limits.' using errcode='22003';
   end if;
 
-  v_quote_age := p_now_ms - p_quote_timestamp_ms;
-  if p_quote_timestamp_ms>p_now_ms or v_quote_age>15000 then
+  -- Use the database clock, and reject a caller clock that is not current.
+  v_server_now_ms := floor(extract(epoch from clock_timestamp())*1000)::bigint;
+  if abs(v_server_now_ms-p_now_ms)>2000 then
+    raise exception 'Option quote clock is not current.' using errcode='22023';
+  end if;
+  v_quote_age := v_server_now_ms - p_quote_timestamp_ms;
+  if p_quote_timestamp_ms>v_server_now_ms or v_quote_age>15000 then
     raise exception 'A matching fresh provider quote is required.' using errcode='22023';
   end if;
 
   -- Expiry-day 15:30 Asia/Kolkata cutoff, represented as UTC epoch milliseconds.
   v_expiry_cutoff_ms :=
     extract(epoch from ((p_expiry + time '15:30') at time zone 'Asia/Kolkata')) * 1000;
-  if p_now_ms > v_expiry_cutoff_ms then
+  if v_server_now_ms > v_expiry_cutoff_ms then
     raise exception 'Expired derivative contracts cannot be traded.' using errcode='22023';
   end if;
 
