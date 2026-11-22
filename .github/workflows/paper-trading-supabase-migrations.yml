@@ -70,7 +70,9 @@ jobs:
       - name: Verify Supabase-only Cloud Run entrypoint and production dependency boundary
         run: node --test market-gateway/test/supabase-deployment.test.js
       - name: Check Supabase LIMIT worker eligibility and cursor safety
-        run: node --test market-gateway/test/paper-limit-worker.test.js
+        run: |
+          node --check market-gateway/paper-limit-worker.js
+          node --test market-gateway/test/paper-limit-worker.test.js
       - name: Check Supabase-native gateway and token security
         run: |
           node --check market-gateway/lib/supabase-runtime.js
