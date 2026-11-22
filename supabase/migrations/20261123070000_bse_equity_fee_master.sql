@@ -38,7 +38,7 @@ begin
   end if;
   if p_source_sha256 is null or p_source_sha256 !~ '^[a-f0-9]{64}$'
      or p_source_reference is null
-     or lower(p_source_reference) !~ '^https?://([a-z0-9-]+\.)*bseindia\.com(/|$)' then
+     or lower(p_source_reference) !~ '^https://([a-z0-9-]+\.)*bseindia\.com(/|$)' then
     raise exception using errcode='22023',message='BSE master provenance is invalid';
   end if;
   if p_rows is null or jsonb_typeof(p_rows)<>'array' then
