@@ -3,6 +3,7 @@ const test=require("node:test");
 const assert=require("node:assert/strict");
 const {marketClockParts,normalizeMarketSession,normalizeExchangeSessionRow,isIntradaySessionOpen,isIntradayOrderExpired,isEligibleIntradayLimitOrder}=require("../lib/intraday-limit-policy");
 const normalSession={exchange:"NSE",sessionDate:"2026-11-23",isTradingDay:true,openMinute:9*60+15,closeMinute:15*60+30};
+const bseSession={...normalSession,exchange:"BSE"};
 
 const epoch=iso=>Date.parse(iso);
 const order={order_type:"LIMIT",status:"PENDING",simulation_only:true,product:"INTRADAY",exchange:"NSE",
@@ -55,7 +56,9 @@ test("intraday LIMIT eligibility requires fresh quote, active session and exact 
  assert.equal(isEligibleIntradayLimitOrder(order,quote,now,{exchange:"NSE",sessionDate:"2026-11-23",isTradingDay:false,openMinute:555,closeMinute:930}),false);
  assert.equal(isEligibleIntradayLimitOrder({...order,product:"DELIVERY"},quote,now,normalSession),false);
  assert.equal(isEligibleIntradayLimitOrder({...order,simulation_only:false},quote,now,normalSession),false);
- assert.equal(isEligibleIntradayLimitOrder({...order,exchange:"BSE"},quote,now,normalSession),false,"BSE must remain disabled until scrip-group fees are available");
+ const bseOrder={...order,exchange:"BSE",instrument_key:"BSE_EQ|INE002A01018"};
+ assert.equal(isEligibleIntradayLimitOrder(bseOrder,quote,now,bseSession),true);
+ assert.equal(isEligibleIntradayLimitOrder(bseOrder,quote,now,normalSession),false,"BSE order must not use an NSE session");
 });
 test("intraday LIMIT worker never executes orders created outside the current trading session",()=>{
  const now=epoch("2026-11-23T04:30:01.000Z");
