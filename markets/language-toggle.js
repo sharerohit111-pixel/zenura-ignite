@@ -32,7 +32,7 @@
     "BR / AR":"BR / AR","CR Indicator":"CR इंडिकेटर","Dual MA (DMA)":"डुअल MA (DMA)","Psychological Line (PSY)":"साइकोलॉजिकल लाइन (PSY)",
     "Awesome Oscillator (AO)":"ऑसम ऑसिलेटर (AO)","Momentum (MTM)":"मोमेंटम (MTM)","Volume Ratio (VR)":"वॉल्यूम रेशियो (VR)",
     "Money Flow Index":"मनी फ्लो इंडेक्स","Rate of Change":"रेट ऑफ चेंज","Price Volume Trend":"प्राइस वॉल्यूम ट्रेंड",
-    "ADD INDICATOR":"इंडिकेटर जोड़ें","Trendline":"ट्रेंडलाइन","Horizontal":"क्षैतिज","Vertical":"लंबवत","Ray":"रे",
+    "ADD INDICATOR":"इंडिकेटर जोड़ें","REMOVE SELECTED":"चुना इंडिकेटर हटाएँ","Trendline":"ट्रेंडलाइन","Horizontal":"क्षैतिज","Vertical":"लंबवत","Ray":"रे",
     "Channel":"चैनल","Fibonacci":"फिबोनाची","Fib Ext.":"फिबोनाची एक्सटेंशन","Rectangle":"आयत","Circle":"वृत्त","Arrow":"तीर","Text":"टेक्स्ट","Brush":"ब्रश","Measure":"मापें",
     "Chart template name":"चार्ट टेम्पलेट का नाम","SAVE TEMPLATE":"टेम्पलेट सेव करें","Saved templates":"सेव टेम्पलेट","LOAD":"लोड करें",
     "UNDO":"पूर्ववत","REDO":"फिर से करें","DELETE LAST":"आखिरी हटाएँ",
