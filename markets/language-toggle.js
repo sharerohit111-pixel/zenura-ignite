@@ -4,6 +4,7 @@
   const HI=Object.freeze({
     "ZENURA IGNITE · Indian Stock Market":"ZENURA IGNITE · भारतीय शेयर बाजार",
     "ZENURA IGNITE · Paper Investing":"ZENURA IGNITE · पेपर निवेश",
+    "ZENURA IGNITE · Paper Trading & Paper Investing":"ZENURA IGNITE · पेपर ट्रेडिंग और पेपर निवेश",
     "Paper Trading":"पेपर ट्रेडिंग","Paper Investing":"पेपर निवेश",
     "PAPER TRADING":"पेपर ट्रेडिंग","PAPER INVESTING":"पेपर निवेश",
     "← ALL MARKETS":"← सभी मार्केट","INDIAN STOCK MARKET":"भारतीय शेयर बाजार",
