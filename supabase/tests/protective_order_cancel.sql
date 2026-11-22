@@ -121,3 +121,4 @@ DELETE FROM public.paper_protective_orders
    'cececece-cece-4ece-8ece-cececececece'
  );
 DELETE FROM public.paper_equity_positions WHERE user_id='11111111-1111-4111-8111-111111111111' AND instrument_key='NSE_EQ|CREATE_TEST' AND product='DELIVERY';
+DELETE FROM public.paper_equity_positions WHERE user_id='11111111-1111-4111-8111-111111111111' AND instrument_key='NSE_EQ|CANCEL_OWN' AND product='DELIVERY';
