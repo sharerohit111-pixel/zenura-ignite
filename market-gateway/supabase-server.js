@@ -871,7 +871,7 @@ async function runPaperProtectiveWorker({maxOrders=20}={}){
       .select("order_id,user_id,asset_class,instrument_key,product,side,trigger_type,trigger_direction,trigger_price_paise,quantity,status,created_at")
       .eq("status","ACTIVE").eq("asset_class","EQUITY").eq("side","SELL")
       .in("product",["DELIVERY","INTRADAY"])
-      .order("last_evaluated_quote_at_ms",{ascending:true,nullsFirst:true})
+      .order("worker_checked_at",{ascending:true,nullsFirst:true})
       .order("created_at",{ascending:true}).limit(maxOrders);
     if(batch.error)throw new Error("Active equity protective orders could not be scanned.");
     const orders=batch.data||[];summary.scanned=orders.length;
@@ -904,11 +904,11 @@ async function runPaperProtectiveWorker({maxOrders=20}={}){
           try{const normalized=normalizeProviderQuote(entry,order.instrument_key,{now,maxAgeMs:15000});
             quote={instrumentKey:order.instrument_key,pricePaise:normalized.pricePaise,tradeTimeMs:normalized.tradeTimeMs};
           }catch(_){}
-          if(!quote){summary.notEligible++;continue;}
           const evaluated=await serviceDb.from("paper_protective_orders")
-            .update({last_evaluated_quote_at_ms:quote.tradeTimeMs})
+            .update({worker_checked_at:new Date(now).toISOString(),...(quote?{last_evaluated_quote_at_ms:quote.tradeTimeMs}:{})})
             .eq("order_id",order.order_id).eq("status","ACTIVE");
           if(evaluated.error){summary.failed++;continue;}
+          if(!quote){summary.notEligible++;continue;}
           if(!evaluateProtectiveOrder(order,quote,now)){summary.notEligible++;continue;}
           const position=positions.find(p=>p.instrument_key===order.instrument_key&&p.product===order.product);
           if(!isPositionCloseable(order,position)){summary.notEligible++;continue;}
