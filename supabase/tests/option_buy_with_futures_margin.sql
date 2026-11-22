@@ -30,7 +30,7 @@ BEGIN
   v_now:=floor(extract(epoch from clock_timestamp())*1000)::bigint;
   v_result:=public.execute_paper_long_option_order(
     'abababab-abab-4bab-8bab-abababababab',
-    repeat('a',64),'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',repeat('b',64),
+    repeat('e',32)||repeat('f',32),'abababab-0000-4000-8000-000000000001',repeat('b',64),
     'NSE_FO|NIFTY_MARGIN_COMPAT_CE','NIFTY_MARGIN_COMPAT_CE',
     'NSE','NSE_FO','CE',current_date+5,25000,65,5,1,'BUY',1250,v_now,v_now
   );
