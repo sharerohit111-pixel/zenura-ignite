@@ -1,7 +1,11 @@
 "use strict";
 const test=require("node:test");
 const assert=require("node:assert/strict");
-const {transformAccount,transformEquityOrder,transformDerivativeOrder,transformWatchlist,transformRecord,user}=require("../scripts/firebase-to-supabase-transform");
+const fs=require("node:fs/promises");
+const os=require("node:os");
+const path=require("node:path");
+const crypto=require("node:crypto");
+const {transformAccount,transformEquityOrder,transformDerivativeOrder,transformWatchlist,transformRecord,user,validateUserMap,transformExport}=require("../scripts/firebase-to-supabase-transform");
 const map={"legacy-user":"123e4567-e89b-42d3-a456-426614174000"};
 const acct={
  currency:"INR",createdAt:"2026-11-20T09:00:00Z",updatedAt:"2026-11-20T10:00:00Z",startingCashPaise:100000000,cashPaise:85000000,reservedCashPaise:5000000,
@@ -60,4 +64,47 @@ test("dispatches account records",()=>{
  const r=transformRecord({collection:"indianPaperAccounts",documentId:"legacy-user",data:acct},map);
  assert.equal(r.table,"paper_accounts");
  assert.equal(r.positions.length,2);
+});
+
+test("rejects duplicate Supabase UUIDs mapped to different Firebase UIDs",()=>{
+ assert.throws(()=>validateUserMap({"legacy-one":map["legacy-user"],"legacy-two":map["legacy-user"]}),/multiple Firebase UIDs/);
+});
+test("emits the private Firebase identity-map import file and import order",async()=>{
+ const root=await fs.mkdtemp(path.join(os.tmpdir(),"zenura-transform-"));
+ const input=path.join(root,"input"),output=path.join(root,"output");
+ await fs.mkdir(input);
+ const auth=JSON.stringify({uid:"legacy-user",emailVerified:true})+"\n";
+ const account=JSON.stringify({collection:"indianPaperAccounts",documentId:"legacy-user",data:acct})+"\n";
+ const digest=value=>crypto.createHash("sha256").update(value).digest("hex");
+ const manifest={format:"zenura-firebase-read-only-export-v1",projectId:"synthetic-test",importPerformed:false,
+  files:{"firebase-auth-users.jsonl":{count:1,sha256:digest(auth)},"indianPaperAccounts.jsonl":{count:1,sha256:digest(account)}}};
+ await fs.writeFile(path.join(input,"firebase-auth-users.jsonl"),auth);
+ await fs.writeFile(path.join(input,"indianPaperAccounts.jsonl"),account);
+ await fs.writeFile(path.join(input,"manifest.json"),JSON.stringify(manifest));
+ const report=await transformExport({inputDirectory:input,outputDirectory:output,userMap:map});
+ const rows=(await fs.readFile(path.join(output,"paper_user_identity_map.jsonl"),"utf8")).trim().split("\n").map(JSON.parse);
+ assert.deepEqual(rows,[{supabase_user_id:map["legacy-user"],firebase_uid:"legacy-user"}]);
+ assert.equal(report.importAllowed,true);
+ assert.equal(report.files.paper_user_identity_map.count,1);
+ assert.equal(report.importOrder[0],"paper_user_identity_map");
+ assert.equal(report.supabaseWrites,0);
+ await fs.rm(root,{recursive:true,force:true});
+});
+test("quarantines Firestore data whose UID is absent from Firebase Auth export",async()=>{
+ const root=await fs.mkdtemp(path.join(os.tmpdir(),"zenura-orphan-"));
+ const input=path.join(root,"input"),output=path.join(root,"output");
+ await fs.mkdir(input);
+ const auth=JSON.stringify({uid:"some-other-user"})+"\n";
+ const account=JSON.stringify({collection:"indianPaperAccounts",documentId:"legacy-user",data:acct})+"\n";
+ const digest=value=>crypto.createHash("sha256").update(value).digest("hex");
+ const manifest={format:"zenura-firebase-read-only-export-v1",projectId:"synthetic-test",importPerformed:false,
+  files:{"firebase-auth-users.jsonl":{count:1,sha256:digest(auth)},"indianPaperAccounts.jsonl":{count:1,sha256:digest(account)}}};
+ await fs.writeFile(path.join(input,"firebase-auth-users.jsonl"),auth);
+ await fs.writeFile(path.join(input,"indianPaperAccounts.jsonl"),account);
+ await fs.writeFile(path.join(input,"manifest.json"),JSON.stringify(manifest));
+ const report=await transformExport({inputDirectory:input,outputDirectory:output,userMap:map});
+ assert.equal(report.errorCount,1);
+ assert.equal(report.importAllowed,false);
+ assert.equal(report.files.paper_user_identity_map,undefined);
+ await fs.rm(root,{recursive:true,force:true});
 });
