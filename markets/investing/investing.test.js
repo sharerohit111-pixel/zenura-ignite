@@ -16,6 +16,7 @@ const manifest=JSON.parse(fs.readFileSync(path.join(pwaRoot,"manifest.webmanifes
 const portal=fs.readFileSync(path.join(pwaRoot,"index.html"),"utf8");
 const languageToggle=fs.readFileSync(path.join(pwaRoot,"language-toggle.js"),"utf8");
 const chartTheme=fs.readFileSync(path.join(root,"../stocks/chart-theme.js"),"utf8");
+const sharedCss=fs.readFileSync(path.join(root,"../stocks/stocks.css"),"utf8");
 test("Paper Investing page includes all locally referenced modules and styles",()=>{
  const assetRefs=[
   ...[...html.matchAll(/<script[^>]*src="([^"]+)"/gi)].map(match=>match[1]),
@@ -139,4 +140,10 @@ test("Chart users can add and remove indicators and load templates as replacemen
  assert.match(engine,/function removeIndicator\(name\)/);
  assert.match(engine,/chart\.removeIndicator\(\{name\}\)/);
  assert.match(engine,/activeIndicators\.clear\(\)/);
+});
+
+test("Professional chart editing toolbar is styled for desktop and touch screens",()=>{
+ assert.match(sharedCss,/\.chart-toolbar\s*\{/);
+ assert.match(sharedCss,/@media\s*\(max-width:\s*650px\)/);
+ assert.match(sharedCss,/chart-remove-indicator/);
 });
