@@ -21,6 +21,10 @@ DECLARE
     'upstox_connections','upstox_oauth_states','upstox_connection_controls',
     'paper_market_stream_leases','paper_market_worker_state','paper_margin_preview_limits'
   ];
+  authenticated_read_tables text[] := ARRAY[
+    'paper_accounts','paper_equity_positions','paper_derivative_positions',
+    'paper_orders','paper_derivative_orders','paper_watchlists'
+  ];
   server_only_tables text[] := ARRAY[
     'paper_user_identity_map','paper_accounts','paper_equity_positions',
     'paper_derivative_positions','paper_orders','paper_derivative_orders',
@@ -55,6 +59,16 @@ BEGIN
     ) THEN RAISE EXCEPTION 'RLS is not enabled on %', t; END IF;
   END LOOP;
 
+  -- Every authenticated read surface must have an owner-scoped SELECT policy.
+  FOREACH t IN ARRAY authenticated_read_tables LOOP
+    IF NOT EXISTS (
+      SELECT 1 FROM pg_policies p
+      WHERE p.schemaname='public' AND p.tablename=t
+        AND p.cmd='SELECT' AND 'authenticated'=ANY(p.roles)
+        AND p.qual ILIKE '%auth.uid()%' AND p.qual ILIKE '%user_id%'
+    ) THEN RAISE EXCEPTION 'Missing owner-scoped authenticated SELECT policy on %', t; END IF;
+  END LOOP;
+
   FOREACH t IN ARRAY server_only_tables LOOP
     IF has_table_privilege('anon', 'public.'||t, 'SELECT')
        OR has_table_privilege('authenticated', 'public.'||t, 'INSERT')
@@ -64,11 +78,11 @@ BEGIN
     END IF;
   END LOOP;
 
-  IF NOT has_table_privilege('authenticated','public.paper_accounts','SELECT')
-     OR NOT has_table_privilege('authenticated','public.paper_orders','SELECT')
-     OR NOT has_table_privilege('authenticated','public.paper_equity_positions','SELECT') THEN
-    RAISE EXCEPTION 'Expected authenticated read grants are missing';
-  END IF;
+  FOREACH t IN ARRAY authenticated_read_tables LOOP
+    IF NOT has_table_privilege('authenticated','public.'||t,'SELECT') THEN
+      RAISE EXCEPTION 'Expected authenticated SELECT grant is missing on %', t;
+    END IF;
+  END LOOP;
   IF NOT has_table_privilege('authenticated','public.paper_watchlists','INSERT')
      OR NOT has_table_privilege('authenticated','public.paper_watchlists','UPDATE')
      OR NOT has_table_privilege('authenticated','public.paper_watchlists','DELETE') THEN
@@ -118,6 +132,19 @@ BEGIN
   IF (SELECT count(*) FROM public.paper_watchlists) <> 1 THEN
     RAISE EXCEPTION 'RLS failed: user A sees unexpected watchlist rows';
   END IF;
+  -- UPDATE/DELETE against user B's row must affect zero rows; own row remains mutable.
+  UPDATE public.paper_watchlists SET name='Banking'
+    WHERE user_id='22222222-2222-4222-8222-222222222222' AND name='My Stocks';
+  IF FOUND THEN RAISE EXCEPTION 'RLS failed: user A updated user B watchlist'; END IF;
+  DELETE FROM public.paper_watchlists
+    WHERE user_id='22222222-2222-4222-8222-222222222222';
+  IF FOUND THEN RAISE EXCEPTION 'RLS failed: user A deleted user B watchlist'; END IF;
+  UPDATE public.paper_watchlists SET instrument_keys=ARRAY['NSE_EQ|TEST003']
+    WHERE user_id='11111111-1111-4111-8111-111111111111' AND name='My Stocks';
+  IF NOT FOUND THEN RAISE EXCEPTION 'RLS failed: user A cannot update own watchlist'; END IF;
+  DELETE FROM public.paper_watchlists
+    WHERE user_id='11111111-1111-4111-8111-111111111111' AND name='My Stocks';
+  IF NOT FOUND THEN RAISE EXCEPTION 'RLS failed: user A cannot delete own watchlist'; END IF;
 END
 $$;
 ROLLBACK;
