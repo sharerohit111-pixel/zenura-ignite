@@ -20,7 +20,7 @@ test("database exchange calendar rows must be verified, current and match the re
  const now=epoch("2026-11-23T04:30:00.000Z");
  const row={exchange:"NSE",session_date:"2026-11-23",is_trading_day:true,
   open_minute:555,close_minute:930,source_reference:"NSE official circular",
-  verified_at:"2026-11-23T04:00:00.000Z"};
+  verified_at:"2026-11-23T04:00:00.000Z",source_sha256:"a".repeat(64)};
  assert.deepEqual(normalizeExchangeSessionRow(row,"NSE","2026-11-23",now),normalSession);
  assert.equal(normalizeExchangeSessionRow({...row,exchange:"BSE"},"NSE","2026-11-23",now),null);
  assert.equal(normalizeExchangeSessionRow({...row,session_date:"2026-11-24"},"NSE","2026-11-23",now),null);
