@@ -41,17 +41,26 @@ The browser must never submit or control the user UUID, execution price, quote t
 - Existing market, options, futures, Paper Investing, OAuth/stream and gateway regression checks remain in the same passing CI workflow.
 - Frontend module syntax, deployment workflow YAML, gateway security checks and production container build pass.
 
-## Validation added for Crypto LIMIT lifecycle
+## Validation completed for Crypto LIMIT lifecycle
 - Disposable PostgreSQL CI covers pending BUY reservation, idempotent replay, worse-than-limit rejection, favorable fill, SELL quantity reservation, cancellation release, SELL fill and INR cash/realized-P&L accounting.
 - Worker eligibility tests reject unsupported symbols, malformed quantity, stale/future quotes and unfavorable prices.
+- Concurrent duplicate LIMIT submission and fill-versus-cancel race coverage passes; the database transaction permits only one winning lifecycle transition.
+- Explicit NULL LIMIT side rejection is covered before any reservation/order write.
+- CI run 45033083572 completed successfully with all 49 workflow steps passing on commit 436251b67858200b280584bcb50eeebf65d26eea.
+
+## Current integration boundary
+- The Crypto Terminal loads the Supabase auth and cloud modules. Signed-in MARKET and LIMIT orders use the trusted gateway; cloud portfolio and order history are published back into the existing UI.
+- Cloud LIMIT cancellation is wired to the authenticated gateway.
+- Signed-in stop-loss/target execution and cloud account reset remain intentionally blocked until server-side implementations exist. Guest-only local simulation remains separate.
+- The cloud API URL remains empty in the page metadata until the trusted gateway is deliberately deployed; signed-in trading therefore fails closed before deployment.
 
 ## Remaining work before production
-1. Complete CI for the additive Crypto LIMIT migration and server-worker wiring; then run schema and authenticated read/write flows in a disposable Supabase branch/project.
-2. Deploy and verify the trusted gateway, CORS allowlist, secrets and external market-data rights; then verify account initialization, BUY/SELL and portfolio/history end-to-end.
-3. Add crypto-specific concurrency/idempotency race tests.
-4. Implement LIMIT order reservation/fill/cancel and server-side stop-loss/target execution as separate tested increments.
-5. Remove Firebase/localStorage trading persistence only after cloud cutover and guest-data behavior are explicitly preserved.
-6. Audit Paper Investing dependencies separately; do not delete database objects until app-wide references and regression tests prove they are unused.
+1. Create or identify an isolated Supabase staging project/branch and apply the migrations there; verify authenticated account initialization, MARKET BUY/SELL, LIMIT reserve/fill/cancel, portfolio/history and two-user isolation end-to-end.
+2. Deploy the trusted gateway only to staging with exact CORS origins, server-only secrets, health checks, operational logging and approved market-data usage; verify the deployed service against staging.
+3. Implement server-side stop-loss/target execution and cloud account lifecycle/reset as separate additive, tested increments before enabling those controls for signed-in users.
+4. Reconcile guest/local historical data and legacy Firebase records with an explicit import/retention plan. Do not delete or overwrite legacy data during cutover.
+5. Audit Paper Investing dependencies separately; do not delete database objects until app-wide references and regression tests prove they are unused.
+6. Obtain explicit production migration and deployment approval only after staging evidence and rollback procedures are reviewed.
 
 ## Safety
 No production database migration has been applied and no gateway deployment has been performed. Existing Firebase/Google Cloud resources and customer data have not been modified.
