@@ -72,6 +72,8 @@ jobs:
           node --check market-gateway/supabase-server.js
           node --check market-gateway/lib/upstox-token-crypto.js
           node --test market-gateway/test/supabase-runtime.test.js market-gateway/test/upstox-token-crypto.test.js
+      - name: Build Supabase-native Cloud Run container from repository root
+        run: docker build --pull -f market-gateway/Dockerfile -t zenura-market-gateway:ci .
       - name: Run Existing transaction reference charge-calculation boundary tests
         run: node --test market-gateway/test/trading-charges.test.js
       - name: Run Existing transaction reference option transaction tests
