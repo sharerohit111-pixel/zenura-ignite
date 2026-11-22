@@ -22,7 +22,7 @@ test("parses BSE standardized master fields 1-5, 59, 60 and 64",()=>{
   );
 });
 test("strips a UTF-8 BOM from the standardized BSE CSV",()=>{
-  const rows=parseBseStandardizedScripMaster("\\uFEFF"+makeRow().join(","),{sourceDate:"2026-11-23"});
+  const rows=parseBseStandardizedScripMaster("\uFEFF"+makeRow().join(","),{sourceDate:"2026-11-23"});
   assert.equal(rows[0].isin,"INE002A01018");
 });
 test("parses quoted commas and ignores non-equity or inactive instruments",()=>{
