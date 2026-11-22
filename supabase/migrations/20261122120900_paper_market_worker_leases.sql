@@ -20,7 +20,7 @@ begin
     state_key,cursor_order_id,cursor_created_at,lease_token,lease_expires_at,updated_at
   ) values(
     p_state_key,null,null,p_lease_token,
-    to_timestamp(p_now_ms::numeric/1000)+make_interval(secs=>p_ttl_ms::numeric/1000),
+    to_timestamp((p_now_ms+p_ttl_ms)::double precision/1000.0),
     clock_timestamp()
   )
   on conflict(state_key) do update set
