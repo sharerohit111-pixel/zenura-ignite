@@ -702,13 +702,13 @@ begin
      or p_instrument_key is null or length(p_instrument_key) not between 1 and 100
      or p_side not in ('BUY','SELL')
      or p_product not in ('DELIVERY','INTRADAY')
-     or p_exchange is null or p_exchange <> 'NSE'
+     or p_exchange is null or p_exchange not in ('NSE','BSE')
      or p_quantity not between 1 and 1000000
      or p_execution_price_paise <= 0
      or p_quote_timestamp_ms is null or p_quote_timestamp_ms <= 0
      or p_quote_age_ms is null or p_quote_age_ms < 0
      or p_quote_age_ms > 15000 then
-    raise exception using errcode='22023', message='Invalid request: NSE cash-equity MARKET orders require a verified supported instrument and fee schedule';
+    raise exception using errcode='22023', message='Invalid request: cash-equity MARKET orders require a verified supported instrument and fee schedule';
   end if;
 
   -- Never trust a caller-supplied quote age or clock: derive freshness from PostgreSQL time.
