@@ -19,7 +19,7 @@
     priceChannelLine:"CHANNEL",fibonacciLine:"FIBONACCI_RETRACEMENT",
     zenuraFibExtension:"FIBONACCI_EXTENSION",zenuraRectangle:"RECTANGLE",
     zenuraCircle:"CIRCLE",zenuraArrow:"ARROW",simpleAnnotation:"TEXT",
-    simpleTag:"TEXT",brush:"TEXT",segment:"PRICE_RANGE",priceLine:"HORIZONTAL_LINE"
+    simpleTag:"TEXT",brush:"BRUSH",segment:"PRICE_RANGE",priceLine:"HORIZONTAL_LINE"
   };
   let libraryPromise=null,chart=null,container=null,context=null,barCallback=null,lastBar=null;
   let pendingQuote=null,framePending=false,activeTheme=(document.body?.dataset?.chartTheme||"dark"),activeChartType="CANDLE",suppressRemove=false;
@@ -73,7 +73,7 @@
     const dark=theme!=="light";
     return {
       grid:{horizontal:{color:dark?"#1d2c40":"#e7edf4"},vertical:{color:dark?"#1d2c40":"#e7edf4"}},
-      candle:{type:chartType==="OHLC"?"ohlc":(chartType==="AREA"||chartType==="LINE"?"area":"candle_solid"),bar:{
+      candle:{type:chartType==="OHLC"?"ohlc":chartType==="LINE"?"line":chartType==="AREA"?"area":"candle_solid",bar:{
         upColor:"#22c99a",downColor:"#ff5c76",noChangeColor:dark?"#91a0b5":"#778399",
         upBorderColor:"#22c99a",downBorderColor:"#ff5c76",
         upWickColor:"#22c99a",downWickColor:"#ff5c76"
