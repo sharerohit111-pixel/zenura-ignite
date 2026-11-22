@@ -49,6 +49,7 @@ test("Paper Investing clears private state and rejects late responses after acco
  assert.match(js,/if\(connector\(\)\?\.getUserId\?\.\(\)===uid\)/);
  assert.match(js,/positionsBody\.replaceChildren\(\)/);
  assert.match(js,/ordersBody\.replaceChildren\(\)/);
+ assert.match(js,/uid!==authUserId/);
 });
 test("Paper Investing server routes and SQL ledger are independent from Paper Trading",()=>{
  for(const route of ['"/paper/investing/account"','"/paper/investing/portfolio"','"/paper/investing/orders"'])
