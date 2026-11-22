@@ -16,6 +16,18 @@ This is the Node.js 22 market-data and paper-order gateway for the **new ZENURA 
 - `MAX_INSTRUMENT_KEYS`: stream subscription guardrail (default 100, hard maximum 500).
 - `PORT`: Cloud Run supplies this automatically (default 8080 locally).
 
+## BSE cash-equity fee master
+
+BSE cash-equity LIMIT/MARKET settlement uses the exchange's daily standardized scrip master for ISIN-to-scrip-group and BSE-exclusive classification. Download the official `BSE_EQ_SCRIP_DDMMYYYY.csv` from BSE Members Help Desk and import it from a trusted server environment:
+
+```sh
+SUPABASE_URL=https://<project-ref>.supabase.co \
+SUPABASE_SERVICE_ROLE_KEY=<server-only-key> \
+npm run import:bse-master -- /secure/path/BSE_EQ_SCRIP_DDMMYYYY.csv YYYY-MM-DD
+```
+
+The importer validates the BSE field layout, filters active equity securities, computes a SHA-256 provenance hash and writes through a service-role-only RPC. Never put the service-role key in the browser or commit it. BSE P/ZP and unknown groups remain fail-closed because their special settlement/fee treatment is not simulated.
+
 ## Run and verify
 
 ```sh
