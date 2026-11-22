@@ -1,0 +1,105 @@
+{
+  "_comment": "Synthetic sanitized examples only. Ephemeral OAuth state and stream leases are intentionally marked non-migratable.",
+  "limitOrders": [
+    {
+      "uid": "firebase-user-fixture-001",
+      "requestFingerprint": "limit-buy-fingerprint-001",
+      "instrumentKey": "NSE_EQ|FIXTURE_A",
+      "tradingSymbol": "FIXTURE_A",
+      "exchange": "NSE",
+      "side": "BUY",
+      "product": "DELIVERY",
+      "orderType": "LIMIT",
+      "status": "PENDING",
+      "quantity": 2,
+      "limitPricePaise": 50500,
+      "reservedCashPaise": 101000,
+      "reservedQuantity": 0,
+      "reservationReleased": false,
+      "simulationOnly": true,
+      "createdAt": "2026-11-20T09:00:00.000Z"
+    },
+    {
+      "uid": "firebase-user-fixture-001",
+      "requestFingerprint": "limit-sell-fingerprint-002",
+      "instrumentKey": "NSE_EQ|FIXTURE_A",
+      "tradingSymbol": "FIXTURE_A",
+      "exchange": "NSE",
+      "side": "SELL",
+      "product": "DELIVERY",
+      "orderType": "LIMIT",
+      "status": "CANCELLED",
+      "quantity": 1,
+      "limitPricePaise": 51000,
+      "reservedCashPaise": 0,
+      "reservedQuantity": 1,
+      "reservationReleased": true,
+      "simulationOnly": true,
+      "cancelledAt": "2026-11-20T09:05:00.000Z"
+    }
+  ],
+  "derivativeOrder": {
+    "uid": "firebase-user-fixture-001",
+    "requestFingerprint": "derivative-fingerprint-001",
+    "instrumentKey": "NSE_FO|FIXTURE_CE",
+    "tradingSymbol": "FIXTURE CE",
+    "exchange": "NSE",
+    "segment": "NSE_FO",
+    "instrumentType": "CE",
+    "expiry": "2026-12-31",
+    "side": "BUY",
+    "quantity": 25,
+    "lots": 1,
+    "lotSize": 25,
+    "executionPricePaise": 1250,
+    "quoteTimestampMs": 1795168800000,
+    "quoteAgeMs": 450,
+    "grossPaise": 31250,
+    "charges": {
+      "grossPaise": 31250,
+      "brokeragePaise": 2000,
+      "exchangeTransactionPaise": 11,
+      "ipftPaise": 0,
+      "sebiPaise": 0,
+      "stampDutyPaise": 1,
+      "gstPaise": 362,
+      "sttPaise": 0,
+      "totalChargesPaise": 2374,
+      "totalDebitPaise": 33624,
+      "netCreditPaise": null,
+      "exchange": "NSE",
+      "side": "BUY",
+      "segment": "EQUITY_OPTIONS",
+      "indicative": true,
+      "simulationOnly": true
+    },
+    "chargesPaise": 2374,
+    "totalDebitPaise": 33624,
+    "netCreditPaise": null,
+    "orderType": "MARKET",
+    "status": "FILLED",
+    "realizedPnlPaise": 0,
+    "cashDeltaPaise": -31250,
+    "simulationOnly": true,
+    "excludesCharges": false
+  },
+  "ephemeral": {
+    "oauthState": {
+      "uid": "firebase-user-fixture-001",
+      "used": false,
+      "expiresAt": "2026-11-20T09:10:00.000Z",
+      "stateToken": "REDACTED"
+    },
+    "streamLease": {
+      "leaseId": "REDACTED",
+      "expiresAtMs": 1795169400000,
+      "revoked": false
+    },
+    "oauthConnectionEnvelope": {
+      "v": 1,
+      "iv": "REDACTED",
+      "tag": "REDACTED",
+      "data": "REDACTED"
+    }
+  }
+}
