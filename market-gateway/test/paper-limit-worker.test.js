@@ -51,3 +51,11 @@ test("crypto LIMIT worker rejects stale, future-dated and malformed quotes",()=>
  assert.equal(isEligibleCryptoLimitOrder(cryptoLimit,{...cryptoQuote,priceUsdt:0},101000),false);
  assert.equal(isEligibleCryptoLimitOrder(cryptoLimit,{...cryptoQuote,tradeTimeMs:NaN},101000),false);
 });
+test("crypto LIMIT worker rejects non-decimal quantities and non-numeric provider prices",()=>{
+ assert.equal(isEligibleCryptoLimitOrder({...cryptoLimit,quantity:true},cryptoQuote,101000),false);
+ assert.equal(isEligibleCryptoLimitOrder({...cryptoLimit,limit_price:[]},cryptoQuote,101000),false);
+ assert.equal(isEligibleCryptoLimitOrder({...cryptoLimit,quantity:"0.0000000000001"},cryptoQuote,101000),false);
+ assert.equal(isEligibleCryptoLimitOrder(cryptoLimit,{...cryptoQuote,priceUsdt:true},101000),false);
+ assert.equal(isEligibleCryptoLimitOrder(cryptoLimit,{...cryptoQuote,priceUsdt:"89900"},101000),false);
+ assert.equal(isEligibleCryptoLimitOrder(cryptoLimit,cryptoQuote,101000),true);
+});
