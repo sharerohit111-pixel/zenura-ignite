@@ -54,7 +54,7 @@ BEGIN
     'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',repeat('b',64),
     'NSE_EQ|INTRA_BUY_CI','INTRA_BUY_CI','NSE','BUY',2,10000
   );
-  IF v_result->>'status'<>'PENDING' OR (v_result->>'reserved_cash_paise')::bigint<>20000 THEN
+  IF v_result->>'status'<>'PENDING' OR (v_result->>'reserved_cash_paise')::bigint<>20026 THEN
     RAISE EXCEPTION 'Intraday LIMIT BUY was not submitted with exact cash reservation';
   END IF;
   v_result:=public.submit_paper_intraday_limit_order(
@@ -104,6 +104,9 @@ BEGIN
     repeat('1',64),9900,v_now_ms-1000,1000,v_now_ms
   );
   IF v_result->>'status'<>'FILLED' OR (v_result->>'gross_paise')::bigint<>19800
+     OR (v_result->>'charges_paise')::bigint<>26
+     OR (v_result->>'cash_delta_paise')::bigint<>-19826
+     OR v_result->'charges_breakdown'->>'product'<>'INTRADAY'
      OR (v_result->>'reserved_cash_paise')::bigint<>0 THEN
     RAISE EXCEPTION 'Intraday LIMIT BUY fill did not atomically debit gross and release reserve';
   END IF;
@@ -124,7 +127,9 @@ BEGIN
   v_result:=public.execute_paper_intraday_limit_fill(
     repeat('3',64),11000,v_now_ms-1000,1000,v_now_ms
   );
-  IF v_result->>'status'<>'FILLED' OR (v_result->>'realized_pnl_paise')::bigint<>3000 THEN
+  IF v_result->>'status'<>'FILLED' OR (v_result->>'realized_pnl_paise')::bigint<>2952
+     OR (v_result->>'charges_paise')::bigint<>48
+     OR (v_result->>'cash_delta_paise')::bigint<>32952 THEN
     RAISE EXCEPTION 'Intraday LIMIT SELL fill did not realize expected gross P&L';
   END IF;
   SELECT quantity,reserved_quantity INTO v_qty,v_reserved
