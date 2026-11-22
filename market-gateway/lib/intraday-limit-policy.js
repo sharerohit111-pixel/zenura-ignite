@@ -17,15 +17,24 @@ function marketClockParts(timestampMs){
   };
 }
 
-function isIntradaySessionOpen(timestampMs,{isTradingDay}={}){
-  if(typeof isTradingDay!=="boolean")return false;
-  const clock=marketClockParts(timestampMs);
-  if(!isTradingDay||clock.weekday==="Sat"||clock.weekday==="Sun")return false;
-  const minute=clock.hour*60+clock.minute;
-  return minute>=SESSION_OPEN_MINUTE&&minute<SESSION_CLOSE_MINUTE;
+function normalizeMarketSession(session){
+  if(!session||typeof session!=="object"||session.isTradingDay!==true
+     ||!Number.isInteger(session.openMinute)||!Number.isInteger(session.closeMinute)
+     ||session.openMinute<0||session.closeMinute>24*60
+     ||session.openMinute>=session.closeMinute)return null;
+  return session;
 }
 
-function isIntradayOrderExpired(order,nowMs,{isTradingDay}={}){
+function isIntradaySessionOpen(timestampMs,session){
+  const normalized=normalizeMarketSession(session);
+  if(!normalized)return false;
+  const clock=marketClockParts(timestampMs);
+  if(clock.weekday==="Sat"||clock.weekday==="Sun")return false;
+  const minute=clock.hour*60+clock.minute;
+  return minute>=normalized.openMinute&&minute<normalized.closeMinute;
+}
+
+function isIntradayOrderExpired(order,nowMs,session){
   if(!order||typeof order!=="object"||order.product!=="INTRADAY"
      ||order.order_type!=="LIMIT"||order.status!=="PENDING"
      ||typeof order.created_at!=="string"||!Number.isFinite(Date.parse(order.created_at))
@@ -33,13 +42,14 @@ function isIntradayOrderExpired(order,nowMs,{isTradingDay}={}){
   const created=marketClockParts(Date.parse(order.created_at));
   const now=marketClockParts(nowMs);
   const sameSessionDate=created.year===now.year&&created.month===now.month&&created.day===now.day;
-  if(!sameSessionDate)return true;
+  const normalized=normalizeMarketSession(session);
+  if(!sameSessionDate||!normalized)return true;
   if(now.weekday==="Sat"||now.weekday==="Sun")return true;
   const minute=now.hour*60+now.minute;
-  return minute>=SESSION_CLOSE_MINUTE;
+  return minute>=normalized.closeMinute;
 }
 
-function isEligibleIntradayLimitOrder(order,quote,nowMs,{isTradingDay}={}){
+function isEligibleIntradayLimitOrder(order,quote,nowMs,session){
   if(!order||typeof order!=="object"||order.order_type!=="LIMIT"||order.status!=="PENDING"
      ||order.simulation_only!==true||order.product!=="INTRADAY"
      ||typeof order.user_id!=="string"||!order.user_id
@@ -51,8 +61,8 @@ function isEligibleIntradayLimitOrder(order,quote,nowMs,{isTradingDay}={}){
      ||!Number.isSafeInteger(quote.tradeTimeMs)||quote.tradeTimeMs<1
      ||!Number.isSafeInteger(nowMs)||nowMs<1||quote.tradeTimeMs>nowMs
      ||nowMs-quote.tradeTimeMs>15000
-     ||!isIntradaySessionOpen(nowMs,{isTradingDay}))return false;
+     ||!isIntradaySessionOpen(nowMs,session))return false;
   return order.side==="BUY"?quote.pricePaise<=order.limit_price_paise:quote.pricePaise>=order.limit_price_paise;
 }
 
-module.exports={marketClockParts,isIntradaySessionOpen,isIntradayOrderExpired,isEligibleIntradayLimitOrder};
+module.exports={marketClockParts,normalizeMarketSession,isIntradaySessionOpen,isIntradayOrderExpired,isEligibleIntradayLimitOrder};
