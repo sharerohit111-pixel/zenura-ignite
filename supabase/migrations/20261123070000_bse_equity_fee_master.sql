@@ -62,9 +62,9 @@ begin
        or x.instrument_code is null or length(x.instrument_code) not between 1 and 12
        or x.group_name is null or length(x.group_name) not between 1 and 3
        or x.scrip_name is null or x.isin is null or x.isin !~ '^[A-Z]{2}[A-Z0-9]{10}$'
-       or x.exclusive_flag not in ('Y','N')
-       or x.status not in ('A','S','I')
-       or x.instrument_type not in ('E','D','C')
+       or x.exclusive_flag is null or x.exclusive_flag not in ('Y','N')
+       or x.status is null or x.status not in ('A','S','I')
+       or x.instrument_type is null or x.instrument_type not in ('E','D','C')
     )
   then
     raise exception using errcode='22023',message='BSE master contains invalid security metadata';
