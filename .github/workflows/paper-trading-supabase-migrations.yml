@@ -45,6 +45,11 @@ jobs:
             echo "Firebase authentication dependency remains in the new market app."
             exit 1
           fi
+      - name: Check professional chart engine and indicator calculations
+        run: |
+          node --check markets/stocks/chart-engine.js
+          node --check markets/stocks/chart-indicators.js
+          node --test markets/stocks/chart-indicators.test.js
       - name: Check native Supabase gateway authentication runtime
         run: |
           node --check market-gateway/lib/supabase-runtime.js
