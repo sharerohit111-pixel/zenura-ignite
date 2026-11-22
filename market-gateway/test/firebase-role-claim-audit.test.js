@@ -25,3 +25,9 @@ test("parses only explicit read-only audit options",()=>{
  assert.deepEqual(parseArgs(["--confirm-read-only-audit","--out-dir","./private-audit","--page-size","25"]),{confirm:true,outputDirectory:"./private-audit",pageSize:25,help:false});
  assert.throws(()=>parseArgs(["--apply-claims"]),/Unknown argument/);
 });
+
+test("rejects repeated pagination tokens instead of looping forever",async()=>{
+ let calls=0;
+ await assert.rejects(auditFirebaseRoleClaims({projectId:"zenura-firebase-prod",auth:{async listUsers(){calls++;return {users:[],pageToken:"same"};}}}),/repeated a pagination token/);
+ assert.equal(calls,2);
+});
