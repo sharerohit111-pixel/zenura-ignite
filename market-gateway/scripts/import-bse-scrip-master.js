@@ -13,8 +13,9 @@ async function main(){
   const supabaseUrl=process.env.SUPABASE_URL;
   const serviceRoleKey=process.env.SUPABASE_SERVICE_ROLE_KEY;
   if(!supabaseUrl||!serviceRoleKey)throw new Error("SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required.");
-  const csv=fs.readFileSync(filePath,"utf8");
-  const sourceSha256=crypto.createHash("sha256").update(csv,"utf8").digest("hex");
+  const sourceBytes=fs.readFileSync(filePath);
+  const csv=sourceBytes.toString("utf8");
+  const sourceSha256=crypto.createHash("sha256").update(sourceBytes).digest("hex");
   const parsed=parseBseStandardizedScripMaster(csv,{sourceDate});
   const rows=parsed.map(row=>({
     scrip_code:row.scripCode,
