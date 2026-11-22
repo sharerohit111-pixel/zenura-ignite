@@ -39,6 +39,11 @@ BEGIN
         AND product='DELIVERY' AND instrument_key='NSE_EQ|CREATE_TEST')<>6 THEN
     RAISE EXCEPTION 'Protective creation did not reserve shares exactly once';
   END IF;
+  IF (SELECT quantity-reserved_quantity FROM public.paper_equity_positions
+      WHERE user_id='11111111-1111-4111-8111-111111111111'
+        AND product='DELIVERY' AND instrument_key='NSE_EQ|CREATE_TEST')<>4 THEN
+    RAISE EXCEPTION 'Protective reservation did not leave the correct unreserved quantity';
+  END IF;
   v_result:=public.create_paper_equity_protective_order(
     'cececece-cece-4ece-8ece-cececececece','11111111-1111-4111-8111-111111111111',
     'NSE_EQ|CREATE_TEST','DELIVERY','STOP_LOSS',8500,8
