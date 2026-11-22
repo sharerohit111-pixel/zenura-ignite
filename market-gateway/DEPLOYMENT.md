@@ -115,7 +115,7 @@ The Cloud Run endpoint is publicly reachable for browser CORS and the Upstox OAu
 
 Map `market-api.zenuraignite.com` to the Cloud Run service and verify the custom domain/certificate before registering the callback in Upstox. Confirm the returned Cloud Run URL and `/health` endpoint. Health is only a liveness check; it does not prove authentication, RLS, OAuth, market quotes or order accounting.
 
-## GitHub Actions OIDC deployment
+## 4. GitHub Actions OIDC deployment
 
 The repository includes a manual production deployment workflow at `.github/workflows/deploy-supabase-market-gateway.yml`. It runs only when manually dispatched from `main`, uses GitHub OIDC/Workload Identity Federation (no downloaded service-account JSON key), builds the gateway image, deploys the Supabase-native Cloud Run service, deploys the isolated LIMIT Cloud Run Job, configures Cloud Scheduler and updates both market pages to the verified gateway URL.
 
