@@ -11,7 +11,7 @@
     "5m":{type:"minute",span:5,unit:"minutes",interval:5,days:14},
     "15m":{type:"minute",span:15,unit:"minutes",interval:15,days:30},
     "1h":{type:"hour",span:1,unit:"hours",interval:1,days:90},
-    "1D":{type:"day",span:1,unit:"days",interval:1,days:365},
+    "1D":{type:"day",span:1,unit:"days",interval:1,days:1825},
     "1W":{type:"week",span:1,unit:"weeks",interval:1,days:1825},
     "1M":{type:"month",span:1,unit:"months",interval:1,days:1825}
   };
