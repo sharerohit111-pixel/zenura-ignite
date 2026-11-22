@@ -62,5 +62,7 @@ jobs:
           done
       - name: Assert RPC grants, table grants, RLS isolation and watchlist ownership
         run: psql -v ON_ERROR_STOP=1 -f scripts/ci/supabase-role-rls-security.sql
+      - name: Compare shared option charge vectors against disposable PostgreSQL
+        run: node market-gateway/test/run-supabase-option-charge-parity.js
       - name: Assert concurrent MARKET order idempotency and cash atomicity
         run: bash scripts/ci/supabase-market-order-concurrency.sh
