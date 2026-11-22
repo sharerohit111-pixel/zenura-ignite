@@ -464,3 +464,9 @@ The Firebase reference layer has a separate quote-age check. A future differenti
 5. **No live Supabase certification.** Disposable PostgreSQL role stubs do not reproduce Supabase Auth/PostgREST, actual project grants/advisors, Edge/Cloud Run runtime, or production data. No SQL has been applied to the connected Supabase project.
 
 These are tracked as explicit acceptance gates, not assumed complete. PR #71 remains a draft audit proposal; PR #70 remains a separate draft migration proposal. No merge, live SQL apply, Firebase change, or production setting change is authorized by this review.
+
+### Additional SQL input-validation finding — numeric special values
+
+Static review of migration 005 found that `p_strike_price` is PostgreSQL `numeric`, and the current guard checks only `p_strike_price is null or p_strike_price<=0`. PostgreSQL `numeric` supports special values such as `NaN` (and, on supported versions, infinities); `NaN <= 0` is not a reliable finite-number test. Because the strike is currently not persisted or otherwise used in the RPC, a special numeric value could pass the positive-value check without being caught by a later calculation. The JavaScript reference helper correctly requires a finite positive number.
+
+**Required before staging:** add an explicit finite/special-value rejection for the SQL strike input and disposable-PostgreSQL negative fixtures for `NaN`, `Infinity`, and `-Infinity` where supported. Also decide whether strike price must be stored immutably on `paper_derivative_orders`; if so, add an additive schema change and include it in the order insert and replay/history tests. Neither schema nor RPC behavior was changed in this audit step. This is a static review finding, not a claimed executed exploit or passing test.
