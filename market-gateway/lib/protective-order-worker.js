@@ -25,7 +25,7 @@ function isPositionCloseable(order,position){
     return closeSide&&order.quantity<=position.quantity-position.reserved_quantity;
   }
   if(order.asset_class==="FUTURE"){
-    if(position.product!==order.product||!Number.isSafeInteger(position.net_quantity)
+    if(!["INTRADAY","DELIVERY"].includes(position.product)||!Number.isSafeInteger(position.net_quantity)
       ||position.net_quantity===0)return false;
     return order.quantity<=Math.abs(position.net_quantity)
       &&((position.net_quantity>0&&order.side==="SELL")||(position.net_quantity<0&&order.side==="BUY"));
