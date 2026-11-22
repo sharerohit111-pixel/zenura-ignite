@@ -111,7 +111,8 @@ function calculateBseEquityCharges({grossPaise,product,side,groupName,exclusiveF
     throw Object.assign(new Error("BSE brokerage cap is invalid."),{status:400});
   const ratePerCrore=bseRatePerCrore(groupName,exclusiveFlag);
   const brokeragePaise=product==="DELIVERY"?2000:Math.min(brokerageCapPaise,Math.round(grossPaise*0.001));
-  const exchangeTransactionPaise=Math.round(grossPaise*ratePerCrore/CRORE_PAISE);
+  const exchangeNumerator=BigInt(grossPaise)*BigInt(ratePerCrore)*100n;
+  const exchangeTransactionPaise=Number((exchangeNumerator+BigInt(CRORE_PAISE)/2n)/BigInt(CRORE_PAISE));
   const sebiPaise=Math.round(grossPaise*0.000001);
   const sttPaise=product==="DELIVERY"?Math.round(grossPaise*0.001):(side==="SELL"?Math.round(grossPaise*0.00025):0);
   const stampDutyPaise=side==="BUY"?(product==="DELIVERY"?Math.round(grossPaise*0.00015):Math.round(grossPaise*0.00003)):0;
@@ -128,7 +129,8 @@ function calculateBseEquityCharges({grossPaise,product,side,groupName,exclusiveF
     totalDebitPaise:side==="BUY"?grossPaise+totalChargesPaise:null,
     netCreditPaise,exchange:"BSE",product,side,segment:"EQUITY_CASH",
     scripGroup:String(groupName).trim().toUpperCase(),exclusiveFlag:String(exclusiveFlag).trim().toUpperCase(),
-    exchangeRatePaisePerCrore:ratePerCrore,ipftIncludedInExchangeCharge:true,bseIpfIncluded:true,
+    exchangeRateRupeesPerCrore:ratePerCrore,exchangeRatePaisePerCrore:ratePerCrore*100,
+    ipftIncludedInExchangeCharge:true,bseIpfIncluded:true,
     scheduleVersion:"BSE-2025-04-29",sourceDate:sourceDate||null,
     indicative:true,simulationOnly:true
   };
