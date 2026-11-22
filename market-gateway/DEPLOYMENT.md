@@ -81,9 +81,9 @@ docker push "$IMAGE"
 gcloud run deploy zenura-market-gateway \
   --project "$PROJECT_ID" --image "$IMAGE" --region "$REGION" \
   --platform managed --allow-unauthenticated \
-  --min 1 --max 5 --cpu 2 --memory 2Gi --concurrency 40 --timeout 3600 \
+  --min 1 --max 5 --cpu 2 --memory 2Gi --concurrency 40 --timeout 3600 --no-cpu-throttling \
   --service-account YOUR_GATEWAY_SERVICE_ACCOUNT@$PROJECT_ID.iam.gserviceaccount.com \
-  --set-env-vars SUPABASE_URL=https://atvbjibhunvzpmfagagm.supabase.co,SUPABASE_PUBLISHABLE_KEY=YOUR_PUBLISHABLE_KEY,UPSTOX_REDIRECT_URI=YOUR_EXACT_GATEWAY_CALLBACK,ZENURA_APP_REDIRECT_URI=YOUR_EXACT_APP_RETURN_URL,ALLOWED_ORIGINS=YOUR_EXACT_FRONTEND_ORIGIN,MAX_INSTRUMENT_KEYS=100 \
+  --set-env-vars SUPABASE_URL=https://atvbjibhunvzpmfagagm.supabase.co,SUPABASE_PUBLISHABLE_KEY=YOUR_PUBLISHABLE_KEY,UPSTOX_REDIRECT_URI=YOUR_EXACT_GATEWAY_CALLBACK,ZENURA_APP_REDIRECT_URI=YOUR_EXACT_APP_RETURN_URL,ALLOWED_ORIGINS=YOUR_EXACT_FRONTEND_ORIGIN,MAX_INSTRUMENT_KEYS=100,PAPER_LIMIT_WORKER_ENABLED=true,PAPER_LIMIT_WORKER_INTERVAL_MS=2000 \
   --set-secrets SUPABASE_SERVICE_ROLE_KEY=zenura-supabase-service-role:latest,UPSTOX_TOKEN_ENCRYPTION_KEY=zenura-upstox-encryption-key:latest,UPSTOX_CLIENT_ID=zenura-upstox-client-id:latest,UPSTOX_CLIENT_SECRET=zenura-upstox-client-secret:latest
 ```
 
