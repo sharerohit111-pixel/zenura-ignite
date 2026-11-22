@@ -160,3 +160,10 @@ test("Every install-time PWA shell asset exists in the repository",()=>{
  const icon=path.resolve(pwaRoot,manifest.icons[0].src);
  assert.ok(fs.existsSync(icon),"PWA manifest icon does not exist");
 });
+
+test("Chart library loading has a second CDN and a bounded timeout",()=>{
+ const engine=fs.readFileSync(path.join(root,"../stocks/chart-engine.js"),"utf8");
+ assert.match(engine,/unpkg\.com\/klinecharts@10\.1\.1/);
+ assert.match(engine,/setTimeout\(failAttempt,8000\)/);
+ assert.match(engine,/attemptFinished/);
+});
