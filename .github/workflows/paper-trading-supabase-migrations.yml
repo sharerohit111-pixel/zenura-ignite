@@ -611,7 +611,7 @@ jobs:
             PERFORM public.execute_paper_long_option_order(
               '66666666-6666-4666-8666-666666666666',repeat('1',64),
               '26262626-2626-4626-8626-262626262626',repeat('2',64),
-              'NSE_FO|GOLDEN','GOLDEN','NSE','NSE_FO','CE',
+              'NSE_FO|TINY','TINY','NSE','NSE_FO','CE',
               current_date+10,22000,1,1,1,'BUY',1000,
               floor(extract(epoch from clock_timestamp())*1000)::bigint,
               floor(extract(epoch from clock_timestamp())*1000)::bigint
@@ -620,7 +620,7 @@ jobs:
             v_sell:=public.execute_paper_long_option_order(
               '66666666-6666-4666-8666-666666666666',repeat('e',64),
               '25252525-2525-4525-8525-252525252525',repeat('f',64),
-              'NSE_FO|GOLDEN','GOLDEN','NSE','NSE_FO','CE',
+              'NSE_FO|TINY','TINY','NSE','NSE_FO','CE',
               current_date+10,22000,1,1,1,'SELL',100,
               floor(extract(epoch from clock_timestamp())*1000)::bigint,
               floor(extract(epoch from clock_timestamp())*1000)::bigint
