@@ -21,6 +21,9 @@ const {
 } = require("firebase/firestore");
 
 const emulatorAddress = process.env.FIRESTORE_EMULATOR_HOST;
+if (process.env.REQUIRE_FIRESTORE_EMULATOR === "1" && !emulatorAddress) {
+  throw new Error("Firestore Emulator is required for this CI run but FIRESTORE_EMULATOR_HOST is missing.");
+}
 const integrationTest = emulatorAddress ? test : test.skip;
 const [emulatorHost, emulatorPort] = (emulatorAddress || "127.0.0.1:8080").split(":");
 const projectId = process.env.GCLOUD_PROJECT || "demo-zenura-ignite";
