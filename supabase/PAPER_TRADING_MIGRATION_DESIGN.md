@@ -214,7 +214,7 @@ The core schema draft was corrected to retain exchange and official lot-size met
 
 Implement one server-only, account-locking, idempotent CE/PE SQL transaction that reproduces the above contract exactly. Before any staging apply, build parity fixtures from the existing JavaScript tests and validate SQL rounding against JavaScript `Math.round` (not PostgreSQL's default numeric rounding). Test concurrent duplicate requests, mismatched idempotency keys, insufficient unreserved cash, partial and full SELL, fee components, negative net credit, stale/future quotes, expiry cutoff, off-tick prices, 50-position cap, malformed stored positions and safe-integer boundaries.
 
-No Options transaction RPC has yet been added. No SQL has been applied to Supabase. Firebase remains unchanged and is still the live source of truth.
+The draft CE/PE transaction RPC is tracked in migration 005 below. No SQL has been applied to Supabase. Firebase remains unchanged and is still the live source of truth.
 
 
 ## Draft atomic CE/PE transaction RPC (2026-11-22)
@@ -228,6 +228,6 @@ Important limitations:
 - Do not apply any SQL or change the live Firebase path until the SQL has been tested against PostgreSQL and the complete migration has explicit approval.
 
 
-### Static review correction — average premium versus cost basis
+### Static parity review — option average and cost basis
 
-A static review found that average option premium and fee-inclusive cost basis must remain distinct. The draft RPC now computes weighted average premium from gross premium fills only, while the cost-basis ledger includes BUY charges; on a partial SELL, the remaining average premium stays unchanged and only the fee-inclusive cost basis is reduced by the proportional allocation. This is a draft correction, not a passed test. Exact paise rounding and repeated partial-close conservation still require executable PostgreSQL parity tests.
+The Firebase `executeLongOptionTransaction` source and its tests define `averagePricePaise` as the rounded fee-inclusive `costBasisPaise / netQuantity` after BUY and after a partial SELL. Migration 005 was corrected to mirror that behavior; do not reinterpret the field as gross premium-only average. The request order ID is SHA-256 of `uid + ':' + idempotencyKey`, and the request fingerprint is SHA-256 of the JSON payload `{instrumentKey, side, quantity}` for this MARKET option flow. The trusted backend must reproduce these exact values before invoking the RPC. This is a source-level parity correction, not a passed PostgreSQL test.
