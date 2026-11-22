@@ -91,9 +91,9 @@ test("Market terminal is installable and its service worker never caches private
  assert.match(portal,/Paper Trading/);assert.match(portal,/Paper Investing/);
  assert.match(html,/manifest\.webmanifest/);assert.match(html,/pwa-register\.js/);
  assert.match(serviceWorker,/request\.headers\.has\("authorization"\)/);
- assert.match(serviceWorker,/url\.origin!==self\.location\.origin/);
+ assert.match(serviceWorker,/url\.origin!==BASE\.origin/);
  assert.match(serviceWorker,/request\.method!=="GET"/);
  assert.match(serviceWorker,/zenura-markets-shell-v2/);
- assert.match(serviceWorker,/self\.registration\.scope/);
+ assert.match(serviceWorker,/BASE=new URL/);
  assert.doesNotMatch(serviceWorker,/supabase\.co|api\.upstox\.com/);
 });
