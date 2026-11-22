@@ -1,6 +1,10 @@
 -- Focused owner-bound, idempotent cancellation tests for protective orders.
 -- Uses the disposable PostgreSQL CI database only.
 
+INSERT INTO public.paper_equity_positions(
+  user_id,product,instrument_key,trading_symbol,exchange,quantity,average_price_paise,cost_basis_paise,reserved_quantity
+) VALUES ('11111111-1111-4111-8111-111111111111','DELIVERY','NSE_EQ|CREATE_TEST','CREATE_TEST','NSE',10,9000,90000,2);
+
 INSERT INTO public.paper_protective_orders(
   order_id,user_id,asset_class,instrument_key,product,side,
   trigger_type,trigger_direction,trigger_price_paise,quantity,status
@@ -19,6 +23,29 @@ DO $protective_cancel$
 DECLARE
   v_result jsonb;
 BEGIN
+  v_result:=public.create_paper_equity_protective_order(
+    'cececece-cece-4ece-8ece-cececececece','11111111-1111-4111-8111-111111111111',
+    'NSE_EQ|CREATE_TEST','DELIVERY','STOP_LOSS',8500,8
+  );
+  IF v_result->'order'->>'status'<>'ACTIVE' OR (v_result->>'idempotent_replay')::boolean IS NOT FALSE THEN
+    RAISE EXCEPTION 'Equity protective order was not created correctly';
+  END IF;
+  v_result:=public.create_paper_equity_protective_order(
+    'cececece-cece-4ece-8ece-cececececece','11111111-1111-4111-8111-111111111111',
+    'NSE_EQ|CREATE_TEST','DELIVERY','STOP_LOSS',8500,8
+  );
+  IF (v_result->>'idempotent_replay')::boolean IS NOT TRUE THEN
+    RAISE EXCEPTION 'Protective order creation replay was not idempotent';
+  END IF;
+  BEGIN
+    PERFORM public.create_paper_equity_protective_order(
+      'cfcccccc-cece-4ece-8ece-cececececece','11111111-1111-4111-8111-111111111111',
+      'NSE_EQ|CREATE_TEST','DELIVERY','STOP_LOSS',8500,9
+    );
+    RAISE EXCEPTION 'Protective order exceeded unreserved position quantity';
+  EXCEPTION WHEN check_violation THEN
+    NULL;
+  END;
   v_result:=public.cancel_paper_protective_order('cacacaca-caca-4aca-8aca-cacacacacaca','11111111-1111-4111-8111-111111111111');
   IF v_result->>'status'<>'CANCELLED' OR (v_result->>'cancelled')::boolean IS NOT TRUE THEN
     RAISE EXCEPTION 'Owner could not cancel own active protective order';
@@ -67,5 +94,7 @@ DELETE FROM public.paper_protective_orders
  WHERE order_id IN (
    'cacacaca-caca-4aca-8aca-cacacacacaca',
    'cbcbcbcb-cbcb-4bcb-8bcb-cbcbcbcbcbcb',
-   'cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd'
+   'cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd',
+   'cececece-cece-4ece-8ece-cececececece'
  );
+DELETE FROM public.paper_equity_positions WHERE user_id='11111111-1111-4111-8111-111111111111' AND instrument_key='NSE_EQ|CREATE_TEST' AND product='DELIVERY';
