@@ -155,3 +155,28 @@ test("futures charge calculator rejects invalid turnover, side, exchange and uns
  assert.throws(()=>calculateFuturesTradeCharges({grossPaise:1000,exchange:"NSE",side:"HOLD"}),/side/);
  assert.throws(()=>calculateFuturesTradeCharges({grossPaise:Number.MAX_SAFE_INTEGER+1,exchange:"NSE"}),/turnover/);
 });
+
+test("NSE delivery BUY includes 2026 brokerage, STT, stamp duty, exchange, SEBI and GST",()=>{
+ const {calculateEquityDeliveryCharges}=require("../lib/trading-charges");
+ const c=calculateEquityDeliveryCharges({grossPaise:100000000,exchange:"NSE",side:"BUY"});
+ assert.equal(c.brokeragePaise,2000);
+ assert.equal(c.exchangeTransactionPaise,3070);
+ assert.equal(c.sttPaise,100000);
+ assert.equal(c.stampDutyPaise,15000);
+ assert.equal(c.dpChargesPaise,0);
+ assert.equal(c.gstPaise,913);
+ assert.equal(c.totalChargesPaise,121083);
+});
+test("NSE delivery SELL includes STT and estimated per-order DP charge",()=>{
+ const {calculateEquityDeliveryCharges}=require("../lib/trading-charges");
+ const c=calculateEquityDeliveryCharges({grossPaise:100000000,exchange:"NSE",side:"SELL"});
+ assert.equal(c.sttPaise,100000);
+ assert.equal(c.stampDutyPaise,0);
+ assert.equal(c.dpChargesPaise,2000);
+ assert.equal(c.gstPaise,1273);
+ assert.equal(c.totalChargesPaise,108443);
+});
+test("BSE delivery orders are blocked until exact scrip-group charges are known",()=>{
+ const {calculateEquityDeliveryCharges}=require("../lib/trading-charges");
+ assert.throws(()=>calculateEquityDeliveryCharges({grossPaise:100000,exchange:"BSE",side:"BUY"}),{status:422});
+});
