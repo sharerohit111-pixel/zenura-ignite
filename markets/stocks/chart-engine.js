@@ -165,6 +165,35 @@
       }
     }finally{suppressRemove=false;}
   }
+  async function loadPreferences(){
+    if(!context?.supabase||!context.instrument)return;
+    const userId=await getSessionUser();if(!userId)return;
+    const {data,error}=await context.supabase.from("paper_chart_preferences")
+      .select("chart_type,indicators").eq("user_id",userId)
+      .eq("instrument_key",context.instrument.instrument_key).maybeSingle();
+    if(error){console.warn("Chart preferences could not be loaded:",error.message);return;}
+    // Each symbol gets its own indicator set; never carry another symbol's indicators forward.
+    const existing=chart?.getIndicators?.()||[];
+    for(const item of existing){
+      const name=typeof item==="string"?item:item?.name;
+      if(name&&name!=="VOL")chart.removeIndicator({name});
+    }
+    activeIndicators.clear();
+    if(["CANDLE","OHLC","AREA","LINE"].includes(data?.chart_type)){
+      activeChartType=data.chart_type;
+      chart?.setStyles(chartStyles(activeTheme,activeChartType));
+      const typeSelect=document.getElementById("chart-type-select");
+      if(typeSelect)typeSelect.value=activeChartType;
+    }
+    const allowed=new Set(root.klinecharts?.getSupportedIndicators?.()||[]);
+    if(Array.isArray(data?.indicators)){
+      for(const name of data.indicators.slice(0,20)){
+        if(typeof name!=="string"||!allowed.has(name)||name==="VOL")continue;
+        try{chart.createIndicator(name);activeIndicators.add(name);}
+        catch(error){console.warn("Saved chart indicator could not be restored:",name,error);}
+      }
+    }
+  }
   async function savePreferences(){
     if(!context?.supabase||!context.instrument)return;
     const userId=await getSessionUser();if(!userId)return;
