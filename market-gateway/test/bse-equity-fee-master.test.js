@@ -21,6 +21,14 @@ test("parses BSE standardized master fields 1-5, 59, 60 and 64",()=>{
     {scripCode:"500325",instrumentCode:"RELIANCE",groupName:"A",isin:"INE002A01018",exclusiveFlag:"N",sourceDate:"2026-11-23"}
   );
 });
+test("keeps BSE fee fields stable with the 2026 CAS marker in field 24",()=>{
+  const row=makeRow({group:"E",exclusive:"Y"});
+  row[23]="1";
+  const rows=parseBseStandardizedScripMaster(row.join(","),{sourceDate:"2026-11-23"});
+  assert.equal(rows[0].groupName,"E");
+  assert.equal(rows[0].exclusiveFlag,"Y");
+  assert.equal(rows[0].instrumentType,"E");
+});
 test("strips a UTF-8 BOM from the standardized BSE CSV",()=>{
   const rows=parseBseStandardizedScripMaster("\uFEFF"+makeRow().join(","),{sourceDate:"2026-11-23"});
   assert.equal(rows[0].isin,"INE002A01018");
