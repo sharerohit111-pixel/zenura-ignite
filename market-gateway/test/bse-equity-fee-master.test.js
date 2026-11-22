@@ -21,6 +21,10 @@ test("parses BSE standardized master fields 1-5, 59, 60 and 64",()=>{
     {scripCode:"500325",instrumentCode:"RELIANCE",groupName:"A",isin:"INE002A01018",exclusiveFlag:"N",sourceDate:"2026-11-23"}
   );
 });
+test("strips a UTF-8 BOM from the standardized BSE CSV",()=>{
+  const rows=parseBseStandardizedScripMaster("\\uFEFF"+makeRow().join(","),{sourceDate:"2026-11-23"});
+  assert.equal(rows[0].isin,"INE002A01018");
+});
 test("parses quoted commas and ignores non-equity or inactive instruments",()=>{
   const active=makeRow({name:"ACME, INDUSTRIES LIMITED"});
   const debt=makeRow({code:"900001",symbol:"DEBT",isin:"INE000A01011",type:"D"});
