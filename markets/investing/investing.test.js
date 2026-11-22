@@ -147,3 +147,16 @@ test("Professional chart editing toolbar is styled for desktop and touch screens
  assert.match(sharedCss,/@media\s*\(max-width:\s*650px\)/);
  assert.match(sharedCss,/chart-remove-indicator/);
 });
+
+test("Every install-time PWA shell asset exists in the repository",()=>{
+ const match=serviceWorker.match(/const SHELL=\[([\s\S]*?)\]\.map/);
+ assert.ok(match,"PWA shell asset list is missing");
+ const entries=[...match[1].matchAll(/"([^"]+)"/g)].map(x=>x[1]);
+ const projectRoot=path.resolve(root,"../..");
+ for(const entry of entries){
+  const target=path.resolve(pwaRoot,entry);
+  assert.ok(fs.existsSync(target),"Missing PWA shell asset: "+entry);
+ }
+ const icon=path.resolve(pwaRoot,manifest.icons[0].src);
+ assert.ok(fs.existsSync(icon),"PWA manifest icon does not exist");
+});
