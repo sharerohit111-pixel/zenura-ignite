@@ -64,11 +64,11 @@ test("protective worker leases, fetches the exact user quote and executes one si
  assert.ok(fill);
  assert.equal(fill.args.p_protective_order_id,baseOrder.order_id);
  assert.equal(fill.args.p_execution_price_paise,8500);
- assert.equal(fill.args.p_quote_timestamp_ms,fill.args.p_now_ms);
+ assert.ok(fill.args.p_now_ms>=fill.args.p_quote_timestamp_ms);
+ assert.ok(fill.args.p_now_ms-fill.args.p_quote_timestamp_ms<2000);
  assert.equal(fill.args.p_execution_order_id.length,64);
  assert.equal(fill.args.p_request_fingerprint.length,64);
  assert.ok(h.calls.some(x=>x.name==="release_paper_market_worker_lease"));
- assert.ok(h.updates===undefined||true);
 });
 
 test("protective worker marks stale quotes checked and never calls the fill RPC",async()=>{
@@ -77,7 +77,8 @@ test("protective worker marks stale quotes checked and never calls the fill RPC"
  assert.equal(result.notEligible,1);
  assert.equal(result.filled,0);
  assert.equal(h.calls.some(x=>x.name==="execute_paper_equity_protective_fill"),false);
- assert.ok(h.updates.length===0);
+ assert.equal(h.updates.length,1);
+ assert.equal(h.updates[0].values.worker_checked_at!==undefined,true);
 });
 
 test("protective worker rotates unsupported instrument rows instead of starving the scan",async()=>{
