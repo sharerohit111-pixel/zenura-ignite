@@ -3,7 +3,7 @@
 -- One live protective exit per position is already enforced by the preceding partial unique index.
 
 -- Preserve any pre-existing active draft exits when advancing the schema.
-do $
+do $reservation_backfill$
 begin
   if exists (
     select 1
@@ -20,7 +20,7 @@ begin
     raise exception 'Existing protective exits exceed unreserved equity shares; reconcile before applying reservation migration';
   end if;
 end;
-$;
+$reservation_backfill$;
 
 update public.paper_equity_positions ep
    set reserved_quantity=ep.reserved_quantity+active_exits.quantity,
