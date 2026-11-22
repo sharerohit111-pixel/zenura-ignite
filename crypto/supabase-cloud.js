@@ -68,8 +68,8 @@ async function placeOrder({ symbol, side, quantity }) {
     body: { symbol, side, quantity: quantityText, idempotency_key: pendingOrder.key }
   });
   if (result.status !== "FILLED" || result.simulationOnly !== true) throw new Error("The cloud did not confirm a completed paper order.");
-  pendingOrder = null;
   await load();
+  pendingOrder = null;
   return result;
 }
 
