@@ -225,6 +225,7 @@
     }
     if(cached)candleCache.delete(cacheKey);
     const token=await current.getAccessToken();
+    if(context!==current)return callback([],{forward:false,backward:false});
     const params=new URLSearchParams({
       instrument_key:current.instrument.instrument_key,unit:period.unit,
       interval:String(period.interval),to_date:to,from_date:from
@@ -235,6 +236,7 @@
     });
     if(!response.ok)throw new Error("Historical candles unavailable ("+response.status+").");
     const payload=await response.json();
+    if(context!==current)return callback([],{forward:false,backward:false});
     let bars=normalizeBars(payload.data?.candles||[]);
     if(type==="forward"&&timestamp)bars=bars.filter(bar=>bar.timestamp<timestamp);
     if(type==="backward"&&timestamp)bars=bars.filter(bar=>bar.timestamp>timestamp);
