@@ -115,7 +115,42 @@ The Cloud Run endpoint is publicly reachable for browser CORS and the Upstox OAu
 
 Map `market-api.zenuraignite.com` to the Cloud Run service and verify the custom domain/certificate before registering the callback in Upstox. Confirm the returned Cloud Run URL and `/health` endpoint. Health is only a liveness check; it does not prove authentication, RLS, OAuth, market quotes or order accounting.
 
-## 4. Frontend gateway configuration
+## 4. Scheduled Supabase Paper LIMIT worker
+
+The LIMIT worker is a separate **Cloud Run Job**, not a Firebase Function and not a public HTTP endpoint. It uses the same Supabase service-role secret and encrypted Upstox user tokens as the gateway. A Postgres lease ensures only one worker instance processes the pending LIMIT queue at a time; fills still go through the transactional `execute_paper_limit_fill` RPC.
+
+Deploy the job with one task and one parallel worker:
+
+```sh
+gcloud run jobs deploy zenura-paper-limit-worker \
+  --project YOUR_DEDICATED_GCP_PROJECT_ID \
+  --source market-gateway \
+  --region asia-south1 \
+  --command node --args paper-limit-worker.js \
+  --tasks 1 --parallelism 1 --task-timeout 180s --max-retries 0 \
+  --service-account YOUR_MARKET_WORKER_SERVICE_ACCOUNT@YOUR_DEDICATED_GCP_PROJECT_ID.iam.gserviceaccount.com \
+  --set-env-vars SUPABASE_URL=https://atvbjibhunvzpmfagagm.supabase.co,SUPABASE_PUBLISHABLE_KEY=YOUR_PUBLISHABLE_KEY \
+  --set-secrets SUPABASE_SERVICE_ROLE_KEY=SUPABASE_SERVICE_ROLE_KEY:latest,UPSTOX_TOKEN_ENCRYPTION_KEY=UPSTOX_TOKEN_ENCRYPTION_KEY:latest
+```
+
+Grant the worker service account Secret Manager Secret Accessor only on those two secrets. Grant the Cloud Scheduler service account `roles/run.invoker` on this Cloud Run Job. Enable the Cloud Scheduler API, then schedule one execution each minute:
+
+```sh
+gcloud scheduler jobs create http zenura-paper-limit-worker-every-minute \
+  --project YOUR_DEDICATED_GCP_PROJECT_ID \
+  --location asia-south1 \
+  --schedule "* * * * *" --time-zone "Asia/Kolkata" \
+  --uri "https://run.googleapis.com/v2/projects/YOUR_DEDICATED_GCP_PROJECT_ID/locations/asia-south1/jobs/zenura-paper-limit-worker:run" \
+  --http-method POST --message-body "{}" \
+  --update-headers "Content-Type=application/json" \
+  --oauth-service-account-email YOUR_SCHEDULER_SERVICE_ACCOUNT@YOUR_DEDICATED_GCP_PROJECT_ID.iam.gserviceaccount.com
+```
+
+The worker scans a bounded batch, groups quote requests by user, checks fresh Upstox quotes and instrument-master identity, and asks Postgres to fill only price-eligible pending Delivery LIMIT orders. The SQL function locks the account/order rows and releases the original cash/share reservation in the same transaction. If Upstox credentials are expired, the affected orders remain pending and the user must reconnect. Monitor Cloud Run Job execution summaries and failures before enabling this schedule in production.
+
+Cloud Scheduler-to-Cloud Run Job execution and the `roles/run.invoker` requirement follow Google's documented job scheduling model. <Link url="https://docs.cloud.google.com/run/docs/execute/jobs-on-schedule" title="Cloud Run: execute jobs on a schedule"/>.
+
+## 5. Frontend gateway configuration
 
 The static pages currently contain an intentionally empty `market-gateway-url` meta value. After Cloud Run and the custom domain are deployed and verified, update both:
 
@@ -124,7 +159,7 @@ The static pages currently contain an intentionally empty `market-gateway-url` m
 
 Set the meta value to the exact verified gateway origin, e.g. `https://market-api.zenuraignite.com`. Never commit a placeholder, unverified endpoint or secret. Deploy the frontend only after the gateway health check, CORS and authenticated smoke tests pass.
 
-## 5. Required end-to-end release gates
+## 6. Required end-to-end release gates
 
 1. `npm install`, `npm run check`, `npm test` in `market-gateway/`.
 2. Supabase migration/RPC tests on disposable Postgres and live Supabase Auth/RLS integration tests with two isolated test users.
