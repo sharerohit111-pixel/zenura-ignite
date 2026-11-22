@@ -74,7 +74,7 @@ test("Manual production deployment keeps the leased LIMIT worker active in the g
 
 test("Public health response confirms the leased LIMIT worker without exposing secrets",()=>{
  assert.match(server,/limitWorker:\{\.\.\.paperLimitWorkerStatus\}/);
- assert.match(server,/lastCycle=\{scanned:result\.scanned,filled:result\.filled,failed:result\.failed,locked:result\.locked\}/);
+ assert.match(server,/lastCycle=\{scanned:result\.scanned,filled:result\.filled,failed:result\.failed,locked:result\.locked,cycleError:false\}/);
  assert.match(deployWorkflow,/jq -e '\.ok and \.instrumentMasterLoaded and \.limitWorker\.enabled and \.limitWorker\.lastRunAt != null and \.limitWorker\.lastCycle\.failed == 0'/);
  assert.doesNotMatch(server,/health[^\n]*SERVICE_ROLE_KEY|health[^\n]*UPSTOX_CLIENT_SECRET/i);
 });
