@@ -116,6 +116,7 @@ declare
   v_isin text;
   v_master public.bse_equity_fee_master%rowtype;
   v_today date;
+  v_latest_source_date date;
   v_rate integer;
   v_brokerage bigint;
   v_exchange bigint;
@@ -135,11 +136,15 @@ begin
     raise exception using errcode='22023',message='Invalid BSE cash-equity charge request';
   end if;
   v_isin:=split_part(p_instrument_key,'|',2);
+  select max(source_date) into v_latest_source_date from public.bse_equity_fee_master
+   where source_date<=v_today;
+  if v_latest_source_date is null or v_latest_source_date<v_today-7 then
+    raise exception using errcode='22023',message='Fresh BSE scrip-group master snapshot is unavailable';
+  end if;
   select * into v_master from public.bse_equity_fee_master
-   where isin=v_isin and source_date<=v_today
-   order by source_date desc limit 1;
-  if not found or v_master.source_date<v_today-7 then
-    raise exception using errcode='22023',message='Fresh BSE scrip-group master data is unavailable for this instrument';
+   where isin=v_isin and source_date=v_latest_source_date;
+  if not found then
+    raise exception using errcode='22023',message='BSE instrument is absent from the latest official scrip master';
   end if;
   if v_master.instrument_status<>'A' or v_master.instrument_type<>'E' then
     raise exception using errcode='22023',message='BSE instrument is not an active equity scrip';
