@@ -135,8 +135,8 @@ begin
     if v_existing.user_id<>p_user_id then
       raise exception 'Stored derivative order does not belong to this account.' using errcode='23505';
     end if;
-    if v_existing.idempotency_key<>p_idempotency_key
-       or v_existing.request_fingerprint<>p_request_fingerprint then
+    if v_existing.idempotency_key is distinct from p_idempotency_key
+       or v_existing.request_fingerprint is distinct from p_request_fingerprint then
       raise exception 'Idempotency key was reused for a different request.' using errcode='23505';
     end if;
     return jsonb_build_object(
