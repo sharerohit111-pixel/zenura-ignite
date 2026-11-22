@@ -85,14 +85,15 @@ test("Paper Trading workspace also references only existing local assets",()=>{
 });
 
 test("Market terminal is installable and its service worker never caches private or external data",()=>{
- assert.equal(manifest.start_url,"/markets/");
- assert.equal(manifest.scope,"/markets/");
+ assert.equal(manifest.start_url,"./");
+ assert.equal(manifest.scope,"./");
  assert.equal(manifest.display,"standalone");
  assert.match(portal,/Paper Trading/);assert.match(portal,/Paper Investing/);
  assert.match(html,/manifest\.webmanifest/);assert.match(html,/pwa-register\.js/);
  assert.match(serviceWorker,/request\.headers\.has\("authorization"\)/);
  assert.match(serviceWorker,/url\.origin!==self\.location\.origin/);
  assert.match(serviceWorker,/request\.method!=="GET"/);
- assert.match(serviceWorker,/zenura-markets-shell-v1/);
+ assert.match(serviceWorker,/zenura-markets-shell-v2/);
+ assert.match(serviceWorker,/self\.registration\.scope/);
  assert.doesNotMatch(serviceWorker,/supabase\.co|api\.upstox\.com/);
 });
