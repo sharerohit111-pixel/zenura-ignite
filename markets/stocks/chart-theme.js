@@ -41,6 +41,7 @@
       persist();
     });
     languageButton?.addEventListener("click",render);
+    documentRef.addEventListener("zenura-language-change",render);
     render();
     return {getTheme:()=>theme,setTheme(value){theme=normalizeTheme(value);render();persist();}};
   }
