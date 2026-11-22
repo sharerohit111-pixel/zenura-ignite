@@ -28,6 +28,8 @@ jobs:
       ZENURA_APP_REDIRECT_URI: ${{ vars.ZENURA_APP_REDIRECT_URI }}
       WORKER_SERVICE_ACCOUNT: ${{ secrets.GCP_WORKER_SERVICE_ACCOUNT }}
       SCHEDULER_SERVICE_ACCOUNT: ${{ secrets.GCP_SCHEDULER_SERVICE_ACCOUNT }}
+      MARKET_DATA_RIGHTS_APPROVED: ${{ vars.MARKET_DATA_RIGHTS_APPROVED }}
+      MARKET_DATA_RIGHTS_REFERENCE: ${{ vars.MARKET_DATA_RIGHTS_REFERENCE }}
     steps:
       - uses: actions/checkout@v4
 
@@ -38,6 +40,7 @@ jobs:
           for name in PROJECT_ID SERVICE_ACCOUNT WIF_PROVIDER MARKET_GATEWAY_URL FRONTEND_ORIGIN UPSTOX_REDIRECT_URI ZENURA_APP_REDIRECT_URI WORKER_SERVICE_ACCOUNT SCHEDULER_SERVICE_ACCOUNT; do
             if [[ -z "${!name}" ]]; then echo "::error::Missing GitHub secret/variable: $name"; exit 1; fi
           done
+          if [[ "$MARKET_DATA_RIGHTS_APPROVED" != "true" || -z "$MARKET_DATA_RIGHTS_REFERENCE" ]]; then echo "::error::Public market-data deployment is blocked until written provider/regulatory approval is recorded."; exit 1; fi
           [[ "$MARKET_GATEWAY_URL" == https://* ]] || { echo "::error::MARKET_GATEWAY_URL must be HTTPS"; exit 1; }
           [[ "$FRONTEND_ORIGIN" == https://* && "$FRONTEND_ORIGIN" != */ ]] || { echo "::error::FRONTEND_ORIGIN must be an HTTPS origin without trailing slash"; exit 1; }
           [[ "$UPSTOX_REDIRECT_URI" == "$MARKET_GATEWAY_URL/upstox/oauth/callback" ]] || { echo "::error::UPSTOX_REDIRECT_URI must exactly match MARKET_GATEWAY_URL/upstox/oauth/callback"; exit 1; }
