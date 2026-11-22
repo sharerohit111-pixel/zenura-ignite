@@ -950,7 +950,7 @@ async function start(){
         paperLimitWorkerStatus.lastRunAt=Date.now();
         paperLimitWorkerStatus.lastCycle={scanned:result.scanned,filled:result.filled,failed:result.failed,locked:result.locked};
         if(result.filled||result.failed)console.log("Paper LIMIT worker cycle",JSON.stringify(result));
-      }catch(error){paperLimitWorkerStatus.lastRunAt=Date.now();console.error("Paper LIMIT worker cycle failed:",error.message);}
+      }catch(error){paperLimitWorkerStatus.lastRunAt=Date.now();paperLimitWorkerStatus.lastCycle={scanned:0,filled:0,failed:1,locked:false};console.error("Paper LIMIT worker cycle failed:",error.message);}
       finally{workerBusy=false;}
     };
     runWorker().catch(()=>{});
