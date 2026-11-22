@@ -67,7 +67,7 @@ test("Manual production deployment keeps the leased LIMIT worker active in the g
  assert.match(deployWorkflow,/--no-cpu-throttling/);
  assert.match(server,/PAPER_LIMIT_WORKER_ENABLED==="true"/);
  assert.match(server,/setInterval\(runWorker,intervalMs\)/);
- assert.match(server,/runPaperLimitWorker\(\{maxOrders:50\}\)/);
+ assert.match(server,/runPaperLimitWorker\(\{maxOrders:10\}\)/);
  assert.match(deployWorkflow,/github\.ref == 'refs\/heads\/main'/);
  assert.doesNotMatch(deployWorkflow,/gcloud run jobs deploy|gcloud scheduler jobs create|firebase deploy|firebase functions:deploy|service_account_key:/i);
 });
