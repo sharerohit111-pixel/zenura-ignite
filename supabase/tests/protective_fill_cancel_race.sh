@@ -15,7 +15,9 @@ UPDATE public.paper_accounts
  WHERE user_id='11111111-1111-4111-8111-111111111111';
 DO $account$
 BEGIN
-  IF NOT FOUND THEN RAISE EXCEPTION 'Protective race test account fixture is missing'; END IF;
+  IF NOT EXISTS (SELECT 1 FROM public.paper_accounts WHERE user_id='11111111-1111-4111-8111-111111111111') THEN
+    RAISE EXCEPTION 'Protective race test account fixture is missing';
+  END IF;
 END
 $account$;
 
