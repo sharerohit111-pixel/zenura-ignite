@@ -21,7 +21,7 @@ BEGIN
   v_now:=floor(extract(epoch from clock_timestamp())*1000)::bigint;
   v_result:=public.execute_paper_futures_market_order(
     'fefefefe-fefe-4efe-8efe-fefefefefefe',repeat('f',32)||repeat('0',32),
-    'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',repeat('b',64),
+    'fefefefe-0000-4000-8000-000000000001',repeat('b',64),
     'NSE_FO|FUT_CLOSE_TEST','FUT_CLOSE_TEST','NSE','NSE_FO',current_date+5,
     25,5,'BUY','DELIVERY',50,10000,200000,1000,v_now,v_now
   );
@@ -34,7 +34,7 @@ BEGIN
   v_now:=floor(extract(epoch from clock_timestamp())*1000)::bigint;
   v_result:=public.execute_paper_futures_market_order(
     'fefefefe-fefe-4efe-8efe-fefefefefefe',repeat('a',64),
-    'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',repeat('b',64),
+    'fefefefe-0000-4000-8000-000000000001',repeat('b',64),
     'NSE_FO|FUT_CLOSE_TEST','FUT_CLOSE_TEST','NSE','NSE_FO',current_date+5,
     25,5,'BUY','DELIVERY',50,10000,200000,1000,v_now,v_now
   );
@@ -48,7 +48,7 @@ BEGIN
   BEGIN
     PERFORM public.execute_paper_futures_market_order(
       'fefefefe-fefe-4efe-8efe-fefefefefefe',repeat('a',64),
-      'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',repeat('c',64),
+      'fefefefe-0000-4000-8000-000000000001',repeat('c',64),
       'NSE_FO|FUT_CLOSE_TEST','FUT_CLOSE_TEST','NSE','NSE_FO',current_date+5,
       25,5,'BUY','DELIVERY',50,10000,200000,1000,v_now,v_now
     );
@@ -61,7 +61,7 @@ BEGIN
   v_now:=floor(extract(epoch from clock_timestamp())*1000)::bigint;
   PERFORM public.execute_paper_futures_market_order(
     'fefefefe-fefe-4efe-8efe-fefefefefefe',repeat('f',32)||repeat('1',32),
-    'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',repeat('d',64),
+    'fefefefe-0000-4000-8000-000000000002',repeat('d',64),
     'NSE_FO|FUT_CLOSE_TEST','FUT_CLOSE_TEST','NSE','NSE_FO',current_date+5,
     25,5,'SELL','DELIVERY',25,12000,0,1000,v_now,v_now
   );
@@ -85,7 +85,7 @@ BEGIN
   v_now:=floor(extract(epoch from clock_timestamp())*1000)::bigint;
   PERFORM public.execute_paper_futures_market_order(
     'fefefefe-fefe-4efe-8efe-fefefefefefe',repeat('f',32)||repeat('2',32),
-    'cccccccc-cccc-4ccc-8ccc-cccccccccccc',repeat('f',64),
+    'fefefefe-0000-4000-8000-000000000003',repeat('f',64),
     'NSE_FO|FUT_CLOSE_TEST','FUT_CLOSE_TEST','NSE','NSE_FO',current_date+5,
     25,5,'SELL','DELIVERY',25,9000,0,1000,v_now,v_now
   );
@@ -104,14 +104,14 @@ BEGIN
   v_now:=floor(extract(epoch from clock_timestamp())*1000)::bigint;
   PERFORM public.execute_paper_futures_market_order(
     'fefefefe-fefe-4efe-8efe-fefefefefefe',repeat('f',32)||repeat('3',32),
-    'dddddddd-dddd-4ddd-8ddd-dddddddddddd',repeat('2',64),
+    'fefefefe-0000-4000-8000-000000000004',repeat('2',64),
     'NSE_FO|FUT_CLOSE_TEST','FUT_CLOSE_TEST','NSE','NSE_FO',current_date+5,
     25,5,'BUY','DELIVERY',50,10000,200000,1000,v_now,v_now
   );
   v_now:=floor(extract(epoch from clock_timestamp())*1000)::bigint;
   PERFORM public.execute_paper_futures_market_order(
     'fefefefe-fefe-4efe-8efe-fefefefefefe',repeat('f',32)||repeat('4',32),
-    'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',repeat('4',64),
+    'fefefefe-0000-4000-8000-000000000005',repeat('4',64),
     'NSE_FO|FUT_CLOSE_TEST','FUT_CLOSE_TEST','NSE','NSE_FO',current_date+5,
     25,5,'SELL','DELIVERY',75,11000,125000,1000,v_now,v_now
   );
@@ -129,7 +129,7 @@ BEGIN
   v_now:=floor(extract(epoch from clock_timestamp())*1000)::bigint;
   PERFORM public.execute_paper_futures_market_order(
     'fefefefe-fefe-4efe-8efe-fefefefefefe',repeat('f',32)||repeat('5',32),
-    'ffffffff-ffff-4fff-8fff-ffffffffffff',repeat('6',64),
+    'fefefefe-0000-4000-8000-000000000006',repeat('6',64),
     'NSE_FO|FUT_CLOSE_TEST','FUT_CLOSE_TEST','NSE','NSE_FO',current_date+5,
     25,5,'BUY','DELIVERY',25,12000,0,1000,v_now,v_now
   );
@@ -150,7 +150,7 @@ BEGIN
   BEGIN
     PERFORM public.execute_paper_futures_market_order(
       'fefefefe-fefe-4efe-8efe-fefefefefefe',repeat('f',32)||repeat('6',32),
-      '11111111-1111-4111-8111-111111111111',repeat('8',64),
+      'fefefefe-0000-4000-8000-000000000007',repeat('8',64),
       'NSE_FO|FUT_MARGIN_FAIL','FUT_MARGIN_FAIL','NSE','NSE_FO',current_date+5,
       25,5,'BUY','DELIVERY',25,10000,200000000,1000,v_now,v_now
     );
@@ -170,7 +170,7 @@ BEGIN
   BEGIN
     PERFORM public.execute_paper_futures_market_order(
       'fefefefe-fefe-4efe-8efe-fefefefefefe',repeat('f',32)||repeat('7',32),
-      '22222222-2222-4222-8222-222222222222',repeat('a',64),
+      'fefefefe-0000-4000-8000-000000000008',repeat('a',64),
       'NSE_FO|FUT_STALE','FUT_STALE','NSE','NSE_FO',current_date+5,
       25,5,'BUY','DELIVERY',25,10000,100000,1000,v_now-20000,v_now
     );
@@ -186,7 +186,7 @@ BEGIN
   BEGIN
     PERFORM public.execute_paper_futures_market_order(
       'fefefefe-fefe-4efe-8efe-fefefefefefe',repeat('f',32)||repeat('8',32),
-      '33333333-3333-4333-8333-333333333333',repeat('c',64),
+      'fefefefe-0000-4000-8000-000000000009',repeat('c',64),
       'NSE_FO|FUT_EXPIRED','FUT_EXPIRED','NSE','NSE_FO',current_date-1,
       25,5,'BUY','DELIVERY',25,10000,100000,1000,v_now,v_now
     );
