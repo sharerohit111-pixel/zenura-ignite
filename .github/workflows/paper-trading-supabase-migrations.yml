@@ -973,13 +973,13 @@ jobs:
           BEGIN
             -- Both CE and PE are accepted for matching NSE_FO identity.
             v_result:=public.execute_paper_long_option_order(
-              '12121212-1212-4212-8212-121212121212',repeat('1',64),
+              '12121212-1212-4212-8212-121212121212','abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789',
               '51515151-5151-4151-8151-515151515151',repeat('a',64),
               'NSE_FO|PARITYCE','PARITYCE','NSE','NSE_FO','CE',
               current_date+10,22000,25,5,1,'BUY',1285,v_now-14000,v_now
             );
             v_result:=public.execute_paper_long_option_order(
-              '12121212-1212-4212-8212-121212121212',repeat('2',64),
+              '12121212-1212-4212-8212-121212121212','fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210',
               '52525252-5252-4252-8252-525252525252',repeat('b',64),
               'NSE_FO|PARITYPE','PARITYPE','NSE','NSE_FO','PE',
               current_date+10,22000,25,5,1,'BUY',1285,v_now-14000,v_now
@@ -987,7 +987,7 @@ jobs:
             -- A quote safely older than 15 seconds must fail.
             BEGIN
               PERFORM public.execute_paper_long_option_order(
-                '12121212-1212-4212-8212-121212121212',repeat('3',64),
+                '12121212-1212-4212-8212-121212121212','0123abcd4567ef890123abcd4567ef890123abcd4567ef890123abcd4567ef89',
                 '53535353-5353-4353-8353-535353535353',repeat('c',64),
                 'NSE_FO|STALE16','STALE16','NSE','NSE_FO','CE',
                 current_date+10,22000,25,5,1,'BUY',1285,v_now-16000,v_now
@@ -998,7 +998,7 @@ jobs:
             -- Exchange and segment must agree.
             BEGIN
               PERFORM public.execute_paper_long_option_order(
-                '12121212-1212-4212-8212-121212121212',repeat('4',64),
+                '12121212-1212-4212-8212-121212121212','89ef6745cdab230189ef6745cdab230189ef6745cdab230189ef6745cdab2301',
                 '54545454-5454-4454-8454-545454545454',repeat('d',64),
                 'NSE_FO|BADVENUE','BADVENUE','BSE','NSE_FO','CE',
                 current_date+10,22000,25,5,1,'BUY',1285,v_now,v_now
@@ -1009,7 +1009,7 @@ jobs:
             -- Tick size must be positive and execution price must be tick-aligned.
             BEGIN
               PERFORM public.execute_paper_long_option_order(
-                '12121212-1212-4212-8212-121212121212',repeat('5',64),
+                '12121212-1212-4212-8212-121212121212','13579bdf2468ace013579bdf2468ace013579bdf2468ace013579bdf2468ace0',
                 '55555555-5555-4555-8555-555555555555',repeat('e',64),
                 'NSE_FO|BADTICK','BADTICK','NSE','NSE_FO','CE',
                 current_date+10,22000,25,0,1,'BUY',1285,v_now,v_now
@@ -1019,7 +1019,7 @@ jobs:
             END;
             BEGIN
               PERFORM public.execute_paper_long_option_order(
-                '12121212-1212-4212-8212-121212121212',repeat('6',64),
+                '12121212-1212-4212-8212-121212121212','02468ace13579bdf02468ace13579bdf02468ace13579bdf02468ace13579bdf',
                 '56565656-5656-4656-8656-565656565656',repeat('f',64),
                 'NSE_FO|OFFTICK2','OFFTICK2','NSE','NSE_FO','CE',
                 current_date+10,22000,25,5,1,'BUY',1286,v_now,v_now
@@ -1030,7 +1030,7 @@ jobs:
             -- The database rejects a caller clock outside the +/-2s tolerance.
             BEGIN
               PERFORM public.execute_paper_long_option_order(
-                '12121212-1212-4212-8212-121212121212',repeat('7',64),
+                '12121212-1212-4212-8212-121212121212','55aa66bb77cc88dd55aa66bb77cc88dd55aa66bb77cc88dd55aa66bb77cc88dd',
                 '57575757-5757-4757-8757-575757575757',repeat('1',64),
                 'NSE_FO|CLOCKSKEW','CLOCKSKEW','NSE','NSE_FO','CE',
                 current_date+10,22000,25,5,1,'BUY',1285,v_now,v_now+2001
@@ -1041,7 +1041,7 @@ jobs:
             -- Expired contracts must fail independent of quote freshness.
             BEGIN
               PERFORM public.execute_paper_long_option_order(
-                '12121212-1212-4212-8212-121212121212',repeat('8',64),
+                '12121212-1212-4212-8212-121212121212','aa55bb66cc77dd88aa55bb66cc77dd88aa55bb66cc77dd88aa55bb66cc77dd88',
                 '58585858-5858-4858-8858-585858585858',repeat('2',64),
                 'NSE_FO|EXPIRED2','EXPIRED2','NSE','NSE_FO','PE',
                 current_date-1,22000,25,5,1,'BUY',1285,v_now,v_now
