@@ -55,3 +55,11 @@ test("Trading and Investing expose the broad built-in technical indicator set",(
  for(const name of ["MA","EMA","SMA","BBI","BIAS","BRAR","BOLL","CCI","DMI","CR","PSY","DMA","TRIX","OBV","VR","WR","MTM","SAR","AO","ROC","PVT","MACD","KDJ","RSI","VOL","VWAP","ATR","ADX","STOCH","SUPERTREND","MFI"])
   assert.match(investing,new RegExp('option value="'+name+'"'),"Investing is missing "+name);
 });
+
+test("Chart workspace restores isolated per-symbol chart type and indicator preferences",()=>{
+ const engine=fs.readFileSync(path.join(root,"../stocks/chart-engine.js"),"utf8");
+ assert.match(engine,/async function loadPreferences\(\)/);
+ assert.match(engine,/paper_chart_preferences/);
+ assert.match(engine,/activeIndicators\.clear\(\)/);
+ assert.match(engine,/await loadPreferences\(\)/);
+});
