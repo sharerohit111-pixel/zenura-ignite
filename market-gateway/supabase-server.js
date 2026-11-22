@@ -15,6 +15,7 @@ const {normalizeProductMode}=require("./lib/product-mode");
 const {parseLimitPricePaise}=require("./lib/limit-price");
 const {normalizeProviderQuote}=require("./lib/provider-quote");
 const {isEligiblePaperLimitOrder,normalizeWorkerCursor,groupOrdersByUser}=require("./lib/paper-limit-worker");
+const {evaluateProtectiveOrder,isSupportedProtectiveOrder,isPositionCloseable}=require("./lib/protective-order-worker");
 const {buildPortfolioValuation}=require("./lib/paper-portfolio-valuation");
 const {calculateDerivativePortfolio}=require("./lib/derivative-portfolio");
 const {validateDerivativeContract}=require("./lib/derivative-contract");
@@ -74,6 +75,7 @@ let instrumentCache=[];
 let instrumentCacheUpdatedAt=0;
 let instrumentRefreshLastAttemptAt=0;
 const paperLimitWorkerStatus={enabled:false,intervalMs:null,lastRunAt:null,lastCycle:null};
+const paperProtectiveWorkerStatus={enabled:false,intervalMs:null,lastRunAt:null,lastCycle:null};
 const activeUserStreams=new Map();
 function fetchProvider(url,options={},timeoutMs=15000){return fetchProviderWithTimeout(fetch,url,options,timeoutMs);}
 function errorStatus(error){
@@ -139,7 +141,7 @@ app.get("/health",(_req,res)=>res.json({
   ok:true,service:"zenura-supabase-market-gateway",authProvider:"supabase",
   feedProtocol:"upstox-v3",instrumentMasterLoaded:instrumentCache.length>0,
   instrumentMasterUpdatedAt:instrumentCacheUpdatedAt||null,
-  limitWorker:{...paperLimitWorkerStatus}
+  limitWorker:{...paperLimitWorkerStatus},protectiveWorker:{...paperProtectiveWorkerStatus}
 }));
 
 app.get("/upstox/connection",async(req,res)=>{
@@ -853,6 +855,94 @@ async function runPaperLimitWorker({maxOrders=50}={}){
   }
 }
 
+async function runPaperProtectiveWorker({maxOrders=20}={}){
+  if(!Number.isInteger(maxOrders)||maxOrders<1||maxOrders>50)throw new TypeError("Protective worker batch size is invalid.");
+  const leaseToken=crypto.randomUUID();
+  const lease=await serviceDb.rpc("acquire_paper_market_worker_lease",{
+    p_state_key:"paper_protective_orders",p_lease_token:leaseToken,p_now_ms:Date.now(),p_ttl_ms:240000
+  });
+  if(lease?.error)throw new Error("Protective worker lease could not be acquired.");
+  if(lease?.data!==true)return {locked:true,scanned:0,filled:0,notEligible:0,failed:0};
+  const summary={locked:false,scanned:0,filled:0,notEligible:0,failed:0};
+  try{
+    if(!instrumentCache.length||Date.now()-instrumentCacheUpdatedAt>6*60*60*1000)await refreshInstrumentCache();
+    const batch=await serviceDb.from("paper_protective_orders")
+      .select("order_id,user_id,asset_class,instrument_key,product,side,trigger_type,trigger_direction,trigger_price_paise,quantity,status,created_at")
+      .eq("status","ACTIVE").eq("asset_class","EQUITY").eq("side","SELL")
+      .in("product",["DELIVERY","INTRADAY"])
+      .order("last_evaluated_quote_at_ms",{ascending:true,nullsFirst:true})
+      .order("created_at",{ascending:true}).limit(maxOrders);
+    if(batch.error)throw new Error("Active equity protective orders could not be scanned.");
+    const orders=batch.data||[];summary.scanned=orders.length;
+    const groups=[...groupOrdersByUser(orders).entries()];
+    const processUserOrders=async([userId,userOrders])=>{
+      try{
+        const validOrders=userOrders.filter(order=>{
+          const instrument=instrumentCache.find(x=>x.instrument_key===order.instrument_key);
+          return isSupportedProtectiveOrder(order)&&instrument&&instrument.instrument_type==="EQ"
+            &&["NSE_EQ","BSE_EQ"].includes(instrument.segment)
+            &&(order.product==="DELIVERY"||order.product==="INTRADAY");
+        });
+        summary.notEligible+=userOrders.length-validOrders.length;
+        if(!validOrders.length)return;
+        const {token}=await getUpstoxAccessToken(userId);
+        const keys=[...new Set(validOrders.map(order=>order.instrument_key))];
+        const response=await fetchProvider("https://api.upstox.com/v3/market-quote/quotes?"+new URLSearchParams({instrument_key:keys.join(",")}),
+          {headers:{Authorization:"Bearer "+token,Accept:"application/json"}});
+        const payload=await readProviderJson(response);
+        if(!response.ok)throw new Error("Upstox protective quote request failed with status "+response.status);
+        const entries=Object.values(payload?.data||{}),now=Date.now();
+        const positionsResult=await serviceDb.from("paper_equity_positions")
+          .select("instrument_key,product,quantity,reserved_quantity")
+          .eq("user_id",userId);
+        if(positionsResult.error)throw new Error("Equity positions for protective orders could not be read.");
+        const positions=positionsResult.data||[];
+        for(const order of validOrders){
+          const entry=entries.find(item=>item?.instrument_token===order.instrument_key);
+          let quote=null;
+          try{const normalized=normalizeProviderQuote(entry,order.instrument_key,{now,maxAgeMs:15000});
+            quote={instrumentKey:order.instrument_key,pricePaise:normalized.pricePaise,tradeTimeMs:normalized.tradeTimeMs};
+          }catch(_){}
+          if(!quote){summary.notEligible++;continue;}
+          const evaluated=await serviceDb.from("paper_protective_orders")
+            .update({last_evaluated_quote_at_ms:quote.tradeTimeMs})
+            .eq("order_id",order.order_id).eq("status","ACTIVE");
+          if(evaluated.error){summary.failed++;continue;}
+          if(!evaluateProtectiveOrder(order,quote,now)){summary.notEligible++;continue;}
+          const position=positions.find(p=>p.instrument_key===order.instrument_key&&p.product===order.product);
+          if(!isPositionCloseable(order,position)){summary.notEligible++;continue;}
+          const executionOrderId=crypto.createHash("sha256").update("zenura-protective-fill:"+order.order_id+":"+quote.tradeTimeMs+":"+quote.pricePaise).digest("hex");
+          const fingerprint=crypto.createHash("sha256").update(JSON.stringify({orderId:order.order_id,instrumentKey:order.instrument_key,
+            product:order.product,side:order.side,quantity:order.quantity,triggerType:order.trigger_type,
+            triggerDirection:order.trigger_direction,triggerPricePaise:order.trigger_price_paise,
+            quoteTimestampMs:quote.tradeTimeMs,executionPricePaise:quote.pricePaise})).digest("hex");
+          const fill=await serviceDb.rpc("execute_paper_equity_protective_fill",{
+            p_protective_order_id:order.order_id,p_execution_order_id:executionOrderId,
+            p_request_fingerprint:fingerprint,p_execution_price_paise:quote.pricePaise,
+            p_quote_timestamp_ms:quote.tradeTimeMs,p_now_ms:Date.now()
+          });
+          if(fill?.error){
+            if(["23514","22023","P0002"].includes(fill.error.code))summary.notEligible++;
+            else{summary.failed++;console.warn("Equity protective fill RPC failed",{orderId:order.order_id,code:fill.error.code||"unknown"});}
+          }else if(fill?.data?.status==="FILLED")summary.filled++;
+          else summary.notEligible++;
+        }
+      }catch(error){
+        summary.failed+=userOrders.length;
+        console.warn("Protective user batch skipped",{userId,errorName:error?.name||"Error",status:error?.status||500});
+      }
+    };
+    for(let offset=0;offset<groups.length;offset+=3)
+      await Promise.all(groups.slice(offset,offset+3).map(processUserOrders));
+    return summary;
+  }finally{
+    const released=await serviceDb.rpc("release_paper_market_worker_lease",{
+      p_state_key:"paper_protective_orders",p_lease_token:leaseToken,p_now_ms:Date.now()
+    });
+    if(released?.error)console.warn("Protective worker lease release failed",{code:released.error.code||"unknown"});
+  }
+}
+
 async function start(){
   if(!ENC_KEY||!UPSTOX_CLIENT_ID||!UPSTOX_CLIENT_SECRET||!UPSTOX_REDIRECT_URI){
     throw new Error("Supabase gateway secrets and Upstox OAuth configuration are required.");
@@ -870,6 +960,29 @@ async function start(){
   await loadProto();
   app.listen(PORT,"0.0.0.0",()=>console.log("Supabase-native ZENURA market gateway listening on",PORT));
   refreshInstrumentCache().catch(error=>console.error("Initial instrument refresh failed:",error.message));
+  if(process.env.PAPER_PROTECTIVE_WORKER_ENABLED==="true"){
+    const intervalMs=Math.max(2000,Math.min(15000,Number(process.env.PAPER_PROTECTIVE_WORKER_INTERVAL_MS)||5000));
+    paperProtectiveWorkerStatus.enabled=true;paperProtectiveWorkerStatus.intervalMs=intervalMs;
+    let workerBusy=false,nextWorkerRunAt=0,backoffMs=intervalMs;
+    const runWorker=async()=>{
+      if(workerBusy||Date.now()<nextWorkerRunAt)return;
+      workerBusy=true;
+      try{
+        const result=await runPaperProtectiveWorker({maxOrders:20});
+        paperProtectiveWorkerStatus.lastRunAt=Date.now();
+        paperProtectiveWorkerStatus.lastCycle={scanned:result.scanned,filled:result.filled,notEligible:result.notEligible,failed:result.failed,locked:result.locked,cycleError:false};
+        backoffMs=intervalMs;nextWorkerRunAt=Date.now()+intervalMs;
+        if(result.filled||result.failed)console.log("Paper protective worker cycle",JSON.stringify(result));
+      }catch(error){
+        paperProtectiveWorkerStatus.lastRunAt=Date.now();
+        paperProtectiveWorkerStatus.lastCycle={scanned:0,filled:0,notEligible:0,failed:1,locked:false,cycleError:true};
+        nextWorkerRunAt=Date.now()+backoffMs;backoffMs=Math.min(60000,backoffMs*2);
+        console.error("Paper protective worker cycle failed:",error.message);
+      }finally{workerBusy=false;}
+    };
+    runWorker().catch(()=>{});const timer=setInterval(runWorker,intervalMs);timer.unref?.();
+    console.log("Paper equity protective worker enabled; interval",intervalMs,"ms");
+  }
   if(process.env.PAPER_LIMIT_WORKER_ENABLED==="true"){
     const intervalMs=Math.max(1000,Math.min(10000,Number(process.env.PAPER_LIMIT_WORKER_INTERVAL_MS)||2000));
     paperLimitWorkerStatus.enabled=true;
@@ -899,4 +1012,4 @@ async function start(){
   }
 }
 if(require.main===module)start().catch(error=>{console.error("Supabase gateway startup failed:",error.message);process.exit(1);});
-module.exports={app,start,runPaperLimitWorker};
+module.exports={app,start,runPaperLimitWorker,runPaperProtectiveWorker};
