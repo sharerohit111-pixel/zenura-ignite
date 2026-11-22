@@ -24,3 +24,13 @@ The workflow and SQL assertion files were committed and fetched back from GitHub
 This first security harness tests the role/ACL boundary, RLS enablement, account read isolation and watchlist CRUD ownership. All six authenticated read surfaces now have two-user runtime read-isolation assertions using synthetic fixtures. The write-operation tests beyond Watchlist are still not applicable to client roles because direct trading writes are intentionally revoked. It also does not test concurrent transaction races, Firebase parity, or the trusted HTTP adapter's Firebase-token-to-Supabase-UUID mapping. Those remain separate follow-up stages.
 
 No PR #70 SQL or workflow was edited. No PR was created or merged. No production database or Firebase resource was changed.
+
+
+## Concurrent MARKET order / idempotency harness
+
+- `scripts/ci/supabase-market-order-concurrency.sh` creates a third synthetic auth user and initializes its account in the disposable PostgreSQL database.
+- Two independent `psql` sessions submit the same MARKET BUY concurrently with the same idempotency UUID and request fingerprint.
+- Assertions require exactly one persisted order and exactly one 10,000-paise cash debit.
+- A subsequent request reusing that idempotency UUID with a different fingerprint must fail.
+- The workflow runs this after the role/RLS assertions, against the same disposable PostgreSQL service. It does not contact Firebase, Supabase production, Upstox, or any external API.
+- This is a targeted two-session race check, not a high-volume load/stress benchmark. It has been authored but not executed yet.
