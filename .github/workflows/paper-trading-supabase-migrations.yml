@@ -1755,6 +1755,52 @@ jobs:
           $crypto_rls$;
           RESET ROLE;
           SQL
+      - name: Exercise concurrent duplicate S-TRADE crypto order requests
+        run: |
+          set -euo pipefail
+          run_duplicate_crypto_order() {
+            psql -v ON_ERROR_STOP=1 -At <<'SQL'
+          SET ROLE service_role;
+          SELECT public.execute_paper_crypto_market_order(
+            '22222222-2222-4222-8222-222222222222',
+            '33333333-3333-4333-8333-333333333333',
+            '44444444-4444-4444-8444-444444444444',
+            repeat('a',64),'ETHUSDT','ETH','BUY',0.001,3000,85,0.255,
+            floor(extract(epoch from clock_timestamp())*1000)::bigint
+          );
+          RESET ROLE;
+          SQL
+          }
+          run_duplicate_crypto_order >/tmp/crypto-duplicate-a.json &
+          first_pid=$!
+          run_duplicate_crypto_order >/tmp/crypto-duplicate-b.json &
+          second_pid=$!
+          wait "$first_pid"
+          wait "$second_pid"
+          psql -v ON_ERROR_STOP=1 <<'SQL'
+          DO $crypto_concurrency$
+          DECLARE
+            v_orders bigint;
+            v_ledger bigint;
+            v_cash numeric(24,8);
+            v_quantity numeric(30,12);
+          BEGIN
+            SELECT count(*) INTO v_orders FROM public.paper_crypto_orders
+             WHERE user_id='22222222-2222-4222-8222-222222222222'
+               AND idempotency_key='44444444-4444-4444-8444-444444444444';
+            SELECT count(*) INTO v_ledger FROM public.paper_crypto_ledger
+             WHERE order_id='33333333-3333-4333-8333-333333333333';
+            SELECT cash_balance INTO v_cash FROM public.paper_crypto_accounts
+             WHERE user_id='22222222-2222-4222-8222-222222222222';
+            SELECT quantity INTO v_quantity FROM public.paper_crypto_positions
+             WHERE user_id='22222222-2222-4222-8222-222222222222' AND symbol='ETHUSDT';
+            IF v_orders<>1 OR v_ledger<>2 OR v_cash<>999744.745 OR v_quantity<>0.001 THEN
+              RAISE EXCEPTION 'Concurrent crypto duplicate caused duplicate or inconsistent accounting: orders %, ledger %, cash %, qty %',
+                v_orders,v_ledger,v_cash,v_quantity;
+            END IF;
+          END
+          $crypto_concurrency$;
+          SQL
       - name: Verify expected schema and RPC registration
         run: |
           psql -v ON_ERROR_STOP=1 <<'SQL'
