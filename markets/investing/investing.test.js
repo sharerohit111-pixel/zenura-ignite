@@ -195,7 +195,7 @@ test("Two-mode launch portal has the shared language toggle and accurate order s
  assert.match(portal,/language-toggle\.js/);
  assert.match(portal,/Delivery limit orders for cash equities/);
  assert.match(portalCss,/\.paper-language-toggle\s*\{/);
- assert.match(languageToggle,/ZENURA IGNITE · Market Terminal/);
+ assert.match(languageToggle,/ZENURA IGNITE · Paper Trading & Paper Investing/);
 });
 
 test("Launch portal exposes exactly the two approved user modes",()=>{
