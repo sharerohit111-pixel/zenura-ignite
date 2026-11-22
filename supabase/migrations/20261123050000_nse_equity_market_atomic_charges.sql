@@ -147,7 +147,7 @@ begin
     raise exception using errcode='22003',message='NSE cash-equity charges exceed supported limits';
   end if;
   v_net_gross := case when p_side='BUY' then v_gross+v_charges else v_gross-v_charges end;
-  if p_side='SELL' and v_net_gross<0 then
+  if p_side='SELL' and v_net_gross<=0 then
     raise exception using errcode='22003',message='NSE cash-equity SELL net proceeds would be negative after minimum charges';
   end if;
   v_cash_delta := case when p_side='BUY' then -v_net_gross else v_net_gross end;
