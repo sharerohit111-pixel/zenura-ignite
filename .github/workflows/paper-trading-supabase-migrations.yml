@@ -664,6 +664,113 @@ jobs:
           END
           $$;
           SQL
+      - name: Exercise concurrent duplicate Options requests
+        run: |
+          set -euo pipefail
+          psql -v ON_ERROR_STOP=1 <<'SQL'
+          INSERT INTO auth.users(id) VALUES ('55555555-5555-4555-8555-555555555555')
+            ON CONFLICT DO NOTHING;
+          SET ROLE service_role;
+          SELECT public.initialize_paper_trading_account('55555555-5555-4555-8555-555555555555');
+          RESET ROLE;
+          SQL
+          run_option() {
+            psql -v ON_ERROR_STOP=1 <<'SQL'
+          SET ROLE service_role;
+          SELECT public.execute_paper_long_option_order(
+            '55555555-5555-4555-8555-555555555555',
+            repeat('c',64),'18181818-1818-4818-8818-181818181818',
+            repeat('d',64),'NSE_FO|RACEOPT','RACEOPT','NSE','NSE_FO','CE',
+            current_date+10,22000,25,5,1,'BUY',1285,
+            floor(extract(epoch from clock_timestamp())*1000)::bigint,
+            floor(extract(epoch from clock_timestamp())*1000)::bigint
+          );
+          RESET ROLE;
+          SQL
+          }
+          run_option & pid1=$!
+          run_option & pid2=$!
+          wait "$pid1"
+          wait "$pid2"
+          psql -v ON_ERROR_STOP=1 <<'SQL'
+          DO $
+          DECLARE
+            v_gross bigint;
+            v_charges bigint;
+            v_cash bigint;
+          BEGIN
+            IF (SELECT count(*) FROM public.paper_derivative_orders
+                WHERE user_id='55555555-5555-4555-8555-555555555555'
+                  AND idempotency_key='18181818-1818-4818-8818-181818181818') <> 1
+               OR (SELECT net_quantity FROM public.paper_derivative_positions
+                WHERE user_id='55555555-5555-4555-8555-555555555555'
+                  AND instrument_key='NSE_FO|RACEOPT') <> 25 THEN
+              RAISE EXCEPTION 'Concurrent duplicate Options requests created duplicate order or position quantity';
+            END IF;
+            SELECT gross_paise,charges_paise INTO v_gross,v_charges
+              FROM public.paper_derivative_orders
+             WHERE user_id='55555555-5555-4555-8555-555555555555'
+               AND idempotency_key='18181818-1818-4818-8818-181818181818';
+            SELECT cash_paise INTO v_cash FROM public.paper_accounts
+             WHERE user_id='55555555-5555-4555-8555-555555555555';
+            IF v_cash <> 100000000-v_gross-v_charges THEN
+              RAISE EXCEPTION 'Concurrent duplicate Options requests charged the account more than once';
+            END IF;
+            BEGIN
+              PERFORM public.execute_paper_long_option_order(
+                '55555555-5555-4555-8555-555555555555',
+                repeat('c',64),'18181818-1818-4818-8818-181818181818',
+                repeat('e',64),'NSE_FO|RACEOPT','RACEOPT','NSE','NSE_FO','CE',
+                current_date+10,22000,25,5,1,'BUY',1285,
+                floor(extract(epoch from clock_timestamp())*1000)::bigint,
+                floor(extract(epoch from clock_timestamp())*1000)::bigint
+              );
+              RAISE EXCEPTION 'Options idempotency key accepted a changed fingerprint';
+            EXCEPTION WHEN unique_violation THEN NULL;
+            END;
+          END
+          $;
+          SQL
+      - name: Reject future and off-tick Options quotes
+        run: |
+          psql -v ON_ERROR_STOP=1 <<'SQL'
+          DO $
+          DECLARE
+            v_now bigint := floor(extract(epoch from clock_timestamp())*1000)::bigint;
+          BEGIN
+            BEGIN
+              PERFORM public.execute_paper_long_option_order(
+                '22222222-2222-4222-8222-222222222222',repeat('7',64),
+                '19191919-1919-4919-8919-191919191919',repeat('a',64),
+                'NSE_FO|FUTURE','FUTURE','NSE','NSE_FO','PE',
+                current_date+10,22000,25,5,1,'BUY',1285,v_now+10000,v_now
+              );
+              RAISE EXCEPTION 'Future Options quote was accepted';
+            EXCEPTION WHEN SQLSTATE '22023' THEN NULL;
+            END;
+            BEGIN
+              PERFORM public.execute_paper_long_option_order(
+                '22222222-2222-4222-8222-222222222222',repeat('8',64),
+                '20202020-2020-4020-8020-202020202020',repeat('b',64),
+                'NSE_FO|OFFTICK','OFFTICK','NSE','NSE_FO','CE',
+                current_date+10,22000,25,5,1,'BUY',1286,v_now,v_now
+              );
+              RAISE EXCEPTION 'Off-tick Options price was accepted';
+            EXCEPTION WHEN SQLSTATE '22023' THEN NULL;
+            END;
+            BEGIN
+              PERFORM public.execute_paper_long_option_order(
+                '22222222-2222-4222-8222-222222222222',repeat('9',64),
+                '21212121-2121-4121-8121-212121212121',repeat('c',64),
+                'NSE_FO|EXPIRED','EXPIRED','NSE','NSE_FO','PE',
+                current_date-1,22000,25,5,1,'BUY',1285,v_now,v_now
+              );
+              RAISE EXCEPTION 'Expired Options contract was accepted';
+            EXCEPTION WHEN SQLSTATE '22023' THEN NULL;
+            END;
+          END
+          $;
+          SQL
       - name: Verify expected schema and RPC registration
         run: |
           psql -v ON_ERROR_STOP=1 <<'SQL'
