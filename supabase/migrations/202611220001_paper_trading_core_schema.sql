@@ -218,12 +218,12 @@ language sql
 stable
 security definer
 set search_path = ''
-as $
+as $fn$
   select m.supabase_user_id
   from public.paper_user_identity_map as m
   where m.firebase_uid = (select auth.jwt()->>'sub')
   limit 1
-$;
+$fn$;
 
 revoke all on function public.current_paper_user_id() from public, anon;
 grant execute on function public.current_paper_user_id() to authenticated, service_role;
