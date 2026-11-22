@@ -1079,6 +1079,62 @@ jobs:
           END
           $futures$;
           SQL
+      - name: Exercise Paper Investing independent ledger and market order accounting
+        run: |
+          psql -v ON_ERROR_STOP=1 <<'SQL'
+          DO $investing$
+          DECLARE
+            v_user uuid := 'fedcba98-7654-4321-8765-fedcba987654';
+            v_now bigint := floor(extract(epoch from clock_timestamp())*1000)::bigint;
+            v_result jsonb;
+            v_cash bigint;
+            v_qty integer;
+            v_cost bigint;
+            v_realized bigint;
+          BEGIN
+            INSERT INTO auth.users(id) VALUES(v_user) ON CONFLICT(id) DO NOTHING;
+            PERFORM public.initialize_paper_investing_account(v_user);
+            v_result:=public.execute_paper_investing_market_order(
+              v_user,repeat('a',64),'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',repeat('b',64),
+              'NSE_EQ|INVEST_TEST','INVEST_TEST','NSE','BUY',10,10000,5,1000,v_now,v_now
+            );
+            IF v_result->>'idempotent_replay'<>'false' OR (v_result->>'cash_paise')::bigint<>99899000 THEN
+              RAISE EXCEPTION 'Paper Investing initial BUY accounting mismatch: %',v_result::text;
+            END IF;
+            v_result:=public.execute_paper_investing_market_order(
+              v_user,repeat('a',64),'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',repeat('b',64),
+              'NSE_EQ|INVEST_TEST','INVEST_TEST','NSE','BUY',10,10000,5,1000,v_now,v_now
+            );
+            IF v_result->>'idempotent_replay'<>'true' THEN RAISE EXCEPTION 'Paper Investing BUY retry was not idempotent'; END IF;
+            v_now:=floor(extract(epoch from clock_timestamp())*1000)::bigint;
+            PERFORM public.execute_paper_investing_market_order(
+              v_user,repeat('c',64),'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',repeat('d',64),
+              'NSE_EQ|INVEST_TEST','INVEST_TEST','NSE','BUY',5,12000,5,500,v_now,v_now
+            );
+            v_now:=floor(extract(epoch from clock_timestamp())*1000)::bigint;
+            PERFORM public.execute_paper_investing_market_order(
+              v_user,repeat('e',64),'cccccccc-cccc-4ccc-8ccc-cccccccccccc',repeat('f',64),
+              'NSE_EQ|INVEST_TEST','INVEST_TEST','NSE','SELL',5,13000,5,500,v_now,v_now
+            );
+            SELECT cash_paise,realized_pnl_paise INTO v_cash,v_realized
+              FROM public.paper_investing_accounts WHERE user_id=v_user;
+            SELECT quantity,cost_basis_paise INTO v_qty,v_cost
+              FROM public.paper_investing_positions WHERE user_id=v_user AND instrument_key='NSE_EQ|INVEST_TEST';
+            IF v_cash<>99903000 OR v_realized<>10667 OR v_qty<>10 OR v_cost<>107667 THEN
+              RAISE EXCEPTION 'Paper Investing buy/sell ledger mismatch cash %, realized %, quantity %, cost %',v_cash,v_realized,v_qty,v_cost;
+            END IF;
+            v_now:=floor(extract(epoch from clock_timestamp())*1000)::bigint;
+            BEGIN
+              PERFORM public.execute_paper_investing_market_order(
+                v_user,repeat('1',64),'dddddddd-dddd-4ddd-8ddd-dddddddddddd',repeat('2',64),
+                'NSE_EQ|INVEST_TEST','INVEST_TEST','NSE','SELL',11,13000,5,500,v_now,v_now
+              );
+              RAISE EXCEPTION 'Paper Investing oversell was accepted';
+            EXCEPTION WHEN SQLSTATE '23514' THEN NULL;
+            END;
+          END
+          $investing$;
+          SQL
       - name: Exercise Supabase Upstox OAuth replay, generation and stream lease controls
         run: |
           psql -v ON_ERROR_STOP=1 <<'SQL'
@@ -1463,6 +1519,7 @@ jobs:
               OR to_regprocedure('public.initialize_paper_trading_account(uuid)') IS NULL
               OR to_regprocedure('public.initialize_paper_investing_account(uuid)') IS NULL
               OR to_regprocedure('public.execute_paper_futures_market_order(uuid,text,uuid,text,text,text,text,text,date,integer,integer,text,text,integer,bigint,bigint,bigint,bigint,bigint)') IS NULL
+              OR to_regprocedure('public.execute_paper_investing_market_order(uuid,text,uuid,text,text,text,text,text,integer,bigint,integer,bigint,bigint,bigint)') IS NULL
               OR to_regprocedure('public.execute_paper_long_option_order(uuid,text,uuid,text,text,text,text,text,text,date,numeric,integer,integer,integer,text,bigint,bigint,bigint)') IS NULL THEN
               RAISE EXCEPTION 'One or more expected trading RPC functions are missing';
             END IF;
