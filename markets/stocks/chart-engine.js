@@ -271,34 +271,48 @@
     try{chart.createIndicator(name);activeIndicators.add(name);savePreferences().catch(()=>{});return true;}
     catch(error){console.warn("Indicator could not be added:",error);return false;}
   }
+  function overlayHandlers(name){
+    return {
+      onDrawEnd:event=>{
+        const overlay=event.overlay;
+        if(overlay){
+          const snapshot={id:overlay.id,name:overlay.name||name,points:overlay.points||[],styles:overlay.styles||{}};
+          undoStack.push(snapshot);redoStack.length=0;
+          persistOverlay(overlay).catch(error=>console.warn("Drawing save failed:",error.message));
+        }
+        return true;
+      },
+      onPressedMoveEnd:event=>{persistOverlay(event.overlay).catch(()=>{});return true;},
+      onRemoved:event=>{removePersistedOverlay(event.overlay).catch(()=>{});return true;}
+    };
+  }
   function addDrawing(name){
     if(!chart||!DRAWINGS[name])return false;
-    try{
-      const id=chart.createOverlay({
-        name,
-        onDrawEnd:event=>{persistOverlay(event.overlay).catch(error=>console.warn("Drawing save failed:",error.message));undoStack.push({name,points:event.overlay.points||[]});redoStack.length=0;return true;},
-        onPressedMoveEnd:event=>{persistOverlay(event.overlay).catch(()=>{});return true;},
-        onRemoved:event=>{removePersistedOverlay(event.overlay).catch(()=>{});return true;}
-      });
-      return !!id;
-    }catch(error){console.warn("Drawing tool unavailable:",error);return false;}
+    try{return !!chart.createOverlay({name,...overlayHandlers(name)});}
+    catch(error){console.warn("Drawing tool unavailable:",error);return false;}
   }
   function removeLastDrawing(){
     if(!chart)return false;
     const overlays=chart.getOverlays?.()||[];
     const overlay=overlays.at(-1);if(!overlay)return false;
+    undoStack.push({id:overlay.id,name:overlay.name,points:overlay.points||[],styles:overlay.styles||{}});
     chart.removeOverlay({id:overlay.id});return true;
   }
   function undo(){
     if(!chart||!undoStack.length)return false;
     const item=undoStack.pop();redoStack.push(item);
-    const overlays=chart.getOverlays?.()||[];
-    const overlay=overlays.at(-1);if(overlay)chart.removeOverlay({id:overlay.id});
-    return true;
+    chart.removeOverlay({id:item.id});return true;
   }
   function redo(){
-    const item=redoStack.pop();if(!item)return false;
-    return addDrawing(item.name);
+    if(!chart||!redoStack.length)return false;
+    const item=redoStack.pop();
+    try{
+      const id=chart.createOverlay({name:item.name,points:item.points,styles:item.styles,...overlayHandlers(item.name)});
+      if(!id)return false;
+      const overlay=(chart.getOverlays?.()||[]).find(x=>x.id===id);
+      if(overlay){undoStack.push({id:overlay.id,name:overlay.name||item.name,points:overlay.points||item.points,styles:overlay.styles||item.styles});persistOverlay(overlay).catch(()=>{});}
+      return true;
+    }catch(error){console.warn("Drawing redo failed:",error);return false;}
   }
   function destroy(){
     if(container?.__zenuraResizeObserver)container.__zenuraResizeObserver.disconnect();
