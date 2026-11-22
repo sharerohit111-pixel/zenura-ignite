@@ -167,27 +167,51 @@ Added `supabase/migrations/202611220004_paper_account_initialization.sql`:
 This remains a draft. It has not been executed against staging or tested under concurrent calls. Account provisioning for migrated Firebase users must be handled by a separate controlled migration path, not by resetting their existing balances to the new-user default.
 
 
-## Options CE/PE transaction audit — next implementation gate (2026-11-22)
+## Options CE/PE transaction audit — source contract recovered (2026-11-22)
 
-The core schema currently provides:
-- `paper_derivative_positions`: one net long position per user/instrument, CE/PE type, expiry, net quantity, average premium and cost basis.
-- `paper_derivative_orders`: MARKET-only order history with CE/PE, BUY/SELL, quantity, lots, lot size, premium execution price, quote timestamp/age, gross premium, charges, total debit, net credit, realized P&L, cash delta and charge breakdown.
-- Derivative positions and order history have own-user SELECT policies; writes remain server-only.
+The exact current implementation was located on `integration/paper-trading-backend-main-2026-11-20` and reviewed:
 
-### Why an execution RPC is not added in this pass
+- `market-gateway/lib/derivative-order-transaction.js`
+- `market-gateway/lib/derivative-contract.js`
+- `market-gateway/lib/derivative-position.js`
+- `market-gateway/lib/trading-charges.js`
+- `market-gateway/test/derivative-order-transaction.test.js`
+- `market-gateway/test/derivative-contract.test.js`
+- `market-gateway/test/derivative-position.test.js`
+- `market-gateway/test/trading-charges.test.js`
 
-A correct derivative transaction must reproduce the existing application's precise rules for:
-1. BUY premium debit, SELL credit, and whether SELL is allowed only against an existing long position (no naked short/options margin).
-2. Quantity-versus-lots consistency and instrument-master lot-size validation.
-3. Average premium/cost-basis allocation on partial SELL and realized P&L.
-4. Brokerage, STT, exchange transaction charges, GST, SEBI charges, stamp duty and rounding rules—or the current product's explicit exclusions.
-5. Cash delta, total debit/net credit and charges-breakdown semantics.
-6. Fresh quote validation and idempotent retry behavior.
+### Verified product behavior to preserve
 
-The currently inspected Firebase source files cover Upstox OAuth and the equity pending-LIMIT worker; they did not expose the derivative execution implementation or its exact fee/math contract. GitHub code search did not return the derivative implementation, so those rules remain unverified. Do not infer them from column names.
+1. Only long CE/PE MARKET BUY and SELL-to-close are enabled. Naked short options, futures, margin borrowing and live orders are disabled. SELL quantity cannot exceed the existing long position.
+2. The instrument must be trusted provider/instrument-master data: NSE_FO or BSE_FO segment, NSE/BSE exchange, CE/PE type, valid instrument key and trading symbol, official lot size, tick size, expiry and strike.
+3. Lots are whole numbers 1–10,000; quantity = lots × official lot size and is capped at 1,000,000. Price is integer paise and must align to the normalized contract tick.
+4. Expiry is normalized to the India-local date. The contract expires at the exchange-local 15:30 cutoff; orders after that instant are rejected.
+5. Quote instrument key must match, quote timestamp cannot be in the future, and quote age is at most 15 seconds.
+6. The shared paper account must have valid cash/reservation/version values and zero reserved margin. A maximum of 50 distinct open derivative positions is enforced. Adding to an existing position at the cap is allowed.
+7. BUY cash movement is negative premium; SELL cash movement is positive premium. The account's actual cash update is premium cash movement minus trade charges.
+8. BUY cost basis increases by gross premium plus all BUY charges. SELL allocates the prior cost basis proportionally to the closed quantity, using integer half-up rounding (the entire remaining basis is allocated on a full close). SELL realized P&L = gross premium - allocated cost basis - SELL charges. Partial-close allocations must conserve the original paise cost basis over repeated closes.
+9. Same idempotency key + same request fingerprint replays the original order without another debit; key reuse with a different fingerprint is rejected. Existing malformed positions or unsafe integer arithmetic reject the transaction before writes.
 
-### Required source audit before implementing
+### Indicative fee schedule reproduced by current code
 
-Retrieve the exact current derivative order handler, derivative math/charges helper, instrument validation and tests from the integration branch. Then create parity fixtures from existing behavior and implement a single account-locking, idempotent SQL transaction for CE/PE. Do not enable naked short positions or change charges policy without explicit evidence from current code/product requirements.
+All values are integer paise, rounded with JavaScript `Math.round` at each fee component:
 
-No Options transaction RPC has been added in this pass. No database changes were applied. This is an intentional safety gate, not a claim that Options migration is complete.
+- Brokerage: ₹20 per executed order (2,000 paise).
+- NSE exchange transaction: 0.03553% of premium turnover; BSE: 0.0325%.
+- NSE IPFT: 0.0005% of premium turnover; BSE: zero.
+- SEBI turnover: 0.0001%.
+- Stamp duty: 0.003% on BUY only.
+- STT: 0.15% on SELL only.
+- GST: 18% on brokerage + exchange transaction + IPFT.
+- Total charges are the sum of those rounded components. BUY total debit = gross + charges. SELL net credit = gross - charges and can legitimately be negative for very small premium turnover.
+- These are explicitly indicative paper-simulation estimates, not a broker contract note.
+
+### Schema alignment performed
+
+The core schema draft was corrected to retain exchange and official lot-size metadata on derivative positions. The `net_credit_paise` field no longer rejects negative values, matching the existing fee helper's tested tiny-premium SELL behavior. This is a draft-branch-only change.
+
+### Next implementation step
+
+Implement one server-only, account-locking, idempotent CE/PE SQL transaction that reproduces the above contract exactly. Before any staging apply, build parity fixtures from the existing JavaScript tests and validate SQL rounding against JavaScript `Math.round` (not PostgreSQL's default numeric rounding). Test concurrent duplicate requests, mismatched idempotency keys, insufficient unreserved cash, partial and full SELL, fee components, negative net credit, stale/future quotes, expiry cutoff, off-tick prices, 50-position cap, malformed stored positions and safe-integer boundaries.
+
+No Options transaction RPC has yet been added. No SQL has been applied to Supabase. Firebase remains unchanged and is still the live source of truth.
