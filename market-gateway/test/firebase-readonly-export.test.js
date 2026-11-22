@@ -1,7 +1,10 @@
 "use strict";
 const test=require("node:test");
 const assert=require("node:assert/strict");
-const {EXPORT_COLLECTIONS,EXCLUDED_COLLECTIONS,serializeFirestoreValue,sanitizeAuthUser,firestoreDocuments,resolveProjectId,parseArgs}=require("../scripts/firebase-readonly-export");
+const fs=require("node:fs/promises");
+const os=require("node:os");
+const path=require("node:path");
+const {EXPORT_COLLECTIONS,EXCLUDED_COLLECTIONS,serializeFirestoreValue,sanitizeAuthUser,firestoreDocuments,exportSnapshot,resolveProjectId,parseArgs}=require("../scripts/firebase-readonly-export");
 test("export scope is allowlisted and excludes broker credentials and operational state",()=>{
  assert.deepEqual(EXPORT_COLLECTIONS,["customerProfiles","users","indianPaperAccounts","indianPaperOrders","indianDerivativeOrders","indianMarketWatchlists"]);
  assert.ok(EXCLUDED_COLLECTIONS.some(x=>x.startsWith("upstoxConnections")));assert.ok(EXCLUDED_COLLECTIONS.includes("upstoxOAuthStates"));
@@ -36,4 +39,18 @@ test("export project selection requires explicit FIREBASE_PROJECT_ID",()=>{
  assert.throws(()=>resolveProjectId({GOOGLE_CLOUD_PROJECT:"ambient-project"}),/FIREBASE_PROJECT_ID explicitly/);
  assert.throws(()=>resolveProjectId({GCLOUD_PROJECT:"ambient-project"}),/FIREBASE_PROJECT_ID explicitly/);
  assert.throws(()=>resolveProjectId({FIREBASE_PROJECT_ID:"   "}),/FIREBASE_PROJECT_ID explicitly/);
+});
+
+test("removes only its partial snapshot files when a read fails",async()=>{
+ const parent=await fs.mkdtemp(path.join(os.tmpdir(),"zenura-export-cleanup-"));
+ const output=path.join(parent,"private-export");let collectionCalls=0;
+ const db={collection(name){return {orderBy(){return {limit(){return {async get(){
+  collectionCalls++;
+  if(collectionCalls===2)throw new Error("synthetic read failure");
+  return {docs:[{id:"doc-1",ref:{path:name+"/doc-1"},data:()=>({cash:100})}]};
+ }}}}}}};
+ await assert.rejects(()=>exportSnapshot({db,auth:{listUsers:async()=>({users:[]})},outputDirectory:output,projectId:"synthetic-project"}),/synthetic read failure/);
+ await assert.rejects(()=>fs.access(output),{code:"ENOENT"});
+ assert.deepEqual(await fs.readdir(parent),[]);
+ await fs.rm(parent,{recursive:true,force:true});
 });
