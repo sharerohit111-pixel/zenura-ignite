@@ -203,7 +203,7 @@ jobs:
             SELECT reserved_cash_paise,cash_paise INTO v_reserved,v_cash
               FROM public.paper_accounts
              WHERE user_id='22222222-2222-4222-8222-222222222222';
-            IF v_result->>'status' <> 'FILLED' OR v_reserved <> 0 OR v_cash <> 99872000 THEN
+            IF v_result->>'status' <> 'FILLED' OR v_reserved <> 0 OR v_cash <> 99902000 THEN
               RAISE EXCEPTION 'LIMIT BUY fill cash or reservation result is incorrect';
             END IF;
           END
