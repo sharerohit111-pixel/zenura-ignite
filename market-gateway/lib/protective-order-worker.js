@@ -14,6 +14,29 @@ function isSupportedProtectiveOrder(order){
   return order.trigger_direction===expectedDirection;
 }
 
+function isPositionCloseable(order,position){
+  if(!isSupportedProtectiveOrder(order)||!position||typeof position!=="object")return false;
+  if(position.instrument_key!==order.instrument_key)return false;
+  if(order.asset_class==="EQUITY"){
+    if(position.product!==order.product||!Number.isSafeInteger(position.quantity)
+      ||!Number.isSafeInteger(position.reserved_quantity)||position.quantity<1
+      ||position.reserved_quantity<0||position.reserved_quantity>position.quantity)return false;
+    const closeSide=order.side==="SELL";
+    return closeSide&&order.quantity<=position.quantity-position.reserved_quantity;
+  }
+  if(order.asset_class==="FUTURE"){
+    if(position.product!==order.product||!Number.isSafeInteger(position.net_quantity)
+      ||position.net_quantity===0)return false;
+    return order.quantity<=Math.abs(position.net_quantity)
+      &&((position.net_quantity>0&&order.side==="SELL")||(position.net_quantity<0&&order.side==="BUY"));
+  }
+  if(position.net_quantity!==undefined){
+    return order.side==="SELL"&&Number.isSafeInteger(position.net_quantity)
+      &&position.net_quantity>0&&order.quantity<=position.net_quantity;
+  }
+  return false;
+}
+
 function evaluateProtectiveOrder(order,quote,nowMs){
   if(!order||typeof order!=="object"||order.status!=="ACTIVE"
     ||!isSupportedProtectiveOrder(order)
@@ -32,4 +55,4 @@ function evaluateProtectiveOrder(order,quote,nowMs){
     :quote.pricePaise<=order.trigger_price_paise;
 }
 
-module.exports={MAX_QUOTE_AGE_MS,evaluateProtectiveOrder,isSupportedProtectiveOrder};
+module.exports={MAX_QUOTE_AGE_MS,evaluateProtectiveOrder,isSupportedProtectiveOrder,isPositionCloseable};
