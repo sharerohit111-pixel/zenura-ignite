@@ -1,6 +1,7 @@
 "use strict";
 
 const {isUuid}=require("./order-idempotency");
+const {authenticateFirebaseRequest}=require("./firebase-auth");
 const RESOLVED_IDENTITY=Symbol("resolved-paper-trading-identity");
 const USER_SCOPED_RPCS=new Set([
   "execute_paper_market_order",
@@ -39,8 +40,14 @@ function createSupabasePaperTradingIdentityAdapter(options={}){
   if(typeof firebaseProjectId!=="string"||!/^[a-z][a-z0-9-]{4,62}$/.test(firebaseProjectId))throw new TypeError("A valid Firebase project ID is required");
   if(typeof fetchImpl!=="function")throw new TypeError("A fetch implementation is required");
 
-  async function resolveIdentity({idToken,decodedToken}={}){
-    if(typeof idToken!=="string"||!idToken.trim())throw safeError("Firebase ID token is required",401);
+  async function resolveIdentity({request,auth}={}){
+    // Verify and forward the token from the same request object; callers cannot pair
+    // a verified decoded token with a different raw Bearer token.
+    const header=request?.get?.("authorization")||"";
+    const match=/^Bearer ([^\\s,]+)$/i.exec(header);
+    if(!match)throw safeError("Sign in required",401);
+    const idToken=match[1];
+    const decodedToken=await authenticateFirebaseRequest(request,auth);
     const firebaseUid=validateFirebaseClaims(decodedToken,firebaseProjectId);
     let response;
     try{
@@ -83,7 +90,6 @@ function buildPaperTradingRpcArgs(identity,rpcName,args={}){
 
 module.exports={
   USER_SCOPED_RPCS,
-  bearerToken,
   buildPaperTradingRpcArgs,
   createSupabasePaperTradingIdentityAdapter
 };
