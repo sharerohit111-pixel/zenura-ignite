@@ -36,4 +36,21 @@ function groupOrdersByUser(orders){
   return groups;
 }
 
-module.exports={isEligiblePaperLimitOrder,normalizeWorkerCursor,groupOrdersByUser};
+
+function isEligibleCryptoLimitOrder(order,quote,nowMs){
+  if(!order||typeof order!=="object"||order.order_type!=="LIMIT"||order.status!=="PENDING"
+     ||order.simulation_only!==true||!/^([A-Z0-9]{2,12})USDT$/.test(order.symbol||"")
+     ||typeof order.user_id!=="string"||!order.user_id
+     ||!["BUY","SELL"].includes(order.side)
+     ||typeof order.quantity!=="string"&&!Number.isFinite(Number(order.quantity))
+     ||Number(order.quantity)<=0||!Number.isFinite(Number(order.limit_price))||Number(order.limit_price)<=0
+     ||!quote||!Number.isFinite(quote.priceUsdt)||quote.priceUsdt<=0
+     ||!Number.isSafeInteger(quote.tradeTimeMs)||quote.tradeTimeMs<1
+     ||!Number.isSafeInteger(nowMs)||nowMs<1||quote.tradeTimeMs>nowMs
+     ||nowMs-quote.tradeTimeMs>15000)return false;
+  return order.side==="BUY"
+    ? quote.priceUsdt<=Number(order.limit_price)
+    : quote.priceUsdt>=Number(order.limit_price);
+}
+
+module.exports={isEligiblePaperLimitOrder,isEligibleCryptoLimitOrder,normalizeWorkerCursor,groupOrdersByUser};
