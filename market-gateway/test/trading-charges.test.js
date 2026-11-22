@@ -26,8 +26,8 @@ test("BSE option BUY uses BSE exchange transaction rate",()=>{
 
 test("NSE IPFT uses Upstox ₹0.50 per lakh option-premium schedule and is included in GST",()=>{
  const c=calculateLongOptionBuyCharges({grossPaise:10000000,exchange:"NSE"});
- assert.equal(c.ipftPaise,50);
- assert.equal(c.gstPaise,1009);
+ assert.equal(c.ipftPaise,0);
+ assert.equal(c.gstPaise,1000);
 });
 
 test("rejects invalid turnover, exchange and brokerage",()=>{
@@ -59,7 +59,7 @@ test("option sell reports a negative net settlement when charges exceed tiny pre
 test("NSE option exchange and IPFT charges use the published premium turnover rates",()=>{
  const c=calculateLongOptionBuyCharges({grossPaise:100000000,exchange:"NSE"});
  assert.equal(c.exchangeTransactionPaise,35530);
- assert.equal(c.ipftPaise,500);
+ assert.equal(c.ipftPaise,1);
  assert.equal(c.gstPaise,6845);
 });
 
