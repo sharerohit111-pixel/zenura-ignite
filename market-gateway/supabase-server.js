@@ -71,6 +71,7 @@ app.use((req,res,next)=>{
 let FeedResponse;
 let instrumentCache=[];
 let instrumentCacheUpdatedAt=0;
+let instrumentRefreshLastAttemptAt=0;
 const paperLimitWorkerStatus={enabled:false,intervalMs:null,lastRunAt:null,lastCycle:null};
 const activeUserStreams=new Map();
 function fetchProvider(url,options={},timeoutMs=15000){return fetchProviderWithTimeout(fetch,url,options,timeoutMs);}
@@ -94,6 +95,10 @@ function validDate(value){
   return !Number.isNaN(d.getTime())&&d.toISOString().slice(0,10)===value;
 }
 const refreshInstrumentCache=createSingleFlight(async()=>{
+  const now=Date.now();
+  if(instrumentRefreshLastAttemptAt&&now-instrumentRefreshLastAttemptAt<30000)
+    throw new Error("Upstox instrument master refresh is cooling down after a recent attempt.");
+  instrumentRefreshLastAttemptAt=now;
   const response=await fetchProvider(INSTRUMENTS_URL,{headers:{Accept:"application/gzip"}});
   if(!response.ok)throw new Error("Upstox instrument master download failed: "+response.status);
   const parsed=await downloadInstrumentMaster(response);
@@ -941,17 +946,23 @@ async function start(){
     const intervalMs=Math.max(1000,Math.min(10000,Number(process.env.PAPER_LIMIT_WORKER_INTERVAL_MS)||2000));
     paperLimitWorkerStatus.enabled=true;
     paperLimitWorkerStatus.intervalMs=intervalMs;
-    let workerBusy=false;
+    let workerBusy=false,nextWorkerRunAt=0,workerBackoffMs=intervalMs;
     const runWorker=async()=>{
-      if(workerBusy)return;
+      if(workerBusy||Date.now()<nextWorkerRunAt)return;
       workerBusy=true;
       try{
         const result=await runPaperLimitWorker({maxOrders:50});
         paperLimitWorkerStatus.lastRunAt=Date.now();
         paperLimitWorkerStatus.lastCycle={scanned:result.scanned,filled:result.filled,failed:result.failed,locked:result.locked};
+        workerBackoffMs=intervalMs;nextWorkerRunAt=Date.now()+intervalMs;
         if(result.filled||result.failed)console.log("Paper LIMIT worker cycle",JSON.stringify(result));
-      }catch(error){paperLimitWorkerStatus.lastRunAt=Date.now();paperLimitWorkerStatus.lastCycle={scanned:0,filled:0,failed:1,locked:false};console.error("Paper LIMIT worker cycle failed:",error.message);}
-      finally{workerBusy=false;}
+      }catch(error){
+        paperLimitWorkerStatus.lastRunAt=Date.now();
+        paperLimitWorkerStatus.lastCycle={scanned:0,filled:0,failed:1,locked:false};
+        nextWorkerRunAt=Date.now()+workerBackoffMs;
+        workerBackoffMs=Math.min(30000,workerBackoffMs*2);
+        console.error("Paper LIMIT worker cycle failed:",error.message);
+      }finally{workerBusy=false;}
     };
     runWorker().catch(()=>{});
     const workerTimer=setInterval(runWorker,intervalMs);
