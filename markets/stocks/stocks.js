@@ -219,7 +219,40 @@
       }
     }catch(error){if(request===derivativePortfolioRequest&&connector.getUserId()===uid)status.textContent=error.message||'Derivative valuation unavailable';}
   }
-  async function refreshPaperViews(){await Promise.all([loadPaperPortfolio(),loadPaperHistory(),loadDerivativePortfolio()]);}
+  let futuresPortfolioRequest=0;
+  async function loadFuturesPortfolio(){
+    const connector=window.ZENURA_MARKET_CONNECTOR,uid=connector?.getUserId?.(),request=++futuresPortfolioRequest;
+    const body=document.getElementById('futures-positions'),historyBody=document.getElementById('futures-history'),status=document.getElementById('futures-portfolio-status');
+    if(!body||!historyBody||!status||!gateway||!connector?.getIdToken||!uid)return;
+    try{
+      const token=await connector.getIdToken();
+      if(request!==futuresPortfolioRequest||connector.getUserId()!==uid)return;
+      const [response,historyResponse]=await Promise.all([
+        fetch(gateway+'/paper/futures/portfolio',{headers:{Authorization:'Bearer '+token,Accept:'application/json'}}),
+        fetch(gateway+'/paper/futures/orders?limit=50',{headers:{Authorization:'Bearer '+token,Accept:'application/json'}})
+      ]);
+      const data=await response.json(),history=await historyResponse.json();
+      if(request!==futuresPortfolioRequest||connector.getUserId()!==uid)return;
+      if(!response.ok)throw new Error(data.error||'Futures portfolio unavailable');
+      if(!historyResponse.ok)throw new Error(history.error||'Futures order history unavailable');
+      body.textContent='';
+      if(!data.positions?.length)tableMessage(body,7,'No open futures positions.');
+      else data.positions.forEach(p=>{
+        const tr=document.createElement('tr');
+        [p.tradingSymbol||p.instrumentKey,p.product,p.netQuantity,inrPaise(p.averagePricePaise),p.marketPricePaise==null?'STALE':inrPaise(p.marketPricePaise),p.unrealizedPnlPaise==null?'—':signedMoney(p.unrealizedPnlPaise),inrPaise(p.marginReservedPaise)].forEach(v=>{const td=document.createElement('td');td.textContent=String(v);tr.append(td);});
+        body.append(tr);
+      });
+      status.textContent=data.marginStatus==='entry_estimate'?'Fresh futures quotes · Margin shown is the entry reservation estimate.':'No open futures positions.';
+      historyBody.textContent='';
+      if(!history.orders?.length)tableMessage(historyBody,8,'No futures orders yet.');
+      else history.orders.forEach(order=>{
+        const tr=document.createElement('tr'),date=order.createdAt?new Date(order.createdAt).toLocaleString('en-IN'):'—';
+        [date,order.tradingSymbol,order.side,order.product,order.quantity/order.lotSize,inrPaise(order.executionPricePaise),inrPaise(order.chargesPaise),order.status+' · SIM'].forEach(v=>{const td=document.createElement('td');td.textContent=String(v);tr.append(td);});
+        historyBody.append(tr);
+      });
+    }catch(error){if(request===futuresPortfolioRequest&&connector.getUserId()===uid)status.textContent=error.message||'Futures portfolio unavailable';}
+  }
+  async function refreshPaperViews(){await Promise.all([loadPaperPortfolio(),loadPaperHistory(),loadDerivativePortfolio(),loadFuturesPortfolio()]);}
   paperRefresh.addEventListener('click',refreshPaperViews);
 
   let paperOrderSubmitting=false,paperOrderSubmitSeq=0;
@@ -286,9 +319,62 @@
   const futuresMarginSide=document.getElementById('futures-margin-side');
   const futuresMarginProduct=document.getElementById('futures-margin-product');
   const futuresMarginStatus=document.getElementById('futures-margin-status');
+  let futuresOrderSubmitting=false;
+  function updateFuturesOrderButtons(){
+    const enabled=!futuresOrderSubmitting&&!!selected&&selected.instrument_type==='FUT'
+      &&['NSE_FO','BSE_FO'].includes(selected.segment)
+      &&!!window.ZENURA_MARKET_CONNECTOR?.getUserId?.()&&!!gateway;
+    const buy=document.getElementById('futures-order-buy'),sell=document.getElementById('futures-order-sell');
+    if(buy)buy.disabled=!enabled;if(sell)sell.disabled=!enabled;
+  }
+  async function submitFuturesOrder(side){
+    if(futuresOrderSubmitting)return;
+    if(!selected||selected.instrument_type!=='FUT'){futuresOrderStatus.textContent='Select a verified futures contract first.';return;}
+    const lots=Number(futuresOrderLots.value),product=futuresOrderProduct.value;
+    if(!Number.isSafeInteger(lots)||lots<1||lots>10000){futuresOrderStatus.textContent='Enter whole lots from 1 to 10,000.';return;}
+    const connector=window.ZENURA_MARKET_CONNECTOR,uid=connector?.getUserId?.();
+    if(!uid||!connector?.getIdToken){futuresOrderStatus.textContent='Sign in before placing a futures paper order.';return;}
+    const storageKey=retryPolicy.userScopedStorageKey(futuresPendingStorageKey,uid);
+    if(!storageKey){futuresOrderStatus.textContent='Could not identify the signed-in account.';return;}
+    const fingerprint=JSON.stringify({instrument_key:selected.instrument_key,side,lots,product});
+    const pending=retryPolicy.readPendingPaperOrder(pendingOrderStorage,storageKey);
+    let key=pending?.key||null;
+    if(key&&!retryPolicy.canRetryPendingPaperOrder(pending.fingerprint,fingerprint)){
+      futuresOrderStatus.textContent='A previous futures order response is uncertain. Retry the same contract, side, lots and product first.';return;
+    }
+    if(!key){
+      if(!window.crypto?.randomUUID){futuresOrderStatus.textContent='Secure request ID is unavailable.';return;}
+      key=window.crypto.randomUUID();
+      if(!retryPolicy.writePendingPaperOrder(pendingOrderStorage,storageKey,{key,fingerprint})){
+        futuresOrderStatus.textContent='Safe order retry storage is unavailable. No order was sent.';return;
+      }
+    }
+    futuresOrderSubmitting=true;updateFuturesOrderButtons();
+    futuresOrderStatus.textContent='Verifying fresh futures quote and Upstox margin…';
+    try{
+      const token=await connector.getIdToken();
+      if(connector.getUserId()!==uid)throw new Error('Account changed. Sign back into the original account to verify this order.');
+      const response=await fetch(gateway+'/paper/futures/orders',{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json',Accept:'application/json'},body:JSON.stringify({instrument_key:selected.instrument_key,side,lots,product,order_type:'MARKET',idempotency_key:key})});
+      const data=await response.json().catch(()=>({}));
+      if(connector.getUserId()!==uid)throw new Error('Account changed while the futures order was processing.');
+      if(!response.ok){if(response.status>=400&&response.status<500)retryPolicy.clearPendingPaperOrder(pendingOrderStorage,storageKey);throw new Error(data.error||'Futures paper order rejected.');}
+      if(typeof data.orderId!=='string'||!Number.isSafeInteger(data.executionPricePaise)||data.executionPricePaise<1)throw new Error('Order response could not be verified. Retry the same order to safely check its result.');
+      retryPolicy.clearPendingPaperOrder(pendingOrderStorage,storageKey);
+      futuresOrderStatus.textContent=side+' '+lots+' lot(s) · '+data.tradingSymbol+' filled at '+inrPaise(data.executionPricePaise)+' · Charges '+inrPaise(data.chargesPaise)+' · Entry margin '+inrPaise(data.openingMarginPaise)+' · SIM';
+      await loadPaperAccount();await refreshPaperViews();
+    }catch(error){if(connector.getUserId()===uid)futuresOrderStatus.textContent=error.message||'Futures order failed.';}
+    finally{futuresOrderSubmitting=false;updateFuturesOrderButtons();}
+  }
+  const futuresOrderLots=document.getElementById('futures-order-lots');
+  const futuresOrderProduct=document.getElementById('futures-order-product');
+  const futuresOrderStatus=document.getElementById('futures-order-status');
+  const futuresPendingStorageKey='zenura-futures-paper-order-pending-v1';
+  document.getElementById('futures-order-buy')?.addEventListener('click',()=>submitFuturesOrder('BUY'));
+  document.getElementById('futures-order-sell')?.addEventListener('click',()=>submitFuturesOrder('SELL'));
   function updateFuturesMarginButton(){
     const signedIn=!!window.ZENURA_MARKET_CONNECTOR?.getUserId?.();
     if(futuresMarginButton)futuresMarginButton.disabled=!signedIn||!gateway||!selected||selected.instrument_type!=='FUT';
+    updateFuturesOrderButtons();
     if(futuresMarginStatus&&!signedIn)futuresMarginStatus.textContent='Sign in to request broker margin preview.';
     else if(futuresMarginStatus&&(!selected||selected.instrument_type!=='FUT'))futuresMarginStatus.textContent='Select a verified futures contract from the Futures watchlist.';
   }
