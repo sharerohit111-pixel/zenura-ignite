@@ -21,6 +21,9 @@ on:
       - "market-gateway/FIREBASE_ROLE_CLAIM_AUDIT.md"
       - "market-gateway/FIREBASE_ROLE_CLAIM_ROLLOUT_PLAN.md"
       - "market-gateway/FIREBASE_CUSTOM_CLAIM_WRITER_INVENTORY.md"
+      - "market-gateway/test/firebase-firestore-rules-audit.test.js"
+      - "market-gateway/FIREBASE_FIRESTORE_RULES_AUDIT.md"
+      - "firestore.rules"
       - ".github/workflows/firebase-readonly-export-tests.yml"
   workflow_dispatch:
 
@@ -65,3 +68,6 @@ jobs:
       - name: Run Firebase role claim audit tests
         working-directory: market-gateway
         run: node --test test/firebase-role-claim-audit.test.js
+      - name: Run static Firestore migration rules audit
+        working-directory: market-gateway
+        run: node --test test/firebase-firestore-rules-audit.test.js
