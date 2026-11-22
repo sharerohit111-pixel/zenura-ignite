@@ -69,23 +69,26 @@ test("dispatches account records",()=>{
 test("rejects duplicate Supabase UUIDs mapped to different Firebase UIDs",()=>{
  assert.throws(()=>validateUserMap({"legacy-one":map["legacy-user"],"legacy-two":map["legacy-user"]}),/multiple Firebase UIDs/);
 });
-test("emits the private Firebase identity-map import file and import order",async()=>{
+
+test("emits the private identity map, four watchlists and dependency-safe import order",async()=>{
  const root=await fs.mkdtemp(path.join(os.tmpdir(),"zenura-transform-"));
  const input=path.join(root,"input"),output=path.join(root,"output");
  await fs.mkdir(input);
  const auth=JSON.stringify({uid:"legacy-user",emailVerified:true})+"\n";
  const account=JSON.stringify({collection:"indianPaperAccounts",documentId:"legacy-user",data:acct})+"\n";
+ const watchlist=JSON.stringify({collection:"indianMarketWatchlists",documentId:"legacy-user",data:{watchlists:{"My Stocks":["A"],Banking:["B"],NIFTY:["C"],"F&O":["D"]},updatedAt:"2026-11-20T10:00:00Z"}})+"\n";
+ const contents={"firebase-auth-users.jsonl":auth,"indianPaperAccounts.jsonl":account,"indianPaperOrders.jsonl":"","indianDerivativeOrders.jsonl":"","indianMarketWatchlists.jsonl":watchlist};
  const digest=value=>crypto.createHash("sha256").update(value).digest("hex");
- const manifest={format:"zenura-firebase-read-only-export-v1",projectId:"synthetic-test",importPerformed:false,
-  files:{"firebase-auth-users.jsonl":{count:1,sha256:digest(auth)},"indianPaperAccounts.jsonl":{count:1,sha256:digest(account)}}};
- await fs.writeFile(path.join(input,"firebase-auth-users.jsonl"),auth);
- await fs.writeFile(path.join(input,"indianPaperAccounts.jsonl"),account);
+ const files=Object.fromEntries(Object.entries(contents).map(([name,value])=>[name,{count:value?value.trim().split("\n").length:0,sha256:digest(value)}]));
+ const manifest={format:"zenura-firebase-read-only-export-v1",projectId:"synthetic-test",importPerformed:false,files};
+ for(const [name,value] of Object.entries(contents))await fs.writeFile(path.join(input,name),value);
  await fs.writeFile(path.join(input,"manifest.json"),JSON.stringify(manifest));
  const report=await transformExport({inputDirectory:input,outputDirectory:output,userMap:map});
  const rows=(await fs.readFile(path.join(output,"paper_user_identity_map.jsonl"),"utf8")).trim().split("\n").map(JSON.parse);
  assert.deepEqual(rows,[{supabase_user_id:map["legacy-user"],firebase_uid:"legacy-user"}]);
  assert.equal(report.importAllowed,true);
  assert.equal(report.files.paper_user_identity_map.count,1);
+ assert.equal(report.files.paper_watchlists.count,4);
  assert.equal(report.importOrder[0],"paper_user_identity_map");
  assert.equal(report.supabaseWrites,0);
  await fs.rm(root,{recursive:true,force:true});
@@ -96,11 +99,11 @@ test("quarantines Firestore data whose UID is absent from Firebase Auth export",
  await fs.mkdir(input);
  const auth=JSON.stringify({uid:"some-other-user"})+"\n";
  const account=JSON.stringify({collection:"indianPaperAccounts",documentId:"legacy-user",data:acct})+"\n";
+ const contents={"firebase-auth-users.jsonl":auth,"indianPaperAccounts.jsonl":account,"indianPaperOrders.jsonl":"","indianDerivativeOrders.jsonl":"","indianMarketWatchlists.jsonl":""};
  const digest=value=>crypto.createHash("sha256").update(value).digest("hex");
- const manifest={format:"zenura-firebase-read-only-export-v1",projectId:"synthetic-test",importPerformed:false,
-  files:{"firebase-auth-users.jsonl":{count:1,sha256:digest(auth)},"indianPaperAccounts.jsonl":{count:1,sha256:digest(account)}}};
- await fs.writeFile(path.join(input,"firebase-auth-users.jsonl"),auth);
- await fs.writeFile(path.join(input,"indianPaperAccounts.jsonl"),account);
+ const files=Object.fromEntries(Object.entries(contents).map(([name,value])=>[name,{count:value?value.trim().split("\n").length:0,sha256:digest(value)}]));
+ const manifest={format:"zenura-firebase-read-only-export-v1",projectId:"synthetic-test",importPerformed:false,files};
+ for(const [name,value] of Object.entries(contents))await fs.writeFile(path.join(input,name),value);
  await fs.writeFile(path.join(input,"manifest.json"),JSON.stringify(manifest));
  const report=await transformExport({inputDirectory:input,outputDirectory:output,userMap:map});
  assert.equal(report.errorCount,1);
