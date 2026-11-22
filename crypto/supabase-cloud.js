@@ -6,6 +6,7 @@ const supportedSymbols = new Set(["BTCUSDT","ETHUSDT","BNBUSDT","SOLUSDT","XRPUS
 let activeUserId = null;
 let loadGeneration = 0;
 let pendingOrder = null;
+let pendingLimitOrder = null;
 
 async function accessToken() {
   const { data, error } = await supabase.auth.getSession();
@@ -73,7 +74,34 @@ async function placeOrder({ symbol, side, quantity }) {
   return result;
 }
 
-window.ZENURA_CRYPTO_TRADING = Object.freeze({ load, placeOrder, isConfigured: () => Boolean(apiBase) });
+async function placeLimitOrder({ symbol, side, quantity, limitPrice }) {
+  if (!supportedSymbols.has(symbol) || !["BUY", "SELL"].includes(side)) throw new Error("Select a supported crypto spot market and order side.");
+  if (!Number.isFinite(quantity) || quantity <= 0 || !Number.isFinite(limitPrice) || limitPrice <= 0) throw new Error("Enter a valid LIMIT quantity and price.");
+  const quantityText = quantity.toFixed(12).replace(/0+$/, "").replace(/\\.$/, "");
+  const limitPriceText = limitPrice.toFixed(8).replace(/0+$/, "").replace(/\\.$/, "");
+  if (!pendingLimitOrder || pendingLimitOrder.symbol !== symbol || pendingLimitOrder.side !== side
+      || pendingLimitOrder.quantity !== quantityText || pendingLimitOrder.limitPrice !== limitPriceText) {
+    pendingLimitOrder = { symbol, side, quantity: quantityText, limitPrice: limitPriceText, key: crypto.randomUUID() };
+  }
+  const result = await api("/crypto/limit-orders", {
+    method: "POST",
+    body: { symbol, side, quantity: quantityText, limit_price: limitPriceText, idempotency_key: pendingLimitOrder.key }
+  });
+  if (!["PENDING", "FILLED"].includes(result.status) || result.simulationOnly !== true) throw new Error("The cloud did not confirm the LIMIT order.");
+  await load();
+  pendingLimitOrder = null;
+  return result;
+}
+
+async function cancelLimitOrder(orderId) {
+  if (typeof orderId !== "string" || !/^[0-9a-f-]{36}$/i.test(orderId)) throw new Error("Invalid cloud LIMIT order ID.");
+  const result = await api("/crypto/limit-orders/" + orderId + "/cancel", { method: "POST", body: {} });
+  if (result.cancelled !== true) throw new Error("The cloud did not confirm LIMIT cancellation.");
+  await load();
+  return result;
+}
+
+window.ZENURA_CRYPTO_TRADING = Object.freeze({ load, placeOrder, placeLimitOrder, cancelLimitOrder, isConfigured: () => Boolean(apiBase) });
 
 supabase.auth.onAuthStateChange((_event, session) => {
   const nextUserId = session?.user?.id || null;
