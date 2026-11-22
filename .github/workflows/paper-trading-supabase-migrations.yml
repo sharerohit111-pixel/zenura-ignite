@@ -445,117 +445,6 @@ jobs:
           END
           $$;
           SQL
-      - name: Verify RLS and privileged RPC boundaries
-        run: |
-          psql -v ON_ERROR_STOP=1 <<'SQL'
-          DO $$
-          DECLARE
-            t text;
-            protected_tables text[] := ARRAY[
-              'paper_user_identity_map','paper_accounts','paper_equity_positions',
-              'paper_derivative_positions','paper_orders','paper_derivative_orders',
-              'paper_watchlists','upstox_connections','upstox_oauth_states',
-              'upstox_connection_controls','paper_market_stream_leases',
-              'paper_market_worker_state','paper_margin_preview_limits'
-            ];
-          BEGIN
-            FOREACH t IN ARRAY protected_tables LOOP
-              IF NOT (SELECT relrowsecurity FROM pg_class WHERE oid=to_regclass('public.'||t)) THEN
-                RAISE EXCEPTION 'RLS is disabled on %',t;
-              END IF;
-            END LOOP;
-            IF EXISTS (
-              SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
-              WHERE n.nspname='public'
-                AND p.proname IN (
-                  'execute_paper_market_order','submit_paper_limit_order',
-                  'execute_paper_limit_fill','cancel_paper_limit_order',
-                  'initialize_paper_trading_account','execute_paper_long_option_order'
-                )
-                AND COALESCE(array_to_string(p.proconfig,','),'') NOT LIKE '%search_path=""%'
-            ) THEN
-              RAISE EXCEPTION 'A privileged trading RPC does not pin an empty search_path';
-            END IF;
-            IF (SELECT count(*) FROM pg_policies
-                WHERE schemaname='public'
-                  AND cmd='SELECT'
-                  AND tablename IN ('paper_accounts','paper_equity_positions',
-                    'paper_derivative_positions','paper_orders',
-                    'paper_derivative_orders','paper_watchlists')
-                  AND qual LIKE '%auth.uid()%') <> 6 THEN
-              RAISE EXCEPTION 'Expected six user-scoped SELECT policies were not found';
-            END IF;
-            IF has_table_privilege('authenticated','public.paper_accounts','INSERT')
-               OR has_table_privilege('authenticated','public.paper_accounts','UPDATE')
-               OR has_table_privilege('authenticated','public.paper_accounts','DELETE')
-               OR has_table_privilege('anon','public.paper_accounts','SELECT') THEN
-              RAISE EXCEPTION 'Unexpected browser-role privilege on protected account data';
-            END IF;
-            IF has_function_privilege('authenticated',
-              'public.execute_paper_market_order(uuid,text,uuid,text,text,text,text,text,text,integer,bigint,bigint,bigint)','EXECUTE')
-               OR has_function_privilege('anon',
-              'public.execute_paper_market_order(uuid,text,uuid,text,text,text,text,text,text,integer,bigint,bigint,bigint)','EXECUTE')
-               OR NOT has_function_privilege('service_role',
-              'public.execute_paper_market_order(uuid,text,uuid,text,text,text,text,text,text,integer,bigint,bigint,bigint)','EXECUTE') THEN
-              RAISE EXCEPTION 'MARKET RPC execution grants are not server-only';
-            END IF;
-          END
-          $$;
-          SQL
-      - name: Verify tenant isolation across account, positions, orders and watchlists
-        run: |
-          psql -v ON_ERROR_STOP=1 <<'SQL'
-          INSERT INTO public.paper_derivative_positions(
-            user_id,instrument_key,trading_symbol,segment,exchange,instrument_type,
-            expiry,lot_size,net_quantity,average_price_paise,cost_basis_paise
-          ) VALUES (
-            '22222222-2222-4222-8222-222222222222','NSE_FO|RLS','RLS','NSE_FO','NSE',
-            'CE',current_date+5,25,25,100,2500
-          ) ON CONFLICT (user_id,instrument_key) DO NOTHING;
-          INSERT INTO public.paper_watchlists(user_id,name,instrument_keys)
-          VALUES ('22222222-2222-4222-8222-222222222222','NIFTY',ARRAY['NSE_EQ|TEST001'])
-          ON CONFLICT (user_id,name) DO NOTHING;
-          SET ROLE authenticated;
-          SELECT set_config('request.jwt.claim.sub','11111111-1111-4111-8111-111111111111',false);
-          DO $$
-          BEGIN
-            IF (SELECT count(*) FROM public.paper_accounts) <> 1
-               OR (SELECT count(*) FROM public.paper_equity_positions) <> 0
-               OR (SELECT count(*) FROM public.paper_derivative_positions) <> 0
-               OR (SELECT count(*) FROM public.paper_orders) <> 0
-               OR (SELECT count(*) FROM public.paper_derivative_orders) <> 0
-               OR (SELECT count(*) FROM public.paper_watchlists) <> 0 THEN
-              RAISE EXCEPTION 'User one can read another tenant row or cannot read own account';
-            END IF;
-            BEGIN
-              INSERT INTO public.paper_watchlists(user_id,name,instrument_keys)
-              VALUES ('22222222-2222-4222-8222-222222222222','Banking',ARRAY['NSE_EQ|TEST002']);
-              RAISE EXCEPTION 'Cross-tenant watchlist insert unexpectedly succeeded';
-            EXCEPTION WHEN insufficient_privilege THEN NULL;
-            END;
-          END
-          $$;
-          SELECT set_config('request.jwt.claim.sub','22222222-2222-4222-8222-222222222222',false);
-          DO $$
-          BEGIN
-            IF (SELECT count(*) FROM public.paper_accounts) <> 1
-               OR (SELECT count(*) FROM public.paper_equity_positions) = 0
-               OR (SELECT count(*) FROM public.paper_derivative_positions) = 0
-               OR (SELECT count(*) FROM public.paper_orders) = 0
-               OR (SELECT count(*) FROM public.paper_derivative_orders) = 0
-               OR (SELECT count(*) FROM public.paper_watchlists) = 0 THEN
-              RAISE EXCEPTION 'User two own-row counts: accounts %, equity %, derivatives %, orders %, derivative_orders %, watchlists %',
-                (SELECT count(*) FROM public.paper_accounts),
-                (SELECT count(*) FROM public.paper_equity_positions),
-                (SELECT count(*) FROM public.paper_derivative_positions),
-                (SELECT count(*) FROM public.paper_orders),
-                (SELECT count(*) FROM public.paper_derivative_orders),
-                (SELECT count(*) FROM public.paper_watchlists);
-            END IF;
-          END
-          $$;
-          RESET ROLE;
-          SQL
       - name: Reject null LIMIT side before any reservation or order write
         run: |
           psql -v ON_ERROR_STOP=1 <<'SQL'
@@ -770,6 +659,117 @@ jobs:
             END;
           END
           $$;
+          SQL
+      - name: Verify RLS and privileged RPC boundaries
+        run: |
+          psql -v ON_ERROR_STOP=1 <<'SQL'
+          DO $$
+          DECLARE
+            t text;
+            protected_tables text[] := ARRAY[
+              'paper_user_identity_map','paper_accounts','paper_equity_positions',
+              'paper_derivative_positions','paper_orders','paper_derivative_orders',
+              'paper_watchlists','upstox_connections','upstox_oauth_states',
+              'upstox_connection_controls','paper_market_stream_leases',
+              'paper_market_worker_state','paper_margin_preview_limits'
+            ];
+          BEGIN
+            FOREACH t IN ARRAY protected_tables LOOP
+              IF NOT (SELECT relrowsecurity FROM pg_class WHERE oid=to_regclass('public.'||t)) THEN
+                RAISE EXCEPTION 'RLS is disabled on %',t;
+              END IF;
+            END LOOP;
+            IF EXISTS (
+              SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+              WHERE n.nspname='public'
+                AND p.proname IN (
+                  'execute_paper_market_order','submit_paper_limit_order',
+                  'execute_paper_limit_fill','cancel_paper_limit_order',
+                  'initialize_paper_trading_account','execute_paper_long_option_order'
+                )
+                AND COALESCE(array_to_string(p.proconfig,','),'') NOT LIKE '%search_path=""%'
+            ) THEN
+              RAISE EXCEPTION 'A privileged trading RPC does not pin an empty search_path';
+            END IF;
+            IF (SELECT count(*) FROM pg_policies
+                WHERE schemaname='public'
+                  AND cmd='SELECT'
+                  AND tablename IN ('paper_accounts','paper_equity_positions',
+                    'paper_derivative_positions','paper_orders',
+                    'paper_derivative_orders','paper_watchlists')
+                  AND qual LIKE '%auth.uid()%') <> 6 THEN
+              RAISE EXCEPTION 'Expected six user-scoped SELECT policies were not found';
+            END IF;
+            IF has_table_privilege('authenticated','public.paper_accounts','INSERT')
+               OR has_table_privilege('authenticated','public.paper_accounts','UPDATE')
+               OR has_table_privilege('authenticated','public.paper_accounts','DELETE')
+               OR has_table_privilege('anon','public.paper_accounts','SELECT') THEN
+              RAISE EXCEPTION 'Unexpected browser-role privilege on protected account data';
+            END IF;
+            IF has_function_privilege('authenticated',
+              'public.execute_paper_market_order(uuid,text,uuid,text,text,text,text,text,text,integer,bigint,bigint,bigint)','EXECUTE')
+               OR has_function_privilege('anon',
+              'public.execute_paper_market_order(uuid,text,uuid,text,text,text,text,text,text,integer,bigint,bigint,bigint)','EXECUTE')
+               OR NOT has_function_privilege('service_role',
+              'public.execute_paper_market_order(uuid,text,uuid,text,text,text,text,text,text,integer,bigint,bigint,bigint)','EXECUTE') THEN
+              RAISE EXCEPTION 'MARKET RPC execution grants are not server-only';
+            END IF;
+          END
+          $$;
+          SQL
+      - name: Verify tenant isolation across account, positions, orders and watchlists
+        run: |
+          psql -v ON_ERROR_STOP=1 <<'SQL'
+          INSERT INTO public.paper_derivative_positions(
+            user_id,instrument_key,trading_symbol,segment,exchange,instrument_type,
+            expiry,lot_size,net_quantity,average_price_paise,cost_basis_paise
+          ) VALUES (
+            '22222222-2222-4222-8222-222222222222','NSE_FO|RLS','RLS','NSE_FO','NSE',
+            'CE',current_date+5,25,25,100,2500
+          ) ON CONFLICT (user_id,instrument_key) DO NOTHING;
+          INSERT INTO public.paper_watchlists(user_id,name,instrument_keys)
+          VALUES ('22222222-2222-4222-8222-222222222222','NIFTY',ARRAY['NSE_EQ|TEST001'])
+          ON CONFLICT (user_id,name) DO NOTHING;
+          SET ROLE authenticated;
+          SELECT set_config('request.jwt.claim.sub','11111111-1111-4111-8111-111111111111',false);
+          DO $$
+          BEGIN
+            IF (SELECT count(*) FROM public.paper_accounts) <> 1
+               OR (SELECT count(*) FROM public.paper_equity_positions) <> 0
+               OR (SELECT count(*) FROM public.paper_derivative_positions) <> 0
+               OR (SELECT count(*) FROM public.paper_orders) <> 0
+               OR (SELECT count(*) FROM public.paper_derivative_orders) <> 0
+               OR (SELECT count(*) FROM public.paper_watchlists) <> 0 THEN
+              RAISE EXCEPTION 'User one can read another tenant row or cannot read own account';
+            END IF;
+            BEGIN
+              INSERT INTO public.paper_watchlists(user_id,name,instrument_keys)
+              VALUES ('22222222-2222-4222-8222-222222222222','Banking',ARRAY['NSE_EQ|TEST002']);
+              RAISE EXCEPTION 'Cross-tenant watchlist insert unexpectedly succeeded';
+            EXCEPTION WHEN insufficient_privilege THEN NULL;
+            END;
+          END
+          $$;
+          SELECT set_config('request.jwt.claim.sub','22222222-2222-4222-8222-222222222222',false);
+          DO $$
+          BEGIN
+            IF (SELECT count(*) FROM public.paper_accounts) <> 1
+               OR (SELECT count(*) FROM public.paper_equity_positions) = 0
+               OR (SELECT count(*) FROM public.paper_derivative_positions) = 0
+               OR (SELECT count(*) FROM public.paper_orders) = 0
+               OR (SELECT count(*) FROM public.paper_derivative_orders) = 0
+               OR (SELECT count(*) FROM public.paper_watchlists) = 0 THEN
+              RAISE EXCEPTION 'User two own-row counts: accounts %, equity %, derivatives %, orders %, derivative_orders %, watchlists %',
+                (SELECT count(*) FROM public.paper_accounts),
+                (SELECT count(*) FROM public.paper_equity_positions),
+                (SELECT count(*) FROM public.paper_derivative_positions),
+                (SELECT count(*) FROM public.paper_orders),
+                (SELECT count(*) FROM public.paper_derivative_orders),
+                (SELECT count(*) FROM public.paper_watchlists);
+            END IF;
+          END
+          $$;
+          RESET ROLE;
           SQL
       - name: Verify expected schema and RPC registration
         run: |
