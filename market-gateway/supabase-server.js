@@ -15,6 +15,7 @@ const {normalizeProductMode}=require("./lib/product-mode");
 const {parseLimitPricePaise}=require("./lib/limit-price");
 const {normalizeProviderQuote}=require("./lib/provider-quote");
 const {isEligiblePaperLimitOrder,normalizeWorkerCursor,groupOrdersByUser}=require("./lib/paper-limit-worker");
+const {isSupportedProtectiveOrder,isPositionCloseable,evaluateProtectiveOrder}=require("./lib/protective-order-worker");
 const {buildPortfolioValuation}=require("./lib/paper-portfolio-valuation");
 const {calculateDerivativePortfolio}=require("./lib/derivative-portfolio");
 const {validateDerivativeContract}=require("./lib/derivative-contract");
@@ -401,6 +402,20 @@ app.post("/paper/orders/:orderId/cancel",async(req,res)=>{
     const result=await runtime.callUserRpc(user,"cancel_paper_limit_order",{p_order_id:orderId});
     res.set("Cache-Control","private, no-store").json({orderId,status:result?.status||"CANCELLED",cashPaise:result?.cash_paise??null,reservedCashPaise:result?.reserved_cash_paise??null,simulationOnly:true});
   }catch(error){sendError(res,error,"LIMIT order cancellation failed.");}
+});
+app.post("/paper/protective-orders/:orderId/cancel",async(req,res)=>{
+  try{
+    const {user}=await auth(req),orderId=String(req.params.orderId||"");
+    if(!/^[0-9a-f-]{36}$/i.test(orderId))return res.status(400).json({error:"Invalid protective order id."});
+    const result=await runtime.callUserRpc(user,"cancel_paper_protective_order",{p_protective_order_id:orderId});
+    res.set("Cache-Control","private, no-store").json({
+      orderId,status:result?.status||"UNKNOWN",
+      cancelled:result?.cancelled===true,
+      alreadyFilled:result?.already_filled===true,
+      idempotentReplay:result?.idempotent_replay===true,
+      simulationOnly:true
+    });
+  }catch(error){sendError(res,error,"Protective order cancellation failed.");}
 });
 app.get("/paper/orders",async(req,res)=>{
   try{
