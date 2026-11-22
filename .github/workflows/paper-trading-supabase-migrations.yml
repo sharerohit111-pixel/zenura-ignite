@@ -13,6 +13,9 @@ on:
       - "market-gateway/README.md"
       - "market-gateway/DEPLOYMENT.md"
       - "market-gateway/test/supabase-deployment.test.js"
+      - "market-gateway/lib/paper-limit-worker.js"
+      - "market-gateway/test/paper-limit-worker.test.js"
+      - "market-gateway/paper-limit-worker.js"
       - "market-gateway/test/trading-charges.test.js"
       - "market-gateway/test/derivative-order-transaction.test.js"
       - "market-gateway/test/derivative-contract.test.js"
@@ -66,6 +69,8 @@ jobs:
           node --test markets/stocks/chart-indicators.test.js
       - name: Verify Supabase-only Cloud Run entrypoint and production dependency boundary
         run: node --test market-gateway/test/supabase-deployment.test.js
+      - name: Check Supabase LIMIT worker eligibility and cursor safety
+        run: node --test market-gateway/test/paper-limit-worker.test.js
       - name: Check Supabase-native gateway and token security
         run: |
           node --check market-gateway/lib/supabase-runtime.js
@@ -120,6 +125,30 @@ jobs:
             echo "Applying $migration"
             psql -v ON_ERROR_STOP=1 -f "$migration"
           done
+      - name: Verify Supabase market worker single-writer lease and expiry
+        run: |
+          psql -v ON_ERROR_STOP=1 <<'SQL'
+          DO $worker_lease$
+          DECLARE
+            v_now bigint:=floor(extract(epoch from clock_timestamp())*1000)::bigint;
+            v_a uuid:='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+            v_b uuid:='bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+            v_result boolean;
+          BEGIN
+            SELECT public.acquire_paper_market_worker_lease('paper_limit_orders',v_a,v_now,120000) INTO v_result;
+            IF v_result IS NOT TRUE THEN RAISE EXCEPTION 'First worker lease was not acquired'; END IF;
+            SELECT public.acquire_paper_market_worker_lease('paper_limit_orders',v_b,v_now+1000,120000) INTO v_result;
+            IF v_result IS NOT FALSE THEN RAISE EXCEPTION 'Concurrent worker lease was unexpectedly acquired'; END IF;
+            SELECT public.release_paper_market_worker_lease('paper_limit_orders',v_a,v_now+2000) INTO v_result;
+            IF v_result IS NOT TRUE THEN RAISE EXCEPTION 'Worker lease was not released'; END IF;
+            SELECT public.acquire_paper_market_worker_lease('paper_limit_orders',v_b,v_now+3000,120000) INTO v_result;
+            IF v_result IS NOT TRUE THEN RAISE EXCEPTION 'Next worker did not acquire released lease'; END IF;
+            SELECT public.acquire_paper_market_worker_lease('paper_limit_orders',v_a,v_now+124000,120000) INTO v_result;
+            IF v_result IS NOT TRUE THEN RAISE EXCEPTION 'Expired worker lease was not recoverable'; END IF;
+            PERFORM public.release_paper_market_worker_lease('paper_limit_orders',v_a,v_now+125000);
+          END
+          $worker_lease$;
+          SQL
       - name: Reject non-finite option strike prices
         run: |
           psql -v ON_ERROR_STOP=1 <<'SQL'
