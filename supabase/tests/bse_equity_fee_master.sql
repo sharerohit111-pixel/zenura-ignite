@@ -1,6 +1,14 @@
 BEGIN;
 SET LOCAL ROLE service_role;
 SELECT public.import_bse_equity_fee_master(
+  (now() at time zone 'Asia/Kolkata')::date-1,
+  repeat('b',64),
+  'https://www.bseindia.com/downloads/Help/file/scrip.zip',
+  jsonb_build_array(
+    jsonb_build_object('scrip_code','599999','instrument_code','OLDONLY','group_name','A','scrip_name','OLD SNAPSHOT ONLY','isin','INE888A01010','exclusive_flag','N','status','A','instrument_type','E')
+  )
+);
+SELECT public.import_bse_equity_fee_master(
   (now() at time zone 'Asia/Kolkata')::date,
   repeat('a',64),
   'https://www.bseindia.com/downloads/Help/file/scrip.zip',
@@ -56,6 +64,12 @@ BEGIN
   EXCEPTION WHEN SQLSTATE '22023' THEN v_rejected:=true;
   END;
   IF NOT v_rejected THEN RAISE EXCEPTION 'BSE Group P was not blocked for settlement-offset ambiguity'; END IF;
+  v_rejected:=false;
+  BEGIN
+    PERFORM public._paper_bse_cash_equity_charges('BSE_EQ|INE888A01010',1000000000,'DELIVERY','BUY');
+  EXCEPTION WHEN SQLSTATE '22023' THEN v_rejected:=true;
+  END;
+  IF NOT v_rejected THEN RAISE EXCEPTION 'ISIN missing from latest BSE snapshot fell back to stale classification'; END IF;
   v_rejected:=false;
   BEGIN
     PERFORM public._paper_bse_cash_equity_charges('BSE_EQ|INE999A01010',1000000000,'DELIVERY','BUY');
