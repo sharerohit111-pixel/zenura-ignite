@@ -58,7 +58,7 @@ jobs:
           node --input-type=module --check < markets/stocks/supabase-client.js
           node --input-type=module --check < markets/stocks/connect.js
           node --input-type=module --check < markets/stocks/email-auth.js
-          if grep -Eiq 'firebase-client|firebase-auth|firebase-functions' markets/stocks/supabase-client.js markets/stocks/connect.js markets/stocks/email-auth.js; then
+          if grep -Eiq 'firebase-client|firebase-auth|firebase-functions' markets/stocks/supabase-client.js markets/stocks/connect.js markets/stocks/email-auth.js crypto/index.html crypto/supabase-auth.js; then
             echo "Firebase authentication dependency remains in the new market app."
             exit 1
           fi
@@ -96,6 +96,8 @@ jobs:
       - name: Check Supabase-native gateway and token security
         run: |
           node --check market-gateway/lib/supabase-runtime.js
+          node --check market-gateway/supabase-server.js
+          node --input-type=module --check < crypto/supabase-auth.js
           node --check market-gateway/supabase-server.js
           node --check market-gateway/lib/upstox-token-crypto.js
           node --test market-gateway/test/supabase-runtime.test.js market-gateway/test/upstox-token-crypto.test.js
