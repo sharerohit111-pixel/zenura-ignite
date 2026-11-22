@@ -46,13 +46,23 @@ async function* authUsers(auth,pageSize=1000){
 async function exportSnapshot({db,auth,outputDirectory,projectId,pageSize=400}){
  if(!db||!auth||typeof outputDirectory!=="string"||!outputDirectory||typeof projectId!=="string"||!projectId||!Number.isInteger(pageSize)||pageSize<1||pageSize>1000)throw new TypeError("Export dependencies, project ID, output directory or page size are invalid.");
  const target=path.resolve(outputDirectory);await fs.mkdir(target,{recursive:false,mode:0o700});const files={};
- for(const name of EXPORT_COLLECTIONS)files[name+".jsonl"]=await writeJsonlFile(path.join(target,name+".jsonl"),firestoreDocuments(db,name,pageSize));
- files["firebase-auth-users.jsonl"]=await writeJsonlFile(path.join(target,"firebase-auth-users.jsonl"),authUsers(auth));
- const manifest={format:"zenura-firebase-read-only-export-v1",projectId,exportedAt:new Date().toISOString(),mode:"read-only",
-  pagination:{firestorePageSize:pageSize,order:"document-name-ascending"},collections:EXPORT_COLLECTIONS,excludedCollections:EXCLUDED_COLLECTIONS,files,
-  totals:{firestoreDocuments:Object.values(files).filter(x=>x.file!=="firebase-auth-users.jsonl").reduce((s,x)=>s+x.count,0),authUsers:files["firebase-auth-users.jsonl"].count},
-  importPerformed:false,sourceMutated:false};
- await fs.writeFile(path.join(target,"manifest.json"),JSON.stringify(manifest,null,2)+"\n",{encoding:"utf8",flag:"wx",mode:0o600});return manifest;
+ try{
+  for(const name of EXPORT_COLLECTIONS)files[name+".jsonl"]=await writeJsonlFile(path.join(target,name+".jsonl"),firestoreDocuments(db,name,pageSize));
+  files["firebase-auth-users.jsonl"]=await writeJsonlFile(path.join(target,"firebase-auth-users.jsonl"),authUsers(auth));
+  const manifest={format:"zenura-firebase-read-only-export-v1",projectId,exportedAt:new Date().toISOString(),mode:"read-only",
+   pagination:{firestorePageSize:pageSize,order:"document-name-ascending"},collections:EXPORT_COLLECTIONS,excludedCollections:EXCLUDED_COLLECTIONS,files,
+   totals:{firestoreDocuments:Object.values(files).filter(x=>x.file!=="firebase-auth-users.jsonl").reduce((s,x)=>s+x.count,0),authUsers:files["firebase-auth-users.jsonl"].count},
+   importPerformed:false,sourceMutated:false};
+  await fs.writeFile(path.join(target,"manifest.json"),JSON.stringify(manifest,null,2)+"\n",{encoding:"utf8",flag:"wx",mode:0o600});return manifest;
+ }catch(error){
+  // Remove only filenames owned by this exporter, then remove the now-empty directory.
+  // Never recursively delete a caller-supplied path or unrelated files.
+  for(const name of [...EXPORT_COLLECTIONS.map(x=>x+".jsonl"),"firebase-auth-users.jsonl","manifest.json"]){
+   try{await fs.unlink(path.join(target,name));}catch(cleanupError){if(cleanupError.code!=="ENOENT")throw cleanupError;}
+  }
+  try{await fs.rmdir(target);}catch(cleanupError){if(cleanupError.code!=="ENOENT"&&cleanupError.code!=="ENOTEMPTY")throw cleanupError;}
+  throw error;
+ }
 }
 function resolveProjectId(env=process.env){
  const projectId=env.FIREBASE_PROJECT_ID;
