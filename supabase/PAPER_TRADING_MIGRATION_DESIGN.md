@@ -231,3 +231,26 @@ Important limitations:
 ### Static parity review — option average and cost basis
 
 The Firebase `executeLongOptionTransaction` source and its tests define `averagePricePaise` as the rounded fee-inclusive `costBasisPaise / netQuantity` after BUY and after a partial SELL. Migration 005 was corrected to mirror that behavior; do not reinterpret the field as gross premium-only average. The request order ID is SHA-256 of `uid + ':' + idempotencyKey`, and the request fingerprint is SHA-256 of the JSON payload `{instrumentKey, side, quantity}` for this MARKET option flow. The trusted backend must reproduce these exact values before invoking the RPC. This is a source-level parity correction, not a passed PostgreSQL test.
+
+
+### CE/PE RPC source-parity audit — 2026-11-22
+
+A further static comparison was completed against the integration-branch sources `derivative-order-transaction.js`, `derivative-position.js`, `derivative-contract.js`, `order-idempotency.js`, `trading-charges.js`, and `derivative-order-transaction.test.js`.
+
+Static matches confirmed:
+- MARKET option order identity uses SHA-256 of `uid + ':' + idempotencyKey`; MARKET fingerprint uses SHA-256 of JSON.stringify({instrumentKey, side, quantity}). The backend must map the Firebase UID to the authenticated Supabase UUID before invoking the RPC.
+- Quote must match the verified instrument key in the trusted backend and be no older than 15 seconds; the SQL receives trusted metadata/price/timestamps and independently checks timestamp age, expiry cutoff and tick alignment.
+- NSE/BSE exchange fees, NSE IPFT, SEBI, BUY stamp duty, SELL STT, brokerage and GST rates/rounding match the inspected source.
+- BUY cash movement is negative gross premium; SELL cash movement is positive gross premium; account cash then subtracts charges. BUY cost basis includes premium plus charges. `average_price_paise` is the rounded fee-inclusive cost basis per unit, matching Firebase.
+- Partial SELL basis allocation uses half-up integer rounding and full close allocates all remaining basis. SELL-to-close cannot create a short option.
+- Order columns, account columns and position columns referenced by migration 005 were compared with the draft core schema; the inspected column names/types are present.
+
+Still unverified / must be tested:
+- PostgreSQL parser/execution and exact migration ordering.
+- Runtime Firebase UID-to-Supabase UUID mapping, authenticated caller adapter, and server-only execution boundary.
+- Real concurrency: simultaneous same-user orders, duplicate idempotency retries, partial close races, account balance/reservation invariants.
+- Differential fixtures against every existing Firebase option transaction test, especially the sample NSE BUY (gross 81,250 paise, charges 2,396 paise, cash 916,354 paise) and SELL/partial-close cases.
+- SQL role grants/RLS behavior under actual Supabase roles, plus rollback behavior on all constraint failures.
+- Strike price is validated as an RPC input but not persisted in the current derivative order schema; decide whether audit/history requires a dedicated `strike_price` column before any staging application.
+
+No local PostgreSQL client/server or Docker runtime was available in the working environment during this review, so no claim of SQL parsing, execution, or integration-test success is made.
