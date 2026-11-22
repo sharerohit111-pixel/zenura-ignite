@@ -29,15 +29,16 @@ UPDATE public.paper_accounts
 
 INSERT INTO public.paper_exchange_sessions(
   exchange,session_date,is_trading_day,open_minute,close_minute,
-  session_kind,source_reference,verified_at
+  session_kind,source_reference,verified_at,source_sha256
 ) VALUES (
   'NSE',(clock_timestamp() at time zone 'Asia/Kolkata')::date,true,
-  0,1440,'SPECIAL','CI Intraday LIMIT fill-cancel race fixture',clock_timestamp()
+  0,1440,'SPECIAL','CI Intraday LIMIT fill-cancel race fixture',clock_timestamp(),repeat('e',64)
 )
 ON CONFLICT(exchange,session_date) DO UPDATE SET
   is_trading_day=excluded.is_trading_day,open_minute=excluded.open_minute,
   close_minute=excluded.close_minute,session_kind=excluded.session_kind,
-  source_reference=excluded.source_reference,verified_at=excluded.verified_at;
+  source_reference=excluded.source_reference,verified_at=excluded.verified_at,
+  source_sha256=excluded.source_sha256;
 
 DELETE FROM public.paper_orders WHERE order_id IN ('$BUY_ORDER','$SELL_ORDER');
 DELETE FROM public.paper_equity_positions
