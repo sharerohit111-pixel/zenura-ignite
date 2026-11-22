@@ -7,6 +7,7 @@ async function auditFirebaseRoleClaims({auth,projectId,pageSize=1000}={}){
  if(!Number.isInteger(pageSize)||pageSize<1||pageSize>1000)throw new TypeError("Page size must be 1..1000.");
  const totals={users:0,enabledUsers:0,disabledUsers:0,roleAuthenticated:0,roleMissing:0,roleUnexpected:0};
  let pageToken=null,pages=0;
+ const seenPageTokens=new Set();
  do{
   const page=await auth.listUsers(pageSize,pageToken||undefined);
   if(!page||!Array.isArray(page.users))throw new Error("Firebase Auth returned an invalid user page.");
@@ -20,6 +21,7 @@ async function auditFirebaseRoleClaims({auth,projectId,pageSize=1000}={}){
    else totals.roleUnexpected++;
   }
   pageToken=page.pageToken||null;
+  if(pageToken){if(seenPageTokens.has(pageToken))throw new Error("Firebase Auth repeated a pagination token.");seenPageTokens.add(pageToken);}
  }while(pageToken);
  return Object.freeze({format:"zenura-firebase-role-claim-audit-v1",projectId,auditedAt:new Date().toISOString(),pages,totals:Object.freeze(totals),sourceMutated:false,customClaimsChanged:false,userIdentifiersCollected:false});
 }
@@ -34,8 +36,8 @@ async function main(argv=process.argv.slice(2)){
  if(!args.confirm){process.stdout.write(JSON.stringify({mode:"dry-run",firebaseReads:false,sourceMutated:false,customClaimsChanged:false,instruction:"Set FIREBASE_PROJECT_ID and pass --confirm-read-only-audit --out-dir <new-private-directory> to run the read-only count audit."},null,2)+"\n");return;}
  if(!args.outputDirectory)throw new Error("--out-dir is required for a confirmed audit.");
  if(!Number.isInteger(args.pageSize)||args.pageSize<1||args.pageSize>1000)throw new Error("--page-size must be an integer from 1 through 1000.");
- const projectId=process.env.FIREBASE_PROJECT_ID||process.env.GOOGLE_CLOUD_PROJECT||process.env.GCLOUD_PROJECT;
- if(!projectId)throw new Error("Set FIREBASE_PROJECT_ID explicitly.");
+ const projectId=process.env.FIREBASE_PROJECT_ID;
+ if(typeof projectId!=="string"||!projectId.trim())throw new Error("Set FIREBASE_PROJECT_ID explicitly; ambient Google project variables are not accepted.");
  const target=path.resolve(args.outputDirectory);
  await fs.mkdir(target,{recursive:false,mode:0o700});
  try{
@@ -45,7 +47,7 @@ async function main(argv=process.argv.slice(2)){
   const report=await auditFirebaseRoleClaims({auth:getAuth(),projectId,pageSize:args.pageSize});
   await fs.writeFile(path.join(target,"role-claim-audit.json"),JSON.stringify(report,null,2)+"\n",{encoding:"utf8",flag:"wx",mode:0o600});
   process.stdout.write(JSON.stringify({mode:"read-only-audit-complete",outputDirectory:target,totals:report.totals,sourceMutated:false,customClaimsChanged:false,userIdentifiersCollected:false},null,2)+"\n");
- }catch(error){throw new Error("Firebase role claim audit failed: "+(error?.message||"unknown error"));}
+ }catch{throw new Error("Firebase role claim audit failed. Check Firebase Admin SDK setup and read-only credentials; sensitive provider error details were suppressed.");}
 }
 if(require.main===module)main().catch(error=>{process.stderr.write(error.message+"\n");process.exitCode=1;});
 module.exports={auditFirebaseRoleClaims,parseArgs};
