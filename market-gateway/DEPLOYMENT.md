@@ -4,7 +4,7 @@
 
 - **Supabase** is the application backend: native Auth, Postgres, RLS and transactional RPCs.
 - **Cloud Run** hosts one Node.js HTTP/SSE market gateway. It is not Firebase and does not use Firebase Auth, Firestore or Firebase Functions.
-- The same Cloud Run process runs the leased Paper LIMIT worker and, when explicitly enabled, a separately leased equity protective-order worker. There is **no separate Cloud Run Job or Cloud Scheduler** in the current design.
+- The same Cloud Run process runs the leased Delivery LIMIT worker and, when explicitly enabled, separately leased Intraday LIMIT and equity protective-order workers. There is **no separate Cloud Run Job or Cloud Scheduler** in the current design.
 - Each user authorizes their own Upstox account. The gateway resolves that user's encrypted token only after validating the user's Supabase access token.
 - All orders are virtual paper orders. The app does not submit orders to Upstox or an exchange.
 - The frontend's gateway URL remains blank until a verified gateway is deployed.
@@ -80,6 +80,7 @@ The deployment uses:
 - `--concurrency 40`: limit request concurrency per instance.
 - `--timeout 3600`: supports long-lived Upstox V3 SSE streams.
 - `PAPER_LIMIT_WORKER_ENABLED=true` and `PAPER_LIMIT_WORKER_INTERVAL_MS=2000`.
+- `PAPER_INTRADAY_LIMIT_WORKER_ENABLED` remains unset/false by default. Do not enable it until the reviewed official NSE/BSE session calendar has been populated and verified in `paper_exchange_sessions`, the migration is approved/applied, and the live calendar/session smoke checks are complete. Optional interval: `PAPER_INTRADAY_LIMIT_WORKER_INTERVAL_MS`.
 - `PAPER_PROTECTIVE_WORKER_ENABLED` remains unset/false by default. Enable only after the protective-order UI, SQL migration checks, end-to-end tests, written market-data rights and compliance gates are complete. Optional interval: `PAPER_PROTECTIVE_WORKER_INTERVAL_MS`.
 
 Every instance may start the worker loop, but the Postgres lease ensures only one worker is the active writer. Worker errors and instrument-master refresh failures use bounded exponential backoff. The public `/health` response exposes only safe readiness data: instrument-master availability, worker liveness and cycle counts. A cycle-level worker fault is distinguished from an individual user's expired token or rejected order; per-user failures are counted without falsely declaring the whole service unhealthy. It never exposes credentials or user data.
@@ -101,7 +102,8 @@ These Auth settings are separate from the Cloud Run deployment workflow and must
 
 - Paper Trading equity MARKET orders are supported.
 - Equity LIMIT orders are currently supported for **Delivery** and are processed by the in-service worker.
-- Intraday LIMIT and F&O LIMIT are not enabled.
+- Intraday LIMIT now has a separate SQL reservation/fill/cancel/expiry lifecycle, session-aware quote validation, a dedicated leased worker and gateway routing. It remains **disabled by default** until official verified calendar rows are loaded and reviewed; the deployment workflow does not enable it.
+- F&O LIMIT remains unsupported.
 - Futures and long CE/PE option market-order paths are separate transactional flows.
 - Paper Investing routes and its dedicated ledger have been retired under the Paper Trading-only product scope.
 - Equity SELL-to-close stop-loss/target execution has a separately leased, bounded, fresh-quote worker implementation and an owner-bound cancellation API. The worker is **opt-in and disabled by default**. Protective-order creation UI/API, end-to-end trigger/cancel race tests and production readiness checks remain incomplete; do not expose or claim always-on protective execution until those gates pass. Futures and Options protective exits remain unsupported.
