@@ -316,8 +316,8 @@ jobs:
               'BUY','DELIVERY',10,10000,floor(extract(epoch from clock_timestamp())*1000)::bigint,0
             );
             IF v_result->>'status' <> 'FILLED'
-               OR (v_result->>'cash_paise')::bigint <> 99900000 THEN
-              RAISE EXCEPTION 'MARKET BUY did not debit expected gross amount';
+               OR (v_result->>'cash_paise')::bigint <> 99897621 THEN
+              RAISE EXCEPTION 'MARKET BUY did not debit gross plus estimated charges';
             END IF;
             v_result := public.execute_paper_market_order(
               '22222222-2222-4222-8222-222222222222',
@@ -331,7 +331,7 @@ jobs:
             END IF;
             SELECT cash_paise INTO v_cash FROM public.paper_accounts
              WHERE user_id='22222222-2222-4222-8222-222222222222';
-            IF v_cash <> 99900000 THEN
+            IF v_cash <> 99897621 THEN
               RAISE EXCEPTION 'MARKET idempotent retry debited cash more than once';
             END IF;
             -- Same key with a different fingerprint must fail.
@@ -347,7 +347,7 @@ jobs:
             EXCEPTION WHEN unique_violation THEN
               NULL;
             END;
-            -- SELL half the position: ₹10,000 realized gain, five shares remain.
+            -- SELL half the position: ₹10,000 gross spread; charges reduce net realized P&L, five shares remain.
             v_result := public.execute_paper_market_order(
               '22222222-2222-4222-8222-222222222222',
               repeat('e',64),
@@ -358,8 +358,8 @@ jobs:
             SELECT quantity INTO v_qty FROM public.paper_equity_positions
              WHERE user_id='22222222-2222-4222-8222-222222222222'
                AND product='DELIVERY' AND instrument_key='NSE_EQ|TEST001';
-            IF v_qty <> 5 OR (v_result->>'order_realized_pnl_paise')::bigint <> 10000 THEN
-              RAISE EXCEPTION 'MARKET SELL position or realized P&L is incorrect';
+            IF v_qty <> 5 OR (v_result->>'order_realized_pnl_paise')::bigint <> 4028 THEN
+              RAISE EXCEPTION 'MARKET SELL net realized P&L or position is incorrect';
             END IF;
             -- LIMIT BUY reservation then cancellation must release all reserved cash.
             v_result := public.submit_paper_limit_order(
@@ -396,8 +396,8 @@ jobs:
             SELECT reserved_cash_paise,cash_paise INTO v_reserved,v_cash
               FROM public.paper_accounts
              WHERE user_id='22222222-2222-4222-8222-222222222222';
-            IF v_result->>'status' <> 'FILLED' OR v_reserved <> 0 OR v_cash <> 99902000 THEN
-              RAISE EXCEPTION 'LIMIT BUY fill cash or reservation result is incorrect';
+            IF v_result->>'status' <> 'FILLED' OR v_reserved <> 0 OR v_cash <> 99894839 THEN
+              RAISE EXCEPTION 'LIMIT BUY fill cash or reservation result is incorrect after fee-inclusive MARKET basis';
             END IF;
             -- LIMIT SELL must reserve shares, reject stale quotes, and release on cancel.
             PERFORM public.submit_paper_limit_order(
@@ -446,9 +446,9 @@ jobs:
             SELECT cash_paise INTO v_cash FROM public.paper_accounts
              WHERE user_id='22222222-2222-4222-8222-222222222222';
             IF v_result->>'status' <> 'FILLED' OR v_qty <> 3 OR v_reserved <> 0
-               OR v_cash <> 99928000
-               OR (v_result->>'realized_pnl_paise')::bigint <> 6000 THEN
-              RAISE EXCEPTION 'LIMIT SELL fill position, cash, reservation or P&L is incorrect';
+               OR v_cash <> 99920839
+               OR (v_result->>'realized_pnl_paise')::bigint <> 5524 THEN
+              RAISE EXCEPTION 'LIMIT SELL fill position, cash, reservation or fee-inclusive basis P&L is incorrect';
             END IF;
           END
           $$;
@@ -524,7 +524,7 @@ jobs:
               RAISE EXCEPTION 'Concurrent duplicate MARKET requests created more than one order';
             END IF;
             IF (SELECT cash_paise FROM public.paper_accounts
-                WHERE user_id='33333333-3333-4333-8333-333333333333') <> 99900000 THEN
+                WHERE user_id='33333333-3333-4333-8333-333333333333') <> 99897621 THEN
               RAISE EXCEPTION 'Concurrent duplicate MARKET requests debited cash more than once';
             END IF;
           END
