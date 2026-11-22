@@ -21,6 +21,9 @@ SELECT public.import_bse_equity_fee_master(
   )
 );
 RESET ROLE;
+INSERT INTO auth.users(id) VALUES ('66666666-6666-4666-8666-666666666666')
+ON CONFLICT (id) DO NOTHING;
+SELECT public.initialize_paper_trading_account('66666666-6666-4666-8666-666666666666');
 
 DO $bse_fee_master$
 DECLARE
@@ -29,6 +32,10 @@ DECLARE
   v_m jsonb;
   v_x jsonb;
   v_rejected boolean;
+  v_result jsonb;
+  v_cash bigint;
+  v_reserved bigint;
+  v_realized bigint;
   v_date date:=(now() at time zone 'Asia/Kolkata')::date;
 BEGIN
   v_a:=public._paper_bse_cash_equity_charges('BSE_EQ|INE002A01018',1000000000,'DELIVERY','BUY');
@@ -76,6 +83,77 @@ BEGIN
   EXCEPTION WHEN SQLSTATE '22023' THEN v_rejected:=true;
   END;
   IF NOT v_rejected THEN RAISE EXCEPTION 'Unknown BSE ISIN was not blocked'; END IF;
+  -- Exercise the actual BSE MARKET settlement RPC using Group A non-exclusive fees.
+  v_result:=public.execute_paper_market_order(
+    '66666666-6666-4666-8666-666666666666',repeat('d',64),
+    'dddddddd-dddd-4ddd-8ddd-dddddddddddd',repeat('e',64),
+    'BSE_EQ|INE002A01018','RELIANCE','BSE','BUY','INTRADAY',100,100000,
+    floor(extract(epoch from clock_timestamp())*1000)::bigint,0
+  );
+  SELECT cash_paise INTO v_cash FROM public.paper_accounts
+   WHERE user_id='66666666-6666-4666-8666-666666666666';
+  IF (v_result->>'charges_paise')::bigint<>2675
+     OR (v_result->>'cash_delta_paise')::bigint<>-10002675
+     OR v_cash<>89997325
+     OR v_result->'charges_breakdown'->>'scrip_group'<>'A'
+     OR (v_result->'charges_breakdown'->>'exchange_rate_paise_per_crore')::integer<>375 THEN
+    RAISE EXCEPTION 'BSE MARKET BUY did not use the imported Group A fee master: %',v_result;
+  END IF;
+  v_result:=public.execute_paper_market_order(
+    '66666666-6666-4666-8666-666666666666',repeat('f',64),
+    'ffffffff-ffff-4fff-8fff-ffffffffffff',repeat('1',64),
+    'BSE_EQ|INE002A01018','RELIANCE','BSE','SELL','INTRADAY',100,120000,
+    floor(extract(epoch from clock_timestamp())*1000)::bigint,0
+  );
+  SELECT cash_paise,realized_pnl_paise INTO v_cash,v_realized FROM public.paper_accounts
+   WHERE user_id='66666666-6666-4666-8666-666666666666';
+  IF (v_result->>'charges_paise')::bigint<>5378
+     OR (v_result->>'cash_delta_paise')::bigint<>11994622
+     OR v_cash<>101991947 OR v_realized<>1991947 THEN
+    RAISE EXCEPTION 'BSE MARKET SELL net proceeds or realized P&L mismatch: %, cash %, realized %',v_result,v_cash,v_realized;
+  END IF;
+
+  -- Exercise BSE Delivery LIMIT reservation and fill using the same daily scrip master.
+  v_result:=public.submit_paper_limit_order(
+    '66666666-6666-4666-8666-666666666666',repeat('2',64),
+    '22222222-2222-4222-8222-222222222222',repeat('3',64),
+    'BSE_EQ|INE002A01018','RELIANCE','BSE','BUY',10,100000
+  );
+  SELECT reserved_cash_paise INTO v_reserved FROM public.paper_accounts
+   WHERE user_id='66666666-6666-4666-8666-666666666666';
+  IF v_reserved<>1002511 THEN
+    RAISE EXCEPTION 'BSE Delivery LIMIT did not reserve exchange-specific charges: %',v_reserved;
+  END IF;
+  v_result:=public.execute_paper_limit_fill(
+    repeat('2',64),99000,floor(extract(epoch from clock_timestamp())*1000)::bigint,0,
+    floor(extract(epoch from clock_timestamp())*1000)::bigint
+  );
+  SELECT reserved_cash_paise,cash_paise INTO v_reserved,v_cash FROM public.paper_accounts
+   WHERE user_id='66666666-6666-4666-8666-666666666666';
+  IF v_result->>'status'<>'FILLED' OR v_reserved<>0 OR v_cash<>100999437
+     OR (v_result->>'charges_paise')::bigint<>2510
+     OR v_result->'charges_breakdown'->>'scrip_group'<>'A' THEN
+    RAISE EXCEPTION 'BSE Delivery LIMIT fill did not settle with the imported fee master: %',v_result;
+  END IF;
+
+  -- BSE LIMIT SELL credits net proceeds and realizes P&L after group fees and statutory charges.
+  PERFORM public.submit_paper_limit_order(
+    '66666666-6666-4666-8666-666666666666',repeat('4',64),
+    '44444444-4444-4444-8444-444444444444',repeat('5',64),
+    'BSE_EQ|INE002A01018','RELIANCE','BSE','SELL',5,120000
+  );
+  v_result:=public.execute_paper_limit_fill(
+    repeat('4',64),120000,floor(extract(epoch from clock_timestamp())*1000)::bigint,0,
+    floor(extract(epoch from clock_timestamp())*1000)::bigint
+  );
+  SELECT cash_paise,realized_pnl_paise INTO v_cash,v_realized FROM public.paper_accounts
+   WHERE user_id='66666666-6666-4666-8666-666666666666';
+  IF (v_result->>'charges_paise')::bigint<>5321
+     OR (v_result->>'cash_delta_paise')::bigint<>594679
+     OR v_cash<>101594116 OR v_realized<>98424 THEN
+    RAISE EXCEPTION 'BSE Delivery LIMIT SELL net settlement mismatch: %, cash %, realized %',v_result,v_cash,v_realized;
+  END IF;
+
   v_rejected:=false;
   BEGIN
     PERFORM public.import_bse_equity_fee_master(
