@@ -6,4 +6,4 @@ COPY --chown=node:node . .
 ENV NODE_ENV=production
 EXPOSE 8080
 USER node
-CMD ["npm","start"]
+CMD ["node","supabase-server.js"]
