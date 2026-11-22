@@ -5,6 +5,10 @@ INSERT INTO public.paper_equity_positions(
   user_id,product,instrument_key,trading_symbol,exchange,quantity,average_price_paise,cost_basis_paise,reserved_quantity
 ) VALUES ('11111111-1111-4111-8111-111111111111','DELIVERY','NSE_EQ|CREATE_TEST','CREATE_TEST','NSE',10,9000,90000,2);
 
+INSERT INTO public.paper_equity_positions(
+  user_id,product,instrument_key,trading_symbol,exchange,quantity,average_price_paise,cost_basis_paise,reserved_quantity
+) VALUES ('11111111-1111-4111-8111-111111111111','DELIVERY','NSE_EQ|CANCEL_OWN','CANCEL_OWN','NSE',10,9000,90000,1);
+
 INSERT INTO public.paper_protective_orders(
   order_id,user_id,asset_class,instrument_key,product,side,
   trigger_type,trigger_direction,trigger_price_paise,quantity,status
@@ -29,6 +33,11 @@ BEGIN
   );
   IF v_result->'order'->>'status'<>'ACTIVE' OR (v_result->>'idempotent_replay')::boolean IS NOT FALSE THEN
     RAISE EXCEPTION 'Equity protective order was not created correctly';
+  END IF;
+  IF (SELECT reserved_quantity FROM public.paper_equity_positions
+      WHERE user_id='11111111-1111-4111-8111-111111111111'
+        AND product='DELIVERY' AND instrument_key='NSE_EQ|CREATE_TEST')<>10 THEN
+    RAISE EXCEPTION 'Protective creation did not reserve shares exactly once';
   END IF;
   v_result:=public.create_paper_equity_protective_order(
     'cececece-cece-4ece-8ece-cececececece','11111111-1111-4111-8111-111111111111',
@@ -58,6 +67,11 @@ BEGIN
   v_result:=public.cancel_paper_protective_order('cacacaca-caca-4aca-8aca-cacacacacaca','11111111-1111-4111-8111-111111111111');
   IF v_result->>'status'<>'CANCELLED' OR (v_result->>'cancelled')::boolean IS NOT TRUE THEN
     RAISE EXCEPTION 'Owner could not cancel own active protective order';
+  END IF;
+  IF (SELECT reserved_quantity FROM public.paper_equity_positions
+      WHERE user_id='11111111-1111-4111-8111-111111111111'
+        AND product='DELIVERY' AND instrument_key='NSE_EQ|CANCEL_OWN')<>0 THEN
+    RAISE EXCEPTION 'Protective cancellation did not release its share reservation';
   END IF;
 
   v_result:=public.cancel_paper_protective_order('cacacaca-caca-4aca-8aca-cacacacacaca','11111111-1111-4111-8111-111111111111');
