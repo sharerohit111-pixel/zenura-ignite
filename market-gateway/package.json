@@ -10,7 +10,8 @@
     "start": "node supabase-server.js",
     "test": "node --test test/*.test.js",
     "check": "node --check server.js && node --check supabase-server.js && node --check lib/supabase-runtime.js && node --check ../markets/stocks/stocks.js && node --check ../markets/stocks/chart-engine.js",
-    "start:legacy-firebase": "node server.js"
+    "start:legacy-firebase": "node server.js",
+    "worker:limit": "node paper-limit-worker.js"
   },
   "dependencies": {
     "express": "4.21.2",
