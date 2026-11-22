@@ -407,6 +407,7 @@ app.post("/paper/orders/:orderId/cancel",async(req,res)=>{
 app.post("/paper/protective-orders",async(req,res)=>{
   try{
     const {user,userDb}=await auth(req);
+    if(!paperProtectiveWorkerStatus.enabled)return res.status(503).json({error:"Protective execution is not enabled on this gateway yet."});
     const orderId=String(req.body?.order_id||""),instrumentKey=String(req.body?.instrument_key||"");
     const product=String(req.body?.product||"").toUpperCase(),triggerType=String(req.body?.trigger_type||"").toUpperCase();
     const triggerPricePaise=Number(req.body?.trigger_price_paise),quantity=Number(req.body?.quantity);
@@ -446,7 +447,7 @@ app.get("/paper/protective-orders",async(req,res)=>{
       triggerPricePaise:order.trigger_price_paise,quantity:order.quantity,status:order.status,
       executionPricePaise:order.execution_price_paise,createdAt:order.created_at,
       filledAt:order.filled_at,cancelledAt:order.cancelled_at,simulationOnly:true}));
-    res.set("Cache-Control","private, no-store").json({orders,simulationOnly:true});
+    res.set("Cache-Control","private, no-store").json({orders,workerEnabled:paperProtectiveWorkerStatus.enabled,simulationOnly:true});
   }catch(error){sendError(res,error,"Protective order history could not be loaded.");}
 });
 app.post("/paper/protective-orders/:orderId/cancel",async(req,res)=>{
