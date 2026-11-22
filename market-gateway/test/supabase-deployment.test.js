@@ -71,6 +71,14 @@ test("Manual production deployment keeps the leased LIMIT worker active in the g
  assert.doesNotMatch(deployWorkflow,/gcloud run jobs deploy|gcloud scheduler jobs create|firebase deploy|firebase functions:deploy|service_account_key:/i);
 });
 
+test("Protective-order cancellation API is authenticated and delegates to the owner-bound RPC",()=>{
+ assert.match(server,/app\.post\("\/paper\/protective-orders\/:orderId\/cancel"/);
+ assert.match(server,/runtime\.callUserRpc\(user,"cancel_paper_protective_order"/);
+ assert.match(server,/idempotentReplay:result\?\.idempotent_replay===true/);
+ const runtime=fs.readFileSync(path.join(root,"lib/supabase-runtime.js"),"utf8");
+ assert.match(runtime,/"cancel_paper_protective_order"/);
+ assert.match(runtime,/p_user_id: user\.id/);
+});
 test("Public health response confirms the leased LIMIT worker without exposing secrets",()=>{
  assert.match(server,/limitWorker:\{\.\.\.paperLimitWorkerStatus\}/);
  assert.match(server,/lastCycle=\{scanned:result\.scanned,filled:result\.filled,failed:result\.failed,locked:result\.locked,cycleError:false\}/);
