@@ -35,3 +35,16 @@ The isolated audit branch now includes `market-gateway/test/run-supabase-option-
 The manual `Audit — Supabase role and RLS security checks` workflow now invokes this runner after applying PR #70 migrations to its disposable PostgreSQL 16 service. It does not connect to the live Supabase project and does not change PR #70 or PR #71.
 
 **Execution status:** The runner and workflow wiring are committed, but no workflow run has yet executed this new step. Do not treat the vectors as passed until a new manual Actions run completes successfully. This remains a five-vector charge-calculation parity check, not full transaction/accounting parity.
+
+## Runner source-level review — 2026-11-22
+
+The SQL arithmetic in the runner was cross-checked against the charge block in PR #71's `202611220005_paper_long_option_transaction.sql` and the Firebase reference `market-gateway/lib/trading-charges.js`. The rate constants and positive-value rounding expressions match the reviewed source:
+- NSE exchange 0.0003553; NSE IPFT 0.000005.
+- BSE exchange 0.000325; BSE IPFT 0.
+- SEBI 0.000001; BUY stamp 0.00003; SELL STT 0.0015.
+- GST 0.18 on brokerage + exchange fee + IPFT.
+- SQL `floor(x + 0.5)` mirrors positive JavaScript `Math.round`.
+
+The runner now rejects non-positive/unsafe gross paise and negative/unsafe brokerage before constructing SQL.
+
+**Important boundary:** this runner evaluates the same charge arithmetic in disposable PostgreSQL; it does not call `execute_paper_long_option_order` or prove the entire RPC transaction, account mutation, or persisted charge JSON. Full RPC parity remains a separate test gate. The manual audit workflow has not yet been re-run with this runner, so no new PASS is claimed.
