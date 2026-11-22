@@ -61,6 +61,8 @@ jobs:
           node --input-type=module --check < markets/stocks/supabase-client.js
           node --input-type=module --check < markets/stocks/connect.js
           node --input-type=module --check < markets/stocks/email-auth.js
+          node --check markets/stocks/stocks.js
+          node --check markets/language-toggle.js
           if grep -Eiq 'firebase-client|firebase-auth|firebase-functions' markets/stocks/supabase-client.js markets/stocks/connect.js markets/stocks/email-auth.js; then
             echo "Firebase authentication dependency remains in the new market app."
             exit 1
