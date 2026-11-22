@@ -18,7 +18,7 @@ create or replace function public.submit_paper_limit_order(
 returns jsonb
 language plpgsql
 security definer
-set search_path = pg_catalog, public
+set search_path = ''
 as $$
 declare
   v_account public.paper_accounts%rowtype;
@@ -134,7 +134,7 @@ create or replace function public.execute_paper_limit_fill(
 returns jsonb
 language plpgsql
 security definer
-set search_path = pg_catalog, public
+set search_path = ''
 as $$
 declare
   v_order public.paper_orders%rowtype;
@@ -294,7 +294,7 @@ create or replace function public.cancel_paper_limit_order(
 returns jsonb
 language plpgsql
 security definer
-set search_path = pg_catalog, public
+set search_path = ''
 as $$
 declare
   v_order public.paper_orders%rowtype;
