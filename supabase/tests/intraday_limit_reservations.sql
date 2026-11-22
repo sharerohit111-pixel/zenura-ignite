@@ -165,6 +165,15 @@ BEGIN
     RAISE EXCEPTION 'Unsupported exchange was accepted for Intraday LIMIT';
   EXCEPTION WHEN SQLSTATE '22023' THEN NULL;
   END;
+  BEGIN
+    PERFORM public.submit_paper_intraday_limit_order(
+      '22222222-2222-4222-8222-222222222222',repeat('7',64),
+      'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',repeat('6',64),
+      'BSE_EQ|INTRA_BSE_BLOCK','INTRA_BSE_BLOCK','BSE','BUY',1,10000
+    );
+    RAISE EXCEPTION 'BSE Intraday LIMIT was accepted without scrip-group fee inputs';
+  EXCEPTION WHEN SQLSTATE '22023' THEN NULL;
+  END;
 END
 $intraday_limit_checks$;
 
