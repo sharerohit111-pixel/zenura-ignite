@@ -80,7 +80,9 @@ gcloud run deploy zenura-market-gateway \
   --set-secrets SUPABASE_SERVICE_ROLE_KEY=SUPABASE_SERVICE_ROLE_KEY:latest,UPSTOX_TOKEN_ENCRYPTION_KEY=UPSTOX_TOKEN_ENCRYPTION_KEY:latest,UPSTOX_CLIENT_ID=UPSTOX_CLIENT_ID:latest,UPSTOX_CLIENT_SECRET=UPSTOX_CLIENT_SECRET:latest
 ```
 
-For a responsive chart/quote experience, the reference deployment keeps one warm gateway instance, gives it 2 vCPU/2 GiB, allows bounded concurrency and sets a 60-minute request timeout for SSE streams. This has ongoing Cloud Run cost; configure a billing budget and alert, and tune max instances against Upstox account-wide stream limits.\n\nThe Cloud Run endpoint is publicly reachable for browser CORS and the Upstox OAuth callback. This does **not** disable application authentication: every private API route verifies the Supabase access token. The startup check refuses to run unless the exact HTTPS frontend origin is present in `ALLOWED_ORIGINS`.
+For a responsive chart/quote experience, the reference deployment keeps one warm gateway instance, gives it 2 vCPU/2 GiB, allows bounded concurrency and sets a 60-minute request timeout for SSE streams. This has ongoing Cloud Run cost; configure a billing budget and alert, and tune max instances against Upstox account-wide stream limits.
+
+The Cloud Run endpoint is publicly reachable for browser CORS and the Upstox OAuth callback. This does **not** disable application authentication: every private API route verifies the Supabase access token. The startup check refuses to run unless the exact HTTPS frontend origin is present in `ALLOWED_ORIGINS`.
 
 Map `market-api.zenuraignite.com` to the Cloud Run service and verify the custom domain/certificate before registering the callback in Upstox. Confirm the returned Cloud Run URL and `/health` endpoint. Health is only a liveness check; it does not prove authentication, RLS, OAuth, market quotes or order accounting.
 
