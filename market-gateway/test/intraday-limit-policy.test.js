@@ -50,7 +50,7 @@ test("intraday pending orders expire at 15:30 IST and never carry to another ses
 test("malformed timestamps and non-pending orders fail closed",()=>{
  assert.throws(()=>marketClockParts(NaN),TypeError);
  assert.equal(normalizeMarketSession({exchange:"NSE",sessionDate:"2026-11-23",isTradingDay:true,openMinute:930,closeMinute:555}),null);
- assert.equal(normalizeMarketSession({exchange:"NSE",sessionDate:"2026-11-22",isTradingDay:true,openMinute:555,closeMinute:930}),{exchange:"NSE",sessionDate:"2026-11-22",isTradingDay:true,openMinute:555,closeMinute:930});
+ assert.deepEqual(normalizeMarketSession({exchange:"NSE",sessionDate:"2026-11-22",isTradingDay:true,openMinute:555,closeMinute:930}),{exchange:"NSE",sessionDate:"2026-11-22",isTradingDay:true,openMinute:555,closeMinute:930});
  assert.equal(isIntradaySessionOpen(epoch("2026-11-23T03:45:00.000Z"),{...normalSession,sessionDate:"2026-11-24"}),false);
  assert.equal(isIntradaySessionOpen(epoch("2026-11-23T03:45:00.000Z"),{...normalSession,exchange:"MCX"}),false);
  assert.equal(isIntradayOrderExpired({...order,created_at:"bad"},epoch("2026-11-23T10:00:00.000Z")),false);
