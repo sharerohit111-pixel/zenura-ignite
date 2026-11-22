@@ -44,32 +44,29 @@
 
 Work only on the Indian-market integration branch and its isolated stock/gateway/migration/test files. Make additive, independently tested changes. After each coherent increment, run targeted tests and the full gateway/CI suite, review the exact diff, and record remaining blockers. Keep Crypto untouched until the Indian-market release gates are met.
 
-## Next engineering gate: protective stop-loss / target worker
+## Current engineering status and next gate
 
-The database currently has a private `paper_protective_orders` table. A pure trigger evaluator and unit tests now exist in `market-gateway/lib/protective-order-worker.js`, but the gateway has no leased worker or atomic fill RPC that evaluates and executes these orders. The evaluator is not connected to live execution; a table, helper and UI control do not constitute server-side protection.
+The equity protective-order slice is now implemented in this integration branch:
 
-Before enabling stop-loss or target execution:
-1. Add a dedicated leased worker state key and bounded cursor/batch processing; never reuse the LIMIT worker cursor or lease.
-2. Evaluate only ACTIVE orders for supported instruments and verified owner/position state. Validate quote instrument identity, exchange, timestamp freshness, positive integer paise price and market-session policy.
-3. Make trigger evaluation deterministic for STOP_LOSS and TARGET using explicit `trigger_direction`; reject malformed combinations and out-of-range quantity/price.
-4. Execute fills only through a SECURITY DEFINER RPC with strict service-role-only grants, row locks, idempotency, position quantity checks, paise accounting, fees/taxes, and atomic order/position/history updates.
-5. Define partial-fill, gap-through, market-closed, stale-quote, insufficient-liquidity and retry behavior. Never silently mark an order FILLED without an atomic ledger fill.
-6. Add concurrency, duplicate-worker, lease-expiry, partial-close, reverse-position, stale/future quote, multi-tenant RLS and crash-recovery tests.
-7. Expose health/last-cycle status without leaking user identifiers or provider secrets; alert on repeated failures and lease starvation.
-8. Keep the UI/API from advertising guaranteed SL/target execution until the worker is deployed, monitored and end-to-end verified.
+- A dedicated protective-worker lease and bounded scan/cursor processing are separate from the LIMIT worker.
+- The worker validates official NSE/BSE cash-equity instruments, exact quote identity and freshness, owner/position state, and deterministic execution identity.
+- Atomic SECURITY DEFINER RPCs create, cancel and fill equity protective orders with row locking, idempotency and reserved-share accounting.
+- Worker orchestration tests cover fills, stale quotes, unsupported instruments, expired provider tokens, lease contention and cancellation/fill races.
+- The worker remains **opt-in and disabled by default**. The creation API fails closed when it is disabled. This does not establish production availability or guaranteed always-on execution.
+- Futures and long-option protective exits remain unsupported and must not be routed through the equity worker.
 
-The existing LIMIT worker is a useful pattern for leasing and fresh-quote validation, but its DELIVERY-equity-only fill RPC must not be reused for futures/options or protective orders without a separate accounting design.
+The next Indian-market cash-equity gate is **Intraday LIMIT lifecycle completion**. The current gateway explicitly rejects `order_type=LIMIT` with `product=INTRADAY`; the SQL submission/fill/cancel functions and scheduled LIMIT worker are Delivery-only. Do not expose or silently accept Intraday LIMIT until the complete lifecycle is implemented.
 
-### Schema-specific findings for the protective-order transaction
+Acceptance criteria for that increment:
 
-Inspection of the current draft migrations adds an important constraint to the design:
+1. Add a forward-only migration; do not edit migrations already recorded remotely.
+2. Support INTRADAY BUY cash reservations and SELL share reservations without consuming funds/shares reserved by other orders.
+3. Extend the worker with bounded, fair processing and a separate, explicit product/session policy; keep Delivery behavior unchanged.
+4. Execute fills atomically under account/order/position locks with idempotency, fresh exact-instrument quotes, reservation release exactly once, and correct Intraday realized-P&L accounting.
+5. Define market-session close/expiry behavior for pending Intraday LIMIT orders; no pending intraday order may silently carry into the next session.
+6. Cover BUY/SELL, partial reservations, insufficient funds/shares, cancel-vs-fill races, duplicate workers, stale/future quotes, lease expiry, idempotent replay, RLS/tenant isolation and recovery.
+7. Keep the UI action disabled until the backend lifecycle and regression tests pass.
 
-- `paper_equity_positions` has `quantity` and `reserved_quantity`, so equity exits can be bounded by held minus already-reserved shares.
-- `paper_derivative_positions` stores a positive `net_quantity` for long CE/PE positions, but has no reserved-exit quantity column.
-- `paper_futures_positions` stores signed `net_quantity` and `reserved_margin_paise`, but no reserved-exit quantity column. Its `product` values are `INTRADAY` / `DELIVERY`; protective order product labels are `FUTURES`.
-- `paper_protective_orders` currently stores trigger and requested quantity, but has no idempotent fill ledger, execution price/quote fields, reservation state, or link to a position version.
+After Intraday LIMIT, finish the remaining cash-equity gaps (including charge-aware accounting and complete order/trade-history validation) before moving to futures lifecycle hardening, options lifecycle validation, risk controls and release testing.
 
-Therefore the pure helper's position checks are preflight validation only. They cannot prevent two ACTIVE protective orders from both claiming the same shares/contracts. Before a worker is enabled, the forward migration and atomic RPC must introduce a consistent reservation strategy for equity, futures and long options, or atomically aggregate and serialize all competing ACTIVE protective orders under the relevant account/position lock. The RPC must also create the canonical paper trade/order-history record and release any reservation exactly once on fill, cancellation or rejection.
-
-The inspected futures market-order RPC already handles account locking, margin and position updates, but its contract is a MARKET entry/exit transaction. It must not be invoked as a shortcut for a triggered protective order unless the protective RPC wraps and preserves the same accounting invariants in one transaction. The option position schema is long-only; protective execution must remain SELL-to-close and must never create a short option position.
-
+The existing Delivery LIMIT worker must not be reused as an Intraday implementation by simply removing its product filter. Its reservation, realized-P&L, session-expiry and cancellation invariants need explicit tests first.
