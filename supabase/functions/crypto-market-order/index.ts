@@ -43,7 +43,7 @@ Deno.serve(async (req: Request) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-    const startingCash = Deno.env.get("CRYPTO_STARTING_CASH_USDT");
+    const startingCash = Deno.env.get("CRYPTO_STARTING_CASH_INR");
     const feeRateRaw = Deno.env.get("CRYPTO_TAKER_FEE_RATE");
     if (!supabaseUrl || !anonKey || !serviceKey || !startingCash || !feeRateRaw) {
       return json({ error: "Crypto trading service is not configured." }, 503);
@@ -99,7 +99,17 @@ Deno.serve(async (req: Request) => {
       return json({ error: "A fresh Binance quote is not available. Retry shortly." }, 409);
     }
 
-    const gross = Number(quantity) * price;
+    const fxResponse = await fetch("https://open.er-api.com/v6/latest/USD", {
+      headers: { Accept: "application/json" }, signal: AbortSignal.timeout(5000),
+    });
+    if (!fxResponse.ok) return json({ error: "INR reference rate is temporarily unavailable." }, 502);
+    const fxData = await fxResponse.json();
+    const fxRateInr = Number(fxData?.rates?.INR);
+    if (fxData?.result !== "success" || !Number.isFinite(fxRateInr) || fxRateInr < 40 || fxRateInr > 200) {
+      return json({ error: "A valid INR reference rate is unavailable." }, 502);
+    }
+
+    const gross = Number(quantity) * price * fxRateInr;
     if (!Number.isFinite(gross) || gross <= 0 || gross > 1_000_000_000_000) {
       return json({ error: "Order value is outside supported limits." }, 400);
     }
@@ -107,7 +117,7 @@ Deno.serve(async (req: Request) => {
     const canonical = {
       userId, orderId, idempotencyKey, symbol, side, quantity,
       provider: "binance-spot", quoteTimestamp,
-      executionPrice: price.toFixed(8), fee: fee.toFixed(8),
+      executionPrice: price.toFixed(8), fxRateInr: fxRateInr.toFixed(8), fee: fee.toFixed(8),
     };
     const requestFingerprint = await fingerprint(canonical);
 
@@ -116,7 +126,7 @@ Deno.serve(async (req: Request) => {
     });
     const { error: initError } = await admin.rpc("initialize_paper_crypto_account", {
       p_user_id: userId,
-      p_starting_cash_usdt: initial,
+      p_starting_cash_inr: initial,
     });
     if (initError) {
       console.error("crypto account initialization failed", initError.message);
@@ -133,6 +143,7 @@ Deno.serve(async (req: Request) => {
       p_side: side,
       p_quantity: quantity,
       p_execution_price: price.toFixed(8),
+      p_fx_rate_inr: fxRateInr.toFixed(8),
       p_fee: fee.toFixed(8),
       p_quote_timestamp_ms: quoteTimestamp,
     });
