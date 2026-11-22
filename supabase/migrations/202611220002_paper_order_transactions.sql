@@ -43,7 +43,9 @@ declare
   v_order public.paper_orders%rowtype;
 begin
   if p_user_id is null or p_idempotency_key is null
-     or p_order_id !~ '^[a-f0-9]{64}$'
+     or p_order_id is null or p_request_fingerprint is null
+     or p_side is null or p_product is null or p_quantity is null
+     or p_execution_price_paise is null or p_order_id !~ '^[a-f0-9]{64}$'
      or p_request_fingerprint !~ '^[a-f0-9]{64}$'
      or p_instrument_key is null or length(p_instrument_key) not between 1 and 100
      or p_side not in ('BUY','SELL')
