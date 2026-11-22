@@ -32,6 +32,9 @@ begin
 
   v_direction:=case when p_trigger_type='STOP_LOSS' then 'AT_OR_BELOW' else 'AT_OR_ABOVE' end;
 
+  -- Serialize duplicate retries using the same client-generated order UUID.
+  perform pg_advisory_xact_lock(hashtextextended(p_order_id::text,0));
+
   select * into v_existing from public.paper_protective_orders
    where order_id=p_order_id for update;
   if found then
