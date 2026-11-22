@@ -101,7 +101,7 @@ if (authShade) {
     window.ZENURA_CRYPTO_CLOUD = { isReady: () => authReady, isSignedIn: () => Boolean(currentUserId), getSession: () => supabase.auth.getSession() };
     const publish = user => {
       const id = user?.id || null;
-      if (id === lastUserId) return;
+      if (authReady && id === lastUserId) return;
       lastUserId = id;
       currentUserId = id;
       authReady = true;
