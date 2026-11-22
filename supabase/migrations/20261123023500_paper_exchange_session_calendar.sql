@@ -17,6 +17,8 @@ create table if not exists public.paper_exchange_sessions (
   constraint paper_exchange_session_window_valid check (
     (is_trading_day is true
       and session_kind in ('REGULAR','SPECIAL')
+      and open_minute is not null
+      and close_minute is not null
       and open_minute between 0 and 1439
       and close_minute between 1 and 1440
       and open_minute < close_minute)
