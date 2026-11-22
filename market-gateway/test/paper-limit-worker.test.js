@@ -15,7 +15,9 @@ test("LIMIT worker fills only matching fresh, pending, simulation-only delivery 
  assert.equal(isEligiblePaperLimitOrder({...base,status:"CANCELLED"},quote,101000),false);
  assert.equal(isEligiblePaperLimitOrder({...base,simulation_only:false},quote,101000),false);
  assert.equal(isEligiblePaperLimitOrder({...base,product:"INTRADAY"},quote,101000),false);
- assert.equal(isEligiblePaperLimitOrder({...base,exchange:"BSE"},quote,101000),false);
+ const bseOrder={...base,exchange:"BSE",instrument_key:"BSE_EQ|INE002A01018"};
+ assert.equal(isEligiblePaperLimitOrder(bseOrder,quote,101000),true);
+ assert.equal(isEligiblePaperLimitOrder({...bseOrder,instrument_key:"NSE_EQ|INE002A01018"},quote,101000),false);
 });
 test("LIMIT worker rejects stale, future-dated and malformed quotes",()=>{
  assert.equal(isEligiblePaperLimitOrder(base,{...quote,tradeTimeMs:85000},101000),false);
