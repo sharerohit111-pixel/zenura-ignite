@@ -153,3 +153,15 @@ Added `supabase/migrations/202611220003_paper_limit_order_transactions.sql` (dra
 ### LIMIT RPC draft validation still required
 
 These SQL functions have only been source-reviewed and statically edited in this branch. They have **not** been parsed/executed against a PostgreSQL staging database, and there are no automated concurrency, retry, reserve/release, worker, or parity test results yet. Before applying them, test at minimum: concurrent duplicate submissions; idempotency-key fingerprint mismatch; insufficient cash; multiple pending BUY reservations; multiple SELL reservations against one position; BUY fill below limit; SELL fill above limit; stale/future quote rejection; cancel-vs-fill race; worker retry; full and partial position close; 50-position cap; integer-boundary arithmetic; and account reservation invariants. The existing Firebase worker remains the live source of truth until approved cutover.
+
+
+## One-time account initialization RPC draft (2026-11-22)
+
+Added `supabase/migrations/202611220004_paper_account_initialization.sql`:
+
+- `initialize_paper_trading_account(p_user_id)` provisions exactly one shared INR Paper Trading account with ₹10,00,000 starting/cash balance (100,000,000 paise) for a newly provisioned Supabase Auth user.
+- It uses `INSERT ... ON CONFLICT DO NOTHING`; retries and concurrent calls do not reset an existing cash balance, reservations, P&L, version, or trading history.
+- It validates existing account invariants before returning the current account state.
+- It is SECURITY DEFINER with a fixed search path and executable only by `service_role`. The trusted backend must derive the user ID from a verified session; do not accept an arbitrary browser-supplied user ID.
+
+This remains a draft. It has not been executed against staging or tested under concurrent calls. Account provisioning for migrated Firebase users must be handled by a separate controlled migration path, not by resetting their existing balances to the new-user default.
