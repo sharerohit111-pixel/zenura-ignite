@@ -38,6 +38,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
+      - name: Install market gateway test dependencies
+        working-directory: market-gateway
+        run: npm install --no-save --no-package-lock --no-audit --no-fund
       - name: Check exporter syntax
         working-directory: market-gateway
         run: node --check scripts/firebase-readonly-export.js
@@ -71,3 +74,8 @@ jobs:
       - name: Run static Firestore migration rules audit
         working-directory: market-gateway
         run: node --test test/firebase-firestore-rules-audit.test.js
+      - name: Run Firestore Emulator security tests
+        working-directory: market-gateway
+        env:
+          REQUIRE_FIRESTORE_EMULATOR: "1"
+        run: npx --yes firebase-tools emulators:exec --config ../firebase.json --only firestore --project demo-zenura-ignite "node --test test/firestore-rules-client.test.js"
