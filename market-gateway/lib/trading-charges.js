@@ -79,6 +79,12 @@ function calculateFuturesTradeCharges({grossPaise,exchange,side="BUY",brokerageC
 }
 
 
+/* NSE/Upstox equity-delivery schedule: NSE cash transaction charge 0.00307% from 2026-03-01,
+ * IPFT ₹0.01/crore, SEBI ₹10/crore, STT 0.10% each side and delivery stamp duty 0.015% buy side
+ * from the current FY26 schedule. Upstox brokerage is ₹20/order; GST is applied to brokerage,
+ * exchange/IPFT and DP components. DP is transparently estimated per sell order (not aggregated
+ * by scrip/day yet). BSE is blocked because its exact scrip-group schedule is not represented.
+ */
 function calculateEquityDeliveryCharges({grossPaise,exchange,side="BUY"}){
   if(!Number.isSafeInteger(grossPaise)||grossPaise<1)
     throw Object.assign(new Error("A valid equity delivery turnover is required."),{status:400});
