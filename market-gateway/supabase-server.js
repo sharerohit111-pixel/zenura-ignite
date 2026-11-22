@@ -362,7 +362,7 @@ app.post("/crypto/orders",async(req,res)=>{
     if(!CRYPTO_SYMBOLS.has(symbol))return res.status(400).json({error:"Select a supported verified crypto spot symbol."});
     if(!["BUY","SELL"].includes(side))return res.status(400).json({error:"Only BUY and SELL crypto paper orders are supported."});
     if(!isUuid(idempotencyKey))return res.status(400).json({error:"A valid UUID idempotency_key is required."});
-    if(!/^(?:0|[1-9]\\d*)(?:\\.\\d{1,12})?$/.test(quantityRaw))return res.status(400).json({error:"Enter a valid crypto quantity with up to 12 decimal places."});
+    if(!/^(?:0|[1-9]\d*)(?:\.\d{1,12})?$/.test(quantityRaw))return res.status(400).json({error:"Enter a valid crypto quantity with up to 12 decimal places."});
     const quantity=Number(quantityRaw);
     if(!Number.isFinite(quantity)||quantity<=0||quantity>1000000000)return res.status(400).json({error:"Crypto quantity is outside supported limits."});
     const baseAsset=symbol.slice(0,-4);
