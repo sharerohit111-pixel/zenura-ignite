@@ -56,5 +56,5 @@ test("encrypts new Upstox tokens with a fresh AES-256-GCM envelope", () => {
   assert.equal(decryptUpstoxToken(first, keyValue), token);
   assert.equal(decryptUpstoxToken(second, keyValue), token);
   assert.throws(() => encryptUpstoxToken("", keyValue));
-  assert.throws(() => encryptUpstoxToken("bad\\ncontrol", keyValue));
+  assert.throws(() => encryptUpstoxToken("bad\ncontrol", keyValue));
 });
