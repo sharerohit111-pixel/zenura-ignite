@@ -1,0 +1,108 @@
+{
+  "schemaVersion": 1,
+  "description": "Shared deterministic long-option charge vectors. All monetary inputs and outputs are integer paise. Values are grounded in the existing Firebase reference implementation and existing passing boundary assertions; not a complete parity suite.",
+  "vectors": [
+    {
+      "id": "nse-buy-standard",
+      "input": {
+        "grossPaise": 81250,
+        "exchange": "NSE",
+        "side": "BUY"
+      },
+      "expected": {
+        "brokeragePaise": 2000,
+        "exchangeTransactionPaise": 29,
+        "ipftPaise": 0,
+        "sebiPaise": 0,
+        "stampDutyPaise": 2,
+        "gstPaise": 365,
+        "sttPaise": 0,
+        "totalChargesPaise": 2396,
+        "totalDebitPaise": 83646,
+        "netCreditPaise": null
+      }
+    },
+    {
+      "id": "bse-buy-standard",
+      "input": {
+        "grossPaise": 100000,
+        "exchange": "BSE",
+        "side": "BUY"
+      },
+      "expected": {
+        "brokeragePaise": 2000,
+        "exchangeTransactionPaise": 33,
+        "ipftPaise": 0,
+        "sebiPaise": 0,
+        "stampDutyPaise": 3,
+        "gstPaise": 366,
+        "sttPaise": 0,
+        "totalChargesPaise": 2402,
+        "totalDebitPaise": 102402,
+        "netCreditPaise": null
+      }
+    },
+    {
+      "id": "nse-sell-standard",
+      "input": {
+        "grossPaise": 97500,
+        "exchange": "NSE",
+        "side": "SELL"
+      },
+      "expected": {
+        "brokeragePaise": 2000,
+        "exchangeTransactionPaise": 35,
+        "ipftPaise": 0,
+        "sebiPaise": 0,
+        "stampDutyPaise": 0,
+        "gstPaise": 366,
+        "sttPaise": 146,
+        "totalChargesPaise": 2547,
+        "totalDebitPaise": null,
+        "netCreditPaise": 94953
+      }
+    },
+    {
+      "id": "nse-buy-half-paise-rounding",
+      "input": {
+        "grossPaise": 5000000,
+        "exchange": "NSE",
+        "side": "BUY",
+        "brokeragePaise": 0
+      },
+      "expected": {
+        "brokeragePaise": 0,
+        "exchangeTransactionPaise": 1777,
+        "ipftPaise": 25,
+        "sebiPaise": 5,
+        "stampDutyPaise": 150,
+        "gstPaise": 324,
+        "sttPaise": 0,
+        "totalChargesPaise": 2281,
+        "totalDebitPaise": 5002281,
+        "netCreditPaise": null
+      }
+    },
+    {
+      "id": "bse-buy-half-paise-rounding",
+      "input": {
+        "grossPaise": 20000,
+        "exchange": "BSE",
+        "side": "BUY",
+        "brokeragePaise": 0
+      },
+      "expected": {
+        "brokeragePaise": 0,
+        "exchangeTransactionPaise": 7,
+        "ipftPaise": 0,
+        "sebiPaise": 0,
+        "stampDutyPaise": 1,
+        "gstPaise": 1,
+        "sttPaise": 0,
+        "totalChargesPaise": 9,
+        "totalDebitPaise": 20009,
+        "netCreditPaise": null
+      }
+    }
+  ]
+}
