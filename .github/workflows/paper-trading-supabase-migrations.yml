@@ -1872,6 +1872,103 @@ jobs:
           END
           $crypto_ledger_trigger$;
           SQL
+      - name: Exercise S-TRADE crypto LIMIT reserve, fill and cancel lifecycle
+        run: |
+          psql -v ON_ERROR_STOP=1 <<'SQL'
+          SELECT public.initialize_paper_crypto_account(
+            '33333333-3333-4333-8333-333333333333',1000000
+          );
+          DO $crypto_limit_lifecycle$
+          DECLARE
+            v_result jsonb;
+            v_now bigint:=floor(extract(epoch from clock_timestamp())*1000)::bigint;
+            v_cash numeric(24,8);
+            v_reserved numeric(24,8);
+            v_qty numeric(30,12);
+            v_reserved_qty numeric(30,12);
+            v_realized numeric(24,8);
+            v_rejected boolean:=false;
+          BEGIN
+            v_result:=public.create_paper_crypto_limit_order(
+              '33333333-3333-4333-8333-333333333333',
+              'aaaaaaaa-3333-4333-8333-333333333331',
+              'bbbbbbbb-3333-4333-8333-333333333331',repeat('a',64),
+              'BTCUSDT','BTC','BUY',0.01,10000,85,8.5
+            );
+            IF v_result->>'idempotent_replay'='true' OR v_result#>>'{order,status}'<>'PENDING' THEN
+              RAISE EXCEPTION 'Crypto LIMIT BUY did not enter PENDING state';
+            END IF;
+            SELECT cash_balance,reserved_cash INTO v_cash,v_reserved
+              FROM public.paper_crypto_accounts WHERE user_id='33333333-3333-4333-8333-333333333333';
+            IF v_cash<>1000000 OR v_reserved<>8508.5 THEN
+              RAISE EXCEPTION 'Crypto LIMIT BUY reservation incorrect: cash %, reserved %',v_cash,v_reserved;
+            END IF;
+            v_result:=public.create_paper_crypto_limit_order(
+              '33333333-3333-4333-8333-333333333333',
+              'aaaaaaaa-3333-4333-8333-333333333331',
+              'bbbbbbbb-3333-4333-8333-333333333331',repeat('a',64),
+              'BTCUSDT','BTC','BUY',0.01,10000,85,8.5
+            );
+            IF v_result->>'idempotent_replay'<>'true' THEN
+              RAISE EXCEPTION 'Crypto LIMIT BUY retry was not idempotent';
+            END IF;
+            BEGIN
+              PERFORM public.fill_paper_crypto_limit_order(
+                '33333333-3333-4333-8333-333333333333',
+                'aaaaaaaa-3333-4333-8333-333333333331',10001,85,8.50085,v_now
+              );
+            EXCEPTION WHEN SQLSTATE '55000' THEN v_rejected:=true;
+            END;
+            IF NOT v_rejected THEN RAISE EXCEPTION 'Crypto BUY LIMIT filled at a worse-than-limit price'; END IF;
+            PERFORM public.fill_paper_crypto_limit_order(
+              '33333333-3333-4333-8333-333333333333',
+              'aaaaaaaa-3333-4333-8333-333333333331',9000,85,7.65,v_now
+            );
+            SELECT cash_balance,reserved_cash INTO v_cash,v_reserved
+              FROM public.paper_crypto_accounts WHERE user_id='33333333-3333-4333-8333-333333333333';
+            SELECT quantity,reserved_quantity INTO v_qty,v_reserved_qty
+              FROM public.paper_crypto_positions WHERE user_id='33333333-3333-4333-8333-333333333333' AND symbol='BTCUSDT';
+            IF v_cash<>992342.35 OR v_reserved<>0 OR v_qty<>0.01 OR v_reserved_qty<>0 THEN
+              RAISE EXCEPTION 'Crypto BUY LIMIT fill accounting incorrect: cash %, reserve %, qty %, reserved qty %',
+                v_cash,v_reserved,v_qty,v_reserved_qty;
+            END IF;
+            PERFORM public.create_paper_crypto_limit_order(
+              '33333333-3333-4333-8333-333333333333',
+              'aaaaaaaa-3333-4333-8333-333333333332',
+              'bbbbbbbb-3333-4333-8333-333333333332',repeat('b',64),
+              'BTCUSDT','BTC','SELL',0.005,10000,85,4.25
+            );
+            SELECT reserved_quantity INTO v_reserved_qty
+              FROM public.paper_crypto_positions WHERE user_id='33333333-3333-4333-8333-333333333333' AND symbol='BTCUSDT';
+            IF v_reserved_qty<>0.005 THEN RAISE EXCEPTION 'Crypto LIMIT SELL quantity was not reserved'; END IF;
+            PERFORM public.cancel_paper_crypto_limit_order(
+              '33333333-3333-4333-8333-333333333333',
+              'aaaaaaaa-3333-4333-8333-333333333332'
+            );
+            SELECT reserved_quantity INTO v_reserved_qty
+              FROM public.paper_crypto_positions WHERE user_id='33333333-3333-4333-8333-333333333333' AND symbol='BTCUSDT';
+            IF v_reserved_qty<>0 THEN RAISE EXCEPTION 'Crypto LIMIT SELL cancel did not release quantity'; END IF;
+            PERFORM public.create_paper_crypto_limit_order(
+              '33333333-3333-4333-8333-333333333333',
+              'aaaaaaaa-3333-4333-8333-333333333333',
+              'bbbbbbbb-3333-4333-8333-333333333333',repeat('c',64),
+              'BTCUSDT','BTC','SELL',0.002,9000,85,1.53
+            );
+            PERFORM public.fill_paper_crypto_limit_order(
+              '33333333-3333-4333-8333-333333333333',
+              'aaaaaaaa-3333-4333-8333-333333333333',10000,85,1.7,v_now
+            );
+            SELECT cash_balance,realized_pnl INTO v_cash,v_realized
+              FROM public.paper_crypto_accounts WHERE user_id='33333333-3333-4333-8333-333333333333';
+            SELECT quantity,reserved_quantity INTO v_qty,v_reserved_qty
+              FROM public.paper_crypto_positions WHERE user_id='33333333-3333-4333-8333-333333333333' AND symbol='BTCUSDT';
+            IF v_cash<>994040.65 OR v_realized<>166.77 OR v_qty<>0.008 OR v_reserved_qty<>0 THEN
+              RAISE EXCEPTION 'Crypto LIMIT SELL fill accounting incorrect: cash %, realized %, qty %, reserved qty %',
+                v_cash,v_realized,v_qty,v_reserved_qty;
+            END IF;
+          END
+          $crypto_limit_lifecycle$;
+          SQL
       - name: Verify expected schema and RPC registration
         run: |
           psql -v ON_ERROR_STOP=1 <<'SQL'
