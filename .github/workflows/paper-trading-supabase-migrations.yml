@@ -1624,6 +1624,8 @@ jobs:
           SQL
       - name: Verify owner-bound protective cancellation and idempotent replay
         run: psql -v ON_ERROR_STOP=1 -f supabase/tests/protective_order_cancel.sql
+      - name: Exercise concurrent protective fill versus cancel row-lock races
+        run: bash supabase/tests/protective_fill_cancel_race.sh
       - name: Verify expected schema and RPC registration
         run: |
           psql -v ON_ERROR_STOP=1 <<'SQL'
