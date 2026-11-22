@@ -60,6 +60,10 @@ begin
     select * into v_existing from public.paper_orders
      where order_id=v_protective.execution_order_id;
     if found then
+      if v_protective.execution_order_id is distinct from p_execution_order_id
+         or v_existing.request_fingerprint is distinct from p_request_fingerprint then
+        raise exception using errcode='23505', message='Protective execution replay does not match the original request';
+      end if;
       return jsonb_build_object('status','FILLED','order',to_jsonb(v_existing),'idempotent_replay',true);
     end if;
     raise exception using errcode='23514', message='Filled protective order has no linked execution record';
