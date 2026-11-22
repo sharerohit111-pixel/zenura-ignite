@@ -36,9 +36,12 @@ After claims are updated, users need a refreshed Firebase ID token before the ro
 claim appears in requests. This utility does not deploy functions, change Firebase
 login behavior, enable the Supabase provider, or migrate user data.
 
-## Not included
+## New-user sign-up trigger
 
-This one-time utility does not install a sign-up trigger for future users. Before
-client-side Supabase access is enabled, a separate additive Firebase Auth trigger
-must ensure newly created users receive the same role claim. That trigger must preserve
-existing claims and be tested/emulated before deployment.
+An additive Firebase Auth onCreate trigger is also prepared in
+`functions/supabase-auth-claims.js` and exported from `functions/index.js`.
+It is inert unless the runtime environment variable
+`SUPABASE_FIREBASE_TPA_READY=true` is set. When enabled, it preserves unrelated
+custom claims, sets the role only when absent, and skips conflicting existing roles.
+It must be deployed only after the Firebase third-party provider is enabled and
+verified. No trigger has been deployed by this change.
