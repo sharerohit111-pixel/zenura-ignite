@@ -45,31 +45,31 @@ DECLARE
   v_date date:=(now() at time zone 'Asia/Kolkata')::date;
 BEGIN
   v_a:=public._paper_bse_cash_equity_charges('BSE_EQ|INE002A01018',1000000000,'DELIVERY','BUY');
-  IF (v_a->>'exchange_transaction_paise')::bigint<>375
+  IF (v_a->>'exchange_transaction_paise')::bigint<>37500
      OR (v_a->>'brokerage_paise')::bigint<>2000
      OR (v_a->>'sebi_paise')::bigint<>1000
      OR (v_a->>'stamp_duty_paise')::bigint<>150000
      OR (v_a->>'stt_paise')::bigint<>1000000
-     OR (v_a->>'gst_paise')::bigint<>428
-     OR (v_a->>'total_charges_paise')::bigint<>1153803
+     OR (v_a->>'gst_paise')::bigint<>7110
+     OR (v_a->>'total_charges_paise')::bigint<>1197610
      OR v_a->>'scrip_group'<>'A'
      OR v_a->>'exclusive_flag'<>'N'
      OR (v_a->>'master_source_date')::date<>v_date THEN
     RAISE EXCEPTION 'BSE Group A non-exclusive Delivery BUY fee vector mismatch: %',v_a;
   END IF;
   v_e:=public._paper_bse_cash_equity_charges('BSE_EQ|INE040A01034',1000000000,'INTRADAY','SELL');
-  IF (v_e->>'exchange_transaction_paise')::bigint<>275
+  IF (v_e->>'exchange_transaction_paise')::bigint<>27500
      OR (v_e->>'stt_paise')::bigint<>250000
      OR (v_e->>'net_credit_paise')::bigint<>(1000000000-(v_e->>'total_charges_paise')::bigint)
      OR v_e->>'exclusive_flag'<>'Y' THEN
     RAISE EXCEPTION 'BSE Group E exclusive Intraday SELL fee vector mismatch: %',v_e;
   END IF;
   v_m:=public._paper_bse_cash_equity_charges('BSE_EQ|INE155A01022',1000000000,'DELIVERY','BUY');
-  IF (v_m->>'exchange_rate_paise_per_crore')::integer<>275 THEN
+  IF (v_m->>'exchange_rate_paise_per_crore')::integer<>27500 THEN
     RAISE EXCEPTION 'BSE Group M fee rate mismatch: %',v_m;
   END IF;
   v_x:=public._paper_bse_cash_equity_charges('BSE_EQ|INE062A01020',1000000000,'DELIVERY','BUY');
-  IF (v_x->>'exchange_rate_paise_per_crore')::integer<>10000 THEN
+  IF (v_x->>'exchange_rate_paise_per_crore')::integer<>1000000 THEN
     RAISE EXCEPTION 'BSE Group X fee rate mismatch: %',v_x;
   END IF;
   v_rejected:=false;
@@ -99,11 +99,11 @@ BEGIN
   );
   SELECT cash_paise INTO v_cash FROM public.paper_accounts
    WHERE user_id='66666666-6666-4666-8666-666666666666';
-  IF (v_result->>'charges_paise')::bigint<>2675
-     OR (v_result->>'cash_delta_paise')::bigint<>-10002675
-     OR v_cash<>89997325
+  IF (v_result->>'charges_paise')::bigint<>3113
+     OR (v_result->>'cash_delta_paise')::bigint<>-10003113
+     OR v_cash<>89996887
      OR v_result->'charges_breakdown'->>'scrip_group'<>'A'
-     OR (v_result->'charges_breakdown'->>'exchange_rate_paise_per_crore')::integer<>375 THEN
+     OR (v_result->'charges_breakdown'->>'exchange_rate_paise_per_crore')::integer<>37500 THEN
     RAISE EXCEPTION 'BSE MARKET BUY did not use the imported Group A fee master: %',v_result;
   END IF;
   v_result:=public.execute_paper_market_order(
@@ -114,9 +114,9 @@ BEGIN
   );
   SELECT cash_paise,realized_pnl_paise INTO v_cash,v_realized FROM public.paper_accounts
    WHERE user_id='66666666-6666-4666-8666-666666666666';
-  IF (v_result->>'charges_paise')::bigint<>5378
-     OR (v_result->>'cash_delta_paise')::bigint<>11994622
-     OR v_cash<>101991947 OR v_realized<>1991947 THEN
+  IF (v_result->>'charges_paise')::bigint<>5903
+     OR (v_result->>'cash_delta_paise')::bigint<>11994097
+     OR v_cash<>101990984 OR v_realized<>1990984 THEN
     RAISE EXCEPTION 'BSE MARKET SELL net proceeds or realized P&L mismatch: %, cash %, realized %',v_result,v_cash,v_realized;
   END IF;
 
@@ -128,7 +128,7 @@ BEGIN
   );
   SELECT reserved_cash_paise INTO v_reserved FROM public.paper_accounts
    WHERE user_id='66666666-6666-4666-8666-666666666666';
-  IF v_reserved<>1003511 THEN
+  IF v_reserved<>1003556 THEN
     RAISE EXCEPTION 'BSE Delivery LIMIT did not reserve exchange-specific charges: %',v_reserved;
   END IF;
   v_result:=public.execute_paper_limit_fill(
@@ -137,8 +137,8 @@ BEGIN
   );
   SELECT reserved_cash_paise,cash_paise INTO v_reserved,v_cash FROM public.paper_accounts
    WHERE user_id='66666666-6666-4666-8666-666666666666';
-  IF v_result->>'status'<>'FILLED' OR v_reserved<>0 OR v_cash<>100998447
-     OR (v_result->>'charges_paise')::bigint<>3500
+  IF v_result->>'status'<>'FILLED' OR v_reserved<>0 OR v_cash<>100997440
+     OR (v_result->>'charges_paise')::bigint<>3544
      OR v_result->'charges_breakdown'->>'scrip_group'<>'A' THEN
     RAISE EXCEPTION 'BSE Delivery LIMIT fill did not settle with the imported fee master: %',v_result;
   END IF;
@@ -155,10 +155,10 @@ BEGIN
   );
   SELECT cash_paise,realized_pnl_paise INTO v_cash,v_realized FROM public.paper_accounts
    WHERE user_id='66666666-6666-4666-8666-666666666666';
-  IF (v_result->>'charges_paise')::bigint<>5321
-     OR (v_result->>'cash_delta_paise')::bigint<>594679
-     OR (v_result->>'realized_pnl_paise')::bigint<>97929
-     OR v_cash<>101593126 OR v_realized<>2089876 THEN
+  IF (v_result->>'charges_paise')::bigint<>5348
+     OR (v_result->>'cash_delta_paise')::bigint<>594652
+     OR (v_result->>'realized_pnl_paise')::bigint<>97880
+     OR v_cash<>101592092 OR v_realized<>2088864 THEN
     RAISE EXCEPTION 'BSE Delivery LIMIT SELL net settlement mismatch: %, cash %, realized %',v_result,v_cash,v_realized;
   END IF;
 
@@ -170,7 +170,7 @@ BEGIN
   );
   SELECT reserved_cash_paise INTO v_reserved FROM public.paper_accounts
    WHERE user_id='66666666-6666-4666-8666-666666666666';
-  IF v_reserved<>200242 THEN
+  IF v_reserved<>200251 THEN
     RAISE EXCEPTION 'BSE Intraday LIMIT did not reserve group-specific charges: %',v_reserved;
   END IF;
   v_result:=public.execute_paper_intraday_limit_fill(
@@ -179,9 +179,9 @@ BEGIN
   );
   SELECT reserved_cash_paise,cash_paise INTO v_reserved,v_cash FROM public.paper_accounts
    WHERE user_id='66666666-6666-4666-8666-666666666666';
-  IF v_result->>'status'<>'FILLED' OR v_reserved<>0 OR v_cash<>101394886
-     OR (v_result->>'charges_paise')::bigint<>240
-     OR (v_result->>'cash_delta_paise')::bigint<>-198240
+  IF v_result->>'status'<>'FILLED' OR v_reserved<>0 OR v_cash<>101393844
+     OR (v_result->>'charges_paise')::bigint<>248
+     OR (v_result->>'cash_delta_paise')::bigint<>-198248
      OR v_result->'charges_breakdown'->>'scrip_group'<>'A' THEN
     RAISE EXCEPTION 'BSE Intraday LIMIT fill did not settle from the verified BSE fee master: %',v_result;
   END IF;
