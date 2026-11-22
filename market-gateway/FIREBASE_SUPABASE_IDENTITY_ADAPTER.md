@@ -6,10 +6,11 @@ Firestore routes yet.
 
 ## Request flow
 
-1. The existing Gateway must first call `authenticateFirebaseRequest(req, getAuth())`.
-   That function verifies the Firebase ID token with revocation checking enabled.
-2. The caller extracts the same Bearer token and passes it, together with the verified
-   Firebase Admin decoded token, to `resolveIdentity`.
+1. The adapter receives the original Express request and Firebase Admin Auth instance.
+2. `resolveIdentity` extracts the strict Bearer token and itself calls the existing
+   `authenticateFirebaseRequest(request, auth)`, which verifies that exact token with
+   revocation checking enabled. This prevents pairing one verified decoded token with
+   a different raw Bearer token.
 3. The adapter validates UID = JWT sub, exact Firebase project audience and issuer,
    and the required `role: "authenticated"` custom claim.
 4. It calls the PR #74 `public.current_paper_user_id()` RPC using only the Supabase
