@@ -18,3 +18,5 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
     headers: { "X-Client-Info": "zenura-ignite-market-web" }
   }
 });
+
+if (typeof window !== "undefined") window.ZENURA_SUPABASE = supabase;
