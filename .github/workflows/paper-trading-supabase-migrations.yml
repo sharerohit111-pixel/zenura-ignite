@@ -960,7 +960,14 @@ jobs:
             v_sell jsonb;
             v_bse jsonb;
             v_breakdown jsonb;
+            v_option_function text;
           BEGIN
+            v_option_function:=pg_get_functiondef('public.execute_paper_long_option_order(uuid,text,uuid,text,text,text,text,text,text,date,numeric,integer,integer,integer,text,bigint,bigint,bigint)'::regprocedure);
+            IF position('v_exchange_rate:=0.0003552;' in v_option_function)=0
+               OR position('v_ipft_rate:=0.000000001;' in v_option_function)=0
+               OR position('v_ipft_rate:=0.000005;' in v_option_function)>0 THEN
+              RAISE EXCEPTION 'SQL option charges do not match the NSE transaction/IPFT schedule';
+            END IF;
             -- Matches trading-charges.test.js: NSE BUY, gross 81,250 paise.
             v_buy:=public.execute_paper_long_option_order(
               '66666666-6666-4666-8666-666666666666',repeat('a',64),
