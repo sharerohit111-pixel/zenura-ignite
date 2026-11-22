@@ -1005,10 +1005,11 @@ jobs:
             v_cash bigint;
             v_realized bigint;
           BEGIN
-            PERFORM public.initialize_paper_trading_account('33333333-3333-4333-8333-333333333333');
+            INSERT INTO auth.users(id) VALUES ('abcdefab-cdef-4abc-8def-abcdefabcdef') ON CONFLICT(id) DO NOTHING;
+            PERFORM public.initialize_paper_trading_account('abcdefab-cdef-4abc-8def-abcdefabcdef');
             v_now := floor(extract(epoch from clock_timestamp())*1000)::bigint;
             v_result := public.execute_paper_futures_market_order(
-              '33333333-3333-4333-8333-333333333333',repeat('a',64),
+              'abcdefab-cdef-4abc-8def-abcdefabcdef',repeat('a',64),
               'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',repeat('b',64),
               'NSE_FO|FUT_TEST','FUT_TEST','NSE','NSE_FO',current_date+5,
               25,5,'BUY','DELIVERY',50,10000,200000,1000,v_now,v_now
@@ -1016,10 +1017,10 @@ jobs:
             IF v_result->>'idempotent_replay' <> 'false'
                OR (v_result->>'cash_paise')::bigint <> 99999000
                OR (v_result->>'reserved_margin_paise')::bigint <> 200000 THEN
-              RAISE EXCEPTION 'Futures opening BUY did not reserve margin and charge fees correctly';
+              RAISE EXCEPTION 'Futures opening BUY accounting mismatch: %',v_result::text;
             END IF;
             v_result := public.execute_paper_futures_market_order(
-              '33333333-3333-4333-8333-333333333333',repeat('a',64),
+              'abcdefab-cdef-4abc-8def-abcdefabcdef',repeat('a',64),
               'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',repeat('b',64),
               'NSE_FO|FUT_TEST','FUT_TEST','NSE','NSE_FO',current_date+5,
               25,5,'BUY','DELIVERY',50,10000,200000,1000,v_now,v_now
@@ -1029,7 +1030,7 @@ jobs:
             END IF;
             v_now := floor(extract(epoch from clock_timestamp())*1000)::bigint;
             PERFORM public.execute_paper_futures_market_order(
-              '33333333-3333-4333-8333-333333333333',repeat('c',64),
+              'abcdefab-cdef-4abc-8def-abcdefabcdef',repeat('c',64),
               'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',repeat('d',64),
               'NSE_FO|FUT_TEST','FUT_TEST','NSE','NSE_FO',current_date+5,
               25,5,'SELL','DELIVERY',25,12000,0,1000,v_now,v_now
@@ -1037,14 +1038,14 @@ jobs:
             SELECT net_quantity,reserved_margin_paise,realized_pnl_paise
               INTO v_qty,v_margin,v_realized
               FROM public.paper_futures_positions
-             WHERE user_id='33333333-3333-4333-8333-333333333333'
+             WHERE user_id='abcdefab-cdef-4abc-8def-abcdefabcdef'
                AND instrument_key='NSE_FO|FUT_TEST';
             IF v_qty<>25 OR v_margin<>100000 OR v_realized<>50000 THEN
               RAISE EXCEPTION 'Partial futures close did not release proportional margin or realize P&L';
             END IF;
             v_now := floor(extract(epoch from clock_timestamp())*1000)::bigint;
             PERFORM public.execute_paper_futures_market_order(
-              '33333333-3333-4333-8333-333333333333',repeat('e',64),
+              'abcdefab-cdef-4abc-8def-abcdefabcdef',repeat('e',64),
               'cccccccc-cccc-4ccc-8ccc-cccccccccccc',repeat('f',64),
               'NSE_FO|FUT_TEST','FUT_TEST','NSE','NSE_FO',current_date+5,
               25,5,'SELL','DELIVERY',50,9000,100000,1000,v_now,v_now
@@ -1052,20 +1053,20 @@ jobs:
             SELECT net_quantity,reserved_margin_paise,average_price_paise
               INTO v_qty,v_margin,v_realized
               FROM public.paper_futures_positions
-             WHERE user_id='33333333-3333-4333-8333-333333333333'
+             WHERE user_id='abcdefab-cdef-4abc-8def-abcdefabcdef'
                AND instrument_key='NSE_FO|FUT_TEST';
             IF v_qty<>-25 OR v_margin<>100000 OR v_realized<>9000 THEN
               RAISE EXCEPTION 'Futures position reversal did not open the remaining short quantity';
             END IF;
             SELECT cash_paise INTO v_cash FROM public.paper_accounts
-             WHERE user_id='33333333-3333-4333-8333-333333333333';
+             WHERE user_id='abcdefab-cdef-4abc-8def-abcdefabcdef';
             IF v_cash<>100022000 THEN
               RAISE EXCEPTION 'Futures realized P&L and charges produced an incorrect cash balance: %',v_cash;
             END IF;
             v_now := floor(extract(epoch from clock_timestamp())*1000)::bigint;
             BEGIN
               PERFORM public.execute_paper_futures_market_order(
-                '33333333-3333-4333-8333-333333333333',repeat('1',64),
+                'abcdefab-cdef-4abc-8def-abcdefabcdef',repeat('1',64),
                 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',repeat('2',64),
                 'NSE_FO|FUT_TEST','FUT_TEST','NSE','NSE_FO',current_date+5,
                 25,5,'BUY','DELIVERY',26,10000,100000,0,v_now,v_now
