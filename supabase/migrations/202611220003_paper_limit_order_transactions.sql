@@ -151,6 +151,8 @@ declare
   v_realized bigint;
   v_open_count integer;
   v_has_position boolean := false;
+  v_server_now_ms bigint;
+  v_actual_quote_age_ms bigint;
 begin
   if p_order_id is null or p_order_id !~ '^[a-f0-9]{64}$'
      or p_execution_price_paise is null or p_execution_price_paise <= 0
@@ -160,6 +162,14 @@ begin
      or p_now_ms-p_quote_timestamp_ms > 15000
      or abs((p_now_ms-p_quote_timestamp_ms)-p_quote_age_ms) > 2000 then
     raise exception using errcode='22023', message='Invalid or stale LIMIT execution quote';
+  end if;
+  v_server_now_ms := floor(extract(epoch from clock_timestamp())*1000)::bigint;
+  if abs(v_server_now_ms-p_now_ms)>2000 or p_quote_timestamp_ms>v_server_now_ms then
+    raise exception using errcode='22023', message='LIMIT quote clock is not current or timestamp is in the future';
+  end if;
+  v_actual_quote_age_ms := v_server_now_ms-p_quote_timestamp_ms;
+  if v_actual_quote_age_ms>15000 or abs(v_actual_quote_age_ms-p_quote_age_ms)>2000 then
+    raise exception using errcode='22023', message='LIMIT quote age does not match database time';
   end if;
 
   select * into v_order from public.paper_orders where order_id=p_order_id;
@@ -267,7 +277,7 @@ begin
 
   update public.paper_orders set status='FILLED',execution_price_paise=p_execution_price_paise,
     gross_paise=v_gross,realized_pnl_paise=v_order_realized,
-    quote_timestamp_ms=p_quote_timestamp_ms,quote_age_ms=p_quote_age_ms,
+    quote_timestamp_ms=p_quote_timestamp_ms,quote_age_ms=v_actual_quote_age_ms,
     reservation_released=true,worker_execution=true,filled_at=now(),updated_at=now()
    where order_id=p_order_id;
 
