@@ -20,6 +20,7 @@ on:
       - "market-gateway/test/firebase-role-claim-audit.test.js"
       - "market-gateway/FIREBASE_ROLE_CLAIM_AUDIT.md"
       - "market-gateway/FIREBASE_ROLE_CLAIM_ROLLOUT_PLAN.md"
+      - "market-gateway/FIREBASE_CUSTOM_CLAIM_WRITER_INVENTORY.md"
       - ".github/workflows/firebase-readonly-export-tests.yml"
   workflow_dispatch:
 
