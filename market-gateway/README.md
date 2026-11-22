@@ -46,7 +46,7 @@ SUPABASE_SERVICE_ROLE_KEY=<server-only-key> \
 npm run import:exchange-sessions -- /secure/path/verified-exchange-sessions.csv
 ```
 
-The importer validates the exchange-specific official host, session window, verification timestamp and duplicate dates, then records the CSV SHA-256. **Treat each file as a complete snapshot for every exchange represented in it:** omitted dates for that exchange are invalidated and fail closed, rather than silently reusing an older calendar. Missing or stale rows keep Intraday LIMIT fail-closed.
+BSE cash transaction rates are published per crore and converted to paise using integer-safe arithmetic. Some exchange billing is based on monthly turnover; this paper-trading ledger allocates an **indicative per-fill estimate**, not the final month-end exchange invoice. P/ZP and unknown scrip groups remain blocked. The importer validates the exchange-specific official host, session window, verification timestamp and duplicate dates, then records the CSV SHA-256. **Treat each file as a complete snapshot for every exchange represented in it:** omitted dates for that exchange are invalidated and fail closed, rather than silently reusing an older calendar. Missing or stale rows keep Intraday LIMIT fail-closed.
 
 ## Run and verify
 
