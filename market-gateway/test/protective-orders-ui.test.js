@@ -24,7 +24,7 @@ test("protective-order UI calls only authenticated server-side paper endpoints",
   assert.match(source,/Authorization:'Bearer '\+token/);
   assert.match(gateway,/create_paper_equity_protective_order/);
   assert.match(gateway,/cancel_paper_protective_order/);
-  assert.match(gateway,/instrument_type==="EQ"&&\["NSE_EQ","BSE_EQ"\]\.includes\(instrument\.segment\)/);
+  assert.match(gateway,/instrument_type==="EQ"&&\["NSE_EQ","BSE_EQ"\]\.includes\(item\.segment\)/);
 });
 
 test("protective-order creation fails closed unless the server reports its worker enabled",()=>{
