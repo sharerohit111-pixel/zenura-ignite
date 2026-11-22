@@ -169,3 +169,10 @@ DELETE FROM public.paper_equity_positions
    AND product='INTRADAY' AND instrument_key IN ('NSE_EQ|INTRA_LIMIT_CI','NSE_EQ|INTRA_FILL_BUY');
 DELETE FROM public.paper_exchange_sessions
  WHERE source_reference='CI verified session fixture';
+-- Restore the shared CI account fixture so later independent MARKET/LIMIT tests
+-- begin from the same deterministic 10-lakh balance.
+UPDATE public.paper_accounts
+   SET cash_paise=100000000,reserved_cash_paise=0,reserved_margin_paise=0,
+       realized_pnl_paise=0,delivery_realized_pnl_paise=0,
+       intraday_realized_pnl_paise=0,version=version+1,updated_at=clock_timestamp()
+ WHERE user_id='22222222-2222-4222-8222-222222222222';
