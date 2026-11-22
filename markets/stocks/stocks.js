@@ -442,6 +442,10 @@
         container:chart,instrument,timeframe,gateway,
         getAccessToken:()=>connector.getIdToken(),
         supabase:window.ZENURA_SUPABASE,
+        onTimeframeChange:next=>{
+          activeTimeframe=next;
+          timeframeButtons.forEach(button=>button.classList.toggle('active',button.dataset.timeframe===next));
+        },
         onError:error=>{
           if(request===chartRequest&&connector.getUserId()===uid&&selected?.instrument_key===instrument.instrument_key){
             chartStatus.textContent='Historical data unavailable';
