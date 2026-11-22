@@ -1,7 +1,7 @@
 "use strict";
 const test=require("node:test");
 const assert=require("node:assert/strict");
-const {marketClockParts,normalizeMarketSession,isIntradaySessionOpen,isIntradayOrderExpired,isEligibleIntradayLimitOrder}=require("../lib/intraday-limit-policy");
+const {marketClockParts,normalizeMarketSession,normalizeExchangeSessionRow,isIntradaySessionOpen,isIntradayOrderExpired,isEligibleIntradayLimitOrder}=require("../lib/intraday-limit-policy");
 const normalSession={exchange:"NSE",sessionDate:"2026-11-23",isTradingDay:true,openMinute:9*60+15,closeMinute:15*60+30};
 
 const epoch=iso=>Date.parse(iso);
@@ -13,6 +13,22 @@ const quote={pricePaise:9900,tradeTimeMs:epoch("2026-11-23T04:30:00.000Z")};
 test("market clock uses Indian Standard Time and handles midnight correctly",()=>{
  assert.deepEqual(marketClockParts(epoch("2026-11-23T03:45:00.000Z")),{weekday:"Mon",year:2026,month:11,day:23,hour:9,minute:15,second:0});
  assert.equal(marketClockParts(epoch("2026-11-23T18:30:00.000Z")).hour,0);
+});
+
+test("database exchange calendar rows must be verified, current and match the requested exchange/date",()=>{
+ const now=epoch("2026-11-23T04:30:00.000Z");
+ const row={exchange:"NSE",session_date:"2026-11-23",is_trading_day:true,
+  open_minute:555,close_minute:930,source_reference:"NSE official circular",
+  verified_at:"2026-11-23T04:00:00.000Z"};
+ assert.deepEqual(normalizeExchangeSessionRow(row,"NSE","2026-11-23",now),normalSession);
+ assert.equal(normalizeExchangeSessionRow({...row,exchange:"BSE"},"NSE","2026-11-23",now),null);
+ assert.equal(normalizeExchangeSessionRow({...row,session_date:"2026-11-24"},"NSE","2026-11-23",now),null);
+ assert.equal(normalizeExchangeSessionRow({...row,is_trading_day:false},"NSE","2026-11-23",now),null);
+ assert.equal(normalizeExchangeSessionRow({...row,verified_at:"2026-11-23T04:31:00.000Z"},"NSE","2026-11-23",now),null);
+ assert.equal(normalizeExchangeSessionRow({...row,verified_at:"invalid"},"NSE","2026-11-23",now),null);
+ assert.equal(normalizeExchangeSessionRow({...row,source_reference:" "},"NSE","2026-11-23",now),null);
+ assert.equal(normalizeExchangeSessionRow({...row,open_minute:null},"NSE","2026-11-23",now),null);
+ assert.equal(normalizeExchangeSessionRow(row,"MCX","2026-11-23",now),null);
 });
 test("intraday session requires an explicit exchange trading-day decision",()=>{
  assert.equal(isIntradaySessionOpen(epoch("2026-11-23T03:45:00.000Z")),false);
