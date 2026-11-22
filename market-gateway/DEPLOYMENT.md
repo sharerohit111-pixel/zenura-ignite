@@ -75,6 +75,7 @@ gcloud run deploy zenura-market-gateway \
   --region asia-south1 \
   --platform managed \
   --allow-unauthenticated \
+  --min 1 --max 10 --cpu 2 --memory 2Gi --concurrency 40 --timeout 3600 --cpu-boost \
   --service-account YOUR_GATEWAY_SERVICE_ACCOUNT@YOUR_DEDICATED_GCP_PROJECT_ID.iam.gserviceaccount.com \
   --set-env-vars SUPABASE_URL=https://atvbjibhunvzpmfagagm.supabase.co,SUPABASE_PUBLISHABLE_KEY=YOUR_PUBLISHABLE_KEY,UPSTOX_REDIRECT_URI=https://market-api.zenuraignite.com/upstox/oauth/callback,ZENURA_APP_REDIRECT_URI=https://zenuraignite.com/markets/stocks/,ALLOWED_ORIGINS=https://zenuraignite.com,MAX_INSTRUMENT_KEYS=100 \
   --set-secrets SUPABASE_SERVICE_ROLE_KEY=SUPABASE_SERVICE_ROLE_KEY:latest,UPSTOX_TOKEN_ENCRYPTION_KEY=UPSTOX_TOKEN_ENCRYPTION_KEY:latest,UPSTOX_CLIENT_ID=UPSTOX_CLIENT_ID:latest,UPSTOX_CLIENT_SECRET=UPSTOX_CLIENT_SECRET:latest
