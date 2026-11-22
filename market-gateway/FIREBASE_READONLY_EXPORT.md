@@ -31,7 +31,9 @@ select the source project and a new output directory:
     export FIREBASE_PROJECT_ID="zenura-ignite-technologies"
     node scripts/firebase-readonly-export.js --confirm-read-only-export --out-dir ./private-export
 
-The exporter accepts only the explicit `FIREBASE_PROJECT_ID` variable. It deliberately ignores ambient `GOOGLE_CLOUD_PROJECT` and `GCLOUD_PROJECT` values so a shell or CI default cannot silently select a different Firebase project. The current repository root Firebase configuration and Indian Market Gateway production guide identify `zenura-ignite-technologies` as the intended Indian Paper Trading project; verify the Firebase Console project and deployed gateway runtime before running. The separate `crypto/firebase-config.js` points to `zenura-ignite` and is out of scope.\n\nAuthenticate with Application Default Credentials that have read-only access. The output
+The exporter accepts only the explicit `FIREBASE_PROJECT_ID` variable. It deliberately ignores ambient `GOOGLE_CLOUD_PROJECT` and `GCLOUD_PROJECT` values so a shell or CI default cannot silently select a different Firebase project. The current repository root Firebase configuration and Indian Market Gateway production guide identify `zenura-ignite-technologies` as the intended Indian Paper Trading project; verify the Firebase Console project and deployed gateway runtime before running. The separate `crypto/firebase-config.js` points to `zenura-ignite` and is out of scope.
+
+Authenticate with Application Default Credentials that have read-only access. The output
 directory must not already exist. JSONL files are written in document-name order with
 counts and SHA-256 digests in manifest.json. Firestore timestamps, byte arrays, references
 and dates carry type markers. Files use owner-only permissions where supported.
