@@ -46,11 +46,16 @@ BEGIN
   IF v_count <> 1 THEN
     RAISE EXCEPTION 'Chart drawing RLS should expose exactly one own drawing';
   END IF;
-  INSERT INTO public.paper_chart_drawings(user_id,instrument_key,timeframe,drawing_type,payload)
-  VALUES ('22222222-2222-4222-8222-222222222222','NSE_EQ|OTHER','5m','RAY','{"points":[[1,2],[3,4]]}'::jsonb);
-  GET DIAGNOSTICS v_rows = ROW_COUNT;
-  IF v_rows <> 0 THEN
+  BEGIN
+    INSERT INTO public.paper_chart_drawings(user_id,instrument_key,timeframe,drawing_type,payload)
+    VALUES ('22222222-2222-4222-8222-222222222222','NSE_EQ|OTHER','5m','RAY','{"points":[[1,2],[3,4]]}'::jsonb);
     RAISE EXCEPTION 'Cross-user chart drawing insert unexpectedly succeeded';
+  EXCEPTION WHEN insufficient_privilege THEN
+    NULL;
+  END;
+  SELECT count(*) INTO v_count FROM public.paper_chart_drawings;
+  IF v_count <> 1 THEN
+    RAISE EXCEPTION 'Cross-user chart drawing insert created an unauthorized row';
   END IF;
 
   SELECT count(*) INTO v_count FROM public.paper_accounts;
