@@ -41,10 +41,10 @@ BEGIN
   v_a:=public._paper_bse_cash_equity_charges('BSE_EQ|INE002A01018',1000000000,'DELIVERY','BUY');
   IF (v_a->>'exchange_transaction_paise')::bigint<>375
      OR (v_a->>'brokerage_paise')::bigint<>2000
-     OR (v_a->>'sebi_paise')::bigint<>1
+     OR (v_a->>'sebi_paise')::bigint<>1000
      OR (v_a->>'stamp_duty_paise')::bigint<>150000
      OR (v_a->>'gst_paise')::bigint<>428
-     OR (v_a->>'total_charges_paise')::bigint<>152804
+     OR (v_a->>'total_charges_paise')::bigint<>153803
      OR v_a->>'scrip_group'<>'A'
      OR v_a->>'exclusive_flag'<>'N'
      OR (v_a->>'master_source_date')::date<>v_date THEN
