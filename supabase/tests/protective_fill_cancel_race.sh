@@ -40,7 +40,7 @@ DELETE FROM public.paper_orders
  WHERE order_id IN (repeat('a',64),repeat('c',64));
 DELETE FROM public.paper_equity_positions
  WHERE user_id='11111111-1111-4111-8111-111111111111'
-   AND product='DELIVERY' AND instrument_key='NSE_EQ|PROTECTIVE_RACE';
+   AND product='DELIVERY' AND instrument_key IN ('NSE_EQ|PROTECTIVE_RACE','NSE_EQ|PROTECTIVE_RACE_CANCEL');
 INSERT INTO public.paper_equity_positions(
   user_id,product,instrument_key,trading_symbol,exchange,quantity,
   average_price_paise,cost_basis_paise,reserved_quantity
@@ -55,7 +55,7 @@ INSERT INTO public.paper_protective_orders(
  ('d1d1d1d1-d1d1-41d1-81d1-d1d1d1d1d1d1','11111111-1111-4111-8111-111111111111',
   'EQUITY','NSE_EQ|PROTECTIVE_RACE','DELIVERY','SELL','STOP_LOSS','AT_OR_BELOW',9000,2,'ACTIVE'),
  ('d2d2d2d2-d2d2-42d2-82d2-d2d2d2d2d2d2','11111111-1111-4111-8111-111111111111',
-  'EQUITY','NSE_EQ|PROTECTIVE_RACE','DELIVERY','SELL','STOP_LOSS','AT_OR_BELOW',9000,2,'ACTIVE');
+  'EQUITY','NSE_EQ|PROTECTIVE_RACE_CANCEL','DELIVERY','SELL','STOP_LOSS','AT_OR_BELOW',9000,2,'ACTIVE');
 
 CREATE OR REPLACE FUNCTION public.test_delay_protective_terminal_update()
 RETURNS trigger LANGUAGE plpgsql AS $$
