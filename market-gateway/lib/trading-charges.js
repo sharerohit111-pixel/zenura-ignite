@@ -3,7 +3,7 @@
 // Indicative Upstox NSE/BSE equity-option charges, in paise.
 // These are paper-simulation estimates, not a broker contract note.
 const RATES={
-  NSE:{exchangeTransaction:0.0003553,ipft:0.000000001}, // NSE total option charge includes ₹0.01/crore IPFT from 1 Mar 2026
+  NSE:{exchangeTransaction:0.0003552,ipft:0.000000001}, // ₹3,552 + ₹0.01 IPFT per crore from 1 Mar 2026
   BSE:{exchangeTransaction:0.000325,ipft:0}
 };
 const STAMP_DUTY_BUY=0.00003; // 0.003%
@@ -44,7 +44,7 @@ function calculateLongOptionTradeCharges({grossPaise,exchange,side="BUY",brokera
 }
 
 const FUTURES_RATES={
-  NSE:{exchangeTransaction:0.0000183,ipft:0.000000001},
+  NSE:{exchangeTransaction:0.000018299,ipft:0.000000001}, // ₹182.99 + ₹0.01 IPFT per crore
   BSE:{exchangeTransaction:0,ipft:0}
 };
 const FUTURES_STT_SELL=0.0005; // 0.05% from 1 April 2026
@@ -79,8 +79,8 @@ function calculateFuturesTradeCharges({grossPaise,exchange,side="BUY",brokerageC
 }
 
 
-/* NSE/Upstox equity-delivery schedule: NSE cash transaction charge 0.00307% from 2026-03-01,
- * IPFT ₹0.01/crore, SEBI ₹10/crore, STT 0.10% each side and delivery stamp duty 0.015% buy side
+/* NSE/Upstox equity-delivery schedule from 2026-03-01: transaction ₹306.99/crore + IPFT ₹0.01/crore,
+ * SEBI ₹10/crore, STT 0.10% each side and delivery stamp duty 0.015% buy side
  * from the current FY26 schedule. Upstox brokerage is ₹20/order; GST is applied to brokerage,
  * exchange/IPFT and DP components. DP is transparently estimated per sell order (not aggregated
  * by scrip/day yet). BSE is blocked because its exact scrip-group schedule is not represented.
@@ -92,7 +92,7 @@ function calculateEquityDeliveryCharges({grossPaise,exchange,side="BUY"}){
   const market=String(exchange||"").toUpperCase();
   if(market!=="NSE")throw Object.assign(new Error("BSE delivery transaction charges depend on the official scrip group; this order is blocked until that exact group rate is available."),{status:422});
   const brokeragePaise=2000;
-  const exchangeTransactionPaise=roundPaise(grossPaise*0.0000307);
+  const exchangeTransactionPaise=roundPaise(grossPaise*0.000030699);
   const ipftPaise=roundPaise(grossPaise*0.000000001);
   const sebiPaise=roundPaise(grossPaise*0.000001);
   const sttPaise=roundPaise(grossPaise*0.001);
