@@ -6,27 +6,40 @@ function parseCsv(input){
   if(typeof input!=="string"||Buffer.byteLength(input,"utf8")>MAX_BYTES)
     throw new Error("Exchange session CSV is missing or exceeds the safe size limit.");
   input=input.replace(/^\uFEFF/,"");
-  const rows=[];let row=[],field="",quoted=false;
+  const rows=[];let row=[],field="",quoted=false,afterQuote=false;
+  function finishField(){row.push(field);field="";afterQuote=false;}
+  function finishRow(){
+    finishField();
+    if(row.some(value=>value.trim()!==""))rows.push(row);
+    row=[];
+    if(rows.length>MAX_ROWS+1)throw new Error("Exchange session CSV contains too many rows.");
+  }
   for(let i=0;i<input.length;i++){
     const ch=input[i];
     if(quoted){
       if(ch==='"'&&input[i+1]==='"'){field+='"';i++;}
-      else if(ch==='"')quoted=false;
+      else if(ch==='"'){quoted=false;afterQuote=true;}
       else field+=ch;
+    }else if(afterQuote){
+      if(ch===",")finishField();
+      else if(ch==="\n"||ch==="\r"){
+        if(ch==="\r"&&input[i+1]==="\n")i++;
+        finishRow();
+      }else throw new Error("Malformed exchange session CSV characters after a quoted field.");
     }else if(ch==='"'){
       if(field.length)throw new Error("Malformed exchange session CSV quote placement.");
       quoted=true;
-    }else if(ch===","){row.push(field);field="";}
+    }else if(ch===","){finishField();}
     else if(ch==="\n"||ch==="\r"){
       if(ch==="\r"&&input[i+1]==="\n")i++;
-      row.push(field);field="";
-      if(row.some(value=>value.trim()!==""))rows.push(row);
-      row=[];
-      if(rows.length>MAX_ROWS+1)throw new Error("Exchange session CSV contains too many rows.");
+      finishRow();
     }else field+=ch;
   }
   if(quoted)throw new Error("Exchange session CSV contains an unterminated quoted field.");
-  if(field.length||row.length){row.push(field);if(row.some(value=>value.trim()!==""))rows.push(row);}
+  if(field.length||row.length||afterQuote){
+    finishField();
+    if(row.some(value=>value.trim()!==""))rows.push(row);
+  }
   if(rows.length>MAX_ROWS+1)throw new Error("Exchange session CSV contains too many rows.");
   return rows;
 }
