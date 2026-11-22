@@ -43,7 +43,8 @@ begin
      or p_idempotency_key is null or p_request_fingerprint is null
      or p_request_fingerprint !~ '^[a-f0-9]{64}$'
      or p_instrument_key is null or length(p_instrument_key) not between 1 and 100
-     or p_exchange not in ('NSE','BSE') or p_side not in ('BUY','SELL')
+     or p_exchange is null or p_exchange not in ('NSE','BSE')
+     or p_side is null or p_side not in ('BUY','SELL')
      or p_quantity is null or p_quantity not between 1 and 1000000
      or p_limit_price_paise is null or p_limit_price_paise<=0 then
     raise exception using errcode='22023',message='Invalid Intraday LIMIT order request';
@@ -215,7 +216,7 @@ begin
     if not v_expire then continue; end if;
 
     select * into v_account from public.paper_accounts where user_id=v_order.user_id for update;
-    if not found then continue; end if;
+    if not found then raise exception using errcode='P0002',message='Paper account missing during Intraday LIMIT expiry'; end if;
     select * into v_order from public.paper_orders where order_id=v_order.order_id for update;
     if not found or v_order.status<>'PENDING' or v_order.reservation_released then continue; end if;
     if v_order.side='BUY' then
