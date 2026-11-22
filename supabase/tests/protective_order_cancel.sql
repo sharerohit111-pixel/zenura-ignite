@@ -19,23 +19,23 @@ DO $protective_cancel$
 DECLARE
   v_result jsonb;
 BEGIN
-  v_result:=public.cancel_paper_protective_order('cacacaca-caca-4aca-8aca-cacacacacaca');
+  v_result:=public.cancel_paper_protective_order('cacacaca-caca-4aca-8aca-cacacacacaca','11111111-1111-4111-8111-111111111111');
   IF v_result->>'status'<>'CANCELLED' OR (v_result->>'cancelled')::boolean IS NOT TRUE THEN
     RAISE EXCEPTION 'Owner could not cancel own active protective order';
   END IF;
 
-  v_result:=public.cancel_paper_protective_order('cacacaca-caca-4aca-8aca-cacacacacaca');
+  v_result:=public.cancel_paper_protective_order('cacacaca-caca-4aca-8aca-cacacacacaca','11111111-1111-4111-8111-111111111111');
   IF v_result->>'status'<>'CANCELLED' OR (v_result->>'idempotent_replay')::boolean IS NOT TRUE THEN
     RAISE EXCEPTION 'Repeated protective cancellation was not idempotent';
   END IF;
 
-  v_result:=public.cancel_paper_protective_order('cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd');
+  v_result:=public.cancel_paper_protective_order('cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd','11111111-1111-4111-8111-111111111111');
   IF v_result->>'status'<>'FILLED' OR (v_result->>'already_filled')::boolean IS NOT TRUE THEN
     RAISE EXCEPTION 'Filled protective order did not remain terminal';
   END IF;
 
   BEGIN
-    PERFORM public.cancel_paper_protective_order('cbcbcbcb-cbcb-4bcb-8bcb-cbcbcbcbcbcb');
+    PERFORM public.cancel_paper_protective_order('cbcbcbcb-cbcb-4bcb-8bcb-cbcbcbcbcbcb','11111111-1111-4111-8111-111111111111');
     RAISE EXCEPTION 'Cross-user protective cancellation unexpectedly succeeded';
   EXCEPTION WHEN insufficient_privilege THEN
     NULL;
