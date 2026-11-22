@@ -42,7 +42,7 @@ test("protective worker cannot close more than the unreserved position or close 
  assert.equal(isPositionCloseable({...order,quantity:1.5},{instrument_key:order.instrument_key,product:"DELIVERY",quantity:12,reserved_quantity:0}),false);
  assert.equal(isPositionCloseable({...order,quantity:1000001},{instrument_key:order.instrument_key,product:"DELIVERY",quantity:1200000,reserved_quantity:0}),false);
  const equity={instrument_key:order.instrument_key,product:"DELIVERY",quantity:12,reserved_quantity:3};
- assert.equal(isPositionCloseable(order,equity),true);
+ assert.equal(isPositionCloseable({...order,quantity:9},equity),true);
  assert.equal(isPositionCloseable({...order,quantity:10},equity),false);
  assert.equal(isPositionCloseable({...order,side:"BUY",trigger_type:"TARGET",trigger_direction:"AT_OR_BELOW"},equity),false);
  const futureOrder={...order,asset_class:"FUTURE",product:"FUTURES",quantity:2};
