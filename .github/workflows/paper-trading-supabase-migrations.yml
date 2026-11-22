@@ -450,13 +450,13 @@ jobs:
             BEGIN
               PERFORM public.submit_paper_limit_order(
                 '22222222-2222-4222-8222-222222222222',
-                repeat('a',64),'16161616-1616-4616-8616-161616161616',
+                repeat('0',64),'16161616-1616-4616-8616-161616161616',
                 repeat('b',64),'NSE_EQ|NULLSIDE','NULLSIDE','NSE',NULL,1,10000
               );
               RAISE EXCEPTION 'NULL LIMIT side was accepted';
             EXCEPTION WHEN SQLSTATE '22023' THEN NULL;
             END;
-            IF EXISTS (SELECT 1 FROM public.paper_orders WHERE order_id=repeat('a',64)) THEN
+            IF EXISTS (SELECT 1 FROM public.paper_orders WHERE order_id=repeat('0',64)) THEN
               RAISE EXCEPTION 'Rejected NULL LIMIT side left an order row behind';
             END IF;
           END
