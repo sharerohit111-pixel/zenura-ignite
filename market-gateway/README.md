@@ -19,7 +19,7 @@ This is the Node.js 22 market-data and paper-order gateway for the **new ZENURA 
 ## Run and verify
 
 ```sh
-npm ci
+npm install
 npm run check
 npm test
 npm start
