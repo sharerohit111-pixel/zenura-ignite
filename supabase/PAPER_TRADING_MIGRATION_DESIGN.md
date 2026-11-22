@@ -45,7 +45,7 @@ Paper Investing is out of scope. No real exchange/broker order is submitted by t
 5. Keep Upstox token ciphertext, OAuth state, stream leases, and rate-limit state inaccessible to browser roles.
 6. Enable RLS on all user-data tables. Browser roles receive read access to own account/history/positions and own watchlists only. Trading writes are reserved for a trusted server runtime.
 7. The Upstox WebSocket gateway is long-lived; it must not be moved blindly into a short-lived Edge Function. Keep a dedicated supported runtime for streaming.
-8. The existing Firebase auth identity must be mapped deliberately to Supabase Auth users before any data import. Do not assume Firebase UID equals Supabase UUID.
+8. Keep Firebase as the authentication provider using Supabase's hosted Firebase third-party Auth integration. Firebase UID values are strings, so do not cast them with auth.uid() or create duplicate Supabase Auth users. Each Firebase UID maps to a stable internal relational UUID in paper_user_identity_map; RLS resolves the verified JWT sub claim through a narrowly scoped SECURITY DEFINER helper.
 9. Existing Firestore documents need an export/transform/import rehearsal and count/checksum reconciliation before cutover.
 
 ## Review items before applying
@@ -85,7 +85,7 @@ The original draft was not applied. A second pass inspected the live gateway hel
 1. Find and audit the exact Upstox OAuth authorization/callback/token-save implementation and its state lifecycle before finalizing `upstox_oauth_states`.
 2. Inspect all remaining Firestore writers/readers for account, connection, stream lease, margin preview, and watchlist collections.
 3. Design and test PostgreSQL RPC/transaction functions for market order, pending LIMIT reserve/fill/cancel, option order, and account initialization. Table DDL alone does not reproduce Firestore's atomic transaction semantics.
-4. Validate RLS, service-role-only writes, indexes, and the Firebase UID to Supabase Auth identity cutover.
+4. Validate RLS, service-role-only writes, indexes, and the Firebase UID to Supabase Auth Firebase third-party JWT integration and identity-map RLS.
 5. Apply nothing to the Supabase project until the draft passes review and the user explicitly approves the staging migration.
 
 
@@ -470,3 +470,35 @@ These are tracked as explicit acceptance gates, not assumed complete. PR #71 rem
 Static review of migration 005 found that `p_strike_price` is PostgreSQL `numeric`, and the current guard checks only `p_strike_price is null or p_strike_price<=0`. PostgreSQL `numeric` supports special values such as `NaN` (and, on supported versions, infinities); `NaN <= 0` is not a reliable finite-number test. Because the strike is currently not persisted or otherwise used in the RPC, a special numeric value could pass the positive-value check without being caught by a later calculation. The JavaScript reference helper correctly requires a finite positive number.
 
 **Required before staging:** add an explicit finite/special-value rejection for the SQL strike input and disposable-PostgreSQL negative fixtures for `NaN`, `Infinity`, and `-Infinity` where supported. Also decide whether strike price must be stored immutably on `paper_derivative_orders`; if so, add an additive schema change and include it in the order insert and replay/history tests. Neither schema nor RPC behavior was changed in this audit step. This is a static review finding, not a claimed executed exploit or passing test.
+
+
+## Firebase third-party Auth integration — architecture correction (2026-11-22)
+
+Supabase's hosted platform supports Firebase Auth as a third-party JWT provider. Keep the
+existing Firebase login and pass the Firebase ID token to Supabase using the publishable
+key; do not migrate or duplicate the user's login identity into Supabase Auth.
+
+Firebase UID values are strings. Supabase's `auth.uid()` casts the JWT `sub` to UUID,
+so the migration uses `auth.jwt()->>'sub'` and a private identity map instead:
+- `paper_user_identity_map.firebase_uid` stores the exact Firebase UID.
+- `paper_user_identity_map.supabase_user_id` is an internal UUID used by the relational
+  tables. It is not a row in `auth.users`.
+- `public.current_paper_user_id()` resolves the verified Firebase JWT subject to that
+  internal UUID. It is SECURITY DEFINER, pins an empty search_path, and is executable
+  only by authenticated/service roles.
+- RLS policies compare each row's internal UUID to the helper result. Browser roles
+  cannot read the mapping table itself.
+- The server-side Firebase-to-Supabase resolver uses the same mapping and fails closed
+  for UIDs that have not yet been migrated.
+
+Before enabling client Data API access, register the exact Firebase project ID in
+Supabase Authentication → Third-Party Auth → Firebase and ensure every Firebase token
+contains `role: authenticated`. Existing Firebase users require a controlled custom
+claims backfill and token refresh; new users require the same claim on account creation.
+Never expose the service-role key to the app. The existing gateway continues to verify
+Firebase token revocation for its own server endpoints.
+
+This removes the need to create synthetic email/phone identities or duplicate Supabase
+Auth users. The identity map is created/imported as part of the controlled data migration.
+No Firebase custom claims have been changed and no Supabase third-party Auth integration
+has been enabled in the live project by this draft.
