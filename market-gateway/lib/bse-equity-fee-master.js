@@ -120,12 +120,12 @@ function calculateBseEquityCharges({grossPaise,product,side,groupName,exclusiveF
     ||(side==="SELL"&&netCreditPaise<=0))
     throw Object.assign(new Error("BSE equity charges exceed supported net settlement limits."),{status:400});
   return {
-    grossPaise,brokeragePaise,exchangeTransactionPaise,sebiPaise,sttPaise,
+    grossPaise,brokeragePaise,exchangeTransactionPaise,ipftPaise:0,sebiPaise,sttPaise,
     stampDutyPaise,dpChargesPaise,gstPaise,totalChargesPaise,
     totalDebitPaise:side==="BUY"?grossPaise+totalChargesPaise:null,
     netCreditPaise,exchange:"BSE",product,side,segment:"EQUITY_CASH",
     scripGroup:String(groupName).trim().toUpperCase(),exclusiveFlag:String(exclusiveFlag).trim().toUpperCase(),
-    exchangeRatePaisePerCrore:ratePerCrore,ipftIncludedInExchangeCharge:true,
+    exchangeRatePaisePerCrore:ratePerCrore,ipftIncludedInExchangeCharge:true,bseIpfIncluded:true,
     scheduleVersion:"BSE-2025-04-29",sourceDate:sourceDate||null,
     indicative:true,simulationOnly:true
   };
