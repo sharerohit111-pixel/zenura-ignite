@@ -111,3 +111,25 @@ test("quarantines Firestore data whose UID is absent from Firebase Auth export",
  assert.equal(report.files.paper_user_identity_map,undefined);
  await fs.rm(root,{recursive:true,force:true});
 });
+
+test("rejects position fields outside Supabase column constraints",()=>{
+ const tooMany={...acct,derivativePositions:{"NSE_FO|TOO-MANY":{instrumentType:"CE",netQuantity:1000001,averagePricePaise:100,costBasisPaise:100000100,exchange:"NSE",updatedAt:"2026-11-20T10:00:00Z"}}};
+ assert.throws(()=>transformAccount({documentId:"legacy-user",data:tooMany},map),/position quantity/);
+ const badExchange={...acct,derivativePositions:{"NSE_FO|BAD":{instrumentType:"CE",netQuantity:1,averagePricePaise:100,costBasisPaise:100,exchange:"BFO",updatedAt:"2026-11-20T10:00:00Z"}}};
+ assert.throws(()=>transformAccount({documentId:"legacy-user",data:badExchange},map),/derivative exchange/);
+ const badDate={...acct,derivativePositions:{"NSE_FO|DATE":{instrumentType:"PE",netQuantity:1,averagePricePaise:100,costBasisPaise:100,exchange:"NSE",expiry:"2026-02-30",updatedAt:"2026-11-20T10:00:00Z"}}};
+ assert.throws(()=>transformAccount({documentId:"legacy-user",data:badDate},map),/calendar date/);
+});
+test("rejects equity LIMIT order missing required limit_price_paise",()=>{
+ const record={documentId:"a".repeat(64),data:{uid:"legacy-user",requestFingerprint:"b".repeat(64),instrumentKey:"NSE_EQ|ABC",side:"BUY",quantity:1,orderType:"LIMIT",status:"PENDING",createdAt:"2026-11-20T10:00:00Z",updatedAt:"2026-11-20T10:00:00Z"}};
+ assert.throws(()=>transformEquityOrder(record,map),/requires a positive limit price/);
+});
+test("rejects uppercase legacy order hashes that violate SQL regex",()=>{
+ const record={documentId:"A".repeat(64),data:{uid:"legacy-user",requestFingerprint:"b".repeat(64),instrumentKey:"NSE_EQ|ABC",side:"BUY",quantity:1,orderType:"MARKET",status:"FILLED",createdAt:"2026-11-20T10:00:00Z",updatedAt:"2026-11-20T10:00:00Z"}};
+ assert.throws(()=>transformEquityOrder(record,map),/Invalid legacy order hash/);
+});
+test("rejects derivative orders with invalid calendar dates or oversized lots",()=>{
+ const base={documentId:"a".repeat(64),data:{uid:"legacy-user",requestFingerprint:"b".repeat(64),instrumentKey:"NSE_FO|ABC",side:"BUY",quantity:1,instrumentType:"CE",lots:1,lotSize:1,status:"FILLED",executionPricePaise:100,quoteTimestampMs:1000,quoteAgeMs:100,grossPaise:100,chargesPaise:0,cashDeltaPaise:-100,createdAt:"2026-11-20T10:00:00Z"}};
+ assert.throws(()=>transformDerivativeOrder({...base,data:{...base.data,expiry:"2026-02-30"}},map),/calendar date/);
+ assert.throws(()=>transformDerivativeOrder({...base,data:{...base.data,lots:10001,quantity:10001}},map),/lots/);
+});
