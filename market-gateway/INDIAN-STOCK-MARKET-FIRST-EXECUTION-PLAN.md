@@ -66,6 +66,10 @@ The Intraday LIMIT lifecycle is now implemented in the draft integration branch,
 
 - A subsequent full GitHub Actions run [45072317000](https://github.com/sharerohit111-pixel/zenura-ignite/actions/runs/45072317000) passed on commit `ce735d456a7fd35cbaf2b2178b3614068491bf15`, including the updated charge-calculation regression suite and the complete market-gateway tests.
 - The NSE charge module now separates the 1 March 2026 transaction component from the ₹0.01/crore IPFT contribution. NSE option IPFT was corrected to ₹0.01/crore rather than the earlier overstated value. These remain indicative standalone calculations and are not yet wired into cash-equity settlement.
+- Added an NSE cash-equity Intraday charge estimator in integer paise: brokerage is capped at ₹20 or 0.10% turnover, STT is sell-side 0.025%, stamp duty is buy-side 0.003%, plus NSE transaction/IPFT, SEBI and GST. BSE intraday deliberately fails closed pending exact scrip-group pricing.
+- Added forward-only migration `20261122214500_align_option_charges_with_nse_ipft_schedule.sql` to correct the long-option SQL fee constants to NSE transaction 0.0003552 plus IPFT 0.000000001. The previous combined/overstated SQL constants would have diverged from the JavaScript calculator at larger turnovers.
+- Added a CI guard that inspects the installed option RPC definition for the corrected SQL constants. GitHub Actions runs [45073565611](https://github.com/sharerohit111-pixel/zenura-ignite/actions/runs/45073565611) and [45073559304](https://github.com/sharerohit111-pixel/zenura-ignite/actions/runs/45073559304) are still running; no pass is claimed yet.
+- The new Intraday calculator and the option SQL correction are still not connected to cash-equity MARKET/LIMIT settlement. That atomic accounting integration remains the next engineering gate.
 
 Remaining before this slice can be marked release-ready:
 
