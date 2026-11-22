@@ -506,3 +506,10 @@ has been enabled in the live project by this draft.
 
 
 Official integration reference: https://supabase.com/docs/guides/auth/third-party/firebase-auth
+
+
+## Identity-map deletion and project-level permission hardening
+
+- Relational user rows reference `paper_user_identity_map` with `ON DELETE RESTRICT`. Deleting an identity mapping cannot silently cascade-delete a user's account, positions, orders or encrypted broker connection; an intentional erasure workflow must explicitly purge dependent data first.
+- The live project already contained `public.rls_auto_enable()` as a SECURITY DEFINER event-trigger function. Its function body and event trigger were preserved; only direct EXECUTE permission for PUBLIC, anon and authenticated was revoked. The exact change is versioned as `20261122083748_revoke_public_execute_rls_auto_enable.sql`.
+- Live privilege verification: anon/authenticated/service_role cannot execute this function; postgres can. Security, performance and health advisors returned zero lints at the time of verification.
