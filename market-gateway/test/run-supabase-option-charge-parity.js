@@ -58,18 +58,13 @@ const queries = fixture.vectors.map((vector) => {
   FROM totals`;
 }).join("\nUNION ALL\n");
 
-const output = execFileSync("psql", ["-X", "-A", "-t", "-v", "ON_ERROR_STOP=1", "-c", queries], {
-  encoding: "utf8",
-  stdio: ["ignore", "pipe", "inherit"]
-}).trim().split(/\r?\n/).filter(Boolean);
-
-if (output.length !== fixture.vectors.length) {
-  throw new Error(`Expected ${fixture.vectors.length} PostgreSQL vector results, received ${output.length}.`);
-}
-
 for (let i = 0; i < fixture.vectors.length; i += 1) {
   const vector = fixture.vectors[i];
-  const actual = JSON.parse(output[i]);
+  const output = execFileSync("psql", ["-X", "-A", "-t", "-v", "ON_ERROR_STOP=1", "-c", queries[i]], {
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "inherit"]
+  }).trim();
+  const actual = JSON.parse(output);
   for (const [field, expected] of Object.entries(vector.expected)) {
     if (actual[field] !== expected) {
       throw new Error(`${vector.id}: ${field} expected ${expected}, got ${actual[field]}`);
