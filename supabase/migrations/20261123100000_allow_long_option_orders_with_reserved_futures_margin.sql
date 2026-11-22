@@ -21,8 +21,8 @@ begin
 
   v_patched := regexp_replace(v_definition,v_pattern,'','g');
   if v_patched=v_definition
-     or position('v_account.reserved_margin_paise>0' in v_patched)=0
-     or position('v_account.reserved_cash_paise+v_account.reserved_margin_paise>v_cash' in v_patched)=0 then
+     or position('v_account.reserved_cash_paise+v_account.reserved_margin_paise>v_account.cash_paise' in v_patched)=0
+     or position('v_cash < v_account.reserved_cash_paise+v_account.reserved_margin_paise' in v_patched)=0 then
     raise exception 'Option/futures shared-cash safety checks were not preserved by the migration';
   end if;
 
