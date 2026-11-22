@@ -42,4 +42,40 @@ function calculateLongOptionTradeCharges({grossPaise,exchange,side="BUY",brokera
     indicative:true,simulationOnly:true
   };
 }
-module.exports={calculateLongOptionTradeCharges,calculateLongOptionBuyCharges:args=>calculateLongOptionTradeCharges({...args,side:"BUY"}),DEFAULT_BROKERAGE_PAISE};
+
+const FUTURES_RATES={
+  NSE:{exchangeTransaction:0.0000183,ipft:0.000000001},
+  BSE:{exchangeTransaction:0,ipft:0}
+};
+const FUTURES_STT_SELL=0.0005; // 0.05% from 1 April 2026
+const FUTURES_STAMP_BUY=0.00002; // 0.002%
+const SEBI_TURNOVER_RATE=0.000001; // Rs 10 per crore
+const FUTURES_BROKERAGE_RATE=0.0005; // 0.05%, capped at Rs 20 per executed order
+
+function calculateFuturesTradeCharges({grossPaise,exchange,side="BUY",brokerageCapPaise=2000}){
+  if(!Number.isSafeInteger(grossPaise)||grossPaise<1)
+    throw Object.assign(new Error("A valid futures turnover is required."),{status:400});
+  if(!["BUY","SELL"].includes(side))throw Object.assign(new Error("Futures trade side must be BUY or SELL."),{status:400});
+  const market=String(exchange||"").toUpperCase(),rates=FUTURES_RATES[market];
+  if(!rates)throw Object.assign(new Error("Only NSE and BSE futures charge schedules are supported."),{status:400});
+  if(!Number.isSafeInteger(brokerageCapPaise)||brokerageCapPaise<0)
+    throw Object.assign(new Error("Brokerage cap is invalid."),{status:400});
+  const brokeragePaise=Math.min(brokerageCapPaise,roundPaise(grossPaise*FUTURES_BROKERAGE_RATE));
+  const exchangeTransactionPaise=roundPaise(grossPaise*rates.exchangeTransaction);
+  const ipftPaise=roundPaise(grossPaise*rates.ipft);
+  const sebiPaise=roundPaise(grossPaise*SEBI_TURNOVER_RATE);
+  const stampDutyPaise=side==="BUY"?roundPaise(grossPaise*FUTURES_STAMP_BUY):0;
+  const sttPaise=side==="SELL"?roundPaise(grossPaise*FUTURES_STT_SELL):0;
+  const gstPaise=roundPaise((brokeragePaise+exchangeTransactionPaise+ipftPaise)*GST);
+  const totalChargesPaise=brokeragePaise+exchangeTransactionPaise+ipftPaise+sebiPaise+stampDutyPaise+sttPaise+gstPaise;
+  if(!Number.isSafeInteger(totalChargesPaise)||!Number.isSafeInteger(grossPaise+totalChargesPaise))
+    throw Object.assign(new Error("Futures charges exceed supported calculation limits."),{status:400});
+  return {
+    grossPaise,brokeragePaise,exchangeTransactionPaise,ipftPaise,sebiPaise,
+    stampDutyPaise,sttPaise,gstPaise,totalChargesPaise,exchange:market,side,
+    segment:"EQUITY_FUTURES",scheduleVersion:"2026-04-01",
+    indicative:true,simulationOnly:true
+  };
+}
+
+module.exports={calculateLongOptionTradeCharges,calculateLongOptionBuyCharges:args=>calculateLongOptionTradeCharges({...args,side:"BUY"}),calculateFuturesTradeCharges,DEFAULT_BROKERAGE_PAISE};
