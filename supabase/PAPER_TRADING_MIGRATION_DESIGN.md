@@ -254,3 +254,20 @@ Still unverified / must be tested:
 - Strike price is validated as an RPC input but not persisted in the current derivative order schema; decide whether audit/history requires a dedicated `strike_price` column before any staging application.
 
 No local PostgreSQL client/server or Docker runtime was available in the working environment during this review, so no claim of SQL parsing, execution, or integration-test success is made.
+
+
+### Equity MARKET and Delivery LIMIT static schema audit — 2026-11-22
+
+Inspected migrations 001–004 together, including the complete `paper_equity_positions` and `paper_orders` definitions and all three LIMIT lifecycle functions.
+
+Static schema references checked:
+- Equity MARKET RPC INSERT/UPDATE/DELETE fields exist in the core schema.
+- LIMIT submit/fill/cancel order fields (`limit_price_paise`, `execution_price_paise`, `reserved_cash_paise`, `reserved_quantity`, `reservation_released`, `worker_execution`, `cancelled_at`, `filled_at`) exist in `paper_orders`.
+- LIMIT fill/cancel position fields and reserved-share constraint exist in `paper_equity_positions`.
+- Account aggregate and mode-specific realized P&L columns are present; MARKET and LIMIT fill functions update the relevant totals.
+- Account-first locking is used to serialize cash/order mutations; LIMIT fill re-reads and locks the order after acquiring the account lock so fill/cancel races resolve through the same lock order.
+- LIMIT is constrained to Delivery and the core schema rejects Intraday LIMIT.
+
+Remaining checks are runtime-only: execute all migrations in order in a disposable PostgreSQL branch, test all concurrent fill/cancel/submit interleavings and reservation invariants, and compare order fingerprint inputs with the existing Node `makeOrderFingerprint` helper. The LIMIT RPC trusts the authenticated backend to supply the matching Firebase-compatible request fingerprint and validated provider instrument/quote; it does not independently derive the SHA-256 fingerprint or verify the quote's instrument key.
+
+Environment observation: the connected Supabase project `zenura-paper-trading` is ACTIVE_HEALTHY but currently reports zero applied migrations and zero public tables. It was queried read-only only. No migration was applied. Do not treat this empty project as a staging clone or apply draft SQL without explicit approval and an isolated test plan.
