@@ -1714,6 +1714,47 @@ jobs:
           $crypto_negative$;
           RESET ROLE;
           SQL
+      - name: Verify S-TRADE crypto cross-user isolation and read-only grants
+        run: |
+          psql -v ON_ERROR_STOP=1 <<'SQL'
+          SET ROLE service_role;
+          SELECT public.initialize_paper_crypto_account(
+            '22222222-2222-4222-8222-222222222222',1000000
+          );
+          RESET ROLE;
+          SELECT set_config(
+            'request.jwt.claims',
+            '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated"}',
+            false
+          );
+          SET ROLE authenticated;
+          DO $crypto_rls$
+          DECLARE
+            v_count bigint;
+            v_denied boolean:=false;
+          BEGIN
+            SELECT count(*) INTO v_count FROM public.paper_crypto_accounts
+             WHERE user_id='22222222-2222-4222-8222-222222222222';
+            IF v_count<>0 THEN RAISE EXCEPTION 'Crypto account RLS leaked another user account'; END IF;
+            SELECT count(*) INTO v_count FROM public.paper_crypto_positions
+             WHERE user_id='22222222-2222-4222-8222-222222222222';
+            IF v_count<>0 THEN RAISE EXCEPTION 'Crypto position RLS leaked another user position'; END IF;
+            SELECT count(*) INTO v_count FROM public.paper_crypto_orders
+             WHERE user_id='22222222-2222-4222-8222-222222222222';
+            IF v_count<>0 THEN RAISE EXCEPTION 'Crypto order RLS leaked another user order'; END IF;
+            SELECT count(*) INTO v_count FROM public.paper_crypto_ledger
+             WHERE user_id='22222222-2222-4222-8222-222222222222';
+            IF v_count<>0 THEN RAISE EXCEPTION 'Crypto ledger RLS leaked another user ledger entry'; END IF;
+            BEGIN
+              UPDATE public.paper_crypto_accounts SET cash_balance=0
+               WHERE user_id='11111111-1111-4111-8111-111111111111';
+            EXCEPTION WHEN insufficient_privilege THEN v_denied:=true;
+            END;
+            IF NOT v_denied THEN RAISE EXCEPTION 'Authenticated client can directly mutate crypto account'; END IF;
+          END
+          $crypto_rls$;
+          RESET ROLE;
+          SQL
       - name: Verify expected schema and RPC registration
         run: |
           psql -v ON_ERROR_STOP=1 <<'SQL'
