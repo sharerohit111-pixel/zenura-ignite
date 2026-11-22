@@ -9,7 +9,8 @@
   "scripts": {
     "start": "node server.js",
     "test": "node --test test/*.test.js",
-    "check": "node --check server.js && node --check ../markets/stocks/stocks.js"
+    "check": "node --check server.js && node --check supabase-server.js && node --check lib/supabase-runtime.js && node --check ../markets/stocks/stocks.js && node --check ../markets/stocks/chart-engine.js",
+    "start:supabase": "node supabase-server.js"
   },
   "dependencies": {
     "@google-cloud/firestore": "9.4.1",
