@@ -29,6 +29,23 @@ function normalizeMarketSession(session){
   return session;
 }
 
+
+function normalizeExchangeSessionRow(row,expectedExchange,expectedDate,nowMs){
+  if(!row||typeof row!=="object"||row.exchange!==expectedExchange
+     ||!["NSE","BSE"].includes(expectedExchange)
+     ||row.session_date!==expectedDate
+     ||typeof row.is_trading_day!=="boolean"||row.is_trading_day!==true
+     ||typeof row.source_reference!=="string"||row.source_reference.trim().length<1
+     ||row.source_reference.length>500
+     ||typeof row.verified_at!=="string"||!Number.isSafeInteger(nowMs)||nowMs<1)return null;
+  const verifiedAtMs=Date.parse(row.verified_at);
+  if(!Number.isFinite(verifiedAtMs)||verifiedAtMs>nowMs)return null;
+  return normalizeMarketSession({
+    exchange:row.exchange,sessionDate:row.session_date,isTradingDay:true,
+    openMinute:row.open_minute,closeMinute:row.close_minute
+  });
+}
+
 function isIntradaySessionOpen(timestampMs,session){
   const normalized=normalizeMarketSession(session);
   if(!normalized)return false;
@@ -80,4 +97,4 @@ function isEligibleIntradayLimitOrder(order,quote,nowMs,session){
   return order.side==="BUY"?quote.pricePaise<=order.limit_price_paise:quote.pricePaise>=order.limit_price_paise;
 }
 
-module.exports={marketClockParts,normalizeMarketSession,isIntradaySessionOpen,isIntradayOrderExpired,isEligibleIntradayLimitOrder};
+module.exports={marketClockParts,normalizeMarketSession,normalizeExchangeSessionRow,isIntradaySessionOpen,isIntradayOrderExpired,isEligibleIntradayLimitOrder};
