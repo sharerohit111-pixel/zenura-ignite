@@ -25,7 +25,7 @@
     if(!uid)throw new Error("Sign in to continue.");
     const headers=await authHeaders();
     if(c.getUserId()!==uid)throw new Error("Account changed during the request. Sign in again.");
-    const response=await fetch(gateway+path,{...options,headers:{...headers,...(options.body?{"Content-Type":"application/json"}:{}),...(options.headers||{})},cache:"no-store",signal:AbortSignal.timeout(20000)});
+    const response=await fetch(gateway+path,{...options,headers:{...headers,...(options.body?{"Content-Type":"application/json"}:{}),...(options.headers||{})},cache:"no-store",signal:AbortSignal.timeout(15000)});
     const data=await response.json().catch(()=>({}));
     if(c.getUserId()!==uid)throw new Error("Account changed during the request. Sign in again.");
     if(!response.ok){const error=new Error(data.error||"Market service request failed ("+response.status+").");error.status=response.status;throw error;}
