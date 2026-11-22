@@ -12,6 +12,11 @@ test("accepts valid futures contract metadata",()=>{
  const f={...option(),instrument_key:"NSE_FO|NIFTY26NOVFUT",trading_symbol:"NIFTY FUT",instrument_type:"FUT",strike_price:0};
  assert.equal(validateDerivativeContract(f,{lots:1,pricePaise:2500000,now}).quantity,65);
 });
+test("rejects mismatched exchange and derivative segment pairs",()=>{
+ for(const patch of [{exchange:"NSE",segment:"BSE_FO"},{exchange:"BSE",segment:"NSE_FO"}]){
+  assert.throws(()=>validateDerivativeContract({...option(),...patch},{lots:1,pricePaise:1250,now}),/exchange and segment do not match/);
+ }
+});
 test("rejects non-derivative, wrong segment and unknown types",()=>{
  for(const patch of [{segment:"NSE_EQ"},{segment:"MCX_FO"},{instrument_type:"EQ"}])assert.throws(()=>validateDerivativeContract({...option(),...patch},{lots:1,pricePaise:1250,now}),/Only verified/);
 });
