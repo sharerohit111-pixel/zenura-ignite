@@ -78,7 +78,7 @@ test("Paper Trading frontend gates protective exits on server worker readiness",
  for(const id of ["paper-protective-type","paper-protective-price","paper-protective-create","paper-protective-orders-body","paper-protective-refresh"])
   assert.match(html,new RegExp('id="'+id+'"'));
  assert.match(js,/protectiveWorkerEnabled=data\.workerEnabled===true/);
- assert.match(js,/if\(!paperProtectiveWorkerStatus/);
+ assert.match(server,/if\(!paperProtectiveWorkerStatus\.enabled\)/);
  assert.match(js,/paper-protective-orders/);
  assert.match(js,/paper-protective-orders\/.*\/cancel/);
  assert.match(js,/protectiveWorkerEnabled=false/);
