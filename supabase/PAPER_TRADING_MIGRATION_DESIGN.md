@@ -226,3 +226,8 @@ Important limitations:
 - The function has not been parsed or executed against PostgreSQL/Supabase staging. It has not passed parity or concurrency tests. It is not production-ready.
 - The migration contains a draft additive ALTER for derivative position exchange/lot-size metadata; the core schema draft already contains those columns for a fresh full migration. Applying migrations out of sequence is unsupported.
 - Do not apply any SQL or change the live Firebase path until the SQL has been tested against PostgreSQL and the complete migration has explicit approval.
+
+
+### Static review correction — average premium versus cost basis
+
+A static review found that average option premium and fee-inclusive cost basis must remain distinct. The draft RPC now computes weighted average premium from gross premium fills only, while the cost-basis ledger includes BUY charges; on a partial SELL, the remaining average premium stays unchanged and only the fee-inclusive cost basis is reduced by the proportional allocation. This is a draft correction, not a passed test. Exact paise rounding and repeated partial-close conservation still require executable PostgreSQL parity tests.
