@@ -38,6 +38,15 @@ BEGIN
     IF NOT has_function_privilege('service_role', fn, 'EXECUTE') THEN
       RAISE EXCEPTION 'service_role cannot execute %', t;
     END IF;
+    -- Every exposed RPC must be SECURITY DEFINER with an explicitly pinned,
+    -- trusted search_path; otherwise the backend role boundary is unsafe.
+    IF NOT EXISTS (
+      SELECT 1 FROM pg_proc p
+      WHERE p.oid=fn AND p.prosecdef
+        AND array_to_string(p.proconfig, ',') ILIKE '%search_path=pg_catalog, public%'
+    ) THEN
+      RAISE EXCEPTION 'RPC is not SECURITY DEFINER with pinned search_path: %', t;
+    END IF;
     IF has_function_privilege('anon', fn, 'EXECUTE')
        OR has_function_privilege('authenticated', fn, 'EXECUTE') THEN
       RAISE EXCEPTION 'anon/authenticated can execute %', t;
