@@ -855,15 +855,15 @@ async function runPaperLimitWorker({maxOrders=50}={}){
       if(batch.error)throw new Error("Pending Paper LIMIT orders could not be rescanned.");
     }
     const orders=batch.data||[];summary.scanned=orders.length;
-    const groups=groupOrdersByUser(orders);
-    for(const [userId,userOrders] of groups){
+    const groups=[...groupOrdersByUser(orders).entries()];
+    const processUserOrders=async([userId,userOrders])=>{
       try{
         const validOrders=userOrders.filter(order=>{
           const item=instrumentCache.find(x=>x.instrument_key===order.instrument_key);
           return item&&item.instrument_type==="EQ"&&["NSE_EQ","BSE_EQ"].includes(item.segment)
             &&item.exchange===order.exchange&&order.side&&order.product==="DELIVERY";
         });
-        if(!validOrders.length){summary.notEligible+=userOrders.length;continue;}
+        if(!validOrders.length){summary.notEligible+=userOrders.length;return;}
         const {token}=await getUpstoxAccessToken(userId);
         const keys=[...new Set(validOrders.map(order=>order.instrument_key))];
         const url="https://api.upstox.com/v3/market-quote/quotes?"+new URLSearchParams({instrument_key:keys.join(",")});
@@ -894,7 +894,9 @@ async function runPaperLimitWorker({maxOrders=50}={}){
         summary.failed+=userOrders.length;
         console.warn("Paper LIMIT user batch skipped",{userId,errorName:error?.name||"Error",status:error?.status||500});
       }
-    }
+    };
+    for(let offset=0;offset<groups.length;offset+=5)
+      await Promise.all(groups.slice(offset,offset+5).map(processUserOrders));
     if(orders.length){
       const last=orders[orders.length-1];
       const saved=await serviceDb.from("paper_market_worker_state")
