@@ -652,6 +652,66 @@ app.get("/paper/futures/portfolio",async(req,res)=>{
     res.set("Cache-Control","private, no-store").json({positions:valued,cashPaise:account.cash_paise,marketValuePaise:0,unrealizedPnlPaise,reservedMarginPaise:account.reserved_margin_paise||0,realizedPnlPaise:account.realized_pnl_paise||0,equityPaise:account.cash_paise+unrealizedPnlPaise,valuationStatus:stalePositions?"partial_stale":"fresh",stalePositions,marginStatus:"entry_estimate",simulationOnly:true});
   }catch(error){sendError(res,error,"Futures portfolio could not be loaded.");}
 });
+
+app.post("/paper/investing/orders",async(req,res)=>{
+  try{
+    const {user,userDb}=await auth(req),instrumentKey=String(req.body?.instrument_key||"");
+    const side=String(req.body?.side||"").toUpperCase(),quantity=Number(req.body?.quantity);
+    const idempotencyKey=String(req.body?.idempotency_key||"");
+    const orderType=String(req.body?.order_type||"MARKET").toUpperCase();
+    if(orderType!=="MARKET")return res.status(400).json({error:"Paper Investing LIMIT orders are not enabled until the independent investing LIMIT worker is deployed."});
+    if(!isUuid(idempotencyKey))return res.status(400).json({error:"A valid UUID idempotency_key is required."});
+    if(!["BUY","SELL"].includes(side))return res.status(400).json({error:"Paper Investing side must be BUY or SELL."});
+    if(!Number.isSafeInteger(quantity)||quantity<1||quantity>1000000)return res.status(400).json({error:"Quantity must be a whole number from 1 to 1,000,000."});
+    if(!instrumentCache.length||Date.now()-instrumentCacheUpdatedAt>6*60*60*1000)await refreshInstrumentCache();
+    const instrument=instrumentCache.find(x=>x.instrument_key===instrumentKey&&x.instrument_type==="EQ"&&["NSE_EQ","BSE_EQ"].includes(x.segment));
+    if(!instrument)return res.status(400).json({error:"Select a verified NSE/BSE cash-equity instrument from the official instrument master."});
+    const orderId=makeOrderId(user.id,idempotencyKey),fingerprint=makeOrderFingerprint({instrumentKey,side,quantity,orderType:"MARKET",product:"DELIVERY"});
+    const {data:prior,error:priorError}=await userDb.from("paper_investing_orders").select("*").eq("user_id",user.id).eq("idempotency_key",idempotencyKey).maybeSingle();
+    if(priorError)throw Object.assign(new Error("Paper Investing idempotency state could not be checked."),{status:503});
+    if(prior){
+      if(prior.order_id!==orderId||prior.request_fingerprint!==fingerprint)return res.status(409).json({error:"This Paper Investing idempotency key was used for different order details."});
+      const {data:account}=await userDb.from("paper_investing_accounts").select("cash_paise").eq("user_id",user.id).maybeSingle();
+      return res.set("Cache-Control","private, no-store").json({orderId:prior.order_id,status:prior.status,side:prior.side,quantity:prior.quantity,executionPricePaise:prior.execution_price_paise,grossPaise:prior.gross_paise,chargesPaise:prior.charges_paise,realizedPnlPaise:prior.realized_pnl_paise,cashPaise:account?.cash_paise??null,idempotentReplay:true,simulationOnly:true});
+    }
+    const {token}=await getUpstoxAccessToken(user.id),{quote}=await getQuote(token,instrumentKey);
+    const normalized=normalizeProviderQuote(quote,instrumentKey,{maxAgeMs:15000});
+    const {normalizeTickSizePaise}=require("./lib/derivative-contract");
+    const tickSizePaise=normalizeTickSizePaise(Number(instrument.tick_size));
+    if(!tickSizePaise||normalized.pricePaise%tickSizePaise!==0)return res.status(409).json({error:"Provider quote does not match the official instrument tick size."});
+    const grossPaise=normalized.pricePaise*quantity;
+    const {calculateEquityDeliveryCharges}=require("./lib/trading-charges");
+    const charges=calculateEquityDeliveryCharges({grossPaise,exchange:instrument.exchange,side});
+    const result=await runtime.callUserRpc(user,"execute_paper_investing_market_order",{
+      p_order_id:orderId,p_idempotency_key:idempotencyKey,p_request_fingerprint:fingerprint,
+      p_instrument_key:instrumentKey,p_trading_symbol:instrument.trading_symbol||instrument.name,
+      p_exchange:instrument.exchange,p_side:side,p_quantity:quantity,
+      p_execution_price_paise:normalized.pricePaise,p_tick_size_paise:tickSizePaise,
+      p_charges_paise:charges.totalChargesPaise,p_quote_timestamp_ms:normalized.tradeTimeMs,p_now_ms:Date.now()
+    });
+    const order=result?.order||{};
+    res.set("Cache-Control","private, no-store").status(result?.idempotent_replay?200:201).json({
+      orderId:order.order_id||orderId,status:order.status||"FILLED",tradingSymbol:instrument.trading_symbol,
+      instrumentKey,exchange:instrument.exchange,side,quantity,
+      executionPricePaise:normalized.pricePaise,grossPaise,chargesPaise:charges.totalChargesPaise,charges,
+      totalDebitPaise:side==="BUY"?grossPaise+charges.totalChargesPaise:0,
+      netCreditPaise:side==="SELL"?grossPaise-charges.totalChargesPaise:0,
+      cashPaise:result?.cash_paise??null,realizedPnlPaise:result?.realized_pnl_paise??0,
+      idempotentReplay:result?.idempotent_replay===true,simulationOnly:true
+    });
+  }catch(error){sendError(res,error,"Paper Investing order could not be completed.");}
+});
+app.get("/paper/investing/orders",async(req,res)=>{
+  try{
+    const {user,userDb}=await auth(req),raw=String(req.query.limit??"50");
+    if(!/^\d+$/.test(raw)||Number(raw)<1)return res.status(400).json({error:"Paper Investing order history limit must be from 1 to 100."});
+    const {data,error}=await userDb.from("paper_investing_orders").select("*").eq("user_id",user.id).order("created_at",{ascending:false}).limit(Math.min(Number(raw),100));
+    if(error)throw Object.assign(new Error("Paper Investing order history could not be loaded."),{status:503});
+    const orders=(data||[]).map(o=>({id:o.order_id,instrumentKey:o.instrument_key,tradingSymbol:o.trading_symbol,exchange:o.exchange,side:o.side,quantity:o.quantity,orderType:o.order_type,status:o.status,executionPricePaise:o.execution_price_paise,grossPaise:o.gross_paise,chargesPaise:o.charges_paise,realizedPnlPaise:o.realized_pnl_paise,simulationOnly:true,createdAt:o.created_at?Date.parse(o.created_at):null}));
+    res.set("Cache-Control","private, no-store").json({orders,simulationOnly:true});
+  }catch(error){sendError(res,error,"Paper Investing order history could not be loaded.");}
+});
+
 app.get("/paper/investing/portfolio",async(req,res)=>{
   try{
     const {user,userDb}=await auth(req);
