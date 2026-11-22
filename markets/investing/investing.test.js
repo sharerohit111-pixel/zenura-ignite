@@ -188,3 +188,12 @@ test("Professional chart supports weekly and monthly history with daily Investin
  const investing=fs.readFileSync(path.join(root,"investing.js"),"utf8");
  assert.match(investing,/activeTimeframe="1D"/);
 });
+
+test("Two-mode launch portal has the shared language toggle and accurate order scope",()=>{
+ const portalCss=fs.readFileSync(path.join(pwaRoot,"portal.css"),"utf8");
+ assert.match(portal,/id="paper-language-toggle"/);
+ assert.match(portal,/language-toggle\.js/);
+ assert.match(portal,/Delivery limit orders for cash equities/);
+ assert.match(portalCss,/\.paper-language-toggle\s*\{/);
+ assert.match(languageToggle,/ZENURA IGNITE · Market Terminal/);
+});
