@@ -19,10 +19,10 @@ function serializeFirestoreValue(value){
  const result={};for(const [key,item] of Object.entries(value))result[key]=serializeFirestoreValue(item);return result;
 }
 function sanitizeAuthUser(user){
- return {uid:user.uid,email:user.email||null,emailVerified:user.emailVerified===true,displayName:user.displayName||null,
-  disabled:user.disabled===true,photoURL:user.photoURL||null,phoneNumber:user.phoneNumber||null,
-  metadata:{creationTime:user.metadata?.creationTime||null,lastSignInTime:user.metadata?.lastSignInTime||null},
-  providerData:(user.providerData||[]).map(p=>({providerId:p.providerId||null,uid:p.uid||null,email:p.email||null,displayName:p.displayName||null}))};
+ if(!user||typeof user.uid!=="string"||!user.uid||user.uid.length>128)throw new TypeError("Firebase Auth user UID is invalid.");
+ // The transformer needs only UIDs to validate the private UID→UUID mapping.
+ // Do not export contact details, provider identities, or sign-in metadata.
+ return {uid:user.uid};
 }
 async function writeJsonlFile(filePath,records){
  const handle=await fs.open(filePath,"wx",0o600),hash=crypto.createHash("sha256");let count=0;
