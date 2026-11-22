@@ -99,3 +99,16 @@ test("rejects unsafe integer turnover and brokerage boundaries",()=>{
  assert.throws(()=>calculateLongOptionTradeCharges({grossPaise:Number.MAX_SAFE_INTEGER+1,exchange:"NSE"}),/turnover/);
  assert.throws(()=>calculateLongOptionTradeCharges({grossPaise:1000,exchange:"NSE",brokeragePaise:Number.MAX_SAFE_INTEGER+1}),/Brokerage/);
 });
+
+test("Firebase BigInt partial-close reference vectors conserve fee-inclusive basis across repeated closes",()=>{
+ const close=(basis,qty,oldQty)=>qty===oldQty?basis:Number((BigInt(basis)*BigInt(qty)+BigInt(Math.floor(oldQty/2)))/BigInt(oldQty));
+ const first=close(98778,25,75);
+ const remaining1=98778-first;
+ const second=close(remaining1,25,50);
+ const remaining2=remaining1-second;
+ assert.equal(first,32926);
+ assert.equal(remaining1,65852);
+ assert.equal(second,32926);
+ assert.equal(remaining2,32926);
+ assert.equal(remaining2+second+first,98778);
+});
