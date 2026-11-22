@@ -148,7 +148,7 @@ gcloud scheduler jobs create http zenura-paper-limit-worker-every-minute \
 
 The worker scans a bounded batch, groups quote requests by user, checks fresh Upstox quotes and instrument-master identity, and asks Postgres to fill only price-eligible pending Delivery LIMIT orders. The SQL function locks the account/order rows and releases the original cash/share reservation in the same transaction. If Upstox credentials are expired, the affected orders remain pending and the user must reconnect. Monitor Cloud Run Job execution summaries and failures before enabling this schedule in production.
 
-Cloud Scheduler-to-Cloud Run Job execution and the `roles/run.invoker` requirement follow Google's documented job scheduling model. <Link url="https://docs.cloud.google.com/run/docs/execute/jobs-on-schedule" title="Cloud Run: execute jobs on a schedule"/>.
+Cloud Scheduler-to-Cloud Run Job execution and the `roles/run.invoker` requirement follow Google's documented job scheduling model. [Cloud Run: execute jobs on a schedule](https://docs.cloud.google.com/run/docs/execute/jobs-on-schedule).
 
 ## 5. Frontend gateway configuration
 
