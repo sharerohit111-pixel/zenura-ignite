@@ -544,7 +544,13 @@ jobs:
                OR (SELECT count(*) FROM public.paper_orders) = 0
                OR (SELECT count(*) FROM public.paper_derivative_orders) = 0
                OR (SELECT count(*) FROM public.paper_watchlists) = 0 THEN
-              RAISE EXCEPTION 'User two cannot read its own tenant rows';
+              RAISE EXCEPTION 'User two own-row counts: accounts %, equity %, derivatives %, orders %, derivative_orders %, watchlists %',
+                (SELECT count(*) FROM public.paper_accounts),
+                (SELECT count(*) FROM public.paper_equity_positions),
+                (SELECT count(*) FROM public.paper_derivative_positions),
+                (SELECT count(*) FROM public.paper_orders),
+                (SELECT count(*) FROM public.paper_derivative_orders),
+                (SELECT count(*) FROM public.paper_watchlists);
             END IF;
           END
           $$;
