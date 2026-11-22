@@ -953,12 +953,12 @@ async function start(){
       try{
         const result=await runPaperLimitWorker({maxOrders:10});
         paperLimitWorkerStatus.lastRunAt=Date.now();
-        paperLimitWorkerStatus.lastCycle={scanned:result.scanned,filled:result.filled,failed:result.failed,locked:result.locked};
+        paperLimitWorkerStatus.lastCycle={scanned:result.scanned,filled:result.filled,failed:result.failed,locked:result.locked,cycleError:false};
         workerBackoffMs=intervalMs;nextWorkerRunAt=Date.now()+intervalMs;
         if(result.filled||result.failed)console.log("Paper LIMIT worker cycle",JSON.stringify(result));
       }catch(error){
         paperLimitWorkerStatus.lastRunAt=Date.now();
-        paperLimitWorkerStatus.lastCycle={scanned:0,filled:0,failed:1,locked:false};
+        paperLimitWorkerStatus.lastCycle={scanned:0,filled:0,failed:1,locked:false,cycleError:true};
         nextWorkerRunAt=Date.now()+workerBackoffMs;
         workerBackoffMs=Math.min(30000,workerBackoffMs*2);
         console.error("Paper LIMIT worker cycle failed:",error.message);
