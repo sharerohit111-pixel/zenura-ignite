@@ -4,7 +4,8 @@ const meta = document.querySelector('meta[name="zenura-crypto-api-url"]');
 const apiBase = (meta?.content || "").trim().replace(/\/+$/, "");
 const supportedSymbols = new Set(["BTCUSDT","ETHUSDT","BNBUSDT","SOLUSDT","XRPUSDT","ADAUSDT","DOGEUSDT","AVAXUSDT","PAXGUSDT","XAUTUSDT"]);
 let activeUserId = null;
-let loading = false;
+let loadGeneration = 0;
+let pendingOrder = null;
 
 async function accessToken() {
   const { data, error } = await supabase.auth.getSession();
@@ -14,9 +15,9 @@ async function accessToken() {
   return token;
 }
 
-async function api(path, options = {}) {
+async function api(path, options = {}, tokenOverride = null) {
   if (!apiBase) throw new Error("Secure cloud trading is not deployed yet. No order was placed.");
-  const token = await accessToken();
+  const token = tokenOverride || await accessToken();
   const response = await fetch(apiBase + path, {
     method: options.method || "GET",
     cache: "no-store",
@@ -43,25 +44,31 @@ function publishPortfolio(payload) {
 }
 
 async function load() {
-  if (loading) return;
-  loading = true;
-  try {
-    await api("/crypto/account");
-    const portfolio = await api("/crypto/portfolio");
-    publishPortfolio(portfolio);
-  } finally {
-    loading = false;
-  }
+  const generation = ++loadGeneration;
+  const token = await accessToken();
+  const sessionBefore = await supabase.auth.getSession();
+  const userId = sessionBefore?.data?.session?.user?.id || null;
+  if (!userId) return;
+  await api("/crypto/account", {}, token);
+  const portfolio = await api("/crypto/portfolio", {}, token);
+  const sessionAfter = await supabase.auth.getSession();
+  if (generation !== loadGeneration || sessionAfter?.data?.session?.user?.id !== userId) return;
+  publishPortfolio(portfolio);
 }
 
 async function placeOrder({ symbol, side, quantity }) {
   if (!supportedSymbols.has(symbol) || !["BUY", "SELL"].includes(side)) throw new Error("Select a supported crypto spot market and order side.");
   if (!Number.isFinite(quantity) || quantity <= 0) throw new Error("Enter a valid crypto quantity.");
+  const quantityText = quantity.toFixed(12).replace(/0+$/, "").replace(/\.$/, "");
+  if (!pendingOrder || pendingOrder.symbol !== symbol || pendingOrder.side !== side || pendingOrder.quantity !== quantityText) {
+    pendingOrder = { symbol, side, quantity: quantityText, key: crypto.randomUUID() };
+  }
   const result = await api("/crypto/orders", {
     method: "POST",
-    body: { symbol, side, quantity: quantity.toFixed(12).replace(/0+$/, "").replace(/\.$/, ""), idempotency_key: crypto.randomUUID() }
+    body: { symbol, side, quantity: quantityText, idempotency_key: pendingOrder.key }
   });
   if (result.status !== "FILLED" || result.simulationOnly !== true) throw new Error("The cloud did not confirm a completed paper order.");
+  pendingOrder = null;
   await load();
   return result;
 }
@@ -72,6 +79,7 @@ supabase.auth.onAuthStateChange((_event, session) => {
   const nextUserId = session?.user?.id || null;
   if (nextUserId === activeUserId) return;
   activeUserId = nextUserId;
+  loadGeneration++;
   if (nextUserId) load().catch(error => console.warn("Crypto cloud portfolio unavailable:", error.message));
 });
 supabase.auth.getSession().then(({ data, error }) => {
