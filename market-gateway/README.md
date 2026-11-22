@@ -25,7 +25,7 @@ npm test
 npm start
 ```
 
-`npm start` and the Docker image both start the Supabase-native gateway. The legacy Firebase server is not started by default.
+`npm start` and the Docker image both start the Supabase-native gateway. `npm run worker:limit` runs the isolated scheduled Supabase LIMIT worker as a one-shot process. The legacy Firebase server is not started by default.
 
 ## API
 
@@ -49,7 +49,7 @@ All private endpoints validate the Supabase access token. User-facing reads/writ
 - Supabase service-role and Upstox secrets must exist only in Cloud Run Secret Manager.
 - Browser requests use Supabase publishable key plus the signed-in user's access token; RLS remains mandatory.
 - Exact-match instrument validation, fresh provider quote checks, idempotency keys and transactional Postgres RPCs protect paper-order execution.
-- The LIMIT-order fill worker must remain disabled until its independent Supabase worker, lease/single-writer design and end-to-end tests are complete.
+- The Supabase LIMIT-order worker is a separate Cloud Run Job. It uses a Postgres lease/single-writer guard, fresh Upstox batch quotes and the transactional `execute_paper_limit_fill` RPC; do not run multiple worker tasks in parallel.
 - Upstox OAuth access tokens expire on the provider's daily schedule; the app must prompt users to reconnect when expired.
 - The public `/instruments` and `/health` endpoints contain no private account data. All account, portfolio, order and stream endpoints require Supabase authentication.
 - Configure exact CORS origins and verify the Upstox developer-console callback URL matches `UPSTOX_REDIRECT_URI` byte-for-byte.
