@@ -12,6 +12,7 @@ on:
       - "market-gateway/scripts/paper-trading-reconcile.js"
       - "market-gateway/test/paper-trading-reconcile.test.js"
       - "market-gateway/PAPER_TRADING_RECONCILIATION.md"
+      - "market-gateway/PAPER_TRADING_SCHEMA_COMPATIBILITY_AUDIT.md"
       - ".github/workflows/firebase-readonly-export-tests.yml"
   workflow_dispatch:
 
