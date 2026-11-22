@@ -37,7 +37,9 @@ function normalizeExchangeSessionRow(row,expectedExchange,expectedDate,nowMs){
      ||typeof row.is_trading_day!=="boolean"||row.is_trading_day!==true
      ||typeof row.source_reference!=="string"||row.source_reference.trim().length<1
      ||row.source_reference.length>500
-     ||typeof row.verified_at!=="string"||!Number.isSafeInteger(nowMs)||nowMs<1)return null;
+     ||typeof row.verified_at!=="string"
+     ||typeof row.source_sha256!=="string"||! /^[a-f0-9]{64}$/.test(row.source_sha256)
+     ||!Number.isSafeInteger(nowMs)||nowMs<1)return null;
   const verifiedAtMs=Date.parse(row.verified_at);
   if(!Number.isFinite(verifiedAtMs)||verifiedAtMs>nowMs)return null;
   return normalizeMarketSession({
