@@ -48,7 +48,7 @@ test("maps derivative charge and cash metadata",()=>{
  assert.equal(r.charges_breakdown.brokerage,200);
 });
 test("migrates four named watchlists and legacy instrumentKeys",()=>{
- const record={documentId:"legacy-user",data:{instrumentKeys:["A","A"],watchlists:{Banking:["B"],NIFTY:["C"],"F&O":["D"]}}};
+ const record={documentId:"legacy-user",data:{instrumentKeys:["A","A"],watchlists:{Banking:["B"],NIFTY:["C"],"F&O":["D"]},updatedAt:"2026-11-20T10:00:00Z"}};
  const rows=transformWatchlist(record,map);
  assert.equal(rows.length,4);
  assert.deepEqual(rows[0].instrument_keys,["A"]);
