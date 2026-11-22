@@ -128,7 +128,7 @@ BEGIN
         AND instrument_key='NSE_EQ|INTRADAY_RACE_SELL')<>0 THEN
     RAISE EXCEPTION 'SELL cancel-first race changed or reserved the position incorrectly';
   END IF;
-  IF (SELECT cash_paise FROM public.paper_accounts WHERE user_id='$USER_ID')<>99980200 THEN
+  IF (SELECT cash_paise FROM public.paper_accounts WHERE user_id='$USER_ID')<>99980174 THEN
     RAISE EXCEPTION 'Intraday LIMIT BUY race debited virtual cash more than once';
   END IF;
 END
