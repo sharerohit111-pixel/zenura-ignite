@@ -60,6 +60,8 @@ test("BSE Delivery BUY charges use scrip-group exchange rate and no separate IPF
   assert.equal(c.sebiPaise,1000);
   assert.equal(c.stampDutyPaise,150000);
   assert.equal(c.sttPaise,1000000);
+  assert.equal(c.gstPaise,7110);
+  assert.equal(c.totalChargesPaise,1197610);
   assert.equal(c.ipftIncludedInExchangeCharge,true);
   assert.equal(c.ipftPaise,0);
   assert.equal(c.scheduleVersion,"BSE-2025-04-29");
@@ -73,6 +75,7 @@ test("BSE Intraday SELL uses group fee, STT and net proceeds",()=>{
   assert.equal(c.brokeragePaise,2000);
   assert.equal(c.sttPaise,250000);
   assert.equal(c.stampDutyPaise,0);
+  assert.equal(c.totalChargesPaise,285810);
   assert.equal(c.netCreditPaise,c.grossPaise-c.totalChargesPaise);
 });
 test("P/ZP and non-positive SELL settlement fail closed",()=>{
