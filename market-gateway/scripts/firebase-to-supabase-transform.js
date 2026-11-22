@@ -34,7 +34,7 @@ async function transformExport({inputDirectory,outputDirectory,userMap}){
  await fs.mkdir(out,{recursive:false,mode:0o700});
  const counts={},seen=new Set(),errors=[],referencedUids=new Set();
  async function write(table,row){
-  const key=table+":"+(row.order_id||row.user_id+":"+(row.product||"")+":"+(row.instrument_key||row.name||""));
+  const key=table+":"+(row.order_id||(row.supabase_user_id||row.user_id)+":"+(row.product||"") + ":" +(row.instrument_key||row.name||""));
   if(seen.has(key))fail("Duplicate target record "+key);seen.add(key);
   await fs.appendFile(path.join(out,table+".jsonl"),JSON.stringify(row)+"\n",{flag:"a",mode:0o600});
   counts[table]=(counts[table]||0)+1;
