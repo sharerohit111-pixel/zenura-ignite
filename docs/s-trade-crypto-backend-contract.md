@@ -27,6 +27,7 @@ The browser must never submit or control the user UUID, execution price, quote t
 - Direct client writes are revoked. Mutations go through SECURITY DEFINER functions with an empty search_path; EXECUTE is granted only to `service_role`.
 - The database enforces a 15-second quote age and 2-second future-clock tolerance as a secondary guard.
 - The RPC locks the account and position, enforces idempotency, uses fixed-precision NUMERIC arithmetic, and updates account, position, order and ledger atomically.
+- The cash ledger is append-only: a dedicated database trigger rejects UPDATE/DELETE even for service-role sessions, and the service role no longer has UPDATE/DELETE grants on the ledger.
 - Buy cost basis includes the fee. Sell realized P&L deducts the sell fee and allocates cost basis proportionally for partial exits.
 
 ## Validation completed in CI
@@ -34,6 +35,7 @@ The browser must never submit or control the user UUID, execution price, quote t
 - Crypto BUY, partial SELL, fee/cost-basis, realized-P&L, exact retry/idempotency and stale-quote checks pass.
 - Negative crypto cases reject zero quantity, unsupported symbols, future-dated quotes, overselling and insufficient virtual INR.
 - Crypto RLS checks verify another user cannot read accounts, positions, orders or ledger entries; authenticated direct account mutation is denied.
+- A separate migration enforces append-only crypto ledger semantics; CI asserts both UPDATE and DELETE fail with SQLSTATE 55000 under the service role.
 - Existing market, options, futures, Paper Investing, OAuth/stream and gateway regression checks remain in the same passing CI workflow.
 - Frontend module syntax, deployment workflow YAML, gateway security checks and production container build pass.
 
