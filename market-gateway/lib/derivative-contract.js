@@ -27,6 +27,7 @@ function validateDerivativeContract(instrument,{lots,pricePaise,now=Date.now()}=
  if(!instrument||typeof instrument!=="object")fail("A verified derivative contract is required.");
  if(!DERIVATIVE_SEGMENTS.has(instrument.segment)||!DERIVATIVE_TYPES.has(instrument.instrument_type))fail("Only verified NSE/BSE futures and options contracts are supported.");
  if(typeof instrument.instrument_key!=="string"||!instrument.instrument_key||typeof instrument.trading_symbol!=="string"||!instrument.trading_symbol||!["NSE","BSE"].includes(instrument.exchange))fail("Derivative contract identity is incomplete.");
+ if((instrument.exchange==="NSE"&&instrument.segment!=="NSE_FO")||(instrument.exchange==="BSE"&&instrument.segment!=="BSE_FO"))fail("Derivative exchange and segment do not match.");
  const lotSize=instrument.lot_size;
  if(!Number.isSafeInteger(lotSize)||lotSize<1||lotSize>1000000)fail("Contract lot size is missing or invalid in the official instrument master.");
  if(!Number.isSafeInteger(lots)||lots<1||lots>10000)fail("Lots must be a whole number between 1 and 10,000.");
