@@ -322,10 +322,18 @@
     }
     if(["CANDLE","OHLC","AREA","LINE"].includes(config.chartType))setChartType(config.chartType);
     if(config.theme==="light"||config.theme==="dark")setTheme(config.theme);
+    for(const name of [...activeIndicators])chart.removeIndicator({name});
+    activeIndicators.clear();
     if(Array.isArray(config.indicators)){
       for(const name of config.indicators.slice(0,20))if(typeof name==="string"&&!activeIndicators.has(name))addIndicator(name);
     }
     await savePreferences();return true;
+  }
+  function removeIndicator(name){
+    if(!chart||!name||name==="VOL"||!activeIndicators.has(name))return false;
+    const removed=chart.removeIndicator({name});
+    if(removed){activeIndicators.delete(name);savePreferences().catch(()=>{});}
+    return removed;
   }
   function setChartType(type){
     if(!["CANDLE","OHLC","AREA","LINE"].includes(type))return false;
@@ -401,6 +409,7 @@
     const id=document.getElementById("chart-template-select")?.value;
     if(id)loadTemplate(id).catch(error=>console.warn("Chart template load failed:",error.message));
   });
+  document.getElementById("chart-remove-indicator")?.addEventListener("click",()=>removeIndicator(document.getElementById("chart-indicator-select")?.value));
   document.getElementById("chart-add-indicator")?.addEventListener("click",()=>{
     const name=document.getElementById("chart-indicator-select")?.value;
     if(name)addIndicator(name);
@@ -413,7 +422,7 @@
   document.getElementById("chart-redo")?.addEventListener("click",redo);
   document.getElementById("chart-remove-last")?.addEventListener("click",removeLastDrawing);
   root.ZenuraProfessionalChart=Object.freeze({
-    mount,updateQuote,setTheme,setChartType,addIndicator,addDrawing,removeLastDrawing,undo,redo,saveTemplate,loadTemplate,destroy,
+    mount,updateQuote,setTheme,setChartType,addIndicator,removeIndicator,addDrawing,removeLastDrawing,undo,redo,saveTemplate,loadTemplate,destroy,
     normalizeBars,periods:Object.freeze({...PERIODS})
   });
 })(window);
