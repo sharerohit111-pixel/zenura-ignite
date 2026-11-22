@@ -19,9 +19,13 @@ function marketClockParts(timestampMs){
 
 function normalizeMarketSession(session){
   if(!session||typeof session!=="object"||session.isTradingDay!==true
+     ||!["NSE","BSE"].includes(session.exchange)
+     ||typeof session.sessionDate!=="string"||!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(session.sessionDate)
      ||!Number.isInteger(session.openMinute)||!Number.isInteger(session.closeMinute)
      ||session.openMinute<0||session.closeMinute>24*60
      ||session.openMinute>=session.closeMinute)return null;
+  const parsed=new Date(session.sessionDate+"T00:00:00.000Z");
+  if(Number.isNaN(parsed.getTime())||parsed.toISOString().slice(0,10)!==session.sessionDate)return null;
   return session;
 }
 
@@ -29,7 +33,8 @@ function isIntradaySessionOpen(timestampMs,session){
   const normalized=normalizeMarketSession(session);
   if(!normalized)return false;
   const clock=marketClockParts(timestampMs);
-  if(clock.weekday==="Sat"||clock.weekday==="Sun")return false;
+  if(clock.weekday==="Sat"||clock.weekday==="Sun"
+     ||session.sessionDate!==`${clock.year}-${String(clock.month).padStart(2,"0")}-${String(clock.day).padStart(2,"0")}`)return false;
   const minute=clock.hour*60+clock.minute;
   return minute>=normalized.openMinute&&minute<normalized.closeMinute;
 }
@@ -43,7 +48,8 @@ function isIntradayOrderExpired(order,nowMs,session){
   const now=marketClockParts(nowMs);
   const sameSessionDate=created.year===now.year&&created.month===now.month&&created.day===now.day;
   const normalized=normalizeMarketSession(session);
-  if(!sameSessionDate||!normalized)return true;
+  if(!sameSessionDate||!normalized
+     ||normalized.sessionDate!==`${now.year}-${String(now.month).padStart(2,"0")}-${String(now.day).padStart(2,"0")}`)return true;
   if(now.weekday==="Sat"||now.weekday==="Sun")return true;
   const minute=now.hour*60+now.minute;
   return minute>=normalized.closeMinute;
@@ -67,7 +73,8 @@ function isEligibleIntradayLimitOrder(order,quote,nowMs,session){
   const createdMs=Date.parse(order.created_at);
   if(createdMs>nowMs)return false;
   const created=marketClockParts(createdMs),now=marketClockParts(nowMs);
-  if(created.year!==now.year||created.month!==now.month||created.day!==now.day)return false;
+  if(created.year!==now.year||created.month!==now.month||created.day!==now.day
+     ||normalized.sessionDate!==`${now.year}-${String(now.month).padStart(2,"0")}-${String(now.day).padStart(2,"0")}`)return false;
   const createdMinute=created.hour*60+created.minute;
   if(createdMinute<normalized.openMinute||createdMinute>=normalized.closeMinute)return false;
   return order.side==="BUY"?quote.pricePaise<=order.limit_price_paise:quote.pricePaise>=order.limit_price_paise;
