@@ -361,6 +361,15 @@ jobs:
             IF v_qty <> 5 OR (v_result->>'order_realized_pnl_paise')::bigint <> 3978 THEN
               RAISE EXCEPTION 'MARKET SELL net realized P&L or position is incorrect';
             END IF;
+            BEGIN
+              PERFORM public.submit_paper_limit_order(
+                '22222222-2222-4222-8222-222222222222',repeat('9',64),
+                '99999999-9999-4999-8999-999999999999',repeat('a',64),
+                'BSE_EQ|LIMIT_BSE_BLOCK','LIMIT_BSE_BLOCK','BSE','BUY',1,10000
+              );
+              RAISE EXCEPTION 'BSE Delivery LIMIT was accepted without scrip-group fee inputs';
+            EXCEPTION WHEN SQLSTATE '22023' THEN NULL;
+            END;
             -- LIMIT BUY reservation then cancellation must release all reserved cash.
             v_result := public.submit_paper_limit_order(
               '22222222-2222-4222-8222-222222222222',
@@ -396,7 +405,9 @@ jobs:
             SELECT reserved_cash_paise,cash_paise INTO v_reserved,v_cash
               FROM public.paper_accounts
              WHERE user_id='22222222-2222-4222-8222-222222222222';
-            IF v_result->>'status' <> 'FILLED' OR v_reserved <> 0 OR v_cash <> 99892310 THEN
+            IF v_result->>'status' <> 'FILLED' OR v_reserved <> 0 OR v_cash <> 99892310
+               OR (v_result->>'charges_paise')::bigint <> 2429
+               OR (v_result->>'cash_delta_paise')::bigint <> -60429 THEN
               RAISE EXCEPTION 'LIMIT BUY fill cash or reservation result is incorrect after fee-inclusive MARKET basis';
             END IF;
             -- LIMIT SELL must reserve shares, reject stale quotes, and release on cancel.
@@ -447,6 +458,8 @@ jobs:
              WHERE user_id='22222222-2222-4222-8222-222222222222';
             IF v_result->>'status' <> 'FILLED' OR v_qty <> 3 OR v_reserved <> 0
                OR v_cash <> 99913563
+               OR (v_result->>'charges_paise')::bigint <> 4747
+               OR (v_result->>'cash_delta_paise')::bigint <> 21253
                OR (v_result->>'realized_pnl_paise')::bigint <> 757 THEN
               RAISE EXCEPTION 'LIMIT SELL fill position, cash, reservation or fee-inclusive basis P&L is incorrect';
             END IF;
