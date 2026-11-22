@@ -951,7 +951,7 @@ async function start(){
       if(workerBusy||Date.now()<nextWorkerRunAt)return;
       workerBusy=true;
       try{
-        const result=await runPaperLimitWorker({maxOrders:50});
+        const result=await runPaperLimitWorker({maxOrders:10});
         paperLimitWorkerStatus.lastRunAt=Date.now();
         paperLimitWorkerStatus.lastCycle={scanned:result.scanned,filled:result.filled,failed:result.failed,locked:result.locked};
         workerBackoffMs=intervalMs;nextWorkerRunAt=Date.now()+intervalMs;
