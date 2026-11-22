@@ -141,7 +141,19 @@ jobs:
           SET ROLE service_role;
           SELECT public.initialize_paper_trading_account('11111111-1111-4111-8111-111111111111');
           SELECT public.initialize_paper_trading_account('22222222-2222-4222-8222-222222222222');
+          SELECT public.initialize_paper_investing_account('11111111-1111-4111-8111-111111111111');
+          SELECT public.initialize_paper_investing_account('22222222-2222-4222-8222-222222222222');
           RESET ROLE;
+          DO $investing_account_checks$
+          BEGIN
+            IF (SELECT cash_paise FROM public.paper_investing_accounts
+                WHERE user_id='11111111-1111-4111-8111-111111111111') <> 100000000
+               OR (SELECT cash_paise FROM public.paper_investing_accounts
+                WHERE user_id='22222222-2222-4222-8222-222222222222') <> 100000000 THEN
+              RAISE EXCEPTION 'New Paper Investing accounts must receive the configured 10 lakh virtual capital';
+            END IF;
+          END
+          $investing_account_checks$;
           UPDATE public.paper_accounts
              SET cash_paise=76543210, reserved_cash_paise=100
            WHERE user_id='11111111-1111-4111-8111-111111111111';
@@ -1136,7 +1148,10 @@ jobs:
               'paper_derivative_positions','paper_orders','paper_derivative_orders',
               'paper_watchlists','upstox_connections','upstox_oauth_states',
               'upstox_connection_controls','paper_market_stream_leases',
-              'paper_market_worker_state','paper_margin_preview_limits'
+              'paper_market_worker_state','paper_margin_preview_limits',
+              'paper_futures_positions','paper_futures_orders','paper_investing_accounts',
+              'paper_investing_positions','paper_investing_orders','paper_protective_orders',
+              'paper_chart_drawings','paper_chart_templates','paper_chart_preferences'
             ];
           BEGIN
             FOREACH t IN ARRAY protected_tables LOOP
@@ -1150,7 +1165,7 @@ jobs:
                 AND p.proname IN (
                   'current_paper_user_id','execute_paper_market_order','submit_paper_limit_order',
                   'execute_paper_limit_fill','cancel_paper_limit_order',
-                  'initialize_paper_trading_account','execute_paper_long_option_order'
+                  'initialize_paper_trading_account','initialize_paper_investing_account','execute_paper_long_option_order'
                 )
                 AND COALESCE(array_to_string(p.proconfig,','),'') NOT LIKE '%search_path=""%'
             ) THEN
@@ -1254,7 +1269,10 @@ jobs:
               'paper_derivative_positions','paper_orders','paper_derivative_orders',
               'paper_watchlists','upstox_connections','upstox_oauth_states',
               'upstox_connection_controls','paper_market_stream_leases',
-              'paper_market_worker_state','paper_margin_preview_limits'
+              'paper_market_worker_state','paper_margin_preview_limits',
+              'paper_futures_positions','paper_futures_orders','paper_investing_accounts',
+              'paper_investing_positions','paper_investing_orders','paper_protective_orders',
+              'paper_chart_drawings','paper_chart_templates','paper_chart_preferences'
             ];
             table_name text;
           BEGIN
@@ -1264,7 +1282,7 @@ jobs:
               END IF;
             END LOOP;
             IF (SELECT count(*) FROM pg_tables
-                WHERE schemaname='public' AND tablename = ANY(expected_tables)) <> 13 THEN
+                WHERE schemaname='public' AND tablename = ANY(expected_tables)) <> 21 THEN
               RAISE EXCEPTION 'Unexpected public table count for migration schema';
             END IF;
             IF to_regprocedure('public.execute_paper_market_order(uuid,text,uuid,text,text,text,text,text,text,integer,bigint,bigint,bigint)') IS NULL
@@ -1272,6 +1290,7 @@ jobs:
               OR to_regprocedure('public.execute_paper_limit_fill(text,bigint,bigint,bigint,bigint)') IS NULL
               OR to_regprocedure('public.cancel_paper_limit_order(uuid,text)') IS NULL
               OR to_regprocedure('public.initialize_paper_trading_account(uuid)') IS NULL
+              OR to_regprocedure('public.initialize_paper_investing_account(uuid)') IS NULL
               OR to_regprocedure('public.execute_paper_long_option_order(uuid,text,uuid,text,text,text,text,text,text,date,numeric,integer,integer,integer,text,bigint,bigint,bigint)') IS NULL THEN
               RAISE EXCEPTION 'One or more expected trading RPC functions are missing';
             END IF;
