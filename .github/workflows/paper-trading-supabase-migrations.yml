@@ -647,6 +647,124 @@ jobs:
           END
           $parity$;
           SQL
+      - name: Verify add-on BUY, insufficient cash rollback and 50-position cap
+        run: |
+          set -euo pipefail
+          psql -v ON_ERROR_STOP=1 <<'SQL'
+          INSERT INTO auth.users(id) VALUES ('99999999-9999-4999-8999-999999999999')
+            ON CONFLICT DO NOTHING;
+          SET ROLE service_role;
+          SELECT public.initialize_paper_trading_account('99999999-9999-4999-8999-999999999999');
+          RESET ROLE;
+          DO $parity$
+          DECLARE
+            v_now bigint := floor(extract(epoch from clock_timestamp())*1000)::bigint;
+            v_first jsonb;
+            v_second jsonb;
+            v_third jsonb;
+            v_basis bigint;
+            v_cash bigint;
+            v_qty bigint;
+            v_count bigint;
+            v_debit bigint;
+          BEGIN
+            -- Two independent BUY fills on the same contract must accumulate basis and quantity.
+            v_first:=public.execute_paper_long_option_order(
+              '99999999-9999-4999-8999-999999999999',repeat('1',64),
+              '41414141-4141-4141-8141-414141414141',repeat('a',64),
+              'NSE_FO|ADDON','ADDON','NSE','NSE_FO','CE',
+              current_date+10,22000,25,5,1,'BUY',1285,v_now,v_now
+            );
+            v_second:=public.execute_paper_long_option_order(
+              '99999999-9999-4999-8999-999999999999',repeat('2',64),
+              '42424242-4242-4242-8242-424242424242',repeat('b',64),
+              'NSE_FO|ADDON','ADDON','NSE','NSE_FO','CE',
+              current_date+10,22000,25,5,1,'BUY',1285,v_now,v_now
+            );
+            SELECT net_quantity,cost_basis_paise INTO v_qty,v_basis
+              FROM public.paper_derivative_positions
+             WHERE user_id='99999999-9999-4999-8999-999999999999'
+               AND instrument_key='NSE_FO|ADDON';
+            v_debit:=(v_first->'order'->>'total_debit_paise')::bigint
+                    +(v_second->'order'->>'total_debit_paise')::bigint;
+            SELECT cash_paise INTO v_cash FROM public.paper_accounts
+             WHERE user_id='99999999-9999-4999-8999-999999999999';
+            IF v_qty<>50 OR v_basis<>v_debit OR v_cash<>100000000-v_debit THEN
+              RAISE EXCEPTION 'Add-on BUY did not conserve fee-inclusive basis, quantity and cash';
+            END IF;
+            -- Insufficient unreserved cash must roll back both order and position writes.
+            UPDATE public.paper_accounts SET cash_paise=10000,reserved_cash_paise=0
+             WHERE user_id='99999999-9999-4999-8999-999999999999';
+            BEGIN
+              PERFORM public.execute_paper_long_option_order(
+                '99999999-9999-4999-8999-999999999999',repeat('3',64),
+                '43434343-4343-4343-8343-434343434343',repeat('c',64),
+                'NSE_FO|POOR','POOR','NSE','NSE_FO','CE',
+                current_date+10,22000,25,5,1,'BUY',1285,v_now,v_now
+              );
+              RAISE EXCEPTION 'Insufficient-cash option BUY was unexpectedly accepted';
+            EXCEPTION WHEN SQLSTATE '23514' THEN
+              NULL;
+            END;
+            SELECT cash_paise INTO v_cash FROM public.paper_accounts
+             WHERE user_id='99999999-9999-4999-8999-999999999999';
+            IF v_cash<>10000 OR EXISTS(
+              SELECT 1 FROM public.paper_derivative_orders
+               WHERE order_id=repeat('3',64)
+            ) OR EXISTS(
+              SELECT 1 FROM public.paper_derivative_positions
+               WHERE user_id='99999999-9999-4999-8999-999999999999'
+                 AND instrument_key='NSE_FO|POOR'
+            ) THEN
+              RAISE EXCEPTION 'Insufficient-cash rejection left partial database writes';
+            END IF;
+            -- Restore test cash, then reach exactly 50 open instruments.
+            UPDATE public.paper_accounts SET cash_paise=100000000,reserved_cash_paise=0
+             WHERE user_id='99999999-9999-4999-8999-999999999999';
+            INSERT INTO public.paper_derivative_positions(
+              user_id,instrument_key,trading_symbol,segment,exchange,instrument_type,
+              expiry,lot_size,net_quantity,average_price_paise,cost_basis_paise
+            )
+            SELECT '99999999-9999-4999-8999-999999999999',
+                   'NSE_FO|CAP'||g,'CAP'||g,'NSE_FO','NSE','CE',
+                   current_date+10,25,25,100,2500
+              FROM generate_series(1,49) AS g;
+            SELECT count(*) INTO v_count FROM public.paper_derivative_positions
+             WHERE user_id='99999999-9999-4999-8999-999999999999' AND net_quantity>0;
+            IF v_count<>50 THEN RAISE EXCEPTION 'Position-cap fixture did not create 50 open positions'; END IF;
+            BEGIN
+              PERFORM public.execute_paper_long_option_order(
+                '99999999-9999-4999-8999-999999999999',repeat('4',64),
+                '44444444-4444-4444-8444-444444444444',repeat('d',64),
+                'NSE_FO|CAP51','CAP51','NSE','NSE_FO','CE',
+                current_date+10,22000,25,5,1,'BUY',1285,v_now,v_now
+              );
+              RAISE EXCEPTION '51st distinct derivative position was unexpectedly accepted';
+            EXCEPTION WHEN SQLSTATE '23514' THEN
+              NULL;
+            END;
+            IF (SELECT count(*) FROM public.paper_derivative_positions
+                WHERE user_id='99999999-9999-4999-8999-999999999999' AND net_quantity>0)<>50
+               OR EXISTS(SELECT 1 FROM public.paper_derivative_orders WHERE order_id=repeat('4',64)) THEN
+              RAISE EXCEPTION 'Position-cap rejection left a partial order or position';
+            END IF;
+            -- Add-on BUY to an existing key remains valid while already at the 50-position cap.
+            v_third:=public.execute_paper_long_option_order(
+              '99999999-9999-4999-8999-999999999999',repeat('5',64),
+              '45454545-4545-4545-8545-454545454545',repeat('e',64),
+              'NSE_FO|ADDON','ADDON','NSE','NSE_FO','CE',
+              current_date+10,22000,25,5,1,'BUY',1285,v_now,v_now
+            );
+            SELECT net_quantity INTO v_qty FROM public.paper_derivative_positions
+             WHERE user_id='99999999-9999-4999-8999-999999999999'
+               AND instrument_key='NSE_FO|ADDON';
+            IF v_qty<>75 OR (SELECT count(*) FROM public.paper_derivative_positions
+                WHERE user_id='99999999-9999-4999-8999-999999999999' AND net_quantity>0)<>50 THEN
+              RAISE EXCEPTION 'Add-on BUY was incorrectly blocked at the 50-position limit';
+            END IF;
+          END
+          $parity$;
+          SQL
       - name: Verify SQL charges and rounding against Firebase golden vectors
         run: |
           set -euo pipefail
