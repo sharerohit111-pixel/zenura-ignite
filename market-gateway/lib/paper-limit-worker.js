@@ -39,7 +39,7 @@ function groupOrdersByUser(orders){
 
 function isPositiveCryptoDecimal(value){
   if(typeof value==="number")return Number.isFinite(value)&&value>0;
-  if(typeof value!=="string"||! /^(?:0|[1-9]\\d*)(?:\\.\\d{1,12})?$/.test(value))return false;
+  if(typeof value!=="string"||!/^(?:0|[1-9]\d*)(?:\.\d{1,12})?$/.test(value))return false;
   const parsed=Number(value);
   return Number.isFinite(parsed)&&parsed>0;
 }
