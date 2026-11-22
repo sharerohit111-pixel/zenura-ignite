@@ -14,6 +14,7 @@ const pwaRoot=path.join(root,"..");
 const serviceWorker=fs.readFileSync(path.join(pwaRoot,"service-worker.js"),"utf8");
 const manifest=JSON.parse(fs.readFileSync(path.join(pwaRoot,"manifest.webmanifest"),"utf8"));
 const portal=fs.readFileSync(path.join(pwaRoot,"index.html"),"utf8");
+const languageToggle=fs.readFileSync(path.join(pwaRoot,"language-toggle.js"),"utf8");
 test("Paper Investing page includes all locally referenced modules and styles",()=>{
  const assetRefs=[
   ...[...html.matchAll(/<script[^>]*src="([^"]+)"/gi)].map(match=>match[1]),
@@ -104,4 +105,14 @@ test("Market terminal is installable and its service worker never caches private
  assert.match(serviceWorker,/zenura-markets-shell-v2/);
  assert.match(serviceWorker,/BASE=new URL/);
  assert.doesNotMatch(serviceWorker,/supabase\.co|api\.upstox\.com/);
+});
+
+test("Hindi-English toggle is shared, persistent and updates both modes",()=>{
+ const trading=fs.readFileSync(path.join(root,"../stocks/index.html"),"utf8");
+ assert.match(html,/language-toggle\.js/);assert.match(trading,/language-toggle\.js/);
+ assert.match(languageToggle,/zenura-language-v1/);
+ assert.match(languageToggle,/zenura-language-change/);
+ assert.match(languageToggle,/MutationObserver/);
+ assert.match(languageToggle,/data-en/);assert.match(languageToggle,/data-hi/);
+ assert.match(serviceWorker,/"language-toggle\.js"/);
 });
