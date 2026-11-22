@@ -372,6 +372,10 @@ begin
         exchange=coalesce(v_order.exchange,exchange),updated_at=v_now
        where user_id=v_order.user_id and product='INTRADAY' and instrument_key=v_order.instrument_key;
     else
+      if (select count(*) from public.paper_equity_positions
+           where user_id=v_order.user_id and quantity>0)>=50 then
+        raise exception using errcode='23514',message='Paper portfolio is limited to 50 open positions';
+      end if;
       insert into public.paper_equity_positions(user_id,product,instrument_key,trading_symbol,
         exchange,quantity,average_price_paise,cost_basis_paise,reserved_quantity,updated_at)
       values(v_order.user_id,'INTRADAY',v_order.instrument_key,v_order.trading_symbol,
