@@ -1,5 +1,7 @@
 # Paper Trading LIMIT Orders — Staging E2E Runbook
 
+> **ARCHIVED — legacy Firebase staging notes.** This document does not apply to the current Supabase-native ZENURA IGNITE launch. Do not run the old Firebase staging or scheduled-worker steps. The current equity Delivery LIMIT worker runs as a leased background loop inside the Supabase Cloud Run gateway; see [DEPLOYMENT.md](./DEPLOYMENT.md).
+
 ## Purpose and release gate
 
 This runbook verifies the cash-equity paper LIMIT order lifecycle against an isolated Firebase/Firestore staging project and a staging Cloud Run gateway. These are simulations only; no broker or exchange order may be submitted.
