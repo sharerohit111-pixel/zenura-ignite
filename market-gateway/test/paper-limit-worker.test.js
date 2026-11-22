@@ -59,3 +59,13 @@ test("crypto LIMIT worker rejects non-decimal quantities and non-numeric provide
  assert.equal(isEligibleCryptoLimitOrder(cryptoLimit,{...cryptoQuote,priceUsdt:"89900"},101000),false);
  assert.equal(isEligibleCryptoLimitOrder(cryptoLimit,cryptoQuote,101000),true);
 });
+
+test("crypto LIMIT worker rejects malformed symbols, identities and unsafe timestamps",()=>{
+ assert.equal(isEligibleCryptoLimitOrder({...cryptoLimit,symbol:"btcUSDT"},cryptoQuote,101000),false);
+ assert.equal(isEligibleCryptoLimitOrder({...cryptoLimit,user_id:""},cryptoQuote,101000),false);
+ assert.equal(isEligibleCryptoLimitOrder({...cryptoLimit,order_type:"MARKET"},cryptoQuote,101000),false);
+ assert.equal(isEligibleCryptoLimitOrder(cryptoLimit,{...cryptoQuote,tradeTimeMs:Number.MAX_SAFE_INTEGER+1},101000),false);
+ assert.equal(isEligibleCryptoLimitOrder(cryptoLimit,cryptoQuote,Number.MAX_SAFE_INTEGER+1),false);
+ assert.equal(isEligibleCryptoLimitOrder({...cryptoLimit,quantity:"01"},cryptoQuote,101000),false);
+ assert.equal(isEligibleCryptoLimitOrder({...cryptoLimit,quantity:"1e-3"},cryptoQuote,101000),false);
+});
