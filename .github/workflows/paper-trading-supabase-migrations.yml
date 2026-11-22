@@ -316,7 +316,7 @@ jobs:
               'BUY','DELIVERY',10,10000,floor(extract(epoch from clock_timestamp())*1000)::bigint,0
             );
             IF v_result->>'status' <> 'FILLED'
-               OR (v_result->>'cash_paise')::bigint <> 99897621 THEN
+               OR (v_result->>'cash_paise')::bigint <> 99897521 THEN
               RAISE EXCEPTION 'MARKET BUY did not debit gross plus estimated charges';
             END IF;
             v_result := public.execute_paper_market_order(
@@ -331,7 +331,7 @@ jobs:
             END IF;
             SELECT cash_paise INTO v_cash FROM public.paper_accounts
              WHERE user_id='22222222-2222-4222-8222-222222222222';
-            IF v_cash <> 99897621 THEN
+            IF v_cash <> 99897521 THEN
               RAISE EXCEPTION 'MARKET idempotent retry debited cash more than once';
             END IF;
             -- Same key with a different fingerprint must fail.
@@ -358,7 +358,7 @@ jobs:
             SELECT quantity INTO v_qty FROM public.paper_equity_positions
              WHERE user_id='22222222-2222-4222-8222-222222222222'
                AND product='DELIVERY' AND instrument_key='NSE_EQ|TEST001';
-            IF v_qty <> 5 OR (v_result->>'order_realized_pnl_paise')::bigint <> 4028 THEN
+            IF v_qty <> 5 OR (v_result->>'order_realized_pnl_paise')::bigint <> 3978 THEN
               RAISE EXCEPTION 'MARKET SELL net realized P&L or position is incorrect';
             END IF;
             -- LIMIT BUY reservation then cancellation must release all reserved cash.
@@ -396,7 +396,7 @@ jobs:
             SELECT reserved_cash_paise,cash_paise INTO v_reserved,v_cash
               FROM public.paper_accounts
              WHERE user_id='22222222-2222-4222-8222-222222222222';
-            IF v_result->>'status' <> 'FILLED' OR v_reserved <> 0 OR v_cash <> 99894839 THEN
+            IF v_result->>'status' <> 'FILLED' OR v_reserved <> 0 OR v_cash <> 99894739 THEN
               RAISE EXCEPTION 'LIMIT BUY fill cash or reservation result is incorrect after fee-inclusive MARKET basis';
             END IF;
             -- LIMIT SELL must reserve shares, reject stale quotes, and release on cancel.
@@ -446,8 +446,8 @@ jobs:
             SELECT cash_paise INTO v_cash FROM public.paper_accounts
              WHERE user_id='22222222-2222-4222-8222-222222222222';
             IF v_result->>'status' <> 'FILLED' OR v_qty <> 3 OR v_reserved <> 0
-               OR v_cash <> 99920839
-               OR (v_result->>'realized_pnl_paise')::bigint <> 5524 THEN
+               OR v_cash <> 99920739
+               OR (v_result->>'realized_pnl_paise')::bigint <> 5504 THEN
               RAISE EXCEPTION 'LIMIT SELL fill position, cash, reservation or fee-inclusive basis P&L is incorrect';
             END IF;
           END
@@ -524,7 +524,7 @@ jobs:
               RAISE EXCEPTION 'Concurrent duplicate MARKET requests created more than one order';
             END IF;
             IF (SELECT cash_paise FROM public.paper_accounts
-                WHERE user_id='33333333-3333-4333-8333-333333333333') <> 99897621 THEN
+                WHERE user_id='33333333-3333-4333-8333-333333333333') <> 99897521 THEN
               RAISE EXCEPTION 'Concurrent duplicate MARKET requests debited cash more than once';
             END IF;
           END
