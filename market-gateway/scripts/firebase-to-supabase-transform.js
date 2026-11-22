@@ -23,7 +23,8 @@ async function transformExport({inputDirectory,outputDirectory,userMap}){
  validateUserMap(userMap);
  const input=path.resolve(inputDirectory),out=path.resolve(outputDirectory),manifest=JSON.parse(await fs.readFile(path.join(input,"manifest.json"),"utf8"));
  if(manifest.format!=="zenura-firebase-read-only-export-v1"||manifest.importPerformed!==false)fail("Unsafe or unsupported source manifest");
- for(const collection of Object.keys(TABLES)){if(!manifest.files?.[collection+".jsonl"])fail("Required source export file is missing: "+collection+".jsonl");}\n const authFile="firebase-auth-users.jsonl",authMeta=manifest.files?.[authFile];
+ for(const collection of Object.keys(TABLES)){if(!manifest.files?.[collection+".jsonl"])fail("Required source export file is missing: "+collection+".jsonl");}
+ const authFile="firebase-auth-users.jsonl",authMeta=manifest.files?.[authFile];
  if(!authMeta)fail("Firebase Auth identity export is required for orphan-user validation");
  const authRaw=await fs.readFile(path.join(input,authFile),"utf8");
  if(crypto.createHash("sha256").update(authRaw).digest("hex")!==authMeta.sha256)fail("Source checksum mismatch: "+authFile);
