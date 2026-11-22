@@ -1,0 +1,20 @@
+{
+  "id": "/markets/",
+  "name": "ZENURA IGNITE – Paper Trading & Paper Investing",
+  "short_name": "ZENURA IGNITE",
+  "description": "Professional Indian stock market paper trading and virtual investing terminal.",
+  "lang": "en-IN",
+  "start_url": "/markets/",
+  "scope": "/markets/",
+  "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
+  "orientation": "any",
+  "background_color": "#07111f",
+  "theme_color": "#07111f",
+  "categories": ["finance", "education", "utilities"],
+  "icons": [{"src":"../crypto/icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any"}],
+  "shortcuts": [
+    {"name":"Paper Trading","short_name":"Trading","url":"/markets/stocks/"},
+    {"name":"Paper Investing","short_name":"Investing","url":"/markets/investing/"}
+  ]
+}
