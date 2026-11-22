@@ -282,3 +282,37 @@ Scope/limitations:
 - It does not connect to or mutate the user's Supabase project and does not access Firebase.
 - It does not yet prove behavioral parity, RLS policy correctness under JWT roles, concurrency, idempotency, cash/position invariants, or provider quote trust.
 - A green workflow must not be represented as production readiness or authorization to cut over.
+
+
+## Database security and transaction hardening — 2026-11-22 (audit branch)
+
+The first disposable PostgreSQL 16 CI run for PR #70 (run 44990636529, job `postgres-migration-smoke`) completed successfully. Its original scope covered ordered DDL application, account initialization retry, a basic account RLS read check, MARKET idempotency, LIMIT reservation/fill/cancel, one CE partial close, and expected table/RPC registration. This is a real CI result, but it is not a concurrency or complete security certification.
+
+A separate hardening branch, `audit/supabase-paper-trading-hardening-2026-11-22`, was created from the verified PR #70 head. It does not modify PR #70, PR #28, or the integration branch.
+
+### Findings and draft fixes
+
+1. **MARKET quote freshness:** the first draft trusted caller-provided `p_quote_age_ms` and did not reject a future `p_quote_timestamp_ms`. The RPC now derives current time from PostgreSQL `clock_timestamp()`, rejects future timestamps and quotes older than 15 seconds, checks caller age within a 2-second tolerance, and persists the database-computed quote age.
+2. **LIMIT submit null-side edge case:** SQL three-valued logic meant a NULL side could fall through the original validation and enter the SELL branch. The RPC now explicitly rejects NULL `p_side`; it also validates account cash/reservation/version invariants before reserving.
+3. **LIMIT fill quote clock:** the worker-supplied `p_now_ms` is now checked against database time (2-second tolerance), quote timestamp is checked against database time, and the stored quote age is database-computed.
+4. **Options quote/expiry clock:** the caller clock is now required to be within 2 seconds of database time. Freshness and the 15:30 Asia/Kolkata expiry cutoff use the database clock rather than trusting the caller timestamp.
+
+### Expanded disposable CI assertions added on the audit branch
+
+- MARKET future quote, stale quote and caller-age mismatch must be rejected before order mutation.
+- Two concurrent identical MARKET requests must produce exactly one order and one cash debit.
+- All 13 tables must have RLS enabled; authenticated/anon roles must not receive account write/public read access; MARKET RPC execution must remain service-role-only.
+- NULL LIMIT side must be rejected without leaving an order row.
+- CE option full close at a one-paise premium must permit a negative net-credit amount when indicative fees exceed turnover and must remove the fully closed position.
+- LIMIT and option fixtures use database-current timestamps so quote checks exercise real clock behavior.
+
+### Remaining test gates
+
+- Run the updated workflow on this audit branch and inspect the full job result/logs; no success is claimed until GitHub reports it.
+- Add deterministic multi-session LIMIT cancel-vs-fill race coverage and concurrent LIMIT duplicate-submit coverage.
+- Add broader RLS row-isolation tests for positions, orders, derivative data and watchlists under two authenticated JWT subjects; the current CI role check is not a substitute for a full Supabase Auth emulator.
+- Add option negative/future quote, off-tick, expiry-boundary, mismatched-idempotency, insufficient-cash, 50-position-cap and repeated-partial-close conservation fixtures.
+- Differentially compare the SQL fee/rounding outputs against the Firebase JavaScript helper for a full boundary-value matrix.
+- Validate trusted backend UID mapping, request fingerprint derivation and quote/instrument binding before any staging or production cutover.
+
+All testing remains confined to GitHub Actions disposable PostgreSQL. No connected Supabase project was modified. Firebase and PR #28 remain untouched. PR #70 remains Draft.
