@@ -181,3 +181,45 @@ test("BSE delivery orders are blocked until exact scrip-group charges are known"
  const {calculateEquityDeliveryCharges}=require("../lib/trading-charges");
  assert.throws(()=>calculateEquityDeliveryCharges({grossPaise:100000,exchange:"BSE",side:"BUY"}),{status:422});
 });
+
+test("NSE intraday BUY includes capped brokerage, exchange, SEBI, stamp duty and GST",()=>{
+ const {calculateEquityIntradayCharges}=require("../lib/trading-charges");
+ const c=calculateEquityIntradayCharges({grossPaise:100000000,exchange:"NSE",side:"BUY"});
+ assert.equal(c.brokeragePaise,2000);
+ assert.equal(c.exchangeTransactionPaise,3070);
+ assert.equal(c.ipftPaise,0);
+ assert.equal(c.sebiPaise,100);
+ assert.equal(c.stampDutyPaise,3000);
+ assert.equal(c.sttPaise,0);
+ assert.equal(c.gstPaise,913);
+ assert.equal(c.totalChargesPaise,9083);
+ assert.equal(c.totalDebitPaise,100009083);
+ assert.equal(c.segment,"EQUITY_INTRADAY");
+ assert.equal(c.indicative,true);
+});
+test("NSE intraday SELL applies 0.025 percent STT and no buy-side stamp duty",()=>{
+ const {calculateEquityIntradayCharges}=require("../lib/trading-charges");
+ const c=calculateEquityIntradayCharges({grossPaise:100000000,exchange:"NSE",side:"SELL"});
+ assert.equal(c.sttPaise,25000);
+ assert.equal(c.stampDutyPaise,0);
+ assert.equal(c.totalChargesPaise,31083);
+ assert.equal(c.netCreditPaise,99968917);
+ assert.equal(c.totalDebitPaise,null);
+});
+test("intraday brokerage is lower of 0.10 percent turnover or Rs 20",()=>{
+ const {calculateEquityIntradayCharges}=require("../lib/trading-charges");
+ const small=calculateEquityIntradayCharges({grossPaise:100000,exchange:"NSE",side:"BUY"});
+ const large=calculateEquityIntradayCharges({grossPaise:100000000,exchange:"NSE",side:"BUY"});
+ assert.equal(small.brokeragePaise,100);
+ assert.equal(large.brokeragePaise,2000);
+});
+test("BSE intraday orders fail closed without the applicable scrip-group rate",()=>{
+ const {calculateEquityIntradayCharges}=require("../lib/trading-charges");
+ assert.throws(()=>calculateEquityIntradayCharges({grossPaise:100000,exchange:"BSE"}),{status:422});
+});
+test("intraday calculator rejects invalid turnover, side and brokerage cap",()=>{
+ const {calculateEquityIntradayCharges}=require("../lib/trading-charges");
+ assert.throws(()=>calculateEquityIntradayCharges({grossPaise:0,exchange:"NSE"}),/turnover/);
+ assert.throws(()=>calculateEquityIntradayCharges({grossPaise:1000,exchange:"NSE",side:"HOLD"}),/side/);
+ assert.throws(()=>calculateEquityIntradayCharges({grossPaise:1000,exchange:"NSE",brokerageCapPaise:-1}),/Brokerage cap/);
+});
