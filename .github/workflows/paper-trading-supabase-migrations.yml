@@ -110,6 +110,10 @@ jobs:
         run: node --test market-gateway/test/derivative-order-transaction.test.js
       - name: Run Existing transaction reference derivative contract validation tests
         run: node --test market-gateway/test/derivative-contract.test.js
+      - name: Run complete market-gateway regression suite
+        run: |
+          npm install --prefix market-gateway --no-audit --no-fund --package-lock=false
+          npm test --prefix market-gateway
       - name: Prepare minimal Supabase-compatible auth roles
         run: |
           psql -v ON_ERROR_STOP=1 <<'SQL'
