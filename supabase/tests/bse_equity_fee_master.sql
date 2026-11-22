@@ -151,7 +151,8 @@ BEGIN
    WHERE user_id='66666666-6666-4666-8666-666666666666';
   IF (v_result->>'charges_paise')::bigint<>5321
      OR (v_result->>'cash_delta_paise')::bigint<>594679
-     OR v_cash<>101593126 OR v_realized<>97929 THEN
+     OR (v_result->>'realized_pnl_paise')::bigint<>97929
+     OR v_cash<>101593126 OR v_realized<>2089876 THEN
     RAISE EXCEPTION 'BSE Delivery LIMIT SELL net settlement mismatch: %, cash %, realized %',v_result,v_cash,v_realized;
   END IF;
 
