@@ -102,7 +102,7 @@ These Auth settings are separate from the Cloud Run deployment workflow and must
 - Equity LIMIT orders are currently supported for **Delivery** and are processed by the in-service worker.
 - Intraday LIMIT and F&O LIMIT are not enabled.
 - Futures and long CE/PE option market-order paths are separate transactional flows.
-- Paper Investing currently supports verified NSE cash-equity MARKET orders. BSE investing execution remains blocked until exact scrip-group charges are available; Investing LIMIT is not enabled.
+- Paper Investing routes and its dedicated ledger have been retired under the Paper Trading-only product scope.
 - Protective stop-loss/target execution is not complete. The table exists, but do not expose or claim those orders as active until the trigger/fill worker and UI pass transaction, concurrency and failure-recovery tests.
 
 ## Manual build reference
