@@ -226,7 +226,11 @@
       observer.observe(container);
       container.__zenuraResizeObserver=observer;
     }
-    context={...options};
+    context={...options,supabase:options.supabase||root.ZENURA_SUPABASE};
+    const oldOverlays=chart.getOverlays?.()||[];
+    suppressRemove=true;
+    for(const old of oldOverlays){try{chart.removeOverlay({id:old.id});}catch(_){}}
+    suppressRemove=false;
     overlayRows.clear();undoStack.length=0;redoStack.length=0;
     chart.setSymbol({ticker:options.instrument.trading_symbol||options.instrument.instrument_key,pricePrecision:2,volumePrecision:0});
     const period=PERIODS[options.timeframe]||PERIODS["1m"];
@@ -293,6 +297,18 @@
     if(chart&&root.klinecharts){try{root.klinecharts.dispose(container);}catch(_){}}
     chart=null;container=null;context=null;barCallback=null;lastBar=null;
   }
+  document.addEventListener("zenura-chart-theme-change",event=>setTheme(event.detail?.theme));
+  document.getElementById("chart-add-indicator")?.addEventListener("click",()=>{
+    const name=document.getElementById("chart-indicator-select")?.value;
+    if(name)addIndicator(name);
+  });
+  document.querySelectorAll("[data-drawing]").forEach(button=>button.addEventListener("click",()=>{
+    document.querySelectorAll("[data-drawing]").forEach(item=>item.classList.toggle("active",item===button));
+    addDrawing(button.dataset.drawing);
+  }));
+  document.getElementById("chart-undo")?.addEventListener("click",undo);
+  document.getElementById("chart-redo")?.addEventListener("click",redo);
+  document.getElementById("chart-remove-last")?.addEventListener("click",removeLastDrawing);
   root.ZenuraProfessionalChart=Object.freeze({
     mount,updateQuote,setTheme,addIndicator,addDrawing,removeLastDrawing,undo,redo,destroy,
     normalizeBars,periods:Object.freeze({...PERIODS})
