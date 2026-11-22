@@ -78,7 +78,9 @@ begin
      or p_instrument_type is null or p_instrument_type not in ('CE','PE')
      or (p_exchange='NSE' and p_segment<>'NSE_FO')
      or (p_exchange='BSE' and p_segment<>'BSE_FO')
-     or p_expiry is null or p_strike_price is null or p_strike_price<=0
+     or p_expiry is null or p_strike_price is null
+     or p_strike_price::text in ('NaN','Infinity','-Infinity')
+     or p_strike_price<=0
      or p_lot_size is null or p_lot_size not between 1 and 1000000
      or p_tick_size_paise is null or p_tick_size_paise not between 1 and 1000000
      or p_lots is null or p_lots not between 1 and 10000
