@@ -9,6 +9,7 @@ const js=fs.readFileSync(path.join(root,"investing.js"),"utf8");
 const css=fs.readFileSync(path.join(root,"investing.css"),"utf8");
 const gateway=fs.readFileSync(path.join(root,"../../market-gateway/supabase-server.js"),"utf8");
 const migration=fs.readFileSync(path.join(root,"../../supabase/migrations/202611220010_paper_investing_market_order.sql"),"utf8");
+const schema=fs.readFileSync(path.join(root,"../../supabase/migrations/202611220007_professional_futures_investing_charts.sql"),"utf8");
 test("Paper Investing page includes all locally referenced modules and styles",()=>{
  for(const match of html.matchAll(/(?:src|href)="([^"]+)"/g)){
   const ref=match[1];if(/^https?:|^#|^mailto:/.test(ref))continue;
@@ -33,7 +34,7 @@ test("Paper Investing server routes and SQL ledger are independent from Paper Tr
   assert.ok(gateway.includes(route),"Missing gateway route "+route);
  assert.match(migration,/paper_investing_accounts/);assert.match(migration,/paper_investing_positions/);
  assert.match(migration,/paper_investing_orders/);assert.match(migration,/execute_paper_investing_market_order/);
- assert.match(migration,/100000000/);
+ assert.match(schema,/100000000/);
 });
 test("Paper Investing responsive styles include compact tablet and mobile layouts",()=>{
  assert.match(css,/@media\s*\(max-width:\s*1050px\)/);
@@ -44,7 +45,7 @@ test("Professional chart maps LINE to line and freehand tool to native brush",()
  const chart=fs.readFileSync(path.join(root,"../stocks/chart-engine.js"),"utf8");
  assert.match(chart,/chartType==="LINE"\?"line"/);
  assert.match(chart,/brush:"BRUSH"/);
- assert.match(migration,/'BRUSH'/);
+ assert.match(schema,/'BRUSH'/);
 });
 
 test("Trading and Investing expose the broad built-in technical indicator set",()=>{
