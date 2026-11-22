@@ -28,6 +28,26 @@ npm run import:bse-master -- /secure/path/BSE_EQ_SCRIP_DDMMYYYY.csv YYYY-MM-DD
 
 The importer validates the BSE field layout, filters active equity securities, computes a SHA-256 provenance hash and writes through a service-role-only RPC. Never put the service-role key in the browser or commit it. BSE P/ZP and unknown groups remain fail-closed because their special settlement/fee treatment is not simulated.
 
+## Verified NSE/BSE session calendar import
+
+Intraday LIMIT fills require an explicitly verified session row for the exact exchange and IST date. No weekday inference is used. Prepare a CSV with the exact header below from official NSE/BSE notices; regular sessions use 09:15–15:30 IST, special sessions must carry their exact exchange-published minutes, and holidays use `false,CLOSED` with blank minutes.
+
+```csv
+exchange,session_date,is_trading_day,open_minute,close_minute,session_kind,source_reference,verified_at
+NSE,2026-11-23,true,555,930,REGULAR,https://www.nseindia.com/market-data/holidays,2026-11-22T12:00:00Z
+BSE,2026-11-23,true,555,930,REGULAR,https://www.bseindia.com/markets/market-info,2026-11-22T12:00:00Z
+```
+
+Import only after checking every row against its official exchange source:
+
+```sh
+SUPABASE_URL=https://<project-ref>.supabase.co \
+SUPABASE_SERVICE_ROLE_KEY=<server-only-key> \
+npm run import:exchange-sessions -- /secure/path/verified-exchange-sessions.csv
+```
+
+The importer validates the exchange-specific official host, session window, verification timestamp and duplicate dates, then records the CSV SHA-256. Missing or stale rows keep Intraday LIMIT fail-closed.
+
 ## Run and verify
 
 ```sh
