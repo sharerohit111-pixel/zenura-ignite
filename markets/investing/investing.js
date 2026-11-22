@@ -12,7 +12,7 @@
   let authUserId=null,watchlistItems=[],streamSequence=0,dataRequestSeq=0;
   const pendingKey="zenura-paper-investing-order-v1";
   function fmt(value){return "₹"+(Number(value||0)/100).toLocaleString("en-IN",{minimumFractionDigits:2,maximumFractionDigits:2});}
-  function safeText(el,value){if(el)el.textContent=value==null?"":String(value);}
+  function safeText(el,value){if(el){const raw=value==null?"":String(value);el.textContent=window.ZenuraLanguage?.t?.(raw)||raw;}}
   function connector(){return window.ZENURA_MARKET_CONNECTOR;}
   async function authHeaders(){
     const c=connector(),token=await c?.getIdToken?.();
@@ -267,13 +267,9 @@
     const uid=connector()?.getUserId?.();
     if(uid){authUserId=uid;refreshAll();}
   });
-  let language="en";
-  $("paper-language-toggle").addEventListener("click",()=>{
-    language=language==="en"?"hi":"en";
-    document.documentElement.lang=language;
-    $("paper-language-toggle").textContent=language==="en"?"हिन्दी":"English";
-    document.querySelectorAll("[data-en][data-hi]").forEach(el=>el.textContent=language==="en"?el.dataset.en:el.dataset.hi);
-    $("paper-chart-theme-toggle").textContent=window.ZenuraChartTheme?.actionLabel(document.body.dataset.chartTheme||"dark",language)||"CHART THEME";
+  window.addEventListener("zenura-language-change",event=>{
+    const language=event.detail?.language||window.ZenuraLanguage?.getLanguage?.()||"en";
+    safeText($("paper-chart-theme-toggle"),window.ZenuraChartTheme?.actionLabel(document.body.dataset.chartTheme||"dark",language)||"CHART THEME");
   });
   window.addEventListener("pagehide",clearStream,{once:true});
   if(!gateway){safeText(orderStatus,"Market gateway URL is not configured. Supabase sign-in is available, but live investing needs the deployed gateway.");}
