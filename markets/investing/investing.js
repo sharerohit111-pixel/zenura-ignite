@@ -44,6 +44,7 @@
   async function searchStocks(){
     const sequence=++searchSequence,q=searchInput.value.trim();
     if(!q){renderSearch([],"Search the official NSE/BSE stock instrument master.");return;}
+    if(!gateway){renderSearch([],"Secure market gateway deployment is pending.");return;}
     try{
       const params=new URLSearchParams({kind:"equities",q,limit:"50"});
       const response=await fetch(gateway+"/instruments?"+params,{headers:{Accept:"application/json"},cache:"public"});
@@ -190,6 +191,7 @@
     safeText(chartStatus,"Loading professional chart…");
     const c=connector(),uid=c?.getUserId?.();
     if(!uid){safeText(orderStatus,"Sign in to connect market data and use Paper Investing.");return;}
+    if(!gateway){safeText(chartStatus,"Secure market gateway deployment is pending.");return;}
     try{
       await window.ZenuraProfessionalChart.mount({
         container:$("market-chart"),instrument:{...item},timeframe:activeTimeframe,gateway,
