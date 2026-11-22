@@ -106,7 +106,7 @@ These Auth settings are separate from the Cloud Run deployment workflow and must
 - F&O LIMIT remains unsupported.
 - Futures and long CE/PE option market-order paths are separate transactional flows.
 - Paper Investing routes and its dedicated ledger have been retired under the Paper Trading-only product scope.
-- Equity SELL-to-close stop-loss/target execution has a separately leased, bounded, fresh-quote worker implementation and an owner-bound cancellation API. The worker is **opt-in and disabled by default**. Protective-order creation UI/API, end-to-end trigger/cancel race tests and production readiness checks remain incomplete; do not expose or claim always-on protective execution until those gates pass. Futures and Options protective exits remain unsupported.
+- Equity SELL-to-close stop-loss/target execution has a separately leased, bounded, fresh-quote worker implementation and an owner-bound cancellation API. The worker is **opt-in and disabled by default**. Protective-order creation UI/API are now integrated in the isolated stock-terminal module, with authenticated create/list/cancel flows, per-user idempotent retry protection and a fail-closed worker-enabled gate. CI covers the module contract and backend fill/cancel row-lock race. A staging browser-to-gateway trigger/cancel rehearsal and production readiness checks remain incomplete; the worker stays opt-in and disabled by default. Do not claim always-on protective execution until those gates pass. Futures and Options protective exits remain unsupported.
 
 ## Manual build reference
 
