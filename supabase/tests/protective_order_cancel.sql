@@ -44,13 +44,24 @@ BEGIN
         AND product='DELIVERY' AND instrument_key='NSE_EQ|CREATE_TEST')<>4 THEN
     RAISE EXCEPTION 'Protective reservation did not leave the correct unreserved quantity';
   END IF;
+  -- An idempotent retry must repeat the original request byte-for-byte,
+  -- including quantity; changing details with the same ID must be rejected.
   v_result:=public.create_paper_equity_protective_order(
     'cececece-cece-4ece-8ece-cececececece','11111111-1111-4111-8111-111111111111',
-    'NSE_EQ|CREATE_TEST','DELIVERY','STOP_LOSS',8500,8
+    'NSE_EQ|CREATE_TEST','DELIVERY','STOP_LOSS',8500,4
   );
   IF (v_result->>'idempotent_replay')::boolean IS NOT TRUE THEN
     RAISE EXCEPTION 'Protective order creation replay was not idempotent';
   END IF;
+  BEGIN
+    PERFORM public.create_paper_equity_protective_order(
+      'cececece-cece-4ece-8ece-cececececece','11111111-1111-4111-8111-111111111111',
+      'NSE_EQ|CREATE_TEST','DELIVERY','STOP_LOSS',8500,8
+    );
+    RAISE EXCEPTION 'Protective order ID reuse with changed quantity was accepted';
+  EXCEPTION WHEN unique_violation THEN
+    NULL;
+  END;
   BEGIN
     PERFORM public.create_paper_equity_protective_order(
       'cfcfcfcf-cece-4ece-8ece-cececececece','11111111-1111-4111-8111-111111111111',
