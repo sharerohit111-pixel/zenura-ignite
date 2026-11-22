@@ -130,7 +130,7 @@ begin
   end if;
 
   v_new_qty := v_old_qty + case when p_side='BUY' then p_quantity else -p_quantity end;
-  if v_old_qty=0 or sign(v_old_qty)=sign(v_new_qty) then
+  if v_old_qty=0 or (v_old_qty>0 and p_side='BUY') or (v_old_qty<0 and p_side='SELL') then
     -- Flat or same-direction add: margin is reserved for the incremental open quantity.
     v_open_qty := p_quantity;
     v_margin_add := p_open_margin_paise;
