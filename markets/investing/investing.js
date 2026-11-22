@@ -8,7 +8,7 @@
   const buyButton=$("investing-buy"),sellButton=$("investing-sell"),quantityInput=$("investing-quantity");
   const positionsBody=$("investing-positions"),ordersBody=$("investing-orders");
   const timeframeButtons=[...document.querySelectorAll("#chart-timeframes [data-timeframe]")];
-  let selected=null,activeTimeframe="5m",searchSequence=0,searchTimer=null,searchAbort=null,streamAbort=null,reconnectTimer=null,staleTimer=null,reconnectAttempt=0,lastQuote=null;
+  let selected=null,activeTimeframe="1D",searchSequence=0,searchTimer=null,searchAbort=null,streamAbort=null,reconnectTimer=null,staleTimer=null,reconnectAttempt=0,lastQuote=null;
   let authUserId=null,watchlistItems=[],streamSequence=0,dataRequestSeq=0;
   const pendingKey="zenura-paper-investing-order-v1";
   function fmt(value){return "₹"+(Number(value||0)/100).toLocaleString("en-IN",{minimumFractionDigits:2,maximumFractionDigits:2});}
