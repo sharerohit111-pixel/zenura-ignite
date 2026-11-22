@@ -1033,7 +1033,7 @@ jobs:
                 '12121212-1212-4212-8212-121212121212','55aa66bb77cc88dd55aa66bb77cc88dd55aa66bb77cc88dd55aa66bb77cc88dd',
                 '57575757-5757-4757-8757-575757575757',repeat('1',64),
                 'NSE_FO|CLOCKSKEW','CLOCKSKEW','NSE','NSE_FO','CE',
-                current_date+10,22000,25,5,1,'BUY',1285,v_now,v_now+2001
+                current_date+10,22000,25,5,1,'BUY',1285,v_now-1000,v_now-2001
               );
               RAISE EXCEPTION 'Caller clock skew above two seconds was unexpectedly accepted';
             EXCEPTION WHEN SQLSTATE '22023' THEN NULL;
