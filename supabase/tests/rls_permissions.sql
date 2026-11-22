@@ -1,5 +1,5 @@
 -- Run after all ordered migrations in the disposable PostgreSQL workflow.
--- Verifies table privileges and RLS ownership for Firebase third-party JWT users.
+-- Verifies table privileges and RLS ownership for native Supabase Auth users.
 
 INSERT INTO public.paper_watchlists(user_id,name,instrument_keys)
 VALUES
@@ -9,7 +9,7 @@ ON CONFLICT (user_id,name) DO UPDATE
 SET instrument_keys=excluded.instrument_keys;
 
 SET ROLE authenticated;
-SELECT set_config('request.jwt.claims','{"sub":"firebase-test-user-one","role":"authenticated"}',false);
+SELECT set_config('request.jwt.claims','{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated"}',false);
 
 DO $rls_privileges$
 DECLARE
@@ -31,8 +31,7 @@ BEGIN
     RAISE EXCEPTION 'Authenticated role unexpectedly has direct trading write privileges';
   END IF;
 
-  IF has_table_privilege('authenticated','public.paper_user_identity_map','SELECT')
-     OR has_table_privilege('authenticated','public.upstox_connections','SELECT')
+  IF has_table_privilege('authenticated','public.upstox_connections','SELECT')
      OR has_table_privilege('authenticated','public.upstox_oauth_states','SELECT')
      OR has_table_privilege('authenticated','public.paper_market_worker_state','SELECT') THEN
     RAISE EXCEPTION 'Authenticated role can access a private identity/provider/worker table';
