@@ -14,8 +14,8 @@ test("Paper Investing page includes all locally referenced modules and styles",(
  const assetRefs=[
   ...[...html.matchAll(/<script[^>]*src="([^"]+)"/gi)].map(match=>match[1]),
   ...[...html.matchAll(/<link[^>]*>/gi)].map(match=>{
-   const tag=match[0],rel=tag.match(/\\brel="([^"]+)"/i)?.[1],href=tag.match(/\\bhref="([^"]+)"/i)?.[1];
-   return rel==="stylesheet"?href:null;
+   const tag=match[0],href=tag.split('href="')[1]?.split('"')[0];
+   return tag.includes('rel="stylesheet"')?href:null;
   }).filter(Boolean)
  ];
  for(const ref of assetRefs){
