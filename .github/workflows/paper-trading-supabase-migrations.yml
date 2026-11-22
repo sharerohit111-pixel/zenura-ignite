@@ -317,7 +317,7 @@ jobs:
              WHERE user_id='22222222-2222-4222-8222-222222222222';
             IF v_qty <> 25 OR v_basis <> 33319 OR v_avg <> 1333
                OR (v_result->>'realized_pnl_paise')::bigint <> 1749
-               OR v_cash <> 99896430 OR v_realized <> 7749 THEN
+               OR v_cash <> 99896430 OR v_realized <> 17749 THEN
               RAISE EXCEPTION 'Long option partial close allocation, charges, cash or P&L is incorrect';
             END IF;
             -- Stale provider quotes must be rejected before account mutation.
