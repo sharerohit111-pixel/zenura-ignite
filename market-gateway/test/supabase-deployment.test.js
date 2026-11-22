@@ -51,14 +51,17 @@ test("Production gateway deployment is manual, main-only and uses WIF plus Secre
  assert.doesNotMatch(workflow,/firebase deploy|firebase functions:deploy/i);
 });
 
-test("Manual production deployment uses OIDC and deploys both Supabase gateway and LIMIT worker",()=>{
+test("Manual production deployment keeps the leased LIMIT worker active in the gateway",()=>{
  assert.match(deployWorkflow,/workflow_dispatch/);
  assert.match(deployWorkflow,/id-token:\s*write/);
  assert.match(deployWorkflow,/workload_identity_provider/);
  assert.match(deployWorkflow,/gcloud run deploy/);
  assert.match(deployWorkflow,/SERVICE:\s*zenura-market-gateway/);
- assert.match(deployWorkflow,/paper-limit-worker\.js/);
- assert.match(deployWorkflow,/zenura-paper-limit-worker-every-minute/);
+ assert.match(deployWorkflow,/PAPER_LIMIT_WORKER_ENABLED=true/);
+ assert.match(deployWorkflow,/--no-cpu-throttling/);
+ assert.match(server,/PAPER_LIMIT_WORKER_ENABLED==="true"/);
+ assert.match(server,/setInterval\(runWorker,intervalMs\)/);
+ assert.match(server,/runPaperLimitWorker\(\{maxOrders:50\}\)/);
  assert.match(deployWorkflow,/github\.ref == 'refs\/heads\/main'/);
  assert.doesNotMatch(deployWorkflow,/firebase deploy|firebase functions:deploy|service_account_key:/i);
 });
