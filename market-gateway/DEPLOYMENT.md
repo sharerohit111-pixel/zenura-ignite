@@ -81,7 +81,7 @@ The deployment uses:
 - `--timeout 3600`: supports long-lived Upstox V3 SSE streams.
 - `PAPER_LIMIT_WORKER_ENABLED=true` and `PAPER_LIMIT_WORKER_INTERVAL_MS=2000`.
 
-Every instance may start the worker loop, but the Postgres lease ensures only one worker is the active writer. Worker errors and instrument-master refresh failures use bounded exponential backoff. The public `/health` response exposes only safe readiness data: instrument-master availability and worker liveness/cycle counts; it never exposes credentials or user data.
+Every instance may start the worker loop, but the Postgres lease ensures only one worker is the active writer. Worker errors and instrument-master refresh failures use bounded exponential backoff. The public `/health` response exposes only safe readiness data: instrument-master availability, worker liveness and cycle counts. A cycle-level worker fault is distinguished from an individual user's expired token or rejected order; per-user failures are counted without falsely declaring the whole service unhealthy. It never exposes credentials or user data.
 
 **Cost warning:** one warm 2-vCPU/2-GiB instance with CPU always allocated creates ongoing Google Cloud charges. Keep deployment manual and configure a billing budget/alert first.
 
