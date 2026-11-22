@@ -40,6 +40,9 @@ ZENURA IGNITE is a **Paper Trading only** product. There is one user-facing mode
 
 ## Current cleanup status
 
-- Product navigation and portal copy now expose Paper Trading only.
-- Dedicated Investing page/client/styles/tests, API routes, SQL ledger objects and CI references remain under dependency-audit cleanup; they are not considered removed until the forward-only migration and full CI pass.
+- Portal, stock navigation, PWA manifest and service-worker asset list now expose/cache Paper Trading only.
+- Dedicated Investing page/client/styles/tests and four gateway API routes have been removed.
+- A forward-only migration retires the three dedicated Investing ledger tables and two Investing-only RPCs without rewriting prior migration history or using CASCADE.
+- CI no longer runs Investing UI/ledger tests or expects Investing tables/RPCs; shared RLS, chart, watchlist, OAuth and trading checks remain.
+- The latest cleanup CI run is still in progress. The migration has not been applied to production Supabase; no production data or service has been modified.
 - Crypto Paper Trading remains protected from this cleanup.
