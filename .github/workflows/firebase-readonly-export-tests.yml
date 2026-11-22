@@ -26,3 +26,9 @@ jobs:
       - name: Run exporter tests
         working-directory: market-gateway
         run: node --test test/firebase-readonly-export.test.js
+      - name: Check transformer syntax
+        working-directory: market-gateway
+        run: node --check scripts/firebase-to-supabase-transform.js
+      - name: Run transformer tests
+        working-directory: market-gateway
+        run: node --test test/firebase-to-supabase-transform.test.js
