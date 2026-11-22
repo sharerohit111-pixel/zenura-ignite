@@ -13,6 +13,9 @@ on:
       - "market-gateway/test/paper-trading-reconcile.test.js"
       - "market-gateway/PAPER_TRADING_RECONCILIATION.md"
       - "market-gateway/PAPER_TRADING_SCHEMA_COMPATIBILITY_AUDIT.md"
+      - "market-gateway/lib/supabase-paper-identity.js"
+      - "market-gateway/test/supabase-paper-identity.test.js"
+      - "market-gateway/FIREBASE_SUPABASE_IDENTITY_ADAPTER.md"
       - ".github/workflows/firebase-readonly-export-tests.yml"
   workflow_dispatch:
 
@@ -45,3 +48,9 @@ jobs:
       - name: Run reconciliation tests
         working-directory: market-gateway
         run: node --test test/paper-trading-reconcile.test.js
+      - name: Check identity adapter syntax
+        working-directory: market-gateway
+        run: node --check lib/supabase-paper-identity.js
+      - name: Run identity adapter tests
+        working-directory: market-gateway
+        run: node --test test/supabase-paper-identity.test.js
