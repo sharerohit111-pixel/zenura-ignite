@@ -46,3 +46,12 @@ test("Professional chart maps LINE to line and freehand tool to native brush",()
  assert.match(chart,/brush:"BRUSH"/);
  assert.match(migration,/'BRUSH'/);
 });
+
+test("Trading and Investing expose the broad built-in technical indicator set",()=>{
+ const trading=fs.readFileSync(path.join(root,"../stocks/index.html"),"utf8");
+ const investing=html;
+ for(const name of ["MA","EMA","SMA","BBI","BIAS","BRAR","BOLL","CCI","DMI","CR","PSY","DMA","TRIX","OBV","VR","WR","MTM","SAR","AO","ROC","PVT","MACD","KDJ","RSI","VOL","VWAP","ATR","ADX","STOCH","SUPERTREND","MFI"])
+  assert.match(trading,new RegExp('option value="'+name+'"'),"Trading is missing "+name);
+ for(const name of ["MA","EMA","SMA","BBI","BIAS","BRAR","BOLL","CCI","DMI","CR","PSY","DMA","TRIX","OBV","VR","WR","MTM","SAR","AO","ROC","PVT","MACD","KDJ","RSI","VOL","VWAP","ATR","ADX","STOCH","SUPERTREND","MFI"])
+  assert.match(investing,new RegExp('option value="'+name+'"'),"Investing is missing "+name);
+});
