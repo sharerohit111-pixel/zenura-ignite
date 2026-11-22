@@ -91,9 +91,9 @@ jobs:
           gcloud run deploy "$SERVICE" \
             --project "$PROJECT_ID" --image "$IMAGE" --region "$REGION" \
             --platform managed --allow-unauthenticated \
-            --min 1 --max 5 --cpu 2 --memory 2Gi --concurrency 40 --timeout 3600 \
+            --min 1 --max 5 --cpu 2 --memory 2Gi --concurrency 40 --timeout 3600 --no-cpu-throttling \
             --service-account "$SERVICE_ACCOUNT" \
-            --set-env-vars "SUPABASE_URL=https://atvbjibhunvzpmfagagm.supabase.co,SUPABASE_PUBLISHABLE_KEY=sb_publishable_kdTDQxlrYkry8mK4Ptlc9w_6oZJEYRQ,UPSTOX_REDIRECT_URI=$UPSTOX_REDIRECT_URI,ZENURA_APP_REDIRECT_URI=$ZENURA_APP_REDIRECT_URI,ALLOWED_ORIGINS=$FRONTEND_ORIGIN,MAX_INSTRUMENT_KEYS=100" \
+            --set-env-vars "SUPABASE_URL=https://atvbjibhunvzpmfagagm.supabase.co,SUPABASE_PUBLISHABLE_KEY=sb_publishable_kdTDQxlrYkry8mK4Ptlc9w_6oZJEYRQ,UPSTOX_REDIRECT_URI=$UPSTOX_REDIRECT_URI,ZENURA_APP_REDIRECT_URI=$ZENURA_APP_REDIRECT_URI,ALLOWED_ORIGINS=$FRONTEND_ORIGIN,MAX_INSTRUMENT_KEYS=100,PAPER_LIMIT_WORKER_ENABLED=true,PAPER_LIMIT_WORKER_INTERVAL_MS=2000" \
             --set-secrets "SUPABASE_SERVICE_ROLE_KEY=zenura-supabase-service-role:latest,UPSTOX_TOKEN_ENCRYPTION_KEY=zenura-upstox-encryption-key:latest,UPSTOX_CLIENT_ID=zenura-upstox-client-id:latest,UPSTOX_CLIENT_SECRET=zenura-upstox-client-secret:latest"
 
       - name: Verify configured gateway origin is live
