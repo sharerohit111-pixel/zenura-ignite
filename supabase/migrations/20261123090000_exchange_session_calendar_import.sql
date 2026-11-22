@@ -78,6 +78,17 @@ begin
   ) then
     raise exception using errcode='22023',message='Older verified exchange session data cannot overwrite a newer revision';
   end if;
+  -- Each imported exchange is a complete verified snapshot. Invalidate omitted dates
+  -- so partial files cannot silently reuse an older open-session decision.
+  update public.paper_exchange_sessions current
+     set source_sha256=null,updated_at=now()
+   where current.exchange in (
+     select distinct x.exchange
+     from jsonb_to_recordset(p_rows) as x(
+       exchange text,session_date date,is_trading_day boolean,open_minute integer,
+       close_minute integer,session_kind text,source_reference text,verified_at timestamptz
+     )
+   );
   insert into public.paper_exchange_sessions(
     exchange,session_date,is_trading_day,open_minute,close_minute,session_kind,
     source_reference,verified_at,source_sha256,updated_at
