@@ -3,7 +3,6 @@
 BEGIN;
 INSERT INTO auth.users(id) VALUES ('55555555-5555-4555-8555-555555555555')
 ON CONFLICT (id) DO NOTHING;
-SET ROLE service_role;
 SELECT public.initialize_paper_trading_account('55555555-5555-4555-8555-555555555555');
 DO $equity_market_fee_checks$
 DECLARE
@@ -109,5 +108,4 @@ BEGIN
   END IF;
 END
 $equity_market_fee_checks$;
-RESET ROLE;
 ROLLBACK;
