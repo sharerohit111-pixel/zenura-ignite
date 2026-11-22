@@ -12,6 +12,9 @@ async function main() {
   const confirmation = process.argv.find(arg => arg.startsWith("--confirm-project="));
   const projectId = process.env.FIREBASE_PROJECT_ID;
 
+  if (projectId !== EXPECTED_FIREBASE_PROJECT_ID) {
+    throw new Error("FIREBASE_PROJECT_ID must be " + EXPECTED_FIREBASE_PROJECT_ID);
+  }
   if (apply && confirmation !== "--confirm-project=" + EXPECTED_FIREBASE_PROJECT_ID) {
     throw new Error("Applying claims requires --confirm-project=" + EXPECTED_FIREBASE_PROJECT_ID);
   }
