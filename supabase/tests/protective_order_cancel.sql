@@ -29,14 +29,14 @@ DECLARE
 BEGIN
   v_result:=public.create_paper_equity_protective_order(
     'cececece-cece-4ece-8ece-cececececece','11111111-1111-4111-8111-111111111111',
-    'NSE_EQ|CREATE_TEST','DELIVERY','STOP_LOSS',8500,8
+    'NSE_EQ|CREATE_TEST','DELIVERY','STOP_LOSS',8500,4
   );
   IF v_result->'order'->>'status'<>'ACTIVE' OR (v_result->>'idempotent_replay')::boolean IS NOT FALSE THEN
     RAISE EXCEPTION 'Equity protective order was not created correctly';
   END IF;
   IF (SELECT reserved_quantity FROM public.paper_equity_positions
       WHERE user_id='11111111-1111-4111-8111-111111111111'
-        AND product='DELIVERY' AND instrument_key='NSE_EQ|CREATE_TEST')<>10 THEN
+        AND product='DELIVERY' AND instrument_key='NSE_EQ|CREATE_TEST')<>6 THEN
     RAISE EXCEPTION 'Protective creation did not reserve shares exactly once';
   END IF;
   v_result:=public.create_paper_equity_protective_order(
@@ -58,7 +58,7 @@ BEGIN
   BEGIN
     PERFORM public.create_paper_equity_protective_order(
       'cfcccccc-cece-4ece-8ece-cececececece','11111111-1111-4111-8111-111111111111',
-      'NSE_EQ|CREATE_TEST','DELIVERY','STOP_LOSS',8500,9
+      'NSE_EQ|CREATE_TEST','DELIVERY','STOP_LOSS',8500,5
     );
     RAISE EXCEPTION 'Protective order exceeded unreserved position quantity';
   EXCEPTION WHEN check_violation THEN
