@@ -1,53 +1,57 @@
-# ZENURA IGNITE — Indian Market Gateway (Cloud Run)
+# ZENURA IGNITE — Supabase-native Indian Market Gateway
 
-This service is a separate long-lived gateway for Upstox Market Data Feed V3. It is not deployed by Firebase Functions.
+This is the Node.js 22 market-data and paper-order gateway for the **new ZENURA IGNITE app**. Its default entrypoint is `supabase-server.js`: Supabase Auth verifies user access tokens, Supabase Postgres stores all app account/order/portfolio/watchlist/chart state, and Upstox credentials remain encrypted on the server.
 
-## Environment
-- `UPSTOX_TOKEN_ENCRYPTION_KEY`: same base64-encoded 32-byte key used by Firebase Functions.
-- `MAX_INSTRUMENT_KEYS`: per-browser-session guardrail (default 100; must remain within provider limits).
-- `ALLOWED_ORIGINS`: comma-separated exact HTTPS origins allowed to call the gateway, e.g. `https://zenuraignite.com`; do not use `*`.
-- Cloud Run must run as a dedicated service account with the Firestore database-level IAM role required for its Admin SDK operations. The gateway reads `upstoxConnections` and reads/writes `indianMarketWatchlists`, `indianPaperAccounts`, `indianPaperOrders`, `indianDerivativeOrders`, `indianMarketStreamLeases`, and `indianMarginPreviewLimits`. Firestore IAM is not collection-scoped, and Admin SDK calls bypass Firestore Security Rules: the rules protecting these collections block browser/client access but do not restrict this service account. Keep the service account dedicated to this gateway, grant no project-wide Owner/Editor role, and enforce collection-level access boundaries in the gateway code.
+**This app's gateway does not use Firebase Authentication, Firestore, Firebase Admin SDK, or Firebase Functions.** The older `server.js` Firebase implementation remains isolated for legacy/reference purposes and is not the Docker or default npm start target.
 
-## Deploy
-Build and deploy this directory as a Cloud Run service. Set ingress/auth policy to allow the public HTTPS endpoint because Firebase ID token validation is performed in the service. Never disable application authentication. Set `UPSTOX_TOKEN_ENCRYPTION_KEY` from Secret Manager, not source control.
+## Required runtime configuration
+
+- `SUPABASE_URL`: `https://<project-ref>.supabase.co`.
+- `SUPABASE_PUBLISHABLE_KEY`: Supabase publishable key (server and browser use the publishable key only for user-scoped access).
+- `SUPABASE_SERVICE_ROLE_KEY`: server-only secret used for token verification and narrowly scoped privileged RPCs. Never expose it to the browser or commit it.
+- `UPSTOX_TOKEN_ENCRYPTION_KEY`: base64-encoded 32-byte encryption key held in Secret Manager.
+- `UPSTOX_CLIENT_ID`, `UPSTOX_CLIENT_SECRET`, `UPSTOX_REDIRECT_URI`: Upstox OAuth credentials and exact callback URL.
+- `ALLOWED_ORIGINS`: comma-separated exact HTTPS frontend origins; wildcard origins are not accepted.
+- `ZENURA_APP_REDIRECT_URI`: exact HTTPS app return URL after Upstox OAuth; its origin must be in `ALLOWED_ORIGINS`.
+- `MAX_INSTRUMENT_KEYS`: stream subscription guardrail (default 100, hard maximum 500).
+- `PORT`: Cloud Run supplies this automatically (default 8080 locally).
+
+## Run and verify
+
+```sh
+npm ci
+npm run check
+npm test
+npm start
+```
+
+`npm start` and the Docker image both start the Supabase-native gateway. The legacy Firebase server is not started by default.
 
 ## API
-- `GET /health`: service health and instrument-master cache status.
-- `GET /instruments?kind=equities|indices|futures|options&q=RELIANCE&exchange=NSE&limit=50`: filtered search from the official Upstox BOD JSON instrument master. Uses the provider's `instrument_key`, refreshes the in-memory cache every six hours, and returns at most 100 results.
-- `POST /stream`: Authorization: Bearer <Firebase ID token>; JSON body `{"instrumentKeys":["NSE_INDEX|Nifty 50"],"mode":"ltpc"}`; responds with Server-Sent Events containing decoded V3 protobuf messages.
-- `GET /candles?instrument_key=...&unit=minutes&interval=1&to_date=YYYY-MM-DD&from_date=YYYY-MM-DD`: authenticated historical OHLC proxy using Upstox Historical Candle V3. `from_date` is optional. The gateway validates unit/interval/date inputs and confirms the instrument key exists in the current official instrument master before requesting provider data. Provider access tokens remain server-side; responses are private/no-store.
-- `GET /option-chain?instrument_key=...&expiry_date=current_week`: authenticated Upstox option-chain proxy. Supports an exact `YYYY-MM-DD` expiry or Upstox relative expiry keywords (`current_week`, `next_week`, `far_week`, `current_month`, `next_month`, `far_month`). Only verified NSE/BSE cash-equity and index underlyings are accepted. Response remains private/no-store.
-- `GET /watchlists`, `GET /watchlist?name=...`, `GET /watchlist/quotes?name=...`, and `PUT /watchlist`: authenticated, per-user named watchlists (My Stocks, Banking, NIFTY, F&O), up to 50 unique instrument keys per list, verified against the official instrument master. Legacy single-list data is read as My Stocks and preserved through the first named-list save. Data is stored privately by Firebase UID.
-- `GET /watchlist/quotes`: authenticated batch quote refresh for the signed-in user's saved watchlist. Returns only exact instrument-token matches with last price and provider net-change; quotes older than 60 seconds or without a valid last-trade timestamp are marked stale/unavailable, never presented as current.
-- `GET /paper/account`: initializes/returns the authenticated user's isolated Indian-market virtual account. Requires `INDIAN_PAPER_STARTING_CASH_PAISE` to be explicitly configured; no assumed starting balance.
-- Gateway local checks: run `npm test` from `market-gateway/` for the pure unit suites, or `npm run check` for gateway and browser-module syntax checks. The GitHub Actions workflow runs the same unit test files on branch pushes and pull requests.
-- `GET /paper/derivatives/portfolio`: separate derivative holdings valuation using exact-match Upstox full quotes no older than 15 seconds. Current long CE/PE holdings are supported; futures and short-option positions require margin snapshots and are rejected by the current paper order boundary.
-- `GET /paper/derivative/orders?limit=50`: authenticated user's private derivative simulation history (up to 100 recent records).
-- `POST /paper/derivative/orders`: server-priced, idempotent long CE/PE option BUY and SELL-to-close simulation for verified NSE/BSE F&O contracts. It uses the same `indianPaperAccounts/{uid}` cash balance as equities, writes positions under `derivativePositions`, and records orders separately in `indianDerivativeOrders`. Body: `{"instrument_key":"NSE_FO|...CE","side":"BUY","lots":1,"idempotency_key":"UUID"}`. The route rejects stale quotes and insufficient cash, atomically debits option premium plus estimated charges on BUY, or credits sale premium net of estimated charges on SELL-to-close. The itemized indicative Upstox estimate includes brokerage, exchange/IPFT, SEBI, GST, buy-side stamp duty and sell-side STT; it returns the breakdown. Rates are versioned in `market-gateway/lib/trading-charges.js`; verify the broker's live tariff before treating the estimate as a contract note. SELL is allowed only to close an existing long position; opening short options and futures remain disabled.
-- `POST /paper/orders`: server-priced market BUY/SELL simulation and pending LIMIT BUY/SELL orders for verified NSE/BSE cash equities only. MARKET orders use an exact-match Upstox Full Market Quote no older than 15 seconds; cash, weighted-average cost, and realized P&L update atomically in a Firestore transaction. LIMIT orders require a positive paise price aligned to the official instrument tick size and are stored as `PENDING`; the backend transaction reserves virtual cash for BUY or available shares for SELL, and the authenticated cancel route releases that reservation. LIMIT order fills are evaluated only against fresh, exact-instrument quotes by the separate scheduled worker. **Keep that scheduled worker disabled in deployment configuration until its rollout is explicitly approved and independently verified.** No exchange/broker order is submitted. MARKET body: `{"instrument_key":"NSE_EQ|...","side":"BUY","quantity":1,"order_type":"MARKET","idempotency_key":"UUID"}`. LIMIT body: `{"instrument_key":"NSE_EQ|...","side":"BUY","quantity":1,"order_type":"LIMIT","limit_price_paise":12345,"idempotency_key":"UUID"}`. Both paths use user-scoped deterministic order IDs and SHA-256 request fingerprints; uncertain retries must reuse the same UUID and exact payload. Replays return the stored result without a second fill, while reusing a key with a different payload returns HTTP 409.
-- `GET /paper/portfolio`: authenticated holdings valuation using Upstox Full Market Quotes V3. Returns market value, unrealized P&L and equity; positions without quotes no older than 60 seconds are marked stale and excluded from valuation totals.
-- `GET /paper/orders?limit=50`: authenticated user's simulation-only order history.
 
-The gateway obtains the encrypted token for the authenticated Firebase UID, decrypts it in memory, requests the V3 authorized WebSocket URL, subscribes only to requested keys, and streams decoded events to that authenticated client. No Upstox access token is sent to the browser.
+- `GET /health`: liveness and instrument-master cache status.
+- `GET /instruments?kind=equities|indices|futures|options&q=RELIANCE&exchange=NSE&limit=50`: official Upstox BOD instrument master search.
+- `GET /candles?instrument_key=...&unit=minutes&interval=5&to_date=YYYY-MM-DD&from_date=YYYY-MM-DD`: authenticated Upstox historical candles.
+- `GET /option-chain?instrument_key=...&expiry_date=current_week`: authenticated NSE/BSE option chain.
+- `POST /stream`: authenticated Upstox V3 WebSocket-to-SSE bridge; user token required.
+- `GET /upstox/connection`, `POST /upstox/oauth/start`, `GET /upstox/oauth/callback`, `DELETE /upstox/connection`: secure Upstox OAuth lifecycle.
+- `GET /watchlists`, `GET /watchlist?name=...`, `GET /watchlist/quotes?name=...`, `PUT /watchlist`: per-user watchlists and quote refresh.
+- `GET /paper/account`, `POST /paper/orders`, `POST /paper/orders/:orderId/cancel`, `GET /paper/orders`, `GET /paper/portfolio`: Paper Trading cash-equity account, market/limit order and portfolio routes.
+- `POST /paper/derivative/margin-preview`, `POST /paper/derivative/orders`, `GET /paper/derivative/orders`, `GET /paper/derivatives/portfolio`: long CE/PE options and futures margin preview. Futures order support is described by the futures endpoints below.
+- `POST /paper/futures/orders`, `GET /paper/futures/orders`, `GET /paper/futures/portfolio`: futures paper orders and portfolio.
+- `GET /paper/investing/account`, `POST /paper/investing/orders`, `GET /paper/investing/orders`, `GET /paper/investing/portfolio`: independent Paper Investing virtual cash, positions and history.
 
-## Important limits and operations
-The default 100-key guardrail applies per stream. The gateway also combines an in-process per-UID guard with a Firestore-backed lease, allowing only one active stream per Firebase UID across Cloud Run instances; the lease is renewed by a server heartbeat. This does not aggregate limits across multiple Firebase UIDs that may share one Upstox broker account, so configure Cloud Run concurrency/max instances and monitor provider usage before scale-out. The browser automatically reconnects after stream closure or stale-feed detection with exponential backoff from 1 to 30 seconds. Upstox standard access tokens expire at the daily 03:30 AM IST cutoff; users must reauthorize after expiry because a background refresh-token flow is not implemented. The gateway fetches the published instrument master and the margin-preview endpoint has a five-second per-UID Firestore cooldown; these are not a provider-wide rate limiter for every endpoint. Add/verify production entitlement policy and provider-account-wide usage monitoring before public production use. The historical candle endpoint is wired to the chart interval controls and OHLC chart UI, and the option-chain endpoint is wired to the expiry selector and CE/PE table. Neither has been live-tested against an authorized Upstox account.
+All private endpoints validate the Supabase access token. User-facing reads/writes use the user's Supabase session and RLS; server-side service-role access is limited to authentication, secure token storage/coordination and explicitly allowlisted RPCs. All orders are paper simulations: no broker/exchange order is sent. The gateway never sends the Upstox access token to the browser.
 
-The official V3 feed uses binary protobuf messages; the checked-in schema is synchronized from Upstox's maintained SDK example. The official instrument documentation recommends JSON BOD files and `instrument_key`; the gateway downloads the published complete JSON gzip file and never substitutes hand-written symbol lists.
+## Security and operating boundaries
 
-Set `ALLOWED_ORIGINS` to the exact deployed frontend origin. The service intentionally rejects CORS preflights from other origins. The `/instruments` route is public reference metadata; live feed, candles, option chain and paper-trading routes require a valid Firebase ID token and an Upstox connection for that same UID. Set `INDIAN_PAPER_STARTING_CASH_PAISE` explicitly (e.g. 100000000 means ₹10,00,000) before enabling paper accounts. Firestore rules deny all direct client access to `upstoxOAuthStates`, `upstoxConnections`, `indianPaperAccounts`, `indianPaperOrders`, and `indianMarketWatchlists`; the gateway and Firebase Functions use server-side Admin SDK access only. The current simulator supports NSE/BSE cash-equity market BUY/SELL, long CE/PE option BUY, and SELL-to-close of existing long options. The option-chain UI exposes simulated BUY and SELL-to-close controls for CE/PE contracts, and the portfolio has separate derivative position and order-history views. Opening short options, futures execution, futures margin reservation, stop-loss/target orders, Intraday/Delivery product separation for cash-equity positions, complete fee simulation for cash equities, dividends, and corporate actions are not implemented. Pending cash-equity LIMIT orders are supported, but their scheduled matcher must remain disabled until a separately approved rollout. Long-option BUY and SELL charges are estimated only. Entry charges are capitalized into an exact paise cost basis for long-option holdings; unrealized P&L includes entry charges and excludes future exit charges, while realized P&L deducts exit charges. This prevents rounded display average prices from creating small P&L drift. Portfolio unrealized P&L uses fresh full-market quotes and stale positions are excluded.
+- No Firebase identity, Firestore UID mapping, old customer import or legacy account reconciliation is part of this app.
+- Supabase service-role and Upstox secrets must exist only in Cloud Run Secret Manager.
+- Browser requests use Supabase publishable key plus the signed-in user's access token; RLS remains mandatory.
+- Exact-match instrument validation, fresh provider quote checks, idempotency keys and transactional Postgres RPCs protect paper-order execution.
+- The LIMIT-order fill worker must remain disabled until its independent Supabase worker, lease/single-writer design and end-to-end tests are complete.
+- Upstox OAuth access tokens expire on the provider's daily schedule; the app must prompt users to reconnect when expired.
+- The public `/instruments` and `/health` endpoints contain no private account data. All account, portfolio, order and stream endpoints require Supabase authentication.
+- Configure exact CORS origins and verify the Upstox developer-console callback URL matches `UPSTOX_REDIRECT_URI` byte-for-byte.
 
-
-### Futures margin preview (preview only)
-
-- The authenticated `POST /paper/derivative/margin-preview` endpoint accepts only an official NSE/BSE futures instrument key, whole lots, and BUY/SELL side.
-- Broker margin previews are limited to one request per authenticated Firebase UID every five seconds using a Firestore transaction (`indianMarginPreviewLimits`), so the cooldown is shared across Cloud Run instances. Rejected requests return HTTP 429 with `Retry-After`; the limiter is server-managed and does not reserve virtual cash.
-- The gateway obtains a fresh Upstox V3 quote, validates the contract against the current official instrument master, then calls Upstox V2 `POST /v2/charges/margin` with the selected product `D` (Delivery) or `I` (Intraday) and the verified quantity/price.
-- The response is validated and returned as a rupee-to-paise margin estimate alongside the user's virtual cash and shortfall.
-- The Stocks UI exposes this only when a futures contract is selected. It is explicitly preview-only: no Firestore write, virtual cash reservation, paper fill, or real broker order occurs.
-- Futures execution remains disabled. Margin estimates are provider estimates and may change; they are not a guarantee of exchange acceptance or reserved funds.
-
-
-### Upstox instrument-master normalization
-
-The current BOD JSON examples publish derivative `expiry` as epoch milliseconds and `tick_size` as numeric values such as `5.0`. The derivative contract validator normalizes millisecond expiry to the India-local calendar date and interprets integer tick values as paise (while accepting legacy sub-₹1 decimal tick fixtures). This is required for tick-aligned quote validation; do not treat the JSON `5.0` tick value as ₹5.00.
+See [DEPLOYMENT.md](./DEPLOYMENT.md) for the Supabase + Cloud Run deployment runbook.
