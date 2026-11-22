@@ -1,6 +1,8 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 
+const ALLOWED_SYMBOLS = new Set(["BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "XRPUSDT", "ADAUSDT", "DOGEUSDT", "AVAXUSDT", "PAXGUSDT", "XAUTUSDT"]);
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": Deno.env.get("APP_ORIGIN") ?? "https://sharerohit111-pixel.github.io",
   "Access-Control-Allow-Headers": "authorization, apikey, content-type, x-client-info",
@@ -62,7 +64,7 @@ Deno.serve(async (req: Request) => {
     const body = await req.json();
     const symbol = typeof body.symbol === "string" ? body.symbol.toUpperCase() : "";
     const side = typeof body.side === "string" ? body.side.toUpperCase() : "";
-    if (!/^[A-Z0-9]{2,20}USDT$/.test(symbol) || !["BUY", "SELL"].includes(side)) {
+    if (!ALLOWED_SYMBOLS.has(symbol) || !["BUY", "SELL"].includes(side)) {
       return json({ error: "Unsupported crypto symbol or side." }, 400);
     }
     const baseAsset = symbol.slice(0, -4);
