@@ -66,20 +66,29 @@ Use a dedicated Google Cloud project and a dedicated runtime service account. Th
 
 Grant the runtime service account only Secret Manager Secret Accessor on the four secrets. The gateway uses Supabase over HTTPS and does not require Firestore IAM, Firebase Admin SDK permissions or Firebase service accounts.
 
-Build and deploy from the repository root:
+Build from the **repository root** so the image includes the shared, Firebase-independent OAuth validation helpers:
 
 ```sh
+PROJECT_ID=YOUR_DEDICATED_GCP_PROJECT_ID
+REGION=asia-south1
+IMAGE="$REGION-docker.pkg.dev/$PROJECT_ID/zenura/market-gateway:release"
+
+gcloud artifacts repositories create zenura --project "$PROJECT_ID" --location "$REGION" --repository-format docker
+gcloud auth configure-docker "$REGION-docker.pkg.dev"
+docker build -f market-gateway/Dockerfile -t "$IMAGE" .
+docker push "$IMAGE"
+
 gcloud run deploy zenura-market-gateway \
-  --project YOUR_DEDICATED_GCP_PROJECT_ID \
-  --source market-gateway \
-  --region asia-south1 \
-  --platform managed \
-  --allow-unauthenticated \
-  --min 1 --max 10 --cpu 2 --memory 2Gi --concurrency 40 --timeout 3600 --cpu-boost \
-  --service-account YOUR_GATEWAY_SERVICE_ACCOUNT@YOUR_DEDICATED_GCP_PROJECT_ID.iam.gserviceaccount.com \
-  --set-env-vars SUPABASE_URL=https://atvbjibhunvzpmfagagm.supabase.co,SUPABASE_PUBLISHABLE_KEY=YOUR_PUBLISHABLE_KEY,UPSTOX_REDIRECT_URI=https://market-api.zenuraignite.com/upstox/oauth/callback,ZENURA_APP_REDIRECT_URI=https://zenuraignite.com/markets/stocks/,ALLOWED_ORIGINS=https://zenuraignite.com,MAX_INSTRUMENT_KEYS=100 \
-  --set-secrets SUPABASE_SERVICE_ROLE_KEY=SUPABASE_SERVICE_ROLE_KEY:latest,UPSTOX_TOKEN_ENCRYPTION_KEY=UPSTOX_TOKEN_ENCRYPTION_KEY:latest,UPSTOX_CLIENT_ID=UPSTOX_CLIENT_ID:latest,UPSTOX_CLIENT_SECRET=UPSTOX_CLIENT_SECRET:latest
+  --project "$PROJECT_ID" --image "$IMAGE" --region "$REGION" \
+  --platform managed --allow-unauthenticated \
+  --min 1 --max 5 --cpu 2 --memory 2Gi --concurrency 40 --timeout 3600 \
+  --service-account YOUR_GATEWAY_SERVICE_ACCOUNT@$PROJECT_ID.iam.gserviceaccount.com \
+  --set-env-vars SUPABASE_URL=https://atvbjibhunvzpmfagagm.supabase.co,SUPABASE_PUBLISHABLE_KEY=YOUR_PUBLISHABLE_KEY,UPSTOX_REDIRECT_URI=YOUR_EXACT_GATEWAY_CALLBACK,ZENURA_APP_REDIRECT_URI=YOUR_EXACT_APP_RETURN_URL,ALLOWED_ORIGINS=YOUR_EXACT_FRONTEND_ORIGIN,MAX_INSTRUMENT_KEYS=100 \
+  --set-secrets SUPABASE_SERVICE_ROLE_KEY=zenura-supabase-service-role:latest,UPSTOX_TOKEN_ENCRYPTION_KEY=zenura-upstox-encryption-key:latest,UPSTOX_CLIENT_ID=zenura-upstox-client-id:latest,UPSTOX_CLIENT_SECRET=zenura-upstox-client-secret:latest
 ```
+
+Create the Artifact Registry repository only once; if it already exists, skip that command. The GitHub Actions deployment workflow uses Workload Identity Federation and expects the matching repository secrets and variables listed in the workflow. It performs the image build, Cloud Run deployment, liveness probe and frontend gateway URL update. It is manual-dispatch only and does not deploy on every commit.
+
 
 For a responsive chart/quote experience, the reference deployment keeps one warm gateway instance, gives it 2 vCPU/2 GiB, allows bounded concurrency and sets a 60-minute request timeout for SSE streams. This has ongoing Cloud Run cost; configure a billing budget and alert, and tune max instances against Upstox account-wide stream limits.
 
