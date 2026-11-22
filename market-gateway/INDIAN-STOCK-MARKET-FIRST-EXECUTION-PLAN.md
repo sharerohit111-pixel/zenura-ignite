@@ -55,18 +55,21 @@ The equity protective-order slice is now implemented in this integration branch:
 - The worker remains **opt-in and disabled by default**. The creation API fails closed when it is disabled. This does not establish production availability or guaranteed always-on execution.
 - Futures and long-option protective exits remain unsupported and must not be routed through the equity worker.
 
-The next Indian-market cash-equity gate is **Intraday LIMIT lifecycle completion**. The current gateway explicitly rejects `order_type=LIMIT` with `product=INTRADAY`; the SQL submission/fill/cancel functions and scheduled LIMIT worker are Delivery-only. Do not expose or silently accept Intraday LIMIT until the complete lifecycle is implemented.
+The Intraday LIMIT lifecycle is now implemented in the draft integration branch, with its user-facing execution path still opt-in and disabled by default:
 
-Acceptance criteria for that increment:
+- Forward-only SQL migration `20261123040000_paper_intraday_limit_reservations.sql` adds separate BUY cash and SELL share reservations, idempotent submission, atomic fill, cancellation and IST session-expiry handling.
+- The dedicated worker uses bounded batches/cursor rotation, verified NSE/BSE cash-equity instruments, exact instrument quote matching, a 15-second quote-age limit and a separate worker lease key. Delivery LIMIT behavior remains isolated.
+- The gateway accepts Intraday LIMIT only when `PAPER_INTRADAY_LIMIT_WORKER_ENABLED=true`; the default remains disabled and the endpoint fails closed.
+- The first implementation exposed a lease allowlist mismatch: the existing lease RPC accepted only Delivery LIMIT and protective-worker keys. Forward-only migration `20261123043000_intraday_limit_worker_lease_key.sql` now registers the Intraday LIMIT key for acquire/release without changing the other workers.
+- SQL reservation/fill/expiry tests and worker orchestration tests are present. Additional CI regressions now cover worker lease ownership/exclusivity and concurrent BUY fill-vs-cancel / SELL cancel-vs-fill races.
+- The latest commits containing these additional regressions do not yet have an observed GitHub Actions run. Do not mark the new concurrency and lease tests as passed until a run reports success.
 
-1. Add a forward-only migration; do not edit migrations already recorded remotely.
-2. Support INTRADAY BUY cash reservations and SELL share reservations without consuming funds/shares reserved by other orders.
-3. Extend the worker with bounded, fair processing and a separate, explicit product/session policy; keep Delivery behavior unchanged.
-4. Execute fills atomically under account/order/position locks with idempotency, fresh exact-instrument quotes, reservation release exactly once, and correct Intraday realized-P&L accounting.
-5. Define market-session close/expiry behavior for pending Intraday LIMIT orders; no pending intraday order may silently carry into the next session.
-6. Cover BUY/SELL, partial reservations, insufficient funds/shares, cancel-vs-fill races, duplicate workers, stale/future quotes, lease expiry, idempotent replay, RLS/tenant isolation and recovery.
-7. Keep the UI action disabled until the backend lifecycle and regression tests pass.
+Remaining before this slice can be marked release-ready:
 
-After Intraday LIMIT, finish the remaining cash-equity gaps (including charge-aware accounting and complete order/trade-history validation) before moving to futures lifecycle hardening, options lifecycle validation, risk controls and release testing.
+1. Observe successful CI for the new lease migration and race tests.
+2. Rehearse the forward-only migrations and worker lease against a disposable Supabase staging database; do not use the linked production project.
+3. Add charge-aware cash/realized-P&L accounting using verified, versioned Indian broker/exchange rates rather than inventing fees. The current Intraday LIMIT fill follows the existing gross-only equity accounting contract.
+4. Validate complete order/trade history and account reconciliation after BUY, SELL, cancellation, expiry and replay.
+5. Keep the UI action and worker disabled until the backend, staging and compliance gates pass.
 
-The existing Delivery LIMIT worker must not be reused as an Intraday implementation by simply removing its product filter. Its reservation, realized-P&L, session-expiry and cancellation invariants need explicit tests first.
+The existing Delivery LIMIT worker must not be reused as an Intraday implementation by simply removing its product filter. The separate reservation, session-expiry, cancellation and fill invariants are required.
