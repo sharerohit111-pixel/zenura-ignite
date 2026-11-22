@@ -101,7 +101,13 @@
   function visit(node){
     if(node.nodeType===3){applyText(node);return;}
     if(node.nodeType!==1&&node.nodeType!==9)return;
-    if(node.nodeType===1)applyAttributes(node);
+    if(node.nodeType===1){
+      if(node.hasAttribute("data-en")&&node.hasAttribute("data-hi")&&node.children.length===0){
+        const next=node.getAttribute(language==="hi"?"data-hi":"data-en");
+        if(node.textContent!==next)node.textContent=next;
+      }
+      applyAttributes(node);
+    }
     for(const child of node.childNodes)visit(child);
   }
   function render(){
