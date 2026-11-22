@@ -15,7 +15,8 @@ function isSupportedProtectiveOrder(order){
 }
 
 function isPositionCloseable(order,position){
-  if(!isSupportedProtectiveOrder(order)||!position||typeof position!=="object")return false;
+  if(!isSupportedProtectiveOrder(order)||!position||typeof position!=="object"
+    ||!Number.isSafeInteger(order.quantity)||order.quantity<1||order.quantity>1000000)return false;
   if(position.instrument_key!==order.instrument_key)return false;
   if(order.asset_class==="EQUITY"){
     if(position.product!==order.product||!Number.isSafeInteger(position.quantity)
