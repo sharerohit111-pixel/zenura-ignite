@@ -473,7 +473,7 @@ app.get("/crypto/portfolio",async(req,res)=>{
     if(accountError||positionError||ordersError)throw Object.assign(new Error("Crypto portfolio could not be loaded."),{status:503});
     if(!account)return res.status(404).json({error:"Crypto paper account has not been initialized."});
     res.set("Cache-Control","private, no-store").json({
-      account:{currency:account.currency,cashBalance:account.cash_balance,realizedPnl:account.realized_pnl},
+      account:{currency:account.currency,cashBalance:account.cash_balance,reservedCash:account.reserved_cash,availableCash:Number(account.cash_balance)-Number(account.reserved_cash||0),realizedPnl:account.realized_pnl},
       positions:positions||[],orders:orders||[],simulationOnly:true
     });
   }catch(error){sendError(res,error,"Crypto portfolio could not be loaded.");}
