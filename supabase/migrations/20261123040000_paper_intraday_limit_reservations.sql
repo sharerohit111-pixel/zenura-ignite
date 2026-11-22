@@ -293,6 +293,8 @@ declare
   v_intraday_realized bigint;
   v_today date;
   v_minute integer;
+  v_quote_local timestamp without time zone;
+  v_quote_minute integer;
 begin
   if p_order_id is null or p_order_id !~ '^[a-f0-9]{64}$'
      or p_execution_price_paise is null or p_execution_price_paise<=0
@@ -332,6 +334,13 @@ begin
   if not found or v_minute<v_session.open_minute or v_minute>=v_session.close_minute
      or (v_order.created_at at time zone 'Asia/Kolkata')::date<>v_today then
     raise exception using errcode='23514',message='Intraday LIMIT fill is outside its verified exchange session';
+  end if;
+  v_quote_local:=to_timestamp(p_quote_timestamp_ms::numeric/1000) at time zone 'Asia/Kolkata';
+  v_quote_minute:=extract(hour from v_quote_local)::integer*60
+                  +extract(minute from v_quote_local)::integer;
+  if v_quote_local::date<>v_today or v_quote_minute<v_session.open_minute
+     or v_quote_minute>=v_session.close_minute then
+    raise exception using errcode='23514',message='Intraday LIMIT quote timestamp is outside the verified exchange session';
   end if;
   if (v_order.side='BUY' and p_execution_price_paise>v_order.limit_price_paise)
      or (v_order.side='SELL' and p_execution_price_paise<v_order.limit_price_paise) then
