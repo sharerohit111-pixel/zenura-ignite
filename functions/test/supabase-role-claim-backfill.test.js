@@ -4,7 +4,8 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const {
   EXPECTED_FIREBASE_PROJECT_ID,
-  backfillSupabaseRoleClaims
+  backfillSupabaseRoleClaims,
+  ensureSupabaseRoleClaimForNewUser
 } = require("../lib/supabase-role-claim-backfill");
 
 function fakeAuth(pages) {
@@ -119,4 +120,54 @@ test("rejects malformed custom claims instead of overwriting them", async () => 
     backfillSupabaseRoleClaims({ auth, projectId: EXPECTED_FIREBASE_PROJECT_ID }),
     error => error.code === "FIREBASE_CUSTOM_CLAIMS_INVALID"
   );
+});
+
+test("new-user claim trigger remains inert until the readiness flag is enabled", async () => {
+  const calls = [];
+  const auth = {
+    async getUser(uid) { calls.push(["getUser", uid]); return { customClaims: {} }; },
+    async setCustomUserClaims(uid, claims) { calls.push(["setCustomUserClaims", uid, claims]); }
+  };
+  const result = await ensureSupabaseRoleClaimForNewUser({ auth, uid: "new-user", enabled: false });
+  assert.deepEqual(result, { status: "disabled" });
+  assert.deepEqual(calls, []);
+});
+
+test("new-user claim trigger preserves existing custom claims when enabled", async () => {
+  const calls = [];
+  const auth = {
+    async getUser(uid) {
+      calls.push(["getUser", uid]);
+      return { customClaims: { onboarding: "complete", beta: true } };
+    },
+    async setCustomUserClaims(uid, claims) { calls.push(["setCustomUserClaims", uid, claims]); }
+  };
+  const result = await ensureSupabaseRoleClaimForNewUser({ auth, uid: "new-user", enabled: true });
+  assert.deepEqual(result, { status: "updated" });
+  assert.deepEqual(calls, [
+    ["getUser", "new-user"],
+    ["setCustomUserClaims", "new-user", { onboarding: "complete", beta: true, role: "authenticated" }]
+  ]);
+});
+
+test("new-user claim trigger skips a conflicting existing role claim", async () => {
+  const calls = [];
+  const auth = {
+    async getUser(uid) { calls.push(["getUser", uid]); return { customClaims: { role: "admin" } }; },
+    async setCustomUserClaims(uid, claims) { calls.push(["setCustomUserClaims", uid, claims]); }
+  };
+  const result = await ensureSupabaseRoleClaimForNewUser({ auth, uid: "new-user", enabled: true });
+  assert.deepEqual(result, { status: "role-conflict" });
+  assert.deepEqual(calls, [["getUser", "new-user"]]);
+});
+
+test("new-user claim trigger does not rewrite an already configured role", async () => {
+  const calls = [];
+  const auth = {
+    async getUser(uid) { calls.push(["getUser", uid]); return { customClaims: { role: "authenticated" } }; },
+    async setCustomUserClaims(uid, claims) { calls.push(["setCustomUserClaims", uid, claims]); }
+  };
+  const result = await ensureSupabaseRoleClaimForNewUser({ auth, uid: "new-user", enabled: true });
+  assert.deepEqual(result, { status: "already-configured" });
+  assert.deepEqual(calls, [["getUser", "new-user"]]);
 });
