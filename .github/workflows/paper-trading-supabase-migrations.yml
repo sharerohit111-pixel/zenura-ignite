@@ -16,6 +16,8 @@ on:
       - "market-gateway/MARKET-DATA-COMPLIANCE.md"
       - "market-gateway/test/supabase-deployment.test.js"
       - "market-gateway/lib/paper-limit-worker.js"
+      - "market-gateway/lib/intraday-limit-policy.js"
+      - "market-gateway/test/intraday-limit-policy.test.js"
       - "market-gateway/lib/protective-order-worker.js"
       - "market-gateway/test/protective-order-worker.test.js"
       - "market-gateway/test/paper-limit-worker.test.js"
@@ -78,6 +80,10 @@ jobs:
           node --test markets/stocks/chart-indicators.test.js
       - name: Verify Supabase-only Cloud Run entrypoint and production dependency boundary
         run: node --test market-gateway/test/supabase-deployment.test.js
+      - name: Check Indian-market Intraday LIMIT session and expiry policy
+        run: |
+          node --check market-gateway/lib/intraday-limit-policy.js
+          node --test market-gateway/test/intraday-limit-policy.test.js
       - name: Check Supabase LIMIT worker eligibility and cursor safety
         run: |
           node --check market-gateway/paper-limit-worker.js
