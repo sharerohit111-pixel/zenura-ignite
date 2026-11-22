@@ -3,9 +3,12 @@
 This is an offline-only transformation library. It has no Supabase/Firebase/network client and
 cannot import, provision identities, create accounts, or mutate source records.
 
-The caller must supply an explicit private mapping from each legacy Firebase UID to an
-already-provisioned Supabase Auth UUID. Missing mappings are hard errors; UIDs are never
-cast or guessed. Keep the mapping outside the repository.
+The caller must supply an explicit private mapping from each legacy Firebase UID to a
+stable internal Supabase UUID. Missing mappings, duplicate UUID assignments and UIDs absent
+from the exported Firebase Auth user list are rejected. The transformation emits
+`paper_user_identity_map.jsonl` with `supabase_user_id` and `firebase_uid`; this file must be
+imported before all rows with foreign keys. The identity map is sensitive and must stay in
+the private output directory, never in the repository.
 
 It maps indianPaperAccounts into one shared INR paper_accounts row, with Delivery and Intraday
 equity positions separate, CE/PE derivative positions separate, and share reservations joined
@@ -18,7 +21,11 @@ mapped to My Stocks only when no named My Stocks list exists.
 Run the dedicated unit test from market-gateway:
 node --test test/firebase-to-supabase-transform.test.js
 
-Strict validation rejects missing UID mappings, malformed paise values, cash over-reservation,
+The report includes an explicit dependency-safe import order and `importAllowed: false` if any
+source record fails validation. It is a report only; no importer exists in this change.
+
+Strict validation rejects missing UID mappings, duplicate identity UUIDs, orphaned Auth users,
+malformed paise values, cash over-reservation,
 inconsistent cost basis, unsupported product/order states, non-CE/PE derivatives and invalid
 watchlists. No synthetic balance is generated. This library is not an importer and does not
 perform Supabase writes. A later offline runner must verify source export checksums and write
