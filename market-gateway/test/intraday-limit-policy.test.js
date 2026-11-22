@@ -34,6 +34,13 @@ test("intraday LIMIT eligibility requires fresh quote, active session and exact 
  assert.equal(isEligibleIntradayLimitOrder({...order,product:"DELIVERY"},quote,now,normalSession),false);
  assert.equal(isEligibleIntradayLimitOrder({...order,simulation_only:false},quote,now,normalSession),false);
 });
+test("intraday LIMIT worker never executes orders created outside the current trading session",()=>{
+ const now=epoch("2026-11-23T04:30:01.000Z");
+ assert.equal(isEligibleIntradayLimitOrder({...order,created_at:"2026-11-20T04:00:00.000Z"},quote,now,normalSession),false);
+ assert.equal(isEligibleIntradayLimitOrder({...order,created_at:"2026-11-23T03:00:00.000Z"},quote,now,normalSession),false);
+ assert.equal(isEligibleIntradayLimitOrder({...order,created_at:"2026-11-23T04:31:00.000Z"},quote,now,normalSession),false);
+ assert.equal(isEligibleIntradayLimitOrder({...order,created_at:"bad"},quote,now,normalSession),false);
+});
 test("intraday pending orders expire at 15:30 IST and never carry to another session",()=>{
  assert.equal(isIntradayOrderExpired(order,epoch("2026-11-23T09:59:59.000Z"),normalSession),false);
  assert.equal(isIntradayOrderExpired(order,epoch("2026-11-23T10:00:00.000Z"),normalSession),true);
