@@ -13,18 +13,18 @@
     "start:legacy-firebase": "node server.js"
   },
   "dependencies": {
-    "express": "^4.21.2",
-    "protobufjs": "^7.4.0",
-    "ws": "^8.18.0",
+    "express": "4.21.2",
+    "protobufjs": "7.4.0",
+    "ws": "8.18.0",
     "@supabase/supabase-js": "2.119.2"
   },
   "devDependencies": {
-    "@firebase/rules-unit-testing": "^4.0.1",
-    "firebase": "^11.0.2",
+    "@firebase/rules-unit-testing": "4.0.1",
+    "firebase": "11.0.2",
     "@google-cloud/firestore": "9.4.1",
     "firebase-admin": "14.5.1"
   },
   "overrides": {
-    "@grpc/grpc-js": "^1.14.7"
+    "@grpc/grpc-js": "1.14.7"
   }
 }
