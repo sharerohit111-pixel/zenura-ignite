@@ -31,7 +31,7 @@ test("Paper Investing page includes all locally referenced modules and styles",(
  }
 });
 test("Paper Investing keeps an independent account, portfolio, order history and two-mode navigation",()=>{
- for(const id of ["investing-cash","investing-positions","investing-orders","investing-buy","investing-sell","investing-search","market-chart","chart-add-indicator","chart-undo","chart-redo","paper-language-toggle","paper-chart-theme-toggle"])
+ for(const id of ["investing-cash","investing-positions","investing-orders","investing-buy","investing-sell","investing-search","market-chart","chart-add-indicator","chart-remove-indicator","chart-undo","chart-redo","paper-language-toggle","paper-chart-theme-toggle"])
   assert.match(html,new RegExp('id="'+id+'"'),"Missing required UI control "+id);
  assert.match(html,/PAPER TRADING/);assert.match(html,/PAPER INVESTING/);
  assert.match(html,/NSE · BSE/);
