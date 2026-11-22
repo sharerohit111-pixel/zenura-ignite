@@ -5,6 +5,7 @@ const { isUuid } = require("./order-idempotency");
 const SERVER_RPCS = new Set([
   "initialize_paper_trading_account",
   "initialize_paper_investing_account",
+  "execute_paper_investing_market_order",
   "execute_paper_market_order",
   "submit_paper_limit_order",
   "cancel_paper_limit_order",
