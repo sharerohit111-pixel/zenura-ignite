@@ -6,7 +6,7 @@ create or replace function public.initialize_paper_trading_account(p_user_id uui
 returns jsonb
 language plpgsql
 security definer
-set search_path = pg_catalog, public
+set search_path = ''
 as $$
 declare
   v_account public.paper_accounts%rowtype;
