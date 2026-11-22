@@ -46,6 +46,9 @@ DECLARE
 BEGIN
   v_a:=public._paper_bse_cash_equity_charges('BSE_EQ|INE002A01018',1000000000,'DELIVERY','BUY');
   IF (v_a->>'exchange_transaction_paise')::bigint<>37500
+     OR (v_a->>'exchange_rate_rupees_per_crore')::integer<>375
+     OR (v_a->>'exchange_rate_paise_per_crore')::integer<>37500
+     OR v_a->>'simulation_billing_basis'<>'indicative_per_fill_allocation'
      OR (v_a->>'brokerage_paise')::bigint<>2000
      OR (v_a->>'sebi_paise')::bigint<>1000
      OR (v_a->>'stamp_duty_paise')::bigint<>150000
@@ -60,6 +63,8 @@ BEGIN
   v_e:=public._paper_bse_cash_equity_charges('BSE_EQ|INE040A01034',1000000000,'INTRADAY','SELL');
   IF (v_e->>'exchange_transaction_paise')::bigint<>27500
      OR (v_e->>'stt_paise')::bigint<>250000
+     OR (v_e->>'total_charges_paise')::bigint<>285810
+     OR (v_e->>'exchange_rate_paise_per_crore')::integer<>27500
      OR (v_e->>'net_credit_paise')::bigint<>(1000000000-(v_e->>'total_charges_paise')::bigint)
      OR v_e->>'exclusive_flag'<>'Y' THEN
     RAISE EXCEPTION 'BSE Group E exclusive Intraday SELL fee vector mismatch: %',v_e;
