@@ -129,3 +129,13 @@ test("Bilingual labels use one persistent translator and keep live chart status 
  assert.match(chartTheme,/zenura-language-change/);
  assert.doesNotMatch(html,/<span id="chart-status"[^>]*data-hi=/);
 });
+
+test("Chart users can add and remove indicators and load templates as replacements",()=>{
+ const engine=fs.readFileSync(path.join(root,"../stocks/chart-engine.js"),"utf8");
+ assert.match(html,/id="chart-remove-indicator"/);
+ const trading=fs.readFileSync(path.join(root,"../stocks/index.html"),"utf8");
+ assert.match(trading,/id="chart-remove-indicator"/);
+ assert.match(engine,/function removeIndicator\(name\)/);
+ assert.match(engine,/chart\.removeIndicator\(\{name\}\)/);
+ assert.match(engine,/activeIndicators\.clear\(\)/);
+});
