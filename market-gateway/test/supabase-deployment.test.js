@@ -33,6 +33,9 @@ test("Browser Supabase client exposes no service-role or provider secret",()=>{
 test("Deployment guide provisions Supabase and Cloud Run, not Firebase services",()=>{
  assert.match(deploy,/Supabase Auth/);
  assert.match(deploy,/Cloud Run/);
+ assert.match(deploy,/no separate Cloud Run Job or Cloud Scheduler/i);
+ assert.match(deploy,/MARKET_DATA_RIGHTS_APPROVED/);
+ assert.doesNotMatch(deploy,/gcloud run jobs deploy|gcloud scheduler jobs create/i);
  assert.doesNotMatch(deploy,/firebase functions:deploy|firebase deploy|FIREBASE_STAGING_PROJECT_ID/i);
 });
 
@@ -66,7 +69,7 @@ test("Manual production deployment keeps the leased LIMIT worker active in the g
  assert.match(server,/setInterval\(runWorker,intervalMs\)/);
  assert.match(server,/runPaperLimitWorker\(\{maxOrders:50\}\)/);
  assert.match(deployWorkflow,/github\.ref == 'refs\/heads\/main'/);
- assert.doesNotMatch(deployWorkflow,/firebase deploy|firebase functions:deploy|service_account_key:/i);
+ assert.doesNotMatch(deployWorkflow,/gcloud run jobs deploy|gcloud scheduler jobs create|firebase deploy|firebase functions:deploy|service_account_key:/i);
 });
 
 test("Public health response confirms the leased LIMIT worker without exposing secrets",()=>{
