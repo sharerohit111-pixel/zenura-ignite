@@ -12,9 +12,12 @@ test("serializes timestamps, bytes, dates and nested values with explicit type m
  assert.deepEqual(v.payload,{__type:"bytes",base64:"aGVsbG8="});
  assert.deepEqual(v.nested[0],{__type:"date",iso:"2025-01-01T00:00:00.000Z"});assert.equal(v.nested[1],42);
 });
-test("auth export omits password hashes, salts and MFA secrets",()=>{
- const safe=sanitizeAuthUser({uid:"legacy-uid",email:"user@example.test",emailVerified:true,passwordHash:"never-export",passwordSalt:"never-export",metadata:{creationTime:"created",lastSignInTime:"signed-in"},providerData:[{providerId:"google.com",uid:"provider-uid",email:"user@example.test"}]});
- assert.equal(safe.uid,"legacy-uid");assert.equal(safe.emailVerified,true);assert.equal("passwordHash" in safe,false);assert.equal("passwordSalt" in safe,false);assert.equal(JSON.stringify(safe).includes("never-export"),false);
+test("auth export contains only the UID needed for orphan validation",()=>{
+ const safe=sanitizeAuthUser({uid:"legacy-uid",email:"user@example.test",emailVerified:true,passwordHash:"never-export",passwordSalt:"never-export",phoneNumber:"+910000000000",displayName:"Private Name",metadata:{creationTime:"created",lastSignInTime:"signed-in"},providerData:[{providerId:"google.com",uid:"provider-uid",email:"user@example.test"}]});
+ assert.deepEqual(safe,{uid:"legacy-uid"});
+ assert.equal(JSON.stringify(safe).includes("user@example.test"),false);
+ assert.equal(JSON.stringify(safe).includes("Private Name"),false);
+ assert.throws(()=>sanitizeAuthUser({uid:""}),/UID is invalid/);
 });
 test("Firestore reader paginates by stable document name",async()=>{
  const rows=["a","b","c"].map(id=>({id,ref:{path:"indianPaperOrders/"+id},data:()=>({id})}));let calls=0;
