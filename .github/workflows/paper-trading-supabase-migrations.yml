@@ -318,7 +318,7 @@ jobs:
             IF v_qty <> 25 OR v_basis <> 33319 OR v_avg <> 1333
                OR (v_result->>'realized_pnl_paise')::bigint <> 1749
                OR v_cash <> 99896430 OR v_realized <> 17749 THEN
-              RAISE EXCEPTION 'Long option partial close allocation, charges, cash or P&L is incorrect';
+              RAISE EXCEPTION 'Long option partial close mismatch: qty=%, basis=%, avg=%, order_realized=%, cash=%, account_realized=%', v_qty,v_basis,v_avg,(v_result->>'realized_pnl_paise'),v_cash,v_realized;
             END IF;
             -- Stale provider quotes must be rejected before account mutation.
             BEGIN
