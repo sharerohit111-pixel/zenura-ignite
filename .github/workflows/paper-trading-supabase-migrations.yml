@@ -693,7 +693,7 @@ jobs:
           wait "$pid1"
           wait "$pid2"
           psql -v ON_ERROR_STOP=1 <<'SQL'
-          DO $
+          DO $$
           DECLARE
             v_gross bigint;
             v_charges bigint;
@@ -729,12 +729,12 @@ jobs:
             EXCEPTION WHEN unique_violation THEN NULL;
             END;
           END
-          $;
+          $$;
           SQL
       - name: Reject future and off-tick Options quotes
         run: |
           psql -v ON_ERROR_STOP=1 <<'SQL'
-          DO $
+          DO $$
           DECLARE
             v_now bigint := floor(extract(epoch from clock_timestamp())*1000)::bigint;
           BEGIN
@@ -769,7 +769,7 @@ jobs:
             EXCEPTION WHEN SQLSTATE '22023' THEN NULL;
             END;
           END
-          $;
+          $$;
           SQL
       - name: Verify expected schema and RPC registration
         run: |
