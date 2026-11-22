@@ -215,3 +215,14 @@ The core schema draft was corrected to retain exchange and official lot-size met
 Implement one server-only, account-locking, idempotent CE/PE SQL transaction that reproduces the above contract exactly. Before any staging apply, build parity fixtures from the existing JavaScript tests and validate SQL rounding against JavaScript `Math.round` (not PostgreSQL's default numeric rounding). Test concurrent duplicate requests, mismatched idempotency keys, insufficient unreserved cash, partial and full SELL, fee components, negative net credit, stale/future quotes, expiry cutoff, off-tick prices, 50-position cap, malformed stored positions and safe-integer boundaries.
 
 No Options transaction RPC has yet been added. No SQL has been applied to Supabase. Firebase remains unchanged and is still the live source of truth.
+
+
+## Draft atomic CE/PE transaction RPC (2026-11-22)
+
+Added `supabase/migrations/202611220005_paper_long_option_transaction.sql` with `public.execute_paper_long_option_order(...)`. It is a draft SECURITY DEFINER function with a fixed search path and execute permission only for `service_role`. It implements long CE/PE MARKET BUY and SELL-to-close, fresh-quote age validation, contract/lot/tick/expiry checks, account-first locking, idempotent replay, the 50-position cap, shared cash reservations, indicative charge components, BUY cost-basis inclusion of charges, partial SELL cost-basis allocation, realized P&L, order history and account version updates in one SQL transaction.
+
+Important limitations:
+- The RPC trusts the calling backend for authenticated user identity, the official instrument-master record, quote provenance, request fingerprint and order-id derivation. Never expose service-role credentials or call it from browser code.
+- The function has not been parsed or executed against PostgreSQL/Supabase staging. It has not passed parity or concurrency tests. It is not production-ready.
+- The migration contains a draft additive ALTER for derivative position exchange/lot-size metadata; the core schema draft already contains those columns for a fresh full migration. Applying migrations out of sequence is unsupported.
+- Do not apply any SQL or change the live Firebase path until the SQL has been tested against PostgreSQL and the complete migration has explicit approval.
