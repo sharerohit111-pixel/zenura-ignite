@@ -10,7 +10,7 @@ create table if not exists public.bse_equity_fee_master (
   instrument_status char(1) not null check (instrument_status in ('A','S','I')),
   instrument_type char(1) not null check (instrument_type in ('E','D','C')),
   source_sha256 text not null check (source_sha256 ~ '^[a-f0-9]{64}$'),
-  source_reference text not null check (lower(source_reference) ~ '^https?://([a-z0-9-]+\.)*bseindia\.com(/|$)'),
+  source_reference text not null check (lower(source_reference) ~ '^https://([a-z0-9-]+\.)*bseindia\.com(/|$)'),
   imported_at timestamptz not null default now(),
   primary key(source_date,isin),
   check (isin=upper(isin)),
