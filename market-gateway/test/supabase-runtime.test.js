@@ -33,7 +33,7 @@ test("accepts only a Bearer token and verifies it with Supabase Auth getUser", a
   const runtime = createSupabaseRuntime({ ...config, createClient: fakeFactory(calls) });
   await assert.rejects(runtime.authenticateRequest({ get: () => "" }), { status: 401 });
   const user = await runtime.authenticateRequest({ get: () => "Bearer " + accessToken });
-  assert.deepEqual(user, { id: uid, email: "user@example.test" });
+  assert.deepEqual(user, { id: uid, email: "user@example.test", emailConfirmedAt: null });
   assert.equal(calls[0].key, config.serviceRoleKey);
 });
 
