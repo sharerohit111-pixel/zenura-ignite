@@ -223,3 +223,15 @@ test("intraday calculator rejects invalid turnover, side and brokerage cap",()=>
  assert.throws(()=>calculateEquityIntradayCharges({grossPaise:1000,exchange:"NSE",side:"HOLD"}),/side/);
  assert.throws(()=>calculateEquityIntradayCharges({grossPaise:1000,exchange:"NSE",brokerageCapPaise:-1}),/Brokerage cap/);
 });
+
+test("NSE delivery brokerage is flat ₹20 per executed order even on small turnover",()=>{
+ const {calculateEquityDeliveryCharges}=require("../lib/trading-charges");
+ const c=calculateEquityDeliveryCharges({grossPaise:100000,exchange:"NSE",side:"BUY"});
+ assert.equal(c.brokeragePaise,2000);
+ assert.equal(c.scheduleVersion,"2026-03-01");
+});
+test("NSE intraday schedule version tracks the 1 March 2026 transaction schedule",()=>{
+ const {calculateEquityIntradayCharges}=require("../lib/trading-charges");
+ const c=calculateEquityIntradayCharges({grossPaise:100000,exchange:"NSE",side:"BUY"});
+ assert.equal(c.scheduleVersion,"2026-03-01");
+});
