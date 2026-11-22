@@ -151,7 +151,7 @@ test("Professional chart editing toolbar is styled for desktop and touch screens
 test("Every install-time PWA shell asset exists in the repository",()=>{
  const match=serviceWorker.match(/const SHELL=\[([\s\S]*?)\]\.map/);
  assert.ok(match,"PWA shell asset list is missing");
- const entries=[...match[1].matchAll(/"([^"]+)"/g)].map(x=>x[1]);
+ const entries=[...match[1].matchAll(/"([^"]*)"/g)].map(x=>x[1]).filter(Boolean);
  const projectRoot=path.resolve(root,"../..");
  for(const entry of entries){
   const target=path.resolve(pwaRoot,entry);
