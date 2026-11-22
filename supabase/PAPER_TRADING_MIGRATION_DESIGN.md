@@ -103,3 +103,25 @@ The Upstox Firebase implementation is in `functions/indian-market.js`, not in th
 - Pending LIMIT worker cursor: the Firebase worker stores its scan cursor in `indianMarketWorkerState/pendingLimitOrders`; a server-only worker-state table is included, with a partial index for pending LIMIT orders.
 
 The OAuth callback and disconnect operations require multi-row atomic behavior. The eventual Supabase implementation must use trusted server-side RPC/transaction functions and must not expose OAuth state, connection controls, worker cursors, encryption envelopes, or secrets to authenticated browser clients.
+
+
+## Runtime boundary and deployment implications
+
+The existing market gateway is a Node.js 22 Express service using `ws` for the Upstox v3 WebSocket feed and Server-Sent Events for browser delivery. It also performs instrument-master refresh, quote validation, portfolio valuation, and scheduled LIMIT execution is handled separately by a Firebase scheduled worker.
+
+Supabase Postgres, Auth, Storage, Realtime and Edge Functions provide the database/auth/API building blocks, but the database itself is not a replacement for the long-lived Node WebSocket/SSE gateway. The migration must preserve this runtime boundary:
+
+1. Supabase Auth + Postgres become the identity and persistent data layer.
+2. Supabase Edge Functions or a trusted Node API handle short request/response actions such as OAuth start/callback, account reads, order submissions and watchlists.
+3. The Upstox WebSocket/SSE gateway and scheduled LIMIT worker remain a separately deployed server process/worker on a container-capable runtime. It may be moved off Google Cloud only after a replacement host passes WebSocket reconnect, lease renewal, backpressure, quote freshness, secrets, scheduled worker and load tests.
+4. Supabase Realtime may be evaluated for downstream fan-out, but it does not itself establish or maintain the upstream Upstox broker WebSocket session.
+
+No hosting provider has been selected or changed. Do not shut down the existing Cloud Run service until the replacement runtime is deployed, tested, and explicitly approved.
+
+### Verified OAuth and market data details
+
+- OAuth state is random 32-byte hex, single-use, and expires after 10 minutes. It carries a connection generation so a callback started before disconnect cannot restore the connection.
+- The token is encrypted with AES-256-GCM using a 32-byte canonical Base64 key held in Firebase Secret Manager today. The envelope is `{v:1,iv,tag,data}`. Keep the equivalent key in the replacement runtime's secret manager, not in Postgres or the browser.
+- The token expiry helper sets the Upstox access-token cutoff at 03:30 Asia/Kolkata; the actual computed expiry must be persisted, not guessed from a fixed 24-hour TTL.
+- The stream lease is renewed/expired in epoch milliseconds and disconnect marks it revoked.
+- The pending LIMIT worker is opt-in gated, scheduled once per minute during the Indian cash-market window, fetches fresh quotes, and executes only eligible pending Delivery LIMIT orders. Preserve the explicit opt-in gate and worker cursor during migration.
