@@ -126,7 +126,7 @@ begin
   where public.paper_market_stream_leases.revoked=true
      or public.paper_market_stream_leases.expires_at_ms<=p_now_ms
   returning lease_id into v_lease;
-  return v_lease=p_lease_id;
+  return coalesce(v_lease=p_lease_id,false);
 end;
 $$;
 
