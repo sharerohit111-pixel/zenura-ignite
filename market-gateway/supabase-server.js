@@ -15,7 +15,6 @@ const {normalizeProductMode}=require("./lib/product-mode");
 const {parseLimitPricePaise}=require("./lib/limit-price");
 const {normalizeProviderQuote}=require("./lib/provider-quote");
 const {isEligiblePaperLimitOrder,normalizeWorkerCursor,groupOrdersByUser}=require("./lib/paper-limit-worker");
-const {isSupportedProtectiveOrder,isPositionCloseable,evaluateProtectiveOrder}=require("./lib/protective-order-worker");
 const {buildPortfolioValuation}=require("./lib/paper-portfolio-valuation");
 const {calculateDerivativePortfolio}=require("./lib/derivative-portfolio");
 const {validateDerivativeContract}=require("./lib/derivative-contract");
