@@ -1551,7 +1551,7 @@ jobs:
             average_price_paise,cost_basis_paise,reserved_quantity
           ) VALUES (
             '12121212-1212-4212-8212-121212121212','DELIVERY',
-            'NSE_EQ|PROTECTIVE_CI','PROTECTIVE_CI','NSE',10,8000,80000,0
+            'NSE_EQ|PROTECTIVE_CI','PROTECTIVE_CI','NSE',10,8000,80000,4
           );
           INSERT INTO public.paper_protective_orders(
             order_id,user_id,asset_class,instrument_key,product,side,
