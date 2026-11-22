@@ -12,7 +12,6 @@ const deploy=fs.readFileSync(path.join(root,"DEPLOYMENT.md"),"utf8");
 const deployWorkflow=fs.readFileSync(path.join(root,"../.github/workflows/deploy-supabase-market-gateway.yml"),"utf8");
 const marketDataCompliance=fs.readFileSync(path.join(root,"MARKET-DATA-COMPLIANCE.md"),"utf8");
 const tradingPage=fs.readFileSync(path.join(root,"../markets/stocks/index.html"),"utf8");
-const investingPage=fs.readFileSync(path.join(root,"../markets/investing/index.html"),"utf8");
 const workflow=fs.readFileSync(path.join(root,"../.github/workflows/deploy-supabase-market-gateway.yml"),"utf8");
 test("Cloud Run and npm default entrypoints run the Supabase-native gateway",()=>{
  assert.equal(pkg.main,"supabase-server.js");
@@ -93,8 +92,8 @@ test("Market-master and LIMIT worker retries use bounded exponential backoff",()
  assert.match(server,/nextWorkerRunAt=Date\.now\(\)\+workerBackoffMs/);
 });
 
-test("Both market modes disclose per-user Upstox authorization and data rights",()=>{
+test("Paper Trading discloses per-user Upstox authorization and data rights",()=>{
  assert.match(tradingPage,/each user’s own Upstox authorization/);
  assert.match(tradingPage,/Public real-time display remains subject to Upstox permission/);
- assert.match(investingPage,/your own authorized Upstox account only/);
+ assert.doesNotMatch(tradingPage,/PAPER INVESTING|Paper Investing/);
 });
