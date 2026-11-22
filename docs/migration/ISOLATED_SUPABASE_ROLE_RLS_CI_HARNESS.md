@@ -21,6 +21,6 @@ The workflow and SQL assertion files were committed and fetched back from GitHub
 
 ## Known limits
 
-This first security harness tests the role/ACL boundary, RLS enablement, account read isolation and watchlist CRUD ownership. For equity/derivative positions and cash/derivative orders, it verifies the owner-scoped SELECT policy and grants structurally, but does not yet seed and exercise cross-user rows for each table. It also does not test concurrent transaction races, Firebase parity, or the trusted HTTP adapter's Firebase-token-to-Supabase-UUID mapping. Those remain separate follow-up stages.
+This first security harness tests the role/ACL boundary, RLS enablement, account read isolation and watchlist CRUD ownership. All six authenticated read surfaces now have two-user runtime read-isolation assertions using synthetic fixtures. The write-operation tests beyond Watchlist are still not applicable to client roles because direct trading writes are intentionally revoked. It also does not test concurrent transaction races, Firebase parity, or the trusted HTTP adapter's Firebase-token-to-Supabase-UUID mapping. Those remain separate follow-up stages.
 
 No PR #70 SQL or workflow was edited. No PR was created or merged. No production database or Firebase resource was changed.
