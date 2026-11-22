@@ -1521,6 +1521,12 @@ jobs:
             END IF;
           END
           $protective_rpc$;
+          UPDATE public.paper_accounts
+             SET starting_cash_paise=100000000,cash_paise=100000000,
+                 reserved_cash_paise=0,reserved_margin_paise=0,
+                 realized_pnl_paise=0,delivery_realized_pnl_paise=0,
+                 intraday_realized_pnl_paise=0,version=1
+           WHERE user_id='12121212-1212-4212-8212-121212121212';
           INSERT INTO public.paper_equity_positions(
             user_id,product,instrument_key,trading_symbol,exchange,quantity,
             average_price_paise,cost_basis_paise,reserved_quantity
