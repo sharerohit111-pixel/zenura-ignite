@@ -400,7 +400,9 @@ app.post("/paper/orders",async(req,res)=>{
     res.status(result?.idempotent_replay?200:201).json({
       orderId:result?.order_id||orderId,status:result?.status||"FILLED",side,product,orderType,
       quantity,executionPricePaise:normalized.pricePaise,grossPaise:result?.gross_paise??null,
-      cashPaise:result?.cash_paise??null,realizedPnlPaise:result?.order_realized_pnl_paise??0,
+      chargesPaise:result?.charges_paise??0,chargesBreakdown:result?.charges_breakdown??{},
+      cashDeltaPaise:result?.cash_delta_paise??null,cashPaise:result?.cash_paise??null,
+      realizedPnlPaise:result?.order_realized_pnl_paise??0,
       idempotentReplay:result?.idempotent_replay===true,simulationOnly:true
     });
   }catch(error){sendError(res,error,"Paper order could not be completed.");}
@@ -489,7 +491,7 @@ app.get("/paper/orders",async(req,res)=>{
     const limit=Math.min(Number(raw),100);
     const {data,error}=await userDb.from("paper_orders").select("*").eq("user_id",user.id).order("created_at",{ascending:false}).limit(limit);
     if(error)throw Object.assign(new Error("Paper order history could not be loaded."),{status:503});
-    const orders=(data||[]).map(o=>({id:o.order_id,tradingSymbol:o.trading_symbol,exchange:o.exchange,side:o.side,quantity:o.quantity,product:o.product,executionPricePaise:o.execution_price_paise,limitPricePaise:o.limit_price_paise,grossPaise:o.gross_paise,realizedPnlPaise:o.realized_pnl_paise,orderType:o.order_type,status:o.status,simulationOnly:true,createdAt:o.created_at?Date.parse(o.created_at):null}));
+    const orders=(data||[]).map(o=>({id:o.order_id,tradingSymbol:o.trading_symbol,exchange:o.exchange,side:o.side,quantity:o.quantity,product:o.product,executionPricePaise:o.execution_price_paise,limitPricePaise:o.limit_price_paise,grossPaise:o.gross_paise,chargesPaise:o.charges_paise??0,chargesBreakdown:o.charges_breakdown??{},cashDeltaPaise:o.cash_delta_paise??null,realizedPnlPaise:o.realized_pnl_paise,orderType:o.order_type,status:o.status,simulationOnly:true,createdAt:o.created_at?Date.parse(o.created_at):null}));
     res.set("Cache-Control","private, no-store").json({orders,hasMore:false,nextCursor:null,simulationOnly:true});
   }catch(error){sendError(res,error,"Paper order history could not be loaded.");}
 });
