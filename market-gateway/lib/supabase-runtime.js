@@ -50,7 +50,7 @@ function createSupabaseRuntime(options = {}) {
     }
     const user = result?.data?.user;
     if (result?.error || !user || !isUuid(user.id)) throw httpError("Supabase session is invalid or expired", 401);
-    return Object.freeze({ id: user.id, email: typeof user.email === "string" ? user.email : null });
+    return Object.freeze({ id: user.id, email: typeof user.email === "string" ? user.email : null, emailConfirmedAt: user.email_confirmed_at || user.confirmed_at || null });
   }
 
   function createUserClient(accessToken) {
