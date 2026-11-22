@@ -1804,8 +1804,7 @@ jobs:
       - name: Verify S-TRADE crypto cash ledger is append-only
         run: |
           psql -v ON_ERROR_STOP=1 <<'SQL'
-          SET ROLE service_role;
-          DO $crypto_ledger_immutable$
+          DO $crypto_ledger_grants$
           DECLARE
             v_ledger_id bigint;
             v_update_denied boolean:=false;
@@ -1817,6 +1816,46 @@ jobs:
             IF v_ledger_id IS NULL THEN
               RAISE EXCEPTION 'Expected S-TRADE ledger fixture was not created';
             END IF;
+            IF has_table_privilege('service_role','public.paper_crypto_ledger','UPDATE')
+               OR has_table_privilege('service_role','public.paper_crypto_ledger','DELETE') THEN
+              RAISE EXCEPTION 'Service role unexpectedly has crypto ledger mutation grants';
+            END IF;
+          END
+          $crypto_ledger_grants$;
+          SET ROLE service_role;
+          DO $crypto_ledger_permissions$
+          DECLARE
+            v_ledger_id bigint;
+            v_update_denied boolean:=false;
+            v_delete_denied boolean:=false;
+          BEGIN
+            SELECT min(ledger_id) INTO v_ledger_id
+              FROM public.paper_crypto_ledger
+             WHERE user_id='11111111-1111-4111-8111-111111111111';
+            BEGIN
+              UPDATE public.paper_crypto_ledger SET amount=amount
+               WHERE ledger_id=v_ledger_id;
+            EXCEPTION WHEN insufficient_privilege THEN v_update_denied:=true;
+            END;
+            BEGIN
+              DELETE FROM public.paper_crypto_ledger WHERE ledger_id=v_ledger_id;
+            EXCEPTION WHEN insufficient_privilege THEN v_delete_denied:=true;
+            END;
+            IF NOT v_update_denied OR NOT v_delete_denied THEN
+              RAISE EXCEPTION 'Service-role ledger grants did not deny mutation';
+            END IF;
+          END
+          $crypto_ledger_permissions$;
+          RESET ROLE;
+          DO $crypto_ledger_trigger$
+          DECLARE
+            v_ledger_id bigint;
+            v_update_denied boolean:=false;
+            v_delete_denied boolean:=false;
+          BEGIN
+            SELECT min(ledger_id) INTO v_ledger_id
+              FROM public.paper_crypto_ledger
+             WHERE user_id='11111111-1111-4111-8111-111111111111';
             BEGIN
               UPDATE public.paper_crypto_ledger SET amount=amount
                WHERE ledger_id=v_ledger_id;
@@ -1827,12 +1866,11 @@ jobs:
             EXCEPTION WHEN SQLSTATE '55000' THEN v_delete_denied:=true;
             END;
             IF NOT v_update_denied OR NOT v_delete_denied THEN
-              RAISE EXCEPTION 'S-TRADE ledger mutation was not blocked (update %, delete %)',
+              RAISE EXCEPTION 'Crypto ledger immutability trigger failed (update %, delete %)',
                 v_update_denied,v_delete_denied;
             END IF;
           END
-          $crypto_ledger_immutable$;
-          RESET ROLE;
+          $crypto_ledger_trigger$;
           SQL
       - name: Verify expected schema and RPC registration
         run: |
