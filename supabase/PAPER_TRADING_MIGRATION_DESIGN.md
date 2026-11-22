@@ -338,3 +338,10 @@ GitHub Actions run **#30 / 44991611079** completed with **success** on disposabl
 This is verified CI evidence for the committed audit branch. It is not a live Supabase project test, not a Firebase differential test, and not a production-readiness approval. No migration was applied to a connected Supabase project.
 
 The audit branch and PR #71 remain Draft. PR #70 remains Draft and unchanged.
+
+
+### Verification result — 2026-11-22 (latest audit CI)
+
+GitHub Actions run **#40 / 44993236150** completed with **success** on the disposable PostgreSQL test environment. All 18 numbered workflow checks passed, including ordered migration application; MARKET freshness/idempotency and concurrency; LIMIT reservation, duplicate-submit and fill-vs-cancel behavior; NULL-side rejection; Options transaction, fee/rounding golden vectors, concurrent duplicate requests and quote validation; RLS/privileged RPC boundaries; two-user tenant isolation across accounts, positions, orders and watchlists; and expected schema/RPC registration.
+
+The Firebase JavaScript helpers were used as reference inputs for the selected fee/rounding golden vectors; this run is not a full Firebase-vs-SQL differential matrix. The PostgreSQL CI harness uses minimal Supabase-compatible auth roles and is not a live Supabase Auth/PostgREST integration test, Database Advisors review, or production certification. No connected Supabase project was modified. Firebase, PR #28 and the integration branch remain untouched. PR #71 remains Draft; PR #70 remains Draft.
