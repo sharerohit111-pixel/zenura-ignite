@@ -43,8 +43,9 @@ BEGIN
      OR (v_a->>'brokerage_paise')::bigint<>2000
      OR (v_a->>'sebi_paise')::bigint<>1000
      OR (v_a->>'stamp_duty_paise')::bigint<>150000
+     OR (v_a->>'stt_paise')::bigint<>1000000
      OR (v_a->>'gst_paise')::bigint<>428
-     OR (v_a->>'total_charges_paise')::bigint<>153803
+     OR (v_a->>'total_charges_paise')::bigint<>1153803
      OR v_a->>'scrip_group'<>'A'
      OR v_a->>'exclusive_flag'<>'N'
      OR (v_a->>'master_source_date')::date<>v_date THEN
@@ -121,7 +122,7 @@ BEGIN
   );
   SELECT reserved_cash_paise INTO v_reserved FROM public.paper_accounts
    WHERE user_id='66666666-6666-4666-8666-666666666666';
-  IF v_reserved<>1002511 THEN
+  IF v_reserved<>1003511 THEN
     RAISE EXCEPTION 'BSE Delivery LIMIT did not reserve exchange-specific charges: %',v_reserved;
   END IF;
   v_result:=public.execute_paper_limit_fill(
@@ -130,8 +131,8 @@ BEGIN
   );
   SELECT reserved_cash_paise,cash_paise INTO v_reserved,v_cash FROM public.paper_accounts
    WHERE user_id='66666666-6666-4666-8666-666666666666';
-  IF v_result->>'status'<>'FILLED' OR v_reserved<>0 OR v_cash<>100999437
-     OR (v_result->>'charges_paise')::bigint<>2510
+  IF v_result->>'status'<>'FILLED' OR v_reserved<>0 OR v_cash<>100998447
+     OR (v_result->>'charges_paise')::bigint<>3500
      OR v_result->'charges_breakdown'->>'scrip_group'<>'A' THEN
     RAISE EXCEPTION 'BSE Delivery LIMIT fill did not settle with the imported fee master: %',v_result;
   END IF;
@@ -150,7 +151,7 @@ BEGIN
    WHERE user_id='66666666-6666-4666-8666-666666666666';
   IF (v_result->>'charges_paise')::bigint<>5321
      OR (v_result->>'cash_delta_paise')::bigint<>594679
-     OR v_cash<>101594116 OR v_realized<>98424 THEN
+     OR v_cash<>101593126 OR v_realized<>97929 THEN
     RAISE EXCEPTION 'BSE Delivery LIMIT SELL net settlement mismatch: %, cash %, realized %',v_result,v_cash,v_realized;
   END IF;
 
