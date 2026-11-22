@@ -124,6 +124,10 @@ docker push "$IMAGE"
 
 Do not manually deploy around the market-data rights gate or the health checks.
 
+## Internal service-role privilege preflight
+
+Before staging sign-off, verify the narrowly scoped `service_role` privileges required by direct server-side reads/updates: `SELECT` on `upstox_connections`, `paper_market_worker_state`, `paper_orders`, `paper_protective_orders` and `paper_equity_positions`, plus `UPDATE` on `paper_market_worker_state` and `paper_protective_orders`. Do not grant these privileges to `anon` or `authenticated`; keep internal tables inaccessible to client roles. The currently linked Supabase project lacks these service-role privileges, so OAuth lookup and worker runtime verification remain blocked until a corrective migration is rehearsed and verified in disposable staging. Never apply this fix directly to production as part of the draft PR.
+
 ## Release safety
 
 - No legacy customer data is imported.
