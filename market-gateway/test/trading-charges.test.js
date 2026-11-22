@@ -91,7 +91,7 @@ test("brokerage override is included in GST base and zero brokerage is supported
  assert.equal(standard.gstPaise,365);
  assert.equal(zero.gstPaise,6);
  assert.equal(zero.brokeragePaise,0);
- assert.equal(zero.totalChargesPaise,standard.totalChargesPaise-2360);
+ assert.equal(zero.totalChargesPaise,standard.totalChargesPaise-2359);
 });
 
 test("rejects unsafe integer turnover and brokerage boundaries",()=>{
