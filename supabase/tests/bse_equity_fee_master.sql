@@ -1,0 +1,85 @@
+BEGIN;
+SET LOCAL ROLE service_role;
+SELECT public.import_bse_equity_fee_master(
+  (now() at time zone 'Asia/Kolkata')::date,
+  repeat('a',64),
+  'https://www.bseindia.com/downloads/Help/file/scrip.zip',
+  jsonb_build_array(
+    jsonb_build_object('scrip_code','500325','instrument_code','RELIANCE','group_name','A','scrip_name','RELIANCE INDUSTRIES LIMITED','isin','INE002A01018','exclusive_flag','N','status','A','instrument_type','E'),
+    jsonb_build_object('scrip_code','500180','instrument_code','HDFCBANK','group_name','E','scrip_name','HDFC BANK LIMITED','isin','INE040A01034','exclusive_flag','Y','status','A','instrument_type','E'),
+    jsonb_build_object('scrip_code','500570','instrument_code','TATAMOTORS','group_name','M','scrip_name','TATA MOTORS LIMITED','isin','INE155A01022','exclusive_flag','N','status','A','instrument_type','E'),
+    jsonb_build_object('scrip_code','500112','instrument_code','SBIN','group_name','X','scrip_name','STATE BANK OF INDIA','isin','INE062A01020','exclusive_flag','N','status','A','instrument_type','E'),
+    jsonb_build_object('scrip_code','500777','instrument_code','SPECIALP','group_name','P','scrip_name','SPECIAL GROUP P LIMITED','isin','INE777A01010','exclusive_flag','N','status','A','instrument_type','E')
+  )
+);
+RESET ROLE;
+
+DO $bse_fee_master$
+DECLARE
+  v_a jsonb;
+  v_e jsonb;
+  v_m jsonb;
+  v_x jsonb;
+  v_rejected boolean;
+  v_date date:=(now() at time zone 'Asia/Kolkata')::date;
+BEGIN
+  v_a:=public._paper_bse_cash_equity_charges('BSE_EQ|INE002A01018',1000000000,'DELIVERY','BUY');
+  IF (v_a->>'exchange_transaction_paise')::bigint<>375
+     OR (v_a->>'brokerage_paise')::bigint<>2000
+     OR (v_a->>'sebi_paise')::bigint<>1
+     OR (v_a->>'stamp_duty_paise')::bigint<>150000
+     OR (v_a->>'gst_paise')::bigint<>428
+     OR (v_a->>'total_charges_paise')::bigint<>152804
+     OR v_a->>'scrip_group'<>'A'
+     OR v_a->>'exclusive_flag'<>'N'
+     OR (v_a->>'master_source_date')::date<>v_date THEN
+    RAISE EXCEPTION 'BSE Group A non-exclusive Delivery BUY fee vector mismatch: %',v_a;
+  END IF;
+  v_e:=public._paper_bse_cash_equity_charges('BSE_EQ|INE040A01034',1000000000,'INTRADAY','SELL');
+  IF (v_e->>'exchange_transaction_paise')::bigint<>275
+     OR (v_e->>'stt_paise')::bigint<>250000
+     OR (v_e->>'net_credit_paise')::bigint<>(1000000000-(v_e->>'total_charges_paise')::bigint)
+     OR v_e->>'exclusive_flag'<>'Y' THEN
+    RAISE EXCEPTION 'BSE Group E exclusive Intraday SELL fee vector mismatch: %',v_e;
+  END IF;
+  v_m:=public._paper_bse_cash_equity_charges('BSE_EQ|INE155A01022',1000000000,'DELIVERY','BUY');
+  IF (v_m->>'exchange_rate_paise_per_crore')::integer<>275 THEN
+    RAISE EXCEPTION 'BSE Group M fee rate mismatch: %',v_m;
+  END IF;
+  v_x:=public._paper_bse_cash_equity_charges('BSE_EQ|INE062A01020',1000000000,'DELIVERY','BUY');
+  IF (v_x->>'exchange_rate_paise_per_crore')::integer<>10000 THEN
+    RAISE EXCEPTION 'BSE Group X fee rate mismatch: %',v_x;
+  END IF;
+  v_rejected:=false;
+  BEGIN
+    PERFORM public._paper_bse_cash_equity_charges('BSE_EQ|INE777A01010',1000000000,'DELIVERY','BUY');
+  EXCEPTION WHEN SQLSTATE '22023' THEN v_rejected:=true;
+  END;
+  IF NOT v_rejected THEN RAISE EXCEPTION 'BSE Group P was not blocked for settlement-offset ambiguity'; END IF;
+  v_rejected:=false;
+  BEGIN
+    PERFORM public._paper_bse_cash_equity_charges('BSE_EQ|INE999A01010',1000000000,'DELIVERY','BUY');
+  EXCEPTION WHEN SQLSTATE '22023' THEN v_rejected:=true;
+  END;
+  IF NOT v_rejected THEN RAISE EXCEPTION 'Unknown BSE ISIN was not blocked'; END IF;
+  v_rejected:=false;
+  BEGIN
+    PERFORM public.import_bse_equity_fee_master(
+      v_date-8,repeat('b',64),'https://www.bseindia.com/',
+      jsonb_build_array(jsonb_build_object('scrip_code','1','instrument_code','OLD','group_name','A','scrip_name','OLD','isin','INE999A01011','exclusive_flag','N','status','A','instrument_type','E'))
+    );
+  EXCEPTION WHEN SQLSTATE '22023' THEN v_rejected:=true;
+  END;
+  IF NOT v_rejected THEN RAISE EXCEPTION 'Stale BSE master import was accepted'; END IF;
+  v_rejected:=false;
+  BEGIN
+    PERFORM public.import_bse_equity_fee_master(
+      v_date,repeat('c',64),'https://www.bseindia.com/',
+      jsonb_build_array(jsonb_build_object('scrip_code','1','instrument_code','BAD','group_name','A','scrip_name','BAD','isin','INE999A01012','exclusive_flag',null,'status','A','instrument_type','E'))
+    );
+  EXCEPTION WHEN SQLSTATE '22023' THEN v_rejected:=true;
+  END;
+  IF NOT v_rejected THEN RAISE EXCEPTION 'Null BSE exclusive flag was accepted'; END IF;
+END
+$bse_fee_master$;
+ROLLBACK;
