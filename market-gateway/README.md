@@ -30,7 +30,7 @@ The importer validates the BSE field layout, filters active equity securities, c
 
 ## Verified NSE/BSE session calendar import
 
-Intraday LIMIT fills require an explicitly verified session row for the exact exchange and IST date. No weekday inference is used. Prepare a CSV with the exact header below from official NSE/BSE notices; regular sessions use 09:15–15:30 IST, special sessions must carry their exact exchange-published minutes, and holidays use `false,CLOSED` with blank minutes.
+Intraday LIMIT fills require an explicitly verified session row for the exact exchange and IST date. No weekday inference is used. Prepare a CSV with the exact header below from official NSE/BSE notices; regular sessions use 09:15–15:30 IST, special sessions must carry their exact exchange-published minutes, and holidays use `false,CLOSED` with blank minutes. The rows shown are illustrative schema examples only—replace them with individually verified official dates and notices; never import them as a real calendar without checking the source.
 
 ```csv
 exchange,session_date,is_trading_day,open_minute,close_minute,session_kind,source_reference,verified_at
