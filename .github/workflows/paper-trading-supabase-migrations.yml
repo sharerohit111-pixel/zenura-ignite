@@ -5,6 +5,7 @@ on:
     paths:
       - "supabase/migrations/**"
       - ".github/workflows/paper-trading-supabase-migrations.yml"
+      - ".github/workflows/deploy-supabase-market-gateway.yml"
       - "markets/**"
       - "markets/stocks/**"
       - "market-gateway/supabase-server.js"
@@ -58,6 +59,8 @@ jobs:
           fi
       - name: Check installable market PWA and service worker
         run: node --check markets/service-worker.js
+      - name: Validate manual Supabase gateway deployment workflow YAML
+        run: ruby -e 'require "yaml"; YAML.load_file(".github/workflows/deploy-supabase-market-gateway.yml")'
       - name: Check Paper Investing UI, integration and responsive assets
         run: |
           node --check markets/investing/investing.js
