@@ -294,6 +294,8 @@ jobs:
         run: bash supabase/tests/intraday_limit_fill_cancel_race.sh
       - name: Verify authenticated table grants and RLS watchlist isolation
         run: psql -v ON_ERROR_STOP=1 -f supabase/tests/rls_permissions.sql
+      - name: Exercise fee-inclusive atomic NSE equity MARKET settlement
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/equity_market_fee_settlement.sql
       - name: Exercise MARKET idempotency and LIMIT reservation lifecycle
         run: |
           psql -v ON_ERROR_STOP=1 <<'SQL'
