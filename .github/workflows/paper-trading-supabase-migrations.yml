@@ -52,9 +52,9 @@ jobs:
           RETURNS jsonb
           LANGUAGE sql
           STABLE
-          AS $
+          AS $jwt$
             SELECT COALESCE(NULLIF(current_setting('request.jwt.claims', true), '')::jsonb, '{}'::jsonb)
-          $;
+          $jwt$;
           GRANT USAGE ON SCHEMA auth TO authenticated, service_role;
           GRANT EXECUTE ON FUNCTION auth.jwt() TO authenticated, service_role;
           SQL
