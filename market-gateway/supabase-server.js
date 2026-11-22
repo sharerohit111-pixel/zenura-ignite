@@ -38,7 +38,7 @@ const UPSTOX_CLIENT_ID=process.env.UPSTOX_CLIENT_ID;
 const UPSTOX_CLIENT_SECRET=process.env.UPSTOX_CLIENT_SECRET;
 const UPSTOX_REDIRECT_URI=process.env.UPSTOX_REDIRECT_URI;
 const APP_REDIRECT_URI=process.env.ZENURA_APP_REDIRECT_URI||"https://zenuraignite.com/markets/stocks/";
-const MAX_KEYS=Math.min(Math.max(Number(process.env.MAX_INSTRUMENT_KEYS||100),1),500);
+const MAX_KEYS=Math.min(Math.max(Number(process.env.MAX_INSTRUMENT_KEYS||100)||100,1),500);
 const ALLOWED_ORIGINS=(process.env.ALLOWED_ORIGINS||"").split(",").map(x=>x.trim()).filter(Boolean);
 const INSTRUMENTS_URL="https://assets.upstox.com/market-quote/instruments/exchange/complete.json.gz";
 const runtime=createSupabaseRuntime({
@@ -389,6 +389,11 @@ app.post("/stream",async(req,res)=>{
 async function start(){
   if(!ENC_KEY||!UPSTOX_CLIENT_ID||!UPSTOX_CLIENT_SECRET||!UPSTOX_REDIRECT_URI){
     throw new Error("Supabase gateway secrets and Upstox OAuth configuration are required.");
+  }
+  const callbackUrl=new URL(UPSTOX_REDIRECT_URI),appUrl=new URL(APP_REDIRECT_URI);
+  if(callbackUrl.protocol!=="https:"||!callbackUrl.pathname.endsWith("/upstox/oauth/callback")
+     ||appUrl.protocol!=="https:"||callbackUrl.username||callbackUrl.password||appUrl.username||appUrl.password){
+    throw new Error("Upstox callback and app redirect must be valid HTTPS URLs.");
   }
   await loadProto();
   app.listen(PORT,"0.0.0.0",()=>console.log("Supabase-native ZENURA market gateway listening on",PORT));
