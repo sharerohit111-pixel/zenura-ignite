@@ -55,7 +55,7 @@ test("BSE Delivery BUY charges use scrip-group exchange rate and no separate IPF
   const c=calculateBseEquityCharges({grossPaise:1000000000,product:"DELIVERY",side:"BUY",groupName:"A",exclusiveFlag:"N",sourceDate:"2026-11-23"});
   assert.equal(c.exchangeTransactionPaise,375);
   assert.equal(c.brokeragePaise,2000);
-  assert.equal(c.sebiPaise,1);
+  assert.equal(c.sebiPaise,1000);
   assert.equal(c.stampDutyPaise,150000);
   assert.equal(c.ipftIncludedInExchangeCharge,true);
   assert.equal(c.totalDebitPaise,c.grossPaise+c.totalChargesPaise);
