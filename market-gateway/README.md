@@ -49,7 +49,7 @@ All private endpoints validate the Supabase access token. User-facing reads/writ
 - Supabase service-role and Upstox secrets must exist only in Cloud Run Secret Manager.
 - Browser requests use Supabase publishable key plus the signed-in user's access token; RLS remains mandatory.
 - Exact-match instrument validation, fresh provider quote checks, idempotency keys and transactional Postgres RPCs protect paper-order execution.
-- The Supabase LIMIT-order worker is a separate Cloud Run Job. It uses a Postgres lease/single-writer guard, fresh Upstox batch quotes and the transactional `execute_paper_limit_fill` RPC; do not run multiple worker tasks in parallel.
+- The equity Delivery LIMIT worker runs as a background loop inside the Cloud Run gateway process. It uses a Postgres lease/single-writer guard, fresh Upstox batch quotes, bounded exponential backoff and the transactional `execute_paper_limit_fill` RPC. Keep one warm Cloud Run instance with CPU always allocated; do not deploy a duplicate Cloud Run Job or Cloud Scheduler worker.
 - Upstox OAuth access tokens expire on the provider's daily schedule; the app must prompt users to reconnect when expired.
 - The public `/instruments` and `/health` endpoints contain no private account data. All account, portfolio, order and stream endpoints require Supabase authentication.
 - Configure exact CORS origins and verify the Upstox developer-console callback URL matches `UPSTOX_REDIRECT_URI` byte-for-byte.
