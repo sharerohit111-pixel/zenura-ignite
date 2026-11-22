@@ -29,7 +29,7 @@ create or replace function public.execute_paper_long_option_order(
 ) returns jsonb
 language plpgsql
 security definer
-set search_path = pg_catalog, public
+set search_path = ''
 as $$
 declare
   v_account public.paper_accounts%rowtype;
