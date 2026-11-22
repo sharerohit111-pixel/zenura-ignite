@@ -77,6 +77,39 @@ jobs:
             echo "Applying $migration"
             psql -v ON_ERROR_STOP=1 -f "$migration"
           done
+      - name: Reject non-finite option strike prices
+        run: |
+          psql -v ON_ERROR_STOP=1 <<'SQL'
+          DO $strike_guard$
+          DECLARE
+            v_strike numeric;
+            v_rejected boolean;
+          BEGIN
+            FOREACH v_strike IN ARRAY ARRAY[
+              'NaN'::numeric, 'Infinity'::numeric, '-Infinity'::numeric
+            ] LOOP
+              v_rejected := false;
+              BEGIN
+                PERFORM public.execute_paper_long_option_order(
+                  '22222222-2222-4222-8222-222222222222',
+                  repeat('a',64),
+                  'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+                  repeat('b',64),
+                  'NSE_FO|STRIKE_TEST','STRIKE_TEST','NSE','NSE_FO','CE',
+                  current_date+5,v_strike,25,5,1,'BUY',100,
+                  floor(extract(epoch from clock_timestamp())*1000)::bigint,
+                  floor(extract(epoch from clock_timestamp())*1000)::bigint
+                );
+              EXCEPTION WHEN SQLSTATE '22023' THEN
+                v_rejected := true;
+              END;
+              IF NOT v_rejected THEN
+                RAISE EXCEPTION 'Non-finite option strike was accepted: %', v_strike;
+              END IF;
+            END LOOP;
+          END
+          $strike_guard$;
+          SQL
       - name: Exercise account initialization and account read isolation
         run: |
           psql -v ON_ERROR_STOP=1 <<'SQL'
@@ -534,6 +567,9 @@ jobs:
                OR v_cash <> 99861361
                OR (v_result->>'idempotent_replay')::boolean IS NOT FALSE THEN
               RAISE EXCEPTION 'Long CE BUY quantity, fee-inclusive basis, average or cash is incorrect';
+            END IF;
+            IF (SELECT strike_price FROM public.paper_derivative_orders WHERE order_id=repeat('9',64)) <> 22000 THEN
+              RAISE EXCEPTION 'Option strike price was not preserved in immutable derivative order history';
             END IF;
             -- Retry must not execute or charge a second time.
             v_result := public.execute_paper_long_option_order(

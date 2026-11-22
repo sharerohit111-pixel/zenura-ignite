@@ -78,7 +78,8 @@ begin
      or p_instrument_type is null or p_instrument_type not in ('CE','PE')
      or (p_exchange='NSE' and p_segment<>'NSE_FO')
      or (p_exchange='BSE' and p_segment<>'BSE_FO')
-     or p_expiry is null or p_strike_price is null or p_strike_price<=0
+     or p_expiry is null or p_strike_price is null
+     or p_strike_price::text in ('NaN','Infinity','-Infinity') or p_strike_price<=0
      or p_lot_size is null or p_lot_size not between 1 and 1000000
      or p_tick_size_paise is null or p_tick_size_paise not between 1 and 1000000
      or p_lots is null or p_lots not between 1 and 10000
@@ -267,13 +268,13 @@ begin
 
   insert into public.paper_derivative_orders(
     order_id,user_id,idempotency_key,request_fingerprint,instrument_key,trading_symbol,
-    exchange,segment,instrument_type,expiry,side,quantity,lots,lot_size,order_type,status,
+    exchange,segment,instrument_type,expiry,strike_price,side,quantity,lots,lot_size,order_type,status,
     execution_price_paise,quote_timestamp_ms,quote_age_ms,gross_paise,charges_paise,
     total_debit_paise,net_credit_paise,realized_pnl_paise,cash_delta_paise,
     charges_breakdown,excludes_charges,simulation_only,created_at
   ) values (
     p_order_id,p_user_id,p_idempotency_key,p_request_fingerprint,p_instrument_key,p_trading_symbol,
-    p_exchange,p_segment,p_instrument_type,p_expiry,p_side,v_quantity,p_lots,p_lot_size,'MARKET','FILLED',
+    p_exchange,p_segment,p_instrument_type,p_expiry,p_strike_price,p_side,v_quantity,p_lots,p_lot_size,'MARKET','FILLED',
     p_execution_price_paise,p_quote_timestamp_ms,v_quote_age,v_gross,v_charges,
     v_total_debit,v_net_credit,v_order_realized,v_cash_delta,
     jsonb_build_object(

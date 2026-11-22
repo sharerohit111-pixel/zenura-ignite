@@ -105,6 +105,8 @@ create table if not exists public.paper_derivative_orders (
   segment text,
   instrument_type text not null check (instrument_type in ('CE','PE')),
   expiry date,
+  -- Nullable only for legacy imported rows; new option RPC fills this immutable contract field.
+  strike_price numeric check (strike_price is null or (strike_price > 0 and strike_price::text not in ('NaN','Infinity','-Infinity'))),
   side text not null check (side in ('BUY','SELL')),
   quantity integer not null check (quantity > 0 and quantity <= 1000000),
   lots integer not null check (lots > 0),

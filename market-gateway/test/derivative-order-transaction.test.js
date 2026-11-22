@@ -38,6 +38,7 @@ test("atomically records a long option BUY and debits premium",async()=>{
  assert.equal(writes[0][0],"create");
  assert.equal(writes[0][2].status,"FILLED");
  assert.equal(writes[0][2].grossPaise,81250);
+ assert.equal(writes[0][2].strikePrice,instrument.strike_price);
  assert.equal(writes[1][0],"update");
  assert.equal(writes[1][2].cashPaise,916354);
  assert.equal(writes[0][2].chargesPaise,2396);
