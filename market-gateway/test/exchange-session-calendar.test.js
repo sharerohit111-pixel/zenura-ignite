@@ -30,6 +30,15 @@ test("loads only the exact verified NSE session for the current IST date",async(
  assert.deepEqual(db.filters,{exchange:"NSE",session_date:"2026-11-23"});
 });
 
+test("loads an explicitly verified BSE session independently of NSE",async()=>{
+ const bseRow={...row,exchange:"BSE",source_reference:"BSE official trading notice"};
+ const db=mockDb(bseRow);
+ assert.deepEqual(await loadVerifiedExchangeSession(db,"BSE",now),{
+  exchange:"BSE",sessionDate:"2026-11-23",isTradingDay:true,openMinute:555,closeMinute:930
+ });
+ assert.deepEqual(db.filters,{exchange:"BSE",session_date:"2026-11-23"});
+});
+
 test("missing, closed, mismatched, malformed or future-verified sessions fail closed",async()=>{
  assert.equal(await loadVerifiedExchangeSession(mockDb(null),"NSE",now),null);
  assert.equal(await loadVerifiedExchangeSession(mockDb({...row,is_trading_day:false,session_kind:"CLOSED",open_minute:null,close_minute:null}),"NSE",now),null);
