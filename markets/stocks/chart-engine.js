@@ -30,11 +30,28 @@
     if(root.klinecharts)return Promise.resolve(root.klinecharts);
     if(libraryPromise)return libraryPromise;
     libraryPromise=new Promise((resolve,reject)=>{
-      const script=document.createElement("script");
-      script.src=CDN;script.async=true;script.crossOrigin="anonymous";
-      script.onload=()=>root.klinecharts?resolve(root.klinecharts):reject(new Error("Chart engine loaded without its API."));
-      script.onerror=()=>{libraryPromise=null;reject(new Error("Professional chart engine could not be loaded. Check the network and retry."));};
-      document.head.appendChild(script);
+      const sources=[CDN,"https://unpkg.com/klinecharts@10.1.1/dist/umd/klinecharts.min.js"];
+      let index=0,settled=false;
+      const attempt=()=>{
+        const script=document.createElement("script");
+        let timeout;
+        const cleanup=()=>{if(timeout)clearTimeout(timeout);script.onload=null;script.onerror=null;};
+        const fallback=()=>{
+          cleanup();script.remove();index++;
+          if(index<sources.length){attempt();return;}
+          if(!settled){settled=true;libraryPromise=null;reject(new Error("Professional chart engine could not be loaded from either CDN. Check the network and retry."));}
+        };
+        script.src=sources[index];script.async=true;script.crossOrigin="anonymous";script.referrerPolicy="no-referrer";
+        script.onload=()=>{
+          cleanup();
+          if(root.klinecharts&&!settled){settled=true;resolve(root.klinecharts);}
+          else fallback();
+        };
+        script.onerror=fallback;
+        timeout=setTimeout(fallback,8000);
+        document.head.appendChild(script);
+      };
+      attempt();
     });
     return libraryPromise;
   }
