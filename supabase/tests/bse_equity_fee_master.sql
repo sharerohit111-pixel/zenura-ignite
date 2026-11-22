@@ -25,10 +25,10 @@ INSERT INTO auth.users(id) VALUES ('66666666-6666-4666-8666-666666666666')
 ON CONFLICT (id) DO NOTHING;
 SELECT public.initialize_paper_trading_account('66666666-6666-4666-8666-666666666666');
 INSERT INTO public.paper_exchange_sessions(
-  exchange,session_date,is_trading_day,open_minute,close_minute,session_kind,source_reference,verified_at
+  exchange,session_date,is_trading_day,open_minute,close_minute,session_kind,source_reference,verified_at,source_sha256
 ) VALUES (
   'BSE',(now() at time zone 'Asia/Kolkata')::date,true,0,1440,'SPECIAL',
-  'CI-only BSE Intraday LIMIT session fixture',now()
+  'CI-only BSE Intraday LIMIT session fixture',now(),repeat('c',64)
 );
 
 DO $bse_fee_master$
