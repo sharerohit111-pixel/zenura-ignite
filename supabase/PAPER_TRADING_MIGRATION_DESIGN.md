@@ -125,3 +125,16 @@ No hosting provider has been selected or changed. Do not shut down the existing 
 - The token expiry helper sets the Upstox access-token cutoff at 03:30 Asia/Kolkata; the actual computed expiry must be persisted, not guessed from a fixed 24-hour TTL.
 - The stream lease is renewed/expired in epoch milliseconds and disconnect marks it revoked.
 - The pending LIMIT worker is opt-in gated, scheduled once per minute during the Indian cash-market window, fetches fresh quotes, and executes only eligible pending Delivery LIMIT orders. Preserve the explicit opt-in gate and worker cursor during migration.
+
+
+## Atomic market-order RPC draft
+
+Added `supabase/migrations/202611220002_paper_order_transactions.sql` with `public.execute_paper_market_order(...)`. It is a SECURITY DEFINER server-only PostgreSQL function that:
+- locks the user's account row before checking idempotency and mutating balances;
+- returns an identical prior order for the same user/key/fingerprint and rejects key reuse with a different fingerprint;
+- validates the trusted server-provided instrument, side, product, quantity, paise price and quote age (maximum 15 seconds);
+- enforces the shared virtual cash balance, reserved cash/margin, unreserved sell quantity, and 50-open-position cap;
+- updates the product-specific equity position, cash, aggregate and product-specific realized P&L, account version, and immutable filled MARKET order in one database transaction;
+- grants execution only to `service_role`; browser roles cannot call it.
+
+This is the first transaction slice only. It does not yet implement pending LIMIT reserve/fill/cancel, option trades, account initialization, or quote/provider verification. The RPC trusts its caller for provider quote and identity validation, so only a trusted backend may call it. The RPC has not been executed against a staging database and has no runtime pass claim.
