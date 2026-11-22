@@ -24,7 +24,7 @@
   };
   let libraryPromise=null,chart=null,container=null,context=null,barCallback=null,lastBar=null;
   let pendingQuote=null,framePending=false,activeTheme=(document.body?.dataset?.chartTheme||"dark"),activeChartType="CANDLE",suppressRemove=false;
-  const overlayRows=new Map(),undoStack=[],redoStack=[],activeIndicators=new Set();
+  const overlayRows=new Map(),undoStack=[],redoStack=[],activeIndicators=new Set(),candleCache=new Map();
 
   function loadLibrary(){
     if(root.klinecharts)return Promise.resolve(root.klinecharts);
@@ -212,6 +212,17 @@
     const days=period.days;
     const to=type==="forward"&&timestamp?dateFromTimestamp(timestamp,-1):localDate();
     const from=type==="forward"&&timestamp?dateFromTimestamp(timestamp,-days):type==="backward"&&timestamp?dateFromTimestamp(timestamp,0):localDate(-days);
+    const cacheKey=[current.instrument.instrument_key,current.timeframe,type,timestamp||"latest",from,to].join("|");
+    const cached=candleCache.get(cacheKey);
+    if(cached&&cached.expiresAt>Date.now()){
+      candleCache.delete(cacheKey);candleCache.set(cacheKey,cached);
+      const bars=cached.bars.map(bar=>({...bar}));
+      if(type==="init"||!timestamp)lastBar=bars.at(-1)||null;
+      else if(type==="backward"&&bars.length)lastBar=bars.at(-1);
+      callback(bars,{forward:type==="forward"&&bars.length>=500,backward:type==="backward"&&bars.length>=500});
+      return;
+    }
+    if(cached)candleCache.delete(cacheKey);
     const token=await current.getAccessToken();
     const params=new URLSearchParams({
       instrument_key:current.instrument.instrument_key,unit:period.unit,
@@ -226,6 +237,9 @@
     let bars=normalizeBars(payload.data?.candles||[]);
     if(type==="forward"&&timestamp)bars=bars.filter(bar=>bar.timestamp<timestamp);
     if(type==="backward"&&timestamp)bars=bars.filter(bar=>bar.timestamp>timestamp);
+    const ttl=type==="backward"?300000:15000;
+    candleCache.set(cacheKey,{bars:bars.map(bar=>({...bar})),expiresAt:Date.now()+ttl});
+    while(candleCache.size>100)candleCache.delete(candleCache.keys().next().value);
     if(type==="init"||!timestamp)lastBar=bars.at(-1)||null;
     else if(type==="backward"&&bars.length)lastBar=bars.at(-1);
     callback(bars,{forward:type==="forward"&&bars.length>=500,backward:type==="backward"&&bars.length>=500});
