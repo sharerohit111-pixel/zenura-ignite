@@ -15,6 +15,7 @@ const serviceWorker=fs.readFileSync(path.join(pwaRoot,"service-worker.js"),"utf8
 const manifest=JSON.parse(fs.readFileSync(path.join(pwaRoot,"manifest.webmanifest"),"utf8"));
 const portal=fs.readFileSync(path.join(pwaRoot,"index.html"),"utf8");
 const languageToggle=fs.readFileSync(path.join(pwaRoot,"language-toggle.js"),"utf8");
+const chartTheme=fs.readFileSync(path.join(root,"../stocks/chart-theme.js"),"utf8");
 test("Paper Investing page includes all locally referenced modules and styles",()=>{
  const assetRefs=[
   ...[...html.matchAll(/<script[^>]*src="([^"]+)"/gi)].map(match=>match[1]),
@@ -115,4 +116,16 @@ test("Hindi-English toggle is shared, persistent and updates both modes",()=>{
  assert.match(languageToggle,/MutationObserver/);
  assert.match(languageToggle,/data-en/);assert.match(languageToggle,/data-hi/);
  assert.match(serviceWorker,/"language-toggle\.js"/);
+});
+
+test("Bilingual labels use one persistent translator and keep live chart status dynamic",()=>{
+ const trading=fs.readFileSync(path.join(root,"../stocks/index.html"),"utf8");
+ assert.match(trading,/id="paper-language-toggle"/);
+ assert.match(html,/id="paper-language-toggle"/);
+ assert.match(languageToggle,/localStorage\.getItem\(KEY\)/);
+ assert.match(languageToggle,/getAttribute\(language==="hi"\?"data-hi":"data-en"\)/);
+ assert.match(languageToggle,/"Futures":"फ्यूचर्स"/);
+ assert.match(languageToggle,/"Options":"ऑप्शंस"/);
+ assert.match(chartTheme,/zenura-language-change/);
+ assert.doesNotMatch(html,/<span id="chart-status"[^>]*data-hi=/);
 });
