@@ -373,6 +373,26 @@ jobs:
           END
           $;
           SQL
+      - name: Reject null LIMIT side before any reservation or order write
+        run: |
+          psql -v ON_ERROR_STOP=1 <<'SQL'
+          DO $
+          BEGIN
+            BEGIN
+              PERFORM public.submit_paper_limit_order(
+                '22222222-2222-4222-8222-222222222222',
+                repeat('a',64),'16161616-1616-4616-8616-161616161616',
+                repeat('b',64),'NSE_EQ|NULLSIDE','NULLSIDE','NSE',NULL,1,10000
+              );
+              RAISE EXCEPTION 'NULL LIMIT side was accepted';
+            EXCEPTION WHEN SQLSTATE '22023' THEN NULL;
+            END;
+            IF EXISTS (SELECT 1 FROM public.paper_orders WHERE order_id=repeat('a',64)) THEN
+              RAISE EXCEPTION 'Rejected NULL LIMIT side left an order row behind';
+            END IF;
+          END
+          $;
+          SQL
       - name: Exercise long option transactions
         run: |
           psql -v ON_ERROR_STOP=1 <<'SQL'
@@ -432,6 +452,19 @@ jobs:
                OR (v_result->>'realized_pnl_paise')::bigint <> 17749
                OR v_cash <> 99896430 OR v_realized <> 17749 THEN
               RAISE EXCEPTION 'Long option partial close mismatch: qty=%, basis=%, avg=%, order_realized=%, cash=%, account_realized=%', v_qty,v_basis,v_avg,(v_result->>'realized_pnl_paise'),v_cash,v_realized;
+            END IF;
+            -- Full close at a one-paise premium: charges exceed turnover, so net credit is negative.
+            v_result := public.execute_paper_long_option_order(
+              '22222222-2222-4222-8222-222222222222',
+              repeat('f',64),'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+              repeat('d',64),'NSE_FO|TESTCE','TESTCE','NSE','NSE_FO','CE',
+              current_date + 10,22000,25,1,1,'SELL',1,1000000,1000100
+            );
+            IF (v_result->'order'->>'net_credit_paise')::bigint >= 0
+               OR EXISTS (SELECT 1 FROM public.paper_derivative_positions
+                 WHERE user_id='22222222-2222-4222-8222-222222222222'
+                   AND instrument_key='NSE_FO|TESTCE') THEN
+              RAISE EXCEPTION 'Tiny-premium full close did not preserve negative net credit or remove the position';
             END IF;
             -- Stale provider quotes must be rejected before account mutation.
             BEGIN
