@@ -1,0 +1,95 @@
+{
+  "_comment": "Synthetic, sanitized compatibility fixtures only. No real user/account data. All monetary values are integer paise.",
+  "identity": {
+    "firebaseUid": "firebase-user-fixture-001",
+    "supabaseAuthUserId": "550e8400-e29b-41d4-a716-446655440000"
+  },
+  "account": {
+    "currency": "INR",
+    "startingCashPaise": 100000000,
+    "cashPaise": 98765000,
+    "reservedCashPaise": 250000,
+    "reservedMarginPaise": 0,
+    "realizedPnlPaise": 125000,
+    "positions": {
+      "NSE_EQ|FIXTURE_A": {
+        "quantity": 2,
+        "averagePricePaise": 50000,
+        "costBasisPaise": 100000
+      }
+    },
+    "intradayPositions": {
+      "NSE_EQ|FIXTURE_B": {
+        "quantity": 1,
+        "averagePricePaise": 75000,
+        "costBasisPaise": 75000
+      }
+    },
+    "derivativePositions": {
+      "NSE_FO|FIXTURE_CE": {
+        "instrumentType": "CE",
+        "netQuantity": 25,
+        "averagePricePaise": 1250,
+        "costBasisPaise": 31250,
+        "exchange": "NSE",
+        "segment": "NSE_FO",
+        "expiry": "2026-12-31",
+        "lotSize": 25
+      }
+    },
+    "reservedPositions": {},
+    "intradayReservedPositions": {},
+    "version": 7,
+    "createdAt": "2026-11-01T00:00:00.000Z",
+    "updatedAt": "2026-11-20T10:00:00.000Z"
+  },
+  "legacyAccount": {
+    "currency": "INR",
+    "startingCashPaise": 75000000,
+    "cashPaise": 70000000,
+    "realizedPnlPaise": 50000,
+    "positions": {
+      "NSE_EQ|LEGACY": {
+        "quantity": 1,
+        "averagePricePaise": 10000
+      }
+    },
+    "version": 3
+  },
+  "cashOrder": {
+    "uid": "firebase-user-fixture-001",
+    "requestFingerprint": "fixture-fingerprint-001",
+    "instrumentKey": "NSE_EQ|FIXTURE_A",
+    "tradingSymbol": "FIXTURE_A",
+    "exchange": "NSE",
+    "side": "BUY",
+    "product": "DELIVERY",
+    "orderType": "MARKET",
+    "status": "FILLED",
+    "quantity": 2,
+    "executionPricePaise": 50000,
+    "grossPaise": 100000,
+    "realizedPnlPaise": 0,
+    "quoteTimestampMs": 1795168800000,
+    "quoteAgeMs": 450,
+    "simulationOnly": true,
+    "reservedCashPaise": 0,
+    "reservedQuantity": 0,
+    "reservationReleased": true,
+    "filledAt": "2026-11-20T10:00:00.000Z",
+    "createdAt": "2026-11-20T10:00:00.000Z"
+  },
+  "legacyCashOrder": {
+    "uid": "firebase-user-fixture-001",
+    "requestFingerprint": "legacy-fingerprint-001",
+    "instrumentKey": "NSE_EQ|LEGACY",
+    "side": "BUY",
+    "product": "DELIVERY",
+    "orderType": "MARKET",
+    "status": "FILLED",
+    "quantity": 1,
+    "executionPricePaise": 10000,
+    "grossPaise": 10000,
+    "simulationOnly": true
+  }
+}
