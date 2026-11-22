@@ -258,7 +258,7 @@
   let paperOrderSubmitting=false,paperOrderSubmitSeq=0;
   function updatePaperButtons(){
     const allowed=!paperOrderSubmitting&&!!selected&&['NSE_EQ','BSE_EQ'].includes(selected.segment)&&selected.instrument_type==='EQ'&&!!window.ZENURA_MARKET_CONNECTOR?.getIdToken&&!!window.ZENURA_MARKET_CONNECTOR?.getUserId?.()&&!!gateway;
-    paperBuy.disabled=!allowed;paperSell.disabled=!allowed;
+    paperBuy.disabled=!allowed;paperSell.disabled=!allowed;updateProtectiveButton?.();
   }
   const pendingOrderStorage=(()=>{try{return window.localStorage;}catch(_){return null;}})();
   const paperPendingStorageKey='zenura-indian-paper-order-pending-v1';
@@ -313,6 +313,110 @@
   }
   paperBuy.addEventListener('click',()=>submitPaperOrder('BUY'));
   paperSell.addEventListener('click',()=>submitPaperOrder('SELL'));
+  const protectiveCreate=document.getElementById('paper-protective-create');
+  const protectiveType=document.getElementById('paper-protective-type');
+  const protectivePrice=document.getElementById('paper-protective-price');
+  const protectiveStatus=document.getElementById('paper-protective-status');
+  const protectiveListStatus=document.getElementById('paper-protective-list-status');
+  const protectiveBody=document.getElementById('paper-protective-orders-body');
+  const protectiveRefresh=document.getElementById('paper-protective-refresh');
+  let protectiveWorkerEnabled=false,protectiveSubmitting=false,protectiveLoadSeq=0;
+  function updateProtectiveButton(){
+    const allowed=!protectiveSubmitting&&protectiveWorkerEnabled&&!!selected
+      &&['NSE_EQ','BSE_EQ'].includes(selected.segment)&&selected.instrument_type==='EQ'
+      &&!!window.ZENURA_MARKET_CONNECTOR?.getIdToken&&!!window.ZENURA_MARKET_CONNECTOR?.getUserId?.()&&!!gateway;
+    if(protectiveCreate)protectiveCreate.disabled=!allowed;
+    if(protectivePrice)protectivePrice.disabled=!allowed;
+  }
+  function protectiveTime(value){
+    const ms=Date.parse(value||'');return Number.isFinite(ms)?new Date(ms).toLocaleString('en-IN'):'—';
+  }
+  async function loadProtectiveOrders(){
+    const connector=window.ZENURA_MARKET_CONNECTOR,uid=connector?.getUserId?.(),request=++protectiveLoadSeq;
+    if(!gateway||!connector?.getIdToken||!uid){protectiveWorkerEnabled=false;updateProtectiveButton();return;}
+    protectiveListStatus.textContent='Loading your private protective orders…';
+    try{
+      const token=await connector.getIdToken();
+      if(request!==protectiveLoadSeq||connector.getUserId()!==uid)return;
+      const response=await fetch(gateway+'/paper/protective-orders?limit=100',{headers:{Authorization:'Bearer '+token,Accept:'application/json'}});
+      const data=await response.json().catch(()=>({}));
+      if(request!==protectiveLoadSeq||connector.getUserId()!==uid)return;
+      if(!response.ok)throw new Error(data.error||'Protective orders could not be loaded.');
+      protectiveWorkerEnabled=data.workerEnabled===true;updateProtectiveButton();
+      protectiveBody.textContent='';
+      const orders=data.orders||[];
+      if(!orders.length)tableMessage(protectiveBody,8,'No protective orders yet.');
+      orders.forEach(order=>{
+        const tr=document.createElement('tr');
+        const instrument=items.find(x=>x.instrument_key===order.instrumentKey);
+        const values=[protectiveTime(order.createdAt),instrument?.trading_symbol||order.instrumentKey,order.product,
+          order.triggerType,order.quantity,inrPaise(order.triggerPricePaise),order.status];
+        values.forEach(value=>{const td=document.createElement('td');td.textContent=String(value);tr.append(td);});
+        const action=document.createElement('td');
+        if(['ACTIVE','TRIGGERED'].includes(order.status)){
+          const cancel=document.createElement('button');cancel.type='button';cancel.textContent='CANCEL';
+          cancel.addEventListener('click',()=>cancelProtectiveOrder(order.orderId));action.append(cancel);
+        }else action.textContent=order.executionPricePaise?('Filled '+inrPaise(order.executionPricePaise)):'—';
+        tr.append(action);protectiveBody.append(tr);
+      });
+      protectiveListStatus.textContent=protectiveWorkerEnabled
+        ?'Equity protective worker is enabled. Orders are simulated; share quantity is rechecked at execution and is not reserved.'
+        :'Protective execution is disabled on this gateway. No new protective exits can be created.';
+      protectiveStatus.textContent=protectiveWorkerEnabled
+        ?'NSE/BSE cash equities only · SELL-to-close · Simulated execution.'
+        :'Protective execution is not enabled on this gateway.';
+    }catch(error){
+      if(request===protectiveLoadSeq&&connector.getUserId()===uid){
+        protectiveWorkerEnabled=false;updateProtectiveButton();
+        protectiveListStatus.textContent=error.message||'Protective order list unavailable.';
+        protectiveStatus.textContent=protectiveListStatus.textContent;
+      }
+    }
+  }
+  async function submitProtectiveOrder(){
+    if(protectiveSubmitting||!protectiveWorkerEnabled||!selected)return;
+    const connector=window.ZENURA_MARKET_CONNECTOR,uid=connector?.getUserId?.();
+    if(!uid||!connector?.getIdToken)return;
+    const quantity=Number(paperQuantity.value),priceRupees=Number(protectivePrice.value);
+    const triggerPricePaise=Math.round(priceRupees*100),product=paperProductMode.value==='INTRADAY'?'INTRADAY':'DELIVERY';
+    const triggerType=protectiveType.value;
+    if(!Number.isSafeInteger(quantity)||quantity<1||quantity>1000000){protectiveStatus.textContent='Enter a valid whole-number exit quantity.';return;}
+    if(!Number.isFinite(priceRupees)||!Number.isSafeInteger(triggerPricePaise)||triggerPricePaise<1){protectiveStatus.textContent='Enter a valid trigger price in rupees.';return;}
+    if(!['NSE_EQ','BSE_EQ'].includes(selected.segment)||selected.instrument_type!=='EQ'){protectiveStatus.textContent='Select an NSE/BSE cash equity first.';return;}
+    if(!window.crypto?.randomUUID){protectiveStatus.textContent='Secure order identity is unavailable in this browser.';return;}
+    protectiveSubmitting=true;updateProtectiveButton();protectiveStatus.textContent='Validating held shares and creating the simulated protective exit…';
+    const instrumentKey=selected.instrument_key,orderId=window.crypto.randomUUID();
+    try{
+      const token=await connector.getIdToken();
+      if(connector.getUserId()!==uid||selected?.instrument_key!==instrumentKey)throw new Error('Account or selected instrument changed. Retry from the intended account and stock.');
+      const response=await fetch(gateway+'/paper/protective-orders',{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json',Accept:'application/json'},
+        body:JSON.stringify({order_id:orderId,instrument_key:instrumentKey,product,trigger_type:triggerType,trigger_price_paise:triggerPricePaise,quantity})});
+      const data=await response.json().catch(()=>({}));
+      if(connector.getUserId()!==uid)throw new Error('Account changed while the protective order was processing.');
+      if(!response.ok)throw new Error(data.error||'Protective order rejected.');
+      protectiveStatus.textContent=(data.idempotentReplay?'Verified existing':'Created')+' '+triggerType+' for '+quantity+' '+(data.tradingSymbol||instrumentKey)+' at '+inrPaise(triggerPricePaise)+'. Simulation only.';
+      await loadProtectiveOrders();
+    }catch(error){if(connector.getUserId()===uid)protectiveStatus.textContent=error.message||'Protective order could not be created.';}
+    finally{protectiveSubmitting=false;updateProtectiveButton();}
+  }
+  async function cancelProtectiveOrder(orderId){
+    const connector=window.ZENURA_MARKET_CONNECTOR,uid=connector?.getUserId?.();
+    if(!uid||!connector?.getIdToken)return;
+    try{
+      const token=await connector.getIdToken();
+      if(connector.getUserId()!==uid)return;
+      const response=await fetch(gateway+'/paper/protective-orders/'+encodeURIComponent(orderId)+'/cancel',{method:'POST',headers:{Authorization:'Bearer '+token,Accept:'application/json'}});
+      const data=await response.json().catch(()=>({}));
+      if(!response.ok)throw new Error(data.error||'Protective cancellation failed.');
+      protectiveStatus.textContent=data.alreadyFilled?'Order was already filled; its execution remains recorded.':data.cancelled?'Protective order cancelled.':'Protective order status: '+data.status+'.';
+      await loadProtectiveOrders();
+    }catch(error){if(connector.getUserId()===uid)protectiveStatus.textContent=error.message||'Protective cancellation failed.';}
+  }
+  protectiveCreate?.addEventListener('click',submitProtectiveOrder);
+  protectiveRefresh?.addEventListener('click',loadProtectiveOrders);
+  if(paperQuantity)paperQuantity.addEventListener('input',updateProtectiveButton);
+  if(paperProductMode)paperProductMode.addEventListener('change',updateProtectiveButton);
+
 
   const futuresMarginButton=document.getElementById('futures-margin-preview');
   const futuresMarginLots=document.getElementById('futures-margin-lots');
@@ -665,13 +769,13 @@
     price.textContent='—';title.textContent='No instrument selected';symbol.textContent='Sign in to load market data';
     setFeedStatus('SIGN IN REQUIRED','Your private market session has ended.');
     resetOptionChain('Sign in to load a private option chain.');
-    updatePaperButtons();updateFuturesMarginButton();
+    updatePaperButtons();updateFuturesMarginButton();protectiveWorkerEnabled=false;protectiveLoadSeq++;updateProtectiveButton();tableMessage(protectiveBody,8,"Sign in to view protective orders.");protectiveListStatus.textContent="Sign in required";protectiveStatus.textContent="Sign in to load protective execution status.";
   }
   window.addEventListener('zenura-market-auth-ready',event=>{
     // Never leave one account's private data visible while another account is loading.
     clearPrivateSession();
     if(!event.detail?.signedIn||!window.ZENURA_MARKET_CONNECTOR?.isAuthenticated?.())return;
-    loadInstruments();loadCandles();loadPaperAccount();refreshPaperViews();loadSavedWatchlist();
+    loadInstruments();loadCandles();loadPaperAccount();refreshPaperViews();loadSavedWatchlist();loadProtectiveOrders();
   });
   window.ZENURA_INDIAN_MARKET={mode:'indian-stocks',provider:'upstox',status:'gateway-configurable',activeList:()=>activeList,refresh:loadInstruments};
   loadInstruments();
