@@ -345,3 +345,63 @@ The audit branch and PR #71 remain Draft. PR #70 remains Draft and unchanged.
 GitHub Actions run **#40 / 44993236150** completed with **success** on the disposable PostgreSQL test environment. All 18 numbered workflow checks passed, including ordered migration application; MARKET freshness/idempotency and concurrency; LIMIT reservation, duplicate-submit and fill-vs-cancel behavior; NULL-side rejection; Options transaction, fee/rounding golden vectors, concurrent duplicate requests and quote validation; RLS/privileged RPC boundaries; two-user tenant isolation across accounts, positions, orders and watchlists; and expected schema/RPC registration.
 
 The Firebase JavaScript helpers were used as reference inputs for the selected fee/rounding golden vectors; this run is not a full Firebase-vs-SQL differential matrix. The PostgreSQL CI harness uses minimal Supabase-compatible auth roles and is not a live Supabase Auth/PostgREST integration test, Database Advisors review, or production certification. No connected Supabase project was modified. Firebase, PR #28 and the integration branch remain untouched. PR #71 remains Draft; PR #70 remains Draft.
+
+## Firebase-to-SQL differential parity matrix — next audit gate
+
+The current CI golden-vector check covers three selected outcomes (NSE BUY, BSE BUY, and tiny-premium NSE SELL). It does **not** yet prove full numerical or transaction parity. The following matrix is the next isolated test plan. Firebase JavaScript helpers remain the reference implementation; SQL is the candidate. Each case must run against both implementations with identical normalized inputs, then compare every persisted/output field in integer paise.
+
+### Charge calculation matrix
+
+| Case | Input / boundary | Required comparison |
+|---|---|---|
+| NSE BUY baseline | gross 81,250 paise; default brokerage | brokerage, exchange, IPFT, SEBI, stamp, GST, STT=0, total charges and debit |
+| BSE BUY baseline | gross 100,000 paise; default brokerage | BSE rate, zero IPFT, GST and total debit |
+| NSE BUY with IPFT | gross 10,000,000 paise | IPFT=50 paise and inclusion in GST base |
+| Large NSE BUY | gross 100,000,000 paise | exchange=35,530; IPFT=500; GST=6,845 |
+| NSE SELL | gross 97,500 paise | STT=146; stamp=0; exchange=35; GST=366; charges=2,547; net credit=94,953 |
+| Tiny NSE SELL | gross 100 paise | charges exceed gross; negative net credit is preserved |
+| Half-paise rounding boundaries | for each fee component, values immediately below, at, and above an x.5 paise boundary | JS Math.round and SQL numeric rounding must agree exactly |
+| Brokerage override | zero, ordinary, and large safe-integer brokerage | GST base and all totals; reject negative/non-integer/unsafe inputs |
+| Input rejection | gross 0, negative, fractional, unsafe; unsupported exchange/side | both implementations reject, with no state mutation |
+| Safe-integer ceiling | values near MAX_SAFE_INTEGER for turnover, fees, total debit and net settlement | no overflow, precision loss or partial write |
+
+### Transaction and position conservation matrix
+
+| Case | Setup / action | Required invariant |
+|---|---|---|
+| First BUY | no existing position | one filled order; cash decreases by gross + charges; cost basis includes charges |
+| Add-on BUY | existing same contract | quantity and fee-inclusive cost basis add; weighted average follows Firebase rounding |
+| Full SELL close | exact open quantity | position removed; realized P&L equals gross proceeds less closed basis and sell charges |
+| Partial SELL close | close less than open quantity | residual quantity and basis conserve exactly; closed-basis rounding matches JS |
+| Repeated partial SELL | multiple closes ending at zero | sum of closed basis equals original basis; no paise created/lost |
+| SELL without position / oversell | absent or insufficient quantity | reject atomically; cash, position, order count unchanged |
+| Fee-heavy SELL | net proceeds negative | cash and realized P&L both include charges exactly once |
+| Insufficient unreserved cash | cash below premium + charges or reserved cash boundary | reject atomically; reservations remain unchanged |
+| Position cap | 49, 50 and 51 open instruments | 50 may be reached; new 51st rejected; add-on BUY to existing key remains allowed |
+| Malformed stored position | invalid type, quantity, average, basis, metadata | reject before mutation |
+| Idempotency | same key/same fingerprint, same key/different fingerprint, different order id/same key | replay exactly once or reject; never double-debit |
+| Concurrency | simultaneous duplicate BUY; competing BUY/SELL on same account | account lock serializes writes; final quantity/cash/order count are deterministic |
+
+### Contract, quote and time matrix
+
+- CE and PE; NSE_FO and BSE_FO; valid and invalid exchange/segment pairings.
+- Lot size 1 and maximum supported lot size; lots 1 and maximum; quantity exactly at and one above the 1,000,000 limit.
+- Tick-size normalization from provider paise form and legacy decimal-rupee form; execution price one tick below/on/above valid tick; malformed, zero, fractional and non-finite tick values.
+- Expiry date normalization from ISO date and provider epoch timestamp; invalid calendar dates; expiry-day immediately before, exactly at, and immediately after 15:30 Asia/Kolkata; non-expiry day.
+- Quote age 0, 1 ms, 14,999 ms, 15,000 ms and 15,001 ms; future timestamp; quote/instrument-key mismatch; invalid timestamp; caller clock skew at 2,000 ms and 2,001 ms.
+- SQL uses database clock while Firebase helper receives server now; the test harness must freeze/inject a shared reference instant or use a bounded clock fixture, not compare independent wall-clock calls.
+
+### Parity acceptance rules
+
+1. Compare all fee components, gross, debit/credit, cash delta, average price, cost basis, closed basis, order realized P&L, account realized P&L, quantity and idempotent replay result.
+2. For valid requests, require exact integer-paise equality. For invalid requests, require both sides to reject before any account/order/position mutation; compare semantic rejection categories rather than brittle error-message text.
+3. Add property-based generated cases around every rounding boundary and safe-integer limit, with deterministic seeds retained in CI.
+4. Include rollback assertions after every rejected transaction and concurrency assertions after all workers finish.
+5. Keep this matrix as a plan until executable parity fixtures are added and pass. Do not describe this as completed parity.
+
+### Known implementation review points to resolve with executable tests
+
+- JavaScript charge calculation uses binary floating-point Math.round; SQL uses exact numeric plus floor(x + 0.5). The listed half-paise boundary vectors are necessary to establish equality rather than assume it.
+- Firebase partial-close basis uses BigInt integer arithmetic; SQL uses numeric arithmetic. Test quantities both odd and even, and repeated partial closes, for exact conservation.
+- Contract/quote binding is a trusted-server responsibility in the Firebase gateway. The SQL RPC is service-role-only and must only be called by a backend that has independently verified the provider instrument and quote.
+- Current three golden vectors remain smoke tests only; the matrix above is not yet implemented or certified.
