@@ -69,7 +69,14 @@
     "Choose an underlying instrument and load a real option chain.":"अंडरलाइंग इंस्ट्रूमेंट चुनें और वास्तविक ऑप्शन चेन लोड करें।",
     "Paper trading only · No exchange orders":"केवल पेपर ट्रेडिंग · कोई वास्तविक एक्सचेंज ऑर्डर नहीं",
     "Powered by ZENURA IGNITE Technologies":"Powered by ZENURA IGNITE Technologies",
-    "No orders loaded.":"कोई ऑर्डर लोड नहीं हुआ।","No filled trades loaded.":"कोई पूरा ट्रेड लोड नहीं हुआ।"
+    "No orders loaded.":"कोई ऑर्डर लोड नहीं हुआ।","No filled trades loaded.":"कोई पूरा ट्रेड लोड नहीं हुआ।",
+    "Protective exit":"सुरक्षात्मक निकास","Stop-loss":"स्टॉप-लॉस","Target":"लक्ष्य","Trigger price (₹)":"ट्रिगर मूल्य (₹)",
+    "SET PROTECTIVE EXIT":"सुरक्षात्मक ऑर्डर सेट करें","Protective Orders":"सुरक्षात्मक ऑर्डर","Protective execution is not enabled on this gateway.":"इस गेटवे पर सुरक्षात्मक निष्पादन सक्षम नहीं है।",
+    "Sign in to view protective orders.":"सुरक्षात्मक ऑर्डर देखने के लिए साइन इन करें।","No protective orders yet.":"अभी कोई सुरक्षात्मक ऑर्डर नहीं है।",
+    "Protective order history could not be loaded.":"सुरक्षात्मक ऑर्डर इतिहास लोड नहीं हो सका।","Protective execution is disabled on this gateway. No new protective exits can be created.":"इस गेटवे पर सुरक्षात्मक निष्पादन बंद है। नया सुरक्षात्मक ऑर्डर नहीं बनाया जा सकता।",
+    "Equity protective worker is enabled. Orders are simulated; share quantity is rechecked at execution and is not reserved.":"इक्विटी सुरक्षात्मक वर्कर सक्षम है। ऑर्डर सिमुलेटेड हैं; निष्पादन के समय शेयर मात्रा दोबारा जाँची जाती है और रिज़र्व नहीं होती।",
+    "NSE/BSE cash equities only · SELL-to-close · Simulated execution.":"केवल NSE/BSE कैश इक्विटी · SELL-to-close · सिमुलेटेड निष्पादन।","CANCEL":"रद्द करें",
+    "Protective order cancelled.":"सुरक्षात्मक ऑर्डर रद्द कर दिया गया।","Protective cancellation failed.":"सुरक्षात्मक ऑर्डर रद्द नहीं हो सका।","Protective order rejected.":"सुरक्षात्मक ऑर्डर अस्वीकार हुआ।"
   });
   const textState=new WeakMap(),attrState=new WeakMap();
   const originalTitle=document.title;
