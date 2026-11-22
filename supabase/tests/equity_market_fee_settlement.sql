@@ -14,7 +14,7 @@ DECLARE
   v_realized bigint;
   v_order public.paper_orders%rowtype;
 BEGIN
-  -- NSE Delivery BUY: gross ₹1,000; fee-inclusive debit ₹1,023.79.
+  -- NSE Delivery BUY: gross ₹1,000; fee-inclusive debit ₹1,024.79.
   v_result:=public.execute_paper_market_order(
     '55555555-5555-4555-8555-555555555555',repeat('a',64),
     'aaaaaaaa-5555-4555-8555-555555555555',repeat('b',64),
@@ -28,9 +28,9 @@ BEGIN
      AND product='DELIVERY' AND instrument_key='NSE_EQ|FEE_DELIVERY';
   SELECT * INTO v_order FROM public.paper_orders WHERE order_id=repeat('a',64);
   IF v_result->>'status'<>'FILLED' OR v_result->>'cash_paise' IS NULL
-     OR v_cash<>99897621 OR v_basis<>102379 OR v_qty<>10
-     OR v_order.gross_paise<>100000 OR v_order.charges_paise<>2379
-     OR v_order.cash_delta_paise<>-102379
+     OR v_cash<>99897521 OR v_basis<>102479 OR v_qty<>10
+     OR v_order.gross_paise<>100000 OR v_order.charges_paise<>2479
+     OR v_order.cash_delta_paise<>-102479
      OR v_order.charges_breakdown->>'schedule_version'<>'2026-03-01'
      OR v_order.charges_breakdown->>'indicative'<>'true' THEN
     RAISE EXCEPTION 'Delivery BUY mismatch: cash %, basis %, qty %, gross %, charges %, delta %, breakdown %, result %',
@@ -47,7 +47,7 @@ BEGIN
   SELECT cash_paise INTO v_cash FROM public.paper_accounts
    WHERE user_id='55555555-5555-4555-8555-555555555555';
   IF (v_result->>'idempotent_replay')::boolean IS NOT TRUE
-     OR (v_result->>'charges_paise')::bigint<>2379 OR v_cash<>99897621 THEN
+     OR (v_result->>'charges_paise')::bigint<>2479 OR v_cash<>99897521 THEN
     RAISE EXCEPTION 'Delivery BUY replay did not preserve the exact fee snapshot';
   END IF;
 
@@ -64,9 +64,9 @@ BEGIN
    WHERE user_id='55555555-5555-4555-8555-555555555555'
      AND product='DELIVERY' AND instrument_key='NSE_EQ|FEE_DELIVERY';
   SELECT charges_paise INTO v_charges FROM public.paper_orders WHERE order_id=repeat('c',64);
-  IF v_cash<>99952839 OR v_basis<>51189 OR v_qty<>5
-     OR v_charges<>4782 OR v_realized<>4028
-     OR (v_result->>'order_realized_pnl_paise')::bigint<>4028 THEN
+  IF v_cash<>99952739 OR v_basis<>51239 OR v_qty<>5
+     OR v_charges<>4782 OR v_realized<>3978
+     OR (v_result->>'order_realized_pnl_paise')::bigint<>3978 THEN
     RAISE EXCEPTION 'Delivery SELL net proceeds, cost basis allocation or realized P&L mismatch';
   END IF;
 
@@ -88,7 +88,7 @@ BEGIN
   SELECT cash_paise,realized_pnl_paise INTO v_cash,v_realized FROM public.paper_accounts
    WHERE user_id='55555555-5555-4555-8555-555555555555';
   SELECT charges_paise INTO v_charges FROM public.paper_orders WHERE order_id=repeat('1',64);
-  IF v_charges<>147 OR v_cash<>99952567 OR v_realized<>3756
+  IF v_charges<>147 OR v_cash<>99952467 OR v_realized<>3706
      OR (v_result->>'order_realized_pnl_paise')::bigint<>-272 THEN
     RAISE EXCEPTION 'Intraday SELL fee-inclusive cash or realized P&L mismatch';
   END IF;
