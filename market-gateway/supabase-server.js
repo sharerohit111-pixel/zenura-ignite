@@ -331,6 +331,89 @@ app.put("/watchlist",async(req,res)=>{
 });
 
 
+
+const CRYPTO_SYMBOLS=new Set(["BTCUSDT","ETHUSDT","BNBUSDT","SOLUSDT","XRPUSDT","ADAUSDT","DOGEUSDT","AVAXUSDT","PAXGUSDT","XAUTUSDT"]);
+app.get("/crypto/account",async(req,res)=>{
+  try{
+    const {user,userDb}=await auth(req);
+    const initialized=await runtime.callUserRpc(user,"initialize_paper_crypto_account",{p_starting_cash_inr:"1000000"});
+    const {data,error}=await userDb.from("paper_crypto_accounts").select("*").eq("user_id",user.id).maybeSingle();
+    if(error||!data)return res.status(409).json({error:"Crypto paper account could not be initialized or read."});
+    res.set("Cache-Control","private, no-store").json({
+      currency:data.currency,cashBalance:data.cash_balance,startingCash:data.starting_cash,
+      realizedPnl:data.realized_pnl,version:data.version,created:initialized?.created===true,
+      simulationOnly:true
+    });
+  }catch(error){sendError(res,error,"Crypto paper account could not be loaded.");}
+});
+app.post("/crypto/orders",async(req,res)=>{
+  try{
+    const {user}=await auth(req);
+    const symbol=typeof req.body?.symbol==="string"?req.body.symbol.toUpperCase():"";
+    const side=String(req.body?.side||"").toUpperCase();
+    const quantityRaw=String(req.body?.quantity??"");
+    const idempotencyKey=String(req.body?.idempotency_key||"");
+    if(!CRYPTO_SYMBOLS.has(symbol))return res.status(400).json({error:"Select a supported verified crypto spot symbol."});
+    if(!["BUY","SELL"].includes(side))return res.status(400).json({error:"Only BUY and SELL crypto paper orders are supported."});
+    if(!isUuid(idempotencyKey))return res.status(400).json({error:"A valid UUID idempotency_key is required."});
+    if(!/^(?:0|[1-9]\\d*)(?:\\.\\d{1,12})?$/.test(quantityRaw))return res.status(400).json({error:"Enter a valid crypto quantity with up to 12 decimal places."});
+    const quantity=Number(quantityRaw);
+    if(!Number.isFinite(quantity)||quantity<=0||quantity>1000000000)return res.status(400).json({error:"Crypto quantity is outside supported limits."});
+    const baseAsset=symbol.slice(0,-4);
+    const [marketResponse,fxResponse]=await Promise.all([
+      fetchProvider("https://api.binance.com/api/v3/trades?"+new URLSearchParams({symbol,limit:"1"}),{headers:{Accept:"application/json"}},5000),
+      fetchProvider("https://open.er-api.com/v6/latest/USD",{headers:{Accept:"application/json"}},5000)
+    ]);
+    if(!marketResponse.ok||!fxResponse.ok)return res.status(502).json({error:"Crypto market price or INR reference rate is temporarily unavailable."});
+    const [trades,fxData]=await Promise.all([marketResponse.json(),fxResponse.json()]);
+    const trade=Array.isArray(trades)?trades[0]:null;
+    const price=Number(trade?.price),quoteTimestamp=Number(trade?.time),fxRate=Number(fxData?.rates?.INR);
+    const quoteAge=Date.now()-quoteTimestamp;
+    if(!Number.isFinite(price)||price<=0||!Number.isSafeInteger(quoteTimestamp)||quoteAge < -2000||quoteAge>15000)
+      return res.status(409).json({error:"A fresh Binance crypto quote is not available. Retry shortly."});
+    if(fxData?.result!=="success"||!Number.isFinite(fxRate)||fxRate<40||fxRate>200)
+      return res.status(502).json({error:"A valid USD/INR reference rate is not available."});
+    const gross=quantity*price*fxRate;
+    if(!Number.isFinite(gross)||gross<=0||gross>1000000000000)return res.status(400).json({error:"Crypto order value is outside supported limits."});
+    const fee=Number((gross*0.001).toFixed(8));
+    const orderId=crypto.randomUUID();
+    const fingerprint=crypto.createHash("sha256").update(JSON.stringify({
+      userId:user.id,orderId,idempotencyKey,symbol,side,quantity:quantityRaw,
+      provider:"binance-spot",quoteTimestamp,executionPrice:price.toFixed(8),
+      fxRateInr:fxRate.toFixed(8),fee:fee.toFixed(8)
+    })).digest("hex");
+    const result=await runtime.callUserRpc(user,"execute_paper_crypto_market_order",{
+      p_order_id:orderId,p_idempotency_key:idempotencyKey,p_request_fingerprint:fingerprint,
+      p_symbol:symbol,p_base_asset:baseAsset,p_side:side,p_quantity:quantityRaw,
+      p_execution_price:price.toFixed(8),p_fx_rate_inr:fxRate.toFixed(8),
+      p_fee:fee.toFixed(8),p_quote_timestamp_ms:quoteTimestamp
+    });
+    res.set("Cache-Control","private, no-store").status(result?.idempotent_replay?200:201).json({
+      orderId:result?.order?.order_id||orderId,status:result?.order?.status||"FILLED",
+      symbol,side,quantity:quantityRaw,executionPriceUsdt:price,fxRateInr:fxRate,
+      grossInr:Number(gross.toFixed(8)),feeInr:fee,cashBalance:result?.cash_balance,
+      realizedPnl:result?.realized_pnl,idempotentReplay:result?.idempotent_replay===true,
+      simulationOnly:true
+    });
+  }catch(error){sendError(res,error,"Crypto paper order could not be completed.");}
+});
+app.get("/crypto/portfolio",async(req,res)=>{
+  try{
+    const {user,userDb}=await auth(req);
+    const [{data:account,error:accountError},{data:positions,error:positionError},{data:orders,error:ordersError}]=await Promise.all([
+      userDb.from("paper_crypto_accounts").select("*").eq("user_id",user.id).maybeSingle(),
+      userDb.from("paper_crypto_positions").select("*").eq("user_id",user.id).order("symbol"),
+      userDb.from("paper_crypto_orders").select("*").eq("user_id",user.id).order("created_at",{ascending:false}).limit(100)
+    ]);
+    if(accountError||positionError||ordersError)throw Object.assign(new Error("Crypto portfolio could not be loaded."),{status:503});
+    if(!account)return res.status(404).json({error:"Crypto paper account has not been initialized."});
+    res.set("Cache-Control","private, no-store").json({
+      account:{currency:account.currency,cashBalance:account.cash_balance,realizedPnl:account.realized_pnl},
+      positions:positions||[],orders:orders||[],simulationOnly:true
+    });
+  }catch(error){sendError(res,error,"Crypto portfolio could not be loaded.");}
+});
+
 app.post("/paper/orders",async(req,res)=>{
   try{
     const {user}=await auth(req);
