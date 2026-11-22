@@ -27,6 +27,7 @@
     function language(){return languageButton?.textContent?.trim()==="English"?"hi":"en";}
     function render(){
       body.dataset.chartTheme=theme;
+      documentRef.dispatchEvent(new CustomEvent("zenura-chart-theme-change",{detail:{theme}}));
       button.textContent=actionLabel(theme,language());
       button.setAttribute("aria-pressed",String(theme==="light"));
       button.setAttribute("aria-label",theme==="light"?"Switch charts to dark theme":"Switch charts to light theme");
