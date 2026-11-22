@@ -4,7 +4,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { execFileSync } = require("node:child_process");
 
-const fixturePath = path.join(__dirname, "..", "test", "fixtures", "supabase-option-charge-parity-vectors.json");
+const fixturePath = path.join(__dirname, "fixtures", "supabase-option-charge-parity-vectors.json");
 const fixture = JSON.parse(fs.readFileSync(fixturePath, "utf8"));
 if (fixture.schemaVersion !== 1 || !Array.isArray(fixture.vectors) || fixture.vectors.length === 0) {
   throw new Error("Unsupported or empty shared option charge vector fixture.");
