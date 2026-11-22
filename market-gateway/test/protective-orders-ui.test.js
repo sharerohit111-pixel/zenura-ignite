@@ -20,7 +20,7 @@ test("protective-order UI calls only authenticated server-side paper endpoints",
   assert.match(source,/ZENURA_MARKET_CONNECTOR/);
   assert.match(source,/\/paper\/protective-orders\?limit=50/);
   assert.match(source,/gateway\+'\/paper\/protective-orders'/);
-  assert.match(source,/\/paper\/protective-orders\/'\+encodeURIComponent\(orderId\)+'\/cancel'/);
+  assert.match(source,/\/paper\/protective-orders\/'\+encodeURIComponent\(orderId\)\+'\/cancel'/);
   assert.match(source,/Authorization:'Bearer '\+token/);
   assert.match(gateway,/create_paper_equity_protective_order/);
   assert.match(gateway,/cancel_paper_protective_order/);
