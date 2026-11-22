@@ -1,0 +1,29 @@
+name: Supabase server REST client tests
+
+on:
+  pull_request:
+    paths:
+      - "market-gateway/lib/supabase-rest-client.js"
+      - "market-gateway/test/supabase-rest-client.test.js"
+      - "market-gateway/lib/supabase-authenticated-context.js"
+      - "market-gateway/test/supabase-authenticated-context.test.js"
+      - ".github/workflows/supabase-server-rest-client-tests.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  supabase-rest-client-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Check Supabase adapter syntax
+        run: |
+          node --check market-gateway/lib/supabase-rest-client.js
+          node --check market-gateway/lib/supabase-authenticated-context.js
+      - name: Run Supabase REST client and authenticated-context unit tests
+        run: node --test market-gateway/test/supabase-rest-client.test.js market-gateway/test/supabase-authenticated-context.test.js
