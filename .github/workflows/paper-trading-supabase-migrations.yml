@@ -169,6 +169,14 @@ jobs:
             SELECT public.acquire_paper_market_worker_lease('paper_limit_orders',v_a,v_now+244000,120000) INTO v_result;
             IF v_result IS NOT TRUE THEN RAISE EXCEPTION 'Expired worker lease was not recoverable'; END IF;
             PERFORM public.release_paper_market_worker_lease('paper_limit_orders',v_a,v_now+245000);
+            SELECT public.acquire_paper_market_worker_lease('paper_protective_orders',v_a,v_now+246000,240000) INTO v_result;
+            IF v_result IS NOT TRUE THEN RAISE EXCEPTION 'Protective worker lease was not acquired'; END IF;
+            SELECT public.acquire_paper_market_worker_lease('paper_protective_orders',v_b,v_now+247000,240000) INTO v_result;
+            IF v_result IS NOT FALSE THEN RAISE EXCEPTION 'Second protective worker acquired the same lease'; END IF;
+            SELECT public.acquire_paper_market_worker_lease('paper_limit_orders',v_b,v_now+248000,240000) INTO v_result;
+            IF v_result IS NOT TRUE THEN RAISE EXCEPTION 'Independent LIMIT lease was blocked by protective worker'; END IF;
+            PERFORM public.release_paper_market_worker_lease('paper_protective_orders',v_a,v_now+249000);
+            PERFORM public.release_paper_market_worker_lease('paper_limit_orders',v_b,v_now+249000);
           END
           $worker_lease$;
           SQL
