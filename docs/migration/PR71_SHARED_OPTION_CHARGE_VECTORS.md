@@ -27,3 +27,11 @@ No existing runtime, migration, workflow, PR #28, PR #70, or PR #71 files were m
 ## Next isolated increment
 
 Add a disposable-PostgreSQL consumer that reads this exact JSON file and independently evaluates the SQL charge formula, then compares each SQL result to the fixture's expected values. Do not derive SQL expectations from the JavaScript calculator at test time. Only after that succeeds should the shared fixture expand to position/accounting vectors.
+
+## Disposable PostgreSQL consumer added
+
+The isolated audit branch now includes `market-gateway/test/run-supabase-option-charge-parity.js`. It reads the same JSON fixture and submits each vector to PostgreSQL, calculating exchange fee, IPFT, SEBI, stamp duty, STT, GST, total charges and settlement in SQL. It compares every returned field and the result field set to the fixture's expected values.
+
+The manual `Audit — Supabase role and RLS security checks` workflow now invokes this runner after applying PR #70 migrations to its disposable PostgreSQL 16 service. It does not connect to the live Supabase project and does not change PR #70 or PR #71.
+
+**Execution status:** The runner and workflow wiring are committed, but no workflow run has yet executed this new step. Do not treat the vectors as passed until a new manual Actions run completes successfully. This remains a five-vector charge-calculation parity check, not full transaction/accounting parity.
