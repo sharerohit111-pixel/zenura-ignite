@@ -21,7 +21,13 @@ const queries = fixture.vectors.map((vector) => {
   if (!["NSE", "BSE"].includes(input.exchange) || !["BUY", "SELL"].includes(input.side)) {
     throw new Error("Unsupported exchange/side in vector " + vector.id);
   }
+  if (!Number.isSafeInteger(input.grossPaise) || input.grossPaise < 1) {
+    throw new Error("Invalid grossPaise in vector " + vector.id);
+  }
   const brokerage = input.brokeragePaise === undefined ? 2000 : input.brokeragePaise;
+  if (!Number.isSafeInteger(brokerage) || brokerage < 0) {
+    throw new Error("Invalid brokeragePaise in vector " + vector.id);
+  }
   const values = [
     sqlLiteral(input.grossPaise),
     sqlLiteral(input.exchange),
