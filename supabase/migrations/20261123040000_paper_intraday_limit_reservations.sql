@@ -50,17 +50,6 @@ begin
     raise exception using errcode='22023',message='Invalid Intraday LIMIT order request';
   end if;
 
-  v_date:=(v_now at time zone 'Asia/Kolkata')::date;
-  v_minute:=(extract(hour from v_now at time zone 'Asia/Kolkata')::integer*60)
-            +extract(minute from v_now at time zone 'Asia/Kolkata')::integer;
-  select * into v_session from public.paper_exchange_sessions
-   where exchange=p_exchange and session_date=v_date
-     and is_trading_day is true and session_kind in ('REGULAR','SPECIAL')
-     and verified_at<=v_now and length(btrim(source_reference))>0;
-  if not found or v_minute<v_session.open_minute or v_minute>=v_session.close_minute then
-    raise exception using errcode='23514',message='No verified open exchange session for Intraday LIMIT';
-  end if;
-
   select * into v_account from public.paper_accounts where user_id=p_user_id for update;
   if not found then raise exception using errcode='P0002',message='Paper account is not initialized'; end if;
   if v_account.cash_paise<0 or v_account.reserved_cash_paise<0
@@ -80,6 +69,18 @@ begin
       'reserved_cash_paise',v_existing.reserved_cash_paise,
       'reserved_quantity',v_existing.reserved_quantity,'idempotent_replay',true,'simulation_only',true);
   end if;
+
+  v_date:=(v_now at time zone 'Asia/Kolkata')::date;
+  v_minute:=(extract(hour from v_now at time zone 'Asia/Kolkata')::integer*60)
+            +extract(minute from v_now at time zone 'Asia/Kolkata')::integer;
+  select * into v_session from public.paper_exchange_sessions
+   where exchange=p_exchange and session_date=v_date
+     and is_trading_day is true and session_kind in ('REGULAR','SPECIAL')
+     and verified_at<=v_now and length(btrim(source_reference))>0;
+  if not found or v_minute<v_session.open_minute or v_minute>=v_session.close_minute then
+    raise exception using errcode='23514',message='No verified open exchange session for Intraday LIMIT';
+  end if;
+
   if exists(select 1 from public.paper_orders where order_id=p_order_id) then
     raise exception using errcode='23505',message='Order ID already exists';
   end if;
