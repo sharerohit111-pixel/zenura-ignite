@@ -9,6 +9,7 @@ const docker=fs.readFileSync(path.join(root,"Dockerfile"),"utf8");
 const server=fs.readFileSync(path.join(root,"supabase-server.js"),"utf8");
 const client=fs.readFileSync(path.join(root,"../markets/stocks/supabase-client.js"),"utf8");
 const deploy=fs.readFileSync(path.join(root,"DEPLOYMENT.md"),"utf8");
+const deployWorkflow=fs.readFileSync(path.join(root,"../.github/workflows/deploy-supabase-market-gateway.yml"),"utf8");
 const workflow=fs.readFileSync(path.join(root,"../.github/workflows/deploy-supabase-market-gateway.yml"),"utf8");
 test("Cloud Run and npm default entrypoints run the Supabase-native gateway",()=>{
  assert.equal(pkg.main,"supabase-server.js");
@@ -48,4 +49,15 @@ test("Production gateway deployment is manual, main-only and uses WIF plus Secre
  assert.match(workflow,/--set-secrets/);
  assert.match(workflow,/MARKET_GATEWAY_URL/);
  assert.doesNotMatch(workflow,/firebase deploy|firebase functions:deploy/i);
+});
+
+test("Manual production deployment uses OIDC and deploys both Supabase gateway and LIMIT worker",()=>{
+ assert.match(deployWorkflow,/workflow_dispatch/);
+ assert.match(deployWorkflow,/id-token:\s*write/);
+ assert.match(deployWorkflow,/workload_identity_provider/);
+ assert.match(deployWorkflow,/gcloud run deploy zenura-market-gateway/);
+ assert.match(deployWorkflow,/paper-limit-worker\.js/);
+ assert.match(deployWorkflow,/zenura-paper-limit-worker-every-minute/);
+ assert.match(deployWorkflow,/github\.ref == 'refs\/heads\/main'/);
+ assert.doesNotMatch(deployWorkflow,/firebase deploy|firebase functions:deploy|service_account_key:/i);
 });
