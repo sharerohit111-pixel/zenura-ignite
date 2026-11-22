@@ -62,9 +62,9 @@ BEGIN
   BEGIN
     PERFORM public.execute_paper_market_order(
       '91919191-9191-4919-8919-919191919191',
-      repeat('a',64),
+      md5('protective-reservation-market-sell')||md5('protective-reservation-market-sell-unique'),
       '93939393-9393-4939-8939-939393939393',
-      repeat('b',64),
+      md5('protective-reservation-market-fingerprint')||md5('protective-reservation-market-fingerprint-unique'),
       'NSE_EQ|PROTECTIVE_RESERVE_GUARD','PROTECTIVE_RESERVE_GUARD','NSE',
       'SELL','DELIVERY',7,11000,
       floor(extract(epoch from clock_timestamp())*1000)::bigint,0
@@ -77,9 +77,9 @@ BEGIN
   BEGIN
     PERFORM public.submit_paper_limit_order(
       '91919191-9191-4919-8919-919191919191',
-      repeat('c',64),
+      md5('protective-reservation-limit-sell')||md5('protective-reservation-limit-sell-unique'),
       '94949494-9494-4949-8949-949494949494',
-      repeat('d',64),
+      md5('protective-reservation-limit-fingerprint')||md5('protective-reservation-limit-fingerprint-unique'),
       'NSE_EQ|PROTECTIVE_RESERVE_GUARD','PROTECTIVE_RESERVE_GUARD','NSE',
       'SELL',7,11000
     );
@@ -97,7 +97,7 @@ BEGIN
     RAISE EXCEPTION 'Rejected SELL requests changed the protective share reservation';
   END IF;
   IF EXISTS (SELECT 1 FROM public.paper_orders
-      WHERE order_id IN (repeat('a',64),repeat('c',64))) THEN
+      WHERE order_id IN (md5('protective-reservation-market-sell')||md5('protective-reservation-market-sell-unique'),md5('protective-reservation-limit-sell')||md5('protective-reservation-limit-sell-unique'))) THEN
     RAISE EXCEPTION 'Rejected SELL request left an order row behind';
   END IF;
 END
