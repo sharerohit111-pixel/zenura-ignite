@@ -5,7 +5,7 @@ on:
     paths:
       - "market-gateway/scripts/firebase-readonly-export.js"
       - "market-gateway/test/firebase-readonly-export.test.js"
-      - "market-gateway/FIREBASE_READONLY_EXPORT.md"
+      - "market-gateway/FIREBASE_READONLY_EXPORT.md"\n      - "market-gateway/scripts/firebase-to-supabase-transform.js"\n      - "market-gateway/test/firebase-to-supabase-transform.test.js"\n      - "market-gateway/FIREBASE_TO_SUPABASE_TRANSFORM.md"
       - ".github/workflows/firebase-readonly-export-tests.yml"
   workflow_dispatch:
 
