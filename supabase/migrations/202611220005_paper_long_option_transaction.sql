@@ -72,16 +72,19 @@ begin
      or p_request_fingerprint !~ '^[a-f0-9]{64}$'
      or p_instrument_key is null or length(p_instrument_key) not between 1 and 100
      or p_trading_symbol is null or length(p_trading_symbol) = 0
-     or p_exchange not in ('NSE','BSE')
-     or p_segment not in ('NSE_FO','BSE_FO')
-     or p_instrument_type not in ('CE','PE')
+     or p_exchange is null or p_exchange not in ('NSE','BSE')
+     or p_segment is null or p_segment not in ('NSE_FO','BSE_FO')
+     or p_instrument_type is null or p_instrument_type not in ('CE','PE')
      or (p_exchange='NSE' and p_segment<>'NSE_FO')
      or (p_exchange='BSE' and p_segment<>'BSE_FO')
      or p_expiry is null or p_strike_price is null or p_strike_price<=0
-     or p_lot_size not between 1 and 1000000
-     or p_tick_size_paise not between 1 and 1000000
-     or p_lots not between 1 and 10000
-     or p_side not in ('BUY','SELL')
+     or p_lot_size is null or p_lot_size not between 1 and 1000000
+     or p_tick_size_paise is null or p_tick_size_paise not between 1 and 1000000
+     or p_lots is null or p_lots not between 1 and 10000
+     or p_side is null or p_side not in ('BUY','SELL')
+     or p_execution_price_paise is null
+     or p_quote_timestamp_ms is null or p_now_ms is null
+     or p_idempotency_key is null or p_order_id is null or p_request_fingerprint is null
      or p_execution_price_paise<=0
      or p_execution_price_paise % p_tick_size_paise <> 0
      or p_quote_timestamp_ms<0 or p_now_ms<0
@@ -103,7 +106,7 @@ begin
 
   -- Expiry-day 15:30 Asia/Kolkata cutoff, represented as UTC epoch milliseconds.
   v_expiry_cutoff_ms :=
-    extract(epoch from ((p_expiry::timestamp + time '15:30') at time zone 'Asia/Kolkata')) * 1000;
+    extract(epoch from ((p_expiry + time '15:30') at time zone 'Asia/Kolkata')) * 1000;
   if p_now_ms > v_expiry_cutoff_ms then
     raise exception 'Expired derivative contracts cannot be traded.' using errcode='22023';
   end if;
