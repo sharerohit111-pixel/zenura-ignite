@@ -26,23 +26,23 @@ test("intraday session requires an explicit exchange trading-day decision",()=>{
 });
 test("intraday LIMIT eligibility requires fresh quote, active session and exact side threshold",()=>{
  const now=epoch("2026-11-23T04:30:01.000Z");
- assert.equal(isEligibleIntradayLimitOrder(order,quote,now,{isTradingDay:true}),true);
- assert.equal(isEligibleIntradayLimitOrder({...order,side:"SELL"},quote,now,{isTradingDay:true}),false);
- assert.equal(isEligibleIntradayLimitOrder({...order,side:"SELL",limit_price_paise:9800},quote,now,{isTradingDay:true}),true);
- assert.equal(isEligibleIntradayLimitOrder(order,{...quote,tradeTimeMs:now-15001},now,{isTradingDay:true}),false);
- assert.equal(isEligibleIntradayLimitOrder(order,quote,now,{isTradingDay:false}),false);
- assert.equal(isEligibleIntradayLimitOrder({...order,product:"DELIVERY"},quote,now,{isTradingDay:true}),false);
- assert.equal(isEligibleIntradayLimitOrder({...order,simulation_only:false},quote,now,{isTradingDay:true}),false);
+ assert.equal(isEligibleIntradayLimitOrder(order,quote,now,normalSession),true);
+ assert.equal(isEligibleIntradayLimitOrder({...order,side:"SELL"},quote,now,normalSession),false);
+ assert.equal(isEligibleIntradayLimitOrder({...order,side:"SELL",limit_price_paise:9800},quote,now,normalSession),true);
+ assert.equal(isEligibleIntradayLimitOrder(order,{...quote,tradeTimeMs:now-15001},now,normalSession),false);
+ assert.equal(isEligibleIntradayLimitOrder(order,quote,now,{isTradingDay:false,openMinute:555,closeMinute:930}),false);
+ assert.equal(isEligibleIntradayLimitOrder({...order,product:"DELIVERY"},quote,now,normalSession),false);
+ assert.equal(isEligibleIntradayLimitOrder({...order,simulation_only:false},quote,now,normalSession),false);
 });
 test("intraday pending orders expire at 15:30 IST and never carry to another session",()=>{
- assert.equal(isIntradayOrderExpired(order,epoch("2026-11-23T09:59:59.000Z"),{isTradingDay:true}),false);
- assert.equal(isIntradayOrderExpired(order,epoch("2026-11-23T10:00:00.000Z"),{isTradingDay:true}),true);
- assert.equal(isIntradayOrderExpired(order,epoch("2026-11-24T04:00:00.000Z"),{isTradingDay:true}),true);
- assert.equal(isIntradayOrderExpired({...order,product:"DELIVERY"},epoch("2026-11-23T10:00:00.000Z"),{isTradingDay:true}),false);
+ assert.equal(isIntradayOrderExpired(order,epoch("2026-11-23T09:59:59.000Z"),normalSession),false);
+ assert.equal(isIntradayOrderExpired(order,epoch("2026-11-23T10:00:00.000Z"),normalSession),true);
+ assert.equal(isIntradayOrderExpired(order,epoch("2026-11-24T04:00:00.000Z"),normalSession),true);
+ assert.equal(isIntradayOrderExpired({...order,product:"DELIVERY"},epoch("2026-11-23T10:00:00.000Z"),normalSession),false);
 });
 test("malformed timestamps and non-pending orders fail closed",()=>{
  assert.throws(()=>marketClockParts(NaN),TypeError);
  assert.equal(normalizeMarketSession({isTradingDay:true,openMinute:930,closeMinute:555}),null);
  assert.equal(isIntradayOrderExpired({...order,created_at:"bad"},epoch("2026-11-23T10:00:00.000Z")),false);
- assert.equal(isEligibleIntradayLimitOrder({...order,status:"CANCELLED"},quote,epoch("2026-11-23T04:30:01.000Z"),{isTradingDay:true}),false);
+ assert.equal(isEligibleIntradayLimitOrder({...order,status:"CANCELLED"},quote,epoch("2026-11-23T04:30:01.000Z"),normalSession),false);
 });
