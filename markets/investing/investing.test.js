@@ -64,3 +64,11 @@ test("Chart workspace restores isolated per-symbol chart type and indicator pref
  assert.match(engine,/activeIndicators\.clear\(\)/);
  assert.match(engine,/await loadPreferences\(\)/);
 });
+
+test("Paper Trading workspace also references only existing local assets",()=>{
+ const trading=fs.readFileSync(path.join(root,"../stocks/index.html"),"utf8");
+ for(const match of trading.matchAll(/(?:src|href)="([^"]+)"/g)){
+  const ref=match[1];if(/^https?:|^#|^mailto:/.test(ref))continue;
+  assert.ok(fs.existsSync(path.resolve(root,"../stocks",ref)), "Missing Paper Trading asset: "+ref);
+ }
+});
