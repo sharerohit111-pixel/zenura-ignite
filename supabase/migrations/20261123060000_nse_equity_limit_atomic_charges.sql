@@ -295,7 +295,7 @@ begin
         round(v_net::numeric/v_order.quantity)::bigint,v_net,0,now());
     else
       if v_position.quantity+v_order.quantity>1000000
-         or v_position.cost_basis_paise+v_gross>9007199254740991 then
+         or v_position.cost_basis_paise+v_net>9007199254740991 then
         raise exception using errcode='22003', message='LIMIT BUY position exceeds supported limits';
       end if;
       update public.paper_equity_positions set
@@ -598,7 +598,7 @@ begin
     if v_order.reserved_cash_paise<=0
        or v_order.reserved_cash_paise<>v_expected_reserve
        or v_reserved_cash<v_order.reserved_cash_paise
-       or v_cash-v_reserved_cash-v_account.reserved_margin_paise+v_order.reserved_cash_paise<v_gross then
+       or v_cash-v_reserved_cash-v_account.reserved_margin_paise+v_order.reserved_cash_paise<v_net then
       raise exception using errcode='23514',message='Intraday LIMIT BUY cash reservation is inconsistent';
     end if;
     if found then
