@@ -43,3 +43,19 @@
 ## Working method
 
 Work only on the Indian-market integration branch and its isolated stock/gateway/migration/test files. Make additive, independently tested changes. After each coherent increment, run targeted tests and the full gateway/CI suite, review the exact diff, and record remaining blockers. Keep Crypto untouched until the Indian-market release gates are met.
+
+## Next engineering gate: protective stop-loss / target worker
+
+The database currently has a private `paper_protective_orders` table, but the inspected gateway has no worker that evaluates and executes these orders. A table and UI control do not constitute server-side protection.
+
+Before enabling stop-loss or target execution:
+1. Add a dedicated leased worker state key and bounded cursor/batch processing; never reuse the LIMIT worker cursor or lease.
+2. Evaluate only ACTIVE orders for supported instruments and verified owner/position state. Validate quote instrument identity, exchange, timestamp freshness, positive integer paise price and market-session policy.
+3. Make trigger evaluation deterministic for STOP_LOSS and TARGET using explicit `trigger_direction`; reject malformed combinations and out-of-range quantity/price.
+4. Execute fills only through a SECURITY DEFINER RPC with strict service-role-only grants, row locks, idempotency, position quantity checks, paise accounting, fees/taxes, and atomic order/position/history updates.
+5. Define partial-fill, gap-through, market-closed, stale-quote, insufficient-liquidity and retry behavior. Never silently mark an order FILLED without an atomic ledger fill.
+6. Add concurrency, duplicate-worker, lease-expiry, partial-close, reverse-position, stale/future quote, multi-tenant RLS and crash-recovery tests.
+7. Expose health/last-cycle status without leaking user identifiers or provider secrets; alert on repeated failures and lease starvation.
+8. Keep the UI/API from advertising guaranteed SL/target execution until the worker is deployed, monitored and end-to-end verified.
+
+The existing LIMIT worker is a useful pattern for leasing and fresh-quote validation, but its DELIVERY-equity-only fill RPC must not be reused for futures/options or protective orders without a separate accounting design.
