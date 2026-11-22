@@ -427,21 +427,38 @@
     const d=new Date();d.setDate(d.getDate()+offset);
     return new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Kolkata',year:'numeric',month:'2-digit',day:'2-digit'}).format(d);
   }
-  function renderChart(candles){
+  async function loadCandles(){
+    if(!selected||!gateway)return;
+    const connector=window.ZENURA_MARKET_CONNECTOR,uid=connector?.getUserId?.();
+    if(!connector?.getIdToken||!uid){chartStatus.textContent='Sign in to load historical candles';return;}
+    const request=++chartRequest,instrument={...selected},timeframe=activeTimeframe;
     chart.textContent='';
-    if(!candles.length){const b=document.createElement('b');b.textContent='No candle data returned';const span=document.createElement('span');span.textContent='Upstox returned no historical candles for this instrument and interval.';chart.append(b,span);return;}
-    const rows=candles.filter(c=>Array.isArray(c)&&c.length>=5&&[1,2,3,4].every(i=>Number.isFinite(Number(c[i]))));
-    if(!rows.length){const b=document.createElement('b');b.textContent='Candle response unavailable';chart.append(b);return;}
-    const width=900,height=300,pad=24,high=Math.max(...rows.map(c=>Number(c[2]))),low=Math.min(...rows.map(c=>Number(c[3]))),range=high-low||1;
-    const points=rows.slice().reverse().map((c,i)=>({x:pad+i*(width-2*pad)/Math.max(rows.length-1,1),y:height-pad-(Number(c[4])-low)*(height-2*pad)/range,c}));
-    const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.setAttribute('viewBox',`0 0 ${width} ${height}`);svg.setAttribute('role','img');svg.setAttribute('aria-label','Historical close price chart from Upstox');
-    for(let i=0;i<5;i++){const y=pad+i*(height-2*pad)/4;const line=document.createElementNS(svg.namespaceURI,'line');line.setAttribute('x1',pad);line.setAttribute('x2',width-pad);line.setAttribute('y1',y);line.setAttribute('y2',y);line.setAttribute('class','chart-gridline');svg.append(line);}
-    const poly=document.createElementNS(svg.namespaceURI,'polyline');poly.setAttribute('points',points.map(p=>p.x+','+p.y).join(' '));poly.setAttribute('class','chart-line');svg.append(poly);
-    const latest=rows[0],first=rows[rows.length-1],change=Number(latest[4])-Number(first[1]);
-    const summary=document.createElement('div');summary.className='candle-summary';
-    [['O',latest[1]],['H',latest[2]],['L',latest[3]],['C',latest[4]],['VOL',latest[5]??'—'],['OI',latest[6]??'—']].forEach(([k,v])=>{const cell=document.createElement('span');cell.textContent=k+' '+(typeof v==='number'?Number(v).toLocaleString('en-IN'):v);summary.append(cell);});
-    const rangeLabel=document.createElement('small');rangeLabel.className='chart-range';rangeLabel.textContent=rows.length+' candles · '+String(rows[rows.length-1][0])+' → '+String(rows[0][0])+' · Change '+(change>=0?'+':'')+change.toFixed(2);
-    chart.append(svg,summary,rangeLabel);
+    const loading=document.createElement('b');loading.textContent='Loading professional chart…';chart.append(loading);
+    chartStatus.textContent='Starting KLineChart 10.1.1';
+    try{
+      const engine=window.ZenuraProfessionalChart;
+      if(!engine)throw new Error('Professional chart engine is not available. Reload the page and retry.');
+      await engine.mount({
+        container:chart,instrument,timeframe,gateway,
+        getAccessToken:()=>connector.getIdToken(),
+        supabase:window.ZENURA_SUPABASE,
+        onError:error=>{
+          if(request===chartRequest&&connector.getUserId()===uid&&selected?.instrument_key===instrument.instrument_key){
+            chartStatus.textContent='Historical data unavailable';
+            const status=document.createElement('span');status.className='chart-engine-error';status.textContent=error?.message||'Could not load historical candles.';
+            if(!chart.querySelector('.chart-engine-error'))chart.append(status);
+          }
+        }
+      });
+      if(request!==chartRequest||connector.getUserId()!==uid||selected?.instrument_key!==instrument.instrument_key)return;
+      chartStatus.textContent='Professional chart · Upstox V3 · '+timeframe;
+    }catch(error){
+      if(request!==chartRequest||connector.getUserId()!==uid)return;
+      chart.textContent='';
+      const b=document.createElement('b');b.textContent='Chart data unavailable';
+      const span=document.createElement('span');span.textContent=error.message||'Could not load historical candles.';
+      chart.append(b,span);chartStatus.textContent='Not connected';
+    }
   }
   async function loadCandles(){
     if(!selected||!gateway)return;
@@ -512,9 +529,10 @@
               if(reconnectTimer){clearTimeout(reconnectTimer);reconnectTimer=null;}
               reconnectAttempt=0;
               lastQuoteText='₹'+(quote.pricePaise/100).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});price.textContent=lastQuoteText;
+              window.ZenuraProfessionalChart?.updateQuote(quote);
               if(staleTimer)clearTimeout(staleTimer);
               staleTimer=setTimeout(()=>{if(connector.getUserId()===uid&&selected?.instrument_key===item.instrument_key){price.textContent='STALE · '+lastQuoteText;setFeedStatus('Live quote is stale','No fresh provider quote received for 15 seconds. Do not use this price for paper orders.');scheduleReconnect(item,uid);}},15000);
-              setFeedStatus('Live quote connected','Last traded price received from Upstox V3. Chart history is a separate integration.');
+              setFeedStatus('Live quote connected','Verified Upstox V3 ticks are updating the professional chart.');
             }
           }catch(_){}
       };
