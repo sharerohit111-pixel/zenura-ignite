@@ -80,7 +80,7 @@ jobs:
       - name: Reject non-finite option strike prices
         run: |
           psql -v ON_ERROR_STOP=1 <<'SQL'
-          DO $
+          DO $$
           DECLARE
             v_strike numeric;
             v_rejected boolean;
@@ -108,7 +108,7 @@ jobs:
               END IF;
             END LOOP;
           END
-          $;
+          $$;
           SQL
       - name: Exercise account initialization and account read isolation
         run: |
