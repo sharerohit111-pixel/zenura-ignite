@@ -138,3 +138,18 @@ Added `supabase/migrations/202611220002_paper_order_transactions.sql` with `publ
 - grants execution only to `service_role`; browser roles cannot call it.
 
 This is the first transaction slice only. It does not yet implement pending LIMIT reserve/fill/cancel, option trades, account initialization, or quote/provider verification. The RPC trusts its caller for provider quote and identity validation, so only a trusted backend may call it. The RPC has not been executed against a staging database and has no runtime pass claim.
+
+
+## Atomic Delivery LIMIT lifecycle RPC draft (2026-11-22)
+
+Added `supabase/migrations/202611220003_paper_limit_order_transactions.sql` (draft only):
+
+- `submit_paper_limit_order`: creates a Delivery-only pending LIMIT order; BUY reserves `limit_price × quantity` from shared unreserved cash, SELL reserves only unreserved Delivery shares. Idempotency key + fingerprint retries return the existing order; mismatched key reuse is rejected.
+- `execute_paper_limit_fill`: server-only worker entry point; validates quote timestamp/age and limit-price crossing, locks account/order/position, applies the fill at the fresh quote price, releases the complete BUY cash reservation or SELL share reservation, updates cash/position/realized P&L and marks the order filled atomically.
+- `cancel_paper_limit_order`: releases the remaining cash/share reservation and marks only a pending LIMIT order cancelled, under the same account-first locking discipline.
+- All three functions are `SECURITY DEFINER` with a fixed search path and execute permission granted only to `service_role`. The trusted backend must validate identity and provider quotes; never expose service-role credentials to browser code.
+- Intraday LIMIT remains disabled. No live broker order is submitted.
+
+### LIMIT RPC draft validation still required
+
+These SQL functions have only been source-reviewed and statically edited in this branch. They have **not** been parsed/executed against a PostgreSQL staging database, and there are no automated concurrency, retry, reserve/release, worker, or parity test results yet. Before applying them, test at minimum: concurrent duplicate submissions; idempotency-key fingerprint mismatch; insufficient cash; multiple pending BUY reservations; multiple SELL reservations against one position; BUY fill below limit; SELL fill above limit; stale/future quote rejection; cancel-vs-fill race; worker retry; full and partial position close; 50-position cap; integer-boundary arithmetic; and account reservation invariants. The existing Firebase worker remains the live source of truth until approved cutover.
