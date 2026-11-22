@@ -80,7 +80,7 @@ test("Paper Trading frontend gates protective exits on server worker readiness",
  assert.match(js,/protectiveWorkerEnabled=data\.workerEnabled===true/);
  assert.match(server,/if\(!paperProtectiveWorkerStatus\.enabled\)/);
  assert.match(js,/paper-protective-orders/);
- assert.match(js,/paper\\/protective-orders\\/.*\\/cancel/);
+ assert.match(js,/paper\/protective-orders\/.*\/cancel/);
  assert.match(js,/protectiveWorkerEnabled=false/);
  assert.match(language,/"Protective Orders":"सुरक्षात्मक ऑर्डर"/);
 });
