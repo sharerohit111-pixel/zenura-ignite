@@ -650,7 +650,7 @@ jobs:
           SET ROLE service_role;
           SELECT public.execute_paper_long_option_order(
             '55555555-5555-4555-8555-555555555555',
-            repeat('9',64),'18181818-1818-4818-8818-181818181818',
+            '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef','18181818-1818-4818-8818-181818181818',
             repeat('d',64),'NSE_FO|RACEOPT','RACEOPT','NSE','NSE_FO','CE',
             current_date+10,22000,25,5,1,'BUY',1285,
             floor(extract(epoch from clock_timestamp())*1000)::bigint,
