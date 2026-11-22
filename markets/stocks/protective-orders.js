@@ -223,7 +223,10 @@
     if (event.detail?.signedIn) loadOrders();
     else show(listStatus,'Sign in to load protective orders.','warning');
   });
-  window.addEventListener('languagechange',()=>{language=document.documentElement.lang==='hi'?'hi':'en';});
+  if (typeof MutationObserver!=='undefined') {
+    new MutationObserver(()=>{language=document.documentElement.lang==='hi'?'hi':'en';})
+      .observe(document.documentElement,{attributes:true,attributeFilter:['lang']});
+  }
   if (uid()) loadOrders();
   else setEnabled(false);
 })();
