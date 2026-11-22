@@ -46,7 +46,7 @@ Work only on the Indian-market integration branch and its isolated stock/gateway
 
 ## Next engineering gate: protective stop-loss / target worker
 
-The database currently has a private `paper_protective_orders` table, but the inspected gateway has no worker that evaluates and executes these orders. A table and UI control do not constitute server-side protection.
+The database currently has a private `paper_protective_orders` table. A pure trigger evaluator and unit tests now exist in `market-gateway/lib/protective-order-worker.js`, but the gateway has no leased worker or atomic fill RPC that evaluates and executes these orders. The evaluator is not connected to live execution; a table, helper and UI control do not constitute server-side protection.
 
 Before enabling stop-loss or target execution:
 1. Add a dedicated leased worker state key and bounded cursor/batch processing; never reuse the LIMIT worker cursor or lease.
