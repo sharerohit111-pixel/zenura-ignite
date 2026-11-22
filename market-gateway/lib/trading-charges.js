@@ -98,7 +98,7 @@ function calculateEquityDeliveryCharges({grossPaise,exchange,side="BUY"}){
     throw Object.assign(new Error("Equity delivery charges exceed supported calculation limits."),{status:400});
   return {grossPaise,brokeragePaise,exchangeTransactionPaise,ipftPaise,sebiPaise,sttPaise,
     stampDutyPaise,dpChargesPaise,gstPaise,totalChargesPaise,exchange:market,side,
-    segment:"EQUITY_DELIVERY",scheduleVersion:"2026-03-01",indicative:true,simulationOnly:true,
+    segment:"EQUITY_DELIVERY",scheduleVersion:"2026-04-01",indicative:true,simulationOnly:true,
     note:"NSE delivery schedule; DP charge is estimated per sell order. BSE scrip-group charges are not estimated."};
 }
 
