@@ -61,14 +61,14 @@ SELECT public.submit_paper_intraday_limit_order(
 );
 
 CREATE OR REPLACE FUNCTION public.test_delay_intraday_limit_terminal_update()
-RETURNS trigger LANGUAGE plpgsql AS $$
+RETURNS trigger LANGUAGE plpgsql AS \$\$
 BEGIN
   IF NEW.status IS DISTINCT FROM OLD.status AND NEW.status IN ('FILLED','CANCELLED') THEN
     PERFORM pg_sleep(1);
   END IF;
   RETURN NEW;
 END;
-$$;
+\$\$;
 DROP TRIGGER IF EXISTS test_delay_intraday_limit_terminal_update ON public.paper_orders;
 CREATE TRIGGER test_delay_intraday_limit_terminal_update
 BEFORE UPDATE ON public.paper_orders
@@ -104,7 +104,7 @@ fi
 wait "$SELL_CANCEL_PID"
 
 psql -v ON_ERROR_STOP=1 <<SQL
-DO $race_assertions$
+DO \$race_assertions\$
 BEGIN
   IF (SELECT status FROM public.paper_orders WHERE order_id='$BUY_ORDER')<>'FILLED' THEN
     RAISE EXCEPTION 'BUY fill-first race did not finish FILLED';
@@ -132,7 +132,7 @@ BEGIN
     RAISE EXCEPTION 'Intraday LIMIT BUY race debited virtual cash more than once';
   END IF;
 END
-$race_assertions$;
+\$race_assertions\$;
 
 DROP TRIGGER IF EXISTS test_delay_intraday_limit_terminal_update ON public.paper_orders;
 DROP FUNCTION IF EXISTS public.test_delay_intraday_limit_terminal_update();
