@@ -134,7 +134,7 @@
     }
   }
   function updateOrderButtons(){
-    const ready=!!selected&&!!lastQuote&&!!connector()?.getUserId?.()&&!streamAbort?.signal.aborted;
+    const ready=!!selected&&selected.exchange==="NSE"&&!!lastQuote&&!!connector()?.getUserId?.()&&!streamAbort?.signal.aborted;
     buyButton.disabled=!ready;sellButton.disabled=!ready;
   }
   function clearStream(){
@@ -190,6 +190,8 @@
     clearStream();selected=item;lastQuote=null;updateOrderButtons();
     safeText(symbolTitle,item.trading_symbol||item.name||item.instrument_key);
     safeText(symbolSub,(item.exchange||"")+" · "+item.instrument_key);
+    if(item.exchange==="BSE")safeText(orderStatus,"BSE shares can be searched and charted, but Paper Investing orders are disabled until exact BSE scrip-group charges are verified.");
+    else safeText(orderStatus,"NSE cash-equity order ticket ready after a fresh quote arrives.");
     safeText(livePrice,"—");safeText($("investing-reference-price"),"—");
     safeText(chartStatus,"Loading professional chart…");
     const c=connector(),uid=c?.getUserId?.();
