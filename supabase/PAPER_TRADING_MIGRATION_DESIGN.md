@@ -443,3 +443,8 @@ GitHub Actions run **#60 / 45000258176** completed with **success** on disposabl
 The exact expiry-cutoff boundary is currently asserted in the Firebase JavaScript contract helper test. The SQL RPC uses PostgreSQL `clock_timestamp()` internally, so its CI test covers expired-vs-future dates and runtime quote/clock tolerances rather than trying to fake the database clock at the exact expiry millisecond. Quote-age SQL tests use 14,000 ms and 16,000 ms fixtures to leave a timing margin; they do not claim exact 14,999/15,000/15,001 ms SQL boundary equivalence. The broader parity matrix remains open.
 
 This remains disposable PostgreSQL CI with minimal Supabase-compatible auth roles, not live Supabase Auth/PostgREST integration, full Firebase-vs-SQL runtime differential certification, Database Advisors review, or production certification. No connected Supabase project, Firebase backend, production data/settings, PR #28, or integration branch was modified. PR #71 and PR #70 remain Draft and open; no PR was merged.
+
+
+### Open parity finding from contract review
+
+The current Firebase-side `validateDerivativeContract` helper validates that `exchange` is either NSE/BSE and `segment` is either NSE_FO/BSE_FO, but it does **not** enforce the pairing (`NSE` ↔ `NSE_FO`, `BSE` ↔ `BSE_FO`). The SQL RPC does enforce that pairing. This is a concrete JS-vs-SQL validation mismatch and remains **unresolved**. It was deliberately not changed in this database/security-only audit branch because the gateway contract helper is backend-owned work; it must be coordinated with the owning gateway-development thread before claiming parity. The SQL negative test confirms the database rejects a mismatched pair, but that alone does not make the two layers equivalent.
