@@ -101,7 +101,27 @@ async function backfillSupabaseRoleClaims({
   return summary;
 }
 
+async function ensureSupabaseRoleClaimForNewUser({ auth, uid, enabled = false }) {
+  if (enabled !== true) return { status: "disabled" };
+  if (!auth || typeof auth.getUser !== "function" ||
+      typeof auth.setCustomUserClaims !== "function" ||
+      typeof uid !== "string" || uid.length < 1) {
+    throw Object.assign(new Error("Firebase Auth claim-sync dependencies are invalid."), {
+      code: "FIREBASE_ROLE_CLAIM_SYNC_INVALID"
+    });
+  }
+
+  const user = await auth.getUser(uid);
+  const decision = claimsForUser(user?.customClaims);
+  if (decision.state === "already-configured") return { status: "already-configured" };
+  if (decision.state === "role-conflict") return { status: "role-conflict" };
+
+  await auth.setCustomUserClaims(uid, decision.nextClaims);
+  return { status: "updated" };
+}
+
 module.exports = {
   EXPECTED_FIREBASE_PROJECT_ID,
-  backfillSupabaseRoleClaims
+  backfillSupabaseRoleClaims,
+  ensureSupabaseRoleClaimForNewUser
 };
