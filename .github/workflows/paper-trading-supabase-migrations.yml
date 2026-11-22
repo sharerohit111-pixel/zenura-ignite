@@ -574,7 +574,7 @@ jobs:
           BEGIN
             -- Firebase BigInt reference: buy 75 units with fee-inclusive basis 98,778 paise.
             PERFORM public.execute_paper_long_option_order(
-              '88888888-8888-4888-8888-888888888888',repeat('1',64),
+              '88888888-8888-4888-8888-888888888888','a1b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4',
               '31313131-3131-4131-8131-313131313131',repeat('2',64),
               'NSE_FO|REPEAT','REPEAT','NSE','NSE_FO','CE',
               current_date+10,22000,25,5,3,'BUY',1285,
@@ -590,7 +590,7 @@ jobs:
             END IF;
             -- First partial close: 98,778 × 25 / 75 rounds to 32,926 paise.
             v_result:=public.execute_paper_long_option_order(
-              '88888888-8888-4888-8888-888888888888',repeat('3',64),
+              '88888888-8888-4888-8888-888888888888','b1c2d3e4b1c2d3e4b1c2d3e4b1c2d3e4b1c2d3e4b1c2d3e4b1c2d3e4b1c2d3e4',
               '32323232-3232-4232-8232-323232323232',repeat('4',64),
               'NSE_FO|REPEAT','REPEAT','NSE','NSE_FO','CE',
               current_date+10,22000,25,5,1,'SELL',1500,
@@ -609,7 +609,7 @@ jobs:
             END IF;
             -- Repeated partial close: half of 65,852 rounds to 32,926 paise.
             v_result:=public.execute_paper_long_option_order(
-              '88888888-8888-4888-8888-888888888888',repeat('5',64),
+              '88888888-8888-4888-8888-888888888888','c1d2e3f4c1d2e3f4c1d2e3f4c1d2e3f4c1d2e3f4c1d2e3f4c1d2e3f4c1d2e3f4',
               '33333333-3333-4333-8333-333333333333',repeat('6',64),
               'NSE_FO|REPEAT','REPEAT','NSE','NSE_FO','CE',
               current_date+10,22000,25,5,1,'SELL',1500,
@@ -628,7 +628,7 @@ jobs:
             END IF;
             -- Final close must consume the exact remaining basis without rounding drift.
             v_result:=public.execute_paper_long_option_order(
-              '88888888-8888-4888-8888-888888888888',repeat('7',64),
+              '88888888-8888-4888-8888-888888888888','d1e2f3a4d1e2f3a4d1e2f3a4d1e2f3a4d1e2f3a4d1e2f3a4d1e2f3a4d1e2f3a4',
               '34343434-3434-4434-8434-343434343434',repeat('8',64),
               'NSE_FO|REPEAT','REPEAT','NSE','NSE_FO','CE',
               current_date+10,22000,25,5,1,'SELL',1500,
@@ -700,7 +700,7 @@ jobs:
             END IF;
             -- Seed one contract so the SELL vector exercises the real close path.
             PERFORM public.execute_paper_long_option_order(
-              '66666666-6666-4666-8666-666666666666',repeat('1',64),
+              '66666666-6666-4666-8666-666666666666','e1f2a3b4e1f2a3b4e1f2a3b4e1f2a3b4e1f2a3b4e1f2a3b4e1f2a3b4e1f2a3b4',
               '26262626-2626-4626-8626-262626262626',repeat('2',64),
               'NSE_FO|TINY','TINY','NSE','NSE_FO','CE',
               current_date+10,22000,1,1,1,'BUY',1000,
@@ -709,7 +709,7 @@ jobs:
             );
             -- Tiny-premium close: gross 100 paise, fixed charges exceed proceeds.
             v_sell:=public.execute_paper_long_option_order(
-              '66666666-6666-4666-8666-666666666666',repeat('e',64),
+              '66666666-6666-4666-8666-666666666666','f1a2b3c4f1a2b3c4f1a2b3c4f1a2b3c4f1a2b3c4f1a2b3c4f1a2b3c4f1a2b3c4',
               '25252525-2525-4525-8525-252525252525',repeat('f',64),
               'NSE_FO|TINY','TINY','NSE','NSE_FO','CE',
               current_date+10,22000,1,1,1,'SELL',100,
