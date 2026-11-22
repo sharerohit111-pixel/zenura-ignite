@@ -144,6 +144,7 @@ declare
   v_order_realized bigint := 0;
   v_realized bigint;
   v_open_count integer;
+  v_has_position boolean := false;
 begin
   if p_order_id is null or p_order_id !~ '^[a-f0-9]{64}$'
      or p_execution_price_paise is null or p_execution_price_paise <= 0
@@ -185,6 +186,7 @@ begin
   select * into v_position from public.paper_equity_positions
    where user_id=v_order.user_id and product='DELIVERY'
      and instrument_key=v_order.instrument_key for update;
+  v_has_position := found;
 
   if v_order.side='BUY' then
     if v_order.reserved_cash_paise<>v_order.limit_price_paise*v_order.quantity::bigint
@@ -192,7 +194,7 @@ begin
        or v_account.reserved_cash_paise<v_order.reserved_cash_paise then
       raise exception using errcode='23514', message='LIMIT BUY reservation is inconsistent';
     end if;
-    if not found then
+    if not v_has_position then
       select count(*) into v_open_count from public.paper_equity_positions
        where user_id=v_order.user_id and quantity>0;
       if v_open_count>=50 then
@@ -225,7 +227,7 @@ begin
     update public.paper_accounts set cash_paise=v_cash,reserved_cash_paise=v_reserved_cash,
       version=version+1,updated_at=now() where user_id=v_order.user_id;
   else
-    if not found or v_order.reserved_cash_paise<>0
+    if not v_has_position or v_order.reserved_cash_paise<>0
        or v_order.reserved_quantity<>v_order.quantity
        or v_position.reserved_quantity<v_order.reserved_quantity
        or v_position.quantity<v_order.quantity then
