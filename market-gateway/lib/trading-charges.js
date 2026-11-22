@@ -102,6 +102,8 @@ function calculateEquityDeliveryCharges({grossPaise,exchange,side="BUY"}){
   const totalChargesPaise=brokeragePaise+exchangeTransactionPaise+ipftPaise+sebiPaise+sttPaise+stampDutyPaise+dpChargesPaise+gstPaise;
   if(!Number.isSafeInteger(totalChargesPaise)||!Number.isSafeInteger(grossPaise+totalChargesPaise))
     throw Object.assign(new Error("Equity delivery charges exceed supported calculation limits."),{status:400});
+  if(side==="SELL"&&grossPaise-totalChargesPaise<=0)
+    throw Object.assign(new Error("NSE delivery SELL proceeds must remain positive after estimated charges."),{status:422});
   return {grossPaise,brokeragePaise,exchangeTransactionPaise,ipftPaise,sebiPaise,sttPaise,
     stampDutyPaise,dpChargesPaise,gstPaise,totalChargesPaise,exchange:market,side,
     segment:"EQUITY_DELIVERY",scheduleVersion:"2026-03-01",indicative:true,simulationOnly:true,
