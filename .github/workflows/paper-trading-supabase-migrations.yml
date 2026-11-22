@@ -24,6 +24,7 @@ on:
       - "market-gateway/test/derivative-order-transaction.test.js"
       - "market-gateway/test/derivative-contract.test.js"
       - "supabase/tests/**"
+      - "supabase/tests/protective_order_cancel.sql"
   workflow_dispatch:
 
 concurrency:
@@ -1609,6 +1610,8 @@ jobs:
           END
           $protective_fill_assertions$;
           SQL
+      - name: Verify owner-bound protective cancellation and idempotent replay
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/protective_order_cancel.sql
       - name: Verify expected schema and RPC registration
         run: |
           psql -v ON_ERROR_STOP=1 <<'SQL'
