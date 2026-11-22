@@ -20,6 +20,7 @@ const {calculateDerivativePortfolio}=require("./lib/derivative-portfolio");
 const {validateDerivativeContract}=require("./lib/derivative-contract");
 const {parseMarginPreviewInput}=require("./lib/margin-preview-input");
 const {normalizeUpstoxMarginResponse}=require("./lib/upstox-margin");
+const {availablePaperCash}=require("./lib/available-paper-cash");
 const {formatSseEvent,formatSseComment}=require("./lib/sse");
 const {fetchProviderWithTimeout}=require("./lib/provider-fetch");
 const {createSingleFlight}=require("./lib/single-flight");
@@ -453,15 +454,16 @@ app.post("/paper/derivative/margin-preview",async(req,res)=>{
     const payload=await readProviderJson(upstream);
     if(!upstream.ok)return res.status(502).json({error:"Upstox broker margin preview failed."});
     const margin=normalizeUpstoxMarginResponse(payload,instrumentKey);
-    const {data:account,error}=await userDb.from("paper_accounts").select("cash_paise").eq("user_id",user.id).maybeSingle();
+    const {data:account,error}=await userDb.from("paper_accounts").select("cash_paise,reserved_cash_paise,reserved_margin_paise").eq("user_id",user.id).maybeSingle();
     if(error||!account)return res.status(409).json({error:"Initialize your Paper Trading account before comparing margin."});
+    const availableCashPaise=availablePaperCash(account);
     res.set("Cache-Control","private, no-store").json({
       status:"PREVIEW_ONLY",tradingSymbol:instrument.trading_symbol,instrumentKey,exchange:instrument.exchange,
       expiry:contract.expiry,side,product,lots,lotSize:contract.lotSize,quantity:contract.quantity,
       quote:{pricePaise:normalized.pricePaise,observedAtMs:normalized.tradeTimeMs},
       requiredMarginPaise:margin.requiredMarginPaise,finalMarginPaise:margin.finalMarginPaise,
-      marginComponents:margin.components,availableVirtualCashPaise:account.cash_paise,
-      shortfallPaise:Math.max(margin.requiredMarginPaise-account.cash_paise,0),
+      marginComponents:margin.components,availableVirtualCashPaise:availableCashPaise,
+      shortfallPaise:Math.max(margin.requiredMarginPaise-availableCashPaise,0),
       source:margin.source,simulationOnly:true,previewOnly:true,executionEnabled:false,persisted:false,marginReserved:false
     });
   }catch(error){sendError(res,error,"Futures margin preview could not be completed.");}
