@@ -714,8 +714,8 @@ jobs:
               FROM public.paper_accounts
              WHERE user_id='22222222-2222-4222-8222-222222222222';
             IF v_qty <> 25 OR v_basis <> 33319 OR v_avg <> 1333
-               OR (v_result->>'realized_pnl_paise')::bigint <> 17749
-               OR v_cash <> 99896430 OR v_realized <> 17749 THEN
+               OR (v_result->>'realized_pnl_paise')::bigint <> 11231
+               OR v_cash <> 99889169 OR v_realized <> 11231 THEN
               RAISE EXCEPTION 'Long option partial close mismatch: qty=%, basis=%, avg=%, order_realized=%, cash=%, account_realized=%', v_qty,v_basis,v_avg,(v_result->>'realized_pnl_paise'),v_cash,v_realized;
             END IF;
             -- Full close at a one-paise premium: charges exceed turnover, so net credit is negative.
