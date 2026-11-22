@@ -38,6 +38,12 @@
     <button type="button" data-drawing="brush">Brush</button>
     <button type="button" data-drawing="segment">Measure</button>
   </div>
+  <div class="chart-template-controls">
+    <input id="chart-template-name" type="text" maxlength="60" placeholder="Chart template name" aria-label="Chart template name">
+    <button type="button" id="chart-save-template">SAVE TEMPLATE</button>
+    <select id="chart-template-select" aria-label="Saved chart templates"><option value="">Saved templates</option></select>
+    <button type="button" id="chart-load-template">LOAD</button>
+  </div>
   <div class="chart-edit-controls">
     <button type="button" id="chart-undo" aria-label="Undo drawing">UNDO</button>
     <button type="button" id="chart-redo" aria-label="Redo drawing">REDO</button>
