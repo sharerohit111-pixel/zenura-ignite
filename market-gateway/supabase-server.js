@@ -525,6 +525,153 @@ app.get("/paper/derivatives/portfolio",async(req,res)=>{
     res.set("Cache-Control","private, no-store").json({...valuation,cashPaise:account.cash_paise,realizedPnlPaise:account.realized_pnl_paise||0,simulationOnly:true,includesEntryCharges:true,excludesEstimatedExitCharges:true});
   }catch(error){sendError(res,error,"Derivative portfolio valuation could not be loaded.");}
 });
+
+app.get("/watchlist/quotes",async(req,res)=>{
+  try{
+    const {user,userDb}=await auth(req),name=watchlistName(req),watchlists=await readWatchlists(userDb,user.id),keys=watchlists[name];
+    if(!keys.length)return res.set("Cache-Control","private, no-store").json({name,quotes:[],status:"empty"});
+    const {token}=await getUpstoxAccessToken(user.id);
+    const response=await fetchProvider("https://api.upstox.com/v3/market-quote/quotes?"+new URLSearchParams({instrument_key:keys.join(",")}),{headers:{Authorization:"Bearer "+token,Accept:"application/json"}});
+    const payload=await readProviderJson(response);
+    if(!response.ok)return res.status(502).json({error:"Watchlist quotes could not be retrieved."});
+    const entries=Object.values(payload?.data||{}),now=Date.now();
+    const quotes=keys.map(instrumentKey=>{
+      const entry=entries.find(x=>x?.instrument_token===instrumentKey),instrument=instrumentCache.find(x=>x.instrument_key===instrumentKey);
+      let normalized=null;try{normalized=normalizeProviderQuote(entry,instrumentKey,{now,maxAgeMs:60000});}catch(_){}
+      const change=Number(entry?.net_change),last=normalized?normalized.pricePaise/100:null,previous=last!==null&&Number.isFinite(change)?last-change:null;
+      return {instrumentKey,tradingSymbol:instrument?.trading_symbol||entry?.symbol||instrumentKey,
+        lastPrice:normalized?last:null,netChange:normalized&&Number.isFinite(change)?change:null,
+        changePercent:normalized&&previous>0?(change/previous)*100:null,
+        quoteAgeMs:normalized?.quoteAgeMs??null,status:normalized?"fresh":"stale_or_unavailable"};
+    });
+    res.set("Cache-Control","private, no-store").json({name,quotes,asOf:now,status:quotes.every(x=>x.status==="fresh")?"fresh":"partial_stale"});
+  }catch(error){sendError(res,error,"Watchlist quotes could not be loaded.");}
+});
+app.post("/paper/futures/orders",async(req,res)=>{
+  try{
+    const {user,userDb}=await auth(req),instrumentKey=String(req.body?.instrument_key||"");
+    const lots=Number(req.body?.lots),side=String(req.body?.side||"").toUpperCase();
+    const rawProduct=String(req.body?.product||"D").toUpperCase();
+    const product=rawProduct==="I"?"INTRADAY":rawProduct==="D"?"DELIVERY":normalizeProductMode(rawProduct);
+    const idempotencyKey=String(req.body?.idempotency_key||"");
+    const orderType=String(req.body?.order_type||"MARKET").toUpperCase();
+    if(!isUuid(idempotencyKey))return res.status(400).json({error:"A valid UUID idempotency_key is required."});
+    if(orderType!=="MARKET")return res.status(400).json({error:"Futures LIMIT orders will be enabled after the protected LIMIT worker is deployed. MARKET is currently supported."});
+    if(!["BUY","SELL"].includes(side)||product===null)return res.status(400).json({error:"Choose BUY/SELL and a valid Intraday/Delivery futures product."});
+    if(!instrumentCache.length||Date.now()-instrumentCacheUpdatedAt>6*60*60*1000)await refreshInstrumentCache();
+    const instrument=instrumentCache.find(x=>x.instrument_key===instrumentKey&&x.instrument_type==="FUT"&&["NSE_FO","BSE_FO"].includes(x.segment));
+    if(!instrument)return res.status(400).json({error:"Select a verified NSE/BSE futures contract from the official instrument master."});
+    const {token}=await getUpstoxAccessToken(user.id),{quote}=await getQuote(token,instrumentKey);
+    const normalized=normalizeProviderQuote(quote,instrumentKey,{maxAgeMs:15000});
+    const contract=validateDerivativeContract(instrument,{lots,pricePaise:normalized.pricePaise,now:Date.now()});
+    const orderId=makeOrderId(user.id,idempotencyKey);
+    const fingerprint=makeOrderFingerprint({instrumentKey,side,quantity:contract.quantity,orderType:"MARKET",product});
+    const {data:prior,error:priorError}=await userDb.from("paper_futures_orders").select("*").eq("user_id",user.id).eq("idempotency_key",idempotencyKey).maybeSingle();
+    if(priorError)throw Object.assign(new Error("Futures order idempotency state could not be checked."),{status:503});
+    if(prior){
+      if(prior.request_fingerprint!==fingerprint||prior.order_id!==orderId)return res.status(409).json({error:"Futures idempotency key was reused with different order details."});
+      const {data:account}=await userDb.from("paper_accounts").select("cash_paise,reserved_margin_paise").eq("user_id",user.id).maybeSingle();
+      return res.set("Cache-Control","private, no-store").json({orderId:prior.order_id,status:prior.status,side:prior.side,product:prior.product,quantity:prior.quantity,lots:prior.quantity/prior.lot_size,executionPricePaise:prior.execution_price_paise,grossPaise:prior.execution_price_paise*prior.quantity,chargesPaise:prior.charges_paise,cashPaise:account?.cash_paise??null,reservedMarginPaise:account?.reserved_margin_paise??null,realizedPnlPaise:prior.realized_pnl_paise,idempotentReplay:true,simulationOnly:true});
+    }
+    const {data:position,error:positionError}=await userDb.from("paper_futures_positions").select("net_quantity,product").eq("user_id",user.id).eq("instrument_key",instrumentKey).maybeSingle();
+    if(positionError)throw Object.assign(new Error("Current futures position could not be read."),{status:503});
+    if(position&&position.product!==product)return res.status(409).json({error:"Close the existing futures position before switching between Intraday and Delivery."});
+    const oldQuantity=position?.net_quantity||0;
+    const opensSameDirection=oldQuantity===0||(oldQuantity>0&&side==="BUY")||(oldQuantity<0&&side==="SELL");
+    const openingQuantity=opensSameDirection?contract.quantity:Math.max(0,contract.quantity-Math.abs(oldQuantity));
+    let openingMarginPaise=0;
+    if(openingQuantity>0){
+      const marginResponse=await fetchProvider("https://api.upstox.com/v2/charges/margin",{
+        method:"POST",headers:{Authorization:"Bearer "+token,Accept:"application/json","Content-Type":"application/json"},
+        body:JSON.stringify({instruments:[{instrument_key:instrumentKey,quantity:openingQuantity,product:product==="INTRADAY"?"I":"D",transaction_type:side,price:normalized.pricePaise/100}]})
+      });
+      const marginPayload=await readProviderJson(marginResponse);
+      if(!marginResponse.ok)return res.status(502).json({error:"Upstox futures margin requirement could not be verified."});
+      openingMarginPaise=normalizeUpstoxMarginResponse(marginPayload,instrumentKey).requiredMarginPaise;
+    }
+    const {calculateFuturesTradeCharges}=require("./lib/trading-charges");
+    const charges=calculateFuturesTradeCharges({grossPaise:contract.contractValuePaise,exchange:instrument.exchange,side});
+    const now=Date.now();
+    const result=await runtime.callUserRpc(user,"execute_paper_futures_market_order",{
+      p_order_id:orderId,p_idempotency_key:idempotencyKey,p_request_fingerprint:fingerprint,
+      p_instrument_key:instrumentKey,p_trading_symbol:instrument.trading_symbol,p_exchange:instrument.exchange,
+      p_segment:instrument.segment,p_expiry:contract.expiry,p_lot_size:contract.lotSize,
+      p_tick_size_paise:contract.tickSizePaise,p_side:side,p_product:product,p_quantity:contract.quantity,
+      p_execution_price_paise:normalized.pricePaise,p_open_margin_paise:openingMarginPaise,
+      p_charges_paise:charges.totalChargesPaise,p_quote_timestamp_ms:normalized.tradeTimeMs,p_now_ms:now
+    });
+    const order=result?.order||{};
+    res.set("Cache-Control","private, no-store").status(result?.idempotent_replay?200:201).json({
+      orderId:order.order_id||orderId,status:order.status||"FILLED",tradingSymbol:instrument.trading_symbol,
+      instrumentKey,exchange:instrument.exchange,expiry:contract.expiry,side,product,orderType:"MARKET",
+      lots,lotSize:contract.lotSize,quantity:contract.quantity,executionPricePaise:normalized.pricePaise,
+      grossPaise:contract.contractValuePaise,chargesPaise:charges.totalChargesPaise,charges,
+      openingMarginPaise:openingMarginPaise,cashPaise:result?.cash_paise??null,
+      reservedMarginPaise:result?.reserved_margin_paise??null,
+      realizedPnlPaise:result?.order_realized_pnl_paise??0,
+      quoteAgeMs:normalized.quoteAgeMs,idempotentReplay:result?.idempotent_replay===true,simulationOnly:true
+    });
+  }catch(error){sendError(res,error,"Futures paper order could not be completed.");}
+});
+app.get("/paper/futures/orders",async(req,res)=>{
+  try{
+    const {user,userDb}=await auth(req),raw=String(req.query.limit??"50");
+    if(!/^\d+$/.test(raw)||Number(raw)<1)return res.status(400).json({error:"Futures order history limit must be from 1 to 100."});
+    const {data,error}=await userDb.from("paper_futures_orders").select("*").eq("user_id",user.id).order("created_at",{ascending:false}).limit(Math.min(Number(raw),100));
+    if(error)throw Object.assign(new Error("Futures order history could not be loaded."),{status:503});
+    const orders=(data||[]).map(o=>({id:o.order_id,tradingSymbol:o.trading_symbol,instrumentKey:o.instrument_key,exchange:o.exchange,expiry:o.expiry,side:o.side,product:o.product,quantity:o.quantity,lotSize:o.lot_size,executionPricePaise:o.execution_price_paise,marginReservedPaise:o.margin_reserved_paise,chargesPaise:o.charges_paise,realizedPnlPaise:o.realized_pnl_paise,status:o.status,orderType:o.order_type,simulationOnly:true,createdAt:o.created_at?Date.parse(o.created_at):null}));
+    res.set("Cache-Control","private, no-store").json({orders,simulationOnly:true});
+  }catch(error){sendError(res,error,"Futures order history could not be loaded.");}
+});
+app.get("/paper/futures/portfolio",async(req,res)=>{
+  try{
+    const {user,userDb}=await auth(req);
+    const [{data:account,error:accountError},{data:rows,error:positionError}]=await Promise.all([
+      userDb.from("paper_accounts").select("cash_paise,reserved_margin_paise,realized_pnl_paise").eq("user_id",user.id).maybeSingle(),
+      userDb.from("paper_futures_positions").select("*").eq("user_id",user.id)
+    ]);
+    if(accountError||!account)return res.status(404).json({error:"Paper Trading account has not been initialized."});
+    if(positionError)throw Object.assign(new Error("Futures positions could not be loaded."),{status:503});
+    const positions=rows||[];
+    if(!positions.length)return res.set("Cache-Control","private, no-store").json({positions:[],cashPaise:account.cash_paise,marketValuePaise:0,unrealizedPnlPaise:0,reservedMarginPaise:account.reserved_margin_paise||0,realizedPnlPaise:account.realized_pnl_paise||0,valuationStatus:"no_open_positions",marginStatus:"none",simulationOnly:true});
+    const {token}=await getUpstoxAccessToken(user.id);
+    const keys=positions.map(p=>p.instrument_key);
+    const quoteResponse=await fetchProvider("https://api.upstox.com/v3/market-quote/quotes?"+new URLSearchParams({instrument_key:keys.join(",")}),{headers:{Authorization:"Bearer "+token,Accept:"application/json"}});
+    const quotePayload=await readProviderJson(quoteResponse);
+    if(!quoteResponse.ok)return res.status(502).json({error:"Futures portfolio quotes could not be retrieved."});
+    const entries=Object.values(quotePayload?.data||{}),now=Date.now();
+    let unrealizedPnlPaise=0,stalePositions=0;
+    const valued=positions.map(p=>{
+      const entry=entries.find(x=>x?.instrument_token===p.instrument_key);
+      let q=null;try{q=normalizeProviderQuote(entry,p.instrument_key,{now,maxAgeMs:15000});}catch(_){}
+      if(!q){stalePositions++;return {instrumentKey:p.instrument_key,tradingSymbol:p.trading_symbol,netQuantity:p.net_quantity,averagePricePaise:p.average_price_paise,marketPricePaise:null,unrealizedPnlPaise:null,marginReservedPaise:p.reserved_margin_paise,valuationStatus:"stale_or_unavailable"};}
+      const pnl=(q.pricePaise-p.average_price_paise)*p.net_quantity;
+      unrealizedPnlPaise+=pnl;
+      return {instrumentKey:p.instrument_key,tradingSymbol:p.trading_symbol,exchange:p.exchange,expiry:p.expiry,product:p.product,netQuantity:p.net_quantity,averagePricePaise:p.average_price_paise,marketPricePaise:q.pricePaise,unrealizedPnlPaise:pnl,marginReservedPaise:p.reserved_margin_paise,quoteAgeMs:q.quoteAgeMs,valuationStatus:"fresh"};
+    });
+    res.set("Cache-Control","private, no-store").json({positions:valued,cashPaise:account.cash_paise,marketValuePaise:0,unrealizedPnlPaise,reservedMarginPaise:account.reserved_margin_paise||0,realizedPnlPaise:account.realized_pnl_paise||0,equityPaise:account.cash_paise+unrealizedPnlPaise,valuationStatus:stalePositions?"partial_stale":"fresh",stalePositions,marginStatus:"entry_estimate",simulationOnly:true});
+  }catch(error){sendError(res,error,"Futures portfolio could not be loaded.");}
+});
+app.get("/paper/investing/portfolio",async(req,res)=>{
+  try{
+    const {user,userDb}=await auth(req);
+    const [{data:account,error:accountError},{data:rows,error:positionError}]=await Promise.all([
+      userDb.from("paper_investing_accounts").select("*").eq("user_id",user.id).maybeSingle(),
+      userDb.from("paper_investing_positions").select("*").eq("user_id",user.id)
+    ]);
+    if(accountError||!account)return res.status(404).json({error:"Paper Investing account has not been initialized."});
+    if(positionError)throw Object.assign(new Error("Paper Investing positions could not be loaded."),{status:503});
+    const positions=(rows||[]).map(p=>[p.instrument_key,{quantity:p.quantity,averagePricePaise:p.average_price_paise,costBasisPaise:p.cost_basis_paise}]);
+    if(!positions.length)return res.set("Cache-Control","private, no-store").json({product:"PAPER_INVESTING",positions:[],cashPaise:account.cash_paise,marketValuePaise:0,unrealizedPnlPaise:0,equityPaise:account.cash_paise,realizedPnlPaise:account.realized_pnl_paise,valuationStatus:"no_open_positions",simulationOnly:true});
+    const {token}=await getUpstoxAccessToken(user.id),keys=positions.map(([key])=>key);
+    const upstream=await fetchProvider("https://api.upstox.com/v3/market-quote/quotes?"+new URLSearchParams({instrument_key:keys.join(",")}),{headers:{Authorization:"Bearer "+token,Accept:"application/json"}});
+    const payload=await readProviderJson(upstream);
+    if(!upstream.ok)return res.status(502).json({error:"Paper Investing market valuation could not be retrieved."});
+    const valuation=buildPortfolioValuation({positions,quotes:Object.values(payload?.data||{}),cashPaise:account.cash_paise,realizedPnlPaise:account.realized_pnl_paise,instruments:instrumentCache,now:Date.now(),maxAgeMs:60000});
+    res.set("Cache-Control","private, no-store").json({...valuation,product:"PAPER_INVESTING"});
+  }catch(error){sendError(res,error,"Paper Investing portfolio could not be loaded.");}
+});
+
 app.get("/paper/investing/account",async(req,res)=>{
   try{
     const {user,userDb}=await auth(req);
