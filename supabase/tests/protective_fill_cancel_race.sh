@@ -46,10 +46,10 @@ INSERT INTO public.paper_equity_positions(
   average_price_paise,cost_basis_paise,reserved_quantity
 ) VALUES (
   '11111111-1111-4111-8111-111111111111','DELIVERY','NSE_EQ|PROTECTIVE_RACE',
-  'PROTECTIVE_RACE','NSE',5,9000,45000,0
+  'PROTECTIVE_RACE','NSE',5,9000,45000,2
 ),(
   '11111111-1111-4111-8111-111111111111','DELIVERY','NSE_EQ|PROTECTIVE_RACE_CANCEL',
-  'PROTECTIVE_RACE_CANCEL','NSE',5,9000,45000,0
+  'PROTECTIVE_RACE_CANCEL','NSE',5,9000,45000,2
 );
 INSERT INTO public.paper_protective_orders(
   order_id,user_id,asset_class,instrument_key,product,side,
