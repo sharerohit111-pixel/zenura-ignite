@@ -71,6 +71,19 @@ test("Manual production deployment keeps the leased LIMIT worker active in the g
  assert.doesNotMatch(deployWorkflow,/gcloud run jobs deploy|gcloud scheduler jobs create|firebase deploy|firebase functions:deploy|service_account_key:/i);
 });
 
+test("Paper Trading frontend gates protective exits on server worker readiness",()=>{
+ const html=fs.readFileSync(path.join(root,"../markets/stocks/index.html"),"utf8");
+ const js=fs.readFileSync(path.join(root,"../markets/stocks/stocks.js"),"utf8");
+ const language=fs.readFileSync(path.join(root,"../markets/language-toggle.js"),"utf8");
+ for(const id of ["paper-protective-type","paper-protective-price","paper-protective-create","paper-protective-orders-body","paper-protective-refresh"])
+  assert.match(html,new RegExp('id="'+id+'"'));
+ assert.match(js,/protectiveWorkerEnabled=data\.workerEnabled===true/);
+ assert.match(js,/if\(!paperProtectiveWorkerStatus/);
+ assert.match(js,/paper-protective-orders/);
+ assert.match(js,/paper-protective-orders\/.*\/cancel/);
+ assert.match(js,/protectiveWorkerEnabled=false/);
+ assert.match(language,/"Protective Orders":"सुरक्षात्मक ऑर्डर"/);
+});
 test("Equity protective create/list APIs validate user ownership and verified cash instruments",()=>{
  assert.match(server,/app\.post\("\/paper\/protective-orders"/);
  assert.match(server,/create_paper_equity_protective_order/);
