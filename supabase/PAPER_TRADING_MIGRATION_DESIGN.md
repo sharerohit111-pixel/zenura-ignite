@@ -316,3 +316,11 @@ A separate hardening branch, `audit/supabase-paper-trading-hardening-2026-11-22`
 - Validate trusted backend UID mapping, request fingerprint derivation and quote/instrument binding before any staging or production cutover.
 
 All testing remains confined to GitHub Actions disposable PostgreSQL. No connected Supabase project was modified. Firebase and PR #28 remain untouched. PR #70 remains Draft.
+
+
+### Additional Supabase security alignment
+
+- All six `SECURITY DEFINER` trading/account RPCs now use an empty `search_path` (`set search_path = ''`); every application table reference is schema-qualified. This follows current Supabase function-security guidance and reduces object-shadowing risk.
+- The six authenticated user-read policies now wrap `auth.uid()` in a scalar `SELECT` to avoid per-row re-evaluation on large scans.
+- Expanded CI asserts those function search-path settings and all six user-scoped policies, and exercises two-tenant RLS reads for accounts, equity positions, derivative positions, equity orders, derivative orders and watchlists. It also attempts a cross-tenant watchlist insert and expects denial.
+- These assertions are being added to the audit branch's disposable PostgreSQL workflow; they are not yet a completed run and do not replace testing with Supabase's real Auth/PostgREST roles or Database Advisors.
