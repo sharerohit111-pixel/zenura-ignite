@@ -173,11 +173,12 @@
       .select("chart_type,indicators").eq("user_id",userId)
       .eq("instrument_key",context.instrument.instrument_key).maybeSingle();
     if(error){console.warn("Chart preferences could not be loaded:",error.message);return;}
-    // Each symbol gets its own indicator set; never carry another symbol's indicators forward.
+    // A first-time symbol gets the default volume pane. Saved preferences replace the full set.
+    if(!data||!Array.isArray(data.indicators))return;
     const existing=chart?.getIndicators?.()||[];
     for(const item of existing){
       const name=typeof item==="string"?item:item?.name;
-      if(name&&name!=="VOL")chart.removeIndicator({name});
+      if(name)chart.removeIndicator({name});
     }
     activeIndicators.clear();
     if(["CANDLE","OHLC","AREA","LINE"].includes(data?.chart_type)){
@@ -189,7 +190,7 @@
     const allowed=new Set([...BUILTIN_INDICATORS,...(root.klinecharts?.getSupportedIndicators?.()||[])]);
     if(Array.isArray(data?.indicators)){
       for(const name of data.indicators.slice(0,20)){
-        if(typeof name!=="string"||!allowed.has(name)||name==="VOL")continue;
+        if(typeof name!=="string"||!allowed.has(name))continue;
         try{chart.createIndicator(name);activeIndicators.add(name);}
         catch(error){console.warn("Saved chart indicator could not be restored:",name,error);}
       }
@@ -259,7 +260,7 @@
       chart=lib.init(container);
       registerCustomOverlays(lib);
       chart.setStyles(chartStyles(activeTheme,activeChartType));
-      chart.createIndicator("VOL");
+      chart.createIndicator("VOL");activeIndicators.add("VOL");
       chart.setDataLoader({
         getBars:async params=>{
           try{await loadBars(params);}catch(error){params.callback([],false);options.onError?.(error);}
@@ -344,7 +345,7 @@
     await savePreferences();return true;
   }
   function removeIndicator(name){
-    if(!chart||!name||name==="VOL"||!activeIndicators.has(name))return false;
+    if(!chart||!name||!activeIndicators.has(name))return false;
     const removed=chart.removeIndicator({name});
     if(removed){activeIndicators.delete(name);savePreferences().catch(()=>{});}
     return removed;
@@ -358,7 +359,7 @@
   }
   function addIndicator(name){
     if(!chart||!name)return false;
-    if(name==="VOL"||activeIndicators.has(name))return true;
+    if(activeIndicators.has(name))return true;
     if(activeIndicators.size>=20){console.warn("Chart indicator limit reached; remove an indicator before adding another.");return false;}
     try{chart.createIndicator(name);activeIndicators.add(name);savePreferences().catch(()=>{});return true;}
     catch(error){console.warn("Indicator could not be added:",error);return false;}
