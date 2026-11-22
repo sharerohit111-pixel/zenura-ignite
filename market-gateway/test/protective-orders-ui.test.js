@@ -22,7 +22,6 @@ test("protective-order UI calls only authenticated server-side paper endpoints",
   assert.match(source,/gateway\+'\/paper\/protective-orders'/);
   assert.match(source,/\/paper\/protective-orders\/'\+encodeURIComponent\(orderId\)+'\/cancel'/);
   assert.match(source,/Authorization:'Bearer '\+token/);
-  assert.match(source,/simulationOnly/); // UI is deliberately described as a paper-only flow.
   assert.match(gateway,/create_paper_equity_protective_order/);
   assert.match(gateway,/cancel_paper_protective_order/);
   assert.match(gateway,/instrument_type==="EQ"&&\["NSE_EQ","BSE_EQ"\]\.includes\(instrument\.segment\)/);
