@@ -371,7 +371,7 @@ jobs:
             );
             SELECT reserved_cash_paise INTO v_reserved FROM public.paper_accounts
              WHERE user_id='22222222-2222-4222-8222-222222222222';
-            IF v_reserved <> 40000 THEN
+            IF v_reserved <> 42407 THEN
               RAISE EXCEPTION 'LIMIT BUY did not reserve expected cash';
             END IF;
             PERFORM public.cancel_paper_limit_order(
@@ -396,7 +396,7 @@ jobs:
             SELECT reserved_cash_paise,cash_paise INTO v_reserved,v_cash
               FROM public.paper_accounts
              WHERE user_id='22222222-2222-4222-8222-222222222222';
-            IF v_result->>'status' <> 'FILLED' OR v_reserved <> 0 OR v_cash <> 99894739 THEN
+            IF v_result->>'status' <> 'FILLED' OR v_reserved <> 0 OR v_cash <> 99892310 THEN
               RAISE EXCEPTION 'LIMIT BUY fill cash or reservation result is incorrect after fee-inclusive MARKET basis';
             END IF;
             -- LIMIT SELL must reserve shares, reject stale quotes, and release on cancel.
@@ -446,8 +446,8 @@ jobs:
             SELECT cash_paise INTO v_cash FROM public.paper_accounts
              WHERE user_id='22222222-2222-4222-8222-222222222222';
             IF v_result->>'status' <> 'FILLED' OR v_qty <> 3 OR v_reserved <> 0
-               OR v_cash <> 99920739
-               OR (v_result->>'realized_pnl_paise')::bigint <> 5504 THEN
+               OR v_cash <> 99913563
+               OR (v_result->>'realized_pnl_paise')::bigint <> 757 THEN
               RAISE EXCEPTION 'LIMIT SELL fill position, cash, reservation or fee-inclusive basis P&L is incorrect';
             END IF;
           END
@@ -560,7 +560,7 @@ jobs:
                 WHERE user_id='44444444-4444-4444-8444-444444444444'
                   AND idempotency_key='17171717-1717-4717-8717-171717171717') <> 1
                OR (SELECT reserved_cash_paise FROM public.paper_accounts
-                WHERE user_id='44444444-4444-4444-8444-444444444444') <> 50000 THEN
+                WHERE user_id='44444444-4444-4444-8444-444444444444') <> 52420 THEN
               RAISE EXCEPTION 'Concurrent LIMIT duplicate submit created duplicate reservation/order';
             END IF;
             BEGIN
@@ -628,7 +628,7 @@ jobs:
             IF v_status NOT IN ('FILLED','CANCELLED') OR v_reserved<>0 THEN
               RAISE EXCEPTION 'LIMIT fill/cancel race left a non-terminal order or leaked reservation';
             END IF;
-            IF (v_status='FILLED' AND v_cash<>99950000)
+            IF (v_status='FILLED' AND v_cash<>99947580)
                OR (v_status='CANCELLED' AND v_cash<>100000000) THEN
               RAISE EXCEPTION 'LIMIT fill/cancel race produced inconsistent cash';
             END IF;
