@@ -10,7 +10,15 @@ const {createSupabaseRuntime,readBearerToken}=require("./lib/supabase-runtime");
 const {downloadInstrumentMaster}=require("./lib/instrument-master-download");
 const {validateUpstoxFeedUrl}=require("./lib/upstox-feed-url");
 const {WATCHLIST_NAMES,normalizeWatchlists,mergeWatchlistUpdate}=require("./lib/watchlists");
-const {isUuid}=require("./lib/order-idempotency");
+const {isUuid,makeOrderId,makeOrderFingerprint}=require("./lib/order-idempotency");
+const {normalizeProductMode}=require("./lib/product-mode");
+const {parseLimitPricePaise}=require("./lib/limit-price");
+const {normalizeProviderQuote}=require("./lib/provider-quote");
+const {buildPortfolioValuation}=require("./lib/paper-portfolio-valuation");
+const {calculateDerivativePortfolio}=require("./lib/derivative-portfolio");
+const {validateDerivativeContract}=require("./lib/derivative-contract");
+const {parseMarginPreviewInput}=require("./lib/margin-preview-input");
+const {normalizeUpstoxMarginResponse}=require("./lib/upstox-margin");
 const {formatSseEvent,formatSseComment}=require("./lib/sse");
 const {fetchProviderWithTimeout}=require("./lib/provider-fetch");
 const {createSingleFlight}=require("./lib/single-flight");
@@ -312,6 +320,219 @@ app.put("/watchlist",async(req,res)=>{
     if(error)throw Object.assign(new Error("Watchlist could not be saved."),{status:503});
     res.set("Cache-Control","private, no-store").json({saved:true,name,count:keys.length,maxItems:50});
   }catch(error){sendError(res,error,"Watchlist could not be saved.");}
+});
+
+
+app.post("/paper/orders",async(req,res)=>{
+  try{
+    const {user}=await auth(req);
+    const instrumentKey=typeof req.body?.instrument_key==="string"?req.body.instrument_key:"";
+    const side=String(req.body?.side||"").toUpperCase();
+    const orderType=String(req.body?.order_type||"MARKET").toUpperCase();
+    const product=normalizeProductMode(req.body?.product);
+    const quantity=Number(req.body?.quantity);
+    const idempotencyKey=typeof req.body?.idempotency_key==="string"?req.body.idempotency_key:"";
+    if(!isUuid(idempotencyKey))return res.status(400).json({error:"A valid UUID idempotency_key is required."});
+    if(!instrumentKey||instrumentKey.length>100||/[\r\n]/.test(instrumentKey))return res.status(400).json({error:"A valid instrument_key is required."});
+    if(!["BUY","SELL"].includes(side))return res.status(400).json({error:"Only BUY and SELL paper orders are supported."});
+    if(!["MARKET","LIMIT"].includes(orderType))return res.status(400).json({error:"Only MARKET and LIMIT paper orders are supported."});
+    if(product===null)return res.status(400).json({error:"product must be DELIVERY or INTRADAY."});
+    if(orderType==="LIMIT"&&product==="INTRADAY")return res.status(400).json({error:"Intraday LIMIT orders are not enabled yet; use Delivery LIMIT or Intraday MARKET."});
+    if(!Number.isSafeInteger(quantity)||quantity<1||quantity>1000000)return res.status(400).json({error:"Quantity must be a whole number between 1 and 1,000,000."});
+    let limitPricePaise;
+    if(orderType==="LIMIT"){
+      limitPricePaise=req.body?.limit_price_paise!==undefined?Number(req.body.limit_price_paise):parseLimitPricePaise(req.body?.limit_price);
+      if(!Number.isSafeInteger(limitPricePaise)||limitPricePaise<1)return res.status(400).json({error:"LIMIT orders require a valid positive price in paise."});
+    }
+    if(!instrumentCache.length||Date.now()-instrumentCacheUpdatedAt>6*60*60*1000)await refreshInstrumentCache();
+    const instrument=instrumentCache.find(x=>x.instrument_key===instrumentKey&&x.instrument_type==="EQ"&&["NSE_EQ","BSE_EQ"].includes(x.segment));
+    if(!instrument)return res.status(400).json({error:"Select a verified NSE/BSE cash-equity instrument from the official instrument master."});
+    const orderId=makeOrderId(user.id,idempotencyKey);
+    const requestFingerprint=makeOrderFingerprint({instrumentKey,side,quantity,orderType,product,...(orderType==="LIMIT"?{limitPricePaise}:{})});
+    if(orderType==="LIMIT"){
+      const {normalizeTickSizePaise}=require("./lib/derivative-contract");
+      const tick=normalizeTickSizePaise(Number(instrument.tick_size));
+      if(!tick||limitPricePaise%tick!==0)return res.status(400).json({error:"LIMIT price must match the official instrument tick size."});
+      const result=await runtime.callUserRpc(user,"submit_paper_limit_order",{
+        p_order_id:orderId,p_idempotency_key:idempotencyKey,p_request_fingerprint:requestFingerprint,
+        p_instrument_key:instrumentKey,p_trading_symbol:instrument.trading_symbol||instrument.name,
+        p_exchange:instrument.exchange,p_side:side,p_quantity:quantity,p_limit_price_paise:limitPricePaise
+      });
+      res.set("Cache-Control","private, no-store");
+      return res.status(result?.idempotent_replay?200:201).json({
+        orderId:result?.order_id||orderId,status:result?.status||"PENDING",
+        quantity,side,product,orderType,limitPricePaise,
+        cashPaise:result?.cash_paise??null,reservedCashPaise:result?.reserved_cash_paise??null,
+        idempotentReplay:result?.idempotent_replay===true,simulationOnly:true
+      });
+    }
+    const {token}=await getUpstoxAccessToken(user.id);
+    const {quote}=await getQuote(token,instrumentKey);
+    const normalized=normalizeProviderQuote(quote,instrumentKey);
+    const result=await runtime.callUserRpc(user,"execute_paper_market_order",{
+      p_order_id:orderId,p_idempotency_key:idempotencyKey,p_request_fingerprint:requestFingerprint,
+      p_instrument_key:instrumentKey,p_trading_symbol:instrument.trading_symbol||instrument.name,
+      p_exchange:instrument.exchange,p_side:side,p_product:product,p_quantity:quantity,
+      p_execution_price_paise:normalized.pricePaise,p_quote_timestamp_ms:normalized.tradeTimeMs,
+      p_quote_age_ms:normalized.quoteAgeMs
+    });
+    res.set("Cache-Control","private, no-store");
+    res.status(result?.idempotent_replay?200:201).json({
+      orderId:result?.order_id||orderId,status:result?.status||"FILLED",side,product,orderType,
+      quantity,executionPricePaise:normalized.pricePaise,grossPaise:result?.gross_paise??null,
+      cashPaise:result?.cash_paise??null,realizedPnlPaise:result?.order_realized_pnl_paise??0,
+      idempotentReplay:result?.idempotent_replay===true,simulationOnly:true
+    });
+  }catch(error){sendError(res,error,"Paper order could not be completed.");}
+});
+app.post("/paper/orders/:orderId/cancel",async(req,res)=>{
+  try{
+    const {user}=await auth(req),orderId=String(req.params.orderId||"");
+    if(!/^[a-f0-9]{64}$/.test(orderId))return res.status(400).json({error:"Invalid paper order id."});
+    const result=await runtime.callUserRpc(user,"cancel_paper_limit_order",{p_order_id:orderId});
+    res.set("Cache-Control","private, no-store").json({orderId,status:result?.status||"CANCELLED",cashPaise:result?.cash_paise??null,reservedCashPaise:result?.reserved_cash_paise??null,simulationOnly:true});
+  }catch(error){sendError(res,error,"LIMIT order cancellation failed.");}
+});
+app.get("/paper/orders",async(req,res)=>{
+  try{
+    const {user,userDb}=await auth(req),raw=String(req.query.limit??"50");
+    if(!/^\d+$/.test(raw)||Number(raw)<1)return res.status(400).json({error:"Order history limit must be a whole number from 1 to 100."});
+    const limit=Math.min(Number(raw),100);
+    const {data,error}=await userDb.from("paper_orders").select("*").eq("user_id",user.id).order("created_at",{ascending:false}).limit(limit);
+    if(error)throw Object.assign(new Error("Paper order history could not be loaded."),{status:503});
+    const orders=(data||[]).map(o=>({id:o.order_id,tradingSymbol:o.trading_symbol,exchange:o.exchange,side:o.side,quantity:o.quantity,product:o.product,executionPricePaise:o.execution_price_paise,limitPricePaise:o.limit_price_paise,grossPaise:o.gross_paise,realizedPnlPaise:o.realized_pnl_paise,orderType:o.order_type,status:o.status,simulationOnly:true,createdAt:o.created_at?Date.parse(o.created_at):null}));
+    res.set("Cache-Control","private, no-store").json({orders,hasMore:false,nextCursor:null,simulationOnly:true});
+  }catch(error){sendError(res,error,"Paper order history could not be loaded.");}
+});
+app.get("/paper/portfolio",async(req,res)=>{
+  try{
+    const {user,userDb}=await auth(req),product=normalizeProductMode(req.query.product);
+    if(product===null)return res.status(400).json({error:"product must be DELIVERY or INTRADAY."});
+    const [{data:account,error:accountError},{data:rows,error:positionError}]=await Promise.all([
+      userDb.from("paper_accounts").select("*").eq("user_id",user.id).maybeSingle(),
+      userDb.from("paper_equity_positions").select("*").eq("user_id",user.id).eq("product",product)
+    ]);
+    if(accountError||!account)return res.status(404).json({error:"Indian paper account has not been initialized."});
+    if(positionError)throw Object.assign(new Error("Paper positions could not be loaded."),{status:503});
+    const positions=(rows||[]).map(p=>[p.instrument_key,{quantity:p.quantity,averagePricePaise:p.average_price_paise,costBasisPaise:p.cost_basis_paise}]).filter(([,p])=>p.quantity>0);
+    const realized=product==="INTRADAY"?(account.intraday_realized_pnl_paise||0):(account.delivery_realized_pnl_paise??account.realized_pnl_paise??0);
+    if(!positions.length)return res.set("Cache-Control","private, no-store").json({product,positions:[],cashPaise:account.cash_paise,marketValuePaise:0,unrealizedPnlPaise:0,equityPaise:account.cash_paise,realizedPnlPaise:realized,valuationStatus:"no_open_positions",stalePositions:0,simulationOnly:true});
+    if(positions.length>50)return res.status(409).json({error:"Portfolio contains more than 50 open positions; valuation stopped."});
+    const {token}=await getUpstoxAccessToken(user.id),keys=positions.map(([key])=>key);
+    const response=await fetchProvider("https://api.upstox.com/v3/market-quote/quotes?"+new URLSearchParams({instrument_key:keys.join(",")}),{headers:{Authorization:"Bearer "+token,Accept:"application/json"}});
+    const payload=await readProviderJson(response);
+    if(!response.ok)return res.status(502).json({error:"Portfolio market valuation could not be retrieved."});
+    const valuation=buildPortfolioValuation({positions,quotes:Object.values(payload?.data||{}),cashPaise:account.cash_paise,realizedPnlPaise:realized,instruments:instrumentCache,now:Date.now(),maxAgeMs:60000});
+    res.set("Cache-Control","private, no-store").json({...valuation,product});
+  }catch(error){sendError(res,error,"Portfolio valuation could not be loaded.");}
+});
+app.post("/paper/derivative/margin-preview",async(req,res)=>{
+  try{
+    const {user,userDb}=await auth(req),{instrumentKey,lots,side,product}=parseMarginPreviewInput(req.body);
+    const {token}=await getUpstoxAccessToken(user.id);
+    if(!instrumentCache.length||Date.now()-instrumentCacheUpdatedAt>6*60*60*1000)await refreshInstrumentCache();
+    const instrument=instrumentCache.find(x=>x.instrument_key===instrumentKey&&x.instrument_type==="FUT"&&["NSE_FO","BSE_FO"].includes(x.segment));
+    if(!instrument)return res.status(400).json({error:"Select a verified NSE/BSE futures contract from the official instrument master."});
+    const rate=await serviceDb.rpc("consume_paper_margin_preview_slot",{p_user_id:user.id,p_now_ms:Date.now(),p_min_interval_ms:5000});
+    if(rate.error||rate.data!==true)return res.status(429).set("Retry-After","5").json({error:"Please wait before requesting another broker margin preview."});
+    const {quote}=await getQuote(token,instrumentKey),normalized=normalizeProviderQuote(quote,instrumentKey,{maxAgeMs:15000});
+    const contract=validateDerivativeContract(instrument,{lots,pricePaise:normalized.pricePaise,now:Date.now()});
+    const upstream=await fetchProvider("https://api.upstox.com/v2/charges/margin",{
+      method:"POST",headers:{Authorization:"Bearer "+token,Accept:"application/json","Content-Type":"application/json"},
+      body:JSON.stringify({instruments:[{instrument_key:instrumentKey,quantity:contract.quantity,product,transaction_type:side,price:normalized.pricePaise/100}]})
+    });
+    const payload=await readProviderJson(upstream);
+    if(!upstream.ok)return res.status(502).json({error:"Upstox broker margin preview failed."});
+    const margin=normalizeUpstoxMarginResponse(payload,instrumentKey);
+    const {data:account,error}=await userDb.from("paper_accounts").select("cash_paise").eq("user_id",user.id).maybeSingle();
+    if(error||!account)return res.status(409).json({error:"Initialize your Paper Trading account before comparing margin."});
+    res.set("Cache-Control","private, no-store").json({
+      status:"PREVIEW_ONLY",tradingSymbol:instrument.trading_symbol,instrumentKey,exchange:instrument.exchange,
+      expiry:contract.expiry,side,product,lots,lotSize:contract.lotSize,quantity:contract.quantity,
+      quote:{pricePaise:normalized.pricePaise,observedAtMs:normalized.tradeTimeMs},
+      requiredMarginPaise:margin.requiredMarginPaise,finalMarginPaise:margin.finalMarginPaise,
+      marginComponents:margin.components,availableVirtualCashPaise:account.cash_paise,
+      shortfallPaise:Math.max(margin.requiredMarginPaise-account.cash_paise,0),
+      source:margin.source,simulationOnly:true,previewOnly:true,executionEnabled:false,persisted:false,marginReserved:false
+    });
+  }catch(error){sendError(res,error,"Futures margin preview could not be completed.");}
+});
+app.post("/paper/derivative/orders",async(req,res)=>{
+  try{
+    const {user}=await auth(req),instrumentKey=String(req.body?.instrument_key||"");
+    const lots=Number(req.body?.lots),side=String(req.body?.side||"").toUpperCase(),idempotencyKey=String(req.body?.idempotency_key||"");
+    if(!isUuid(idempotencyKey))return res.status(400).json({error:"A valid UUID idempotency_key is required."});
+    if(!["BUY","SELL"].includes(side))return res.status(400).json({error:"Only BUY and SELL to close existing long CE/PE positions are supported."});
+    if(!instrumentCache.length||Date.now()-instrumentCacheUpdatedAt>6*60*60*1000)await refreshInstrumentCache();
+    const instrument=instrumentCache.find(x=>x.instrument_key===instrumentKey&&["CE","PE"].includes(x.instrument_type)&&["NSE_FO","BSE_FO"].includes(x.segment));
+    if(!instrument)return res.status(400).json({error:"Select a verified NSE/BSE CE/PE contract from the official instrument master."});
+    const {token}=await getUpstoxAccessToken(user.id),{quote}=await getQuote(token,instrumentKey);
+    const normalized=normalizeProviderQuote(quote,instrumentKey,{maxAgeMs:15000});
+    const contract=validateDerivativeContract(instrument,{lots,pricePaise:normalized.pricePaise,now:Date.now()});
+    const orderId=makeOrderId(user.id,idempotencyKey),fingerprint=makeOrderFingerprint({instrumentKey,side,quantity:contract.quantity});
+    const result=await runtime.callUserRpc(user,"execute_paper_long_option_order",{
+      p_order_id:orderId,p_idempotency_key:idempotencyKey,p_request_fingerprint:fingerprint,
+      p_instrument_key:instrumentKey,p_trading_symbol:instrument.trading_symbol,p_exchange:instrument.exchange,
+      p_segment:instrument.segment,p_instrument_type:instrument.instrument_type,p_expiry:contract.expiry,
+      p_strike_price:instrument.strike_price,p_lot_size:contract.lotSize,p_tick_size_paise:contract.tickSizePaise,
+      p_lots:lots,p_side:side,p_execution_price_paise:normalized.pricePaise,
+      p_quote_timestamp_ms:normalized.tradeTimeMs,p_now_ms:Date.now()
+    });
+    const order=result?.order||{};
+    res.set("Cache-Control","private, no-store").status(result?.idempotent_replay?200:201).json({
+      orderId:result?.order_id||orderId,tradingSymbol:order.trading_symbol||instrument.trading_symbol,
+      instrumentKey,side,quantity:order.quantity??contract.quantity,lots,
+      executionPricePaise:order.execution_price_paise??normalized.pricePaise,
+      grossPaise:order.gross_paise??null,chargesPaise:order.charges_paise??0,
+      totalDebitPaise:order.total_debit_paise??null,netCreditPaise:order.net_credit_paise??null,
+      cashPaise:result?.cash_paise??null,realizedPnlPaise:result?.realized_pnl_paise??0,
+      idempotentReplay:result?.idempotent_replay===true,simulationOnly:true,excludesCharges:false
+    });
+  }catch(error){sendError(res,error,"Derivative paper order could not be completed.");}
+});
+app.get("/paper/derivative/orders",async(req,res)=>{
+  try{
+    const {user,userDb}=await auth(req),raw=String(req.query.limit??"50");
+    if(!/^\d+$/.test(raw)||Number(raw)<1)return res.status(400).json({error:"Derivative order history limit must be from 1 to 100."});
+    const {data,error}=await userDb.from("paper_derivative_orders").select("*").eq("user_id",user.id).order("created_at",{ascending:false}).limit(Math.min(Number(raw),100));
+    if(error)throw Object.assign(new Error("Derivative order history could not be loaded."),{status:503});
+    const orders=(data||[]).map(o=>({id:o.order_id,tradingSymbol:o.trading_symbol,instrumentKey:o.instrument_key,instrumentType:o.instrument_type,expiry:o.expiry,side:o.side,quantity:o.quantity,lots:o.lots,executionPricePaise:o.execution_price_paise,grossPaise:o.gross_paise,chargesPaise:o.charges_paise||0,totalDebitPaise:o.total_debit_paise??null,netCreditPaise:o.net_credit_paise??null,status:o.status,orderType:o.order_type,simulationOnly:true,createdAt:o.created_at?Date.parse(o.created_at):null}));
+    res.set("Cache-Control","private, no-store").json({orders,simulationOnly:true,excludesCharges:false});
+  }catch(error){sendError(res,error,"Derivative order history could not be loaded.");}
+});
+app.get("/paper/derivatives/portfolio",async(req,res)=>{
+  try{
+    const {user,userDb}=await auth(req);
+    const [{data:account,error:accountError},{data:rows,error:positionError}]=await Promise.all([
+      userDb.from("paper_accounts").select("cash_paise,realized_pnl_paise").eq("user_id",user.id).maybeSingle(),
+      userDb.from("paper_derivative_positions").select("*").eq("user_id",user.id)
+    ]);
+    if(accountError||!account)return res.status(404).json({error:"Indian paper account has not been initialized."});
+    if(positionError)throw Object.assign(new Error("Derivative positions could not be loaded."),{status:503});
+    const positions=(rows||[]).map(p=>({instrumentKey:p.instrument_key,instrumentType:p.instrument_type,netQuantity:p.net_quantity,averagePricePaise:p.average_price_paise,costBasisPaise:p.cost_basis_paise}));
+    if(!positions.length)return res.set("Cache-Control","private, no-store").json({positions:[],cashPaise:account.cash_paise,marketValuePaise:0,unrealizedPnlPaise:0,reservedMarginPaise:0,realizedPnlPaise:account.realized_pnl_paise||0,valuationStatus:"no_open_positions",simulationOnly:true,includesEntryCharges:true,excludesEstimatedExitCharges:true});
+    const {token}=await getUpstoxAccessToken(user.id),keys=positions.map(p=>p.instrumentKey);
+    const upstream=await fetchProvider("https://api.upstox.com/v3/market-quote/quotes?"+new URLSearchParams({instrument_key:keys.join(",")}),{headers:{Authorization:"Bearer "+token,Accept:"application/json"}});
+    const payload=await readProviderJson(upstream);
+    if(!upstream.ok)return res.status(502).json({error:"Derivative portfolio quotes could not be retrieved."});
+    const quotes=[];
+    for(const p of positions){
+      const entry=Object.values(payload?.data||{}).find(x=>x?.instrument_token===p.instrumentKey);
+      const q=normalizeProviderQuote(entry,p.instrumentKey,{maxAgeMs:15000});
+      quotes.push({instrumentKey:p.instrumentKey,pricePaise:q.pricePaise,observedAtMs:q.tradeTimeMs});
+    }
+    const valuation=calculateDerivativePortfolio({positions,quotes,now:Date.now()});
+    res.set("Cache-Control","private, no-store").json({...valuation,cashPaise:account.cash_paise,realizedPnlPaise:account.realized_pnl_paise||0,simulationOnly:true,includesEntryCharges:true,excludesEstimatedExitCharges:true});
+  }catch(error){sendError(res,error,"Derivative portfolio valuation could not be loaded.");}
+});
+app.get("/paper/investing/account",async(req,res)=>{
+  try{
+    const {user,userDb}=await auth(req);
+    const initialized=await runtime.callUserRpc(user,"initialize_paper_investing_account",{});
+    const {data,error}=await userDb.from("paper_investing_accounts").select("*").eq("user_id",user.id).maybeSingle();
+    if(error||!data)return res.status(409).json({error:"Paper Investing account could not be initialized or read."});
+    res.set("Cache-Control","private, no-store").json({cashPaise:data.cash_paise,startingCashPaise:data.starting_cash_paise,reservedCashPaise:data.reserved_cash_paise,realizedPnlPaise:data.realized_pnl_paise,version:data.version,created:initialized?.created===true,simulationOnly:true});
+  }catch(error){sendError(res,error,"Paper Investing account could not be loaded.");}
 });
 
 app.post("/stream",async(req,res)=>{
