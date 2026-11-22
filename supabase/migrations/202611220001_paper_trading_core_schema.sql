@@ -90,7 +90,9 @@ create table if not exists public.paper_orders (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   constraint paper_limit_order_requires_price
-    check (order_type <> 'LIMIT' or limit_price_paise is not null)
+    check (order_type <> 'LIMIT' or limit_price_paise is not null),
+  constraint paper_intraday_limit_not_enabled
+    check (order_type <> 'LIMIT' or product = 'DELIVERY')
 );
 
 create table if not exists public.paper_derivative_orders (
@@ -158,8 +160,8 @@ create table if not exists public.upstox_oauth_states (
 create table if not exists public.paper_market_stream_leases (
   user_id uuid primary key references auth.users(id) on delete cascade,
   lease_id uuid not null,
-  expires_at timestamptz not null,
-  updated_at timestamptz not null default now()
+  expires_at_ms bigint not null check (expires_at_ms >= 0),
+  updated_at_ms bigint not null check (updated_at_ms >= 0)
 );
 
 create table if not exists public.paper_margin_preview_limits (
@@ -185,7 +187,7 @@ create index if not exists paper_derivative_positions_user_idx
 create index if not exists upstox_oauth_states_expiry_idx
   on public.upstox_oauth_states (expires_at);
 create index if not exists paper_market_stream_leases_expiry_idx
-  on public.paper_market_stream_leases (expires_at);
+  on public.paper_market_stream_leases (expires_at_ms);
 
 -- Enable RLS on all user-owned data. Trading writes are server-only.
 alter table public.paper_user_identity_map enable row level security;
