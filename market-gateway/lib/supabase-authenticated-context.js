@@ -16,6 +16,13 @@ async function authenticateSupabaseRequest(req, { firebaseAuth, supabaseClient }
 
   const decoded = await authenticateFirebaseRequest(req, firebaseAuth);
   const firebaseUid = decoded?.uid;
+  if (typeof firebaseUid !== "string" || firebaseUid.length < 1 ||
+      firebaseUid.length > 128 || firebaseUid.trim().length === 0) {
+    throw Object.assign(new Error("A valid Firebase user identity is required."), {
+      status: 401,
+      code: "FIREBASE_IDENTITY_INVALID"
+    });
+  }
   const supabaseUserId = await supabaseClient.resolveFirebaseUid(firebaseUid);
 
   return Object.freeze({ firebaseUid, supabaseUserId });
