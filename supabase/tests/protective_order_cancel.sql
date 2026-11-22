@@ -39,6 +39,15 @@ BEGIN
   END IF;
   BEGIN
     PERFORM public.create_paper_equity_protective_order(
+      'cfcfcfcf-cece-4ece-8ece-cececececece','11111111-1111-4111-8111-111111111111',
+      'NSE_EQ|CREATE_TEST','DELIVERY','TARGET',11000,1
+    );
+    RAISE EXCEPTION 'Second live protective exit for the same equity position was accepted';
+  EXCEPTION WHEN unique_violation THEN
+    NULL;
+  END;
+  BEGIN
+    PERFORM public.create_paper_equity_protective_order(
       'cfcccccc-cece-4ece-8ece-cececececece','11111111-1111-4111-8111-111111111111',
       'NSE_EQ|CREATE_TEST','DELIVERY','STOP_LOSS',8500,9
     );
