@@ -5,7 +5,7 @@
 
 create table if not exists public.paper_crypto_accounts (
   user_id uuid primary key references auth.users(id) on delete cascade,
-  currency text not null default 'USDT' check (currency = 'USDT'),
+  currency text not null default 'INR' check (currency = 'INR'),
   starting_cash numeric(24,8) not null check (starting_cash > 0),
   cash_balance numeric(24,8) not null check (cash_balance >= 0),
   reserved_cash numeric(24,8) not null default 0 check (reserved_cash >= 0),
@@ -41,6 +41,7 @@ create table if not exists public.paper_crypto_orders (
   quantity numeric(30,12) not null check (quantity > 0),
   limit_price numeric(24,8) check (limit_price is null or limit_price > 0),
   execution_price numeric(24,8) check (execution_price is null or execution_price > 0),
+  fx_rate_inr numeric(24,8) check (fx_rate_inr is null or fx_rate_inr > 0),
   gross_value numeric(24,8) check (gross_value is null or gross_value >= 0),
   fee numeric(24,8) not null default 0 check (fee >= 0),
   realized_pnl numeric(24,8) not null default 0,
@@ -59,7 +60,7 @@ create table if not exists public.paper_crypto_ledger (
   user_id uuid not null references auth.users(id) on delete cascade,
   order_id uuid not null references public.paper_crypto_orders(order_id) on delete restrict,
   entry_type text not null check (entry_type in ('BUY','SELL','FEE')),
-  currency text not null check (currency = 'USDT'),
+  currency text not null check (currency = 'INR'),
   amount numeric(24,8) not null,
   balance_before numeric(24,8) not null check (balance_before >= 0),
   balance_after numeric(24,8) not null check (balance_after >= 0),
@@ -100,7 +101,7 @@ grant usage, select on sequence public.paper_crypto_ledger_ledger_id_seq to serv
 
 create or replace function public.initialize_paper_crypto_account(
   p_user_id uuid,
-  p_starting_cash_usdt numeric
+  p_starting_cash_inr numeric
 ) returns jsonb
 language plpgsql
 security definer
@@ -109,13 +110,13 @@ as $$
 declare
   v_account public.paper_crypto_accounts%rowtype;
 begin
-  if p_user_id is null or p_starting_cash_usdt is null
-     or p_starting_cash_usdt <= 0 or p_starting_cash_usdt > 1000000000000 then
+  if p_user_id is null or p_starting_cash_inr is null
+     or p_starting_cash_inr <= 0 or p_starting_cash_inr > 1000000000 then
     raise exception 'Invalid crypto account initialization input.' using errcode = '22023';
   end if;
 
   insert into public.paper_crypto_accounts(user_id, starting_cash, cash_balance)
-  values (p_user_id, p_starting_cash_usdt, p_starting_cash_usdt)
+  values (p_user_id, p_starting_cash_inr, p_starting_cash_inr)
   on conflict (user_id) do nothing;
 
   select * into strict v_account
@@ -141,6 +142,7 @@ create or replace function public.execute_paper_crypto_market_order(
   p_side text,
   p_quantity numeric,
   p_execution_price numeric,
+  p_fx_rate_inr numeric,
   p_fee numeric,
   p_quote_timestamp_ms bigint
 ) returns jsonb
@@ -169,10 +171,11 @@ begin
      or p_request_fingerprint is null or p_request_fingerprint !~ '^[a-f0-9]{64}$'
      or p_symbol is null or p_symbol !~ '^[A-Z0-9]{2,20}USDT$'
      or p_base_asset is null or p_base_asset !~ '^[A-Z0-9]{2,12}$'
-     or p_symbol <> (p_base_asset || 'USDT')
+     or p_symbol <> (p_base_asset || 'INR')
      or p_side is null or p_side not in ('BUY','SELL')
      or p_quantity is null or p_quantity <= 0 or p_quantity > 1000000000
      or p_execution_price is null or p_execution_price <= 0 or p_execution_price > 1000000000
+     or p_fx_rate_inr is null or p_fx_rate_inr <= 0 or p_fx_rate_inr > 1000000
      or p_fee is null or p_fee < 0 or p_fee > 1000000000
      or p_quote_timestamp_ms is null or p_quote_timestamp_ms < 0 then
     raise exception 'Invalid crypto market order input.' using errcode = '22023';
@@ -184,7 +187,7 @@ begin
     raise exception 'A fresh verified crypto quote is required.' using errcode = '22023';
   end if;
 
-  v_gross := round(p_quantity * p_execution_price, 8);
+  v_gross := round(p_quantity * p_execution_price * p_fx_rate_inr, 8);
   if v_gross <= 0 or v_gross > 1000000000000 then
     raise exception 'Crypto order value is outside supported limits.' using errcode = '22003';
   end if;
@@ -213,11 +216,11 @@ begin
 
   insert into public.paper_crypto_orders(
     order_id,user_id,idempotency_key,request_fingerprint,symbol,base_asset,
-    side,order_type,status,quantity,execution_price,gross_value,fee,
+    side,order_type,status,quantity,execution_price,fx_rate_inr,gross_value,fee,
     quote_timestamp_ms,quote_age_ms,simulation_only,filled_at
   ) values (
     p_order_id,p_user_id,p_idempotency_key,p_request_fingerprint,p_symbol,p_base_asset,
-    p_side,'MARKET','FILLED',p_quantity,p_execution_price,v_gross,p_fee,
+    p_side,'MARKET','FILLED',p_quantity,p_execution_price,p_fx_rate_inr,v_gross,p_fee,
     p_quote_timestamp_ms,v_quote_age,true,now()
   ) returning * into v_order;
 
@@ -291,11 +294,11 @@ end;
 $$;
 
 revoke all on function public.initialize_paper_crypto_account(uuid,numeric) from public, anon, authenticated;
-revoke all on function public.execute_paper_crypto_market_order(uuid,uuid,uuid,text,text,text,text,numeric,numeric,numeric,bigint) from public, anon, authenticated;
+revoke all on function public.execute_paper_crypto_market_order(uuid,uuid,uuid,text,text,text,text,numeric,numeric,numeric,numeric,bigint) from public, anon, authenticated;
 grant execute on function public.initialize_paper_crypto_account(uuid,numeric) to service_role;
 grant execute on function public.execute_paper_crypto_market_order(uuid,uuid,uuid,text,text,text,text,numeric,numeric,numeric,bigint) to service_role;
 
-comment on table public.paper_crypto_accounts is 'Isolated USDT-denominated simulated crypto cash accounts; no live exchange funds.';
+comment on table public.paper_crypto_accounts is 'INR-denominated simulated crypto cash accounts; crypto pairs are converted using a recorded USD/INR reference rate; no live exchange funds.';
 comment on table public.paper_crypto_positions is 'User-owned simulated spot crypto positions.';
 comment on table public.paper_crypto_orders is 'Immutable-intent simulated crypto spot order history; market execution only in initial RPC.';
 comment on table public.paper_crypto_ledger is 'Append-only cash movement ledger for simulated crypto orders.';
