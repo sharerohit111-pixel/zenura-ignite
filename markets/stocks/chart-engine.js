@@ -336,6 +336,8 @@
   }
   function addIndicator(name){
     if(!chart||!name)return false;
+    if(activeIndicators.has(name))return true;
+    if(activeIndicators.size>=20){console.warn("Chart indicator limit reached; remove an indicator before adding another.");return false;}
     try{chart.createIndicator(name);activeIndicators.add(name);savePreferences().catch(()=>{});return true;}
     catch(error){console.warn("Indicator could not be added:",error);return false;}
   }
