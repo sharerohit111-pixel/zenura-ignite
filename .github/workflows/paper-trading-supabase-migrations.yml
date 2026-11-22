@@ -6,6 +6,7 @@ on:
       - "supabase/migrations/**"
       - ".github/workflows/paper-trading-supabase-migrations.yml"
       - "market-gateway/test/trading-charges.test.js"
+      - "market-gateway/test/derivative-order-transaction.test.js"
   workflow_dispatch:
 
 jobs:
@@ -35,6 +36,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Run Firebase reference charge-calculation boundary tests
         run: node --test market-gateway/test/trading-charges.test.js
+      - name: Run Firebase reference option transaction tests
+        run: node --test market-gateway/test/derivative-order-transaction.test.js
       - name: Prepare minimal Supabase-compatible auth roles
         run: |
           psql -v ON_ERROR_STOP=1 <<'SQL'
