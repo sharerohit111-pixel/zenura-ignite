@@ -166,10 +166,10 @@
       const response=await fetch(gateway+'/paper/orders?'+params.toString(),{headers:{Authorization:'Bearer '+token,Accept:'application/json'}});
       const data=await response.json();if(seq!==paperHistoryLoadSeq||connector.getUserId()!==uid)return;if(!response.ok)throw new Error(data.error||'Order history unavailable');
       if(!append)paperHistory.textContent='';
-      if(!data.orders?.length&&!append)tableMessage(paperHistory,8,'No paper orders yet.');
+      if(!data.orders?.length&&!append)tableMessage(paperHistory,10,'No paper orders yet.');
       else data.orders.forEach(order=>{
         const tr=document.createElement('tr'),date=order.createdAt?new Date(order.createdAt).toLocaleString('en-IN'):'—';
-        [date,order.tradingSymbol,order.product==='INTRADAY'?'INTRADAY':'DELIVERY',order.side,order.orderType||'MARKET',order.quantity,Number.isSafeInteger(order.executionPricePaise)?inrPaise(order.executionPricePaise):'—',order.status+' · SIM'].forEach(v=>{const td=document.createElement('td');td.textContent=String(v);tr.append(td);});
+        [date,order.tradingSymbol,order.product==='INTRADAY'?'INTRADAY':'DELIVERY',order.side,order.orderType||'MARKET',order.quantity,Number.isSafeInteger(order.executionPricePaise)?inrPaise(order.executionPricePaise):'—',order.chargesBreakdown?.schedule_version?inrPaise(order.chargesPaise):'—',Number.isSafeInteger(order.realizedPnlPaise)?signedMoney(order.realizedPnlPaise):'—',order.status+' · SIM'].forEach(v=>{const td=document.createElement('td');td.textContent=String(v);tr.append(td);});
         paperHistory.append(tr);
       });
       paperHistoryCursor=data.nextCursor||null;
