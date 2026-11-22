@@ -47,6 +47,9 @@ INSERT INTO public.paper_equity_positions(
 ) VALUES (
   '11111111-1111-4111-8111-111111111111','DELIVERY','NSE_EQ|PROTECTIVE_RACE',
   'PROTECTIVE_RACE','NSE',5,9000,45000,0
+),(
+  '11111111-1111-4111-8111-111111111111','DELIVERY','NSE_EQ|PROTECTIVE_RACE_CANCEL',
+  'PROTECTIVE_RACE_CANCEL','NSE',5,9000,45000,0
 );
 INSERT INTO public.paper_protective_orders(
   order_id,user_id,asset_class,instrument_key,product,side,
@@ -144,5 +147,5 @@ DELETE FROM public.paper_protective_orders
 DELETE FROM public.paper_orders WHERE order_id IN (repeat('a',64),repeat('c',64));
 DELETE FROM public.paper_equity_positions
  WHERE user_id='11111111-1111-4111-8111-111111111111'
-   AND product='DELIVERY' AND instrument_key='NSE_EQ|PROTECTIVE_RACE';
+   AND product='DELIVERY' AND instrument_key IN ('NSE_EQ|PROTECTIVE_RACE','NSE_EQ|PROTECTIVE_RACE_CANCEL');
 SQL
