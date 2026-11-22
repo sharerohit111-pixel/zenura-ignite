@@ -158,7 +158,7 @@ async function executeLongOptionTransaction({
       uid,requestFingerprint,instrumentKey:contract.instrumentKey,
       tradingSymbol:instrument.trading_symbol,exchange:contract.exchange,
       segment:contract.segment,instrumentType:contract.instrumentType,
-      expiry:contract.expiry,side,quantity:contract.quantity,lots,
+      expiry:contract.expiry,strikePrice:instrument.strike_price,side,quantity:contract.quantity,lots,
       lotSize:contract.lotSize,executionPricePaise:quote.pricePaise,
       quoteTimestampMs:quote.observedAtMs,quoteAgeMs:now-quote.observedAtMs,
       grossPaise:contract.contractValuePaise,charges,chargesPaise:charges.totalChargesPaise,totalDebitPaise:charges.totalDebitPaise,netCreditPaise:charges.netCreditPaise,orderType:"MARKET",

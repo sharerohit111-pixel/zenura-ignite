@@ -535,6 +535,9 @@ jobs:
                OR (v_result->>'idempotent_replay')::boolean IS NOT FALSE THEN
               RAISE EXCEPTION 'Long CE BUY quantity, fee-inclusive basis, average or cash is incorrect';
             END IF;
+            IF (SELECT strike_price FROM public.paper_derivative_orders WHERE order_id=repeat('9',64)) <> 22000 THEN
+              RAISE EXCEPTION 'Option strike price was not preserved in immutable derivative order history';
+            END IF;
             -- Retry must not execute or charge a second time.
             v_result := public.execute_paper_long_option_order(
               '22222222-2222-4222-8222-222222222222',
