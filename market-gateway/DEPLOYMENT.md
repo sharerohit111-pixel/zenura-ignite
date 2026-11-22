@@ -89,6 +89,25 @@ gcloud run deploy zenura-market-gateway \
 
 Create the Artifact Registry repository only once; if it already exists, skip that command. The GitHub Actions deployment workflow uses Workload Identity Federation and expects the matching repository secrets and variables listed in the workflow. It performs the image build, Cloud Run deployment, liveness probe and frontend gateway URL update. It is manual-dispatch only and does not deploy on every commit.
 
+### GitHub deployment configuration
+
+The workflow is restricted to manual dispatch from the protected `main` branch. Configure these GitHub Actions **secrets**:
+
+- `GCP_PROJECT_ID`: dedicated Google Cloud project ID.
+- `GCP_SERVICE_ACCOUNT`: deployer service account email.
+- `GCP_WORKLOAD_IDENTITY_PROVIDER`: full Workload Identity Provider resource name.
+
+Configure these GitHub Actions **variables**:
+
+- `MARKET_GATEWAY_URL`: verified HTTPS origin mapped to Cloud Run (no trailing slash).
+- `FRONTEND_ORIGIN`: exact HTTPS frontend origin (no trailing slash).
+- `UPSTOX_REDIRECT_URI`: exactly `MARKET_GATEWAY_URL/upstox/oauth/callback`.
+- `ZENURA_APP_REDIRECT_URI`: exactly `FRONTEND_ORIGIN/markets/stocks/`.
+
+The deployer identity needs Artifact Registry Writer, Cloud Run Admin and Service Account User on the runtime identity. Bind the GitHub OIDC principal to the deployer service account with a repository and branch condition limited to `sharerohit111-pixel/zenura-ignite` on `main`. The runtime service account needs Secret Manager Secret Accessor only on the four named secrets.
+
+The workflow deliberately uses one warm Cloud Run instance (2 vCPU / 2 GiB) for responsive market streaming. This creates ongoing Google Cloud charges. Keep the workflow manual, configure a billing budget/alert, and do not run it until the project, secrets, callback URL, DNS and billing are ready. The workflow checks its configuration and Secret Manager entries before building or deploying.
+
 
 For a responsive chart/quote experience, the reference deployment keeps one warm gateway instance, gives it 2 vCPU/2 GiB, allows bounded concurrency and sets a 60-minute request timeout for SSE streams. This has ongoing Cloud Run cost; configure a billing budget and alert, and tune max instances against Upstox account-wide stream limits.
 
