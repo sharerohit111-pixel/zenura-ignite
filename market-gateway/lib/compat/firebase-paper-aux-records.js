@@ -24,9 +24,11 @@ function normalizeFirebaseLimitOrder(args){
  const reservedCash=o.reservedCashPaise??0,reservedQty=o.reservedQuantity??0;
  if(!Number.isSafeInteger(reservedCash)||reservedCash<0||!Number.isSafeInteger(reservedQty)||reservedQty<0)
    fail("Malformed LIMIT reservation metadata.");
- if(o.side==="BUY"&&(reservedQty!==0||reservedCash!==(o.status==="PENDING"&&!o.reservationReleased?expected:0)))
+ if(o.side==="BUY"&&(reservedQty!==0||(reservedCash!==0&&reservedCash!==expected)||
+   (o.status==="PENDING"&&!o.reservationReleased&&reservedCash!==expected)))
    fail("BUY LIMIT reservation does not reconcile with its lifecycle state.");
- if(o.side==="SELL"&&(reservedCash!==0||reservedQty!==(o.status==="PENDING"&&!o.reservationReleased?o.quantity:0)))
+ if(o.side==="SELL"&&(reservedCash!==0||(reservedQty!==0&&reservedQty!==o.quantity)||
+   (o.status==="PENDING"&&!o.reservationReleased&&reservedQty!==o.quantity)))
    fail("SELL LIMIT reservation does not reconcile with its lifecycle state.");
  return {...identity,legacyIdempotencyKey:null,order:structuredClone(o)};
 }
