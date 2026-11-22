@@ -93,6 +93,22 @@ BEGIN
     RAISE EXCEPTION 'Intraday SELL fee-inclusive cash or realized P&L mismatch';
   END IF;
 
+  -- Tiny NSE SELLs whose minimum brokerage exceeds gross proceeds must fail closed.
+  BEGIN
+    PERFORM public.execute_paper_market_order(
+      '55555555-5555-4555-8555-555555555555',repeat('9',64),
+      '99999999-5555-4555-8555-555555555555',repeat('8',64),
+      'NSE_EQ|FEE_DELIVERY','FEEDEL','NSE','SELL','DELIVERY',1,1,
+      floor(extract(epoch from clock_timestamp())*1000)::bigint,0
+    );
+    RAISE EXCEPTION 'Tiny NSE SELL with negative net proceeds was accepted';
+  EXCEPTION WHEN SQLSTATE '22003' THEN
+    NULL;
+  END;
+  IF EXISTS(SELECT 1 FROM public.paper_orders WHERE order_id=repeat('9',64)) THEN
+    RAISE EXCEPTION 'Rejected tiny NSE SELL left a persisted order row';
+  END IF;
+
   -- Unsupported BSE cash scrip fee classification is rejected before any mutation.
   BEGIN
     PERFORM public.execute_paper_market_order(
