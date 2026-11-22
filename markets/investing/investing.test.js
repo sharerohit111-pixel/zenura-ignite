@@ -40,6 +40,14 @@ test("Paper Investing client uses authenticated Supabase session and idempotent 
  assert.match(js,/\/paper\/investing\/orders/);assert.match(js,/ZenuraProfessionalChart\.mount/);
  assert.doesNotMatch(js,/firebase/i);
 });
+test("Paper Investing clears private state and rejects late responses after account changes",()=>{
+ assert.match(js,/function clearPrivateSession\(\)/);
+ assert.match(js,/dataRequestSeq\+\+/);
+ assert.match(js,/c\.getUserId\(\)!==uid/);
+ assert.match(js,/if\(connector\(\)\?\.getUserId\?\.\(\)===uid\)/);
+ assert.match(js,/positionsBody\.replaceChildren\(\)/);
+ assert.match(js,/ordersBody\.replaceChildren\(\)/);
+});
 test("Paper Investing server routes and SQL ledger are independent from Paper Trading",()=>{
  for(const route of ['"/paper/investing/account"','"/paper/investing/portfolio"','"/paper/investing/orders"'])
   assert.ok(gateway.includes(route),"Missing gateway route "+route);
