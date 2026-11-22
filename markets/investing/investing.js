@@ -9,7 +9,7 @@
   const positionsBody=$("investing-positions"),ordersBody=$("investing-orders");
   const timeframeButtons=[...document.querySelectorAll("#chart-timeframes [data-timeframe]")];
   let selected=null,activeTimeframe="5m",searchSequence=0,searchTimer=null,streamAbort=null,reconnectTimer=null,staleTimer=null,reconnectAttempt=0,lastQuote=null;
-  let authUserId=null,watchlistItems=[],streamSequence=0;
+  let authUserId=null,watchlistItems=[],streamSequence=0,dataRequestSeq=0;
   const pendingKey="zenura-paper-investing-order-v1";
   function fmt(value){return "₹"+(Number(value||0)/100).toLocaleString("en-IN",{minimumFractionDigits:2,maximumFractionDigits:2});}
   function safeText(el,value){if(el)el.textContent=value==null?"":String(value);}
@@ -21,9 +21,13 @@
   }
   async function api(path,options={}){
     if(!gateway)throw new Error("Market gateway URL is not configured yet.");
+    const c=connector(),uid=c?.getUserId?.();
+    if(!uid)throw new Error("Sign in to continue.");
     const headers=await authHeaders();
+    if(c.getUserId()!==uid)throw new Error("Account changed during the request. Sign in again.");
     const response=await fetch(gateway+path,{...options,headers:{...headers,...(options.body?{"Content-Type":"application/json"}:{}),...(options.headers||{})},cache:"no-store",signal:AbortSignal.timeout(20000)});
     const data=await response.json().catch(()=>({}));
+    if(c.getUserId()!==uid)throw new Error("Account changed during the request. Sign in again.");
     if(!response.ok){const error=new Error(data.error||"Market service request failed ("+response.status+").");error.status=response.status;throw error;}
     return data;
   }
@@ -50,7 +54,8 @@
     }catch(error){if(sequence===searchSequence)renderSearch([],error.message);}
   }
   async function loadWatchlist(){
-    if(!connector()?.getUserId?.()){watchlistBox.textContent="Sign in to load your watchlist.";return;}
+    const uid=connector()?.getUserId?.();
+    if(!uid){watchlistBox.textContent="Sign in to load your watchlist.";return;}
     try{
       const payload=await api("/watchlist?name=My%20Stocks");
       watchlistItems=payload.items||[];
@@ -65,17 +70,18 @@
         price.textContent=quote?.lastPrice!=null?fmt(Math.round(quote.lastPrice*100)):"—";
         row.append(label,price);row.addEventListener("click",()=>selectInstrument(item));watchlistBox.append(row);
       }
-    }catch(error){watchlistBox.textContent=error.message||"Watchlist could not be loaded.";}
+    }catch(error){if(connector()?.getUserId?.()===uid)watchlistBox.textContent=error.message||"Watchlist could not be loaded.";}
   }
   async function addToWatchlist(){
     if(!selected)return;
+    const uid=connector()?.getUserId?.();if(!uid)return;
     try{
       const current=watchlistItems.map(x=>x.instrument_key);
       if(current.includes(selected.instrument_key)){orderStatus.textContent="This stock is already in your watchlist.";return;}
       if(current.length>=50)throw new Error("Watchlist limit is 50 stocks.");
       await api("/watchlist",{method:"PUT",body:JSON.stringify({name:"My Stocks",instrumentKeys:[...current,selected.instrument_key]})});
       await loadWatchlist();orderStatus.textContent="Added to your saved watchlist.";
-    }catch(error){orderStatus.textContent=error.message;}
+    }catch(error){if(connector()?.getUserId?.()===uid)orderStatus.textContent=error.message;}
   }
   async function loadAccount(){
     const data=await api("/paper/investing/account");
@@ -112,10 +118,16 @@
     safeText($("investing-orders-status"),(data.orders||[]).length+" latest orders");
   }
   async function refreshAll(){
-    if(!connector()?.getUserId?.())return;
+    const uid=connector()?.getUserId?.();if(!uid)return;
+    const request=++dataRequestSeq;
     safeText($("investing-portfolio-status"),"Refreshing private Paper Investing ledger…");
-    try{await loadAccount();await Promise.all([loadPortfolio(),loadOrders(),loadWatchlist()]);}
-    catch(error){safeText($("investing-portfolio-status"),error.message||"Investing data could not be refreshed.");}
+    try{
+      await loadAccount();await Promise.all([loadPortfolio(),loadOrders(),loadWatchlist()]);
+      if(request!==dataRequestSeq||connector()?.getUserId?.()!==uid)return;
+    }catch(error){
+      if(request===dataRequestSeq&&connector()?.getUserId?.()===uid)
+        safeText($("investing-portfolio-status"),error.message||"Investing data could not be refreshed.");
+    }
   }
   function updateOrderButtons(){
     const ready=!!selected&&!!lastQuote&&!!connector()?.getUserId?.()&&!streamAbort?.signal.aborted;
@@ -217,7 +229,7 @@
       await refreshAll();
     }catch(error){
       if([400,401,403,404,422].includes(error.status)){try{sessionStorage.removeItem(pendingKey);}catch(_){}}
-      safeText(orderStatus,error.message||"Paper Investing order failed.");
+      if(connector()?.getUserId?.()===uid)safeText(orderStatus,error.message||"Paper Investing order failed.");
     }
     finally{updateOrderButtons();}
   }
@@ -233,10 +245,27 @@
   }));
   const addWatchlist=document.createElement("button");addWatchlist.type="button";addWatchlist.textContent="ADD TO WATCHLIST";addWatchlist.className="investing-add-watchlist";
   $("investing-symbol-sub").after(addWatchlist);addWatchlist.addEventListener("click",addToWatchlist);
+  function clearPrivateSession(){
+    dataRequestSeq++;authUserId=null;watchlistItems=[];clearStream();lastQuote=null;selected=null;
+    window.ZenuraProfessionalChart?.destroy();
+    safeText(symbolTitle,"No stock selected");safeText(symbolSub,"Sign in to load market data");
+    safeText(livePrice,"—");safeText($("investing-reference-price"),"—");
+    safeText($("investing-cash"),"—");safeText($("investing-starting-cash"),"—");
+    safeText($("investing-market-value"),"—");safeText($("investing-unrealized"),"—");
+    safeText($("investing-equity"),"—");safeText($("investing-portfolio-status"),"Sign in to view your private investing portfolio.");
+    safeText($("investing-orders-status"),"Sign in required");safeText(chartStatus,"Sign in to load the professional chart");
+    safeText(orderStatus,"Sign in to use Paper Investing.");
+    positionsBody.replaceChildren();ordersBody.replaceChildren();
+    const p=document.createElement("tr"),pd=document.createElement("td");pd.colSpan=6;pd.textContent="Sign in to view private holdings.";p.append(pd);positionsBody.append(p);
+    const o=document.createElement("tr"),od=document.createElement("td");od.colSpan=7;od.textContent="Sign in to view private order history.";o.append(od);ordersBody.append(o);
+    watchlistBox.textContent="Sign in to load your private watchlist.";
+    updateOrderButtons();
+  }
   window.addEventListener("zenura-market-auth-ready",event=>{
-    const signedIn=!!event.detail?.signedIn;
-    if(!signedIn){authUserId=null;clearStream();lastQuote=null;selected=null;window.ZenuraProfessionalChart?.destroy();updateOrderButtons();watchlistBox.textContent="Sign in to load your watchlist.";return;}
-    const uid=connector()?.getUserId?.();if(uid&&uid!==authUserId){authUserId=uid;refreshAll();}
+    clearPrivateSession();
+    if(!event.detail?.signedIn)return;
+    const uid=connector()?.getUserId?.();
+    if(uid){authUserId=uid;refreshAll();}
   });
   let language="en";
   $("paper-language-toggle").addEventListener("click",()=>{
