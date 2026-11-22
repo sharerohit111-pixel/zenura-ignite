@@ -73,11 +73,10 @@ test("Manual production deployment keeps the leased LIMIT worker active in the g
 
 test("Protective-order cancellation API is authenticated and delegates to the owner-bound RPC",()=>{
  assert.match(server,/app\.post\("\/paper\/protective-orders\/:orderId\/cancel"/);
- assert.match(server,/runtime\.callUserRpc\(user,"cancel_paper_protective_order"/);
+ assert.match(server,/userDb\.rpc\("cancel_paper_protective_order"/);
+ assert.match(server,/p_user_id:user\.id/);
  assert.match(server,/idempotentReplay:result\?\.idempotent_replay===true/);
- const runtime=fs.readFileSync(path.join(root,"lib/supabase-runtime.js"),"utf8");
- assert.match(runtime,/"cancel_paper_protective_order"/);
- assert.match(runtime,/p_user_id: user\.id/);
+
 });
 test("Equity protective worker is separately leased, bounded, quote-verified and opt-in only",()=>{
  assert.match(server,/async function runPaperProtectiveWorker\(\{maxOrders=20\}=\{\}\)/);
