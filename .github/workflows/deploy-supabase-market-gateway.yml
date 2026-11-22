@@ -101,7 +101,7 @@ jobs:
         run: |
           set -euo pipefail
           for attempt in {1..12}; do
-            if curl --fail --silent --show-error "$MARKET_GATEWAY_URL/health" | jq -e '.ok and .limitWorker.enabled' >/dev/null; then
+            if curl --fail --silent --show-error "$MARKET_GATEWAY_URL/health" | jq -e '.ok and .instrumentMasterLoaded and .limitWorker.enabled and .limitWorker.lastRunAt != null and .limitWorker.lastCycle.failed == 0' >/dev/null; then
               echo "Gateway health and Paper LIMIT worker are ready."
               exit 0
             fi
