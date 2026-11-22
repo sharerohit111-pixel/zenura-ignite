@@ -29,6 +29,9 @@ on:
       - "market-gateway/lib/bse-equity-fee-master.js"
       - "market-gateway/test/bse-equity-fee-master.test.js"
       - "market-gateway/scripts/import-bse-scrip-master.js"
+      - "market-gateway/lib/exchange-session-import.js"
+      - "market-gateway/test/exchange-session-import.test.js"
+      - "market-gateway/scripts/import-exchange-sessions.js"
       - "market-gateway/test/trading-charges.test.js"
       - "market-gateway/test/derivative-order-transaction.test.js"
       - "market-gateway/test/derivative-contract.test.js"
@@ -175,6 +178,8 @@ jobs:
           done
       - name: Exercise BSE scrip master import and group-specific fee rules
         run: psql -v ON_ERROR_STOP=1 -f supabase/tests/bse_equity_fee_master.sql
+      - name: Exercise verified NSE and BSE session calendar imports
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/exchange_session_import.sql
       - name: Verify Supabase market worker single-writer lease and expiry
         run: |
           psql -v ON_ERROR_STOP=1 <<'SQL'
