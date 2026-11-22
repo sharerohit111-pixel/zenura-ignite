@@ -232,3 +232,65 @@ comment on function public.create_paper_crypto_limit_order(uuid,uuid,uuid,text,t
   is 'Creates a simulated crypto LIMIT order and atomically reserves INR cash or unreserved base quantity.';
 comment on function public.fill_paper_crypto_limit_order(uuid,uuid,numeric,numeric,numeric,bigint)
   is 'Fills only a pending simulated crypto LIMIT order using a fresh server-verified quote at or better than its limit.';
+
+
+-- Dedicated cursor and lease: crypto LIMIT scanning must not share the equities worker cursor.
+create table if not exists public.paper_crypto_limit_worker_state (
+  state_key text primary key default 'crypto_limit_orders' check (state_key='crypto_limit_orders'),
+  cursor_created_at timestamptz,
+  cursor_order_id uuid,
+  lease_token uuid,
+  lease_expires_at timestamptz,
+  updated_at timestamptz not null default now()
+);
+alter table public.paper_crypto_limit_worker_state enable row level security;
+revoke all on public.paper_crypto_limit_worker_state from public,anon,authenticated;
+grant select,insert,update,delete on public.paper_crypto_limit_worker_state to service_role;
+
+create or replace function public.acquire_paper_crypto_limit_worker_lease(
+  p_lease_token uuid,p_now_ms bigint,p_ttl_ms bigint
+) returns boolean
+language plpgsql security definer set search_path=''
+as $$
+declare v_token uuid;
+begin
+  if p_lease_token is null or p_now_ms is null or p_now_ms<0
+     or p_ttl_ms is null or p_ttl_ms not between 5000 and 120000 then
+    raise exception 'Invalid crypto LIMIT worker lease request' using errcode='22023';
+  end if;
+  insert into public.paper_crypto_limit_worker_state(
+    state_key,lease_token,lease_expires_at,updated_at
+  ) values('crypto_limit_orders',p_lease_token,
+    to_timestamp((p_now_ms+p_ttl_ms)::double precision/1000.0),clock_timestamp())
+  on conflict(state_key) do update set lease_token=excluded.lease_token,
+    lease_expires_at=excluded.lease_expires_at,updated_at=clock_timestamp()
+  where public.paper_crypto_limit_worker_state.lease_token is null
+     or public.paper_crypto_limit_worker_state.lease_expires_at is null
+     or public.paper_crypto_limit_worker_state.lease_expires_at<=to_timestamp(p_now_ms::numeric/1000)
+  returning lease_token into v_token;
+  return coalesce(v_token=p_lease_token,false);
+end;
+$$;
+
+create or replace function public.release_paper_crypto_limit_worker_lease(
+  p_lease_token uuid,p_now_ms bigint
+) returns boolean
+language plpgsql security definer set search_path=''
+as $$
+declare v_rows integer;
+begin
+  if p_lease_token is null or p_now_ms is null or p_now_ms<0 then
+    raise exception 'Invalid crypto LIMIT worker lease release' using errcode='22023';
+  end if;
+  update public.paper_crypto_limit_worker_state
+     set lease_token=null,lease_expires_at=null,updated_at=clock_timestamp()
+   where state_key='crypto_limit_orders' and lease_token=p_lease_token;
+  get diagnostics v_rows=row_count;
+  return v_rows=1;
+end;
+$$;
+
+revoke all on function public.acquire_paper_crypto_limit_worker_lease(uuid,bigint,bigint) from public,anon,authenticated;
+revoke all on function public.release_paper_crypto_limit_worker_lease(uuid,bigint) from public,anon,authenticated;
+grant execute on function public.acquire_paper_crypto_limit_worker_lease(uuid,bigint,bigint) to service_role;
+grant execute on function public.release_paper_crypto_limit_worker_lease(uuid,bigint) to service_role;
