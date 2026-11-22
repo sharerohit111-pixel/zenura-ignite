@@ -271,3 +271,14 @@ Static schema references checked:
 Remaining checks are runtime-only: execute all migrations in order in a disposable PostgreSQL branch, test all concurrent fill/cancel/submit interleavings and reservation invariants, and compare order fingerprint inputs with the existing Node `makeOrderFingerprint` helper. The LIMIT RPC trusts the authenticated backend to supply the matching Firebase-compatible request fingerprint and validated provider instrument/quote; it does not independently derive the SHA-256 fingerprint or verify the quote's instrument key.
 
 Environment observation: the connected Supabase project `zenura-paper-trading` is ACTIVE_HEALTHY but currently reports zero applied migrations and zero public tables. It was queried read-only only. No migration was applied. Do not treat this empty project as a staging clone or apply draft SQL without explicit approval and an isolated test plan.
+
+
+### Isolated PostgreSQL migration smoke-test workflow — 2026-11-22
+
+Added `.github/workflows/paper-trading-supabase-migrations.yml` on the migration draft branch. On PR changes to the migration directory (or manual dispatch), GitHub Actions provisions a disposable PostgreSQL 16 service, creates minimal `auth.users`, `auth.uid()`, and Supabase role stubs, applies every migration in filename order with `ON_ERROR_STOP`, then checks the expected 13 tables and six RPC signatures.
+
+Scope/limitations:
+- This CI job is an isolated parser/DDL/RPC-registration smoke test, not a complete Supabase emulator.
+- It does not connect to or mutate the user's Supabase project and does not access Firebase.
+- It does not yet prove behavioral parity, RLS policy correctness under JWT roles, concurrency, idempotency, cash/position invariants, or provider quote trust.
+- A green workflow must not be represented as production readiness or authorization to cut over.
