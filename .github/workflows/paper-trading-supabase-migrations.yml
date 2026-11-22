@@ -31,6 +31,10 @@ on:
       - "market-gateway/test/derivative-contract.test.js"
       - "supabase/tests/**"
       - "supabase/tests/protective_order_cancel.sql"
+  push:
+    branches:
+      - integration/supabase-native-auth-professional-launch-2026-11-22
+
   workflow_dispatch:
 
 concurrency:
