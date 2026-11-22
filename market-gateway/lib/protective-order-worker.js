@@ -2,13 +2,23 @@
 
 const MAX_QUOTE_AGE_MS=15000;
 
+function isSupportedProtectiveOrder(order){
+  if(!order||typeof order!=="object")return false;
+  const productByAsset={EQUITY:["DELIVERY","INTRADAY"],FUTURE:["FUTURES"],OPTION:["OPTIONS"]};
+  if(!productByAsset[order.asset_class]?.includes(order.product))return false;
+  if(!["BUY","SELL"].includes(order.side)||!["STOP_LOSS","TARGET"].includes(order.trigger_type))return false;
+  // For a closing order, stop-loss and target directions depend on the held side.
+  const expectedDirection=order.trigger_type==="STOP_LOSS"
+    ?(order.side==="SELL"?"AT_OR_BELOW":"AT_OR_ABOVE")
+    :(order.side==="SELL"?"AT_OR_ABOVE":"AT_OR_BELOW");
+  return order.trigger_direction===expectedDirection;
+}
+
 function evaluateProtectiveOrder(order,quote,nowMs){
   if(!order||typeof order!=="object"||order.status!=="ACTIVE"
-    ||!["EQUITY","FUTURE","OPTION"].includes(order.asset_class)
-    ||!["DELIVERY","INTRADAY","FUTURES","OPTIONS"].includes(order.product)
-    ||!["BUY","SELL"].includes(order.side)
-    ||!["STOP_LOSS","TARGET"].includes(order.trigger_type)
-    ||!["AT_OR_ABOVE","AT_OR_BELOW"].includes(order.trigger_direction)
+    ||!isSupportedProtectiveOrder(order)
+    ||typeof order.order_id!=="string"||!order.order_id
+    ||typeof order.user_id!=="string"||!order.user_id
     ||typeof order.instrument_key!=="string"||!order.instrument_key
     ||!Number.isSafeInteger(order.trigger_price_paise)||order.trigger_price_paise<1
     ||!Number.isSafeInteger(order.quantity)||order.quantity<1||order.quantity>1000000
@@ -22,4 +32,4 @@ function evaluateProtectiveOrder(order,quote,nowMs){
     :quote.pricePaise<=order.trigger_price_paise;
 }
 
-module.exports={MAX_QUOTE_AGE_MS,evaluateProtectiveOrder};
+module.exports={MAX_QUOTE_AGE_MS,evaluateProtectiveOrder,isSupportedProtectiveOrder};
