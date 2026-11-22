@@ -11,8 +11,12 @@ const gateway=fs.readFileSync(path.join(root,"../../market-gateway/supabase-serv
 const migration=fs.readFileSync(path.join(root,"../../supabase/migrations/202611220010_paper_investing_market_order.sql"),"utf8");
 const schema=fs.readFileSync(path.join(root,"../../supabase/migrations/202611220007_professional_futures_investing_charts.sql"),"utf8");
 test("Paper Investing page includes all locally referenced modules and styles",()=>{
- for(const match of html.matchAll(/(?:src|href)="([^"]+)"/g)){
-  const ref=match[1];if(/^https?:|^#|^mailto:/.test(ref))continue;
+ const assetRefs=[
+  ...[...html.matchAll(/<script\\b[^>]*\\bsrc="([^"]+)"/gi)].map(match=>match[1]),
+  ...[...html.matchAll(/<link\\b(?=[^>]*\\brel="stylesheet")(?=[^>]*\\bhref="([^"]+)")[^>]*>/gi)].map(match=>match[1])
+ ];
+ for(const ref of assetRefs){
+  if(/^https?:|^#|^mailto:/.test(ref))continue;
   assert.ok(fs.existsSync(path.resolve(root,ref)), "Missing Paper Investing asset: "+ref);
  }
 });
