@@ -13,6 +13,7 @@ on:
       - "market-gateway/package.json"
       - "market-gateway/README.md"
       - "market-gateway/DEPLOYMENT.md"
+      - "market-gateway/MARKET-DATA-COMPLIANCE.md"
       - "market-gateway/test/supabase-deployment.test.js"
       - "market-gateway/lib/paper-limit-worker.js"
       - "market-gateway/test/paper-limit-worker.test.js"
