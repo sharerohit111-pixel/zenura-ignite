@@ -1,13 +1,20 @@
--- DRAFT ONLY — do not apply until the migration review and explicit approval.
--- ZENURA IGNITE Paper Trading: first-pass relational schema based on the
--- existing Firebase/Firestore gateway contracts on
--- integration/paper-trading-backend-main-2026-11-20.
+-- DRAFT ONLY — do not apply until migration review and explicit approval.
+-- ZENURA IGNITE Paper Trading: schema aligned to the inspected Firebase gateway
+-- transaction contracts on integration/paper-trading-backend-main-2026-11-20.
+-- Money is integer paise. One shared INR virtual-cash account is used by Delivery,
+-- Intraday and supported long CE/PE option simulation. No live broker orders.
 --
--- Money is stored as integer paise. The ₹10,00,000 starting cash is shared
--- across Delivery, Intraday and long-option simulation, matching the current
--- Firestore account model. No real broker order is ever submitted.
+-- IMPORTANT: Firebase UIDs are not assumed to be UUIDs. Import and auth cutover
+-- must populate paper_user_identity_map after corresponding Supabase Auth users
+-- are provisioned. Never cast a Firebase UID to UUID.
 
 begin;
+
+create table if not exists public.paper_user_identity_map (
+  supabase_user_id uuid primary key references auth.users(id) on delete cascade,
+  firebase_uid text not null unique check (length(firebase_uid) between 1 and 128),
+  created_at timestamptz not null default now()
+);
 
 create table if not exists public.paper_accounts (
   user_id uuid primary key references auth.users(id) on delete cascade,
@@ -35,14 +42,17 @@ create table if not exists public.paper_equity_positions (
   quantity integer not null check (quantity > 0 and quantity <= 1000000),
   average_price_paise bigint not null check (average_price_paise > 0),
   cost_basis_paise bigint not null check (cost_basis_paise > 0),
+  reserved_quantity integer not null default 0 check (reserved_quantity >= 0),
   updated_at timestamptz not null default now(),
-  primary key (user_id, product, instrument_key)
+  primary key (user_id, product, instrument_key),
+  constraint paper_equity_reserved_not_over_held check (reserved_quantity <= quantity)
 );
 
 create table if not exists public.paper_derivative_positions (
   user_id uuid not null references auth.users(id) on delete cascade,
   instrument_key text not null check (length(instrument_key) between 1 and 100),
   trading_symbol text,
+  segment text,
   instrument_type text not null check (instrument_type in ('CE','PE')),
   expiry date,
   net_quantity integer not null check (net_quantity > 0 and net_quantity <= 1000000),
@@ -71,6 +81,11 @@ create table if not exists public.paper_orders (
   realized_pnl_paise bigint not null default 0,
   reserved_cash_paise bigint not null default 0 check (reserved_cash_paise >= 0),
   reserved_quantity integer not null default 0 check (reserved_quantity >= 0),
+  quote_timestamp_ms bigint,
+  quote_age_ms bigint,
+  reservation_released boolean not null default false,
+  cancelled_at timestamptz,
+  filled_at timestamptz,
   simulation_only boolean not null default true check (simulation_only is true),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
@@ -86,23 +101,29 @@ create table if not exists public.paper_derivative_orders (
   instrument_key text not null,
   trading_symbol text,
   exchange text,
+  segment text,
   instrument_type text not null check (instrument_type in ('CE','PE')),
   expiry date,
   side text not null check (side in ('BUY','SELL')),
   quantity integer not null check (quantity > 0 and quantity <= 1000000),
   lots integer not null check (lots > 0),
+  lot_size integer not null check (lot_size > 0),
   order_type text not null default 'MARKET' check (order_type = 'MARKET'),
   status text not null default 'FILLED' check (status in ('FILLED','REJECTED')),
   execution_price_paise bigint not null check (execution_price_paise > 0),
+  quote_timestamp_ms bigint not null,
+  quote_age_ms bigint not null check (quote_age_ms >= 0),
   gross_paise bigint not null check (gross_paise > 0),
   charges_paise bigint not null default 0 check (charges_paise >= 0),
   total_debit_paise bigint check (total_debit_paise is null or total_debit_paise >= 0),
   net_credit_paise bigint check (net_credit_paise is null or net_credit_paise >= 0),
   realized_pnl_paise bigint not null default 0,
+  cash_delta_paise bigint not null,
   charges_breakdown jsonb not null default '{}'::jsonb,
+  excludes_charges boolean not null default false,
   simulation_only boolean not null default true check (simulation_only is true),
-  created_at timestamptz not null default now(),
- );
+  created_at timestamptz not null default now()
+);
 
 create table if not exists public.paper_watchlists (
   user_id uuid not null references auth.users(id) on delete cascade,
@@ -113,12 +134,13 @@ create table if not exists public.paper_watchlists (
   constraint paper_watchlists_max_50 check (cardinality(instrument_keys) <= 50)
 );
 
--- Provider credentials remain encrypted at application level. Never expose
--- this table through client-side Data API grants or user-facing SELECT policies.
+-- AES-256-GCM envelope is JSON {v,iv,tag,data}; the encryption key stays in
+-- server-side secret storage and is never placed in Postgres or browser code.
 create table if not exists public.upstox_connections (
   user_id uuid primary key references auth.users(id) on delete cascade,
-  token_ciphertext text not null,
-  token_expires_at timestamptz,
+  status text not null check (status in ('connected','disconnected')),
+  token_ciphertext jsonb not null,
+  token_expires_at timestamptz not null,
   token_issued_at timestamptz,
   scopes text[] not null default '{}',
   metadata jsonb not null default '{}'::jsonb,
@@ -142,7 +164,8 @@ create table if not exists public.paper_market_stream_leases (
 
 create table if not exists public.paper_margin_preview_limits (
   user_id uuid primary key references auth.users(id) on delete cascade,
-  last_requested_at timestamptz not null
+  last_requested_at_ms bigint not null check (last_requested_at_ms >= 0),
+  updated_at_ms bigint not null check (updated_at_ms >= 0)
 );
 
 create unique index if not exists paper_orders_user_idempotency_idx
@@ -164,9 +187,8 @@ create index if not exists upstox_oauth_states_expiry_idx
 create index if not exists paper_market_stream_leases_expiry_idx
   on public.paper_market_stream_leases (expires_at);
 
--- Enable RLS on every user-data table. Trading writes will be performed by
--- a trusted server runtime using the service role; browser clients get reads
--- only for their own account/history/positions and CRUD for their own lists.
+-- Enable RLS on all user-owned data. Trading writes are server-only.
+alter table public.paper_user_identity_map enable row level security;
 alter table public.paper_accounts enable row level security;
 alter table public.paper_equity_positions enable row level security;
 alter table public.paper_derivative_positions enable row level security;
@@ -206,11 +228,11 @@ drop policy if exists paper_watchlists_delete_own on public.paper_watchlists;
 create policy paper_watchlists_delete_own on public.paper_watchlists
   for delete to authenticated using (auth.uid() = user_id);
 
--- No authenticated/anon policies are defined for Upstox credentials, OAuth
--- states, leases or rate-limit rows. Service-role backend only.
-revoke all on public.paper_accounts, public.paper_equity_positions,
-  public.paper_derivative_positions, public.paper_orders,
-  public.paper_derivative_orders, public.paper_watchlists,
+-- No authenticated/anon access for identity mapping or provider credentials,
+-- OAuth states, stream leases or rate-limit state. Service-role backend only.
+revoke all on public.paper_user_identity_map, public.paper_accounts,
+  public.paper_equity_positions, public.paper_derivative_positions,
+  public.paper_orders, public.paper_derivative_orders, public.paper_watchlists,
   public.upstox_connections, public.upstox_oauth_states,
   public.paper_market_stream_leases, public.paper_margin_preview_limits
   from anon, authenticated;
