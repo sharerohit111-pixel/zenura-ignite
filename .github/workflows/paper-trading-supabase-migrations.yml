@@ -278,6 +278,8 @@ jobs:
           $$;
           RESET ROLE;
           SQL
+      - name: Exercise Intraday LIMIT reservation, cancellation and session expiry
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/intraday_limit_reservations.sql
       - name: Verify authenticated table grants and RLS watchlist isolation
         run: psql -v ON_ERROR_STOP=1 -f supabase/tests/rls_permissions.sql
       - name: Exercise MARKET idempotency and LIMIT reservation lifecycle
