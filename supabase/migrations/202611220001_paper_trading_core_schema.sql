@@ -142,6 +142,9 @@ create table if not exists public.upstox_connections (
   user_id uuid primary key references auth.users(id) on delete cascade,
   status text not null check (status in ('connected','disconnected')),
   token_ciphertext jsonb not null,
+  token_type text not null default 'Bearer',
+  provider text not null default 'upstox' check (provider = 'upstox'),
+  authorized_at timestamptz,
   token_expires_at timestamptz not null,
   token_issued_at timestamptz,
   scopes text[] not null default '{}',
@@ -153,15 +156,31 @@ create table if not exists public.upstox_connections (
 create table if not exists public.upstox_oauth_states (
   state_hash text primary key,
   user_id uuid not null references auth.users(id) on delete cascade,
+  connection_generation bigint not null default 0 check (connection_generation >= 0),
+  used boolean not null default false,
+  used_at timestamptz,
   expires_at timestamptz not null,
   created_at timestamptz not null default now()
+);
+
+create table if not exists public.upstox_connection_controls (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  generation bigint not null default 0 check (generation >= 0),
+  updated_at_ms bigint not null check (updated_at_ms >= 0)
 );
 
 create table if not exists public.paper_market_stream_leases (
   user_id uuid primary key references auth.users(id) on delete cascade,
   lease_id uuid not null,
   expires_at_ms bigint not null check (expires_at_ms >= 0),
-  updated_at_ms bigint not null check (updated_at_ms >= 0)
+  updated_at_ms bigint not null check (updated_at_ms >= 0),
+  revoked boolean not null default false
+);
+
+create table if not exists public.paper_market_worker_state (
+  state_key text primary key,
+  cursor_order_id text,
+  updated_at timestamptz not null default now()
 );
 
 create table if not exists public.paper_margin_preview_limits (
@@ -178,6 +197,8 @@ create index if not exists paper_orders_user_created_idx
   on public.paper_orders (user_id, created_at desc, order_id desc);
 create index if not exists paper_orders_user_status_idx
   on public.paper_orders (user_id, status, created_at desc);
+create index if not exists paper_orders_pending_worker_idx
+  on public.paper_orders (created_at asc, order_id asc) where order_type = 'LIMIT' and status = 'PENDING';
 create index if not exists paper_derivative_orders_user_created_idx
   on public.paper_derivative_orders (user_id, created_at desc, order_id desc);
 create index if not exists paper_equity_positions_user_product_idx
@@ -199,7 +220,9 @@ alter table public.paper_derivative_orders enable row level security;
 alter table public.paper_watchlists enable row level security;
 alter table public.upstox_connections enable row level security;
 alter table public.upstox_oauth_states enable row level security;
+alter table public.upstox_connection_controls enable row level security;
 alter table public.paper_market_stream_leases enable row level security;
+alter table public.paper_market_worker_state enable row level security;
 alter table public.paper_margin_preview_limits enable row level security;
 
 drop policy if exists paper_accounts_select_own on public.paper_accounts;
@@ -236,7 +259,8 @@ revoke all on public.paper_user_identity_map, public.paper_accounts,
   public.paper_equity_positions, public.paper_derivative_positions,
   public.paper_orders, public.paper_derivative_orders, public.paper_watchlists,
   public.upstox_connections, public.upstox_oauth_states,
-  public.paper_market_stream_leases, public.paper_margin_preview_limits
+  public.upstox_connection_controls, public.paper_market_stream_leases,
+  public.paper_market_worker_state, public.paper_margin_preview_limits
   from anon, authenticated;
 
 grant select on public.paper_accounts, public.paper_equity_positions,
