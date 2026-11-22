@@ -15,7 +15,13 @@ DECLARE
   ];
   acl record;
   t text;
-  protected_tables text[] := ARRAY[
+  all_tables text[] := ARRAY[
+    'paper_user_identity_map','paper_accounts','paper_equity_positions',
+    'paper_derivative_positions','paper_orders','paper_derivative_orders','paper_watchlists',
+    'upstox_connections','upstox_oauth_states','upstox_connection_controls',
+    'paper_market_stream_leases','paper_market_worker_state','paper_margin_preview_limits'
+  ];
+  server_only_tables text[] := ARRAY[
     'paper_user_identity_map','paper_accounts','paper_equity_positions',
     'paper_derivative_positions','paper_orders','paper_derivative_orders',
     'upstox_connections','upstox_oauth_states','upstox_connection_controls',
@@ -42,11 +48,14 @@ BEGIN
     END IF;
   END LOOP;
 
-  FOREACH t IN ARRAY protected_tables LOOP
+  FOREACH t IN ARRAY all_tables LOOP
     IF NOT EXISTS (
       SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
       WHERE n.nspname='public' AND c.relname=t AND c.relrowsecurity
     ) THEN RAISE EXCEPTION 'RLS is not enabled on %', t; END IF;
+  END LOOP;
+
+  FOREACH t IN ARRAY server_only_tables LOOP
     IF has_table_privilege('anon', 'public.'||t, 'SELECT')
        OR has_table_privilege('authenticated', 'public.'||t, 'INSERT')
        OR has_table_privilege('authenticated', 'public.'||t, 'UPDATE')
