@@ -10,6 +10,10 @@ const css=fs.readFileSync(path.join(root,"investing.css"),"utf8");
 const gateway=fs.readFileSync(path.join(root,"../../market-gateway/supabase-server.js"),"utf8");
 const migration=fs.readFileSync(path.join(root,"../../supabase/migrations/202611220010_paper_investing_market_order.sql"),"utf8");
 const schema=fs.readFileSync(path.join(root,"../../supabase/migrations/202611220007_professional_futures_investing_charts.sql"),"utf8");
+const pwaRoot=path.join(root,"..");
+const serviceWorker=fs.readFileSync(path.join(pwaRoot,"service-worker.js"),"utf8");
+const manifest=JSON.parse(fs.readFileSync(path.join(pwaRoot,"manifest.webmanifest"),"utf8"));
+const portal=fs.readFileSync(path.join(pwaRoot,"index.html"),"utf8");
 test("Paper Investing page includes all locally referenced modules and styles",()=>{
  const assetRefs=[
   ...[...html.matchAll(/<script[^>]*src="([^"]+)"/gi)].map(match=>match[1]),
@@ -78,4 +82,17 @@ test("Paper Trading workspace also references only existing local assets",()=>{
   const ref=match[1];if(/^https?:|^#|^mailto:/.test(ref))continue;
   assert.ok(fs.existsSync(path.resolve(root,"../stocks",ref)), "Missing Paper Trading asset: "+ref);
  }
+});
+
+test("Market terminal is installable and its service worker never caches private or external data",()=>{
+ assert.equal(manifest.start_url,"/markets/");
+ assert.equal(manifest.scope,"/markets/");
+ assert.equal(manifest.display,"standalone");
+ assert.match(portal,/Paper Trading/);assert.match(portal,/Paper Investing/);
+ assert.match(html,/manifest\.webmanifest/);assert.match(html,/pwa-register\.js/);
+ assert.match(serviceWorker,/request\.headers\.has\("authorization"\)/);
+ assert.match(serviceWorker,/url\.origin!==self\.location\.origin/);
+ assert.match(serviceWorker,/request\.method!=="GET"/);
+ assert.match(serviceWorker,/zenura-markets-shell-v1/);
+ assert.doesNotMatch(serviceWorker,/supabase\.co|api\.upstox\.com/);
 });
