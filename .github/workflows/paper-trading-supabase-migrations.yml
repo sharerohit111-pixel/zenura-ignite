@@ -98,6 +98,7 @@ jobs:
           node --check market-gateway/lib/supabase-runtime.js
           node --check market-gateway/supabase-server.js
           node --input-type=module --check < crypto/supabase-auth.js
+          node --input-type=module --check < crypto/supabase-cloud.js
           node --check market-gateway/supabase-server.js
           node --check market-gateway/lib/upstox-token-crypto.js
           node --test market-gateway/test/supabase-runtime.test.js market-gateway/test/upstox-token-crypto.test.js
