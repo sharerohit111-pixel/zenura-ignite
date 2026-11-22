@@ -65,3 +65,10 @@ test("Manual production deployment keeps the leased LIMIT worker active in the g
  assert.match(deployWorkflow,/github\.ref == 'refs\/heads\/main'/);
  assert.doesNotMatch(deployWorkflow,/firebase deploy|firebase functions:deploy|service_account_key:/i);
 });
+
+test("Public health response confirms the leased LIMIT worker without exposing secrets",()=>{
+ assert.match(server,/limitWorker:\{\.\.\.paperLimitWorkerStatus\}/);
+ assert.match(server,/lastCycle=\{scanned:result\.scanned,filled:result\.filled,failed:result\.failed,locked:result\.locked\}/);
+ assert.match(deployWorkflow,/jq -e '\.ok and \.limitWorker\.enabled'/);
+ assert.doesNotMatch(server,/health[^\n]*SERVICE_ROLE_KEY|health[^\n]*UPSTOX_CLIENT_SECRET/i);
+});
