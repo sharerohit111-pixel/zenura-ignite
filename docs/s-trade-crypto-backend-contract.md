@@ -9,7 +9,9 @@ Status: draft implementation on `feature/s-trade-crypto-supabase-backend-2026-11
 - Existing Crypto Terminal paper fee is 0.10%; gateway uses the same 0.001 rate.
 - Binance USDT pair price is converted to INR using the USD/INR reference rate from the existing reference-rate provider. Both the USDT execution price and applied INR rate are recorded on the order.
 - Separate crypto cash account, positions, orders, and append-only INR cash ledger.
-- Market orders are the only executable order type in this first migration. LIMIT is not enabled by this migration; client-side exit-limit and stop/target code is not considered a reliable server-side risk engine.
+- MARKET orders are supported by the initial spot RPC. A follow-up additive migration introduces server-side LIMIT reservations, fills and cancellations; the trusted worker uses fresh Binance trades and server-side USD/INR reference rates.
+- LIMIT BUY reserves INR cash including estimated fees; LIMIT SELL reserves uncommitted base quantity. Cancel releases the reservation. Fills require a fresh quote at or better than the submitted limit and update positions, cash, fees, realized P&L and the append-only ledger atomically.
+- Crypto LIMIT processing uses a dedicated lease/cursor, separate from the equities LIMIT worker.
 - Authenticated Crypto Terminal uses `crypto/supabase-cloud.js` to initialize the cloud account, submit BUY/SELL market orders and synchronize cloud portfolio/order history. It retains guest-local behavior separately.
 - For signed-in users, local-only exit orders, stop-loss/target triggers and account reset are blocked until server-side equivalents exist. The cloud API URL remains empty until the trusted gateway is deliberately deployed, so authenticated trading fails closed.
 - No live exchange order placement, custody, deposits, or withdrawals.
@@ -39,8 +41,12 @@ The browser must never submit or control the user UUID, execution price, quote t
 - Existing market, options, futures, Paper Investing, OAuth/stream and gateway regression checks remain in the same passing CI workflow.
 - Frontend module syntax, deployment workflow YAML, gateway security checks and production container build pass.
 
+## Validation added for Crypto LIMIT lifecycle
+- Disposable PostgreSQL CI covers pending BUY reservation, idempotent replay, worse-than-limit rejection, favorable fill, SELL quantity reservation, cancellation release, SELL fill and INR cash/realized-P&L accounting.
+- Worker eligibility tests reject unsupported symbols, malformed quantity, stale/future quotes and unfavorable prices.
+
 ## Remaining work before production
-1. Run the crypto schema and authenticated read/write flows in a disposable Supabase branch/project (in addition to the PostgreSQL CI fixture).
+1. Complete CI for the additive Crypto LIMIT migration and server-worker wiring; then run schema and authenticated read/write flows in a disposable Supabase branch/project.
 2. Deploy and verify the trusted gateway, CORS allowlist, secrets and external market-data rights; then verify account initialization, BUY/SELL and portfolio/history end-to-end.
 3. Add crypto-specific concurrency/idempotency race tests.
 4. Implement LIMIT order reservation/fill/cancel and server-side stop-loss/target execution as separate tested increments.
