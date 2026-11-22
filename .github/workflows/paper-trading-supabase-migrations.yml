@@ -173,6 +173,8 @@ jobs:
             echo "Applying $migration"
             psql -v ON_ERROR_STOP=1 -f "$migration"
           done
+      - name: Exercise BSE scrip master import and group-specific fee rules
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/bse_equity_fee_master.sql
       - name: Verify Supabase market worker single-writer lease and expiry
         run: |
           psql -v ON_ERROR_STOP=1 <<'SQL'
