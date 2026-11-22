@@ -26,6 +26,8 @@ on:
       - "market-gateway/test/protective-order-worker.test.js"
       - "market-gateway/test/paper-limit-worker.test.js"
       - "market-gateway/paper-limit-worker.js"
+      - "market-gateway/lib/bse-equity-fee-master.js"
+      - "market-gateway/test/bse-equity-fee-master.test.js"
       - "market-gateway/test/trading-charges.test.js"
       - "market-gateway/test/derivative-order-transaction.test.js"
       - "market-gateway/test/derivative-contract.test.js"
