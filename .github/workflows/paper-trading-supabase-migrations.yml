@@ -1555,6 +1555,90 @@ jobs:
           $$;
           RESET ROLE;
           SQL
+      - name: Exercise S-TRADE crypto INR accounting, idempotency and quote freshness
+        run: |
+          psql -v ON_ERROR_STOP=1 <<'SQL'
+          SET ROLE service_role;
+          SELECT public.initialize_paper_crypto_account(
+            '11111111-1111-4111-8111-111111111111',1000000
+          );
+          DO $crypto_paper$
+          DECLARE
+            v_now bigint:=floor(extract(epoch from clock_timestamp())*1000)::bigint;
+            v_result jsonb;
+            v_cash numeric(24,8);
+            v_qty numeric(30,12);
+            v_cost numeric(24,8);
+            v_rejected boolean;
+          BEGIN
+            -- Buy 0.01 BTC at 50,000 USDT and INR reference rate 85; 0.10% fee.
+            v_result:=public.execute_paper_crypto_market_order(
+              '11111111-1111-4111-8111-111111111111',
+              'aaaaaaaa-1111-4111-8111-111111111111',
+              'bbbbbbbb-1111-4111-8111-111111111111',
+              repeat('a',64),'BTCUSDT','BTC','BUY',0.01,50000,85,42.5,v_now
+            );
+            IF (v_result->>'cash_balance')::numeric <> 957457.5
+               OR v_result->>'idempotent_replay' <> 'false' THEN
+              RAISE EXCEPTION 'Crypto BUY cash or status is incorrect: %',v_result;
+            END IF;
+
+            -- Exact retry must not create a second debit.
+            v_result:=public.execute_paper_crypto_market_order(
+              '11111111-1111-4111-8111-111111111111',
+              'aaaaaaaa-1111-4111-8111-111111111111',
+              'bbbbbbbb-1111-4111-8111-111111111111',
+              repeat('a',64),'BTCUSDT','BTC','BUY',0.01,50000,85,42.5,v_now
+            );
+            IF v_result->>'idempotent_replay' <> 'true' THEN
+              RAISE EXCEPTION 'Crypto BUY retry was not idempotent';
+            END IF;
+
+            -- Reusing the key for a different intent must be rejected.
+            v_rejected:=false;
+            BEGIN
+              PERFORM public.execute_paper_crypto_market_order(
+                '11111111-1111-4111-8111-111111111111',
+                'aaaaaaaa-1111-4111-8111-111111111111',
+                'bbbbbbbb-1111-4111-8111-111111111111',
+                repeat('c',64),'BTCUSDT','BTC','BUY',0.02,50000,85,85,v_now
+              );
+            EXCEPTION WHEN unique_violation THEN v_rejected:=true;
+            END;
+            IF NOT v_rejected THEN RAISE EXCEPTION 'Crypto idempotency key collision was accepted'; END IF;
+
+            -- Partial sell: half the position, fees included in realized P&L.
+            v_result:=public.execute_paper_crypto_market_order(
+              '11111111-1111-4111-8111-111111111111',
+              'cccccccc-1111-4111-8111-111111111111',
+              'dddddddd-1111-4111-8111-111111111111',
+              repeat('d',64),'BTCUSDT','BTC','SELL',0.005,51000,85,21.675,v_now
+            );
+            SELECT cash_balance INTO v_cash FROM public.paper_crypto_accounts
+             WHERE user_id='11111111-1111-4111-8111-111111111111';
+            SELECT quantity,cost_basis INTO v_qty,v_cost FROM public.paper_crypto_positions
+             WHERE user_id='11111111-1111-4111-8111-111111111111' AND symbol='BTCUSDT';
+            IF v_cash <> 979110.825 OR v_qty <> 0.005 OR v_cost <> 21271.25
+               OR (v_result->>'realized_pnl')::numeric <> 381.075 THEN
+              RAISE EXCEPTION 'Crypto partial SELL accounting is incorrect: %, %, %, %',v_cash,v_qty,v_cost,v_result;
+            END IF;
+
+            -- Stale quote must fail closed.
+            v_rejected:=false;
+            BEGIN
+              PERFORM public.execute_paper_crypto_market_order(
+                '11111111-1111-4111-8111-111111111111',
+                'eeeeeeee-1111-4111-8111-111111111111',
+                'ffffffff-1111-4111-8111-111111111111',
+                repeat('e',64),'BTCUSDT','BTC','BUY',0.001,50000,85,4.25,v_now-16000
+              );
+            EXCEPTION WHEN SQLSTATE '22023' THEN v_rejected:=true;
+            END;
+            IF NOT v_rejected THEN RAISE EXCEPTION 'Stale crypto quote was accepted'; END IF;
+          END
+          $crypto_paper$;
+          RESET ROLE;
+          SQL
       - name: Verify expected schema and RPC registration
         run: |
           psql -v ON_ERROR_STOP=1 <<'SQL'
