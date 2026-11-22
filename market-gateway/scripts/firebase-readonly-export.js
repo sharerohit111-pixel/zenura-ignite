@@ -2,7 +2,8 @@
 const crypto=require("node:crypto");
 const fs=require("node:fs/promises");
 const path=require("node:path");
-const EXPORT_COLLECTIONS=Object.freeze(["customerProfiles","users","indianPaperAccounts","indianPaperOrders","indianDerivativeOrders","indianMarketWatchlists"]);
+const EXPORT_COLLECTIONS=Object.freeze(["indianPaperAccounts","indianPaperOrders","indianDerivativeOrders","indianMarketWatchlists"]);
+const NOT_REQUIRED_COLLECTIONS=Object.freeze(["customerProfiles (profile PII is not needed by the Paper Trading transformer)","users (profile/entitlement data is not needed by the Paper Trading transformer)"]);
 const EXCLUDED_COLLECTIONS=Object.freeze(["upstoxConnections (encrypted broker-token envelopes)","upstoxOAuthStates","upstoxConnectionControls","indianMarketStreamLeases","indianMarketWorkerState","indianMarginPreviewLimits","paymentOrders","razorpayEvents"]);
 function serializeFirestoreValue(value){
  if(value===undefined||value===null)return null;
@@ -50,7 +51,7 @@ async function exportSnapshot({db,auth,outputDirectory,projectId,pageSize=400}){
   for(const name of EXPORT_COLLECTIONS)files[name+".jsonl"]=await writeJsonlFile(path.join(target,name+".jsonl"),firestoreDocuments(db,name,pageSize));
   files["firebase-auth-users.jsonl"]=await writeJsonlFile(path.join(target,"firebase-auth-users.jsonl"),authUsers(auth));
   const manifest={format:"zenura-firebase-read-only-export-v1",projectId,exportedAt:new Date().toISOString(),mode:"read-only",
-   pagination:{firestorePageSize:pageSize,order:"document-name-ascending"},collections:EXPORT_COLLECTIONS,excludedCollections:EXCLUDED_COLLECTIONS,files,
+   pagination:{firestorePageSize:pageSize,order:"document-name-ascending"},collections:EXPORT_COLLECTIONS,notRequiredCollections:NOT_REQUIRED_COLLECTIONS,excludedCollections:EXCLUDED_COLLECTIONS,files,
    totals:{firestoreDocuments:Object.values(files).filter(x=>x.file!=="firebase-auth-users.jsonl").reduce((s,x)=>s+x.count,0),authUsers:files["firebase-auth-users.jsonl"].count},
    importPerformed:false,sourceMutated:false};
   await fs.writeFile(path.join(target,"manifest.json"),JSON.stringify(manifest,null,2)+"\n",{encoding:"utf8",flag:"wx",mode:0o600});return manifest;
@@ -89,4 +90,4 @@ async function main(argv=process.argv.slice(2)){
  process.stdout.write(JSON.stringify({mode:"read-only-export-complete",outputDirectory:path.resolve(args.outputDirectory),totals:manifest.totals,importPerformed:false,sourceMutated:false},null,2)+"\n");
 }
 if(require.main===module)main().catch(error=>{process.stderr.write("Firebase export failed: "+error.message+"\n");process.exitCode=1;});
-module.exports={EXPORT_COLLECTIONS,EXCLUDED_COLLECTIONS,serializeFirestoreValue,sanitizeAuthUser,firestoreDocuments,authUsers,exportSnapshot,resolveProjectId,parseArgs};
+module.exports={EXPORT_COLLECTIONS,NOT_REQUIRED_COLLECTIONS,EXCLUDED_COLLECTIONS,serializeFirestoreValue,sanitizeAuthUser,firestoreDocuments,authUsers,exportSnapshot,resolveProjectId,parseArgs};

@@ -4,9 +4,10 @@ const assert=require("node:assert/strict");
 const fs=require("node:fs/promises");
 const os=require("node:os");
 const path=require("node:path");
-const {EXPORT_COLLECTIONS,EXCLUDED_COLLECTIONS,serializeFirestoreValue,sanitizeAuthUser,firestoreDocuments,exportSnapshot,resolveProjectId,parseArgs}=require("../scripts/firebase-readonly-export");
+const {EXPORT_COLLECTIONS,NOT_REQUIRED_COLLECTIONS,EXCLUDED_COLLECTIONS,serializeFirestoreValue,sanitizeAuthUser,firestoreDocuments,exportSnapshot,resolveProjectId,parseArgs}=require("../scripts/firebase-readonly-export");
 test("export scope is allowlisted and excludes broker credentials and operational state",()=>{
- assert.deepEqual(EXPORT_COLLECTIONS,["customerProfiles","users","indianPaperAccounts","indianPaperOrders","indianDerivativeOrders","indianMarketWatchlists"]);
+ assert.deepEqual(EXPORT_COLLECTIONS,["indianPaperAccounts","indianPaperOrders","indianDerivativeOrders","indianMarketWatchlists"]);
+ assert.deepEqual(NOT_REQUIRED_COLLECTIONS,["customerProfiles (profile PII is not needed by the Paper Trading transformer)","users (profile/entitlement data is not needed by the Paper Trading transformer)"]);
  assert.ok(EXCLUDED_COLLECTIONS.some(x=>x.startsWith("upstoxConnections")));assert.ok(EXCLUDED_COLLECTIONS.includes("upstoxOAuthStates"));
 });
 test("serializes timestamps, bytes, dates and nested values with explicit type markers",()=>{
@@ -39,6 +40,23 @@ test("export project selection requires explicit FIREBASE_PROJECT_ID",()=>{
  assert.throws(()=>resolveProjectId({GOOGLE_CLOUD_PROJECT:"ambient-project"}),/FIREBASE_PROJECT_ID explicitly/);
  assert.throws(()=>resolveProjectId({GCLOUD_PROJECT:"ambient-project"}),/FIREBASE_PROJECT_ID explicitly/);
  assert.throws(()=>resolveProjectId({FIREBASE_PROJECT_ID:"   "}),/FIREBASE_PROJECT_ID explicitly/);
+});
+
+
+test("snapshot exports only four trading collections and UID-only Auth identities",async()=>{
+ const parent=await fs.mkdtemp(path.join(os.tmpdir(),"zenura-export-minimal-"));
+ const output=path.join(parent,"snapshot"),queried=[];
+ const db={collection(name){queried.push(name);return {orderBy(){return {limit(){return {async get(){return {docs:[]};}};}};}};}};
+ const manifest=await exportSnapshot({db,auth:{listUsers:async()=>({users:[{uid:"firebase-user-1",email:"private@example.test"}]})},outputDirectory:output,projectId:"synthetic-project"});
+ assert.deepEqual(queried,["indianPaperAccounts","indianPaperOrders","indianDerivativeOrders","indianMarketWatchlists"]);
+ assert.deepEqual(manifest.collections,["indianPaperAccounts","indianPaperOrders","indianDerivativeOrders","indianMarketWatchlists"]);
+ assert.deepEqual(manifest.notRequiredCollections,NOT_REQUIRED_COLLECTIONS);
+ const files=await fs.readdir(output);
+ assert.deepEqual(files.sort(),["firebase-auth-users.jsonl","indianDerivativeOrders.jsonl","indianMarketWatchlists.jsonl","indianPaperAccounts.jsonl","indianPaperOrders.jsonl","manifest.json"].sort());
+ const authData=await fs.readFile(path.join(output,"firebase-auth-users.jsonl"),"utf8");
+ assert.equal(authData.includes("private@example.test"),false);
+ assert.equal(authData.includes("firebase-user-1"),true);
+ await fs.rm(parent,{recursive:true,force:true});
 });
 
 test("removes only its partial snapshot files when a read fails",async()=>{

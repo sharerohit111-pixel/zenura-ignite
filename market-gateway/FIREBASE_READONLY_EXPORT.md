@@ -6,7 +6,7 @@ functions, or switch application traffic.
 
 ## Inspected source collections
 
-- customerProfiles/{firebaseUid} and users/{firebaseUid}: user/profile documents.
+- customerProfiles/{firebaseUid} and users/{firebaseUid}: deliberately NOT exported. The Paper Trading transformer does not consume these profile/entitlement documents; excluding them avoids copying email, phone, display name and unrelated profile data.
 - indianPaperAccounts/{firebaseUid}: one shared INR balance, reserved cash, Delivery,
   Intraday and derivative position maps, realized P&L, version and timestamps.
 - indianPaperOrders/{sha256-order-id}: equity MARKET and Delivery LIMIT order history.
@@ -14,7 +14,9 @@ functions, or switch application traffic.
 - indianMarketWatchlists/{firebaseUid}: named per-user watchlists.
 - Firebase Auth users are exported separately as UID-only records. The transformer uses these UIDs solely to validate that Firestore references have matching Auth identities; contact details, provider identities and sign-in metadata are not exported.
 
-The allowlist excludes upstoxConnections because it contains encrypted broker-token
+The allowlist contains only the four Trading data collections. Firebase Auth users are exported separately as UID-only records for orphan-reference validation; no email, phone, display name, provider identity or sign-in metadata is exported. `customerProfiles` and `users` are explicitly recorded in the manifest as not required and are not read.
+
+The exclusion list also excludes upstoxConnections because it contains encrypted broker-token
 envelopes. OAuth state, connection-control, stream lease, worker cursor, margin-preview
 rate-limit and payment-provider collections are also excluded. Password hashes, salts,
 MFA secrets and refresh tokens are never exported.
@@ -45,7 +47,7 @@ read-only export itself.
 
 ## Migration constraints
 
-- Firebase UIDs are strings; map them to Supabase UUIDs using the private identity map.
+- Firebase UIDs are strings; only UIDs referenced by the four Trading collections are mapped to Supabase UUIDs using the private identity map.
   Never cast Firebase UIDs to UUIDs or create new virtual accounts during import.
 - One indianPaperAccounts document is one shared cash account across Delivery, Intraday
   and supported long CE/PE options. Never split it into separate ₹10 lakh accounts.
