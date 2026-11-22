@@ -405,3 +405,17 @@ The current CI golden-vector check covers three selected outcomes (NSE BUY, BSE 
 - Firebase partial-close basis uses BigInt integer arithmetic; SQL uses numeric arithmetic. Test quantities both odd and even, and repeated partial closes, for exact conservation.
 - Contract/quote binding is a trusted-server responsibility in the Firebase gateway. The SQL RPC is service-role-only and must only be called by a backend that has independently verified the provider instrument and quote.
 - Current three golden vectors remain smoke tests only; the matrix above is not yet implemented or certified.
+
+
+### Verification result — 2026-11-22 (audit CI run #51)
+
+GitHub Actions run **#51 / 44994067662** completed with **success** on the disposable PostgreSQL test environment. All **20 numbered verification steps** passed. In addition to the earlier transaction, concurrency, quote-freshness, RLS/RPC and tenant-isolation checks, this run passed:
+
+- The Firebase reference charge-calculation boundary suite (Node test file market-gateway/test/trading-charges.test.js), including half-paise rounding, BUY stamp / SELL STT boundaries, brokerage overrides, zero-brokerage GST base and unsafe-integer rejection.
+- The repeated partial-close cost-basis conservation fixture against the Firebase BigInt reference vector: starting fee-inclusive basis 98,778 paise for 75 units; two 25-unit closes each consume 32,926 paise; the final 25-unit close consumes the remaining 32,926 paise; total closed basis equals the original 98,778 paise and the position is removed.
+- SQL fee/rounding golden vectors, including the isolated tiny-premium SELL fixture.
+- Concurrent duplicate Options requests, future/off-tick quote rejection, RLS/privileged RPC boundaries, two-user tenant isolation, and expected schema/RPC registration.
+
+The partial-close fixture is a deterministic reference-vector check, not a full runtime differential execution of every Firebase and SQL transaction path. The charge suite exercises the Firebase JavaScript reference boundaries; SQL is compared through the selected golden-vector fixtures, not through the complete parity matrix above. The full matrix remains an open audit gate.
+
+The CI harness uses disposable PostgreSQL and minimal Supabase-compatible auth roles. It is not a live Supabase Auth/PostgREST integration test, Database Advisors review, or production certification. No connected Supabase project, Firebase backend, production data/settings, PR #28, or integration branch was modified. PR #71 remains Draft and open; PR #70 remains Draft and open. No PR was merged.
