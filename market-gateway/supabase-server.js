@@ -1078,7 +1078,7 @@ async function runPaperCryptoLimitWorker({maxOrders=50}={}){
   if(!Number.isInteger(maxOrders)||maxOrders<1||maxOrders>100)throw new TypeError("Crypto LIMIT worker batch size is invalid.");
   const leaseToken=crypto.randomUUID(),now=Date.now();
   const lease=await serviceDb.rpc("acquire_paper_crypto_limit_worker_lease",{
-    p_lease_token:leaseToken,p_now_ms:now,p_ttl_ms:60000
+    p_lease_token:leaseToken,p_now_ms:now,p_ttl_ms:120000
   });
   if(lease?.error)throw new Error("Crypto LIMIT worker lease could not be acquired.");
   if(lease?.data!==true)return {locked:true,scanned:0,filled:0,notEligible:0,failed:0};
@@ -1199,7 +1199,7 @@ async function start(){
       workerBusy=true;
       try{
         const [result,cryptoResult]=await Promise.all([
-          runPaperLimitWorker({maxOrders:10}),runPaperCryptoLimitWorker({maxOrders:25})
+          runPaperLimitWorker({maxOrders:10}),runPaperCryptoLimitWorker({maxOrders:10})
         ]);
         paperLimitWorkerStatus.lastRunAt=Date.now();
         paperLimitWorkerStatus.lastCycle={
