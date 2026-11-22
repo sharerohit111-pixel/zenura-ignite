@@ -54,7 +54,7 @@ async function exportSnapshot({db,auth,outputDirectory,projectId,pageSize=400}){
   importPerformed:false,sourceMutated:false};
  await fs.writeFile(path.join(target,"manifest.json"),JSON.stringify(manifest,null,2)+"\n",{encoding:"utf8",flag:"wx",mode:0o600});return manifest;
 }
-function parseArgs(argv){
+function resolveProjectId(env=process.env){\n const projectId=env.FIREBASE_PROJECT_ID;\n if(typeof projectId!=="string"||!projectId.trim())throw new Error("Set FIREBASE_PROJECT_ID explicitly; ambient Google project variables are not accepted.");\n return projectId.trim();\n}\nfunction parseArgs(argv){
  const args={confirm:false,outputDirectory:null,pageSize:400,dryRun:true};
  for(let i=0;i<argv.length;i++){const v=argv[i];if(v==="--confirm-read-only-export")args.confirm=true;else if(v==="--out-dir")args.outputDirectory=argv[++i]||null;else if(v==="--page-size")args.pageSize=Number(argv[++i]);else if(v==="--help"||v==="-h")args.help=true;else throw new Error("Unknown argument: "+v);}
  args.dryRun=!args.confirm;return args;
@@ -75,4 +75,4 @@ async function main(argv=process.argv.slice(2)){
  process.stdout.write(JSON.stringify({mode:"read-only-export-complete",outputDirectory:path.resolve(args.outputDirectory),totals:manifest.totals,importPerformed:false,sourceMutated:false},null,2)+"\n");
 }
 if(require.main===module)main().catch(error=>{process.stderr.write("Firebase export failed: "+error.message+"\n");process.exitCode=1;});
-module.exports={EXPORT_COLLECTIONS,EXCLUDED_COLLECTIONS,serializeFirestoreValue,sanitizeAuthUser,firestoreDocuments,authUsers,exportSnapshot,parseArgs};
+module.exports={EXPORT_COLLECTIONS,EXCLUDED_COLLECTIONS,serializeFirestoreValue,sanitizeAuthUser,firestoreDocuments,authUsers,exportSnapshot,resolveProjectId,parseArgs};
