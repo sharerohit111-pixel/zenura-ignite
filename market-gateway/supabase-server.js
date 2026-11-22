@@ -407,6 +407,7 @@ app.get("/paper/orders",async(req,res)=>{
 app.get("/paper/portfolio",async(req,res)=>{
   try{
     const {user,userDb}=await auth(req),product=normalizeProductMode(req.query.product);
+    if(!instrumentCache.length||Date.now()-instrumentCacheUpdatedAt>6*60*60*1000)await refreshInstrumentCache();
     if(product===null)return res.status(400).json({error:"product must be DELIVERY or INTRADAY."});
     const [{data:account,error:accountError},{data:rows,error:positionError}]=await Promise.all([
       userDb.from("paper_accounts").select("*").eq("user_id",user.id).maybeSingle(),
@@ -529,6 +530,7 @@ app.get("/paper/derivatives/portfolio",async(req,res)=>{
 app.get("/watchlist/quotes",async(req,res)=>{
   try{
     const {user,userDb}=await auth(req),name=watchlistName(req),watchlists=await readWatchlists(userDb,user.id),keys=watchlists[name];
+    if(!instrumentCache.length||Date.now()-instrumentCacheUpdatedAt>6*60*60*1000)await refreshInstrumentCache();
     if(!keys.length)return res.set("Cache-Control","private, no-store").json({name,quotes:[],status:"empty"});
     const {token}=await getUpstoxAccessToken(user.id);
     const response=await fetchProvider("https://api.upstox.com/v3/market-quote/quotes?"+new URLSearchParams({instrument_key:keys.join(",")}),{headers:{Authorization:"Bearer "+token,Accept:"application/json"}});
@@ -722,6 +724,7 @@ app.get("/paper/investing/portfolio",async(req,res)=>{
     if(accountError||!account)return res.status(404).json({error:"Paper Investing account has not been initialized."});
     if(positionError)throw Object.assign(new Error("Paper Investing positions could not be loaded."),{status:503});
     const positions=(rows||[]).map(p=>[p.instrument_key,{quantity:p.quantity,averagePricePaise:p.average_price_paise,costBasisPaise:p.cost_basis_paise}]);
+    if(!instrumentCache.length||Date.now()-instrumentCacheUpdatedAt>6*60*60*1000)await refreshInstrumentCache();
     if(!positions.length)return res.set("Cache-Control","private, no-store").json({product:"PAPER_INVESTING",positions:[],cashPaise:account.cash_paise,marketValuePaise:0,unrealizedPnlPaise:0,equityPaise:account.cash_paise,realizedPnlPaise:account.realized_pnl_paise,valuationStatus:"no_open_positions",simulationOnly:true});
     const {token}=await getUpstoxAccessToken(user.id),keys=positions.map(([key])=>key);
     const upstream=await fetchProvider("https://api.upstox.com/v3/market-quote/quotes?"+new URLSearchParams({instrument_key:keys.join(",")}),{headers:{Authorization:"Bearer "+token,Accept:"application/json"}});
