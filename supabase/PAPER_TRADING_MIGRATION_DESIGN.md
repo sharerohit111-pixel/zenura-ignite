@@ -329,3 +329,12 @@ All testing remains confined to GitHub Actions disposable PostgreSQL. No connect
 ### Data API exposure note (current Supabase platform behavior)
 
 RLS and SQL grants are separate from whether a table is exposed through the Supabase Data API. Supabase's October 30, 2026 breaking change makes new public-schema tables opt-in rather than automatically exposed. The migrations deliberately do not attempt to alter project-level Data API exposure settings; before an eventual app cutover, verify only the intended read tables are exposed and keep privileged transaction/provider tables unexposed. The actual project's settings remain untouched.
+
+
+### Verification result — 2026-11-22
+
+GitHub Actions run **#30 / 44991611079** completed with **success** on disposable PostgreSQL 16.16. All 17 workflow steps completed successfully, including ordered migration application, MARKET retry/freshness, concurrent MARKET duplicate requests, concurrent LIMIT duplicate submit, LIMIT fill-vs-cancel race, NULL-side rejection, CE partial/full-close and fee behavior, concurrent Options duplicate requests, future/off-tick Options rejection, RLS/search-path/grant checks, two-user row isolation, and cross-tenant watchlist insert denial.
+
+This is verified CI evidence for the committed audit branch. It is not a live Supabase project test, not a Firebase differential test, and not a production-readiness approval. No migration was applied to a connected Supabase project.
+
+The audit branch and PR #71 remain Draft. PR #70 remains Draft and unchanged.
