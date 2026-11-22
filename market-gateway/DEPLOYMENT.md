@@ -136,7 +136,7 @@ Create the four Google Secret Manager secrets checked by the workflow: `zenura-s
 
 ## 5. Scheduled Supabase Paper LIMIT worker
 
-The LIMIT worker is a separate **Cloud Run Job**, not a Firebase Function and not a public HTTP endpoint. It uses the same Supabase service-role secret and encrypted Upstox user tokens as the gateway. A Postgres lease ensures only one worker instance processes the pending LIMIT queue at a time; fills still go through the transactional `execute_paper_limit_fill` RPC.
+The LIMIT worker is a separate **Cloud Run Job**, not a Firebase Function and not a public HTTP endpoint. It uses the same Supabase service-role secret and encrypted Upstox user tokens as the gateway. A four-minute Postgres lease (longer than the 180-second job timeout) ensures only one worker instance processes the pending LIMIT queue at a time; fills still go through the transactional `execute_paper_limit_fill` RPC.
 
 Deploy the job with one task and one parallel worker:
 
