@@ -1,7 +1,7 @@
 "use strict";
 const test=require("node:test");
 const assert=require("node:assert/strict");
-const {isEligiblePaperLimitOrder,normalizeWorkerCursor,groupOrdersByUser}=require("../lib/paper-limit-worker");
+const {isEligiblePaperLimitOrder,isEligibleCryptoLimitOrder,normalizeWorkerCursor,groupOrdersByUser}=require("../lib/paper-limit-worker");
 
 const base={order_type:"LIMIT",status:"PENDING",simulation_only:true,product:"DELIVERY",
  user_id:"11111111-1111-4111-8111-111111111111",instrument_key:"NSE_EQ|TEST",
@@ -31,4 +31,23 @@ test("LIMIT worker groups pending orders by verified user id",()=>{
  const groups=groupOrdersByUser([base,{...base,order_id:"b".repeat(64)},{...base,user_id:"22222222-2222-4222-8222-222222222222"},{...base,user_id:null}]);
  assert.equal(groups.size,2);
  assert.equal(groups.get(base.user_id).length,2);
+});
+
+const cryptoLimit={order_type:"LIMIT",status:"PENDING",simulation_only:true,
+ user_id:"11111111-1111-4111-8111-111111111111",symbol:"BTCUSDT",side:"BUY",
+ quantity:"0.001",limit_price:"90000"};
+const cryptoQuote={priceUsdt:89900,tradeTimeMs:100000};
+test("crypto LIMIT worker requires pending simulation order and favorable fresh quote",()=>{
+ assert.equal(isEligibleCryptoLimitOrder(cryptoLimit,cryptoQuote,101000),true);
+ assert.equal(isEligibleCryptoLimitOrder({...cryptoLimit,side:"SELL"},cryptoQuote,101000),false);
+ assert.equal(isEligibleCryptoLimitOrder({...cryptoLimit,side:"SELL",limit_price:"89000"},cryptoQuote,101000),true);
+ assert.equal(isEligibleCryptoLimitOrder({...cryptoLimit,status:"CANCELLED"},cryptoQuote,101000),false);
+ assert.equal(isEligibleCryptoLimitOrder({...cryptoLimit,simulation_only:false},cryptoQuote,101000),false);
+ assert.equal(isEligibleCryptoLimitOrder({...cryptoLimit,symbol:"BTC"},cryptoQuote,101000),false);
+});
+test("crypto LIMIT worker rejects stale, future-dated and malformed quotes",()=>{
+ assert.equal(isEligibleCryptoLimitOrder(cryptoLimit,{...cryptoQuote,tradeTimeMs:85000},101000),false);
+ assert.equal(isEligibleCryptoLimitOrder(cryptoLimit,{...cryptoQuote,tradeTimeMs:101001},101000),false);
+ assert.equal(isEligibleCryptoLimitOrder(cryptoLimit,{...cryptoQuote,priceUsdt:0},101000),false);
+ assert.equal(isEligibleCryptoLimitOrder(cryptoLimit,{...cryptoQuote,tradeTimeMs:NaN},101000),false);
 });

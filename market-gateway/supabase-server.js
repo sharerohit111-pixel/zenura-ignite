@@ -14,7 +14,7 @@ const {isUuid,makeOrderId,makeOrderFingerprint}=require("./lib/order-idempotency
 const {normalizeProductMode}=require("./lib/product-mode");
 const {parseLimitPricePaise}=require("./lib/limit-price");
 const {normalizeProviderQuote}=require("./lib/provider-quote");
-const {isEligiblePaperLimitOrder,normalizeWorkerCursor,groupOrdersByUser}=require("./lib/paper-limit-worker");
+const {isEligiblePaperLimitOrder,isEligibleCryptoLimitOrder,normalizeWorkerCursor,groupOrdersByUser}=require("./lib/paper-limit-worker");
 const {buildPortfolioValuation}=require("./lib/paper-portfolio-valuation");
 const {calculateDerivativePortfolio}=require("./lib/derivative-portfolio");
 const {validateDerivativeContract}=require("./lib/derivative-contract");
@@ -330,6 +330,154 @@ app.put("/watchlist",async(req,res)=>{
   }catch(error){sendError(res,error,"Watchlist could not be saved.");}
 });
 
+
+
+const CRYPTO_SYMBOLS=new Set(["BTCUSDT","ETHUSDT","BNBUSDT","SOLUSDT","XRPUSDT","ADAUSDT","DOGEUSDT","AVAXUSDT","PAXGUSDT","XAUTUSDT"]);
+function makeCryptoOrderId(userId,idempotencyKey){
+  const hex=crypto.createHash("sha256").update(userId+":"+idempotencyKey).digest("hex").slice(0,32).split("");
+  hex[12]="5";hex[16]=((parseInt(hex[16],16)&3)|8).toString(16);
+  const value=hex.join("");
+  return value.slice(0,8)+"-"+value.slice(8,12)+"-"+value.slice(12,16)+"-"+value.slice(16,20)+"-"+value.slice(20);
+}
+app.get("/crypto/account",async(req,res)=>{
+  try{
+    const {user,userDb}=await auth(req);
+    const initialized=await runtime.callUserRpc(user,"initialize_paper_crypto_account",{p_starting_cash_inr:"1000000"});
+    const {data,error}=await userDb.from("paper_crypto_accounts").select("*").eq("user_id",user.id).maybeSingle();
+    if(error||!data)return res.status(409).json({error:"Crypto paper account could not be initialized or read."});
+    res.set("Cache-Control","private, no-store").json({
+      currency:data.currency,cashBalance:data.cash_balance,startingCash:data.starting_cash,
+      realizedPnl:data.realized_pnl,version:data.version,created:initialized?.created===true,
+      simulationOnly:true
+    });
+  }catch(error){sendError(res,error,"Crypto paper account could not be loaded.");}
+});
+app.post("/crypto/orders",async(req,res)=>{
+  try{
+    const {user}=await auth(req);
+    const symbol=typeof req.body?.symbol==="string"?req.body.symbol.toUpperCase():"";
+    const side=String(req.body?.side||"").toUpperCase();
+    const quantityRaw=String(req.body?.quantity??"");
+    const idempotencyKey=String(req.body?.idempotency_key||"");
+    if(!CRYPTO_SYMBOLS.has(symbol))return res.status(400).json({error:"Select a supported verified crypto spot symbol."});
+    if(!["BUY","SELL"].includes(side))return res.status(400).json({error:"Only BUY and SELL crypto paper orders are supported."});
+    if(!isUuid(idempotencyKey))return res.status(400).json({error:"A valid UUID idempotency_key is required."});
+    if(!/^(?:0|[1-9]\d*)(?:\.\d{1,12})?$/.test(quantityRaw))return res.status(400).json({error:"Enter a valid crypto quantity with up to 12 decimal places."});
+    const quantity=Number(quantityRaw);
+    if(!Number.isFinite(quantity)||quantity<=0||quantity>1000000000)return res.status(400).json({error:"Crypto quantity is outside supported limits."});
+    const baseAsset=symbol.slice(0,-4);
+    const [marketResponse,fxResponse]=await Promise.all([
+      fetchProvider("https://api.binance.com/api/v3/trades?"+new URLSearchParams({symbol,limit:"1"}),{headers:{Accept:"application/json"}},5000),
+      fetchProvider("https://open.er-api.com/v6/latest/USD",{headers:{Accept:"application/json"}},5000)
+    ]);
+    if(!marketResponse.ok||!fxResponse.ok)return res.status(502).json({error:"Crypto market price or INR reference rate is temporarily unavailable."});
+    const [trades,fxData]=await Promise.all([marketResponse.json(),fxResponse.json()]);
+    const trade=Array.isArray(trades)?trades[0]:null;
+    const price=Number(trade?.price),quoteTimestamp=Number(trade?.time),fxRate=Number(fxData?.rates?.INR);
+    const quoteAge=Date.now()-quoteTimestamp;
+    if(!Number.isFinite(price)||price<=0||!Number.isSafeInteger(quoteTimestamp)||quoteAge < -2000||quoteAge>15000)
+      return res.status(409).json({error:"A fresh Binance crypto quote is not available. Retry shortly."});
+    if(fxData?.result!=="success"||!Number.isFinite(fxRate)||fxRate<40||fxRate>200)
+      return res.status(502).json({error:"A valid USD/INR reference rate is not available."});
+    const gross=quantity*price*fxRate;
+    if(!Number.isFinite(gross)||gross<=0||gross>1000000000000)return res.status(400).json({error:"Crypto order value is outside supported limits."});
+    const fee=Number((gross*0.001).toFixed(8));
+    const orderId=makeCryptoOrderId(user.id,idempotencyKey);
+    const fingerprint=crypto.createHash("sha256").update(JSON.stringify({
+      userId:user.id,symbol,side,quantity:quantityRaw
+    })).digest("hex");
+    const result=await runtime.callUserRpc(user,"execute_paper_crypto_market_order",{
+      p_order_id:orderId,p_idempotency_key:idempotencyKey,p_request_fingerprint:fingerprint,
+      p_symbol:symbol,p_base_asset:baseAsset,p_side:side,p_quantity:quantityRaw,
+      p_execution_price:price.toFixed(8),p_fx_rate_inr:fxRate.toFixed(8),
+      p_fee:fee.toFixed(8),p_quote_timestamp_ms:quoteTimestamp
+    });
+    res.set("Cache-Control","private, no-store").status(result?.idempotent_replay?200:201).json({
+      orderId:result?.order?.order_id||orderId,status:result?.order?.status||"FILLED",
+      symbol,side,quantity:quantityRaw,executionPriceUsdt:price,fxRateInr:fxRate,
+      grossInr:Number(gross.toFixed(8)),feeInr:fee,cashBalance:result?.cash_balance,
+      realizedPnl:result?.realized_pnl,idempotentReplay:result?.idempotent_replay===true,
+      simulationOnly:true
+    });
+  }catch(error){sendError(res,error,"Crypto paper order could not be completed.");}
+});
+app.post("/crypto/limit-orders",async(req,res)=>{
+  try{
+    const {user}=await auth(req);
+    const symbol=typeof req.body?.symbol==="string"?req.body.symbol.toUpperCase():"";
+    const side=String(req.body?.side||"").toUpperCase();
+    const quantityRaw=String(req.body?.quantity??"");
+    const limitPriceRaw=String(req.body?.limit_price??"");
+    const idempotencyKey=String(req.body?.idempotency_key||"");
+    if(!CRYPTO_SYMBOLS.has(symbol))return res.status(400).json({error:"Select a supported verified crypto spot symbol."});
+    if(!["BUY","SELL"].includes(side))return res.status(400).json({error:"Only BUY and SELL crypto LIMIT orders are supported."});
+    if(!isUuid(idempotencyKey))return res.status(400).json({error:"A valid UUID idempotency_key is required."});
+    if(!/^(?:0|[1-9]\d*)(?:\.\d{1,12})?$/.test(quantityRaw)||Number(quantityRaw)<=0||!Number.isFinite(Number(quantityRaw))||Number(quantityRaw)>1000000000)
+      return res.status(400).json({error:"Enter a valid crypto quantity with up to 12 decimal places."});
+    if(!/^(?:0|[1-9]\d*)(?:\.\d{1,8})?$/.test(limitPriceRaw)||Number(limitPriceRaw)<=0||!Number.isFinite(Number(limitPriceRaw))||Number(limitPriceRaw)>1000000000)
+      return res.status(400).json({error:"Enter a valid LIMIT price with up to 8 decimal places."});
+    const baseAsset=symbol.slice(0,-4);
+    const fxResponse=await fetchProvider("https://open.er-api.com/v6/latest/USD",{headers:{Accept:"application/json"}},5000);
+    if(!fxResponse.ok)return res.status(502).json({error:"USD/INR reference rate is temporarily unavailable."});
+    const fxData=await fxResponse.json(),fxRate=Number(fxData?.rates?.INR);
+    if(fxData?.result!=="success"||!Number.isFinite(fxRate)||fxRate<40||fxRate>200)
+      return res.status(502).json({error:"A valid USD/INR reference rate is not available."});
+    const gross=Number(quantityRaw)*Number(limitPriceRaw)*fxRate;
+    if(!Number.isFinite(gross)||gross<=0||gross>1000000000000)
+      return res.status(400).json({error:"Crypto LIMIT reservation exceeds supported limits."});
+    const fee=Number((gross*0.001).toFixed(8));
+    const orderId=makeCryptoOrderId(user.id,idempotencyKey);
+    const fingerprint=crypto.createHash("sha256").update(JSON.stringify({
+      userId:user.id,symbol,side,quantity:quantityRaw,orderType:"LIMIT",limitPrice:limitPriceRaw
+    })).digest("hex");
+    await runtime.callUserRpc(user,"initialize_paper_crypto_account",{p_starting_cash_inr:"1000000"});
+    const result=await runtime.callUserRpc(user,"create_paper_crypto_limit_order",{
+      p_order_id:orderId,p_idempotency_key:idempotencyKey,p_request_fingerprint:fingerprint,
+      p_symbol:symbol,p_base_asset:baseAsset,p_side:side,p_quantity:quantityRaw,
+      p_limit_price:limitPriceRaw,p_fx_rate_inr:fxRate.toFixed(8),p_fee:fee.toFixed(8)
+    });
+    const order=result?.order||{};
+    res.set("Cache-Control","private, no-store").status(result?.idempotent_replay?200:201).json({
+      orderId:order.order_id||orderId,status:order.status||"PENDING",orderType:"LIMIT",
+      symbol,side,quantity:quantityRaw,limitPriceUsdt:limitPriceRaw,
+      reservedInr:order.reserved_amount??0,cashBalance:result?.cash_balance,
+      reservedCash:result?.reserved_cash,idempotentReplay:result?.idempotent_replay===true,
+      simulationOnly:true
+    });
+  }catch(error){sendError(res,error,"Crypto LIMIT order could not be created.");}
+});
+app.post("/crypto/limit-orders/:orderId/cancel",async(req,res)=>{
+  try{
+    const {user}=await auth(req);
+    const orderId=String(req.params.orderId||"");
+    if(!isUuid(orderId))return res.status(400).json({error:"A valid crypto order ID is required."});
+    const result=await runtime.callUserRpc(user,"cancel_paper_crypto_limit_order",{
+      p_order_id:orderId
+    });
+    res.set("Cache-Control","private, no-store").json({
+      orderId:result?.order?.order_id||orderId,status:result?.order?.status||"CANCELLED",
+      cancelled:result?.cancelled===true,idempotentReplay:result?.idempotent_replay===true,
+      simulationOnly:true
+    });
+  }catch(error){sendError(res,error,"Crypto LIMIT order could not be cancelled.");}
+});
+
+app.get("/crypto/portfolio",async(req,res)=>{
+  try{
+    const {user,userDb}=await auth(req);
+    const [{data:account,error:accountError},{data:positions,error:positionError},{data:orders,error:ordersError}]=await Promise.all([
+      userDb.from("paper_crypto_accounts").select("*").eq("user_id",user.id).maybeSingle(),
+      userDb.from("paper_crypto_positions").select("*").eq("user_id",user.id).order("symbol"),
+      userDb.from("paper_crypto_orders").select("*").eq("user_id",user.id).order("created_at",{ascending:false}).limit(100)
+    ]);
+    if(accountError||positionError||ordersError)throw Object.assign(new Error("Crypto portfolio could not be loaded."),{status:503});
+    if(!account)return res.status(404).json({error:"Crypto paper account has not been initialized."});
+    res.set("Cache-Control","private, no-store").json({
+      account:{currency:account.currency,cashBalance:account.cash_balance,reservedCash:account.reserved_cash,availableCash:Number(account.cash_balance)-Number(account.reserved_cash||0),realizedPnl:account.realized_pnl},
+      positions:positions||[],orders:orders||[],simulationOnly:true
+    });
+  }catch(error){sendError(res,error,"Crypto portfolio could not be loaded.");}
+});
 
 app.post("/paper/orders",async(req,res)=>{
   try{
@@ -925,6 +1073,105 @@ async function runPaperLimitWorker({maxOrders=50}={}){
   }
 }
 
+
+async function runPaperCryptoLimitWorker({maxOrders=50}={}){
+  if(!Number.isInteger(maxOrders)||maxOrders<1||maxOrders>100)throw new TypeError("Crypto LIMIT worker batch size is invalid.");
+  const leaseToken=crypto.randomUUID(),now=Date.now();
+  const lease=await serviceDb.rpc("acquire_paper_crypto_limit_worker_lease",{
+    p_lease_token:leaseToken,p_now_ms:now,p_ttl_ms:120000
+  });
+  if(lease?.error)throw new Error("Crypto LIMIT worker lease could not be acquired.");
+  if(lease?.data!==true)return {locked:true,scanned:0,filled:0,notEligible:0,failed:0};
+  const summary={locked:false,scanned:0,filled:0,notEligible:0,failed:0};
+  try{
+    const state=await serviceDb.from("paper_crypto_limit_worker_state")
+      .select("cursor_created_at,cursor_order_id").eq("state_key","crypto_limit_orders").maybeSingle();
+    if(state.error)throw new Error("Crypto LIMIT worker cursor could not be read.");
+    let cursor=state.data||{};
+    const loadBatch=position=>{
+      let query=serviceDb.from("paper_crypto_orders")
+        .select("order_id,user_id,symbol,base_asset,side,order_type,status,quantity,limit_price,simulation_only,created_at")
+        .eq("order_type","LIMIT").eq("status","PENDING").eq("simulation_only",true)
+        .order("created_at",{ascending:true}).order("order_id",{ascending:true}).limit(maxOrders);
+      if(position.cursor_created_at&&position.cursor_order_id)
+        query=query.or("created_at.gt."+position.cursor_created_at+",and(created_at.eq."+position.cursor_created_at+",order_id.gt."+position.cursor_order_id+")");
+      return query;
+    };
+    let batch=await loadBatch(cursor);
+    if(batch.error)throw new Error("Pending crypto LIMIT orders could not be scanned.");
+    if(!(batch.data||[]).length&&(cursor.cursor_created_at||cursor.cursor_order_id)){
+      cursor={cursor_created_at:null,cursor_order_id:null};
+      const reset=await serviceDb.from("paper_crypto_limit_worker_state")
+        .update({cursor_created_at:null,cursor_order_id:null,updated_at:new Date().toISOString()})
+        .eq("state_key","crypto_limit_orders").eq("lease_token",leaseToken);
+      if(reset.error)throw new Error("Crypto LIMIT worker cursor could not be reset.");
+      batch=await loadBatch(cursor);
+      if(batch.error)throw new Error("Pending crypto LIMIT orders could not be rescanned.");
+    }
+    const orders=batch.data||[];summary.scanned=orders.length;
+    let fxRate=null;
+    const quoteCache=new Map();
+    for(const order of orders){
+      try{
+        if(!CRYPTO_SYMBOLS.has(order.symbol)||order.base_asset!==order.symbol.slice(0,-4)){
+          summary.notEligible++;continue;
+        }
+        let quote=quoteCache.get(order.symbol);
+        if(!quote){
+          const response=await fetchProvider("https://api.binance.com/api/v3/trades?"+new URLSearchParams({symbol:order.symbol,limit:"1"}),{headers:{Accept:"application/json"}},5000);
+          if(!response.ok)throw new Error("Binance crypto LIMIT quote request failed.");
+          const trades=await response.json(),trade=Array.isArray(trades)?trades[0]:null;
+          quote={priceUsdt:Number(trade?.price),tradeTimeMs:Number(trade?.time)};
+          quoteCache.set(order.symbol,quote);
+        }
+        const nowMs=Date.now();
+        if(!isEligibleCryptoLimitOrder(order,quote,nowMs)){summary.notEligible++;continue;}
+        if(fxRate===null){
+          const fx=await fetchProvider("https://open.er-api.com/v6/latest/USD",{headers:{Accept:"application/json"}},5000);
+          if(!fx.ok)throw new Error("USD/INR reference rate unavailable for crypto LIMIT fill.");
+          const fxData=await fx.json();fxRate=Number(fxData?.rates?.INR);
+          if(fxData?.result!=="success"||!Number.isFinite(fxRate)||fxRate<40||fxRate>200)
+            throw new Error("Invalid USD/INR reference rate for crypto LIMIT fill.");
+        }
+        const gross=Number(order.quantity)*quote.priceUsdt*fxRate;
+        if(!Number.isFinite(gross)||gross<=0||gross>1000000000000){summary.notEligible++;continue;}
+        const fee=Number((gross*0.001).toFixed(8));
+        const filled=await serviceDb.rpc("fill_paper_crypto_limit_order",{
+          p_user_id:order.user_id,p_order_id:order.order_id,
+          p_execution_price:quote.priceUsdt.toFixed(8),p_fx_rate_inr:fxRate.toFixed(8),
+          p_fee:fee.toFixed(8),p_quote_timestamp_ms:quote.tradeTimeMs
+        });
+        if(filled?.error){
+          if(["23514","22023","P0002","55000"].includes(filled.error.code))summary.notEligible++;
+          else{summary.failed++;console.warn("Crypto LIMIT fill RPC failed",{orderId:order.order_id,code:filled.error.code||"unknown"});}
+        }else if(filled?.data?.order?.status==="FILLED")summary.filled++;
+        else summary.notEligible++;
+      }catch(error){
+        summary.failed++;
+        console.warn("Crypto LIMIT order processing failed",{orderId:order.order_id,errorName:error?.name||"Error"});
+      }
+    }
+    if(orders.length){
+      const last=orders[orders.length-1];
+      const saved=await serviceDb.from("paper_crypto_limit_worker_state")
+        .update({cursor_created_at:last.created_at,cursor_order_id:last.order_id,updated_at:new Date().toISOString()})
+        .eq("state_key","crypto_limit_orders").eq("lease_token",leaseToken);
+      if(saved.error)throw new Error("Crypto LIMIT worker cursor could not be saved.");
+    }else{
+      const saved=await serviceDb.from("paper_crypto_limit_worker_state")
+        .update({cursor_created_at:null,cursor_order_id:null,updated_at:new Date().toISOString()})
+        .eq("state_key","crypto_limit_orders").eq("lease_token",leaseToken);
+      if(saved.error)throw new Error("Crypto LIMIT worker cursor could not be reset.");
+    }
+    return summary;
+  }finally{
+    const released=await serviceDb.rpc("release_paper_crypto_limit_worker_lease",{
+      p_lease_token:leaseToken,p_now_ms:Date.now()
+    });
+    if(released?.error)console.warn("Crypto LIMIT worker lease release failed",{code:released.error.code||"unknown"});
+  }
+}
+
 async function start(){
   if(!ENC_KEY||!UPSTOX_CLIENT_ID||!UPSTOX_CLIENT_SECRET||!UPSTOX_REDIRECT_URI){
     throw new Error("Supabase gateway secrets and Upstox OAuth configuration are required.");
@@ -951,11 +1198,17 @@ async function start(){
       if(workerBusy||Date.now()<nextWorkerRunAt)return;
       workerBusy=true;
       try{
-        const result=await runPaperLimitWorker({maxOrders:10});
+        const [result,cryptoResult]=await Promise.all([
+          runPaperLimitWorker({maxOrders:10}),runPaperCryptoLimitWorker({maxOrders:10})
+        ]);
         paperLimitWorkerStatus.lastRunAt=Date.now();
-        paperLimitWorkerStatus.lastCycle={scanned:result.scanned,filled:result.filled,failed:result.failed,locked:result.locked,cycleError:false};
+        paperLimitWorkerStatus.lastCycle={
+          scanned:result.scanned+cryptoResult.scanned,filled:result.filled+cryptoResult.filled,
+          failed:result.failed+cryptoResult.failed,locked:result.locked&&cryptoResult.locked,
+          crypto:cryptoResult,cycleError:false
+        };
         workerBackoffMs=intervalMs;nextWorkerRunAt=Date.now()+intervalMs;
-        if(result.filled||result.failed)console.log("Paper LIMIT worker cycle",JSON.stringify(result));
+        if(result.filled||result.failed||cryptoResult.filled||cryptoResult.failed)console.log("Paper LIMIT worker cycle",JSON.stringify({equity:result,crypto:cryptoResult}));
       }catch(error){
         paperLimitWorkerStatus.lastRunAt=Date.now();
         paperLimitWorkerStatus.lastCycle={scanned:0,filled:0,failed:1,locked:false,cycleError:true};
@@ -971,4 +1224,4 @@ async function start(){
   }
 }
 if(require.main===module)start().catch(error=>{console.error("Supabase gateway startup failed:",error.message);process.exit(1);});
-module.exports={app,start,runPaperLimitWorker};
+module.exports={app,start,runPaperLimitWorker,runPaperCryptoLimitWorker};

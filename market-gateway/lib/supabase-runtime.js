@@ -10,7 +10,9 @@ const SERVER_RPCS = new Set([
   "submit_paper_limit_order",
   "cancel_paper_limit_order",
   "execute_paper_long_option_order",
-  "execute_paper_futures_market_order"
+  "execute_paper_futures_market_order",
+  "initialize_paper_crypto_account",
+  "execute_paper_crypto_market_order"
 ]);
 
 function httpError(message, status) {
