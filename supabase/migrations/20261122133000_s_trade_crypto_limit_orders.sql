@@ -40,7 +40,7 @@ begin
      or p_request_fingerprint is null or p_request_fingerprint !~ '^[a-f0-9]{64}$'
      or p_symbol is null or p_symbol !~ '^[A-Z0-9]{2,20}USDT$'
      or p_base_asset is null or p_symbol <> p_base_asset || 'USDT'
-     or p_side is null or p_side not in ('BUY','SELL') or p_quantity is null or p_quantity<=0 or p_quantity>1000000000
+     or p_side is null or p_side is null or p_side not in ('BUY','SELL') or p_quantity is null or p_quantity<=0 or p_quantity>1000000000
      or p_limit_price is null or p_limit_price<=0 or p_limit_price>1000000000
      or p_fx_rate_inr is null or p_fx_rate_inr<40 or p_fx_rate_inr>200
      or p_fee is null or p_fee<0 or p_fee>1000000000 then
