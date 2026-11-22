@@ -16,7 +16,7 @@ const GST=0.18;
 function parseCsvRows(input){
   if(typeof input!=="string"||Buffer.byteLength(input,"utf8")>MAX_CSV_BYTES)
     throw new Error("BSE scrip master CSV is missing or exceeds the safe size limit.");
-  input=input.replace(/^\\uFEFF/,"");
+  input=input.replace(/^\uFEFF/,"");
   const rows=[];let row=[],field="",quoted=false;
   for(let i=0;i<input.length;i++){
     const ch=input[i];
