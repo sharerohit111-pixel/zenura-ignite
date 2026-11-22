@@ -64,3 +64,29 @@ test("does not accept an invalid or non-UUID Auth identity", async () => {
   const runtime = createSupabaseRuntime({ ...config, createClient: factory });
   await assert.rejects(runtime.authenticateRequest({ get: () => "Bearer " + accessToken }), { status: 401 });
 });
+
+test("allowlists only the two S-TRADE crypto transactional RPCs", async () => {
+  const calls = [];
+  const runtime = createSupabaseRuntime({ ...config, createClient: fakeFactory(calls) });
+  const user = await runtime.authenticateRequest({ get: () => "Bearer " + accessToken });
+  const initialized = await runtime.callUserRpc(user, "initialize_paper_crypto_account", {
+    p_starting_cash_usdt: "10000"
+  });
+  assert.equal(initialized.args.p_user_id, uid);
+  assert.equal(initialized.args.p_starting_cash_usdt, "10000");
+  const order = await runtime.callUserRpc(user, "execute_paper_crypto_market_order", {
+    p_order_id: "11111111-2222-4333-8444-555555555556",
+    p_idempotency_key: "11111111-2222-4333-8444-555555555557"
+  });
+  assert.equal(order.args.p_user_id, uid);
+  await assert.rejects(
+    runtime.callUserRpc(user, "execute_paper_crypto_market_order", {
+      p_user_id: "22222222-2222-4222-8222-222222222222"
+    }),
+    { status: 400 }
+  );
+  await assert.rejects(
+    runtime.callUserRpc(user, "execute_paper_crypto_unknown", {}),
+    { status: 400 }
+  );
+});
