@@ -59,3 +59,17 @@ Before enabling stop-loss or target execution:
 8. Keep the UI/API from advertising guaranteed SL/target execution until the worker is deployed, monitored and end-to-end verified.
 
 The existing LIMIT worker is a useful pattern for leasing and fresh-quote validation, but its DELIVERY-equity-only fill RPC must not be reused for futures/options or protective orders without a separate accounting design.
+
+### Schema-specific findings for the protective-order transaction
+
+Inspection of the current draft migrations adds an important constraint to the design:
+
+- `paper_equity_positions` has `quantity` and `reserved_quantity`, so equity exits can be bounded by held minus already-reserved shares.
+- `paper_derivative_positions` stores a positive `net_quantity` for long CE/PE positions, but has no reserved-exit quantity column.
+- `paper_futures_positions` stores signed `net_quantity` and `reserved_margin_paise`, but no reserved-exit quantity column. Its `product` values are `INTRADAY` / `DELIVERY`; protective order product labels are `FUTURES`.
+- `paper_protective_orders` currently stores trigger and requested quantity, but has no idempotent fill ledger, execution price/quote fields, reservation state, or link to a position version.
+
+Therefore the pure helper's position checks are preflight validation only. They cannot prevent two ACTIVE protective orders from both claiming the same shares/contracts. Before a worker is enabled, the forward migration and atomic RPC must introduce a consistent reservation strategy for equity, futures and long options, or atomically aggregate and serialize all competing ACTIVE protective orders under the relevant account/position lock. The RPC must also create the canonical paper trade/order-history record and release any reservation exactly once on fill, cancellation or rejection.
+
+The inspected futures market-order RPC already handles account locking, margin and position updates, but its contract is a MARKET entry/exit transaction. It must not be invoked as a shortcut for a triggered protective order unless the protective RPC wraps and preserves the same accounting invariants in one transaction. The option position schema is long-only; protective execution must remain SELL-to-close and must never create a short option position.
+
