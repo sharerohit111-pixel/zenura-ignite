@@ -127,8 +127,8 @@ begin
 
   -- NSE cash-equity indicative schedule, version 2026-03-01.
   -- Integer paise; PostgreSQL round(numeric) gives half-away-from-zero.
-  v_brokerage := least(2000::bigint,round(v_gross::numeric *
-    case when p_product='INTRADAY' then 0.001 else 0.001 end)::bigint);
+  v_brokerage := case when p_product='DELIVERY' then 2000::bigint
+    else least(2000::bigint,round(v_gross::numeric*0.001)::bigint) end;
   v_exchange := round(v_gross::numeric*0.000030699)::bigint;
   v_ipft := round(v_gross::numeric*0.000000001)::bigint;
   v_sebi := round(v_gross::numeric*0.000001)::bigint;
