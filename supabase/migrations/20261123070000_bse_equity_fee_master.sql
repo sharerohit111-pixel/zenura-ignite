@@ -184,7 +184,7 @@ begin
     raise exception using errcode='22003',message='BSE equity charges exceed supported net settlement limits';
   end if;
   return jsonb_build_object(
-    'schedule_version','BSE-2022-12-01','exchange','BSE','product',p_product,'side',p_side,
+    'schedule_version','BSE-2025-04-29','exchange','BSE','product',p_product,'side',p_side,
     'gross_paise',p_gross_paise,'brokerage_paise',v_brokerage,
     'exchange_transaction_paise',v_exchange,'exchange_rate_paise_per_crore',v_rate,
     'ipft_paise',0,'bse_ipf_included',true,'sebi_paise',v_sebi,'stt_paise',v_stt,
