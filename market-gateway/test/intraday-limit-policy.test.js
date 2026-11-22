@@ -46,6 +46,12 @@ test("intraday LIMIT eligibility requires fresh quote, active session and exact 
  assert.equal(isEligibleIntradayLimitOrder({...order,side:"SELL"},quote,now,normalSession),false);
  assert.equal(isEligibleIntradayLimitOrder({...order,side:"SELL",limit_price_paise:9800},quote,now,normalSession),true);
  assert.equal(isEligibleIntradayLimitOrder(order,{...quote,tradeTimeMs:now-15001},now,normalSession),false);
+ const justBeforeOpen=epoch("2026-11-23T03:44:59.000Z");
+ const justAfterOpen=epoch("2026-11-23T03:45:01.000Z");
+ assert.equal(isEligibleIntradayLimitOrder(
+  {...order,created_at:"2026-11-23T03:45:00.000Z"},
+  {pricePaise:9900,tradeTimeMs:justBeforeOpen},justAfterOpen,normalSession
+ ),false,"pre-market quote must not trigger a fill immediately after the open");
  assert.equal(isEligibleIntradayLimitOrder(order,quote,now,{exchange:"NSE",sessionDate:"2026-11-23",isTradingDay:false,openMinute:555,closeMinute:930}),false);
  assert.equal(isEligibleIntradayLimitOrder({...order,product:"DELIVERY"},quote,now,normalSession),false);
  assert.equal(isEligibleIntradayLimitOrder({...order,simulation_only:false},quote,now,normalSession),false);
