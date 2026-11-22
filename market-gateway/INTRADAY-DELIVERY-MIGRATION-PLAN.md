@@ -1,5 +1,7 @@
 # Cash-Equity Intraday / Delivery Separation Plan
 
+> **HISTORICAL DESIGN NOTE.** This plan predates the current Supabase-native launch architecture. Use [DEPLOYMENT.md](./DEPLOYMENT.md) for the active gateway and LIMIT-worker design. No Firebase customer-data migration is part of the current product scope.
+
 Status: design-only; no runtime behavior changes are made by this document.
 Scope: ZENURA IGNITE Paper Trading cash equities only. Paper Investing is out of scope.
 Safety: production deployment and the scheduled LIMIT matcher remain disabled.
