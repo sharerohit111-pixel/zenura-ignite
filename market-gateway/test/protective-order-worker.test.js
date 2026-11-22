@@ -1,7 +1,7 @@
 "use strict";
 const test=require("node:test");
 const assert=require("node:assert/strict");
-const {evaluateProtectiveOrder,MAX_QUOTE_AGE_MS,isSupportedProtectiveOrder}=require("../lib/protective-order-worker");
+const {evaluateProtectiveOrder,MAX_QUOTE_AGE_MS,isSupportedProtectiveOrder,isPositionCloseable}=require("../lib/protective-order-worker");
 
 const order={order_id:"a".repeat(64),user_id:"11111111-1111-4111-8111-111111111111",
  status:"ACTIVE",asset_class:"EQUITY",instrument_key:"NSE_EQ|TEST",product:"DELIVERY",
@@ -35,4 +35,19 @@ test("protective worker rejects malformed order values and unsupported enums",()
  assert.equal(evaluateProtectiveOrder({...order,asset_class:"CRYPTO"},quote,101000),false);
  assert.equal(evaluateProtectiveOrder({...order,trigger_direction:"CLOSE_ENOUGH"},quote,101000),false);
  assert.equal(evaluateProtectiveOrder({...order,user_id:null},quote,101000),false);
+});
+
+test("protective worker cannot close more than the unreserved position or close the wrong side",()=>{
+ const equity={instrument_key:order.instrument_key,product:"DELIVERY",quantity:12,reserved_quantity:3};
+ assert.equal(isPositionCloseable(order,equity),true);
+ assert.equal(isPositionCloseable({...order,quantity:10},equity),false);
+ assert.equal(isPositionCloseable({...order,side:"BUY",trigger_type:"TARGET",trigger_direction:"AT_OR_BELOW"},equity),false);
+ const futureOrder={...order,asset_class:"FUTURE",product:"FUTURES",quantity:2};
+ assert.equal(isPositionCloseable(futureOrder,{instrument_key:order.instrument_key,product:"FUTURES",net_quantity:3}),true);
+ assert.equal(isPositionCloseable(futureOrder,{instrument_key:order.instrument_key,product:"FUTURES",net_quantity:-3}),false);
+ assert.equal(isPositionCloseable({...futureOrder,side:"BUY",trigger_type:"STOP_LOSS",trigger_direction:"AT_OR_ABOVE"},
+   {instrument_key:order.instrument_key,product:"FUTURES",net_quantity:-3}),true);
+ const optionOrder={...order,asset_class:"OPTION",product:"OPTIONS",quantity:1};
+ assert.equal(isPositionCloseable(optionOrder,{instrument_key:order.instrument_key,net_quantity:1}),true);
+ assert.equal(isPositionCloseable(optionOrder,{instrument_key:order.instrument_key,net_quantity:0}),false);
 });
