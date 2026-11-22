@@ -83,10 +83,10 @@ test("injects only the resolved Supabase UUID into allowlisted trading RPC args"
   assert.equal(Object.isFrozen(args),true);
 });
 
-test("prevents forged identity, caller user-id override and non-trading RPC calls",()=>{
+test("prevents forged identities and non-allowlisted RPC calls",async()=>{
   assert.throws(()=>buildPaperTradingRpcArgs({supabaseUserId},"execute_paper_market_order",{}),{status:401});
-  assert.throws(()=>buildPaperTradingRpcArgs({},"execute_paper_market_order",{p_user_id:supabaseUserId}),{status:401});
-  assert.throws(()=>buildPaperTradingRpcArgs({},"unknown_admin_rpc",{}),{status:401});
+  const identity=await adapter(async()=>response(supabaseUserId)).resolveIdentity({idToken,decodedToken});
+  assert.throws(()=>buildPaperTradingRpcArgs(identity,"unknown_admin_rpc",{}),{status:400});
 });
 
 test("rejects user-id overrides even for a resolved identity",async()=>{
