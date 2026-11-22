@@ -24,6 +24,12 @@ RESET ROLE;
 INSERT INTO auth.users(id) VALUES ('66666666-6666-4666-8666-666666666666')
 ON CONFLICT (id) DO NOTHING;
 SELECT public.initialize_paper_trading_account('66666666-6666-4666-8666-666666666666');
+INSERT INTO public.paper_exchange_sessions(
+  exchange,session_date,is_trading_day,open_minute,close_minute,session_kind,source_reference,verified_at
+) VALUES (
+  'BSE',(now() at time zone 'Asia/Kolkata')::date,true,0,1440,'SPECIAL',
+  'CI-only BSE Intraday LIMIT session fixture',now()
+);
 
 DO $bse_fee_master$
 DECLARE
@@ -154,6 +160,30 @@ BEGIN
      OR (v_result->>'realized_pnl_paise')::bigint<>97929
      OR v_cash<>101593126 OR v_realized<>2089876 THEN
     RAISE EXCEPTION 'BSE Delivery LIMIT SELL net settlement mismatch: %, cash %, realized %',v_result,v_cash,v_realized;
+  END IF;
+
+  -- BSE Intraday LIMIT uses its own verified session and the same group-specific fee resolver.
+  v_result:=public.submit_paper_intraday_limit_order(
+    '66666666-6666-4666-8666-666666666666',repeat('6',64),
+    '66666666-6666-4666-8666-666666666666',repeat('7',64),
+    'BSE_EQ|INE002A01018','RELIANCE','BSE','BUY',2,100000
+  );
+  SELECT reserved_cash_paise INTO v_reserved FROM public.paper_accounts
+   WHERE user_id='66666666-6666-4666-8666-666666666666';
+  IF v_reserved<>200242 THEN
+    RAISE EXCEPTION 'BSE Intraday LIMIT did not reserve group-specific charges: %',v_reserved;
+  END IF;
+  v_result:=public.execute_paper_intraday_limit_fill(
+    repeat('6',64),99000,floor(extract(epoch from clock_timestamp())*1000)::bigint,0,
+    floor(extract(epoch from clock_timestamp())*1000)::bigint
+  );
+  SELECT reserved_cash_paise,cash_paise INTO v_reserved,v_cash FROM public.paper_accounts
+   WHERE user_id='66666666-6666-4666-8666-666666666666';
+  IF v_result->>'status'<>'FILLED' OR v_reserved<>0 OR v_cash<>101394886
+     OR (v_result->>'charges_paise')::bigint<>240
+     OR (v_result->>'cash_delta_paise')::bigint<>-198240
+     OR v_result->'charges_breakdown'->>'scrip_group'<>'A' THEN
+    RAISE EXCEPTION 'BSE Intraday LIMIT fill did not settle from the verified BSE fee master: %',v_result;
   END IF;
 
   v_rejected:=false;
