@@ -44,3 +44,10 @@ The same isolated script also races two distinct 60,000,000-paise MARKET BUY req
 ### RPC execution role
 
 The concurrency script now issues each MARKET RPC call after `SET ROLE service_role`, including the mismatched-fingerprint rejection check. The harness reads assertions as the disposable database owner, but order mutations execute under the intended backend role rather than relying on PostgreSQL superuser privileges. This still does not replace a real Supabase staging integration test.
+
+
+### Source-migration signature cross-check (2026-11-22)
+
+The concurrency harness MARKET RPC call was cross-checked against PR #70 draft migration `202611220002_paper_order_transactions.sql`. The declared 13-argument order matches the harness: user UUID, order ID, idempotency UUID, request fingerprint, instrument key, trading symbol, exchange, side, product, quantity, execution price paise, quote timestamp milliseconds, and quote age milliseconds. The migration requires a 64-character lowercase-hex order ID and request fingerprint, a positive execution price, and quote age from 0 through 15,000 ms; the synthetic fixtures meet those checks. The initializer is the one-UUID `initialize_paper_trading_account(uuid)` RPC and provisions the disposable test account with ₹10,00,000 in virtual cash.
+
+This is a source review only. The SQL and shell harness have not yet been executed by the workflow, so runtime compatibility remains unverified.
