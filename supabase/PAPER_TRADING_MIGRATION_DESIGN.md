@@ -419,3 +419,14 @@ GitHub Actions run **#51 / 44994067662** completed with **success** on the dispo
 The partial-close fixture is a deterministic reference-vector check, not a full runtime differential execution of every Firebase and SQL transaction path. The charge suite exercises the Firebase JavaScript reference boundaries; SQL is compared through the selected golden-vector fixtures, not through the complete parity matrix above. The full matrix remains an open audit gate.
 
 The CI harness uses disposable PostgreSQL and minimal Supabase-compatible auth roles. It is not a live Supabase Auth/PostgREST integration test, Database Advisors review, or production certification. No connected Supabase project, Firebase backend, production data/settings, PR #28, or integration branch was modified. PR #71 remains Draft and open; PR #70 remains Draft and open. No PR was merged.
+
+
+### Verification result — 2026-11-22 (audit CI run #55)
+
+GitHub Actions run **#55 / 44999830275** completed with **success** on disposable PostgreSQL. All **22 numbered verification steps** passed. This run additionally executed the Firebase reference option transaction test file in CI and added SQL transaction fixtures for:
+
+- Add-on BUY on an existing CE position: the two independent fills accumulated quantity, fee-inclusive cost basis and shared-cash debit exactly.
+- Insufficient unreserved cash: the RPC rejected the order and assertions confirmed no order or position was written and the test account cash remained unchanged.
+- The 50-open-position boundary: the 51st distinct contract was rejected without a partial order; an add-on BUY to an already-open contract remained allowed at the cap.
+
+The Firebase JS transaction reference test includes a separate add-on BUY vector for exact fee-inclusive basis, average price and cash. The SQL tests run in a disposable PostgreSQL harness with minimal Supabase-compatible auth roles. They are not live Supabase Auth/PostgREST tests, full end-to-end Firebase-vs-SQL runtime differential execution, Database Advisors review, or production certification. Existing golden vectors and deterministic partial-close vectors remain selected parity fixtures; the complete matrix above is still an open audit gate. No actual Supabase project, Firebase backend, production data/settings, PR #28, or integration branch was modified. PR #71 and PR #70 remain Draft and open; no PR was merged.
