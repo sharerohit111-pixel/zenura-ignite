@@ -357,6 +357,8 @@
     chart=null;container=null;context=null;barCallback=null;lastBar=null;
   }
   document.addEventListener("zenura-chart-theme-change",event=>setTheme(event.detail?.theme));
+  window.addEventListener("zenura-market-auth-ready",event=>{if(!event.detail?.signedIn)destroy();});
+  window.addEventListener("pagehide",destroy,{once:true});
   document.getElementById("chart-type-select")?.addEventListener("change",event=>setChartType(event.target.value));
   document.getElementById("chart-save-template")?.addEventListener("click",()=>{
     const input=document.getElementById("chart-template-name");
