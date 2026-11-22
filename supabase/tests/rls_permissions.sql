@@ -24,7 +24,10 @@ BEGIN
     RAISE EXCEPTION 'Authenticated role is missing a required Paper Trading read grant';
   END IF;
 
-  IF has_table_privilege('authenticated','public.paper_accounts','INSERT')
+  IF has_table_privilege('authenticated','public.paper_futures_orders','INSERT')
+     OR has_table_privilege('authenticated','public.paper_investing_accounts','UPDATE')
+     OR has_table_privilege('authenticated','public.paper_protective_orders','INSERT')
+     OR has_table_privilege('authenticated','public.paper_accounts','INSERT')
      OR has_table_privilege('authenticated','public.paper_accounts','UPDATE')
      OR has_table_privilege('authenticated','public.paper_orders','INSERT')
      OR has_table_privilege('authenticated','public.paper_derivative_orders','DELETE') THEN
@@ -35,6 +38,19 @@ BEGIN
      OR has_table_privilege('authenticated','public.upstox_oauth_states','SELECT')
      OR has_table_privilege('authenticated','public.paper_market_worker_state','SELECT') THEN
     RAISE EXCEPTION 'Authenticated role can access a private identity/provider/worker table';
+  END IF;
+
+  INSERT INTO public.paper_chart_drawings(user_id,instrument_key,timeframe,drawing_type,payload)
+  VALUES ('11111111-1111-4111-8111-111111111111','NSE_EQ|OWN','5m','TRENDLINE','{"points":[[1,2],[3,4]]}'::jsonb);
+  SELECT count(*) INTO v_count FROM public.paper_chart_drawings;
+  IF v_count <> 1 THEN
+    RAISE EXCEPTION 'Chart drawing RLS should expose exactly one own drawing';
+  END IF;
+  INSERT INTO public.paper_chart_drawings(user_id,instrument_key,timeframe,drawing_type,payload)
+  VALUES ('22222222-2222-4222-8222-222222222222','NSE_EQ|OTHER','5m','RAY','{"points":[[1,2],[3,4]]}'::jsonb);
+  GET DIAGNOSTICS v_rows = ROW_COUNT;
+  IF v_rows <> 0 THEN
+    RAISE EXCEPTION 'Cross-user chart drawing insert unexpectedly succeeded';
   END IF;
 
   SELECT count(*) INTO v_count FROM public.paper_accounts;
@@ -80,6 +96,7 @@ $rls_privileges$;
 RESET ROLE;
 
 -- Keep the focused permission test isolated from the later shared-tenant RLS suite.
+DELETE FROM public.paper_chart_drawings WHERE user_id IN ('11111111-1111-4111-8111-111111111111','22222222-2222-4222-8222-222222222222');
 DELETE FROM public.paper_watchlists
  WHERE (user_id='11111111-1111-4111-8111-111111111111' AND name IN ('My Stocks','Banking'))
     OR (user_id='22222222-2222-4222-8222-222222222222' AND name='My Stocks');
