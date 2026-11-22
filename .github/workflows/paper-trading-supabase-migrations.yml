@@ -319,9 +319,10 @@ jobs:
           RESET ROLE;
           SQL
           }
-          run_duplicate &
-          run_duplicate &
-          wait
+          run_duplicate & pid1=$!
+          run_duplicate & pid2=$!
+          wait "$pid1"
+          wait "$pid2"
           psql -v ON_ERROR_STOP=1 <<'SQL'
           DO $
           BEGIN
