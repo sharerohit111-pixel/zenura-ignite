@@ -69,14 +69,15 @@ The Intraday LIMIT lifecycle is now implemented in the draft integration branch,
 - Added an NSE cash-equity Intraday charge estimator in integer paise: brokerage is capped at ₹20 or 0.10% turnover, STT is sell-side 0.025%, stamp duty is buy-side 0.003%, plus NSE transaction/IPFT, SEBI and GST. BSE intraday deliberately fails closed pending exact scrip-group pricing.
 - BSE pricing was checked against the official [BSE Equity Segment Master Circular](https://www.bseindia.com/markets/MarketInfo/DownloadAttach.aspx?attachedId=8a7fec3a-95bc-4bd2-82de-76e2a84e2915&id=20250429-51): cash transaction fees depend on scrip group and, for some groups, the BSE-exclusive flag from the exchange scrip master. The currently downloaded Upstox instrument-master records do not expose those required fields, so BSE cash settlement remains fail-closed rather than guessing a rate.
 - Added forward-only migration `20261122214500_align_option_charges_with_nse_ipft_schedule.sql` to correct the long-option SQL fee constants to NSE transaction 0.0003552 plus IPFT 0.000000001. The previous combined/overstated SQL constants would have diverged from the JavaScript calculator at larger turnovers.
-- Added a CI guard that inspects the installed option RPC definition for the corrected SQL constants. GitHub Actions runs [45073565611](https://github.com/sharerohit111-pixel/zenura-ignite/actions/runs/45073565611) and [45073559304](https://github.com/sharerohit111-pixel/zenura-ignite/actions/runs/45073559304) are still running; no pass is claimed yet.
+- Added a CI guard that inspects the installed option RPC definition for the corrected SQL constants. The complete GitHub Actions run [45074654262](https://github.com/sharerohit111-pixel/zenura-ignite/actions/runs/45074654262) passed after the option and equity fee-accounting regressions were aligned.
 - The new Intraday calculator and the option SQL correction are still not connected to cash-equity MARKET/LIMIT settlement. That atomic accounting integration remains the next engineering gate.
 
 Remaining before this slice can be marked release-ready:
 
 1. Rehearse the forward-only migrations and worker lease against a disposable Supabase staging database; do not use the linked production project.
-2. Integrate verified, versioned Indian equity charges into MARKET and LIMIT fills, cash reservations, cost basis, realized/unrealized P&L, and order history. The current equity MARKET and Intraday LIMIT SQL settlement is gross-only; the standalone NSE delivery charge calculator is not yet wired into that settlement path. Do not present gross-only P&L as net P&L.
-3. Validate complete order/trade history and account reconciliation after BUY, SELL, cancellation, expiry and replay, including charge reversals and partial fills.
-4. Keep the UI action and worker disabled until the backend, staging and compliance gates pass.
+2. Extend the new fee-inclusive NSE MARKET settlement to Delivery LIMIT and Intraday LIMIT submission reservations, fills, cancellations, expiry and idempotent replay. MARKET charges now flow atomically into cash, cost basis, net realized P&L and order history; LIMIT remains gross-only until its own RPC lifecycle is migrated.
+3. Complete BSE cash-fee support only after the official scrip-group/exclusive-category inputs are available; BSE MARKET currently fails closed.
+4. Validate complete order/trade history and account reconciliation after BUY, SELL, cancellation, expiry and replay, including fee-inclusive reservations, charge reversals and partial fills.
+5. Keep the UI action and worker disabled until backend, staging and compliance gates pass.
 
 The existing Delivery LIMIT worker must not be reused as an Intraday implementation by simply removing its product filter. The separate reservation, session-expiry, cancellation and fill invariants are required.
