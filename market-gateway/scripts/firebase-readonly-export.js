@@ -2,9 +2,6 @@
 const crypto=require("node:crypto");
 const fs=require("node:fs/promises");
 const path=require("node:path");
-const {initializeApp,applicationDefault,getApps}=require("firebase-admin/app");
-const {getFirestore}=require("firebase-admin/firestore");
-const {getAuth}=require("firebase-admin/auth");
 const EXPORT_COLLECTIONS=Object.freeze(["customerProfiles","users","indianPaperAccounts","indianPaperOrders","indianDerivativeOrders","indianMarketWatchlists"]);
 const EXCLUDED_COLLECTIONS=Object.freeze(["upstoxConnections (encrypted broker-token envelopes)","upstoxOAuthStates","upstoxConnectionControls","indianMarketStreamLeases","indianMarketWorkerState","indianMarginPreviewLimits","paymentOrders","razorpayEvents"]);
 function serializeFirestoreValue(value){
@@ -70,6 +67,9 @@ async function main(argv=process.argv.slice(2)){
  if(!Number.isInteger(args.pageSize)||args.pageSize<1||args.pageSize>1000)throw new Error("--page-size must be an integer from 1 through 1000.");
  const projectId=process.env.FIREBASE_PROJECT_ID||process.env.GOOGLE_CLOUD_PROJECT||process.env.GCLOUD_PROJECT;
  if(!projectId)throw new Error("Set FIREBASE_PROJECT_ID or GOOGLE_CLOUD_PROJECT explicitly.");
+ const {initializeApp,applicationDefault,getApps}=require("firebase-admin/app");
+ const {getFirestore}=require("firebase-admin/firestore");
+ const {getAuth}=require("firebase-admin/auth");
  if(!getApps().length)initializeApp({credential:applicationDefault(),projectId});
  const manifest=await exportSnapshot({db:getFirestore(),auth:getAuth(),outputDirectory:args.outputDirectory,projectId,pageSize:args.pageSize});
  process.stdout.write(JSON.stringify({mode:"read-only-export-complete",outputDirectory:path.resolve(args.outputDirectory),totals:manifest.totals,importPerformed:false,sourceMutated:false},null,2)+"\n");
