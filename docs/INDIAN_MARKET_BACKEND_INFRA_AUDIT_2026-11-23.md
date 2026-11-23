@@ -69,3 +69,16 @@ The Supabase performance advisor reported 17 indexes as unused at the observatio
 - Lease RPCs accept caller-supplied `p_now_ms` and calculate expiry from that value, while some metadata uses database `clock_timestamp()`. Since only service_role can execute these RPCs, this is not a direct client exploit, but worker correctness depends on trusted server time and disciplined clock synchronization. Recommend deriving authoritative lease time inside PostgreSQL (or explicitly validating drift) during a staging-tested hardening change.
 - Worker lease acquisition is atomic via INSERT/ON CONFLICT with expiry predicate. Release matches the lease token. Stream lease renewal requires matching lease ID, non-revoked status, and unexpired lease. The consumer still needs fencing checks on every side effect/checkpoint; source code was not available to verify that end-to-end.
 - One read-only catalog query using a non-existent `information_schema.schema_privileges` view failed; no database state was changed. Role membership was subsequently inspected using `pg_auth_members`.
+
+
+### Follow-up — migration inventory, sensitive-table ACLs, extensions and trigger inventory
+- The applied migration inventory contains 15 versions. Two distinct versions share the name `paper_market_worker_leases` (`20261122121443` and `20261122122110`); version IDs remain unique, but the repeated label should be clarified in the source migration archive to avoid operator confusion.
+- The repository tree scan confirms there is no `supabase/` directory, migration SQL, `config.toml`, Upstox callback/worker source, or market-data runtime implementation on `main`. The checked-in GitHub Actions workflows are Firebase/GitHub Pages/Kirana Spark related; no Supabase migration/deploy/test workflow was found.
+- Sensitive service-only tables inspected have no `anon` or `authenticated` table grants. The `service_role` table grants are limited to REFERENCES/TRIGGER/TRUNCATE in the information_schema view; no direct SELECT/INSERT/UPDATE/DELETE grant was present. SECURITY DEFINER RPCs therefore form the intended privileged access path. Keep this boundary and add CI assertions to detect accidental client-role grants.
+- No triggers were returned for the inspected Upstox/lease tables in `information_schema.triggers`.
+- Installed extensions visible in the catalog: `pg_stat_statements`, `pgcrypto`, `plpgsql`, `supabase_vault`, and `uuid-ossp`.
+- Attempted to inspect `cron.job`, but the `cron` schema/relation is not present. This does not establish that no external scheduler exists; it means in-database pg_cron scheduling was not discoverable via that catalog query.
+- A read-only catalog query that referenced `cron.job` failed because that relation is absent; no database state was changed.
+
+### Updated confidence and remaining blockers
+The database-side ACL and SECURITY DEFINER boundary has stronger positive evidence than the application runtime boundary. This does not establish that OAuth callback validation, Upstox secret custody, encryption key rotation, market-data ingestion, worker lease fencing, or deployment health are correct. Those remain unverified until the backend source and an isolated staging environment are available.
