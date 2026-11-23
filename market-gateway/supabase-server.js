@@ -574,19 +574,14 @@ app.post("/paper/derivative/limit-orders",async(req,res)=>{
     if(!instrumentKey||instrumentKey.length>160||/[\r\n]/.test(instrumentKey))
       return res.status(400).json({error:"A valid NSE option instrument_key is required."});
     if(!["BUY","SELL"].includes(side))return res.status(400).json({error:"Options LIMIT side must be BUY or SELL."});
+    if(!Number.isSafeInteger(lots)||lots<1||lots>10000)
+      return res.status(400).json({error:"Lots must be a whole number between 1 and 10,000."});
     if(!Number.isSafeInteger(limitPricePaise)||limitPricePaise<1)
       return res.status(400).json({error:"LIMIT price must be a positive integer number of paise."});
-    if(!instrumentCache.length||Date.now()-instrumentCacheUpdatedAt>6*60*60*1000)await refreshInstrumentCache();
-    const instrument=instrumentCache.find(x=>x.instrument_key===instrumentKey
-      &&x.exchange==="NSE"&&x.segment==="NSE_FO"&&["CE","PE"].includes(x.instrument_type));
-    if(!instrument)return res.status(400).json({error:"Select a verified NSE CE/PE contract from the official instrument master."});
-    const nowMs=Date.now();
-    const contract=validateDerivativeContract(instrument,{lots,pricePaise:limitPricePaise,now:nowMs});
     const orderId=makeOrderId(user.id,idempotencyKey);
-    const fingerprint=makeOrderFingerprint({
-      instrumentKey,side,quantity:contract.quantity,lots,orderType:"LIMIT",
-      limitPricePaise,exchange:"NSE",expiry:contract.expiry
-    });
+    const fingerprint=makeOrderFingerprint({instrumentKey,side,lots,orderType:"LIMIT",limitPricePaise});
+    // Resolve an identical retry before checking today's session, quote or expiry.
+    // This lets users safely recover a response even after the order's session ends.
     const {data:prior,error:priorError}=await userDb.from("paper_option_limit_orders")
       .select("*").eq("user_id",user.id).eq("idempotency_key",idempotencyKey).maybeSingle();
     if(priorError)throw Object.assign(new Error("Options LIMIT idempotency state could not be checked."),{status:503});
@@ -601,6 +596,12 @@ app.post("/paper/derivative/limit-orders",async(req,res)=>{
         status:prior.status,idempotentReplay:true,simulationOnly:true
       });
     }
+    if(!instrumentCache.length||Date.now()-instrumentCacheUpdatedAt>6*60*60*1000)await refreshInstrumentCache();
+    const instrument=instrumentCache.find(x=>x.instrument_key===instrumentKey
+      &&x.exchange==="NSE"&&x.segment==="NSE_FO"&&["CE","PE"].includes(x.instrument_type));
+    if(!instrument)return res.status(400).json({error:"Select a verified NSE CE/PE contract from the official instrument master."});
+    const nowMs=Date.now();
+    const contract=validateDerivativeContract(instrument,{lots,pricePaise:limitPricePaise,now:nowMs});
     const {data:account,error:accountError}=await userDb.from("paper_accounts")
       .select("cash_paise,reserved_cash_paise,reserved_margin_paise")
       .eq("user_id",user.id).maybeSingle();
