@@ -197,6 +197,36 @@ BEGIN
     RAISE EXCEPTION 'Insufficient futures margin rejection mutated account state';
   END IF;
 
+  -- A stale close-only pre-read must fail closed if the account-first SQL lock
+  -- now observes a reversal that opens new exposure without a positive margin quote.
+  v_now:=floor(extract(epoch from clock_timestamp())*1000)::bigint;
+  PERFORM public.execute_paper_futures_market_order(
+    'fefefefe-fefe-4efe-8efe-fefefefefefe',repeat('9',32)||repeat('0',32),
+    'fefefefe-0000-4000-8000-000000000010',repeat('9',64),
+    'NSE_FO|FUT_STALE_POSITION','FUT_STALE_POSITION','NSE','NSE_FO',current_date+5,
+    25,5,'BUY','DELIVERY',25,10000,100000,1000,v_now,v_now
+  );
+  v_rejected:=false;
+  v_now:=floor(extract(epoch from clock_timestamp())*1000)::bigint;
+  BEGIN
+    PERFORM public.execute_paper_futures_market_order(
+      'fefefefe-fefe-4efe-8efe-fefefefefefe',repeat('9',32)||repeat('1',32),
+      'fefefefe-0000-4000-8000-000000000011',repeat('8',64),
+      'NSE_FO|FUT_STALE_POSITION','FUT_STALE_POSITION','NSE','NSE_FO',current_date+5,
+      25,5,'SELL','DELIVERY',50,11000,0,1000,v_now,v_now
+    );
+  EXCEPTION WHEN SQLSTATE '22023' THEN
+    v_rejected:=true;
+  END;
+  SELECT net_quantity,reserved_margin_paise INTO v_qty,v_margin
+    FROM public.paper_futures_positions
+   WHERE user_id='fefefefe-fefe-4efe-8efe-fefefefefefe'
+     AND instrument_key='NSE_FO|FUT_STALE_POSITION';
+  IF NOT v_rejected OR v_qty<>25 OR v_margin<>100000
+     OR EXISTS(SELECT 1 FROM public.paper_futures_orders WHERE order_id=repeat('9',32)||repeat('1',32)) THEN
+    RAISE EXCEPTION 'Stale close-only position snapshot allowed an unpriced futures reversal';
+  END IF;
+
   -- Stale provider quote and expired contract are rejected before any write.
   v_rejected:=false;
   v_now:=floor(extract(epoch from clock_timestamp())*1000)::bigint;
