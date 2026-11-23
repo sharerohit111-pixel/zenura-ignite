@@ -119,5 +119,5 @@ Paper simulation only. No broker order-placement endpoint, no live trading, no p
 - Reconnect backoff is exponential with jitter (1s base, 15s local backoff ceiling), at most five attempts. A provider `Retry-After` from an authorization 429 is respected, capped at 300 seconds. No provider payloads are sent to clients.
 - HTTP 401 during reauthorization ends the stream with stable `upstox_reconnect_required`; lease loss/renewal failure still ends the stream immediately. The same per-user stream reservation and lease heartbeat remain active while reconnecting.
 - Superseded sockets are closed and their late events ignored by socket-generation checks. Stream cleanup cancels a pending reconnect timer and releases the user reservation/lease.
-- Added unit tests for retry delay, jitter, Retry-After cap, and attempt bounds. These are helper-level tests; the WebSocket route has not yet been exercised against a mock Upstox server or staging.
+- Added unit tests for retry delay, jitter, Retry-After cap, and attempt bounds. Isolated Node 22 harness verification: 3 passed, 0 failed; helper syntax check passed. These are helper-level tests; the WebSocket route has not yet been exercised against a mock Upstox server or staging.
 - No production deployment, provider call, database migration, or real broker order occurred.
