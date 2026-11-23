@@ -44,3 +44,38 @@
 ## Shared-component boundary
 
 Do not modify common account schema, generic worker leases, Equity/Options code, common market gateway routing, shared auth/RLS, or PR #93 lease functions without cross-chat coordination. Follow-up persistent accounting changes should be limited to Futures-specific migrations/RPCs/tests and reviewed against the existing global account lock order.
+
+
+## Live Supabase project verification (read-only, 2026-11-23)
+
+Project `atvbjibhunvzpmfagagm` is `ACTIVE_HEALTHY` on PostgreSQL 17.12. The live migration history currently ends at `20261122123415_paper_market_worker_lease_timeout`; the later GitHub Futures LIMIT ledger/atomic-RPC work was not present in the hosted migration history at audit time. Do not assume an open PR branch has been applied to Supabase.
+
+The live database already contains `paper_futures_orders` and `paper_futures_positions`:
+- Position quantity is signed and constrained to non-zero values with an absolute cap of 1,000,000.
+- Position margin and account reserved margin are non-negative.
+- Account constraint enforces `reserved_cash_paise + reserved_margin_paise <= cash_paise`.
+- Orders have unique idempotency per user and an explicit `simulation_only IS TRUE` constraint.
+- Futures order and position tables have RLS enabled with authenticated SELECT-own policies. No direct authenticated INSERT/UPDATE/DELETE policy was found.
+- The live MARKET RPC is `SECURITY DEFINER`, has an empty search_path, and its ACL is restricted to `postgres` and `service_role`; no authenticated/public EXECUTE grant was found.
+- No Futures risk/settlement/variation-margin ledger table or daily settlement/liquidation RPC was found in the inspected public schema.
+- No triggers were found on the three inspected account/Futures tables; current conservation is therefore maintained by transaction RPCs rather than table triggers.
+
+## Consequences for next implementation
+
+1. Do not apply DDL directly to the hosted project while the GitHub migration chain is still being reconciled.
+2. First reconcile the open Futures LIMIT PR chain and its migration files with the actual hosted migration history. The hosted project has not yet recorded those later migrations.
+3. Create the next migration using the repository's pinned Supabase CLI workflow (the CLI must be checked with `supabase --version` and `supabase migration new --help`; CLI v3 changes remote defaults and hosted-write confirmation behavior). Do not invent a timestamp or assume a local command's default target.
+4. Add a Futures-only ledger with append-only, uniquely idempotent events for margin reservation/release, realized close P&L, daily variation settlement, expiry settlement, and simulation liquidation. Store contract key, expiry, signed quantity, price basis, event type, source/provenance, model/version, and paise deltas.
+5. Each mutating RPC must lock account first, then its event/idempotency identity, then position, matching the existing global lock order. The event insert, cash/margin/position update, and account version increment must commit atomically.
+6. Required conservation checks:
+   - Account reserved margin = sum of open Futures position margin + pending Futures opening-order reservation.
+   - Per-position margin = initial allocated margin + subsequent margin additions − releases, never below zero.
+   - Each event idempotency key maps to exactly one immutable payload and one accounting effect.
+   - Daily variation postings sum to signed quantity × (settlement price − prior settlement price); after posting, the settlement basis advances exactly once.
+   - Expiry closes the exact signed open quantity, realizes the final basis-to-settlement P&L, releases all residual position margin, and leaves no open expired contract.
+   - Simulated liquidation is an explicitly labelled paper event; it never routes to a broker.
+7. Because public-schema Data API auto-exposure defaults changed in 2026, every new public table must explicitly define RLS and deliberate grants. Do not rely on automatic exposure or broad authenticated table writes.
+
+## Supabase platform compatibility note
+
+The project is PostgreSQL 17.12. Supabase's 2026 changelog documents that public tables are no longer automatically exposed to the Data API by default (enforced across projects from 2026-10-30), and CLI v3 changes database commands to local-by-default with explicit hosted confirmation. Any future schema PR must explicitly handle grants/RLS and use the repository's pinned CLI version and documented remote workflow.
