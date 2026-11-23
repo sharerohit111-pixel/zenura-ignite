@@ -72,3 +72,13 @@ test("Futures LIMIT and unknown order types fail closed before instrument or pro
   assert.ok(cache>reject&&token>reject&&rpc>reject,"unsupported order types must be rejected before cache/provider/database execution");
   assert.match(route,/Futures LIMIT orders will be enabled after the protected LIMIT worker is deployed/);
 });
+
+ 
+test("Futures portfolio withholds aggregate P&L and equity when any open-position quote is stale",()=>{
+  const route=server.slice(server.indexOf('app.get("/paper/futures/portfolio"'),server.indexOf('// Paper Investing routes'));
+  assert.match(route,/unrealizedPnlPaise:stalePositions\?null:unrealizedPnlPaise/);
+  assert.match(route,/equityPaise:stalePositions\?null:account\.cash_paise\+unrealizedPnlPaise/);
+  assert.match(route,/valuationStatus:stalePositions\?"partial_stale":"fresh"/);
+  const ui=fs.readFileSync(path.join(__dirname,"../../markets/stocks/stocks.js"),"utf8");
+  assert.match(ui,/Stale\/unavailable quotes for .*Aggregate unrealized P&L and equity are withheld/);
+});
