@@ -242,7 +242,7 @@
         [p.tradingSymbol||p.instrumentKey,p.product,p.netQuantity,inrPaise(p.averagePricePaise),p.marketPricePaise==null?'STALE':inrPaise(p.marketPricePaise),p.unrealizedPnlPaise==null?'—':signedMoney(p.unrealizedPnlPaise),inrPaise(p.marginReservedPaise)].forEach(v=>{const td=document.createElement('td');td.textContent=String(v);tr.append(td);});
         body.append(tr);
       });
-      status.textContent=data.marginStatus==='entry_estimate'?'Fresh futures quotes · Margin shown is the entry reservation estimate.':'No open futures positions.';
+      status.textContent=data.stalePositions>0?'Stale/unavailable quotes for '+data.stalePositions+' of '+data.positions.length+' futures positions. Aggregate unrealized P&L and equity are withheld until every quote is fresh. Margin shown is the entry reservation estimate.':data.marginStatus==='entry_estimate'?'Fresh futures quotes · Margin shown is the entry reservation estimate.':'No open futures positions.';
       historyBody.textContent='';
       if(!history.orders?.length)tableMessage(historyBody,8,'No futures orders yet.');
       else history.orders.forEach(order=>{
