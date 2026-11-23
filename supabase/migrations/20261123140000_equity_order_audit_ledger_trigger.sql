@@ -63,9 +63,10 @@ begin
     return NEW;
   end if;
 
-  -- MARKET INSERT FILLED or LIMIT PENDING -> FILLED.
-  if NEW.status='FILLED'
-     and (TG_OP='INSERT' or OLD.status is distinct from 'FILLED') then
+  -- LIMIT PENDING -> FILLED. MARKET fills are written by the dedicated
+  -- execute_paper_market_order wrapper migration to avoid duplicate audit rows.
+  if TG_OP='UPDATE' and OLD.status='PENDING'
+     and NEW.status='FILLED' and NEW.order_type='LIMIT' then
     if NEW.execution_price_paise is null or NEW.execution_price_paise<=0
        or NEW.gross_paise is null or NEW.gross_paise<=0
        or NEW.charges_paise is null or NEW.charges_paise<0
