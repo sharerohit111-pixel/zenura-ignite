@@ -60,10 +60,15 @@ concurrency:
 
 jobs:
   postgres-migration-smoke:
+    name: PostgreSQL ${{ matrix.postgres-version }} migration and regression
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        postgres-version: ["16", "17"]
     services:
       postgres:
-        image: postgres:16
+        image: postgres:${{ matrix.postgres-version }}
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
