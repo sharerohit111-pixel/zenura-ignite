@@ -109,6 +109,40 @@ function evaluateMaintenanceRisk({ reservedMarginPaise, unrealizedPnlPaise, main
   };
 }
 
+/** Rollover is two explicit legs: close old contract, then open a different contract. */
+function simulatePositionRollover({
+  oldInstrumentKey, oldNetQuantity, oldAveragePricePaise, oldExitPricePaise, oldReservedMarginPaise,
+  newInstrumentKey, newNetQuantity, newEntryPricePaise, newInitialMarginBps, newMaintenanceMarginBps
+}) {
+  if (typeof oldInstrumentKey !== "string" || !oldInstrumentKey.trim()
+      || typeof newInstrumentKey !== "string" || !newInstrumentKey.trim()
+      || oldInstrumentKey === newInstrumentKey) {
+    throw new Error("Rollover requires two distinct validated contract keys.");
+  }
+  if (!Number.isSafeInteger(oldNetQuantity) || oldNetQuantity === 0
+      || !Number.isSafeInteger(newNetQuantity) || newNetQuantity === 0
+      || Math.sign(oldNetQuantity) !== Math.sign(newNetQuantity)
+      || Math.abs(oldNetQuantity) !== Math.abs(newNetQuantity)) {
+    throw new Error("Rollover must explicitly close and reopen the same signed quantity.");
+  }
+  nonNegativeInteger(oldReservedMarginPaise, "oldReservedMarginPaise");
+  const realized = signedPnl(oldNetQuantity, oldAveragePricePaise, oldExitPricePaise);
+  const newMargin = calculateSimulatedMargin({
+    pricePaise: newEntryPricePaise, quantity: Math.abs(newNetQuantity),
+    initialMarginBps: newInitialMarginBps, maintenanceMarginBps: newMaintenanceMarginBps
+  });
+  return {
+    closedLeg: { instrumentKey: oldInstrumentKey, realizedPnlPaise: realized,
+      releasedMarginPaise: oldReservedMarginPaise, remainingQuantity: 0 },
+    openedLeg: { instrumentKey: newInstrumentKey, netQuantity: newNetQuantity,
+      entryPricePaise: newEntryPricePaise, initialMarginPaise: newMargin.initialMarginPaise,
+      maintenanceMarginPaise: newMargin.maintenanceMarginPaise },
+    rolloverMode: "TWO_LEG_SIMULATION",
+    automaticContractCarry: false,
+    simulationOnly: true
+  };
+}
+
 /** Expiry close requires an explicit settlement price and provenance; no LTP/payoff fallback. */
 function settleExpiredPosition({ netQuantity, averagePricePaise, reservedMarginPaise, settlementPricePaise, settlementSource, expiryReached }) {
   if (expiryReached !== true) throw new Error("Contract expiry has not been reached.");
