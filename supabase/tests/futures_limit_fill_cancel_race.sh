@@ -84,7 +84,7 @@ SQL
 # Fill wins the account/order locks; cancellation must observe FILLED and remain idempotent.
 FILL_NOW="$(psql -Atqc "SELECT floor(extract(epoch from clock_timestamp())*1000)::bigint")"
 psql -v ON_ERROR_STOP=1 -c "SET ROLE service_role; SELECT public.execute_paper_futures_limit_fill(
- '$ORDER_FILL','$EXEC_FILL',1,25,9900,0,$FILL_NOW,$FILL_NOW
+ '$ORDER_FILL','$EXEC_FILL',1,25,9900,9895,9900,25,25,0,$FILL_NOW,$FILL_NOW
 );" >/tmp/zenura-futures-fill-wins.log 2>&1 &
 FILL_PID=$!
 wait_for_terminal_update_lock "execute_paper_futures_limit_fill"
@@ -97,7 +97,7 @@ CANCEL_PID=$!
 wait_for_terminal_update_lock "cancel_paper_futures_limit_order"
 CANCEL_FILL_NOW="$(psql -Atqc "SELECT floor(extract(epoch from clock_timestamp())*1000)::bigint")"
 if psql -v ON_ERROR_STOP=1 -c "SET ROLE service_role; SELECT public.execute_paper_futures_limit_fill(
- '$ORDER_CANCEL','FUT-RACE-CANCEL-LOST',1,25,9900,0,$CANCEL_FILL_NOW,$CANCEL_FILL_NOW
+ '$ORDER_CANCEL','FUT-RACE-CANCEL-LOST',1,25,9900,9895,9900,25,25,0,$CANCEL_FILL_NOW,$CANCEL_FILL_NOW
 );" >/tmp/zenura-futures-fill-loses.log 2>&1; then
   echo "Futures LIMIT fill unexpectedly succeeded after cancellation won."
   exit 1
@@ -107,13 +107,13 @@ wait "$CANCEL_PID"
 # Two concurrent deliveries of the same provider execution must create one fill.
 DUP_NOW="$(psql -Atqc "SELECT floor(extract(epoch from clock_timestamp())*1000)::bigint")"
 psql -v ON_ERROR_STOP=1 -c "SET ROLE service_role; SELECT public.execute_paper_futures_limit_fill(
- '$ORDER_DUP','$EXEC_DUP',1,25,9900,0,$DUP_NOW,$DUP_NOW
+ '$ORDER_DUP','$EXEC_DUP',1,25,9900,9895,9900,25,25,0,$DUP_NOW,$DUP_NOW
 );" >/tmp/zenura-futures-duplicate-fill-1.log 2>&1 &
 DUP1_PID=$!
 wait_for_terminal_update_lock "execute_paper_futures_limit_fill"
 DUP_NOW2="$(psql -Atqc "SELECT floor(extract(epoch from clock_timestamp())*1000)::bigint")"
 psql -v ON_ERROR_STOP=1 -c "SET ROLE service_role; SELECT public.execute_paper_futures_limit_fill(
- '$ORDER_DUP','$EXEC_DUP',1,25,9900,0,$DUP_NOW,$DUP_NOW2
+ '$ORDER_DUP','$EXEC_DUP',1,25,9900,9895,9900,25,25,0,$DUP_NOW,$DUP_NOW2
 );" >/tmp/zenura-futures-duplicate-fill-2.log 2>&1 &
 DUP2_PID=$!
 wait "$DUP1_PID"
