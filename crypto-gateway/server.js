@@ -405,8 +405,14 @@ async function runLimitWorker({maxOrders=5}={}) {
     }
     return summary;
   } finally {
-    const released=await serviceDb.rpc("release_paper_crypto_limit_worker_lease",{p_lease_token:leaseToken,p_now_ms:Date.now()});
-    if(released.error) console.error("Crypto LIMIT worker lease release failed.");
+    // A network-level release exception must not mask the worker result/error.
+    // The database lease has a bounded TTL and will expire if release is unavailable.
+    try {
+      const released=await serviceDb.rpc("release_paper_crypto_limit_worker_lease",{p_lease_token:leaseToken,p_now_ms:Date.now()});
+      if(released.error) console.error("Crypto LIMIT worker lease release failed.");
+    } catch {
+      console.error("Crypto LIMIT worker lease release failed; the bounded lease will expire.");
+    }
   }
 }
 
