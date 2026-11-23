@@ -325,6 +325,10 @@ begin
     end if;
   end if;
 
+  v_open_release := v_order.reserved_open_margin_paise;
+  v_close_release := v_order.reserved_close_quantity;
+
+  if v_open_release>0 then
     if v_account.reserved_margin_paise<v_open_release then
       raise exception 'Futures LIMIT opening-margin reservation is inconsistent.'
         using errcode='23514';
