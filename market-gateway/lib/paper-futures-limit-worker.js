@@ -140,6 +140,7 @@ function createPaperFuturesLimitWorker({
       const groups=[...groupOrdersByUser(orders).entries()];
       const processUserOrders=async([userId,userOrders])=>{
         if(getUpstoxUserCooldown(userId)){summary.failed+=userOrders.length;return;}
+        let providerHealthy=false;
         try{
           const currentNow=now();
           const eligible=[];
@@ -173,6 +174,7 @@ function createPaperFuturesLimitWorker({
           );
           const payload=await readProviderJson(response);
           if(!response.ok)throw upstoxHttpError(response);
+          providerHealthy=true;
           clearUpstoxUserCooldown(userId);
           for(const {order} of eligible){
             const nowMs=now();
@@ -230,7 +232,7 @@ function createPaperFuturesLimitWorker({
             }else summary.notEligible++;
           }
         }catch(error){
-          recordUpstoxUserFailure(userId,error);
+          if(!providerHealthy)recordUpstoxUserFailure(userId,error);
           summary.failed+=userOrders.length;
           console.warn("Futures LIMIT user batch skipped",{userId,errorName:error?.name||"Error",status:error?.status||500,code:error?.code||"unknown"});
         }
