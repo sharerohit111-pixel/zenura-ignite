@@ -44,6 +44,7 @@ const {upstoxHttpError}=require("./lib/upstox-http-policy");
 const {getUpstoxUserCooldown,recordUpstoxUserFailure,clearUpstoxUserCooldown}=require("./lib/upstox-user-cooldown");
 const {MAX_RECONNECT_ATTEMPTS,reconnectDelayMs}=require("./lib/stream-reconnect-policy");
 const {decryptUpstoxToken,encryptUpstoxToken}=require("./lib/upstox-token-crypto");
+const {isUpstoxAccessTokenUsable}=require("./lib/upstox-token-validity");
 const {readUserUpstoxConnection}=require("./lib/upstox-user-connection");
 const {nextUpstoxTokenExpiry}=require("../functions/lib/upstox-token-expiry");
 const {isUsableUpstoxTokenResponse}=require("../functions/lib/upstox-token-response");
@@ -139,7 +140,8 @@ async function getConnection(userId){
   return {...data,tokenCiphertext:data.token_ciphertext,expiresAtMs:Date.parse(data.token_expires_at)};
 }
 function connectionUsable(connection){
-  return !!connection&&connection.status==="connected"&&Number.isFinite(connection.expiresAtMs)&&connection.expiresAtMs>Date.now()
+  return !!connection&&connection.status==="connected"
+    &&isUpstoxAccessTokenUsable(connection.expiresAtMs,Date.now())
     &&connection.tokenCiphertext&&typeof connection.tokenCiphertext==="object";
 }
 async function getUpstoxAccessToken(userId){
