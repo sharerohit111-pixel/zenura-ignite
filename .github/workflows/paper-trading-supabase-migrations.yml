@@ -185,6 +185,8 @@ jobs:
         run: psql -v ON_ERROR_STOP=1 -f supabase/tests/futures_market_order_accounting.sql
       - name: Reconcile Indian-market long Options ledger cash, charges and realized P&L
         run: psql -v ON_ERROR_STOP=1 -f supabase/tests/long_option_ledger_reconciliation.sql
+      - name: Verify F&O LIMIT schema remains fail-closed until lifecycle release
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/derivative_limit_schema_guard.sql
       - name: Verify long Options coexist with reserved Futures margin
         run: psql -v ON_ERROR_STOP=1 -f supabase/tests/option_buy_with_futures_margin.sql
       - name: Exercise BSE scrip master import and group-specific fee rules
