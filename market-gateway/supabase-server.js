@@ -177,9 +177,12 @@ app.post("/upstox/oauth/start",async(req,res)=>{
   }catch(error){sendError(res,error,"Upstox authorization could not be started.");}
 });
 app.get("/upstox/oauth/callback",async(req,res)=>{
-  const finish=(status)=>{const target=new URL(APP_REDIRECT_URI);target.searchParams.set("upstox",status);res.redirect(303,target.toString());};
+  const finish=(status)=>{
+    res.set({"Cache-Control":"no-store","Pragma":"no-cache","Referrer-Policy":"no-referrer"});
+    const target=new URL(APP_REDIRECT_URI);target.searchParams.set("upstox",status);res.redirect(303,target.toString());
+  };
   try{
-    const code=String(req.query.code||""),state=String(req.query.state||"");
+    const {code,state}=req.query;
     if(!isUsableUpstoxOAuthCallback(code,state))return finish("error");
     if(!UPSTOX_CLIENT_ID||!UPSTOX_CLIENT_SECRET||!UPSTOX_REDIRECT_URI||!ENC_KEY)return finish("error");
     const stateHash=crypto.createHash("sha256").update(state).digest("hex");
