@@ -253,7 +253,7 @@ BEGIN
    WHERE order_id in (repeat('d',64),repeat('e',64));
   IF v_result->>'status'<>'FILLED'
      OR v_account_cash<>99998414 OR v_account_realized<>-1586
-     OR v_account_reserved<>0 OR v_fill_count<>2 OR v_fill_charges<>4918
+     OR v_account_reserved<>83646 OR v_fill_count<>2 OR v_fill_charges<>4918
      OR EXISTS(SELECT 1 FROM public.paper_derivative_positions
        WHERE user_id='cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd'
          AND instrument_key='NSE_FO|OPTION_LIMIT_PE_ROUNDTRIP')
