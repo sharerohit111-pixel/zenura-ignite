@@ -327,6 +327,40 @@ async function runLimitWorker({maxOrders=10}={}) {
         if(filled.data?.order?.status==="FILLED") summary.filled++; else summary.notEligible++;
       } catch { summary.failed++; }
     }
+    // SL/Target plans use the same exclusive Crypto worker lease as LIMIT orders.
+    // Their quantity was reserved at plan creation; the SQL exit RPC consumes only that reserve.
+    const riskBatch=await serviceDb.from("paper_crypto_risk_plans")
+      .select("plan_id,user_id,symbol,base_asset,quantity,stop_loss_price,take_profit_price")
+      .eq("status","ACTIVE").order("created_at",{ascending:true}).limit(maxOrders);
+    if(riskBatch.error) throw new Error("Active Crypto SL/Target plans could not be scanned.");
+    summary.riskScanned=riskBatch.data?.length||0;
+    for(const plan of riskBatch.data||[]) {
+      try {
+        if(!CRYPTO_SYMBOLS.has(plan.symbol)||plan.base_asset!==plan.symbol.slice(0,-4)) { summary.notEligible++; continue; }
+        let quote=quoteCache.get(plan.symbol);
+        if(!quote) {
+          const trades=await providerJson("https://api.binance.com/api/v3/trades?"+new URLSearchParams({symbol:plan.symbol,limit:"1"}));
+          const trade=Array.isArray(trades)?trades[0]:null;
+          quote={priceUsdt:Number(trade?.price),tradeTimeMs:Number(trade?.time)}; quoteCache.set(plan.symbol,quote);
+        }
+        const nowMs=Date.now();
+        if(!Number.isFinite(quote.priceUsdt)||quote.priceUsdt<=0||!Number.isSafeInteger(quote.tradeTimeMs)||quote.tradeTimeMs>nowMs||nowMs-quote.tradeTimeMs>QUOTE_MAX_AGE_MS) { summary.notEligible++; continue; }
+        const hitStop=plan.stop_loss_price!==null&&quote.priceUsdt<=Number(plan.stop_loss_price);
+        const hitTarget=plan.take_profit_price!==null&&quote.priceUsdt>=Number(plan.take_profit_price);
+        if(!hitStop&&!hitTarget) { summary.notEligible++; continue; }
+        if(fxRate===null) fxRate=await getFxRate();
+        const gross=Number(plan.quantity)*quote.priceUsdt*fxRate;
+        if(!Number.isFinite(gross)||gross<=0||gross>MAX_ORDER_INR) { summary.failed++; continue; }
+        const fee=Number((gross*FEE_RATE).toFixed(8));
+        const executed=await serviceDb.rpc("execute_paper_crypto_risk_exit",{
+          p_user_id:plan.user_id,p_plan_id:plan.plan_id,p_execution_price:quote.priceUsdt.toFixed(8),
+          p_fx_rate_inr:fxRate.toFixed(8),p_fee:fee.toFixed(8),p_quote_timestamp_ms:quote.tradeTimeMs
+        });
+        if(executed.error) { summary.failed++; continue; }
+        if(executed.data?.plan?.status==="EXECUTED") summary.riskExecuted=(summary.riskExecuted||0)+1;
+        else summary.notEligible++;
+      } catch { summary.failed++; }
+    }
     if(orders.length) {
       const last=orders[orders.length-1];
       const saved=await serviceDb.from("paper_crypto_limit_worker_state").update({cursor_created_at:last.created_at,cursor_order_id:last.order_id,updated_at:new Date().toISOString()}).eq("state_key","crypto_limit_orders").eq("lease_token",leaseToken);
