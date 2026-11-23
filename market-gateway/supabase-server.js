@@ -655,11 +655,12 @@ app.post("/paper/futures/orders",async(req,res)=>{
     if(!instrumentCache.length||Date.now()-instrumentCacheUpdatedAt>6*60*60*1000)await refreshInstrumentCache();
     const instrument=instrumentCache.find(x=>x.instrument_key===instrumentKey&&x.instrument_type==="FUT"&&["NSE_FO","BSE_FO"].includes(x.segment));
     if(!instrument)return res.status(400).json({error:"Select a verified NSE/BSE futures contract from the official instrument master."});
-    const {token}=await getUpstoxAccessToken(user.id),{quote}=await getQuote(token,instrumentKey);
-    const normalized=normalizeProviderQuote(quote,instrumentKey,{maxAgeMs:15000});
-    const contract=validateDerivativeContract(instrument,{lots,pricePaise:normalized.pricePaise,now:Date.now()});
+    // Resolve the immutable contract metadata first. A retry of an already-filled
+    // order must return its original receipt even if the provider quote/token is
+    // temporarily unavailable; never re-execute it at a new market price.
+    const metadata=validateDerivativeContract(instrument,{lots,pricePaise:normalizeTickSizePaise(instrument.tick_size),now:Date.now()});
     const orderId=makeOrderId(user.id,idempotencyKey);
-    const fingerprint=makeOrderFingerprint({instrumentKey,side,quantity:contract.quantity,orderType:"MARKET",product});
+    const fingerprint=makeOrderFingerprint({instrumentKey,side,quantity:metadata.quantity,orderType:"MARKET",product});
     const {data:prior,error:priorError}=await userDb.from("paper_futures_orders").select("*").eq("user_id",user.id).eq("idempotency_key",idempotencyKey).maybeSingle();
     if(priorError)throw Object.assign(new Error("Futures order idempotency state could not be checked."),{status:503});
     if(prior){
@@ -667,6 +668,9 @@ app.post("/paper/futures/orders",async(req,res)=>{
       const {data:account}=await userDb.from("paper_accounts").select("cash_paise,reserved_margin_paise").eq("user_id",user.id).maybeSingle();
       return res.set("Cache-Control","private, no-store").json({orderId:prior.order_id,status:prior.status,side:prior.side,product:prior.product,quantity:prior.quantity,lots:prior.quantity/prior.lot_size,executionPricePaise:prior.execution_price_paise,grossPaise:prior.execution_price_paise*prior.quantity,chargesPaise:prior.charges_paise,cashPaise:account?.cash_paise??null,reservedMarginPaise:account?.reserved_margin_paise??null,realizedPnlPaise:prior.realized_pnl_paise,idempotentReplay:true,simulationOnly:true});
     }
+    const {token}=await getUpstoxAccessToken(user.id),{quote}=await getQuote(token,instrumentKey);
+    const normalized=normalizeProviderQuote(quote,instrumentKey,{maxAgeMs:15000});
+    const contract=validateDerivativeContract(instrument,{lots,pricePaise:normalized.pricePaise,now:Date.now()});
     const {data:position,error:positionError}=await userDb.from("paper_futures_positions").select("net_quantity,product").eq("user_id",user.id).eq("instrument_key",instrumentKey).maybeSingle();
     if(positionError)throw Object.assign(new Error("Current futures position could not be read."),{status:503});
     if(position&&position.product!==product)return res.status(409).json({error:"Close the existing futures position before switching between Intraday and Delivery."});
