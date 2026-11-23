@@ -70,6 +70,7 @@ function createPaperIntradayLimitWorker({
       const groups=[...groupOrdersByUser(orders).entries()];
       const processUserOrders=async([userId,userOrders])=>{
         if(getUpstoxUserCooldown(userId)){summary.failed+=userOrders.length;return;}
+        let providerHealthy=false;
         try{
           const validOrders=userOrders.filter(order=>{
             const instrument=instruments.find(item=>item.instrument_key===order.instrument_key);
@@ -87,6 +88,7 @@ function createPaperIntradayLimitWorker({
           );
           const payload=await readProviderJson(response);
           if(!response.ok)throw upstoxHttpError(response);
+          providerHealthy=true;
           clearUpstoxUserCooldown(userId);
           const entries=Object.values(payload?.data||{});
           const sessionCache=new Map();
@@ -115,7 +117,7 @@ function createPaperIntradayLimitWorker({
             }else summary.notEligible++;
           }
         }catch(error){
-          recordUpstoxUserFailure(userId,error);
+          if(!providerHealthy)recordUpstoxUserFailure(userId,error);
           summary.failed+=userOrders.length;
           console.warn("Intraday LIMIT user batch skipped",{userId,errorName:error?.name||"Error",status:error?.status||500,code:error?.code||"unknown"});
         }
