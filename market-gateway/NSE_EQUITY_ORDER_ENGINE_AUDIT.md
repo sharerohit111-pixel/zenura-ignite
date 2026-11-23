@@ -83,3 +83,35 @@ Implemented on the isolated equity branch:
 **CI:** GitHub Actions run `45151983771` was in progress at the time of this update. Its completed initial checks were successful; the full market-gateway regression suite and disposable PostgreSQL migration tests had not yet reported a final result.
 
 **Still pending:** LIMIT partial fills, persistent PARTIALLY_FILLED lifecycle, atomic execution-to-ledger integration, and end-to-end PostgreSQL race tests. These remain gated on approval from the shared accounting/database owner where schema or settlement semantics are affected.
+
+## CI verification and LIMIT partial-fill design audit — 2026-11-23
+
+**Verified CI run:** [45152566344](https://github.com/sharerohit111-pixel/zenura-ignite/actions/runs/45152566344) completed with conclusion **success** on commit `1a4d43484eb9c6e27c01327336210b67d57f57e2`. The workflow's complete market-gateway regression suite, disposable PostgreSQL migration smoke tests, container build, security checks, existing MARKET settlement/idempotency tests, LIMIT reservation lifecycle checks, and existing concurrency checks all passed. This is evidence for the tested current implementation only; it is not evidence that partial fills are implemented.
+
+### Confirmed current LIMIT fill behavior
+
+Inspection of the latest ordered cash-equity settlement migrations confirms:
+
+- DELIVERY `execute_paper_limit_fill` accepts a single execution price and processes the entire `v_order.quantity`; its eligibility condition requires `status='PENDING'`.
+- INTRADAY `execute_paper_intraday_limit_fill` follows the same pending-to-filled, whole-order execution model.
+- Both paths set `status='FILLED'`, release the full reservation, and set one order-level execution price/gross/charges/cash delta/realized P&L result. There is no cumulative fill quantity or remaining quantity update in these functions.
+- The current append-only `paper_equity_fills` table (PR #92 foundation) can represent individual executions, but its migration explicitly does not wire any MARKET/LIMIT RPC to it. The cash ledger is likewise schema-only.
+- Current SELL settlement allocates cost basis for the whole order quantity in one calculation. Partial executions would require proportional, deterministic cost-basis allocation and rounding conservation across multiple fills.
+- Current BUY settlement computes charges for the whole execution in one calculation. A partial-fill design must define per-fill versus order-level minimum brokerage and other fee rounding so cumulative charges reconcile exactly.
+
+### Safe design requirements — no schema/RPC changes authorized or made
+
+Before implementation, the shared database/accounting owner must approve a single transaction contract covering:
+
+1. Order state: `PENDING → PARTIALLY_FILLED → FILLED`, with immutable total quantity and monotonic cumulative filled quantity; remaining quantity must equal total minus cumulative.
+2. Fill identity: client/worker execution idempotency key plus unique `(order_id, execution_id)`; retries must return the original fill receipt without reapplying cash, shares, fees or P&L.
+3. BUY reservation: consume only the executed portion of reserved cash, keep the remainder reserved for open quantity, and release only the unfilled remainder on cancel/expiry.
+4. SELL reservation: consume only executed reserved shares; preserve remaining share reservation; reject any fill/cancel race that would over-consume shares.
+5. Price accounting: maintain cumulative executed quantity, cumulative gross, weighted average execution price and deterministic paise rounding.
+6. Fees: specify whether minimum brokerage is per order or per execution, and reconcile fee deltas across partial executions and final completion/cancellation.
+7. SELL cost basis: allocate basis incrementally using a deterministic remainder rule so the sum of all partial allocations plus residual position basis equals the original basis exactly.
+8. Atomic audit: insert each immutable fill row and corresponding cash-ledger event in the same SQL transaction as order/account/position/reservation changes.
+9. Concurrency: account-first lock order, then order and position locks; test concurrent duplicate fill, fill-vs-cancel, competing SELL, retry-after-commit and multi-worker lease behavior in disposable PostgreSQL.
+10. MARKET behavior remains atomic full fill unless a separately approved execution model explicitly changes it.
+
+No shared database schema, accounting RPC, worker, Crypto, Futures or Options implementation was modified as part of this audit. No migration was applied to production, no deployment occurred, and PR #94 remains Draft/unmerged.
