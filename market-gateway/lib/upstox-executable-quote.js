@@ -63,6 +63,12 @@ function extractUpstoxExecutableQuote(feedResponse, instrumentKey, {
   const askPricePaise = toPricePaise(depth.askP);
   const bidQuantity = Number(depth.bidQ);
   const askQuantity = Number(depth.askQ);
+  if (bidPricePaise !== null && askPricePaise !== null &&
+      bidPricePaise > askPricePaise &&
+      Number.isSafeInteger(bidQuantity) && bidQuantity > 0 &&
+      Number.isSafeInteger(askQuantity) && askQuantity > 0) {
+    fail("Upstox returned a crossed bid/ask book; executable quote rejected.");
+  }
   return Object.freeze({
     instrumentKey,
     timestampMs,
