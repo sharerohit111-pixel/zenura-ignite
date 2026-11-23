@@ -22,7 +22,13 @@ declare
   v_order public.paper_orders%rowtype;
   v_account public.paper_accounts%rowtype;
   v_fill_id uuid;
+  v_reserved_cash_paise bigint:=0;
 begin
+  -- Snapshot the reservation before the execution helper clears it on fill.
+  select * into strict v_order from public.paper_orders
+   where order_id=p_order_id for update;
+  v_reserved_cash_paise:=v_order.reserved_cash_paise;
+
   v_result:=public._execute_paper_limit_fill_without_ledger(
     p_order_id,p_execution_price_paise,p_quote_timestamp_ms,p_quote_age_ms,p_now_ms
   );
@@ -62,17 +68,17 @@ begin
       'realized_pnl_paise',v_order.realized_pnl_paise,'simulation_only',true)
   );
 
-  if v_order.side='BUY' and v_order.reserved_cash_paise>0 then
+  if v_order.side='BUY' and v_reserved_cash_paise>0 then
     insert into public.paper_equity_cash_ledger(
       user_id,order_id,event_key,event_type,cash_delta_paise,
       reserved_cash_delta_paise,cash_balance_after_paise,
       reserved_cash_after_paise,metadata
     ) values (
       v_order.user_id,v_order.order_id,'limit-reserve-consume:'||v_order.order_id,
-      'RESERVATION_CONSUME',0,-v_order.reserved_cash_paise,
+      'RESERVATION_CONSUME',0,-v_reserved_cash_paise,
       v_account.cash_paise,v_account.reserved_cash_paise,
       jsonb_build_object('source','execute_paper_limit_fill',
-        'reservation_paise',v_order.reserved_cash_paise,'simulation_only',true)
+        'reservation_paise',v_reserved_cash_paise,'simulation_only',true)
     );
   end if;
   return v_result;
@@ -103,7 +109,13 @@ declare
   v_order public.paper_orders%rowtype;
   v_account public.paper_accounts%rowtype;
   v_fill_id uuid;
+  v_reserved_cash_paise bigint:=0;
 begin
+  -- Snapshot the reservation before the execution helper clears it on fill.
+  select * into strict v_order from public.paper_orders
+   where order_id=p_order_id for update;
+  v_reserved_cash_paise:=v_order.reserved_cash_paise;
+
   v_result:=public._execute_paper_intraday_limit_fill_without_ledger(
     p_order_id,p_execution_price_paise,p_quote_timestamp_ms,p_quote_age_ms,p_now_ms
   );
@@ -144,17 +156,17 @@ begin
       'realized_pnl_paise',v_order.realized_pnl_paise,'simulation_only',true)
   );
 
-  if v_order.side='BUY' and v_order.reserved_cash_paise>0 then
+  if v_order.side='BUY' and v_reserved_cash_paise>0 then
     insert into public.paper_equity_cash_ledger(
       user_id,order_id,event_key,event_type,cash_delta_paise,
       reserved_cash_delta_paise,cash_balance_after_paise,
       reserved_cash_after_paise,metadata
     ) values (
       v_order.user_id,v_order.order_id,'intraday-limit-reserve-consume:'||v_order.order_id,
-      'RESERVATION_CONSUME',0,-v_order.reserved_cash_paise,
+      'RESERVATION_CONSUME',0,-v_reserved_cash_paise,
       v_account.cash_paise,v_account.reserved_cash_paise,
       jsonb_build_object('source','execute_paper_intraday_limit_fill',
-        'reservation_paise',v_order.reserved_cash_paise,'simulation_only',true)
+        'reservation_paise',v_reserved_cash_paise,'simulation_only',true)
     );
   end if;
   return v_result;
