@@ -265,7 +265,7 @@ function createPaperFuturesLimitWorker({
       for(let offset=0;offset<groups.length;offset+=5)
         await Promise.all(groups.slice(offset,offset+5).map(processUserOrders));
 
-      if(summary.leaseLost)return summary;
+      if(summary.leaseLost||summary.failed>0)return summary;
       if(orders.length){
         const last=orders[orders.length-1];
         const saved=await serviceDb.from("paper_market_worker_state")

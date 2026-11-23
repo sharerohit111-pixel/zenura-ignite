@@ -145,6 +145,21 @@ test("fills only the displayed best ask quantity using a fresh V3 snapshot",asyn
   assert.ok(db.calls.some(x=>x.type==="rpc"&&x.name==="release_paper_market_worker_lease"));
 });
 
+test("does not advance the Futures LIMIT cursor when a batch contains failed fills",async()=>{
+  const db=makeDb({onRpc:async(name)=>{
+    if(name==="execute_paper_futures_limit_fill")
+      return {data:null,error:{code:"XX000",message:"simulated transient failure"}};
+    return {data:true,error:null};
+  }});
+  const result=await createPaperFuturesLimitWorker(deps(db))({maxOrders:10});
+  assert.equal(result.failed,1);
+  const cursorWrites=db.calls.filter(call=>
+    call.type==="query"&&call.table==="paper_market_worker_state"
+      &&call.state.operation==="update"
+  );
+  assert.equal(cursorWrites.length,0);
+});
+
 test("stops new Futures LIMIT fills when lease renewal reports ownership loss",async()=>{
   let scheduled=null,fillCalls=0,renewCalls=0;
   const db=makeDb({onRpc:async(name)=>{
