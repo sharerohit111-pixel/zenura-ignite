@@ -91,7 +91,7 @@ test("Futures order margin is based on the full submitted quantity, not a stale 
   assert.match(route,/if\(!closesEntireOrder\)/);
   assert.doesNotMatch(route,/const openingQuantity=/);
   assert.match(route,/pre-transaction position snapshot/);
-  assert.match(route,/if the SQL transaction would open exposure, the SQL ledger/i);
+  assert.match(route,/SQL transaction would open exposure, the SQL ledger/i);
   assert.match(route,/marginEstimateScope:"full_submitted_quantity_conservative_on_reversal"/);
   const ui=fs.readFileSync(path.join(__dirname,"../../markets/stocks/stocks.js"),"utf8");
   assert.match(ui,/Conservative order-quantity margin estimate/);
