@@ -44,6 +44,10 @@ on:
       - "market-gateway/test/upstox-executable-quote.test.js"
       - "supabase/tests/**"
       - "supabase/tests/protective_order_cancel.sql"
+      - "market-gateway/lib/**"
+      - "market-gateway/test/**"
+      - "market-gateway/supabase-server.js"
+      - "supabase/**"
   push:
     branches:
       - integration/supabase-native-auth-professional-launch-2026-11-22
