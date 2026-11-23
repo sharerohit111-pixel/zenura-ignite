@@ -35,7 +35,10 @@ alter table public.paper_futures_orders
   check (
     filled_quantity between 0 and quantity
     and remaining_quantity between 0 and quantity
-    and filled_quantity + remaining_quantity = quantity
+    -- Existing MARKET RPCs predate these LIMIT-only tracking fields and do not
+    -- populate them. Preserve their established write contract; enforce exact
+    -- quantity conservation for LIMIT rows, whose lifecycle will use these fields.
+    and (order_type = 'MARKET' or filled_quantity + remaining_quantity = quantity)
     and reserved_open_margin_paise >= 0
     and reserved_close_quantity >= 0
     and reserved_close_quantity <= remaining_quantity
