@@ -86,6 +86,15 @@ BEGIN
      OR (v_result->>'order_realized_pnl_paise')::bigint<>3978 THEN
     RAISE EXCEPTION 'Delivery SELL net proceeds, cost basis allocation or realized P&L mismatch';
   END IF;
+  IF (SELECT count(*) FROM public.paper_equity_fills WHERE order_id=repeat('c',64))<>1
+     OR (SELECT count(*) FROM public.paper_equity_cash_ledger
+          WHERE order_id=repeat('c',64) AND event_type='TRADE_CREDIT')<>1
+     OR (SELECT cash_delta_paise FROM public.paper_equity_cash_ledger
+          WHERE order_id=repeat('c',64) AND event_type='TRADE_CREDIT')<>55218
+     OR (SELECT cash_balance_after_paise FROM public.paper_equity_cash_ledger
+          WHERE order_id=repeat('c',64) AND event_type='TRADE_CREDIT')<>99952739 THEN
+    RAISE EXCEPTION 'MARKET SELL fill/credit ledger does not reconcile to net proceeds';
+  END IF;
 
   -- Intraday BUY and SELL use intraday STT/stamp rules and still settle atomically.
   PERFORM public.execute_paper_market_order(
