@@ -42,3 +42,23 @@ test("Futures LIMIT reservation allocation rejects unsafe or impossible quantiti
   assert.throws(()=>allocateFuturesLimitReservation({remainingReservationPaise:10,remainingQuantity:2,fillQuantity:3}),RangeError);
   assert.throws(()=>allocateFuturesLimitReservation({remainingReservationPaise:Number.MAX_SAFE_INTEGER+1,remainingQuantity:2,fillQuantity:1}),TypeError);
 });
+
+
+test("Futures LIMIT reservation allocation conserves every paise across varied fill partitions",()=>{
+  for(let reserved=0;reserved<=257;reserved++){
+    for(let quantity=1;quantity<=12;quantity++){
+      let remainingReservationPaise=reserved;
+      let remainingQuantity=quantity;
+      let transferred=0;
+      while(remainingQuantity>0){
+        const fillQuantity=Math.min(remainingQuantity,1+(remainingQuantity%3));
+        const next=allocateFuturesLimitReservation({remainingReservationPaise,remainingQuantity,fillQuantity});
+        transferred+=next.allocatedReservationPaise;
+        remainingReservationPaise=next.remainingReservationPaise;
+        remainingQuantity=next.remainingQuantity;
+      }
+      assert.equal(transferred,reserved,`reservation ${reserved} paise across ${quantity} units`);
+      assert.equal(remainingReservationPaise,0);
+    }
+  }
+});
