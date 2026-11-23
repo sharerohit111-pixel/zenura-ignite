@@ -8,7 +8,7 @@ const base={
  contract:{instrumentKey:"NSE_FO|NIFTY_CE",instrumentType:"CE",exchange:"NSE",segment:"NSE_FO",underlyingType:"INDEX",settlementType:"CASH_SETTLED",expiryDate:"2026-11-24",strikePricePaise:2500000},
  settlementPricePaise:2510000,settlementDate:"2026-11-24",
  settlementSource:"https://www.nseindia.com/market-data/settlement-prices",
- settlementSourceSha256:"a".repeat(64),verifiedAtMs:1000,nowMs:2000
+ settlementSourceSha256:"a".repeat(64),settlementTimestampMs:Date.parse("2026-11-24T15:30:00+05:30"),verifiedAtMs:Date.parse("2026-11-24T16:00:00+05:30"),nowMs:Date.parse("2026-11-25T10:00:00+05:30")
 };
 
 test("simulates long CE cash-settlement payoff without posting or inventing net charges",()=>{
@@ -50,5 +50,6 @@ test("blocks short, mismatched, non-expiry-date or unverified settlement inputs"
  assert.throws(()=>simulateLongIndexOptionExpiry({...base,settlementDate:"2026-11-23"}),{status:422});
  assert.throws(()=>simulateLongIndexOptionExpiry({...base,settlementSource:"https://example.com/price"}),{status:422});
  assert.throws(()=>simulateLongIndexOptionExpiry({...base,settlementSourceSha256:"bad"}),{status:422});
- assert.throws(()=>simulateLongIndexOptionExpiry({...base,verifiedAtMs:3000}),{status:422});
+ assert.throws(()=>simulateLongIndexOptionExpiry({...base,verifiedAtMs:Date.parse("2026-11-26T10:00:00+05:30")}),{status:422});
+ assert.throws(()=>simulateLongIndexOptionExpiry({...base,settlementTimestampMs:Date.parse("2026-11-23T15:30:00+05:30")}),{status:422});
 });
