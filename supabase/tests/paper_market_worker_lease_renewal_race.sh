@@ -11,17 +11,17 @@ new_owner="f3222222-2222-4222-8222-222222222222"
 seed_lease() {
   local token="$1"
   local expiry_ms="$2"
-  psql -v ON_ERROR_STOP=1 -v token="$token" -v expiry_ms="$expiry_ms" <<'SQL'
-INSERT INTO public.paper_market_worker_state(
-  state_key,cursor_order_id,cursor_created_at,lease_token,lease_expires_at,updated_at
-) VALUES (
-  'paper_futures_limit_orders',NULL,NULL, :'token'::uuid, to_timestamp((:expiry_ms)::double precision / 1000.0),clock_timestamp()
-)
-ON CONFLICT(state_key) DO UPDATE SET
-  lease_token=EXCLUDED.lease_token,
-  lease_expires_at=EXCLUDED.lease_expires_at,
-  updated_at=clock_timestamp();
-SQL
+  [[ "$token" =~ ^[0-9a-fA-F-]{36}$ ]] || { echo "Invalid lease token" >&2; return 1; }
+  [[ "$expiry_ms" =~ ^[0-9]+$ ]] || { echo "Invalid lease expiry" >&2; return 1; }
+  psql -X -v ON_ERROR_STOP=1 -c "INSERT INTO public.paper_market_worker_state(
+    state_key,cursor_order_id,cursor_created_at,lease_token,lease_expires_at,updated_at
+  ) VALUES (
+    '$state_key',NULL,NULL,'$token'::uuid,to_timestamp($expiry_ms::double precision / 1000.0),clock_timestamp()
+  )
+  ON CONFLICT(state_key) DO UPDATE SET
+    lease_token=EXCLUDED.lease_token,
+    lease_expires_at=EXCLUDED.lease_expires_at,
+    updated_at=clock_timestamp();"
 }
 
 wait_for_lock_holder() {
