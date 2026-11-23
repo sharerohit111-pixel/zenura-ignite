@@ -16,7 +16,7 @@ const {parseLimitPricePaise}=require("./lib/limit-price");
 const {normalizeProviderQuote}=require("./lib/provider-quote");
 const {loadVerifiedExchangeSession}=require("./lib/exchange-session-calendar");
 const {isIntradaySessionOpen}=require("./lib/intraday-limit-policy");
-const {normalizeEquityTickSizePaise}=require("./lib/equity-order-validation");
+const {normalizeEquityTickSizePaise,isEquityExecutionPriceOnTick}=require("./lib/equity-order-validation");
 const {isEligiblePaperLimitOrder,normalizeWorkerCursor,groupOrdersByUser}=require("./lib/paper-limit-worker");
 const {createPaperProtectiveWorker}=require("./lib/paper-protective-worker");
 const {createPaperIntradayLimitWorker}=require("./lib/paper-intraday-limit-worker");
@@ -396,7 +396,7 @@ app.post("/paper/orders",async(req,res)=>{
     const {quote}=await getQuote(token,instrumentKey);
     const normalized=normalizeProviderQuote(quote,instrumentKey);
     const tick=normalizeEquityTickSizePaise(instrument.tick_size);
-    if(!tick||normalized.pricePaise%tick!==0)
+    if(!isEquityExecutionPriceOnTick(normalized.pricePaise,tick))
       return res.status(502).json({error:"The verified market quote price does not align with the official instrument tick size."});
     if(!isIntradaySessionOpen(normalized.tradeTimeMs,session))
       return res.status(409).json({error:"The market quote timestamp is outside the verified exchange session."});
