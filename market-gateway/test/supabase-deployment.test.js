@@ -156,3 +156,20 @@ test("Equity LIMIT cancellation resolves the authenticated user's scoped Supabas
  assert.match(route,/userDb\.from\("paper_orders"\)/);
  assert.match(route,/eq\("user_id",user\.id\)/);
 });
+
+test("Gateway attaches a server-generated request correlation ID",()=>{
+ assert.match(server,/const requestId=crypto\.randomUUID\(\)/);
+ assert.match(server,/req\.requestId=requestId/);
+ assert.match(server,/res\.set\("X-Request-Id",requestId\)/);
+});
+test("API error logs are structured and exclude raw error messages",()=>{
+ const start=server.indexOf("function sendError(");
+ const end=server.indexOf("function decryptToken(",start);
+ assert.ok(start>=0&&end>start,"sendError helper must exist");
+ const helper=server.slice(start,end);
+ assert.match(helper,/event:"api_request_failed"/);
+ assert.match(helper,/requestId/);
+ assert.match(helper,/method:/);
+ assert.match(helper,/path:/);
+ assert.doesNotMatch(helper,/error\.message/);
+});
