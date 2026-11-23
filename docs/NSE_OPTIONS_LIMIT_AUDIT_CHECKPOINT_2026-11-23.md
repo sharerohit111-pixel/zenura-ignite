@@ -44,3 +44,9 @@ Scope: NSE long CE/PE Options LIMIT Paper Trading only. No production migration,
 - No changes to Equity, Futures, Crypto, production Supabase, production flags, or deployment configuration in this audit checkpoint.
 - Do not merge PR #91 or apply its draft migrations to production.
 - Any follow-up implementation should add only isolated Options tests or Options-specific fixes after confirming the gap against existing code.
+
+## Follow-up change on audit branch
+
+- Commit `f65cb4a08f841d35c7dc34d6bddf271fd895801b` adds a focused worker regression test for a valid NSE PE SELL-to-close order. It asserts execution from best bid, bid-depth-limited partial quantity, and preservation of the exact bid/ask snapshot passed to the atomic fill RPC.
+- This test addition has been committed but has not yet been executed by CI on this audit branch; no workflow run was returned for that commit. Do not treat it as passing evidence until a CI run reports success.
+- The SQL positive-path PE accounting round trip remains a follow-up test gap.
