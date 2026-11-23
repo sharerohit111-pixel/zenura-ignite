@@ -690,18 +690,27 @@ app.post("/paper/futures/orders",async(req,res)=>{
     const {token}=await getUpstoxAccessToken(user.id),{quote}=await getQuote(token,instrumentKey);
     const normalized=normalizeProviderQuote(quote,instrumentKey,{maxAgeMs:15000});
     const contract=validateDerivativeContract(instrument,{lots,pricePaise:normalized.pricePaise,now:Date.now()});
-    // Margin is requested for the full submitted quantity. The database account lock
-    // serializes concurrent fills, but a position read here would become stale before
-    // the transaction and could under-reserve margin on a concurrent reversal.
-    // The SQL ledger applies this conservative full-order estimate only to the
-    // quantity that actually opens/increases exposure; close-only orders ignore it.
-    const marginResponse=await fetchProvider("https://api.upstox.com/v2/charges/margin",{
-      method:"POST",headers:{Authorization:"Bearer "+token,Accept:"application/json","Content-Type":"application/json"},
-      body:JSON.stringify({instruments:[{instrument_key:instrumentKey,quantity:contract.quantity,product:product==="INTRADAY"?"I":"D",transaction_type:side,price:normalized.pricePaise/100}]})
-    });
-    const marginPayload=await readProviderJson(marginResponse);
-    if(!marginResponse.ok)return res.status(502).json({error:"Upstox futures margin requirement could not be verified."});
-    const openingMarginPaise=normalizeUpstoxMarginResponse(marginPayload,instrumentKey).requiredMarginPaise;
+    const {data:position,error:positionError}=await userDb.from("paper_futures_positions").select("net_quantity,product").eq("user_id",user.id).eq("instrument_key",instrumentKey).maybeSingle();
+    if(positionError)throw Object.assign(new Error("Current futures position could not be read."),{status:503});
+    if(position&&position.product!==product)return res.status(409).json({error:"Close the existing futures position before switching between Intraday and Delivery."});
+    const oldQuantity=position?.net_quantity||0;
+    const closesEntireOrder=oldQuantity!==0&&((oldQuantity>0&&side==="SELL")||(oldQuantity<0&&side==="BUY"))&&Math.abs(oldQuantity)>=contract.quantity;
+    // Never size margin from a pre-transaction position snapshot: another order may
+    // change it before the account-first SQL lock. For any order that might open or
+    // reverse exposure, obtain a conservative estimate for the full submitted size.
+    // A position snapshot that suggests a pure close may skip the provider margin call;
+    // if it becomes stale and the SQL transaction would open exposure, the SQL ledger
+    // rejects the order because p_open_margin_paise is zero (fail closed).
+    let openingMarginPaise=0;
+    if(!closesEntireOrder){
+      const marginResponse=await fetchProvider("https://api.upstox.com/v2/charges/margin",{
+        method:"POST",headers:{Authorization:"Bearer "+token,Accept:"application/json","Content-Type":"application/json"},
+        body:JSON.stringify({instruments:[{instrument_key:instrumentKey,quantity:contract.quantity,product:product==="INTRADAY"?"I":"D",transaction_type:side,price:normalized.pricePaise/100}]})
+      });
+      const marginPayload=await readProviderJson(marginResponse);
+      if(!marginResponse.ok)return res.status(502).json({error:"Upstox futures margin requirement could not be verified."});
+      openingMarginPaise=normalizeUpstoxMarginResponse(marginPayload,instrumentKey).requiredMarginPaise;
+    }
     const {calculateFuturesTradeCharges}=require("./lib/trading-charges");
     const charges=calculateFuturesTradeCharges({grossPaise:contract.contractValuePaise,exchange:instrument.exchange,side});
     const now=Date.now();
