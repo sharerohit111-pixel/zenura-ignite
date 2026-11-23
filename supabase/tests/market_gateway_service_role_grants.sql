@@ -15,9 +15,18 @@ BEGIN
     IF NOT has_table_privilege('service_role','public.'||v_table,'SELECT') THEN
       RAISE EXCEPTION 'service_role is missing required SELECT on %',v_table;
     END IF;
-    IF has_table_privilege('anon','public.'||v_table,'SELECT')
-       OR has_table_privilege('authenticated','public.'||v_table,'SELECT') THEN
-      RAISE EXCEPTION 'Client role unexpectedly has private SELECT access to %',v_table;
+    IF has_table_privilege('anon','public.'||v_table,'SELECT') THEN
+      RAISE EXCEPTION 'anon unexpectedly has SELECT access to %',v_table;
+    END IF;
+  END LOOP;
+
+  -- Browser users intentionally retain RLS-scoped SELECT on their own orders and
+  -- equity positions. Provider connections and worker state stay server-only.
+  FOREACH v_table IN ARRAY ARRAY[
+    'upstox_connections','paper_market_worker_state','paper_protective_orders'
+  ] LOOP
+    IF has_table_privilege('authenticated','public.'||v_table,'SELECT') THEN
+      RAISE EXCEPTION 'authenticated unexpectedly has private SELECT access to %',v_table;
     END IF;
   END LOOP;
 
