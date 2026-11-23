@@ -168,3 +168,30 @@ Additional PR #89 submit/release audit:
 - `cancel_paper_futures_limit_order` performs an owner pre-read and delegates to that shared release primitive. `expire_paper_futures_limit_order` delegates to the same primitive.
 - Therefore the currently observed PR #89 LIMIT lifecycle has a consistent account-first ordering; order and position lock order differs only by operation and conditional close-reservation handling. The LIMIT fill checks the fill replay after the order lock and before position lock.
 - This audit covers the PR #89 LIMIT RPCs only. It does not establish the lock order of legacy MARKET submit/fill/cancel, PR #93 worker lease acquisition/renewal, or any Chat 7 shared Options RPC. Those remain explicit audit/approval gates.
+
+
+## 8. Follow-up audit — PR #93 worker lease and Futures MARKET RPC (2026-11-23)
+
+### Futures MARKET transaction — verified source
+The existing `execute_paper_futures_market_order` definition in `supabase/migrations/20261122120722_futures_market_order_transaction.sql` uses this sequence:
+1. Validate request, server clock, quote freshness and contract cutoff before writes.
+2. Lock the shared `paper_accounts` row first (`FOR UPDATE`).
+3. Lock an existing Futures order by user/idempotency key (`FOR UPDATE`) for replay detection.
+4. Lock the matching Futures position (`FOR UPDATE`) for close/open/reversal calculation.
+5. Apply the position mutation, update the shared account cash/reserved-margin/realized-P&L/version fields, and insert the terminal MARKET order receipt, all in one transaction.
+
+The MARKET RPC has no separate fill-ledger lookup because MARKET is one terminal execution receipt. It transfers/releases margin in the same account-first transaction, supports signed long/short close and reversal, and deletes a flat position row. The existing `supabase/tests/futures_market_order_accounting.sql` exercises exact replay, changed-payload rejection, partial/full close, reversal, cash/margin reconciliation, stale close-only pre-read fail-closed behavior, split-reservation residuals and stale-quote rejection.
+
+The HTTP route performs a position pre-read only to decide whether to request a provider margin estimate. It explicitly treats that read as potentially stale; the SQL transaction recalculates against its locked position and rejects an opening/reversal when the submitted provider margin is zero. This is a useful fail-closed boundary, not a replacement for transactional validation.
+
+### Worker lease — verified scope and lock interaction
+PR #93's worker acquires the dedicated `paper_futures_limit_orders` lease before scanning and releases it in `finally`. Renewal is a separate owner-token-bound update of the `paper_market_worker_state` row; its lease SQL does not lock `paper_accounts`, Futures orders or positions. The worker performs cursor reads/writes outside the order-fill RPC transaction. Each fill is delegated to the existing atomic LIMIT-fill RPC, whose account → order → execution replay → position sequence is documented above. Thus the worker lease row lock is not held in the same SQL transaction as the account/order/position locks; no nested lease→account lock chain was observed in this worker path.
+
+The worker stops starting fills and avoids cursor persistence/expiry side effects after it observes lease loss, and it does not advance the cursor after a failed fill. The heartbeat renewal interval is 60 seconds against a 240-second TTL. The two-connection renewal/reacquisition test covers the lease-row race itself. This audit does not prove a global lock order for other workers or shared Options RPCs.
+
+### Integration findings / open gates
+- Observed Futures MARKET and LIMIT paths are account-first, but their remaining lock order differs by lifecycle: MARKET account → idempotency/order → position; LIMIT submit account → idempotency/order replay → position; LIMIT fill account → order → fill replay → position; LIMIT release account → order → position when close reservation release is needed.
+- Do not introduce a new settlement/event lock ahead of or between these established locks until Chat 3 and Chat 7 explicitly review a concrete lock graph and concurrency tests.
+- The PR #93 worker lease branch extends shared acquire/release/renew allowlists to include both Futures and Options keys. PR #91 also contains overlapping shared lease migration work; one canonical shared migration/history must be agreed before integration. Keep the Futures worker disabled until that reconciliation and staging rehearsal.
+- Chat 3 (PR #96) and Chat 7 (PR #97) have not yet provided review/approval in the fetched discussion timeline. No approval is inferred from the comments posted by this workstream.
+- This audit is documentation-only. No SQL, runtime code, migration, deployment, feature flag, or broker execution behavior was changed.
