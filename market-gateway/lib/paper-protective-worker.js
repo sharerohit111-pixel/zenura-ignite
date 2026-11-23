@@ -1,5 +1,7 @@
 "use strict";
 
+const {upstoxHttpError}=require("./upstox-http-policy");
+
 const crypto=require("node:crypto");
 const {groupOrdersByUser}=require("./paper-limit-worker");
 const {evaluateProtectiveOrder,isSupportedProtectiveOrder,isPositionCloseable}=require("./protective-order-worker");
@@ -58,7 +60,7 @@ function createPaperProtectiveWorker({
           const response=await fetchProvider("https://api.upstox.com/v3/market-quote/quotes?"+new URLSearchParams({instrument_key:keys.join(",")}),
             {headers:{Authorization:"Bearer "+token,Accept:"application/json"}});
           const payload=await readProviderJson(response);
-          if(!response.ok)throw new Error("Upstox protective quote request failed with status "+response.status);
+          if(!response.ok)throw upstoxHttpError(response);
           const entries=Object.values(payload?.data||{}),now=Date.now();
           const positionsResult=await serviceDb.from("paper_equity_positions")
             .select("instrument_key,product,quantity,reserved_quantity")
@@ -105,7 +107,7 @@ function createPaperProtectiveWorker({
               .eq("order_id",order.order_id).eq("status","ACTIVE");
             if(marked.error)summary.failed++;
           }
-          console.warn("Protective user batch skipped",{userId,errorName:error?.name||"Error",status:error?.status||500});
+          console.warn("Protective user batch skipped",{userId,errorName:error?.name||"Error",status:error?.status||500,code:error?.code||"unknown"});
         }
       };
       for(let offset=0;offset<groups.length;offset+=3)
