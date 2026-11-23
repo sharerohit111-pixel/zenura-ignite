@@ -67,6 +67,8 @@ jobs:
         run: psql -v ON_ERROR_STOP=1 -f supabase/tests/crypto_limit_full_exit_reservation.sql
       - name: Verify reserved Crypto position delete guard
         run: psql -v ON_ERROR_STOP=1 -f supabase/tests/crypto_reserved_position_guard.sql
+      - name: Verify MARKET SELL preserves reserved LIMIT quantity
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/crypto_market_sell_reservation.sql
       - name: Check Crypto browser module syntax
         run: |
           node --input-type=module --check < crypto/supabase-client.js
