@@ -197,3 +197,32 @@ Do not add an `EXPIRED` state by assumption. The database and product owners mus
 Whichever option is approved must preserve the current fail-safe behavior for missing or unverified session data and must release only the unfilled remainder after partial execution.
 
 These are verified repository-schema findings, not proposed production changes. No schema, SQL RPC, worker, or accounting code was modified during this follow-up audit.
+
+
+## 13. Follow-up API, worker and UI compatibility audit
+
+The existing application consumers were inspected because a database-only status change would not be sufficient:
+
+### API and backend
+- The authenticated equity order-history endpoint returns the raw order status and currently exposes original `quantity`, but no cumulative filled quantity, remaining quantity, or weighted average fill price.
+- The LIMIT submission response path returns order status, but the browser currently validates only `PENDING`, `FILLED`, and `CANCELLED`. A future `PARTIALLY_FILLED` response would be treated as unverifiable and reported as an uncertain response.
+- The backend Delivery worker and Intraday worker query only `status='PENDING'`; the worker evaluation helper also rejects any non-PENDING status. Both need coordinated changes to pick up partially filled remainders.
+- The current order history endpoint returns at most 100 records and advertises `hasMore:false`; pagination/cursor correctness must be addressed if the UI needs complete execution history. This is not a reason to change the unrelated order-history contract until its owner approves.
+
+### UI
+- The OPEN filter already includes `PARTIALLY_FILLED`, and a Hindi label for that status already exists. These are presentation-only accommodations, not evidence that backend partial fills are supported.
+- The order-book row renders the original order quantity and has no filled/remaining quantity display.
+- Cancellation controls are rendered only for PENDING LIMIT orders. The UI therefore does not currently offer cancellation of a partially filled remainder.
+- Trade History currently selects only orders whose final status is `FILLED`. It does not render individual execution rows from `paper_equity_fills`; partial executions would be invisible there until the parent order becomes fully filled.
+- The browser-side LIMIT submission response validator rejects `PARTIALLY_FILLED` as an unknown status and its result messaging has no partial-fill state.
+
+### Required coordinated acceptance criteria
+Before enabling partial fills, the approved implementation must:
+1. Return and validate cumulative filled quantity, remaining quantity, weighted average fill price, and current reservation amounts in API responses.
+2. Make both workers and the shared eligibility/evaluation helpers safely process the remaining quantity for PENDING and PARTIALLY_FILLED orders, with SQL authoritative re-checks under locks.
+3. Make cancellation of a partially filled order release only the unfilled remainder while preserving prior executions.
+4. Display partial execution progress and allow the user to cancel the remaining quantity when policy permits.
+5. Render execution history from immutable fill records, including partially filled orders, rather than relying only on final parent-order status.
+6. Test old clients, retry/idempotency responses, pagination, worker cursor behavior, and status transitions during staged rollout.
+
+No application, API, worker, database, or UI code was changed during this audit. The items above extend the approval/design requirements only.
