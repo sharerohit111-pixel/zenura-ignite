@@ -107,6 +107,8 @@ This branch now destructures `{user,userDb}` and adds a regression assertion to 
 
 ## 8. Safety and validation boundary
 
+- Regression test selector was corrected after the first CI attempt; rerun must execute against the latest branch head (`f9287e14`) rather than the original PR commit.
+
 - No shared database migration or schema change is included.
 - No production deployment, worker activation, scheduler activation, secret change or live account operation is included.
 - Crypto code and data paths are excluded.
