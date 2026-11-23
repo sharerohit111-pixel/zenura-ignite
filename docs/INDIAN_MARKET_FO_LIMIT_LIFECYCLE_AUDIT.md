@@ -82,3 +82,16 @@ This review remains design-only. No runtime, schema, API, worker, or production 
 The existing Supabase lease RPC currently allowlists only `paper_limit_orders` and `paper_protective_orders`. It does not expose a derivative-specific lease namespace. F&O LIMIT must therefore receive its own dedicated lease state key (for example, `paper_derivative_limit_orders`) and a narrowly scoped forward-only migration/RPC allowlist update after the derivative worker is implemented and tested. Do not reuse the equity LIMIT or protective-order cursor/lease: doing so would couple independent worker batches and create ambiguous ownership/recovery behavior.
 
 The lease is not a substitute for order-level atomicity. The fill/cancel/expiry RPCs must revalidate order state and quote freshness under the established account → order → position lock sequence, even when a worker holds the lease. This remains a design finding only; no lease schema, worker, or runtime was changed.
+
+
+## Follow-up schema compatibility review (2026-11-23)
+
+The current order-table constraints are materially different and must be handled explicitly before any derivative LIMIT writer is added:
+
+- `paper_futures_orders` already has LIMIT/PENDING columns and a pending-order partial index, plus a per-user idempotency unique index. These are metadata and indexing only; the existing Futures MARKET RPC inserts FILLED rows and does not reserve pending LIMIT margin.
+- `paper_derivative_orders` is stricter: `order_type` is constrained to MARKET only and `status` to FILLED/REJECTED. A proper Options LIMIT lifecycle therefore needs a forward-only constraint replacement and additional reservation/fill/cancel fields. Do not weaken the MARKET-only check in place without a complete tested transition plan.
+- `paper_derivative_positions` is long CE/PE only and requires positive net quantity; it must not be reused for Futures signed positions. Futures has its own signed-quantity position table and account-level reserved-margin ledger.
+- The existing Futures position row records a single aggregate reserved margin amount. A LIMIT reservation model must distinguish pending-order margin from filled-position margin so partial fills/cancellation can release only the unfilled remainder, and account totals continue reconciling.
+- The existing derivative orders are execution receipts, not a fill ledger. A future partial-fill implementation needs immutable per-fill records with unique execution identifiers and an atomic aggregate order-state transition; mutating one receipt row is not sufficient audit history.
+
+This is source/schema review only. No constraints were relaxed, no new tables or columns were added, and no production state was changed. The next safe implementation step is a disposable SQL design/test harness for Futures pending-margin accounting before introducing any production-facing worker or API.
