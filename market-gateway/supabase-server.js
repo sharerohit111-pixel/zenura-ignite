@@ -581,7 +581,8 @@ app.post("/paper/derivative/limit-orders",async(req,res)=>{
     if(!Number.isSafeInteger(limitPricePaise)||limitPricePaise<1)
       return res.status(400).json({error:"LIMIT price must be a positive integer number of paise."});
     const orderId=makeOrderId(user.id,idempotencyKey);
-    const fingerprint=makeOrderFingerprint({instrumentKey,side,lots,orderType:"LIMIT",limitPricePaise});
+    // Fingerprint the caller's lot count so idempotent replay remains resolvable before instrument/session lookups.
+    const fingerprint=makeOrderFingerprint({instrumentKey,side,quantity:lots,orderType:"LIMIT",limitPricePaise});
     // Resolve an identical retry before checking today's session, quote or expiry.
     // This lets users safely recover a response even after the order's session ends.
     const {data:prior,error:priorError}=await userDb.from("paper_option_limit_orders")
