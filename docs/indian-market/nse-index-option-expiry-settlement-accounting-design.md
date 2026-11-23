@@ -185,3 +185,38 @@ Official sources:
 ### Release decision
 
 The **STT rate and base are confirmed**, but the complete charge schedule, exercise-specific rounding, and any other applicable component are not. Consequently the overall expiry charge schedule remains **unverified**, `settlementChargesPaise` and `netRealizedPnlPaise` must remain null, and `ledgerPostingAllowed` must remain false. Obtain NSE Clearing/clearing-member exercise reports or a current official exercise-specific charge specification before implementing charge posting.
+
+
+## 11. Follow-up regulatory clarification (checked 2026-11-23)
+
+### SEBI turnover fee — exercise turnover is in scope, but do not auto-debit the paper user
+
+The **SEBI (Stock Brokers) Regulations, 2026**, notified in the Gazette of India on 2026-01-07, Regulation 41 and the Equity Derivatives fee table set the stock-broker fee at **0.00010% of turnover (₹10 per crore)**. The accompanying definition explicitly says derivatives turnover includes trades settled on expiry and, for options, premium turnover plus the notional value of option contracts exercised or assigned.
+
+This confirms that option exercise contributes to the broker's SEBI regulatory turnover-fee base. It does **not**, by itself, establish that the fee is a separately chargeable client-level expiry debit in every broker's contract note or paper-trading fee model. Treat it as a broker regulatory cost until the chosen broker's current client charge schedule or exercise contract-note evidence proves the client allocation, taxable base, rounding and collection method. Do not automatically calculate it on intrinsic payout or debit it from the simulated user's cash.
+
+Official source:
+- Gazette of India, SEBI (Stock Brokers) Regulations, 2026, dated 2026-01-07, Regulation 41, Equity Derivatives row and options-exercise turnover explanation: https://egazette.gov.in/WriteReadData/2026/269177.pdf
+
+### Exchange transaction charges — premium-traded basis only in located schedule
+
+NSE Finance & Accounts Circular **NSE/FA/73061**, dated 2026-02-27 and effective 2026-03-01, states Equity Options transaction charges are calculated **on premium**. This schedule does not establish a separate transaction charge on intrinsic-value cash settlement at expiry. Do not apply the premium transaction charge a second time to expiry exercise; require a specific current clearing/exercise charge rule before adding one.
+
+Official source:
+- NSE Circular NSE/FA/73061: https://nsearchives.nseindia.com/content/circulars/FA73061.pdf
+
+### Stamp duty — ordinary option rate is not enough to prove expiry-exercise debit
+
+NSE's investor levy page lists **0.003% for Equity Options**, payable by buyer, and says clearing corporations collect stamp duty on securities transactions from 2020-07-01. However, that summary does not specify an independent stamp-duty base or a second stamp-duty event for automatic cash-settled index-option exercise. The general option rate must not be multiplied by intrinsic value or applied again at expiry without a rule/exercise statement establishing that exact event and base.
+
+Official reference:
+- NSE levies page: https://www.nseindia.in/static/invest/first-time-investor-sebi-turnover-fees-stt-other-levies
+- Indian Stamp Act, 1899, section 9A: https://indiacode.ecourtsindia.com/stamp-act/section/9A/
+
+### Updated release decision
+
+Verified: exercise STT rate/base (0.15% of intrinsic value); exercise turnover inclusion for the broker's SEBI fee calculation; NSE's located Equity Options transaction-charge schedule is on premium turnover.
+
+Not verified for a client-level paper-account expiry debit: exercise STT rounding/aggregation, client allocation of SEBI turnover fee, a separate expiry-exercise stamp-duty event/base, any separate exchange/clearing charge, and broker-specific brokerage/service charges. GST can only be assessed on a verified taxable service-fee base, not presumed on intrinsic settlement payout.
+
+Therefore the complete **client-level expiry charge schedule remains unverified**. Keep `settlementChargesPaise=null`, `netRealizedPnlPaise=null`, and `ledgerPostingAllowed=false`. The next evidence required is a current NSE Clearing exercise/STT report plus a broker contract note/charge schedule for an ITM long index option expiry, with client-level component amounts and rounding. No posting implementation is authorized.
