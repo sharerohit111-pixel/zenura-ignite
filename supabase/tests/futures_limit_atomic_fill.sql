@@ -6,15 +6,15 @@ SELECT public.initialize_paper_trading_account('cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcd
 
 INSERT INTO public.paper_exchange_sessions(
   exchange,session_date,is_trading_day,open_minute,close_minute,
-  session_kind,source_reference,verified_at
+  session_kind,source_reference,verified_at,source_sha256
 ) VALUES (
   'NSE',(clock_timestamp() at time zone 'Asia/Kolkata')::date,
-  true,0,1440,'SPECIAL','CI-only verified full-day session fixture',clock_timestamp()
+  true,0,1440,'SPECIAL','https://www.nseindia.com/market-data/holidays',clock_timestamp(),repeat('e',64)
 )
 ON CONFLICT(exchange,session_date) DO UPDATE SET
   is_trading_day=true,open_minute=0,close_minute=1440,
-  session_kind='SPECIAL',source_reference='CI-only verified full-day session fixture',
-  verified_at=clock_timestamp();
+  session_kind='SPECIAL',source_reference='https://www.nseindia.com/market-data/holidays',
+  verified_at=clock_timestamp(),source_sha256=repeat('e',64);
 
 DO $futures_limit_fill$
 DECLARE
