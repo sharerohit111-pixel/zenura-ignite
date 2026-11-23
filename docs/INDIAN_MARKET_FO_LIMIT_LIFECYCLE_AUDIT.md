@@ -110,3 +110,16 @@ A pure gateway arithmetic helper now defines how an already-authorized Futures L
 Files: `market-gateway/lib/futures-limit-reservation.js` and `market-gateway/test/futures-limit-reservation.test.js`.
 
 This helper is deliberately not connected to any order route, worker, database RPC, or production ledger. It solves only deterministic integer-paise allocation; it does not calculate broker margin, lock close quantity, authorize a fill, or make fill/cancel atomic. Those responsibilities remain in a future SQL transaction and must be independently tested before F&O LIMIT is enabled.
+
+
+## Futures LIMIT ledger design boundary — before any migration
+
+The existing `paper_futures_orders.margin_reserved_paise` field is a MARKET execution receipt field; it is not sufficient to represent the lifecycle of a partially filled LIMIT order. A reviewed forward-only schema proposal must separate these concepts:
+
+1. **Order aggregate:** requested quantity, cumulative filled quantity, remaining quantity, average fill price, cumulative charges, current status, pending opening-margin remainder, pending close-quantity remainder, and terminal timestamps. Enforce `requested = filled + remaining` and nonnegative quantities in SQL.
+2. **Pending reservation ledger:** one owner/order-bound reservation record with distinct opening-margin paise and close-quantity units. Pending opening margin must remain separate from `paper_futures_positions.reserved_margin_paise`; on each fill, transfer only the fill's allocated reserve to the resulting position and decrement the order reserve in the same transaction. Cancellation releases only the unfilled remainder.
+3. **Immutable fills:** append-only fill rows with a deterministic unique execution identity, order ID, sequence, quantity, price, quote timestamp, charges, realized P&L, and reservation transfer. A duplicate execution identity returns the stored fill and cannot mutate balances twice.
+4. **Position close locks:** a close/reversal order must reserve the exact closeable signed quantity under the position row lock. Competing orders see only unreserved quantity. For a reversal, separately track the close slice and the opening remainder; margin is reserved only for the opening slice using a trusted, current provider margin result.
+5. **Atomic transition:** account → order/idempotency → position/reservation locks; re-read order state, quote, expiry/session, and remaining quantities after locks; insert fill, update aggregate, move margin, update signed position, and update account in one SQL transaction. A fill-vs-cancel race must resolve through this same serialized state transition.
+
+Do not add columns or loosen the existing order constraints until this design is converted into exact forward-only DDL, SQL RPC signatures/grants, RLS review, and disposable PostgreSQL race tests. In particular, never interpret the existing `margin_reserved_paise` receipt as pending reserve or reuse the long-Options position table for Futures.
