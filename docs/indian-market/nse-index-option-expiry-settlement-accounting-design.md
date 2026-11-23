@@ -335,3 +335,44 @@ Compare client + contract + expiry + strike + CE/PE + exercise quantity/value ac
 A dedicated Global Indices expiry-day final STT/exercise report family is now confirmed to exist on NSE's official report index. Its contents remain unverified because the PDF endpoints could not be retrieved. This narrows the evidence request but does not close the STT rounding or broker pass-through gap.
 
 No posting implementation is authorized. Keep `settlementChargesPaise=null`, `netRealizedPnlPaise=null`, and `ledgerPostingAllowed=false`.
+
+
+## 15. Retrieved Global Indices final STT report specification (checked 2026-11-23)
+
+### Correction to Section 14 retrieval status
+
+The Global Indices final Trading Member STT specification PDF was subsequently retrieved and inspected successfully:
+- Official PDF: https://www.nseclearing.in/sites/default/files/2021-11/data_report_gi_stt01.pdf
+- Report filename: `F_STT01_F_DDMMYYYY.CSV`.
+- Delivery directory: `/FAOFTP/F/<MEMBERCODE>/REPORTS`.
+
+The specification defines:
+- Record Type 10: STT date and Trading Member Code (member-level control record).
+- Record Type 20: STT date, Trading Member Code, Trading Client Code (client-level total).
+- Record Type 30: client-contract sale records, with instrument, symbol, expiry, strike, option type, CA level, sell quantity/value, taxable sell values and STT fields.
+- **Record Type 40: client-contract exercise records**, with STT date, Trading Member Code, Trading Client Code, Instrument Type, Symbol, Expiry Date, Strike price, Option Type, CA level, Exercise quantity, Exercise value, Taxable Exercise value, STT options and Total STT.
+
+This confirms the final Global Indices STT report contains a client/contract exercise row and both taxable exercise value and STT amount fields. It is a concrete reconciliation artifact, not merely a report name on an index page.
+
+### What this still does not prove
+
+The specification defines field names and record hierarchy, but does not define:
+- Decimal precision/units of monetary fields.
+- Whether the exchange rounds STT per unit, per contract, per client-contract row, or at a later aggregation stage.
+- The exact numeric rounding mode.
+- Actual sample values or a worked calculation.
+- Which parts of the clearing-member liability are passed through by a specific broker to its client.
+
+Therefore do not reverse-engineer a rounding formula from the 0.15% statutory rate or treat the row's Total STT as a universal client debit without broker evidence. Obtain a redacted real report row and its matching client contract note/ledger.
+
+### Reconciliation adapter requirements
+
+When an authenticated member-side file is available, preserve the raw row and parse all fields losslessly. Validate the row's STT date, member/client codes, instrument, symbol, expiry, strike, CE/PE, CA level, exercise quantity, exercise value, taxable exercise value, STT options and total STT. Reconcile Type 40 exercise rows to the final exercise report and client note; reconcile Type 20 totals to the sum of the corresponding client-contract records, subject to the report's own documented aggregation rules. Do not invent a tolerance or rounding adjustment.
+
+The PDF's directory and filename convention are useful ingestion metadata, but the importer must still authenticate the member file and verify the report date and member identity. A filename alone is not proof of provenance.
+
+### Release decision
+
+The final Global Indices F_STT01_F Type 40 schema is now verified from the official PDF. This closes the report-layout question for the Trading Member STT report, but **does not close the rounding, sample-row, or broker client pass-through questions**. Clearing Member F_STT02_F and final exercise F_EX01_F/F_EX02_F specifications still require separate inspection.
+
+No posting implementation is authorized. Keep `settlementChargesPaise=null`, `netRealizedPnlPaise=null`, and `ledgerPostingAllowed=false`.
