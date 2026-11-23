@@ -24,6 +24,7 @@ const {buildPortfolioValuation}=require("./lib/paper-portfolio-valuation");
 const {calculateDerivativePortfolio}=require("./lib/derivative-portfolio");
 const {validateDerivativeContract,normalizeTickSizePaise}=require("./lib/derivative-contract");
 const {resolveNseOptionMarketExecution}=require("./lib/option-market-execution");
+const {isNseOptionContract}=require("./lib/nse-option-instruments");
 const {validateOptionLimitOrder,evaluateOptionLimitQuote}=require("./lib/option-limit-policy");
 const {parseMarginPreviewInput}=require("./lib/margin-preview-input");
 const {normalizeUpstoxMarginResponse}=require("./lib/upstox-margin");
@@ -227,7 +228,7 @@ app.get("/instruments",async(req,res)=>{
       if(kind==="equities"&&!(item.instrument_type==="EQ"&&["NSE_EQ","BSE_EQ"].includes(item.segment)))return false;
       if(kind==="indices"&&!(item.instrument_type==="INDEX"&&["NSE_INDEX","BSE_INDEX"].includes(item.segment)))return false;
       if(kind==="futures"&&!(item.instrument_type==="FUT"&&["NSE_FO","BSE_FO"].includes(item.segment)))return false;
-      if(kind==="options"&&!((["CE","PE"].includes(item.instrument_type))&&["NSE_FO","BSE_FO"].includes(item.segment)))return false;
+      if(kind==="options"&&!isNseOptionContract(item))return false;
       if(q&&!String(item.trading_symbol||"").toLowerCase().includes(q)&&!String(item.name||"").toLowerCase().includes(q)&&!String(item.underlying_symbol||"").toLowerCase().includes(q))return false;
       return true;
     }).slice(0,limit).map(item=>({
@@ -714,7 +715,7 @@ app.post("/paper/derivative/orders",async(req,res)=>{
     const {user,userDb}=await auth(req),instrumentKey=String(req.body?.instrument_key||"");
     const lots=Number(req.body?.lots),side=String(req.body?.side||"").toUpperCase(),idempotencyKey=String(req.body?.idempotency_key||"");
     const orderType=String(req.body?.order_type||"MARKET").toUpperCase();
-    if(orderType!=="MARKET")return res.status(400).json({error:"Options LIMIT orders are not supported yet. Only MARKET orders are currently available."});
+    if(orderType!=="MARKET")return res.status(400).json({error:"Use /paper/derivative/limit-orders for NSE Options LIMIT orders.",code:"use_options_limit_endpoint"});
     if(!isUuid(idempotencyKey))return res.status(400).json({error:"A valid UUID idempotency_key is required."});
     if(!["BUY","SELL"].includes(side))return res.status(400).json({error:"Only BUY and SELL to close existing long CE/PE positions are supported."});
     if(!instrumentCache.length||Date.now()-instrumentCacheUpdatedAt>6*60*60*1000)await refreshInstrumentCache();
