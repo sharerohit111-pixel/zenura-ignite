@@ -183,3 +183,29 @@ This branch now destructures `{user,userDb}` and adds a regression assertion to 
 - This is not evidence that a compatible shared limiter table/RPC exists in the current Indian Market migration chain or in the hosted database. Do not assume the PR #70 draft table is deployed, mergeable, or suitable for the new route-family/token-bucket policy.
 - Before implementation, Chat 7 should reconcile PR #70's proposed rate-limit state with the current ordered migration chain and current hosted migration history, then decide whether to extend an existing draft object or create a forward-only migration. Avoid duplicate tables, conflicting key formats, or broadening service-role grants.
 - No SQL file was copied, modified, applied, or merged as part of this coordination check.
+
+
+## 13. Proposed route-family policy matrix (review required)
+
+This matrix classifies work by cost and side-effect risk so Chat 7 / backend owners can agree a policy before implementation. It intentionally specifies **no numeric quotas, burst sizes or refill rates**; those require expected traffic, provider limits, product UX and shared-database capacity decisions.
+
+| Route family | Representative routes | Identity / scope | Suggested enforcement point | Degraded-mode posture |
+|---|---|---|---|---|
+| Order mutations | Equity, Futures and Options submit; cancel; protective-order mutations | Verified Supabase user + mutation family; retain order-level idempotency | After authentication and cheap schema/instrument validation, before mutation RPC | Fail closed with 503 if shared limiter unavailable; quota exhaustion 429 |
+| Expensive market/provider reads | Candles, option-chain, quote/provider-backed reads, margin preview | Verified user + provider/operation family; also global provider concurrency budget | After auth and cheap validation, before token/provider lookup or expensive provider call | Fail closed with 503; never translate backend outage to 429 |
+| Stream lifecycle | Stream start/stop/reconnect | Verified user/account + stream lifecycle family; preserve DB account lease | Before acquiring/renewing stream lease; keep lease as a separate concurrency invariant | Fail closed for new stream starts if limiter/lease backend unavailable; cleanup existing streams safely |
+| History and portfolio reads | Equity/Futures/Options order history, fills, portfolio, account | Verified user + read family | After auth; preserve user-scoped queries and cursor validation | A documented low-cost-read degraded policy may be considered only with ingress protection; no local-counter fallback |
+| Public catalogue / health | Instruments, health | Trusted ingress identity for public catalogue; health isolated for platform probes | Edge/WAF before application/provider work; health has separate probe policy | Serve only from bounded cache where designed; protect origin from unauthenticated floods |
+| OAuth lifecycle | OAuth start/callback/token exchange | Verified user for start; trusted ingress identity + validated one-time state for callback | Edge protection before callback parsing; user quota before start/token exchange | Fail closed for token exchange when shared policy backend is unavailable; preserve single-use state |
+| Instrument refresh / admin jobs | Internal refresh and maintenance tasks | Service identity / job identity, not caller-supplied user identity | Scheduler/worker admission and global provider concurrency | Bounded retry with backoff; no overlapping refresh; never expose internal controls publicly |
+
+### Cross-cutting invariants
+
+- Route-family policy is additive to authentication, RLS, ownership checks, idempotency, order-state validation, worker leases and provider concurrency controls; it must not replace them.
+- A user quota key must derive only from the authenticated Supabase subject. A request body, URL parameter or client header must never select another user's bucket.
+- Public IP identity must come from a verified ingress boundary. Until Cloud Run's actual proxy chain is confirmed, application code must not treat arbitrary X-Forwarded-For as authoritative.
+- Mutation retries must preserve the same idempotency key and request fingerprint. Rate limiting must not cause a second financial side effect or bypass a prior idempotent result.
+- A 429 rate_limited response means a valid request exceeded a configured policy and includes integer Retry-After; a 503 rate_limit_unavailable response means the policy backend could not make a trustworthy decision. They are distinct operational conditions.
+- Apply request/body limits and edge protection before parsing expensive payloads. Authenticate before user-keyed decisions. Perform cheap deterministic validation before consuming provider-heavy budgets.
+- Quota values, global concurrency caps, route exceptions, retention/TTL, clock source and alert thresholds remain open design decisions. Record approvals and load-test evidence before rollout.
+- Do not implement this matrix until Chat 7 confirms the shared schema/RPC contract and migration ordering. This section is a proposal, not an active policy.
