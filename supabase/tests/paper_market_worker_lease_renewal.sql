@@ -67,6 +67,20 @@ BEGIN
     RAISE EXCEPTION 'Lease renewal RPC grants are not service-role-only';
   END IF;
 
+  IF public.acquire_paper_market_worker_lease(
+    'paper_option_limit_orders',v_owner,v_now+300010,30000
+  ) IS NOT TRUE THEN
+    RAISE EXCEPTION 'Options worker namespace was not preserved by shared lease allowlist';
+  END IF;
+  IF public.renew_paper_market_worker_lease(
+    'paper_option_limit_orders',v_owner,v_now+300011,120000
+  ) IS NOT TRUE THEN
+    RAISE EXCEPTION 'Options worker namespace could not renew its shared lease';
+  END IF;
+  PERFORM public.release_paper_market_worker_lease(
+    'paper_option_limit_orders',v_owner,v_now+300012
+  );
+
   PERFORM public.release_paper_market_worker_lease(
     'paper_futures_limit_orders',v_owner,v_now+300001
   );

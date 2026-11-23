@@ -49,11 +49,12 @@ BEGIN
     'paper_futures_limit_orders',v_other,v_now+6
   );
 
-  -- Existing equity/intraday/protective namespaces must remain usable.
+  -- Existing equity/intraday/protective and coordinated Options namespaces remain usable.
   FOREACH v_acquired IN ARRAY ARRAY[
     public.acquire_paper_market_worker_lease('paper_limit_orders',v_owner,v_now+10,120000),
     public.acquire_paper_market_worker_lease('paper_intraday_limit_orders',v_owner,v_now+11,120000),
-    public.acquire_paper_market_worker_lease('paper_protective_orders',v_owner,v_now+12,120000)
+    public.acquire_paper_market_worker_lease('paper_protective_orders',v_owner,v_now+12,120000),
+    public.acquire_paper_market_worker_lease('paper_option_limit_orders',v_owner,v_now+13,120000)
   ] LOOP
     IF v_acquired IS NOT TRUE THEN
       RAISE EXCEPTION 'An existing paper market worker lease key regressed';
@@ -62,6 +63,7 @@ BEGIN
   PERFORM public.release_paper_market_worker_lease('paper_limit_orders',v_owner,v_now+13);
   PERFORM public.release_paper_market_worker_lease('paper_intraday_limit_orders',v_owner,v_now+14);
   PERFORM public.release_paper_market_worker_lease('paper_protective_orders',v_owner,v_now+15);
+  PERFORM public.release_paper_market_worker_lease('paper_option_limit_orders',v_owner,v_now+16);
 
   v_rejected:=false;
   BEGIN
