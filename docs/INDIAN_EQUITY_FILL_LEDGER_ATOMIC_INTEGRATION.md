@@ -107,3 +107,18 @@ For MARKET fills, no reservation is consumed by these RPCs, so the ledger trade 
 - Cancellation/rejection reservation-release ledger events are not covered by the three settlement functions; integrate them in the corresponding cancel/reject RPCs as a separate reviewed step.
 - No disposable PostgreSQL integration test has been run for this design yet.
 - No production DDL, migration, grants, or policies were changed.
+
+
+## Draft implementation prepared (2026-11-23)
+
+A separate draft SQL file now contains additive `CREATE OR REPLACE FUNCTION` definitions for the three existing full-fill settlement RPCs:
+- `supabase/drafts/indian_equity_atomic_fill_ledger_integration.sql`
+- Paired disposable-only rollback: `supabase/drafts/indian_equity_atomic_fill_ledger_integration.down.sql`
+
+The implementation copies the existing function bodies and inserts fill/ledger writes after the existing account/order settlement updates and before the function returns. Existing function signatures, validation, fee calculations, position math, lock order, SECURITY DEFINER declaration, empty/fixed search_path, and function ACLs are not intentionally changed. Successful RPC responses now include `fill_id`; exact retry responses look up the existing fill and return its identifier when present.
+
+The fill `execution_id` is deterministic per current full-fill order contract: `equity-order:<order_id>`. MARKET writes one trade ledger event. LIMIT BUY writes the trade event plus a separate reservation-consume event. LIMIT SELL writes the trade credit; reserved shares remain represented in position/order state.
+
+Static source checks confirmed all three function signatures match their source definitions, all retain SECURITY DEFINER and empty search_path, and each contains one fill insertion. Delivery/Intraday LIMIT each contain two ledger insert sites (trade and conditional reservation consumption); MARKET contains one trade ledger insert.
+
+These files remain draft-only. No PostgreSQL parser/runtime or disposable database was available in this step, so SQL compilation, migration replay, transaction rollback, concurrent worker behavior, and pgTAP tests remain unverified. Do not promote to active migrations or deploy until those checks pass.
