@@ -1061,4 +1061,13 @@ async function start(){
   }
 }
 if(require.main===module)start().catch(error=>{console.error("Supabase gateway startup failed:",error.message);process.exit(1);});
-module.exports={app,start,runPaperLimitWorker,runPaperIntradayLimitWorker,runPaperProtectiveWorker};
+const exported={app,start,runPaperLimitWorker,runPaperIntradayLimitWorker,runPaperProtectiveWorker};
+if(process.env.NODE_ENV==="test"){
+  exported.configureRouteTestState=({instruments=[],intradayLimitWorkerEnabled=false}={})=>{
+    if(!Array.isArray(instruments))throw new TypeError("Test instruments must be an array");
+    instrumentCache=instruments.map(item=>({...item}));
+    instrumentCacheUpdatedAt=Date.now();
+    paperIntradayLimitWorkerStatus.enabled=intradayLimitWorkerEnabled===true;
+  };
+}
+module.exports=exported;
