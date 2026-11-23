@@ -46,6 +46,7 @@ const {MAX_RECONNECT_ATTEMPTS,reconnectDelayMs}=require("./lib/stream-reconnect-
 const {decryptUpstoxToken,encryptUpstoxToken}=require("./lib/upstox-token-crypto");
 const {isUpstoxAccessTokenUsable}=require("./lib/upstox-token-validity");
 const {readUserUpstoxConnection}=require("./lib/upstox-user-connection");
+const {revokeUpstoxAccessToken}=require("./lib/upstox-revocation");
 const {nextUpstoxTokenExpiry}=require("../functions/lib/upstox-token-expiry");
 const {isUsableUpstoxTokenResponse}=require("../functions/lib/upstox-token-response");
 const {isUsableUpstoxOAuthCallback}=require("../functions/lib/upstox-oauth-callback-input");
@@ -225,9 +226,26 @@ app.get("/upstox/oauth/callback",async(req,res)=>{
 app.delete("/upstox/connection",async(req,res)=>{
   try{
     const {user}=await auth(req);
+    // Capture the current token in memory only. Local disconnection is committed
+    // first so provider logout failure can never leave this app using the token.
+    let providerToken=null;
+    try{
+      const connection=await getConnection(user.id);
+      if(connection&&connection.status==="connected"
+        &&Number.isFinite(connection.expiresAtMs)&&connection.expiresAtMs>Date.now()
+        &&connection.tokenCiphertext&&typeof connection.tokenCiphertext==="object"){
+        providerToken=decryptToken(connection.tokenCiphertext);
+      }
+    }catch(_error){providerToken=null;}
     const {data,error}=await serviceDb.rpc("disconnect_upstox_connection",{p_user_id:user.id,p_now_ms:Date.now()});
     if(error)throw Object.assign(new Error("Upstox connection could not be safely revoked."),{status:503});
-    res.set("Cache-Control","no-store").json({disconnected:true,generation:data,feedReady:false});
+    const providerRevoked=providerToken
+      ?await revokeUpstoxAccessToken(providerToken,{fetchProvider,readProviderJson})
+      :null;
+    res.set("Cache-Control","no-store").json({
+      disconnected:true,generation:data,feedReady:false,
+      providerRevocation:providerRevoked===true?"confirmed":providerRevoked===false?"unconfirmed":"not_attempted"
+    });
   }catch(error){sendError(res,error,"Upstox disconnect failed.");}
 });
 
