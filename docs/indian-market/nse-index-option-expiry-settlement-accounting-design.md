@@ -296,3 +296,42 @@ Still not verified: rounding/aggregation semantics, actual client exercise STT r
 For a future evidence adapter, retain the complete original record (not only the total) and reconcile at least client + instrument + expiry + strike + option type + CA level + exercise quantity/value + taxable exercise value + STT amount. Do not infer a rounding rule from the rate or reverse-engineer one from a single aggregate.
 
 No posting implementation is authorized. Keep settlementChargesPaise=null, netRealizedPnlPaise=null, and ledgerPostingAllowed=false.
+
+## 14. Expiry-day Global Indices final settlement reports (checked 2026-11-23)
+
+### Newly identified official report family
+
+NSE India's official Equity Derivatives Data & Reports Download page separately lists an **Additional Settlement Reports (on expiry day of Global Indices)** section. It includes:
+- Final detailed Position File for Trading Members: `F_PS03_F`.
+- Final detailed Position File for Clearing Members: `F_PS04_F`.
+- Final Bank Report for Next Day Obligations: `F_BK01_F`.
+- **Final detailed STT Report for Trading Members: `F_STT01_F`.**
+- Final detailed STT Report for Clearing Members: `F_STT02_F`.
+- Final Detailed Exercise Reports: `F_EX01_F` and `F_EX02_F`.
+
+This is directly relevant to the long index-option expiry workflow and is a more targeted report family than relying only on the ordinary daily F_STT01/F_EX01 documentation. The NSE page labels these as additional settlement reports specifically for Global Indices expiry day.
+
+Official index page:
+- https://www.nseindia.com/static/products-services/equity-derivatives-data-reports-download
+
+### Retrieval limitation
+
+The index page exposes links for the final STT and exercise PDFs, but the linked PDFs redirect from the legacy nscclindia.com host to nseclearing.in paths that the current retrieval interface cannot open. Therefore the exact `F_STT01_F` / `F_STT02_F` / `F_EX01_F` record layouts, rounding fields, and sample values were **not inspected** in this pass. Do not infer their schemas from the ordinary F_STT01 page or legacy F_STT02 document.
+
+The official page itself was last updated 2023-01-03, so confirm that the report names and formats remain current with NSE Clearing before building an importer.
+
+### Next evidence request
+
+Request from the broker/clearing member the actual redacted final expiry-day Global Indices report set for one ITM long index CE/PE expiry:
+1. `F_STT01_F` client/contract rows and `F_STT02_F` clearing-member reconciliation.
+2. `F_EX01_F` accepted exercise quantity and `F_EX02_F` clearing-member exercise reconciliation.
+3. Corresponding next-day obligation/bank report rows.
+4. The broker's client contract note/ledger showing which amounts were passed through and their rounding.
+
+Compare client + contract + expiry + strike + CE/PE + exercise quantity/value across the final exercise and STT reports. The STT report should be the primary evidence for actual exercise tax amount; the exercise report alone is not a tax calculation source.
+
+### Updated release decision
+
+A dedicated Global Indices expiry-day final STT/exercise report family is now confirmed to exist on NSE's official report index. Its contents remain unverified because the PDF endpoints could not be retrieved. This narrows the evidence request but does not close the STT rounding or broker pass-through gap.
+
+No posting implementation is authorized. Keep `settlementChargesPaise=null`, `netRealizedPnlPaise=null`, and `ledgerPostingAllowed=false`.
