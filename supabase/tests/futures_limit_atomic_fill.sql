@@ -19,6 +19,7 @@ ON CONFLICT(exchange,session_date) DO UPDATE SET
 DO $futures_limit_fill$
 DECLARE
   v_now bigint;
+  v_first_quote bigint;
   v_result jsonb;
   v_rejected boolean;
   v_order_status text;
@@ -45,8 +46,9 @@ BEGIN
   -- First partial fill transfers 80000 paise to the position; account margin
   -- remains unchanged because this is an order-to-position reservation transfer.
   v_now:=floor(extract(epoch from clock_timestamp())*1000)::bigint;
+  v_first_quote:=v_now;
   v_result:=public.execute_paper_futures_limit_fill(
-    repeat('a',64),'UPSTOX-EXEC-001',1,10,9900,100,v_now,v_now
+    repeat('a',64),'UPSTOX-EXEC-001',1,10,9900,100,v_first_quote,v_now
   );
   IF v_result->>'status'<>'PARTIALLY_FILLED'
      OR (v_result->>'filled_quantity')::integer<>10
@@ -78,7 +80,7 @@ BEGIN
   -- ID is rejected and cannot debit charges or create another fill.
   v_now:=floor(extract(epoch from clock_timestamp())*1000)::bigint;
   v_result:=public.execute_paper_futures_limit_fill(
-    repeat('a',64),'UPSTOX-EXEC-001',1,10,9900,100,v_now,v_now
+    repeat('a',64),'UPSTOX-EXEC-001',1,10,9900,100,v_first_quote,v_now
   );
   IF (v_result->>'idempotent_replay')::boolean IS NOT TRUE THEN
     RAISE EXCEPTION 'Exact Futures LIMIT fill replay was not idempotent';
@@ -87,7 +89,7 @@ BEGIN
   v_now:=floor(extract(epoch from clock_timestamp())*1000)::bigint;
   BEGIN
     PERFORM public.execute_paper_futures_limit_fill(
-      repeat('a',64),'UPSTOX-EXEC-001',1,9,9900,100,v_now,v_now
+      repeat('a',64),'UPSTOX-EXEC-001',1,9,9900,100,v_first_quote,v_now
     );
   EXCEPTION WHEN SQLSTATE '23505' THEN v_rejected:=true;
   END;
