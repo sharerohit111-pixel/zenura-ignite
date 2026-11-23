@@ -140,3 +140,20 @@ Paper simulation only. No broker order-placement endpoint, no live trading, no p
 - The workers still require a separate operational backoff/circuit-breaker policy for repeated per-user 401/429 failures. Current batch-level failure handling can revisit failed batches on later worker cycles; do not enable high-volume workers until bounded provider cooldown behavior is tested.
 - Verification performed: source re-fetch confirmed the helper import, shared error conversion and sanitized status/code logging in all four extracted worker modules. Full module syntax/test execution, full gateway test suite, mock provider integration and CI remain unverified.
 - Latest worker hardening commit: `6f9bed748c8b56f088feee9d6118067740b81895`.
+
+
+## Per-user worker cooldown / provider circuit-breaker update (2026-11-23)
+
+- Added shared `market-gateway/lib/upstox-user-cooldown.js`, used by the Delivery LIMIT worker and the Intraday LIMIT, Protective, Futures LIMIT and Options LIMIT workers.
+- Cooldown is keyed by the authenticated Supabase user ID, shared by all worker modules in the same Node.js process, and bounded to 5,000 in-memory user entries. No token, provider body, or credential is stored in cooldown state.
+- Provider failure policy:
+  - 401 / `upstox_reconnect_required`: 5-minute reconnect cooldown. The connection is not deleted and no refresh grant is attempted.
+  - 429: honors sanitized provider `Retry-After`, capped at five minutes; if absent, applies a bounded exponential cooldown starting at five seconds.
+  - Network / 5xx / generic upstream provider failure: bounded exponential cooldown starting at five seconds and capped at one minute.
+  - Other client errors do not open a provider cooldown.
+- A successful provider quote response clears only that user's cooldown. Failures in downstream portfolio/ledger RPC processing after a successful provider response do not incorrectly count as provider failures.
+- Workers skip provider calls for users whose cooldown is active. The Protective worker also updates `worker_checked_at` on skipped rows so a cooling-down user's orders do not starve other users in its ordered scan.
+- Added eight focused cooldown policy tests for user isolation, 401, 429/Retry-After, exponential backoff, success reset, invalid input and bounded state. The isolated Node 22 harness run completed **8 passed, 0 failed**. A focused Intraday worker regression test was added to verify that a 429 suppresses the next worker-cycle provider call; that full worker test file has not been executed here.
+- **Scope limitation:** this is an in-process cooldown, not a distributed circuit breaker. It does not coordinate separate gateway replicas/processes, and simultaneous first requests from different worker types can still race before a failure opens the cooldown. A shared database/Redis cooldown with atomic acquisition and a cross-replica half-open probe is required if the gateway runs multiple replicas or workers outside one process.
+- Full gateway tests, all worker integration tests, CI, multi-replica concurrency tests, staging and live provider checks remain unverified. Do not enable production workers on the strength of the helper-only tests.
+- No database schema or migration changes were made. No deployment, provider call, production setting change, Crypto change or real broker order occurred.
