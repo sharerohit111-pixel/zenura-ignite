@@ -226,3 +226,22 @@ Extended the existing disposable PostgreSQL SQL regressions:
 - `supabase/tests/intraday_limit_reservations.sql` now asserts an Intraday LIMIT BUY fill creates exactly one fill, a TRADE_DEBIT event and a RESERVATION_CONSUME event; the cash and reserved-cash deltas/snapshots must reconcile. Exact fill replay must not duplicate fill or ledger rows.
 
 These are additional assertions in the existing SQL test files; they have not yet been executed against PostgreSQL. Static review confirmed the cash snapshot column name matches the ledger DDL (`cash_balance_after_paise`). Delivery LIMIT fill, cross-tenant FK rejection, concurrent duplicate execution and forced post-insert rollback remain to be covered by dedicated runtime tests.
+
+
+## Delivery LIMIT, rollback and race regression expansion (2026-11-23)
+
+Committed additional disposable-only coverage:
+- New `supabase/tests/equity_delivery_limit_fill_ledger.sql`: Delivery LIMIT BUY/SELL atomic fill and ledger reconciliation, replay idempotency, and an injected failure on the first ledger insert after the fill insert. The failure assertion verifies the statement rolls back the order, account, position, fill and ledger changes.
+- Extended `supabase/tests/intraday_limit_reservations.sql`: Intraday LIMIT SELL trade-credit reconciliation and replay; filled order rows are retained during cleanup because immutable fills/ledger reference them.
+- Updated `supabase/tests/intraday_limit_fill_cancel_race.sh`: retain the filled BUY parent order during cleanup.
+- Updated `.github/workflows/indian-market-db-postgres17.yml` to execute the Delivery LIMIT test and the existing concurrent fill/cancel race script.
+- Updated `docs/INDIAN_MARKET_DATABASE_INTEGRITY_REGRESSION_TESTS.md` with the new executable coverage and remaining tenant-integrity dependency.
+
+Latest relevant commits:
+- Intraday SELL and immutable cleanup: `fedd8b6bd829423d211588e59598e16d582aefa0`
+- Race cleanup: `b2f0d3f75168c5064a39b6f04ed546d82b6e5278`
+- Delivery LIMIT + injected rollback test: `eb93f206c9c6002800668503a4bd8af32e1a8cbc`
+- Workflow expansion: `559569f5b39e730479bfb5f21e9ea11bde50b4e0`
+- Regression contract update: `0e095acf1e7bab2698ea1b710935aa3c2e9eaba3`
+
+All changes remain on the isolated infrastructure feature branch. The SQL was source-reviewed only; no PostgreSQL runtime result has been observed yet. The cross-tenant composite-FK draft remains unexecuted because the branch still lacks a canonical merged Futures/Options migration chain. No production database or Crypto asset was modified.
