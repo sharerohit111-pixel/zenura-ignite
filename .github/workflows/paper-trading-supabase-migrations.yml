@@ -205,6 +205,8 @@ jobs:
         run: psql -v ON_ERROR_STOP=1 -f supabase/tests/options_limit_atomic_fill.sql
       - name: Exercise concurrent NSE Options LIMIT fill, cancel and duplicate execution races
         run: bash supabase/tests/options_limit_fill_cancel_race.sh
+      - name: Verify NSE Options LIMIT expiry preserves reservations without a verified session
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/options_limit_expiry_calendar_guard.sql
       - name: Verify F&O LIMIT schema remains fail-closed until lifecycle release
         run: psql -v ON_ERROR_STOP=1 -f supabase/tests/derivative_limit_schema_guard.sql
       - name: Verify isolated NSE Options LIMIT schema, RLS and MARKET SELL reservation guard
