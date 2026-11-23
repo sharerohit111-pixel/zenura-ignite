@@ -28,6 +28,13 @@ Scope: Indian Market only. No Crypto changes. No live broker orders.
 - Stream leases, bounded subscriptions, backpressure, per-user stream registration and worker lease primitives exist.
 - Existing exchange-session calendar tooling is present and missing/unverified sessions fail closed in the reviewed derivative worker path.
 
+## Follow-up implementation and verification
+
+- Extracted the service-role connection lookup into `market-gateway/lib/upstox-user-connection.js`; the gateway passes only the authenticated Supabase user ID and the query is explicitly constrained by `user_id`.
+- Added `market-gateway/test/upstox-user-connection.test.js` covering two distinct user IDs returning only their own mocked connection rows, plus rejection of missing/invalid user identifiers before any database query.
+- The two new isolation unit tests were executed in a temporary Node 22 harness using the exact committed helper and test source: 2 passed. This is a mocked query-builder unit test, not a live Supabase/RLS integration test; actual database isolation and service-role grants remain unverified until staging checks.
+- The complete `market-gateway` test suite has not been executed because a repository checkout/runtime with its dependencies was not available in this session. GitHub Actions currently has no workflow run associated with the latest branch commit.
+
 ## Findings and gaps requiring implementation or further proof
 
 1. **No refresh-token flow is implemented.** The current standard OAuth access token is treated as a daily credential and expired connections require user reconnection. Upstox documents standard token expiry at 03:30 IST; the current code's behavior is consistent with this. Do not invent a refresh grant. Evaluate Upstox Analytics Token as a separate product/credential model only after confirming its account, static-IP and terms constraints; it must not become an undocumented shared end-user token.
