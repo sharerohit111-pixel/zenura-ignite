@@ -1,5 +1,7 @@
 "use strict";
 
+const {upstoxHttpError}=require("./upstox-http-policy");
+
 const crypto=require("node:crypto");
 const {normalizeWorkerCursor,groupOrdersByUser}=require("./paper-limit-worker");
 const {isEligibleIntradayLimitOrder}=require("./intraday-limit-policy");
@@ -82,7 +84,7 @@ function createPaperIntradayLimitWorker({
             {headers:{Authorization:"Bearer "+token,Accept:"application/json"}}
           );
           const payload=await readProviderJson(response);
-          if(!response.ok)throw new Error("Upstox Intraday LIMIT quote request failed.");
+          if(!response.ok)throw upstoxHttpError(response);
           const entries=Object.values(payload?.data||{});
           const sessionCache=new Map();
           for(const order of validOrders){
@@ -111,7 +113,7 @@ function createPaperIntradayLimitWorker({
           }
         }catch(error){
           summary.failed+=userOrders.length;
-          console.warn("Intraday LIMIT user batch skipped",{userId,errorName:error?.name||"Error",status:error?.status||500});
+          console.warn("Intraday LIMIT user batch skipped",{userId,errorName:error?.name||"Error",status:error?.status||500,code:error?.code||"unknown"});
         }
       };
       for(let offset=0;offset<groups.length;offset+=5)
