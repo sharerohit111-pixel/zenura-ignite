@@ -1,0 +1,17 @@
+.futures-limit-panel{margin-top:18px}
+.futures-limit-panel .futures-limit-fields{display:grid;grid-template-columns:repeat(4,minmax(120px,1fr));gap:12px;align-items:end}
+.futures-limit-panel label{display:flex;flex-direction:column;gap:7px;color:var(--muted,#9fb0c7);font-size:12px;font-weight:700;letter-spacing:.04em}
+.futures-limit-panel input,.futures-limit-panel select{width:100%;min-height:42px;padding:10px 12px;border:1px solid var(--line,#26364c);border-radius:10px;background:var(--surface-2,#0d1929);color:var(--text,#edf4ff);font:inherit}
+.futures-limit-panel .futures-limit-actions{display:flex;gap:10px;flex-wrap:wrap}
+.futures-limit-panel .futures-limit-actions button,.futures-limit-panel .futures-limit-cancel{min-height:40px;padding:9px 16px;border:1px solid var(--line,#26364c);border-radius:10px;background:var(--surface-2,#0d1929);color:var(--text,#edf4ff);font-weight:800;cursor:pointer}
+.futures-limit-panel .futures-limit-actions button:disabled,.futures-limit-panel .futures-limit-cancel:disabled{opacity:.45;cursor:not-allowed}
+.futures-limit-panel #futures-limit-buy{background:#123e32;border-color:#1f7658;color:#c9ffeb}
+.futures-limit-panel #futures-limit-sell{background:#47242b;border-color:#8a3b4a;color:#ffe0e5}
+#futures-limit-status{margin:12px 0;color:var(--muted,#9fb0c7);font-size:13px;line-height:1.5}
+#futures-limit-status[data-state="error"]{color:#ff9ca9}
+#futures-limit-status[data-state="success"]{color:#8de4b7}
+#futures-limit-status[data-state="warning"]{color:#f3c97b}
+.futures-limit-orders-wrap{margin-top:14px;overflow-x:auto}
+.futures-limit-cancel{font-size:11px;letter-spacing:.04em}
+@media(max-width:760px){.futures-limit-panel .futures-limit-fields{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:420px){.futures-limit-panel .futures-limit-fields{grid-template-columns:1fr}}

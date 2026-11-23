@@ -52,6 +52,10 @@ test("server RPC always injects verified user UUID and rejects caller-selected i
   const user = await runtime.authenticateRequest({ get: () => "Bearer " + accessToken });
   const result = await runtime.callUserRpc(user, "initialize_paper_trading_account", {});
   assert.equal(result.args.p_user_id, uid);
+  const submit=await runtime.callUserRpc(user,"submit_paper_futures_limit_order",{p_order_id:"a".repeat(64)});
+  assert.equal(submit.args.p_user_id,uid);
+  const cancel=await runtime.callUserRpc(user,"cancel_paper_futures_limit_order",{p_order_id:"a".repeat(64)});
+  assert.equal(cancel.args.p_user_id,uid);
   await assert.rejects(runtime.callUserRpc(user, "initialize_paper_trading_account", { p_user_id: "22222222-2222-4222-8222-222222222222" }), { status: 400 });
   await assert.rejects(runtime.callUserRpc(user, "unknown_rpc", {}), { status: 400 });
 });

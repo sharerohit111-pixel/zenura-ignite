@@ -4,6 +4,19 @@ INSERT INTO auth.users(id) VALUES ('abababab-abab-4bab-8bab-abababababab')
 ON CONFLICT (id) DO NOTHING;
 SELECT public.initialize_paper_trading_account('abababab-abab-4bab-8bab-abababababab');
 
+INSERT INTO public.paper_exchange_sessions(
+  exchange,session_date,is_trading_day,open_minute,close_minute,
+  session_kind,source_reference,verified_at,source_sha256
+) VALUES (
+  'NSE',(clock_timestamp() at time zone 'Asia/Kolkata')::date,
+  true,0,1440,'SPECIAL','https://www.nseindia.com/market-data/holidays',
+  clock_timestamp(),repeat('e',64)
+)
+ON CONFLICT(exchange,session_date) DO UPDATE SET
+  is_trading_day=true,open_minute=0,close_minute=1440,session_kind='SPECIAL',
+  source_reference='https://www.nseindia.com/market-data/holidays',
+  verified_at=clock_timestamp(),source_sha256=repeat('e',64);
+
 DO $futures_limit_submit_release$
 DECLARE
   v_now bigint;
@@ -28,7 +41,7 @@ BEGIN
     'abababab-abab-4bab-8bab-abababababab',repeat('c',64),
     'abababab-0000-4000-8000-000000000002',repeat('b',64),
     'NSE_FO|FUT_LIMIT_CLOSE','FUT_LIMIT_CLOSE','NSE','NSE_FO',current_date+5,
-    25,5,'SELL','DELIVERY',25,12000,0,clock_timestamp()+interval '10 minutes'
+    25,5,'SELL','DELIVERY',25,12000,0,null,floor(extract(epoch from clock_timestamp())*1000)::bigint,clock_timestamp()+interval '10 minutes'
   );
   IF v_result->>'status'<>'PENDING'
      OR (v_result->>'reserved_close_quantity')::integer<>25
@@ -52,7 +65,7 @@ BEGIN
       'abababab-abab-4bab-8bab-abababababab',repeat('d',64),
       'abababab-0000-4000-8000-000000000003',repeat('c',64),
       'NSE_FO|FUT_LIMIT_CLOSE','FUT_LIMIT_CLOSE','NSE','NSE_FO',current_date+5,
-      25,5,'SELL','DELIVERY',50,12000,0,clock_timestamp()+interval '10 minutes'
+      25,5,'SELL','DELIVERY',50,12000,0,null,floor(extract(epoch from clock_timestamp())*1000)::bigint,clock_timestamp()+interval '10 minutes'
     );
   EXCEPTION WHEN SQLSTATE '23514' THEN v_rejected:=true;
   END;
@@ -123,7 +136,7 @@ BEGIN
     'abababab-abab-4bab-8bab-abababababab',repeat('8',64),
     'abababab-0000-4000-8000-000000000007',repeat('1',64),
     'NSE_FO|FUT_LIMIT_OPEN','FUT_LIMIT_OPEN','NSE','NSE_FO',current_date+5,
-    25,5,'BUY','DELIVERY',25,10000,150000,clock_timestamp()+interval '10 minutes'
+    25,5,'BUY','DELIVERY',25,10000,150000,floor(extract(epoch from clock_timestamp())*1000)::bigint,floor(extract(epoch from clock_timestamp())*1000)::bigint,clock_timestamp()+interval '10 minutes'
   );
   SELECT reserved_margin_paise INTO v_reserved
     FROM public.paper_accounts
@@ -135,7 +148,7 @@ BEGIN
     'abababab-abab-4bab-8bab-abababababab',repeat('8',64),
     'abababab-0000-4000-8000-000000000007',repeat('1',64),
     'NSE_FO|FUT_LIMIT_OPEN','FUT_LIMIT_OPEN','NSE','NSE_FO',current_date+5,
-    25,5,'BUY','DELIVERY',25,10000,150000,clock_timestamp()+interval '10 minutes'
+    25,5,'BUY','DELIVERY',25,10000,150000,floor(extract(epoch from clock_timestamp())*1000)::bigint,floor(extract(epoch from clock_timestamp())*1000)::bigint,clock_timestamp()+interval '10 minutes'
   );
   IF (v_result->>'idempotent_replay')::boolean IS NOT TRUE THEN
     RAISE EXCEPTION 'Opening Futures LIMIT replay was not idempotent';
@@ -153,7 +166,7 @@ BEGIN
       'abababab-abab-4bab-8bab-abababababab',repeat('8',64),
       'abababab-0000-4000-8000-000000000007',repeat('2',64),
       'NSE_FO|FUT_LIMIT_OPEN','FUT_LIMIT_OPEN','NSE','NSE_FO',current_date+5,
-      25,5,'BUY','DELIVERY',25,10000,150000,clock_timestamp()+interval '10 minutes'
+      25,5,'BUY','DELIVERY',25,10000,150000,floor(extract(epoch from clock_timestamp())*1000)::bigint,floor(extract(epoch from clock_timestamp())*1000)::bigint,clock_timestamp()+interval '10 minutes'
     );
   EXCEPTION WHEN SQLSTATE '23505' THEN v_rejected:=true;
   END;
@@ -176,7 +189,7 @@ BEGIN
     'abababab-abab-4bab-8bab-abababababab',repeat('9',64),
     'abababab-0000-4000-8000-000000000008',repeat('3',64),
     'NSE_FO|FUT_LIMIT_EXPIRY','FUT_LIMIT_EXPIRY','NSE','NSE_FO',current_date+5,
-    25,5,'BUY','DELIVERY',25,10000,125000,clock_timestamp()+interval '1 second'
+    25,5,'BUY','DELIVERY',25,10000,125000,floor(extract(epoch from clock_timestamp())*1000)::bigint,floor(extract(epoch from clock_timestamp())*1000)::bigint,clock_timestamp()+interval '1 second'
   );
   PERFORM pg_sleep(1.1);
   v_result:=public.expire_paper_futures_limit_order(repeat('9',64));
@@ -194,8 +207,61 @@ BEGIN
     RAISE EXCEPTION 'Repeated Futures LIMIT expiry was not idempotent';
   END IF;
 
+  -- A replay of an already-expired submit remains idempotent even though the
+  -- original expires_at is now in the past.
+  v_now:=floor(extract(epoch from clock_timestamp())*1000)::bigint;
+  v_result:=public.submit_paper_futures_limit_order(
+    'abababab-abab-4bab-8bab-abababababab',repeat('9',64),
+    'abababab-0000-4000-8000-000000000008',repeat('3',64),
+    'NSE_FO|FUT_LIMIT_EXPIRY','FUT_LIMIT_EXPIRY','NSE','NSE_FO',current_date+5,
+    25,5,'BUY','DELIVERY',25,10000,125000,null,v_now,clock_timestamp()-interval '1 second'
+  );
+  IF v_result->>'status'<>'EXPIRED'
+     OR (v_result->>'idempotent_replay')::boolean IS NOT TRUE THEN
+    RAISE EXCEPTION 'Expired Futures LIMIT submit replay was not idempotent: %',v_result;
+  END IF;
+
+  -- A future-dated DAY order cannot be expired while a verified exchange
+  -- session is open; missing verified session data must fail closed by expiring it.
+  PERFORM public.submit_paper_futures_limit_order(
+    'abababab-abab-4bab-8bab-abababababab',repeat('4',64),
+    'abababab-0000-4000-8000-000000000009',repeat('4',64),
+    'NSE_FO|FUT_LIMIT_NO_SESSION','FUT_LIMIT_NO_SESSION','NSE','NSE_FO',current_date+5,
+    25,5,'BUY','DELIVERY',25,10000,50000,floor(extract(epoch from clock_timestamp())*1000)::bigint,floor(extract(epoch from clock_timestamp())*1000)::bigint,clock_timestamp()+interval '10 minutes'
+  );
+  INSERT INTO public.paper_exchange_sessions(
+    exchange,session_date,is_trading_day,open_minute,close_minute,
+    session_kind,source_reference,verified_at,source_sha256
+  ) VALUES (
+    'NSE',(clock_timestamp() at time zone 'Asia/Kolkata')::date,
+    true,0,1440,'SPECIAL','https://www.nseindia.com/market-data/holidays',
+    clock_timestamp(),repeat('e',64)
+  )
+  ON CONFLICT(exchange,session_date) DO UPDATE SET
+    is_trading_day=true,open_minute=0,close_minute=1440,session_kind='SPECIAL',
+    source_reference='https://www.nseindia.com/market-data/holidays',
+    verified_at=clock_timestamp(),source_sha256=repeat('e',64);
+  v_rejected:=false;
+  BEGIN
+    PERFORM public.expire_paper_futures_limit_order(repeat('4',64));
+  EXCEPTION WHEN SQLSTATE '22023' THEN v_rejected:=true;
+  END;
+  IF NOT v_rejected THEN
+    RAISE EXCEPTION 'Futures LIMIT order expired during a verified open session';
+  END IF;
+  DELETE FROM public.paper_exchange_sessions
+   WHERE exchange='NSE'
+     AND session_date=(clock_timestamp() at time zone 'Asia/Kolkata')::date;
+  v_result:=public.expire_paper_futures_limit_order(repeat('4',64));
+  SELECT reserved_margin_paise INTO v_reserved
+    FROM public.paper_accounts
+   WHERE user_id='abababab-abab-4bab-8bab-abababababab';
+  IF v_result->>'status'<>'EXPIRED' OR v_reserved<>0 THEN
+    RAISE EXCEPTION 'Futures LIMIT order was not expired after verified session data disappeared';
+  END IF;
+
   IF has_function_privilege('anon',
-       'public.submit_paper_futures_limit_order(uuid,text,uuid,text,text,text,text,text,date,integer,integer,text,text,integer,bigint,bigint,timestamp with time zone)',
+       'public.submit_paper_futures_limit_order(uuid,text,uuid,text,text,text,text,text,date,integer,integer,text,text,integer,bigint,bigint,bigint,bigint,timestamp with time zone)',
        'EXECUTE')
      OR has_function_privilege('authenticated',
        'public.cancel_paper_futures_limit_order(uuid,text)','EXECUTE')

@@ -670,7 +670,7 @@
     const connector=window.ZENURA_MARKET_CONNECTOR,uid=connector?.getUserId?.();
     clearFeedTimers();
     if(streamAbort){streamAbort.abort();streamAbort=null;}
-    selected=item;if(!isReconnect)resetOptionChain('Underlying changed. Load the option chain for the selected instrument.');if(futuresMarginStatus)futuresMarginStatus.textContent=item.instrument_type==='FUT'?'Selected '+(item.trading_symbol||'futures contract')+'. Request a fresh broker margin preview.':'Select a verified futures contract from the Futures watchlist.';updateFuturesMarginButton();chartRequest++;lastQuoteText='';if(!isReconnect)reconnectAttempt=0;title.textContent=item.trading_symbol||item.name;symbol.textContent=item.instrument_key;price.textContent='—';
+    selected=item;window.dispatchEvent(new CustomEvent('zenura:instrument-selected',{detail:{instrument:item}}));if(!isReconnect)resetOptionChain('Underlying changed. Load the option chain for the selected instrument.');if(futuresMarginStatus)futuresMarginStatus.textContent=item.instrument_type==='FUT'?'Selected '+(item.trading_symbol||'futures contract')+'. Request a fresh broker margin preview.':'Select a verified futures contract from the Futures watchlist.';updateFuturesMarginButton();chartRequest++;lastQuoteText='';if(!isReconnect)reconnectAttempt=0;title.textContent=item.trading_symbol||item.name;symbol.textContent=item.instrument_key;price.textContent='—';
     setFeedStatus('Waiting for verified live quote','Connecting to Upstox V3 feed. Prices will appear only when received from the provider.');
     render(items);updatePaperButtons();renderSavedWatchlist();loadCandles();
     if(!gateway||!connector?.getIdToken||!uid){setFeedStatus('Market gateway not configured','Sign in and configure the deployed market gateway to start live quotes.');return;}
@@ -734,14 +734,14 @@
   }
   tabs.forEach(tab=>tab.addEventListener('click',()=>{
     clearFeedTimers();if(streamAbort){streamAbort.abort();streamAbort=null;}
-    tabs.forEach(x=>x.classList.toggle('active',x===tab));activeList=tab.dataset.list;selected=null;resetOptionChain('Select an underlying instrument to load an option chain.');updateFuturesMarginButton();chartRequest++;
+    tabs.forEach(x=>x.classList.toggle('active',x===tab));activeList=tab.dataset.list;selected=null;window.dispatchEvent(new CustomEvent('zenura:instrument-selected',{detail:{instrument:null}}));resetOptionChain('Select an underlying instrument to load an option chain.');updateFuturesMarginButton();chartRequest++;
     title.textContent='No instrument selected';symbol.textContent='Choose an instrument';price.textContent='—';updatePaperButtons();renderSavedWatchlist();loadInstruments();
   }));
   search.addEventListener('input',()=>{clearTimeout(debounce);debounce=setTimeout(loadInstruments,250);});
   function clearPrivateSession(){
     clearFeedTimers();
     if(streamAbort){streamAbort.abort();streamAbort=null;}
-    selected=null;lastQuoteText='';reconnectAttempt=0;
+    selected=null;window.dispatchEvent(new CustomEvent('zenura:instrument-selected',{detail:{instrument:null}}));lastQuoteText='';reconnectAttempt=0;
     ++watchlistLoadSeq;++watchQuoteSeq;++watchlistEditSeq;++paperAccountRequest;++paperPortfolioRequest;
     ++paperHistoryLoadSeq;++derivativePortfolioRequest;++optionChainRequest;++futuresMarginRequest;++chartRequest;
     ++paperOrderSubmitSeq;++derivativeOrderSubmitSeq;paperOrderSubmitting=false;derivativeOrderSubmitting=false;
@@ -777,7 +777,7 @@
     if(!event.detail?.signedIn||!window.ZENURA_MARKET_CONNECTOR?.isAuthenticated?.())return;
     loadInstruments();loadCandles();loadPaperAccount();refreshPaperViews();loadSavedWatchlist();loadProtectiveOrders();
   });
-  window.ZENURA_INDIAN_MARKET={mode:'indian-stocks',provider:'upstox',status:'gateway-configurable',activeList:()=>activeList,refresh:loadInstruments};
+  window.ZENURA_INDIAN_MARKET={mode:'indian-stocks',provider:'upstox',status:'gateway-configurable',activeList:()=>activeList,getSelectedInstrument:()=>selected,refresh:loadInstruments};
   loadInstruments();
   renderSavedWatchlist();
 })();
