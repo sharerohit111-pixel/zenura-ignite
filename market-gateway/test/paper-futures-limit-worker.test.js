@@ -145,20 +145,49 @@ test("fills only the displayed best ask quantity using a fresh V3 snapshot",asyn
   assert.ok(db.calls.some(x=>x.type==="rpc"&&x.name==="release_paper_market_worker_lease"));
 });
 
-test("preserves pending Futures LIMIT orders when the verified session calendar is missing",async()=>{
-  let expiryRpcCalled=false,tokenRequested=false;
-  const db=makeDb({onRpc:async(name,args)=>{
-    if(name==="expire_paper_futures_limit_order"){expiryRpcCalled=true;return {data:{status:"EXPIRED",idempotent_replay:false},error:null};}
-    return {data:true,error:null};
-  }});
+test("preserves pending Futures LIMIT orders when the verified session is missing",async()=>{
+  let expiryCalls=0,tokenRequested=false;
+  const db=makeDb({onRpc:async(name)=>{if(name==="expire_paper_futures_limit_order")expiryCalls++;return {data:true,error:null};}});
   const d=deps(db,{session:false,token:false});
   d.getUpstoxAccessToken=async()=>{tokenRequested=true;throw new Error("must not request token");};
   const result=await createPaperFuturesLimitWorker(d)({maxOrders:10});
   assert.equal(result.expired,0);
   assert.equal(result.notEligible,1);
-  assert.equal(expiryRpcCalled,false);
+  assert.equal(expiryCalls,0);
   assert.equal(tokenRequested,false);
 });
+
+test("preserves pending Futures LIMIT orders before the verified session opens",async()=>{
+  const db=makeDb();
+  const d=deps(db);
+  d.loadSession=async()=>({exchange:"NSE",sessionDate:"2026-11-23",isTradingDay:true,openMinute:650,closeMinute:930});
+  const result=await createPaperFuturesLimitWorker(d)({maxOrders:10});
+  assert.equal(result.expired,0);
+  assert.equal(result.notEligible,1);
+  assert.equal(db.calls.some(x=>x.type==="rpc"&&x.name==="expire_paper_futures_limit_order"),false);
+});
+
+test("expires pending Futures LIMIT orders after a verified session closes",async()=>{
+  let expiryCalls=0;
+  const db=makeDb({onRpc:async(name)=>{if(name==="expire_paper_futures_limit_order"){expiryCalls++;return {data:{status:"EXPIRED",idempotent_replay:false},error:null};}return {data:true,error:null};}});
+  const d=deps(db);
+  d.loadSession=async()=>({exchange:"NSE",sessionDate:"2026-11-23",isTradingDay:true,openMinute:555,closeMinute:600});
+  const result=await createPaperFuturesLimitWorker(d)({maxOrders:10});
+  assert.equal(result.expired,1);
+  assert.equal(expiryCalls,1);
+});
+
+test("preserves pending Futures LIMIT orders on a verified non-trading day",async()=>{
+  let expiryCalls=0;
+  const db=makeDb({onRpc:async(name)=>{if(name==="expire_paper_futures_limit_order")expiryCalls++;return {data:true,error:null};}});
+  const d=deps(db);
+  d.loadSession=async()=>({exchange:"NSE",sessionDate:"2026-11-23",isTradingDay:false,openMinute:555,closeMinute:930});
+  const result=await createPaperFuturesLimitWorker(d)({maxOrders:10});
+  assert.equal(result.expired,0);
+  assert.equal(result.notEligible,1);
+  assert.equal(expiryCalls,0);
+});
+
 test("does not submit a fill from a crossed or missing executable book",async()=>{
   const payload=quotePayload();
   payload.data["NSE_FO:NIFTY26NOVFUT"].depth.sell[0].price=98.9;
