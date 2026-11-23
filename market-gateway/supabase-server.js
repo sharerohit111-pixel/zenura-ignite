@@ -1072,4 +1072,10 @@ async function start(){
   }
 }
 if(require.main===module)start().catch(error=>{console.error("Supabase gateway startup failed:",error.message);process.exit(1);});
-module.exports={app,start,runPaperLimitWorker,runPaperIntradayLimitWorker,runPaperProtectiveWorker};
+function configureRouteTestState(state={}){
+  if(process.env.NODE_ENV!=="test")throw new Error("Route test state is available only in NODE_ENV=test.");
+  if(Array.isArray(state.instruments)){instrumentCache=state.instruments;instrumentCacheUpdatedAt=Date.now();instrumentRefreshLastAttemptAt=0;}
+  if(typeof state.intradayLimitWorkerEnabled==="boolean")paperIntradayLimitWorkerStatus.enabled=state.intradayLimitWorkerEnabled;
+}
+module.exports={app,start,runPaperLimitWorker,runPaperIntradayLimitWorker,runPaperProtectiveWorker,
+  ...(process.env.NODE_ENV==="test"?{configureRouteTestState}: {})};
