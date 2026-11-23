@@ -67,6 +67,6 @@ Next release gates: provision/identify isolated staging with approved cost, appl
 
 ## Supabase staging cost quote — 2026-11-23
 - The ZENURA IGNITE Supabase organization was verified as `afmowmxpfuykokvgjfxb`.
-- Supabase returned a development-branch estimate of **$0.01344 per hour**. At continuous usage this is approximately **$0.32256 per day** or **$9.81 per 30-day month** (720 hours).
+- Supabase returned a development-branch estimate of **$0.01344 per hour**. At continuous usage this is approximately **$0.32256 per day** or **$9.68 per 30-day month** (720 hours).
 - This is a quote/estimate only. No staging branch has been created and no cost has been incurred. Obtain explicit agreement to the quoted charge before creating the branch.
 - A development branch is based on the selected parent project's migrations; verify parent-project suitability and migration impact before creation. Do not use a production parent if it would expose production data/schema to unintended branch operations.
