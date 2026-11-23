@@ -111,11 +111,29 @@ BEGIN
      OR (v_result->>'reserved_cash_paise')::bigint<>0 THEN
     RAISE EXCEPTION 'Intraday LIMIT BUY fill did not atomically debit gross and release reserve';
   END IF;
+  IF (SELECT count(*) FROM public.paper_equity_fills
+       WHERE order_id=repeat('1',64))<>1
+     OR (SELECT count(*) FROM public.paper_equity_cash_ledger
+          WHERE order_id=repeat('1',64))<>2
+     OR (SELECT cash_delta_paise FROM public.paper_equity_cash_ledger
+          WHERE order_id=repeat('1',64) AND event_type='TRADE_DEBIT')<>-19826
+     OR (SELECT reserved_cash_delta_paise FROM public.paper_equity_cash_ledger
+          WHERE order_id=repeat('1',64) AND event_type='RESERVATION_CONSUME')<>-20026
+     OR (SELECT cash_balance_after_paise FROM public.paper_equity_cash_ledger
+          WHERE order_id=repeat('1',64) AND event_type='TRADE_DEBIT')<>99980174
+     OR (SELECT reserved_cash_after_paise FROM public.paper_equity_cash_ledger
+          WHERE order_id=repeat('1',64) AND event_type='RESERVATION_CONSUME')<>0 THEN
+    RAISE EXCEPTION 'Intraday LIMIT BUY fill/ledger events do not reconcile to post-settlement cash and reserve';
+  END IF;
   v_result:=public.execute_paper_intraday_limit_fill(
     repeat('1',64),9900,v_now_ms-1000,1000,v_now_ms
   );
   IF (v_result->>'already_filled')::boolean IS NOT TRUE THEN
     RAISE EXCEPTION 'Intraday LIMIT BUY fill retry was not idempotent';
+  END IF;
+  IF (SELECT count(*) FROM public.paper_equity_fills WHERE order_id=repeat('1',64))<>1
+     OR (SELECT count(*) FROM public.paper_equity_cash_ledger WHERE order_id=repeat('1',64))<>2 THEN
+    RAISE EXCEPTION 'Intraday LIMIT BUY replay duplicated fill or cash-ledger events';
   END IF;
 
   -- A stale quote must leave the pending order and its reservation untouched.
