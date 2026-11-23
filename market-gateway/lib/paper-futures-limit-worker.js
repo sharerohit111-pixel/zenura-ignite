@@ -8,22 +8,16 @@ const {normalizeTickSizePaise,normalizeExpiryDate}=require("./derivative-contrac
 const {calculateFuturesTradeCharges}=require("./trading-charges");
 const {evaluateUpstoxRestDerivativeLimit}=require("./upstox-rest-executable-quote");
 
-function futuresSessionState(nowMs,session){
-  if(!Number.isSafeInteger(nowMs)||nowMs<1||!session
-     ||session.exchange!=="NSE"||!Number.isInteger(session.openMinute)
-     ||!Number.isInteger(session.closeMinute)||session.openMinute<0
-     ||session.closeMinute>1440||session.openMinute>=session.closeMinute)return "MISSING";
+function isVerifiedSessionOpen(nowMs,session){
+  if(!Number.isSafeInteger(nowMs)||nowMs<1||!session||session.isTradingDay!==true
+     ||!["NSE","BSE"].includes(session.exchange)
+     ||!Number.isInteger(session.openMinute)||!Number.isInteger(session.closeMinute)
+     ||session.openMinute<0||session.closeMinute>1440
+     ||session.openMinute>=session.closeMinute)return false;
   const clock=marketClockParts(nowMs);
   const date=clock.year+"-"+String(clock.month).padStart(2,"0")+"-"+String(clock.day).padStart(2,"0");
-  if(session.sessionDate!==date)return "MISSING";
-  if(session.isTradingDay!==true)return "NOT_TRADING_DAY";
   const minute=clock.hour*60+clock.minute;
-  if(minute<session.openMinute)return "BEFORE_OPEN";
-  if(minute>=session.closeMinute)return "CLOSED";
-  return "OPEN";
-}
-function isVerifiedSessionOpen(nowMs,session){
-  return futuresSessionState(nowMs,session)==="OPEN";
+  return session.sessionDate===date&&minute>=session.openMinute&&minute<session.closeMinute;
 }
 function isContractExpired(order,nowMs){
   const expiry=normalizeExpiryDate(order?.expiry);
@@ -147,19 +141,15 @@ function createPaperFuturesLimitWorker({
           const eligible=[];
           for(const order of userOrders){
             const session=await getSession(order.exchange,currentNow);
-            const sessionState=futuresSessionState(currentNow,session);
+            const sessionOpen=isVerifiedSessionOpen(currentNow,session);
             const expiredByTime=Date.parse(order.expires_at)<=currentNow;
-            if(expiredByTime||isContractExpired(order,currentNow)||sessionState==="CLOSED"){
+            if(expiredByTime||isContractExpired(order,currentNow)||!sessionOpen){
               const expired=await serviceDb.rpc("expire_paper_futures_limit_order",{p_order_id:order.order_id});
               if(expired?.error){
                 if(["22023","23514","P0002"].includes(expired.error.code))summary.notEligible++;
                 else{summary.failed++;console.warn("Futures LIMIT expiry RPC failed",{orderId:order.order_id,code:expired.error.code||"unknown"});}
               }else if(expired.data?.status==="EXPIRED"&&!expired.data.idempotent_replay)summary.expired++;
               else summary.notEligible++;
-              continue;
-            }
-            if(sessionState!=="OPEN"){
-              summary.notEligible++;
               continue;
             }
             const instrument=instruments.find(item=>item?.instrument_key===order.instrument_key);
@@ -265,5 +255,5 @@ function createPaperFuturesLimitWorker({
 }
 
 module.exports={
-  createPaperFuturesLimitWorker,isContractExpired,isValidNseFuture,cumulativeFillCharges,isVerifiedSessionOpen,futuresSessionState
+  createPaperFuturesLimitWorker,isContractExpired,isValidNseFuture,cumulativeFillCharges,isVerifiedSessionOpen
 };
