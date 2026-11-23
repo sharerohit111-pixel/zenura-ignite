@@ -134,7 +134,7 @@ function createPaperOptionLimitWorker({
           const eligible=[];
           for(const order of userOrders){
             if(Date.parse(order.expires_at)<=currentNow||isContractExpired(order,currentNow)
-               ||sessionState==="MISSING"||sessionState==="CLOSED"){
+               ||sessionState==="CLOSED"){
               const expired=await serviceDb.rpc("expire_paper_option_limit_order",{p_order_id:order.order_id});
               if(expired?.error){
                 if(["22023","23514","P0002"].includes(expired.error.code))summary.notEligible++;
