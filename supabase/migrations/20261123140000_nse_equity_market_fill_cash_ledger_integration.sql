@@ -1,4 +1,4 @@
--- NSE Equity MARKET fill and cash ledger integration.
+-- NSE/BSE cash-equity MARKET fill and cash ledger integration.
 -- Wrap the existing atomic MARKET RPC so its immutable audit rows commit in
 -- the same PostgreSQL transaction as cash, position and order mutations.
 -- LIMIT reservation/fill paths are handled by a later migration.
@@ -51,7 +51,7 @@ begin
   select * into v_order from public.paper_orders
    where order_id=p_order_id and user_id=p_user_id and status='FILLED';
   if not found or v_order.order_type<>'MARKET'
-     or v_order.exchange<>'NSE'
+     or v_order.exchange is null or v_order.exchange not in ('NSE','BSE')
      or v_order.execution_price_paise is null
      or v_order.gross_paise is null
      or v_order.charges_paise is null
@@ -97,7 +97,7 @@ begin
     p_user_id,p_order_id,v_fill_id,'trade:'||p_order_id,
     case when v_order.cash_delta_paise<0 then 'TRADE_DEBIT' else 'TRADE_CREDIT' end,
     v_order.cash_delta_paise,0,v_account.cash_paise,v_account.reserved_cash_paise,
-    jsonb_build_object('order_type','MARKET','exchange','NSE',
+    jsonb_build_object('order_type','MARKET','exchange',v_order.exchange,
       'product',v_order.product,'side',v_order.side,
       'execution_id',v_order.order_id,'simulation_only',true)
   )
