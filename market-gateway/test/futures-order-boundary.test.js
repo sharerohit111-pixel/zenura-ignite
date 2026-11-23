@@ -1,0 +1,34 @@
+"use strict";
+const test=require("node:test");
+const assert=require("node:assert/strict");
+const fs=require("node:fs");
+const path=require("node:path");
+
+const server=fs.readFileSync(path.join(__dirname,"../supabase-server.js"),"utf8");
+const start=server.indexOf('app.post("/paper/futures/orders"');
+const end=server.indexOf('app.post("/paper/futures/orders/:orderId/cancel"',start);
+const route=server.slice(start,end);
+
+test("Futures MARKET and LIMIT execution accept only NSE_FO contracts",()=>{
+  assert.ok(start>=0&&end>start,"dedicated Futures order route must exist");
+  assert.match(route,/x\.exchange==="NSE"&&x\.segment==="NSE_FO"/);
+  assert.doesNotMatch(route,/\["NSE_FO","BSE_FO"\]\.includes\(x\.segment\)/);
+  assert.match(route,/Futures LIMIT currently supports NSE contracts only/);
+});
+
+test("Futures MARKET orders require a verified open NSE session after idempotent replay",()=>{
+  const replay=route.indexOf("idempotentReplay:true,simulationOnly:true");
+  const session=route.indexOf("loadVerifiedExchangeSession(serviceDb,instrument.exchange,marketNowMs)");
+  const quote=route.indexOf("getUpstoxAccessToken(user.id)",session);
+  assert.ok(replay>=0&&session>replay,"exact retries must return their stored receipt without a market-session dependency");
+  assert.ok(quote>session,"new MARKET orders must validate the verified session before provider access");
+  assert.match(route,/isVerifiedSessionOpen\(marketNowMs,marketSession\)/);
+});
+
+test("Futures MARKET execution uses fresh executable depth, not LTP fallback",()=>{
+  assert.match(server,/extractUpstoxRestExecutableQuote/);
+  assert.match(server,/resolveFuturesMarketExecution/);
+  assert.match(route,/quote:book,side,quantity:metadata\.quantity,tickSizePaise:metadata\.tickSizePaise/);
+  assert.match(route,/pricePaise:execution\.pricePaise/);
+  assert.doesNotMatch(route,/normalizeProviderQuote\(quote,instrumentKey/);
+});

@@ -14,6 +14,8 @@ const {isUuid,makeOrderId,makeOrderFingerprint}=require("./lib/order-idempotency
 const {normalizeProductMode}=require("./lib/product-mode");
 const {parseLimitPricePaise}=require("./lib/limit-price");
 const {normalizeProviderQuote}=require("./lib/provider-quote");
+const {extractUpstoxRestExecutableQuote}=require("./lib/upstox-rest-executable-quote");
+const {resolveFuturesMarketExecution}=require("./lib/futures-market-execution");
 const {isEligiblePaperLimitOrder,normalizeWorkerCursor,groupOrdersByUser}=require("./lib/paper-limit-worker");
 const {createPaperProtectiveWorker}=require("./lib/paper-protective-worker");
 const {createPaperIntradayLimitWorker}=require("./lib/paper-intraday-limit-worker");
@@ -677,8 +679,8 @@ app.post("/paper/futures/orders",async(req,res)=>{
     if(orderType==="LIMIT"&&(!Number.isSafeInteger(limitPricePaise)||limitPricePaise<=0))return res.status(400).json({error:"LIMIT orders require a positive integer limit_price_paise."});
     if(!["BUY","SELL"].includes(side)||product===null)return res.status(400).json({error:"Choose BUY/SELL and a valid Intraday/Delivery futures product."});
     if(!instrumentCache.length||Date.now()-instrumentCacheUpdatedAt>6*60*60*1000)await refreshInstrumentCache();
-    const instrument=instrumentCache.find(x=>x.instrument_key===instrumentKey&&x.instrument_type==="FUT"&&["NSE_FO","BSE_FO"].includes(x.segment));
-    if(!instrument)return res.status(400).json({error:"Select a verified NSE/BSE futures contract from the official instrument master."});
+    const instrument=instrumentCache.find(x=>x.instrument_key===instrumentKey&&x.instrument_type==="FUT"&&x.exchange==="NSE"&&x.segment==="NSE_FO");
+    if(!instrument)return res.status(400).json({error:"Select a verified NSE Futures contract from the official instrument master."});
     // Resolve the immutable contract metadata first. A retry of an already-filled
     // order must return its original receipt even if the provider quote/token is
     // temporarily unavailable; never re-execute it at a new market price.
@@ -779,9 +781,23 @@ app.post("/paper/futures/orders",async(req,res)=>{
           idempotentReplay:result?.idempotent_replay===true,simulationOnly:true
         });
     }
-    const {token}=await getUpstoxAccessToken(user.id),{quote}=await getQuote(token,instrumentKey);
-    const normalized=normalizeProviderQuote(quote,instrumentKey,{maxAgeMs:15000});
-    const contract=validateDerivativeContract(instrument,{lots,pricePaise:normalized.pricePaise,now:Date.now()});
+    const marketNowMs=Date.now();
+    const marketSession=await loadVerifiedExchangeSession(serviceDb,instrument.exchange,marketNowMs);
+    if(!isVerifiedSessionOpen(marketNowMs,marketSession))
+      return res.status(409).json({error:"A verified open NSE session is required to submit a Futures MARKET order."});
+    const {token}=await getUpstoxAccessToken(user.id);
+    const {payload}=await getQuote(token,instrumentKey);
+    const quoteNowMs=Date.now();
+    const book=extractUpstoxRestExecutableQuote(payload,instrumentKey,{nowMs:quoteNowMs,maxAgeMs:15000});
+    const execution=resolveFuturesMarketExecution({
+      quote:book,side,quantity:metadata.quantity,tickSizePaise:metadata.tickSizePaise,
+      nowMs:quoteNowMs,maxAgeMs:15000
+    });
+    const normalized={
+      pricePaise:execution.pricePaise,tradeTimeMs:execution.quoteTimestampMs,
+      quoteAgeMs:execution.quoteAgeMs
+    };
+    const contract=validateDerivativeContract(instrument,{lots,pricePaise:normalized.pricePaise,now:quoteNowMs});
     const {data:position,error:positionError}=await userDb.from("paper_futures_positions").select("net_quantity,product").eq("user_id",user.id).eq("instrument_key",instrumentKey).maybeSingle();
     if(positionError)throw Object.assign(new Error("Current futures position could not be read."),{status:503});
     if(position&&position.product!==product)return res.status(409).json({error:"Close the existing futures position before switching between Intraday and Delivery."});
