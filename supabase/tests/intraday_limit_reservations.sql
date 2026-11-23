@@ -143,6 +143,11 @@ BEGIN
     RAISE EXCEPTION 'Rejected stale Intraday LIMIT quote changed order, reservation or position state';
   END IF;
 
+  -- Keep the stale-quote reservation test isolated from the later expiry balance assertion.
+  PERFORM public.cancel_paper_intraday_limit_order(
+    '22222222-2222-4222-8222-222222222222',repeat('5',64)
+  );
+
   -- SELL fill realizes P&L and releases only the shares reserved by this order.
   PERFORM public.submit_paper_intraday_limit_order(
     '22222222-2222-4222-8222-222222222222',repeat('3',64),
