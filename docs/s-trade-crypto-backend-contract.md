@@ -97,7 +97,7 @@ No production database migration has been applied and no gateway deployment has 
 ## Current verified state — 2026-11-23 (supersedes earlier pending-check notes)
 - The standalone Crypto gateway extraction is complete on this isolated branch; it is no longer an outstanding implementation blocker.
 - Draft PR #85 remains open and unmerged. Its changes are isolated from `main`; no production merge was performed.
-- Latest full Crypto-only CI: [run #45104634648](https://github.com/sharerohit111-pixel/zenura-ignite/actions/runs/45104634648), completed successfully at code commit `67b647556e5f03cbdefdf3e8ff5b8d4b1089dd71`; the current branch head includes subsequent documentation-only commits.
+- Latest full Crypto-only CI: [run #45105183954](https://github.com/sharerohit111-pixel/zenura-ignite/actions/runs/45105183954), completed successfully at branch commit `054476c4b66c802cb72131b13de13e036ab608fa`, including the gateway worker-batch safety adjustment.
 - CI applies the Crypto migrations to disposable PostgreSQL 16 and passes four SQL regressions: full-position LIMIT SELL reservation release/accounting, reserved-position DELETE guard, MARKET SELL protection for reserved LIMIT SELL quantity, and authenticated two-user RLS isolation across accounts/positions/orders/ledger. Frontend syntax, gateway unit tests and client-isolation checks also pass.
 - The earlier note saying PostgreSQL execution had not yet run is superseded by this CI evidence. CI is not a substitute for live Supabase staging integration.
 - Supabase currently has no Crypto development branch and no `paper_crypto_*` tables; none of the Crypto migrations has been applied to the connected live project.
