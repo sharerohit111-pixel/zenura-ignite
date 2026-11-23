@@ -406,7 +406,7 @@ async function start() {
   const host=process.env.HOST||"0.0.0.0";
   const server=app.listen(PORT,host,()=>console.log("ZENURA Crypto paper gateway listening on "+PORT));
   if (process.env.CRYPTO_LIMIT_WORKER_ENABLED==="true") {
-    const tick=async()=>{try{const result=await runLimitWorker();if(result.scanned)console.log("Crypto LIMIT worker cycle",result);}catch(e){console.error("Crypto LIMIT worker cycle failed:",e.message);}};
+    const tick=async()=>{try{const result=await runLimitWorker();if(result.scanned||result.riskScanned)console.log("Crypto paper worker cycle",result);}catch(e){console.error("Crypto paper worker cycle failed:",e.message);}};
     await tick(); workerTimer=setInterval(tick,workerIntervalMs); workerTimer.unref?.();
   }
   const shutdown=()=>{if(workerTimer)clearInterval(workerTimer);server.close(()=>process.exit(0));};
