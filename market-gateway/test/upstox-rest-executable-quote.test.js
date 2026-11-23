@@ -57,7 +57,7 @@ test("rejects missing depth and never falls back to last_price",()=>{
   const empty=response({askQty:0});
   assert.equal(evaluateUpstoxRestDerivativeLimit(empty,KEY,{
     side:"BUY",limitPricePaise:99999,remainingQuantity:25,nowMs:NOW
-  }).reason,"MISSING_EXECUTABLE_SIDE");
+  }).reason,"INCOMPLETE_DEPTH_BOOK");
 });
 
 test("rejects wrong instrument identity and malformed response",()=>{
