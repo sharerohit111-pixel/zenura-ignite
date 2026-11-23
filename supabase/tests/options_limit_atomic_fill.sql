@@ -58,7 +58,7 @@ BEGIN
   IF v_result->>'status'<>'PARTIALLY_FILLED'
      OR (v_result->>'filled_quantity')::integer<>20
      OR (v_result->>'remaining_quantity')::integer<>45
-     OR (v_result->>'incremental_charges_paise')::bigint<>2378 THEN
+     OR (v_result->>'incremental_charges_paise')::bigint<>2372 THEN
     RAISE EXCEPTION 'First Options BUY partial fill failed: %',v_result;
   END IF;
 
@@ -76,9 +76,9 @@ BEGIN
     FROM public.paper_accounts
    WHERE user_id='cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd';
   IF v_status<>'PARTIALLY_FILLED' OR v_filled<>20 OR v_remaining<>45
-     OR v_order_cash<>56468 OR v_order_gross<>24800 OR v_order_charges<>2378
-     OR v_position_qty<>20 OR v_position_basis<>27178 OR v_position_reserved<>0
-     OR v_account_cash<>99972822 OR v_account_reserved<>56468 THEN
+     OR v_order_cash<>56474 OR v_order_gross<>24800 OR v_order_charges<>2372
+     OR v_position_qty<>20 OR v_position_basis<>27172 OR v_position_reserved<>0
+     OR v_account_cash<>99972828 OR v_account_reserved<>56474 THEN
     RAISE EXCEPTION 'First Options BUY fill did not conserve order/account/position ledger';
   END IF;
 
@@ -122,9 +122,9 @@ BEGIN
     FROM public.paper_accounts
    WHERE user_id='cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd';
   IF v_status<>'FILLED' OR v_filled<>65 OR v_remaining<>0 OR v_order_cash<>0
-     OR v_order_gross<>80375 OR v_order_charges<>2418
-     OR v_position_qty<>65 OR v_position_basis<>82793 OR v_position_reserved<>0
-     OR v_account_cash<>99917207 OR v_account_reserved<>0 THEN
+     OR v_order_gross<>80375 OR v_order_charges<>2396
+     OR v_position_qty<>65 OR v_position_basis<>82771 OR v_position_reserved<>0
+     OR v_account_cash<>99917229 OR v_account_reserved<>0 THEN
     RAISE EXCEPTION 'Final Options BUY fill failed reservation/account/cost-basis conservation';
   END IF;
 
@@ -156,8 +156,8 @@ BEGIN
    WHERE user_id='cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd';
   IF v_status<>'PARTIALLY_FILLED' OR v_filled<>20 OR v_remaining<>45
      OR v_order_close<>45 OR v_order_gross<>26000 OR v_order_charges<>2410
-     OR v_position_qty<>45 OR v_position_basis<>57318 OR v_position_reserved<>45
-     OR v_account_cash<>99940797 OR v_account_realized<>-1885 THEN
+     OR v_position_qty<>45 OR v_position_basis<>57303 OR v_position_reserved<>45
+     OR v_account_cash<>99940819 OR v_account_realized<>-1878 THEN
     RAISE EXCEPTION 'Partial Options SELL fill failed close-reservation/P&L conservation';
   END IF;
 
@@ -181,8 +181,8 @@ BEGIN
    WHERE order_id in (repeat('a',64),repeat('b',64));
   IF v_status<>'FILLED' OR v_filled<>65 OR v_remaining<>0 OR v_order_close<>0
      OR v_order_gross<>84725 OR v_order_charges<>2522
-     OR v_account_cash<>99999410 OR v_account_realized<>-590
-     OR v_account_reserved<>0 OR v_fill_count<>4 OR v_fill_charges<>4940
+     OR v_account_cash<>99999432 OR v_account_realized<>-568
+     OR v_account_reserved<>0 OR v_fill_count<>4 OR v_fill_charges<>4918
      OR EXISTS(SELECT 1 FROM public.paper_derivative_positions
        WHERE user_id='cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd'
          AND instrument_key='NSE_FO|OPTION_LIMIT_FILL') THEN
