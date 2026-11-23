@@ -17,7 +17,8 @@ const {normalizeProviderQuote}=require("./lib/provider-quote");
 const {isEligiblePaperLimitOrder,normalizeWorkerCursor,groupOrdersByUser}=require("./lib/paper-limit-worker");
 const {createPaperProtectiveWorker}=require("./lib/paper-protective-worker");
 const {createPaperIntradayLimitWorker}=require("./lib/paper-intraday-limit-worker");
-const {createPaperFuturesLimitWorker}=require("./lib/paper-futures-limit-worker");
+const {createPaperFuturesLimitWorker,isVerifiedSessionOpen}=require("./lib/paper-futures-limit-worker");
+const {loadVerifiedExchangeSession}=require("./lib/exchange-session-calendar");
 const {buildPortfolioValuation}=require("./lib/paper-portfolio-valuation");
 const {calculateDerivativePortfolio}=require("./lib/derivative-portfolio");
 const {validateDerivativeContract,normalizeTickSizePaise}=require("./lib/derivative-contract");
@@ -671,7 +672,9 @@ app.post("/paper/futures/orders",async(req,res)=>{
     const idempotencyKey=String(req.body?.idempotency_key||"");
     const orderType=String(req.body?.order_type||"MARKET").toUpperCase();
     if(!isUuid(idempotencyKey))return res.status(400).json({error:"A valid UUID idempotency_key is required."});
-    if(orderType!=="MARKET")return res.status(400).json({error:"Futures LIMIT orders will be enabled after the protected LIMIT worker is deployed. MARKET is currently supported."});
+    if(!["MARKET","LIMIT"].includes(orderType))return res.status(400).json({error:"Choose MARKET or LIMIT for Futures orders."});
+    const limitPricePaise=orderType==="LIMIT"?Number(req.body?.limit_price_paise):null;
+    if(orderType==="LIMIT"&&(!Number.isSafeInteger(limitPricePaise)||limitPricePaise<=0))return res.status(400).json({error:"LIMIT orders require a positive integer limit_price_paise."});
     if(!["BUY","SELL"].includes(side)||product===null)return res.status(400).json({error:"Choose BUY/SELL and a valid Intraday/Delivery futures product."});
     if(!instrumentCache.length||Date.now()-instrumentCacheUpdatedAt>6*60*60*1000)await refreshInstrumentCache();
     const instrument=instrumentCache.find(x=>x.instrument_key===instrumentKey&&x.instrument_type==="FUT"&&["NSE_FO","BSE_FO"].includes(x.segment));
@@ -679,15 +682,100 @@ app.post("/paper/futures/orders",async(req,res)=>{
     // Resolve the immutable contract metadata first. A retry of an already-filled
     // order must return its original receipt even if the provider quote/token is
     // temporarily unavailable; never re-execute it at a new market price.
-    const metadata=validateDerivativeContract(instrument,{lots,pricePaise:normalizeTickSizePaise(instrument.tick_size),now:Date.now()});
+    const metadata=validateDerivativeContract(instrument,{
+      lots,pricePaise:orderType==="LIMIT"?limitPricePaise:normalizeTickSizePaise(instrument.tick_size),now:Date.now()
+    });
     const orderId=makeOrderId(user.id,idempotencyKey);
-    const fingerprint=makeOrderFingerprint({instrumentKey,side,quantity:metadata.quantity,orderType:"MARKET",product});
+    const fingerprint=orderType==="LIMIT"
+      ?makeOrderFingerprint({instrumentKey,side,quantity:metadata.quantity,orderType:"LIMIT",product,limitPricePaise})
+      :makeOrderFingerprint({instrumentKey,side,quantity:metadata.quantity,orderType:"MARKET",product});
     const {data:prior,error:priorError}=await userDb.from("paper_futures_orders").select("*").eq("user_id",user.id).eq("idempotency_key",idempotencyKey).maybeSingle();
     if(priorError)throw Object.assign(new Error("Futures order idempotency state could not be checked."),{status:503});
     if(prior){
       if(prior.request_fingerprint!==fingerprint||prior.order_id!==orderId)return res.status(409).json({error:"Futures idempotency key was reused with different order details."});
       const {data:account}=await userDb.from("paper_accounts").select("cash_paise,reserved_margin_paise").eq("user_id",user.id).maybeSingle();
+      if(orderType==="LIMIT"){
+        return res.set("Cache-Control","private, no-store").json({
+          orderId:prior.order_id,status:prior.status,side:prior.side,product:prior.product,
+          orderType:"LIMIT",quantity:prior.quantity,lots:prior.quantity/prior.lot_size,
+          limitPricePaise:prior.limit_price_paise,filledQuantity:prior.filled_quantity,
+          remainingQuantity:prior.remaining_quantity,averageFillPricePaise:prior.average_fill_price_paise,
+          reservedOpenMarginPaise:prior.reserved_open_margin_paise,
+          reservedCloseQuantity:prior.reserved_close_quantity,expiresAt:prior.expires_at,
+          cashPaise:account?.cash_paise??null,reservedMarginPaise:account?.reserved_margin_paise??null,
+          idempotentReplay:true,simulationOnly:true
+        });
+      }
       return res.set("Cache-Control","private, no-store").json({orderId:prior.order_id,status:prior.status,side:prior.side,product:prior.product,quantity:prior.quantity,lots:prior.quantity/prior.lot_size,executionPricePaise:prior.execution_price_paise,grossPaise:prior.execution_price_paise*prior.quantity,chargesPaise:prior.charges_paise,cashPaise:account?.cash_paise??null,reservedMarginPaise:account?.reserved_margin_paise??null,realizedPnlPaise:prior.realized_pnl_paise,idempotentReplay:true,simulationOnly:true});
+    }
+    if(orderType==="LIMIT"){
+      if(process.env.PAPER_FUTURES_LIMIT_ENABLED!=="true")
+        return res.status(503).json({error:"Futures LIMIT submission is currently disabled."});
+      const submitNowMs=Date.now();
+      const session=await loadVerifiedExchangeSession(serviceDb,instrument.exchange,submitNowMs);
+      if(!isVerifiedSessionOpen(submitNowMs,session))
+        return res.status(409).json({error:"A verified open exchange session is required to submit a Futures LIMIT order."});
+      const closeMs=Date.parse(session.sessionDate+"T00:00:00+05:30")+session.closeMinute*60000;
+      const expiryCutoffMs=Date.parse(metadata.expiry+"T15:30:00+05:30");
+      const requestedExpiryMs=req.body?.expires_at?Date.parse(String(req.body.expires_at)):closeMs;
+      if(!Number.isFinite(requestedExpiryMs)||requestedExpiryMs<=submitNowMs
+         ||requestedExpiryMs>closeMs||requestedExpiryMs>expiryCutoffMs)
+        return res.status(400).json({error:"Futures LIMIT expiry must be after now and no later than the verified session close or contract expiry."});
+      const expiresAt=new Date(requestedExpiryMs).toISOString();
+      const {data:position,error:positionError}=await userDb.from("paper_futures_positions")
+        .select("net_quantity,product,reserved_close_quantity")
+        .eq("user_id",user.id).eq("instrument_key",instrumentKey).maybeSingle();
+      if(positionError)throw Object.assign(new Error("Current Futures position could not be read."),{status:503});
+      if(position&&position.product!==product)
+        return res.status(409).json({error:"Close the existing Futures position before switching between Intraday and Delivery."});
+      const oldQuantity=position?.net_quantity||0;
+      const oppositePosition=oldQuantity!==0&&((oldQuantity>0&&side==="SELL")||(oldQuantity<0&&side==="BUY"));
+      const availableCloseQuantity=Math.max(0,Math.abs(oldQuantity)-(position?.reserved_close_quantity||0));
+      if(oppositePosition&&availableCloseQuantity<metadata.quantity)
+        return res.status(409).json({error:"Futures LIMIT close quantity exceeds the unreserved open position."});
+      const closeOnly=oppositePosition;
+      let openingMarginPaise=0,marginQuoteTimestampMs=null;
+      if(!closeOnly){
+        const {token}=await getUpstoxAccessToken(user.id);
+        const marginResponse=await fetchProvider("https://api.upstox.com/v2/charges/margin",{
+          method:"POST",headers:{Authorization:"Bearer "+token,Accept:"application/json","Content-Type":"application/json"},
+          body:JSON.stringify({instruments:[{
+            instrument_key:instrumentKey,quantity:metadata.quantity,
+            product:product==="INTRADAY"?"I":"D",transaction_type:side,
+            price:limitPricePaise/100
+          }]})
+        });
+        const marginPayload=await readProviderJson(marginResponse);
+        if(!marginResponse.ok)return res.status(502).json({error:"Upstox Futures margin requirement could not be verified at the LIMIT price."});
+        openingMarginPaise=normalizeUpstoxMarginResponse(marginPayload,instrumentKey).requiredMarginPaise;
+        marginQuoteTimestampMs=Date.now();
+      }
+      const rpcNowMs=Date.now();
+      const result=await runtime.callUserRpc(user,"submit_paper_futures_limit_order",{
+        p_order_id:orderId,p_idempotency_key:idempotencyKey,p_request_fingerprint:fingerprint,
+        p_instrument_key:instrumentKey,p_trading_symbol:instrument.trading_symbol,
+        p_exchange:instrument.exchange,p_segment:instrument.segment,p_expiry:metadata.expiry,
+        p_lot_size:metadata.lotSize,p_tick_size_paise:metadata.tickSizePaise,
+        p_side:side,p_product:product,p_quantity:metadata.quantity,
+        p_limit_price_paise:limitPricePaise,p_open_margin_paise:openingMarginPaise,
+        p_margin_quote_timestamp_ms:marginQuoteTimestampMs,p_now_ms:rpcNowMs,p_expires_at:expiresAt
+      });
+      const order=result?.order||{};
+      return res.set("Cache-Control","private, no-store")
+        .status(result?.idempotent_replay?200:201).json({
+          orderId:order.order_id||orderId,status:order.status||"PENDING",
+          tradingSymbol:instrument.trading_symbol,instrumentKey,exchange:instrument.exchange,
+          expiry:metadata.expiry,side,product,orderType:"LIMIT",lots,lotSize:metadata.lotSize,
+          quantity:metadata.quantity,limitPricePaise,filledQuantity:order.filled_quantity||0,
+          remainingQuantity:order.remaining_quantity??metadata.quantity,
+          averageFillPricePaise:order.average_fill_price_paise??null,
+          openingMarginPaise:openingMarginPaise,marginEstimateScope:closeOnly?"close_only_no_open_margin":"provider_margin_at_limit_price",
+          reservedOpenMarginPaise:order.reserved_open_margin_paise??openingMarginPaise,
+          reservedCloseQuantity:order.reserved_close_quantity??(closeOnly?metadata.quantity:0),
+          expiresAt:order.expires_at||expiresAt,cashPaise:result?.cash_paise??null,
+          reservedMarginPaise:result?.reserved_margin_paise??null,
+          idempotentReplay:result?.idempotent_replay===true,simulationOnly:true
+        });
     }
     const {token}=await getUpstoxAccessToken(user.id),{quote}=await getQuote(token,instrumentKey);
     const normalized=normalizeProviderQuote(quote,instrumentKey,{maxAgeMs:15000});
