@@ -91,3 +91,12 @@ The disposable PostgreSQL 17 workflow now runs the following assertions after ap
 - Existing Intraday LIMIT fill-vs-cancel and cancel-vs-fill race shell test is included in the PostgreSQL 17 workflow. Its cleanup retains the filled parent order so immutable fill/ledger foreign keys remain valid.
 
 These tests are committed but have not yet been observed passing in GitHub Actions. The tenant-composite-FK draft still requires a canonical combined Futures/Options/Equity migration chain before its cross-tenant integration tests can safely run. No production migration or production database write was performed.
+
+
+## PostgreSQL 17 execution result (2026-11-23)
+
+The disposable CI run [45158171206](https://github.com/sharerohit111-pixel/zenura-ignite/actions/runs/45158171206) completed successfully on commit `5dbf8eecbf24c72a5d436c378e86c269f7f8fdc3` using PostgreSQL 17.12.
+
+All configured checks passed: repository migrations, Equity integration draft compilation/application, append-only schema checks, MARKET fee settlement, Delivery LIMIT BUY/SELL ledger and replay assertions, injected atomic rollback, Intraday LIMIT reservation/fill assertions, and concurrent fill/cancel race tests.
+
+This result applies only to the listed Equity-focused disposable test lane. Tenant-composite-FK tests and the integrated Futures/Options/Equity migration sequence remain pending; no production migration was applied.
