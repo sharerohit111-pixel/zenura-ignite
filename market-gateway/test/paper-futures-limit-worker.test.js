@@ -134,6 +134,10 @@ test("fills only the displayed best ask quantity using a fresh V3 snapshot",asyn
   assert.equal(result.failed,0);
   assert.equal(fillArgs.p_fill_quantity,10);
   assert.equal(fillArgs.p_execution_price_paise,9900);
+  assert.equal(fillArgs.p_bid_price_paise,9895);
+  assert.equal(fillArgs.p_ask_price_paise,9900);
+  assert.equal(fillArgs.p_bid_quantity,8);
+  assert.equal(fillArgs.p_ask_quantity,10);
   assert.equal(fillArgs.p_quote_timestamp_ms,NOW-1000);
   assert.equal(fillArgs.p_now_ms,NOW);
   assert.match(fillArgs.p_execution_id,/^[a-f0-9]{64}$/);
