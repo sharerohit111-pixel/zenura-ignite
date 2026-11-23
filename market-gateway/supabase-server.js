@@ -781,6 +781,10 @@ app.post("/paper/futures/orders",async(req,res)=>{
           idempotentReplay:result?.idempotent_replay===true,simulationOnly:true
         });
     }
+    const marketNowMs=Date.now();
+    const marketSession=await loadVerifiedExchangeSession(serviceDb,instrument.exchange,marketNowMs);
+    if(!isVerifiedSessionOpen(marketNowMs,marketSession))
+      return res.status(409).json({error:"A verified open NSE session is required to submit a Futures MARKET order."});
     const {token}=await getUpstoxAccessToken(user.id);
     const {payload}=await getQuote(token,instrumentKey);
     const quoteNowMs=Date.now();
