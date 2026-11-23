@@ -60,3 +60,26 @@
 - No Crypto, Futures or Options runtime file is modified.
 - No production migration, deployment, feature activation or merge is performed.
 - Follow-up SQL/accounting work must wait for the relevant shared-component owner approval. Until then, implement only isolated gateway validation/policy and tests that do not mutate shared accounting/database contracts.
+
+
+## Follow-up implementation — verified MARKET session and tick validation
+
+Implemented on the isolated equity branch:
+
+- MARKET order requests now load the exact NSE/BSE session row for the current Asia/Kolkata date using the existing `loadVerifiedExchangeSession` helper.
+- MARKET orders fail closed unless the calendar row is verified, sourced, trading-day eligible, and the current time is inside its official REGULAR/SPECIAL session window.
+- The provider quote timestamp must also fall inside that same verified session window.
+- MARKET execution prices are checked against the official instrument tick size before the execution RPC is called.
+- LIMIT ticket tick validation now uses the new equity-only validator rather than importing the derivative contract module.
+- Added isolated tests for equity tick-size normalization and execution-price alignment.
+- No database schema, SQL RPC, shared accounting, Crypto, Futures or Options code was changed.
+
+**Implementation commits**
+- `688a5439fd0be3d53bc1bec4ca92a4bba0a1dbcc` — MARKET session and tick validation.
+- `74ec8b06d1737365be4374a63db43464ed5746ec` — isolated equity tick validator.
+- `585d55055620d6e5d7e1bead8492f1396171ac24` — tick validation unit tests.
+- `85cf9aca4ddc01042042cdeaa1e4f8ba2461576e` — strict integer-paise tick predicate.
+
+**CI:** GitHub Actions run `45151983771` was in progress at the time of this update. Its completed initial checks were successful; the full market-gateway regression suite and disposable PostgreSQL migration tests had not yet reported a final result.
+
+**Still pending:** LIMIT partial fills, persistent PARTIALLY_FILLED lifecycle, atomic execution-to-ledger integration, and end-to-end PostgreSQL race tests. These remain gated on approval from the shared accounting/database owner where schema or settlement semantics are affected.
