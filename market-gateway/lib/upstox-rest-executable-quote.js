@@ -21,7 +21,7 @@ function normalizeLevel(level){
   if(!level||typeof level!=="object"||Array.isArray(level))return null;
   const pricePaise=toPricePaise(level.price);
   const quantity=level.quantity;
-  if(pricePaise===null||!Number.isSafeInteger(quantity)||quantity<=0)return null;
+  if(pricePaise===null||!Number.isSafeInteger(quantity)||quantity<=0||quantity>2147483647)return null;
   return {pricePaise,quantity};
 }
 function extractUpstoxRestExecutableQuote(payload,instrumentKey,{
