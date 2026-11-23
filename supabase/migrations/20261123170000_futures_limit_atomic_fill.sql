@@ -100,12 +100,6 @@ begin
 
   v_server_now := clock_timestamp();
   v_server_now_ms := floor(extract(epoch from v_server_now)*1000)::bigint;
-  if abs(v_server_now_ms-p_now_ms)>2000 then
-    raise exception 'Futures LIMIT fill clock is not current.' using errcode='22023';
-  end if;
-  if not public._paper_quote_age_is_fresh(p_quote_timestamp_ms,v_server_now_ms) then
-    raise exception 'A matching fresh Futures provider quote is required.' using errcode='22023';
-  end if;
 
   -- Resolve the owner only to acquire the account lock first. Recheck after locking.
   select user_id into v_user_id
@@ -151,6 +145,15 @@ begin
       'remaining_quantity',v_order.remaining_quantity,
       'idempotent_replay',true,'simulation_only',true
     );
+  end if;
+
+  -- A replay is a no-op even after its original quote has aged out. Freshness
+  -- and clock checks apply only to a new execution event.
+  if abs(v_server_now_ms-p_now_ms)>2000 then
+    raise exception 'Futures LIMIT fill clock is not current.' using errcode='22023';
+  end if;
+  if not public._paper_quote_age_is_fresh(p_quote_timestamp_ms,v_server_now_ms) then
+    raise exception 'A matching fresh Futures provider quote is required.' using errcode='22023';
   end if;
 
   if v_order.status not in ('PENDING','PARTIALLY_FILLED')
