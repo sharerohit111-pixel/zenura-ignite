@@ -4,6 +4,19 @@ INSERT INTO auth.users(id) VALUES ('abababab-abab-4bab-8bab-abababababab')
 ON CONFLICT (id) DO NOTHING;
 SELECT public.initialize_paper_trading_account('abababab-abab-4bab-8bab-abababababab');
 
+INSERT INTO public.paper_exchange_sessions(
+  exchange,session_date,is_trading_day,open_minute,close_minute,
+  session_kind,source_reference,verified_at,source_sha256
+) VALUES (
+  'NSE',(clock_timestamp() at time zone 'Asia/Kolkata')::date,
+  true,0,1440,'SPECIAL','https://www.nseindia.com/market-data/holidays',
+  clock_timestamp(),repeat('e',64)
+)
+ON CONFLICT(exchange,session_date) DO UPDATE SET
+  is_trading_day=true,open_minute=0,close_minute=1440,session_kind='SPECIAL',
+  source_reference='https://www.nseindia.com/market-data/holidays',
+  verified_at=clock_timestamp(),source_sha256=repeat('e',64);
+
 DO $futures_limit_submit_release$
 DECLARE
   v_now bigint;
