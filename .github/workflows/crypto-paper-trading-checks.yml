@@ -78,6 +78,10 @@ jobs:
           if (!scripts.length) throw new Error('No inline Crypto Terminal scripts found');
           for (const source of scripts) new Function(source);
           NODE
+      - name: Set up Node.js 22 for Crypto gateway
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
       - name: Test standalone Crypto gateway
         working-directory: crypto-gateway
         run: |
