@@ -131,3 +131,12 @@ Paper simulation only. No broker order-placement endpoint, no live trading, no p
 - The change is limited to provider error classification; quote freshness, order/ledger logic, and retry policy are unchanged.
 - Verification so far: all eight targeted source replacements matched exactly once and were committed. Full gateway tests, route-level mocked HTTP tests, CI, staging and live Upstox checks remain unverified. Do not treat the earlier helper-only tests as route-level proof.
 - Latest change commit: `31942e0c3103b289ede75a97a9022deb2e7e06ae`. No production migration, deployment, provider call, Crypto change or real broker order occurred.
+
+
+## Paper worker provider-error classification update (2026-11-23)
+
+- Extended the same `upstoxHttpError` classification to the delivery LIMIT, intraday LIMIT, protective-order, futures LIMIT and options LIMIT worker quote requests.
+- Worker batch warnings now include the stable provider error code alongside status, while omitting provider response bodies and credentials. This preserves the existing no-automatic-retry behavior for fill RPCs and order state changes.
+- The workers still require a separate operational backoff/circuit-breaker policy for repeated per-user 401/429 failures. Current batch-level failure handling can revisit failed batches on later worker cycles; do not enable high-volume workers until bounded provider cooldown behavior is tested.
+- Verification performed: source re-fetch confirmed the helper import, shared error conversion and sanitized status/code logging in all four extracted worker modules. Full module syntax/test execution, full gateway test suite, mock provider integration and CI remain unverified.
+- Latest worker hardening commit: `6f9bed748c8b56f088feee9d6118067740b81895`.
