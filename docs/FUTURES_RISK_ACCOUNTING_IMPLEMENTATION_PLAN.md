@@ -18,7 +18,7 @@
 
 ### Phase 0 — Baseline and contract freeze
 1. Reconcile PR #87/#88/#89/#93/#96 and PR #108/#110 branch ancestry and migration order before any persistent code.
-2. Capture the existing account-first lock order and exact columns used by MARKET/LIMIT account, order, position, pending opening-margin, and close-quantity reservations.
+2. Capture the existing account-first lock order and exact columns used by MARKET/LIMIT account, order, position, pending opening-margin, and close-quantity reservations. The PR #89 LIMIT-fill SQL specifically resolves owner, locks `paper_accounts`, locks `paper_futures_orders`, checks the execution-id replay in `paper_futures_fills`, then locks `paper_futures_positions`; this is an observed LIMIT-fill sequence, not yet proof of every MARKET/cancel/worker path.
 3. Add a written cross-chat interface contract: Chat 3 owns order/position lifecycle; Chat 4 owns risk/settlement events; Chat 7 reviews shared account and Options coexistence.
 4. Keep all worker/submit flags disabled.
 
@@ -47,7 +47,7 @@ Do not duplicate the existing order fill ledger. Risk/settlement events are a se
 
 ### Phase 3 — Atomic margin reservation and release
 1. Implement Futures-only reserve/release RPCs only after Chat 3 confirms the order/position handoff contract.
-2. Lock in the agreed global order: shared account first; idempotency/event identity next; then order/position and any basis row in deterministic order. If an existing RPC's actual order differs, stop and obtain cross-chat approval rather than silently changing it.
+2. Do not invent a new global lock order. Preserve the exact order of each existing lifecycle RPC. In PR #89 LIMIT fill, the observed order is account → order → execution replay lookup → position; any new settlement event/basis locks must be fitted around this only after Chat 3 and Chat 7 approve a cross-RPC order. Audit MARKET, cancel, expiry and worker paths separately before claiming a global order. If paths conflict, stop and redesign with the owning chat rather than silently changing existing RPCs.
 3. Reserve opening margin atomically with order/position state and event insertion. Release only the exact remaining reservation on cancel, expiry, close, or terminal settlement.
 4. Same idempotency key + same canonical payload returns the original receipt; same key + changed payload is a hard conflict.
 5. Concurrent updates must serialize on the account row and pass two-connection race tests.
@@ -140,3 +140,23 @@ Opening-day positions require an explicitly approved basis convention. Until tha
 - SEBI circular HO/47/11/11(3)2025-MRD-POD2/I/23843/2026 dated 2026-10-15; CAS/settlement methodology transition effective 2026-12-07. Use the regulator's original circular and NCL's issued SOP as the controlling documents; secondary summaries are discovery aids only.
 
 The official F&O Daily Settlement Prices report is the authoritative data-ingestion candidate. The report schema, settlement-kind mapping, correction/revision semantics, and exact row-level contract keys must be validated from an actual official sample before enabling ingestion. Do not infer that a report listing alone proves a particular field is an official final settlement value.
+
+
+## 7. Follow-up code audit — PR #89 lock order and position closure (2026-11-23)
+
+A focused read of `supabase/migrations/20261123170000_futures_limit_atomic_fill.sql` confirms the LIMIT fill transaction:
+1. Resolve the order owner without a lock.
+2. Lock `paper_accounts` first (`FOR UPDATE`).
+3. Lock the owned `paper_futures_orders` row (`FOR UPDATE`).
+4. Check the execution-id replay in `paper_futures_fills`.
+5. Later lock the matching `paper_futures_positions` row (`FOR UPDATE`).
+
+Opening fills transfer allocated margin from the pending order reservation to position margin without changing aggregate account reserved margin. Closing fills release position margin proportionally, with exact residual release on a full close. A fully closed position is currently **deleted** by this existing LIMIT-fill RPC after the completing order is terminalized; this is Chat 3's established order-lifecycle behavior and must not be changed by Chat 4.
+
+Therefore:
+- The prior proposed abstract sequence "account → idempotency/event → order/position" is not an observed implementation contract and has been removed as a prescription.
+- Chat 4's expiry settlement must preserve an immutable final position/settlement snapshot in its own Futures risk/settlement event ledger before any approved position-state transition. It must not assume the existing order lifecycle retains zero-quantity position rows.
+- Before any new RPC is authored, separately inspect and reconcile MARKET submit/fill, cancel/release, expiry, and PR #93 worker lease lock paths. The LIMIT-fill sequence alone does not prove the global lock order.
+- Chat 3 confirmation remains required for close reservation release, pending-to-filled margin transfer and prevention of post-expiry fills. Chat 7 confirmation remains required for shared account lock order and cross-derivative margin conservation.
+
+This follow-up is an audit/documentation correction only; no SQL or runtime code was changed.
