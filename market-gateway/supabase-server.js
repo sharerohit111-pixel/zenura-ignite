@@ -14,6 +14,8 @@ const {isUuid,makeOrderId,makeOrderFingerprint}=require("./lib/order-idempotency
 const {normalizeProductMode}=require("./lib/product-mode");
 const {parseLimitPricePaise}=require("./lib/limit-price");
 const {normalizeProviderQuote}=require("./lib/provider-quote");
+const {extractUpstoxRestExecutableQuote}=require("./lib/upstox-rest-executable-quote");
+const {resolveFuturesMarketExecution}=require("./lib/futures-market-execution");
 const {isEligiblePaperLimitOrder,normalizeWorkerCursor,groupOrdersByUser}=require("./lib/paper-limit-worker");
 const {createPaperProtectiveWorker}=require("./lib/paper-protective-worker");
 const {createPaperIntradayLimitWorker}=require("./lib/paper-intraday-limit-worker");
@@ -779,9 +781,19 @@ app.post("/paper/futures/orders",async(req,res)=>{
           idempotentReplay:result?.idempotent_replay===true,simulationOnly:true
         });
     }
-    const {token}=await getUpstoxAccessToken(user.id),{quote}=await getQuote(token,instrumentKey);
-    const normalized=normalizeProviderQuote(quote,instrumentKey,{maxAgeMs:15000});
-    const contract=validateDerivativeContract(instrument,{lots,pricePaise:normalized.pricePaise,now:Date.now()});
+    const {token}=await getUpstoxAccessToken(user.id);
+    const {payload}=await getQuote(token,instrumentKey);
+    const quoteNowMs=Date.now();
+    const book=extractUpstoxRestExecutableQuote(payload,instrumentKey,{nowMs:quoteNowMs,maxAgeMs:15000});
+    const execution=resolveFuturesMarketExecution({
+      quote:book,side,quantity:metadata.quantity,tickSizePaise:metadata.tickSizePaise,
+      nowMs:quoteNowMs,maxAgeMs:15000
+    });
+    const normalized={
+      pricePaise:execution.pricePaise,tradeTimeMs:execution.quoteTimestampMs,
+      quoteAgeMs:execution.quoteAgeMs
+    };
+    const contract=validateDerivativeContract(instrument,{lots,pricePaise:normalized.pricePaise,now:quoteNowMs});
     const {data:position,error:positionError}=await userDb.from("paper_futures_positions").select("net_quantity,product").eq("user_id",user.id).eq("instrument_key",instrumentKey).maybeSingle();
     if(positionError)throw Object.assign(new Error("Current futures position could not be read."),{status:503});
     if(position&&position.product!==product)return res.status(409).json({error:"Close the existing futures position before switching between Intraday and Delivery."});
