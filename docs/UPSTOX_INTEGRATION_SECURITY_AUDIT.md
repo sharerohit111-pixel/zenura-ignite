@@ -110,3 +110,14 @@ Paper simulation only. No broker order-placement endpoint, no live trading, no p
 - Added focused unit tests for 401, 429, seconds/date Retry-After, clamping, invalid/past values, and generic upstream failures.
 - Test execution in an isolated Node 22 harness: 5 passed, 0 failed. This validates the helper tests only; it is not a full gateway test run or a live Upstox/staging test.
 - No provider calls, production configuration changes, migration, deployment, or real broker order occurred.
+
+## WebSocket recovery hardening (2026-11-23)
+
+- The `/stream` SSE bridge now makes a bounded reconnect attempt after upstream WebSocket error/close or subscription-send failure.
+- Each retry obtains a fresh authorized feed URL from the Upstox feed-authorize endpoint; the existing validated URL guard is applied again.
+- On each new socket, the original validated instrument-key set and feed mode are resubscribed. Existing event freshness/order filters remain in use.
+- Reconnect backoff is exponential with jitter (1s base, 15s local backoff ceiling), at most five attempts. A provider `Retry-After` from an authorization 429 is respected, capped at 300 seconds. No provider payloads are sent to clients.
+- HTTP 401 during reauthorization ends the stream with stable `upstox_reconnect_required`; lease loss/renewal failure still ends the stream immediately. The same per-user stream reservation and lease heartbeat remain active while reconnecting.
+- Superseded sockets are closed and their late events ignored by socket-generation checks. Stream cleanup cancels a pending reconnect timer and releases the user reservation/lease.
+- Added unit tests for retry delay, jitter, Retry-After cap, and attempt bounds. These are helper-level tests; the WebSocket route has not yet been exercised against a mock Upstox server or staging.
+- No production deployment, provider call, database migration, or real broker order occurred.
