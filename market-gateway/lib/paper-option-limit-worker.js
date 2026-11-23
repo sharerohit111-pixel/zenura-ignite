@@ -57,7 +57,7 @@ function isValidNseOptionLimitOrder(order,instrument){
     &&Number.isSafeInteger(order.reserved_cash_paise)&&order.reserved_cash_paise>=0
     &&Number.isSafeInteger(order.reserved_close_quantity)&&order.reserved_close_quantity>=0
     &&(order.side==="BUY"
-      ?order.reserved_close_quantity===0
+      ?order.reserved_close_quantity===0&&order.reserved_cash_paise>0
       :order.reserved_cash_paise===0&&order.reserved_close_quantity>=order.remaining_quantity);
 }
 
