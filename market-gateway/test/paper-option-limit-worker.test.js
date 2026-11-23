@@ -240,3 +240,23 @@ test("expires an option at the exact 15:30 Asia/Kolkata cutoff, not one millisec
  assert.equal(isContractExpired(expiryOrder,cutoff),true);
  assert.equal(isContractExpired(expiryOrder,cutoff+1),true);
 });
+
+
+test("worker skips corrupted contract orders before requesting quotes or submitting fills",async()=>{
+ const corrupted={...order,strike_price:25100};
+ const db=makeDb({orders:[corrupted]});
+ let tokenCalls=0,quoteCalls=0,fillCalls=0,expireCalls=0;
+ const d=deps(db);
+ d.getUpstoxAccessToken=async()=>{tokenCalls++;return {token:"unused"};};
+ d.fetchProvider=async()=>{quoteCalls++;return {ok:true};};
+ const result=await createPaperOptionLimitWorker(d)({maxOrders:10});
+ fillCalls=db.calls.filter(call=>call.type==="rpc"&&call.name==="execute_paper_option_limit_fill").length;
+ expireCalls=db.calls.filter(call=>call.type==="rpc"&&call.name==="expire_paper_option_limit_order").length;
+ assert.equal(result.scanned,1);
+ assert.equal(result.notEligible,1);
+ assert.equal(result.failed,0);
+ assert.equal(tokenCalls,0);
+ assert.equal(quoteCalls,0);
+ assert.equal(fillCalls,0);
+ assert.equal(expireCalls,0);
+});
