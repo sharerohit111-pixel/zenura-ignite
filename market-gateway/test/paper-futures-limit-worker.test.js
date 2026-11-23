@@ -171,3 +171,21 @@ test("does not submit a fill from a crossed or missing executable book",async()=
   assert.equal(fillCalls,0);
   assert.equal(result.notEligible,1);
 });
+
+test("does not scan orders or release a Futures LIMIT lease owned by another worker",async()=>{
+  const db=makeDb({lease:false});
+  const result=await createPaperFuturesLimitWorker(deps(db))({maxOrders:10});
+  assert.deepEqual(result,{
+    locked:true,scanned:0,filled:0,partial:0,notEligible:0,failed:0,expired:0
+  });
+  assert.equal(db.calls.some(call=>call.type==="query"),false);
+  assert.equal(db.calls.some(call=>call.type==="rpc"&&call.name==="release_paper_market_worker_lease"),false);
+});
+
+test("rejects invalid Futures LIMIT worker batch sizes before acquiring a lease",async()=>{
+  const db=makeDb();
+  const worker=createPaperFuturesLimitWorker(deps(db));
+  await assert.rejects(()=>worker({maxOrders:0}),/batch size is invalid/);
+  await assert.rejects(()=>worker({maxOrders:101}),/batch size is invalid/);
+  assert.equal(db.calls.some(call=>call.type==="rpc"&&call.name==="acquire_paper_market_worker_lease"),false);
+});
