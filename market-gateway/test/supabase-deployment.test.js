@@ -157,6 +157,24 @@ test("Equity LIMIT cancellation resolves the authenticated user's scoped Supabas
  assert.match(route,/eq\("user_id",user\.id\)/);
 });
 
+
+test("Equity, Futures and Options order histories use composite keyset pagination",()=>{
+ for(const route of [
+  'app.get("/paper/orders"',
+  'app.get("/paper/futures/orders"',
+  'app.get("/paper/derivative/orders"',
+  'app.get("/paper/derivative/limit-orders"'
+ ]){
+  const start=server.indexOf(route);
+  const end=server.indexOf("\\napp.",start+5);
+  assert.ok(start>=0&&end>start,route+" route must exist");
+  const source=server.slice(start,end);
+  assert.match(source,/decodeHistoryCursor\\(req\\.query\\.cursor\\)/);
+  assert.match(source,/applyHistoryCursor\\(query,decoded\\.cursor\\)/);
+  assert.match(source,/order\\("created_at",\\{ascending:false\\}\\)\\.order\\("order_id",\\{ascending:false\\}\\)\\.limit\\(limit\\+1\\)/);
+  assert.match(source,/hasMore:page\\.hasMore,nextCursor:page\\.nextCursor/);
+ }
+});
 test("Gateway attaches a server-generated request correlation ID",()=>{
  assert.match(server,/const requestId=crypto\.randomUUID\(\)/);
  assert.match(server,/req\.requestId=requestId/);
