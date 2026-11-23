@@ -194,6 +194,20 @@ BEGIN
     RAISE EXCEPTION 'Repeated Futures LIMIT expiry was not idempotent';
   END IF;
 
+  -- A replay of an already-expired submit remains idempotent even though the
+  -- original expires_at is now in the past.
+  v_now:=floor(extract(epoch from clock_timestamp())*1000)::bigint;
+  v_result:=public.submit_paper_futures_limit_order(
+    'abababab-abab-4bab-8bab-abababababab',repeat('9',64),
+    'abababab-0000-4000-8000-000000000008',repeat('3',64),
+    'NSE_FO|FUT_LIMIT_EXPIRY','FUT_LIMIT_EXPIRY','NSE','NSE_FO',current_date+5,
+    25,5,'BUY','DELIVERY',25,10000,125000,null,v_now,clock_timestamp()-interval '1 second'
+  );
+  IF v_result->>'status'<>'EXPIRED'
+     OR (v_result->>'idempotent_replay')::boolean IS NOT TRUE THEN
+    RAISE EXCEPTION 'Expired Futures LIMIT submit replay was not idempotent: %',v_result;
+  END IF;
+
   -- A future-dated DAY order cannot be expired while a verified exchange
   -- session is open; missing verified session data must fail closed by expiring it.
   PERFORM public.submit_paper_futures_limit_order(
