@@ -145,20 +145,20 @@ test("fills only the displayed best ask quantity using a fresh V3 snapshot",asyn
   assert.ok(db.calls.some(x=>x.type==="rpc"&&x.name==="release_paper_market_worker_lease"));
 });
 
-test("expires pending Futures LIMIT orders when the verified session is missing",async()=>{
-  let expiredId=null,tokenRequested=false;
+test("preserves pending Futures LIMIT orders when the verified session calendar is missing",async()=>{
+  let expiryRpcCalled=false,tokenRequested=false;
   const db=makeDb({onRpc:async(name,args)=>{
-    if(name==="expire_paper_futures_limit_order"){expiredId=args.p_order_id;return {data:{status:"EXPIRED",idempotent_replay:false},error:null};}
+    if(name==="expire_paper_futures_limit_order"){expiryRpcCalled=true;return {data:{status:"EXPIRED",idempotent_replay:false},error:null};}
     return {data:true,error:null};
   }});
   const d=deps(db,{session:false,token:false});
   d.getUpstoxAccessToken=async()=>{tokenRequested=true;throw new Error("must not request token");};
   const result=await createPaperFuturesLimitWorker(d)({maxOrders:10});
-  assert.equal(result.expired,1);
-  assert.equal(expiredId,ORDER);
+  assert.equal(result.expired,0);
+  assert.equal(result.notEligible,1);
+  assert.equal(expiryRpcCalled,false);
   assert.equal(tokenRequested,false);
 });
-
 test("does not submit a fill from a crossed or missing executable book",async()=>{
   const payload=quotePayload();
   payload.data["NSE_FO:NIFTY26NOVFUT"].depth.sell[0].price=98.9;
