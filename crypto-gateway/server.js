@@ -49,7 +49,7 @@ async function authenticate(req) {
   return { user: { id: user.id }, userDb };
 }
 async function userRpc(user, name, args) {
-  const allowed = new Set(["initialize_paper_crypto_account","execute_paper_crypto_market_order","create_paper_crypto_limit_order","cancel_paper_crypto_limit_order","reset_paper_crypto_account"]);
+  const allowed = new Set(["initialize_paper_crypto_account","execute_paper_crypto_market_order","create_paper_crypto_limit_order","cancel_paper_crypto_limit_order","reset_paper_crypto_account","create_paper_crypto_risk_plan","cancel_paper_crypto_risk_plan"]);
   if (!allowed.has(name)) throw httpError("Crypto operation is not allowlisted.", 400);
   const result = await serviceDb.rpc(name, { ...args, p_user_id: user.id });
   if (result?.error) {
@@ -226,6 +226,46 @@ app.post("/crypto/limit-orders", cryptoOrderRateLimit, async(req,res) => {
     });
   } catch(e) { sendError(res,e,"Crypto LIMIT order could not be created."); }
 });
+app.post("/crypto/risk-plans", cryptoOrderRateLimit, async(req,res) => {
+  try {
+    const { user } = await authenticate(req);
+    const symbol = typeof req.body?.symbol === "string" ? req.body.symbol.toUpperCase() : "";
+    const quantity = String(req.body?.quantity ?? "");
+    const slRaw = req.body?.stop_loss_price == null || req.body.stop_loss_price === "" ? null : String(req.body.stop_loss_price);
+    const tpRaw = req.body?.take_profit_price == null || req.body.take_profit_price === "" ? null : String(req.body.take_profit_price);
+    const key = String(req.body?.idempotency_key || "");
+    const validPrice = value => value === null || (/^(?:0|[1-9]\\d*)(?:\\.\\d{1,8})?$/.test(value) && Number.isFinite(Number(value)) && Number(value)>0 && Number(value)<=MAX_QUANTITY);
+    if (!CRYPTO_SYMBOLS.has(symbol) || !/^(?:0|[1-9]\\d*)(?:\\.\\d{1,12})?$/.test(quantity)
+        || !Number.isFinite(Number(quantity)) || Number(quantity)<=0 || Number(quantity)>MAX_QUANTITY
+        || !isUuid(key) || !validPrice(slRaw) || !validPrice(tpRaw) || (slRaw===null && tpRaw===null)
+        || (slRaw!==null && tpRaw!==null && Number(slRaw)>=Number(tpRaw))) {
+      throw httpError("Enter a valid Crypto quantity, SL/Target prices and idempotency key.",400);
+    }
+    const planId = makeOrderId(user.id,key);
+    const result = await userRpc(user,"create_paper_crypto_risk_plan",{
+      p_plan_id:planId,p_idempotency_key:key,p_symbol:symbol,p_base_asset:symbol.slice(0,-4),
+      p_quantity:quantity,p_stop_loss_price:slRaw,p_take_profit_price:tpRaw
+    });
+    res.set("Cache-Control","private, no-store").status(result?.idempotent_replay?200:201).json({
+      planId:result?.plan?.plan_id||planId,status:result?.plan?.status||"ACTIVE",
+      symbol,quantity,stopLossPrice:slRaw,takeProfitPrice:tpRaw,
+      idempotentReplay:result?.idempotent_replay===true,simulationOnly:true
+    });
+  } catch(e) { sendError(res,e,"Crypto SL/Target plan could not be saved."); }
+});
+app.post("/crypto/risk-plans/:planId/cancel", cryptoOrderRateLimit, async(req,res) => {
+  try {
+    const { user } = await authenticate(req);
+    const planId = String(req.params.planId||"");
+    if (!isUuid(planId)) throw httpError("A valid Crypto risk plan ID is required.",400);
+    const result = await userRpc(user,"cancel_paper_crypto_risk_plan",{p_plan_id:planId});
+    res.set("Cache-Control","private, no-store").json({
+      planId:result?.plan?.plan_id||planId,status:result?.plan?.status||"CANCELLED",
+      cancelled:result?.cancelled===true,idempotentReplay:result?.idempotent_replay===true,simulationOnly:true
+    });
+  } catch(e) { sendError(res,e,"Crypto SL/Target plan could not be cancelled."); }
+});
+
 app.post("/crypto/limit-orders/:orderId/cancel", cryptoOrderRateLimit, async(req,res) => {
   try {
     const { user } = await authenticate(req);
