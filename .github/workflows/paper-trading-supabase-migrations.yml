@@ -42,6 +42,10 @@ on:
       - "market-gateway/test/derivative-limit-quote-policy.test.js"
       - "market-gateway/lib/upstox-executable-quote.js"
       - "market-gateway/test/upstox-executable-quote.test.js"
+      - "docs/FUTURES_RISK_ACCOUNTING_AUDIT.md"
+      - "docs/FUTURES_RISK_LEDGER_DESIGN.md"
+      - "market-gateway/lib/futures-risk-accounting.js"
+      - "market-gateway/test/futures-risk-accounting.test.js"
       - "supabase/tests/**"
       - "supabase/tests/protective_order_cancel.sql"
   push:
@@ -139,6 +143,10 @@ jobs:
         run: node --test market-gateway/test/derivative-order-transaction.test.js
       - name: Run Existing transaction reference derivative contract validation tests
         run: node --test market-gateway/test/derivative-contract.test.js
+      - name: Verify isolated Futures risk and accounting simulation helpers
+        run: |
+          node --check market-gateway/lib/futures-risk-accounting.js
+          node --test market-gateway/test/futures-risk-accounting.test.js
       - name: Run complete market-gateway regression suite
         run: |
           npm install --prefix market-gateway --no-audit --no-fund --package-lock=false
