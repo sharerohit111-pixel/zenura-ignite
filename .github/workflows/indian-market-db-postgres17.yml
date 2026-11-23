@@ -116,3 +116,6 @@ jobs:
 
       - name: Exercise Intraday LIMIT reservation and atomic fill lifecycle
         run: psql -v ON_ERROR_STOP=1 -f supabase/tests/intraday_limit_reservations.sql
+
+      - name: Exercise concurrent Intraday LIMIT fill/cancel races
+        run: bash supabase/tests/intraday_limit_fill_cancel_race.sh
