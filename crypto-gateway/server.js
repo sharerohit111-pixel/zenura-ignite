@@ -226,6 +226,16 @@ app.post("/crypto/limit-orders", cryptoOrderRateLimit, async(req,res) => {
     });
   } catch(e) { sendError(res,e,"Crypto LIMIT order could not be created."); }
 });
+app.get("/crypto/risk-plans", async(req,res) => {
+  try {
+    const { user, userDb } = await authenticate(req);
+    const result = await userDb.from("paper_crypto_risk_plans")
+      .select("plan_id,symbol,quantity,stop_loss_price,take_profit_price,status,created_at,updated_at")
+      .eq("user_id",user.id).order("created_at",{ascending:false}).limit(100);
+    if (result.error) throw httpError("Crypto SL/Target plans could not be loaded.",503);
+    res.set("Cache-Control","private, no-store").json({plans:result.data||[],simulationOnly:true});
+  } catch(e) { sendError(res,e,"Crypto SL/Target plans could not be loaded."); }
+});
 app.post("/crypto/risk-plans", cryptoOrderRateLimit, async(req,res) => {
   try {
     const { user } = await authenticate(req);
