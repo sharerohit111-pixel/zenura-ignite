@@ -118,7 +118,7 @@ test("quote evaluation fails closed on missing instrument, stale quote and off-t
   }}
  };
  const result=evaluateOptionLimitQuote(payload,instrument,{
-  side:"BUY",limitPricePaise:1250,remainingQuantity:65,tickSizePaise:5
+  side:"SELL",limitPricePaise:1240,remainingQuantity:65,tickSizePaise:5
  },{nowMs:Date.parse("2026-11-23T04:30:01.000Z")});
  assert.equal(result.eligible,false);
  assert.equal(result.reason,"OFF_TICK_EXECUTABLE_PRICE");
