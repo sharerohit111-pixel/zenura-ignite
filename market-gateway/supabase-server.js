@@ -14,6 +14,9 @@ const {isUuid,makeOrderId,makeOrderFingerprint}=require("./lib/order-idempotency
 const {normalizeProductMode}=require("./lib/product-mode");
 const {parseLimitPricePaise}=require("./lib/limit-price");
 const {normalizeProviderQuote}=require("./lib/provider-quote");
+const {loadVerifiedExchangeSession}=require("./lib/exchange-session-calendar");
+const {isIntradaySessionOpen}=require("./lib/intraday-limit-policy");
+const {normalizeEquityTickSizePaise,isEquityExecutionPriceOnTick}=require("./lib/equity-order-validation");
 const {isEligiblePaperLimitOrder,normalizeWorkerCursor,groupOrdersByUser}=require("./lib/paper-limit-worker");
 const {createPaperProtectiveWorker}=require("./lib/paper-protective-worker");
 const {createPaperIntradayLimitWorker}=require("./lib/paper-intraday-limit-worker");
@@ -363,8 +366,7 @@ app.post("/paper/orders",async(req,res)=>{
     const orderId=makeOrderId(user.id,idempotencyKey);
     const requestFingerprint=makeOrderFingerprint({instrumentKey,side,quantity,orderType,product,...(orderType==="LIMIT"?{limitPricePaise}:{})});
     if(orderType==="LIMIT"){
-      const {normalizeTickSizePaise}=require("./lib/derivative-contract");
-      const tick=normalizeTickSizePaise(Number(instrument.tick_size));
+      const tick=normalizeEquityTickSizePaise(instrument.tick_size);
       if(!tick||limitPricePaise%tick!==0)return res.status(400).json({error:"LIMIT price must match the official instrument tick size."});
       const rpcName=product==="INTRADAY"?"submit_paper_intraday_limit_order":"submit_paper_limit_order";
       const rpcArgs=product==="INTRADAY"?{
@@ -386,9 +388,18 @@ app.post("/paper/orders",async(req,res)=>{
         idempotentReplay:result?.idempotent_replay===true,simulationOnly:true
       });
     }
+    const marketNowMs=Date.now();
+    const session=await loadVerifiedExchangeSession(serviceDb,instrument.exchange,marketNowMs);
+    if(!session||!isIntradaySessionOpen(marketNowMs,session))
+      return res.status(409).json({error:"NSE/BSE cash MARKET orders are accepted only during a verified open exchange session."});
     const {token}=await getUpstoxAccessToken(user.id);
     const {quote}=await getQuote(token,instrumentKey);
     const normalized=normalizeProviderQuote(quote,instrumentKey);
+    const tick=normalizeEquityTickSizePaise(instrument.tick_size);
+    if(!isEquityExecutionPriceOnTick(normalized.pricePaise,tick))
+      return res.status(502).json({error:"The verified market quote price does not align with the official instrument tick size."});
+    if(!isIntradaySessionOpen(normalized.tradeTimeMs,session))
+      return res.status(409).json({error:"The market quote timestamp is outside the verified exchange session."});
     const result=await runtime.callUserRpc(user,"execute_paper_market_order",{
       p_order_id:orderId,p_idempotency_key:idempotencyKey,p_request_fingerprint:requestFingerprint,
       p_instrument_key:instrumentKey,p_trading_symbol:instrument.trading_symbol||instrument.name,
