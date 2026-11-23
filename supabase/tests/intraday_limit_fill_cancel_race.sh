@@ -40,7 +40,8 @@ ON CONFLICT(exchange,session_date) DO UPDATE SET
   source_reference=excluded.source_reference,verified_at=excluded.verified_at,
   source_sha256=excluded.source_sha256;
 
-DELETE FROM public.paper_orders WHERE order_id IN ('$BUY_ORDER','$SELL_ORDER');
+-- Keep the filled BUY parent order: its immutable fill and ledger rows reference it.
+DELETE FROM public.paper_orders WHERE order_id='$SELL_ORDER';
 DELETE FROM public.paper_equity_positions
  WHERE user_id='$USER_ID' AND product='INTRADAY'
    AND instrument_key IN ('NSE_EQ|INTRADAY_RACE_BUY','NSE_EQ|INTRADAY_RACE_SELL');
@@ -137,7 +138,8 @@ END
 
 DROP TRIGGER IF EXISTS test_delay_intraday_limit_terminal_update ON public.paper_orders;
 DROP FUNCTION IF EXISTS public.test_delay_intraday_limit_terminal_update();
-DELETE FROM public.paper_orders WHERE order_id IN ('$BUY_ORDER','$SELL_ORDER');
+-- Keep the filled BUY parent order: its immutable fill and ledger rows reference it.
+DELETE FROM public.paper_orders WHERE order_id='$SELL_ORDER';
 DELETE FROM public.paper_equity_positions
  WHERE user_id='$USER_ID' AND product='INTRADAY'
    AND instrument_key IN ('NSE_EQ|INTRADAY_RACE_BUY','NSE_EQ|INTRADAY_RACE_SELL');
