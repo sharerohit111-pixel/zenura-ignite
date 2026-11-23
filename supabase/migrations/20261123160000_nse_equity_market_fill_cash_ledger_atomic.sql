@@ -12,7 +12,7 @@ drop trigger if exists paper_equity_orders_audit_deferred on public.paper_orders
 --     audit wrapper and _execute_paper_market_order_legacy is the pre-audit core.
 -- Move the true core to one stable private name so this migration behaves identically
 -- in push CI and in the eventual PR merge commit.
-do $
+do $$
 begin
   if to_regprocedure(
     'public._execute_paper_market_order_legacy(uuid,text,uuid,text,text,text,text,text,text,integer,bigint,bigint,bigint)'
@@ -30,7 +30,7 @@ begin
     ) rename to _execute_paper_market_order_core;
   end if;
 end;
-$;
+$$;
 
 revoke all on function public._execute_paper_market_order_core(
   uuid,text,uuid,text,text,text,text,text,text,integer,bigint,bigint,bigint
