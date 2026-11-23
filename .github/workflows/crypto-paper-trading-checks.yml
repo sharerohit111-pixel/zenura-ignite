@@ -65,6 +65,8 @@ jobs:
           done
       - name: Verify full-position LIMIT SELL reservation lifecycle
         run: psql -v ON_ERROR_STOP=1 -f supabase/tests/crypto_limit_full_exit_reservation.sql
+      - name: Verify reserved Crypto position delete guard
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/crypto_reserved_position_guard.sql
       - name: Check Crypto browser module syntax
         run: |
           node --input-type=module --check < crypto/supabase-client.js
