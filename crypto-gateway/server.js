@@ -361,7 +361,7 @@ async function runLimitWorker({maxOrders=5}={}) {
     // Their quantity was reserved at plan creation; the SQL exit RPC consumes only that reserve.
     const riskBatch=await serviceDb.from("paper_crypto_risk_plans")
       .select("plan_id,user_id,symbol,base_asset,quantity,stop_loss_price,take_profit_price")
-      .eq("status","ACTIVE").order("updated_at",{ascending:true}).limit(maxOrders);
+      .eq("status","ACTIVE").order("updated_at",{ascending:true}).order("plan_id",{ascending:true}).limit(maxOrders);
     if(riskBatch.error) throw new Error("Active Crypto SL/Target plans could not be scanned.");
     summary.riskScanned=riskBatch.data?.length||0;
     for(const plan of riskBatch.data||[]) {
