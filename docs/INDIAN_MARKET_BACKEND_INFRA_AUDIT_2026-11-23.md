@@ -61,3 +61,11 @@ The worker lease RPCs use bounded TTLs (5–300 seconds), allowed state keys, an
 
 ### Informational — performance advisor reports 17 unused indexes
 The Supabase performance advisor reported 17 indexes as unused at the observation time, including the market-worker pending-order indexes, Upstox OAuth state indexes, and several account/order/position indexes. This is not evidence that they are safe to drop: the project is newly created and workload coverage may be low. Preserve them until representative workload statistics and query plans are collected in staging. No index was removed. The health advisor returned no findings.
+
+
+### Additional infrastructure inspection — role boundaries and lease timing
+- Database role catalog shows `anon`, `authenticated`, and `service_role` are non-login, non-superuser roles with no direct role memberships. `authenticator` is the login role and can assume the API roles; `postgres` is the administrative role. This is consistent with the expected Supabase role model.
+- All inspected SECURITY DEFINER functions have an empty function-level `search_path` and schema-qualify referenced relations; the non-definer quote freshness helper pins `search_path=pg_catalog`. Explicit EXECUTE ACLs remain restricted to `service_role` and owner `postgres`.
+- Lease RPCs accept caller-supplied `p_now_ms` and calculate expiry from that value, while some metadata uses database `clock_timestamp()`. Since only service_role can execute these RPCs, this is not a direct client exploit, but worker correctness depends on trusted server time and disciplined clock synchronization. Recommend deriving authoritative lease time inside PostgreSQL (or explicitly validating drift) during a staging-tested hardening change.
+- Worker lease acquisition is atomic via INSERT/ON CONFLICT with expiry predicate. Release matches the lease token. Stream lease renewal requires matching lease ID, non-revoked status, and unexpired lease. The consumer still needs fencing checks on every side effect/checkpoint; source code was not available to verify that end-to-end.
+- One read-only catalog query using a non-existent `information_schema.schema_privileges` view failed; no database state was changed. Role membership was subsequently inspected using `pg_auth_members`.
