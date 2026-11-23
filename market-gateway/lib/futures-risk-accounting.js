@@ -188,8 +188,11 @@ function settleExpiredPosition({ netQuantity, averagePricePaise, reservedMarginP
 module.exports = {
   calculateSimulatedMargin,
   calculateMarginAvailability,
+  reserveSimulatedMargin,
+  releaseSimulatedMargin,
   calculateUnrealizedPnl,
   calculateDailySettlement,
   evaluateMaintenanceRisk,
+  simulatePositionRollover,
   settleExpiredPosition
 };
