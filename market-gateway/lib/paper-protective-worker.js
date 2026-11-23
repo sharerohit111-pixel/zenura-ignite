@@ -1,6 +1,7 @@
 "use strict";
 
 const {upstoxHttpError}=require("./upstox-http-policy");
+const {getUpstoxUserCooldown,recordUpstoxUserFailure,clearUpstoxUserCooldown}=require("./upstox-user-cooldown");
 
 const crypto=require("node:crypto");
 const {groupOrdersByUser}=require("./paper-limit-worker");
@@ -38,6 +39,7 @@ function createPaperProtectiveWorker({
       const orders=batch.data||[];summary.scanned=orders.length;
       const groups=[...groupOrdersByUser(orders).entries()];
       const processUserOrders=async([userId,userOrders])=>{
+        if(getUpstoxUserCooldown(userId)){summary.failed+=userOrders.length;return;}
         try{
           const validOrders=userOrders.filter(order=>{
             const instrument=instrumentCache.find(x=>x.instrument_key===order.instrument_key);
@@ -61,6 +63,7 @@ function createPaperProtectiveWorker({
             {headers:{Authorization:"Bearer "+token,Accept:"application/json"}});
           const payload=await readProviderJson(response);
           if(!response.ok)throw upstoxHttpError(response);
+          clearUpstoxUserCooldown(userId);
           const entries=Object.values(payload?.data||{}),now=Date.now();
           const positionsResult=await serviceDb.from("paper_equity_positions")
             .select("instrument_key,product,quantity,reserved_quantity")
@@ -99,6 +102,7 @@ function createPaperProtectiveWorker({
             else summary.notEligible++;
           }
         }catch(error){
+          recordUpstoxUserFailure(userId,error);
           summary.failed+=userOrders.length;
           const checkedAt=new Date().toISOString();
           for(const order of userOrders){
