@@ -41,6 +41,7 @@ const {createMarketFeedEventOrderFilter}=require("./lib/market-feed-event-order"
 const {createLeaseHeartbeat}=require("./lib/lease-heartbeat");
 const {readProviderJson}=require("./lib/provider-json");
 const {decryptUpstoxToken,encryptUpstoxToken}=require("./lib/upstox-token-crypto");
+const {readUserUpstoxConnection}=require("./lib/upstox-user-connection");
 const {nextUpstoxTokenExpiry}=require("../functions/lib/upstox-token-expiry");
 const {isUsableUpstoxTokenResponse}=require("../functions/lib/upstox-token-response");
 const {isUsableUpstoxOAuthCallback}=require("../functions/lib/upstox-oauth-callback-input");
@@ -122,7 +123,7 @@ async function loadProto(){
   FeedResponse=root.lookupType("com.upstox.marketdatafeederv3udapi.rpc.proto.FeedResponse");
 }
 async function getConnection(userId){
-  const {data,error}=await serviceDb.from("upstox_connections").select("*").eq("user_id",userId).maybeSingle();
+  const {data,error}=await readUserUpstoxConnection(serviceDb,userId);
   if(error)throw Object.assign(new Error("Upstox connection status could not be read"),{status:503});
   if(!data)return null;
   return {...data,tokenCiphertext:data.token_ciphertext,expiresAtMs:Date.parse(data.token_expires_at)};
