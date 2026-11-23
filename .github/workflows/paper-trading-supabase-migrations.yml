@@ -179,6 +179,8 @@ jobs:
             echo "Applying $migration"
             psql -v ON_ERROR_STOP=1 -f "$migration"
           done
+      - name: Verify least-privilege Supabase market gateway service-role grants
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/market_gateway_service_role_grants.sql
       - name: Exercise BSE scrip master import and group-specific fee rules
         run: psql -v ON_ERROR_STOP=1 -f supabase/tests/bse_equity_fee_master.sql
       - name: Exercise verified NSE and BSE session calendar imports
