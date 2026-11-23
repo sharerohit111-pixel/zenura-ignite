@@ -15,11 +15,18 @@ alter table public.paper_equity_fills
     on delete restrict;
 
 alter table public.paper_equity_cash_ledger
-  add column reversal_of_ledger_id uuid
-    references public.paper_equity_cash_ledger(ledger_id) on delete restrict,
+  add column reversal_of_ledger_id uuid,
   add column reason text;
 
 alter table public.paper_equity_cash_ledger
+  add constraint paper_equity_cash_ledger_ledger_user_unique
+    unique (ledger_id, user_id);
+
+alter table public.paper_equity_cash_ledger
+  add constraint paper_equity_cash_ledger_reversal_owner_fk
+    foreign key (reversal_of_ledger_id, user_id)
+    references public.paper_equity_cash_ledger(ledger_id, user_id)
+    on delete restrict,
   add constraint paper_equity_cash_ledger_order_owner_fk
     foreign key (order_id, user_id)
     references public.paper_orders(order_id, user_id)
