@@ -8,16 +8,22 @@ const {normalizeTickSizePaise,normalizeExpiryDate}=require("./derivative-contrac
 const {calculateFuturesTradeCharges}=require("./trading-charges");
 const {evaluateUpstoxRestDerivativeLimit}=require("./upstox-rest-executable-quote");
 
-function isVerifiedSessionOpen(nowMs,session){
-  if(!Number.isSafeInteger(nowMs)||nowMs<1||!session||session.isTradingDay!==true
-     ||!["NSE","BSE"].includes(session.exchange)
-     ||!Number.isInteger(session.openMinute)||!Number.isInteger(session.closeMinute)
-     ||session.openMinute<0||session.closeMinute>1440
-     ||session.openMinute>=session.closeMinute)return false;
+function futuresSessionState(nowMs,session){
+  if(!Number.isSafeInteger(nowMs)||nowMs<1||!session
+     ||session.exchange!=="NSE"||!Number.isInteger(session.openMinute)
+     ||!Number.isInteger(session.closeMinute)||session.openMinute<0
+     ||session.closeMinute>1440||session.openMinute>=session.closeMinute)return "MISSING";
   const clock=marketClockParts(nowMs);
   const date=clock.year+"-"+String(clock.month).padStart(2,"0")+"-"+String(clock.day).padStart(2,"0");
+  if(session.sessionDate!==date)return "MISSING";
+  if(session.isTradingDay!==true)return "NOT_TRADING_DAY";
   const minute=clock.hour*60+clock.minute;
-  return session.sessionDate===date&&minute>=session.openMinute&&minute<session.closeMinute;
+  if(minute<session.openMinute)return "BEFORE_OPEN";
+  if(minute>=session.closeMinute)return "CLOSED";
+  return "OPEN";
+}
+function isVerifiedSessionOpen(nowMs,session){
+  return futuresSessionState(nowMs,session)==="OPEN";
 }
 function isContractExpired(order,nowMs){
   const expiry=normalizeExpiryDate(order?.expiry);
@@ -141,14 +147,9 @@ function createPaperFuturesLimitWorker({
           const eligible=[];
           for(const order of userOrders){
             const session=await getSession(order.exchange,currentNow);
-            const sessionOpen=isVerifiedSessionOpen(currentNow,session);
+            const sessionState=futuresSessionState(currentNow,session);
             const expiredByTime=Date.parse(order.expires_at)<=currentNow;
-            const contractExpired=isContractExpired(order,currentNow);
-            // Expire only at the persisted order cutoff or the verified contract
-            // expiry cutoff. A missing/unverified/closed session is not proof that
-            // an order has expired; preserve its reservations and wait for a
-            // verified executable session instead of releasing margin/quantity.
-            if(expiredByTime||contractExpired){
+            if(expiredByTime||isContractExpired(order,currentNow)||sessionState==="CLOSED"){
               const expired=await serviceDb.rpc("expire_paper_futures_limit_order",{p_order_id:order.order_id});
               if(expired?.error){
                 if(["22023","23514","P0002"].includes(expired.error.code))summary.notEligible++;
@@ -157,7 +158,7 @@ function createPaperFuturesLimitWorker({
               else summary.notEligible++;
               continue;
             }
-            if(!sessionOpen){
+            if(sessionState!=="OPEN"){
               summary.notEligible++;
               continue;
             }
@@ -264,5 +265,5 @@ function createPaperFuturesLimitWorker({
 }
 
 module.exports={
-  createPaperFuturesLimitWorker,isContractExpired,isValidNseFuture,cumulativeFillCharges,isVerifiedSessionOpen
+  createPaperFuturesLimitWorker,isContractExpired,isValidNseFuture,cumulativeFillCharges,isVerifiedSessionOpen,futuresSessionState
 };
