@@ -63,3 +63,17 @@ For the three current full-fill Equity settlement RPCs (MARKET, Delivery LIMIT, 
 - An exception after the fill insert rolls back fill, ledger, order, account, and position changes together.
 - Do not assert partial Equity fill behavior: current Equity LIMIT fill RPCs settle the full remaining order quantity and have no caller-supplied execution ID/fill-sequence contract.
 - Cancellation/rejection reservation release requires separate RPC coverage and must not be marked complete by these fill tests.
+
+
+## Draft implementation static checks (not database test results)
+
+The current draft integration SQL must pass all existing Equity assertions plus:
+- Each of the three RPC definitions retains its exact existing signature and SECURITY DEFINER + empty/fixed search_path.
+- MARKET full fill inserts one fill and one trade event.
+- Delivery and Intraday LIMIT full fill insert one fill and one trade event; BUY additionally inserts one reservation-consume event, SELL does not.
+- The deterministic execution ID is `equity-order:<order_id>`; it is stable across retries and fits the current 128-character constraint.
+- Returned `fill_id` is present for new settlements and is looked up on exact replay when an existing fill row is available.
+- All fill and ledger inserts occur within the existing function transaction, after settlement state is calculated, so injected failures must roll back all changes.
+- Validate final account snapshots and ledger deltas against actual database state; do not accept static text inspection as proof.
+
+Status: source-level static checks only. SQL parse/compile, disposable DB, pgTAP, concurrency, and forced rollback tests are still NOT RUN.
