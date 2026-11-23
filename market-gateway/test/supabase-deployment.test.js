@@ -146,3 +146,11 @@ test("Paper Trading discloses per-user Upstox authorization and data rights",()=
  assert.match(tradingPage,/Public real-time display remains subject to Upstox permission/);
  assert.doesNotMatch(tradingPage,/PAPER INVESTING|Paper Investing/);
 });
+
+test("Equity LIMIT cancellation resolves the authenticated user's scoped Supabase client",()=>{
+ const route=server.match(/app\\.post\\("\\/paper\\/orders\\/:orderId\\/cancel"[\\s\\S]*?\\n\\}\\);/);
+ assert.ok(route,"Equity LIMIT cancellation route must exist");
+ assert.match(route[0],/const \\{user,userDb\\}=await auth\\(req\\)/);
+ assert.match(route[0],/userDb\\.from\\("paper_orders"\\)/);
+ assert.match(route[0],/eq\\("user_id",user\\.id\\)/);
+});
