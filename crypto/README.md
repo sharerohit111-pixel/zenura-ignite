@@ -53,5 +53,13 @@ The repository's existing GitHub Pages workflow publishes the repository root. T
 ## Isolated development branch status (2026-11-23)
 - Crypto frontend, auth/cloud adapters, and additive Crypto-only SQL migrations are staged on `feature/crypto-only-supabase-backend-2026-11-23`.
 - The shared Indian-market gateway implementation is deliberately not copied into this branch. A dedicated Crypto-only Node.js gateway has been extracted under `crypto-gateway/` with its own environment configuration and worker boundary.
-- Crypto-only disposable PostgreSQL CI now covers five SQL regression suites, frontend syntax, gateway unit tests and Crypto/Indian Market isolation. The latest full run is [#45105183954](https://github.com/sharerohit111-pixel/zenura-ignite/actions/runs/45105183954), successful at branch commit `054476c4b66c802cb72131b13de13e036ab608fa`.
+- Crypto-only disposable PostgreSQL CI covers seven SQL regression suites, frontend syntax, gateway unit tests and Crypto/Indian Market isolation. The latest full run is [#45109490413](https://github.com/sharerohit111-pixel/zenura-ignite/actions/runs/45109490413), successful at branch head `d2aebb102604ebd59484cfe70d056b3570b3fdcc`.
 - Isolated Supabase staging validation and gateway hosting remain pending. No Supabase Crypto migration has been applied and no production deployment has been performed.
+
+
+## Latest isolated verification — 2026-11-23
+GitHub Draft PR [#85](https://github.com/sharerohit111-pixel/zenura-ignite/pull/85) remains open, unmerged and in draft state.
+Latest run #45109490413 completed all 16 primary workflow steps successfully, including seven disposable-PostgreSQL regression suites, Crypto browser syntax/isolation checks, and standalone gateway tests.
+Read-only inspection of the connected Supabase Production project confirms that no `paper_crypto_*` tables or Crypto migrations are installed there. No dedicated isolated Crypto staging database is currently available; the existing project must not receive these migrations as a substitute.
+No Crypto Edge Functions are deployed in the connected Supabase project. No Crypto gateway hosting, secrets, production migrations or deployment have been changed.
+Next release gates: provision/identify isolated staging with approved cost, apply only the reviewed Crypto migrations there, perform authenticated end-to-end MARKET/LIMIT tests, then implement server-side stop-loss/target and account reset before enabling those signed-in controls.
