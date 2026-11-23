@@ -22,6 +22,7 @@
     if(state)status.dataset.state=state;else delete status.dataset.state;
   }
   function money(paise){
+    if(paise===null||paise===undefined||paise==="")return "—";
     if(!Number.isSafeInteger(Number(paise)))return "—";
     return new Intl.NumberFormat("en-IN",{style:"currency",currency:"INR",maximumFractionDigits:2}).format(Number(paise)/100);
   }
@@ -142,7 +143,7 @@
       const data=await response.json().catch(()=>({}));
       if(connector()?.getUserId?.()!==uid)throw new Error("Account changed while the order was processing. Sign in again to verify its result.");
       if(!response.ok){
-        if([400,401,403,404,422].includes(response.status))clearPending();
+        if([400,401,403,404,409,422].includes(response.status))clearPending();
         throw new Error(data.error||"Options LIMIT order could not be submitted.");
       }
       if(typeof data.orderId!=="string"||!["PENDING","PARTIALLY_FILLED","FILLED"].includes(data.status)){
