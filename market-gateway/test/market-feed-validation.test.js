@@ -12,9 +12,11 @@ test("rejects zero, negative, malformed and unsafe prices",()=>{
 test("rejects missing, malformed, stale and excessive future timestamps",()=>{
  for(const ltt of [undefined,"bad",0,String(NOW-15001),String(NOW+5001)])assert.equal(isFreshMarketFeedQuote(quote({ltt}),{now:NOW}),false);
 });
-test("accepts exact stale-age and future-skew boundaries",()=>{
+test("accepts the exact stale-age boundary and rejects any future timestamp",()=>{
  assert.equal(isFreshMarketFeedQuote(quote({ltt:String(NOW-15000)}),{now:NOW}),true);
- assert.equal(isFreshMarketFeedQuote(quote({ltt:String(NOW+5000)}),{now:NOW}),true);
+ assert.equal(isFreshMarketFeedQuote(quote({ltt:String(NOW)}),{now:NOW}),true);
+ assert.equal(isFreshMarketFeedQuote(quote({ltt:String(NOW+1)}),{now:NOW}),false);
+ assert.equal(isFreshMarketFeedQuote(quote({ltt:String(NOW+5000)}),{now:NOW}),false);
 });
 test("filters unknown instruments and stale quotes without changing valid feed data",()=>{
  const valid={ltpc:quote()};
