@@ -143,13 +143,22 @@ function createPaperFuturesLimitWorker({
             const session=await getSession(order.exchange,currentNow);
             const sessionOpen=isVerifiedSessionOpen(currentNow,session);
             const expiredByTime=Date.parse(order.expires_at)<=currentNow;
-            if(expiredByTime||isContractExpired(order,currentNow)||!sessionOpen){
+            const contractExpired=isContractExpired(order,currentNow);
+            // Expire only at the persisted order cutoff or the verified contract
+            // expiry cutoff. A missing/unverified/closed session is not proof that
+            // an order has expired; preserve its reservations and wait for a
+            // verified executable session instead of releasing margin/quantity.
+            if(expiredByTime||contractExpired){
               const expired=await serviceDb.rpc("expire_paper_futures_limit_order",{p_order_id:order.order_id});
               if(expired?.error){
                 if(["22023","23514","P0002"].includes(expired.error.code))summary.notEligible++;
                 else{summary.failed++;console.warn("Futures LIMIT expiry RPC failed",{orderId:order.order_id,code:expired.error.code||"unknown"});}
               }else if(expired.data?.status==="EXPIRED"&&!expired.data.idempotent_replay)summary.expired++;
               else summary.notEligible++;
+              continue;
+            }
+            if(!sessionOpen){
+              summary.notEligible++;
               continue;
             }
             const instrument=instruments.find(item=>item?.instrument_key===order.instrument_key);
