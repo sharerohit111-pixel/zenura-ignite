@@ -23,6 +23,7 @@ const {loadVerifiedExchangeSession}=require("./lib/exchange-session-calendar");
 const {buildPortfolioValuation}=require("./lib/paper-portfolio-valuation");
 const {calculateDerivativePortfolio}=require("./lib/derivative-portfolio");
 const {validateDerivativeContract,normalizeTickSizePaise}=require("./lib/derivative-contract");
+const {resolveNseOptionMarketExecution}=require("./lib/option-market-execution");
 const {validateOptionLimitOrder,evaluateOptionLimitQuote}=require("./lib/option-limit-policy");
 const {parseMarginPreviewInput}=require("./lib/margin-preview-input");
 const {normalizeUpstoxMarginResponse}=require("./lib/upstox-margin");
@@ -717,8 +718,8 @@ app.post("/paper/derivative/orders",async(req,res)=>{
     if(!isUuid(idempotencyKey))return res.status(400).json({error:"A valid UUID idempotency_key is required."});
     if(!["BUY","SELL"].includes(side))return res.status(400).json({error:"Only BUY and SELL to close existing long CE/PE positions are supported."});
     if(!instrumentCache.length||Date.now()-instrumentCacheUpdatedAt>6*60*60*1000)await refreshInstrumentCache();
-    const instrument=instrumentCache.find(x=>x.instrument_key===instrumentKey&&["CE","PE"].includes(x.instrument_type)&&["NSE_FO","BSE_FO"].includes(x.segment));
-    if(!instrument)return res.status(400).json({error:"Select a verified NSE/BSE CE/PE contract from the official instrument master."});
+    const instrument=instrumentCache.find(x=>x.instrument_key===instrumentKey&&x.exchange==="NSE"&&x.segment==="NSE_FO"&&["CE","PE"].includes(x.instrument_type));
+    if(!instrument)return res.status(400).json({error:"Select a verified NSE CE/PE contract from the official instrument master."});
     // Resolve contract identity and idempotency before requiring a live quote.
     const metadata=validateDerivativeContract(instrument,{lots,pricePaise:normalizeTickSizePaise(instrument.tick_size),now:Date.now()});
     const orderId=makeOrderId(user.id,idempotencyKey),fingerprint=makeOrderFingerprint({instrumentKey,side,quantity:metadata.quantity});
@@ -735,22 +736,25 @@ app.post("/paper/derivative/orders",async(req,res)=>{
         realizedPnlPaise:prior.realized_pnl_paise??0,idempotentReplay:true,simulationOnly:true,excludesCharges:false
       });
     }
-    const {token}=await getUpstoxAccessToken(user.id),{quote}=await getQuote(token,instrumentKey);
-    const normalized=normalizeProviderQuote(quote,instrumentKey,{maxAgeMs:15000});
-    const contract=validateDerivativeContract(instrument,{lots,pricePaise:normalized.pricePaise,now:Date.now()});
+    const {token}=await getUpstoxAccessToken(user.id),{payload:quotePayload}=await getQuote(token,instrumentKey);
+    const quoteNowMs=Date.now();
+    const executable=resolveNseOptionMarketExecution(quotePayload,instrument,{
+      side,quantity:metadata.quantity,nowMs:quoteNowMs,maxAgeMs:15000
+    });
+    const contract=validateDerivativeContract(instrument,{lots,pricePaise:executable.pricePaise,now:quoteNowMs});
     const result=await runtime.callUserRpc(user,"execute_paper_long_option_order",{
       p_order_id:orderId,p_idempotency_key:idempotencyKey,p_request_fingerprint:fingerprint,
       p_instrument_key:instrumentKey,p_trading_symbol:instrument.trading_symbol,p_exchange:instrument.exchange,
       p_segment:instrument.segment,p_instrument_type:instrument.instrument_type,p_expiry:contract.expiry,
       p_strike_price:instrument.strike_price,p_lot_size:contract.lotSize,p_tick_size_paise:contract.tickSizePaise,
-      p_lots:lots,p_side:side,p_execution_price_paise:normalized.pricePaise,
-      p_quote_timestamp_ms:normalized.tradeTimeMs,p_now_ms:Date.now()
+      p_lots:lots,p_side:side,p_execution_price_paise:executable.pricePaise,
+      p_quote_timestamp_ms:executable.quoteTimestampMs,p_now_ms:quoteNowMs
     });
     const order=result?.order||{};
     res.set("Cache-Control","private, no-store").status(result?.idempotent_replay?200:201).json({
       orderId:result?.order_id||orderId,tradingSymbol:order.trading_symbol||instrument.trading_symbol,
       instrumentKey,side,quantity:order.quantity??contract.quantity,lots,
-      executionPricePaise:order.execution_price_paise??normalized.pricePaise,
+      executionPricePaise:order.execution_price_paise??executable.pricePaise,
       grossPaise:order.gross_paise??null,chargesPaise:order.charges_paise??0,
       totalDebitPaise:order.total_debit_paise??null,netCreditPaise:order.net_credit_paise??null,
       cashPaise:result?.cash_paise??null,realizedPnlPaise:result?.realized_pnl_paise??0,
