@@ -160,3 +160,11 @@ Therefore:
 - Chat 3 confirmation remains required for close reservation release, pending-to-filled margin transfer and prevention of post-expiry fills. Chat 7 confirmation remains required for shared account lock order and cross-derivative margin conservation.
 
 This follow-up is an audit/documentation correction only; no SQL or runtime code was changed.
+
+
+Additional PR #89 submit/release audit:
+- `submit_paper_futures_limit_order` locks account → existing idempotency/order row (if replay) → matching position. For a new opening LIMIT it increases `paper_accounts.reserved_margin_paise` and stores the same opening reservation on the order; for a close-only LIMIT it increments `paper_futures_positions.reserved_close_quantity` and reserves no opening margin.
+- `_release_paper_futures_limit_order` resolves owner, then locks account → order → position (only when a close-quantity release is required). It releases the order's exact remaining opening-margin reservation from the account and separately releases the order's exact remaining close quantity from the position. Replays of terminal orders return zero releases.
+- `cancel_paper_futures_limit_order` performs an owner pre-read and delegates to that shared release primitive. `expire_paper_futures_limit_order` delegates to the same primitive.
+- Therefore the currently observed PR #89 LIMIT lifecycle has a consistent account-first ordering; order and position lock order differs only by operation and conditional close-reservation handling. The LIMIT fill checks the fill replay after the order lock and before position lock.
+- This audit covers the PR #89 LIMIT RPCs only. It does not establish the lock order of legacy MARKET submit/fill/cancel, PR #93 worker lease acquisition/renewal, or any Chat 7 shared Options RPC. Those remain explicit audit/approval gates.
