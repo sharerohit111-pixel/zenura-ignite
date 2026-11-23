@@ -48,3 +48,12 @@ A separate Options development branch contains a broader derivative lease-key mi
 ## Safety boundary
 
 The worker remains disabled unless its explicit environment flag is enabled; submission is separately gated. This change does not enable either flag. No production Supabase migration or Cloud Run deployment was run. Equity, Options and Crypto execution source files are not changed by this work.
+
+
+## Additional worker lease finding (follow-up source review)
+
+The Futures LIMIT worker currently acquires a 240-second lease and releases it in a `finally` block, but the worker lease RPC pair exposes only acquire/release; there is no owner-checked renewal RPC wired into this worker. The gateway's process-local `workerBusy` guard prevents overlapping cycles only inside one process and does not protect against a second gateway instance acquiring the lease after TTL expiry while the first cycle is still running.
+
+The existing generic `createLeaseHeartbeat` helper is used for a different market-stream lease and cannot safely renew this worker lease because the market-worker SQL API has no renewal operation. Do not reuse the stream renewal RPC or extend shared worker lease functions in this isolated Futures change without coordination with the Options/other worker branches: the lease functions and allowlist are shared infrastructure, and the Options branch already has an overlapping migration.
+
+**Required before enabling the Futures worker in a multi-instance deployment:** coordinate a service-role-only, owner-token-checked market-worker lease renewal RPC (including TTL and safe timestamp validation), reconcile the Futures/Options allowlists into one migration, add lease-loss handling that stops new fills, and test renewal-vs-expiry/reacquisition races in disposable PostgreSQL. Until then, keep `PAPER_FUTURES_LIMIT_WORKER_ENABLED` disabled in multi-instance environments. The current 240-second TTL is not proof of safe long-running ownership.
