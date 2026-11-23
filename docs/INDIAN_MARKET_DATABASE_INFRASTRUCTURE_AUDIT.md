@@ -187,3 +187,16 @@ The design specifies in-transaction fill insertion and matching cash-ledger entr
 Cancellation/rejection reservation-release ledger entries are explicitly out of scope for this fill-integration step and need a separate cancel/reject RPC integration review.
 
 No settlement RPC was modified in this step. No active migration was created, no disposable PostgreSQL integration tests were run, and production/Crypto remain unchanged.
+
+
+## Equity atomic fill/ledger draft implementation (2026-11-23)
+
+Created draft-only additive RPC replacement SQL:
+- `supabase/drafts/indian_equity_atomic_fill_ledger_integration.sql`
+- `supabase/drafts/indian_equity_atomic_fill_ledger_integration.down.sql` (disposable environment only)
+
+The draft replaces the existing full-fill definitions for MARKET, Delivery LIMIT, and Intraday LIMIT without changing their signatures. It retains existing settlement logic and adds one fill plus the appropriate cash-ledger events inside the same RPC transaction. LIMIT BUY records TRADE_DEBIT and RESERVATION_CONSUME separately; LIMIT SELL records TRADE_CREDIT; MARKET records one trade event. Stable execution ID is order-scoped. RPC responses include fill_id, and replay branches attempt to return the already-created fill_id.
+
+Static checks: all three signatures match the source definitions; all retain SECURITY DEFINER and empty/fixed search_path; each has one fill insert; each LIMIT function has trade and conditional reservation ledger insert sites; MARKET has one trade ledger insert.
+
+No SQL parser, disposable PostgreSQL, Supabase local test database, or pgTAP execution was available. Therefore SQL compilation and all runtime behavior remain unverified. The draft has not been promoted into `supabase/migrations/`, and no production DDL or RPC was changed. Do not merge/deploy until compilation, migration replay, replay/idempotency, concurrent workers, forced rollback, and tenant-FK regression tests pass.
