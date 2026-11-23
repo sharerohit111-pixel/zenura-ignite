@@ -438,11 +438,21 @@ async function runLimitWorker({maxOrders=5}={}) {
 
 const workerIntervalMs=Math.min(Math.max(Number(process.env.CRYPTO_LIMIT_WORKER_INTERVAL_MS||5000),1000),60000);
 let workerTimer=null;
+// Avoid repeatedly hitting the database lease while a slow provider-bound cycle is still running.
+function createSingleFlightTask(task) {
+  let running=false;
+  return async(...args)=>{
+    if(running) return false;
+    running=true;
+    try { await task(...args); return true; }
+    finally { running=false; }
+  };
+}
 async function start() {
   const host=process.env.HOST||"0.0.0.0";
   const server=app.listen(PORT,host,()=>console.log("ZENURA Crypto paper gateway listening on "+PORT));
   if (process.env.CRYPTO_LIMIT_WORKER_ENABLED==="true") {
-    const tick=async()=>{try{const result=await runLimitWorker();if(result.scanned||result.riskScanned)console.log("Crypto paper worker cycle",result);}catch(e){console.error("Crypto paper worker cycle failed:",e.message);}};
+    const tick=createSingleFlightTask(async()=>{try{const result=await runLimitWorker();if(result.scanned||result.riskScanned)console.log("Crypto paper worker cycle",result);}catch(e){console.error("Crypto paper worker cycle failed:",e.message);}});
     await tick(); workerTimer=setInterval(tick,workerIntervalMs); workerTimer.unref?.();
   }
   const shutdown=()=>{if(workerTimer)clearInterval(workerTimer);server.close(()=>process.exit(0));};
@@ -459,4 +469,4 @@ app.use((error, _req, res, next) => {
 });
 
 if(require.main===module) start().catch(error=>{console.error("Crypto gateway startup failed:",error.message);process.exit(1);});
-module.exports={app,runLimitWorker,releaseWorkerLeaseSafely,rotateRiskPlanSafely,validateOrderInput,validateRiskPlanInput,isFreshCryptoQuote,getRiskPlanTrigger,makeOrderId,createRateLimiter,isUuid};
+module.exports={app,runLimitWorker,createSingleFlightTask,releaseWorkerLeaseSafely,rotateRiskPlanSafely,validateOrderInput,validateRiskPlanInput,isFreshCryptoQuote,getRiskPlanTrigger,makeOrderId,createRateLimiter,isUuid};
