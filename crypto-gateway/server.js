@@ -193,7 +193,8 @@ app.post("/crypto/limit-orders/:orderId/cancel", async(req,res) => {
   } catch(e) { sendError(res,e,"Crypto LIMIT order could not be cancelled."); }
 });
 
-async function runLimitWorker({maxOrders=50}={}) {
+// Keep a batch comfortably below the 120-second lease even when provider calls time out.
+async function runLimitWorker({maxOrders=10}={}) {
   if (!Number.isInteger(maxOrders)||maxOrders<1||maxOrders>100) throw new TypeError("Invalid Crypto LIMIT worker batch size.");
   const leaseToken=crypto.randomUUID(), now=Date.now();
   const lease=await serviceDb.rpc("acquire_paper_crypto_limit_worker_lease",{p_lease_token:leaseToken,p_now_ms:now,p_ttl_ms:120000});
