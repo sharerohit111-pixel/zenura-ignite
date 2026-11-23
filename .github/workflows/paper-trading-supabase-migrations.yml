@@ -43,6 +43,7 @@ on:
   push:
     branches:
       - integration/supabase-native-auth-professional-launch-2026-11-22
+      - feature/nse-equity-accounting-engine-2026-11-23
 
   workflow_dispatch:
 
