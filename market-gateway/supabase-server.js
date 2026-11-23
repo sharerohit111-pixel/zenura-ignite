@@ -1208,6 +1208,7 @@ async function runPaperLimitWorker({maxOrders=50}={}){
     const groups=[...groupOrdersByUser(orders).entries()];
     const processUserOrders=async([userId,userOrders])=>{
       if(getUpstoxUserCooldown(userId)){summary.failed+=userOrders.length;return;}
+      let providerHealthy=false;
       try{
         const validOrders=userOrders.filter(order=>{
           const item=instrumentCache.find(x=>x.instrument_key===order.instrument_key);
@@ -1221,6 +1222,7 @@ async function runPaperLimitWorker({maxOrders=50}={}){
         const response=await fetchProvider(url,{headers:{Authorization:"Bearer "+token,Accept:"application/json"}});
         const payload=await readProviderJson(response);
         if(!response.ok)throw upstoxHttpError(response);
+        providerHealthy=true;
         clearUpstoxUserCooldown(userId);
         const entries=Object.values(payload?.data||{});
         for(const order of validOrders){
@@ -1243,7 +1245,7 @@ async function runPaperLimitWorker({maxOrders=50}={}){
         }
         summary.notEligible+=userOrders.length-validOrders.length;
       }catch(error){
-        recordUpstoxUserFailure(userId,error);
+        if(!providerHealthy)recordUpstoxUserFailure(userId,error);
         summary.failed+=userOrders.length;
         console.warn("Paper LIMIT user batch skipped",{userId,errorName:error?.name||"Error",status:error?.status||500});
       }
