@@ -84,7 +84,7 @@ FILL_PID=$!
 wait_for_terminal_update_lock "execute_paper_equity_protective_fill"
 psql -v ON_ERROR_STOP=1 <<SQL
 SET ROLE authenticated;
-SELECT set_config('request.jwt.claims','{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated"}',false);
+SELECT set_config('request.jwt.claims','{"sub":"$USER_ID","role":"authenticated"}',false);
 DO \$cancel_after_fill\$
 DECLARE v_result jsonb;
 BEGIN
@@ -103,7 +103,7 @@ wait "$FILL_PID"
 # Cancellation takes the row lock first. A waiting fill must reject the CANCELLED order.
 psql -v ON_ERROR_STOP=1 <<SQL >/tmp/zenura-protective-cancel-wins.log 2>&1 &
 SET ROLE authenticated;
-SELECT set_config('request.jwt.claims','{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated"}',false);
+SELECT set_config('request.jwt.claims','{"sub":"$USER_ID","role":"authenticated"}',false);
 SELECT public.cancel_paper_protective_order(
  '$ORDER_CANCEL','$USER_ID'
 );
