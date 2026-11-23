@@ -11,7 +11,7 @@ const route=server.slice(start,end);
 
 test("Futures MARKET and LIMIT execution accept only NSE_FO contracts",()=>{
   assert.ok(start>=0&&end>start,"dedicated Futures order route must exist");
-  assert.match(route,/instrument\.exchange==="NSE"&&instrument\.segment==="NSE_FO"/);
+  assert.match(route,/x\.exchange==="NSE"&&x\.segment==="NSE_FO"/);
   assert.doesNotMatch(route,/\["NSE_FO","BSE_FO"\]\.includes\(x\.segment\)/);
   assert.match(route,/Futures LIMIT currently supports NSE contracts only/);
 });
