@@ -4,7 +4,7 @@ const { evaluateDerivativeLimitQuote } = require("./derivative-limit-quote-polic
 
 function toSafeTimestamp(value) {
   if (!(typeof value === "string" || typeof value === "number") ||
-      !/^\\d{1,16}$/.test(String(value))) return null;
+      !/^\d{1,16}$/.test(String(value))) return null;
   const timestamp = Number(value);
   return Number.isSafeInteger(timestamp) && timestamp > 0 ? timestamp : null;
 }
