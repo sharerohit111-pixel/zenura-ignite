@@ -28,8 +28,8 @@ test("rejects expired or malformed contracts using exchange-local expiry cutoff"
  assert.throws(()=>validateDerivativeContract({...option(),expiry:"2026-11-17"},{lots:1,pricePaise:1250,now}),/Expired/);
  assert.throws(()=>validateDerivativeContract({...option(),expiry:"2026-02-30"},{lots:1,pricePaise:1250,now}));
  const expiryClose=Date.UTC(2026,10,26,10,0);
- assert.equal(validateDerivativeContract(option(),{lots:1,pricePaise:1250,now:expiryClose}).quantity,65);
- assert.throws(()=>validateDerivativeContract(option(),{lots:1,pricePaise:1250,now:expiryClose+1}),/Expired/);
+ assert.equal(validateDerivativeContract(option(),{lots:1,pricePaise:1250,now:expiryClose-1}).quantity,65);
+ assert.throws(()=>validateDerivativeContract(option(),{lots:1,pricePaise:1250,now:expiryClose}),/Expired/);
 });
 test("requires valid option strike and clean futures strike",()=>{
  assert.throws(()=>validateDerivativeContract({...option(),strike_price:0},{lots:1,pricePaise:1250,now}),/strike/);
