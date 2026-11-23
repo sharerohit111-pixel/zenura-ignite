@@ -105,6 +105,9 @@ jobs:
       - name: Exercise fee-inclusive MARKET settlement with integrated fill ledger
         run: psql -v ON_ERROR_STOP=1 -f supabase/tests/equity_market_fee_settlement.sql
 
+      - name: Exercise Delivery LIMIT fill, ledger replay and atomic rollback
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/equity_delivery_limit_fill_ledger.sql
+
       - name: Seed disposable Intraday LIMIT test account
         run: |
           psql -v ON_ERROR_STOP=1 <<'SQL'
