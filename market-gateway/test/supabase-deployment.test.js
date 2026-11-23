@@ -193,3 +193,11 @@ test("API error logs are structured and exclude raw error messages",()=>{
  assert.ok(logCall.length>0,"structured error log must be emitted");
  assert.doesNotMatch(logCall,/error\.message/);
 });
+
+test("Request correlation IDs are attached before JSON parsing and exposed to browser clients",()=>{
+ const requestIdMiddleware=server.indexOf('const requestId=crypto.randomUUID()');
+ const jsonParser=server.indexOf('app.use(express.json({limit:"32kb"}))');
+ assert.ok(requestIdMiddleware>=0&&jsonParser>requestIdMiddleware,
+  "request ID middleware must run before body parsing can reject malformed JSON");
+ assert.match(server,/Access-Control-Expose-Headers","Retry-After, X-Request-Id"/);
+});
