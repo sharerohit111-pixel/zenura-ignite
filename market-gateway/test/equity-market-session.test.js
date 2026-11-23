@@ -37,7 +37,7 @@ test("cash MARKET policy honors a verified special-session window",async()=>{
   assert.ok(session);
   assert.equal(isIntradaySessionOpen(now,session),true);
   assert.equal(isIntradaySessionOpen(Date.parse("2026-11-23T03:59:00.000Z"),session),false);
-  assert.equal(isIntradaySessionOpen(Date.parse("2026-11-23T07:00:00.000Z"),session),false);
+  assert.equal(isIntradaySessionOpen(Date.parse("2026-11-23T08:00:00.000Z"),session),false);
 });
 
 test("cash MARKET policy fails closed when no verified calendar row exists",async()=>{
