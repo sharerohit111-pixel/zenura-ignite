@@ -289,3 +289,34 @@ The repository deployment workflow contains a manual production deployment path 
 - Full request/response schema matrix and end-to-end authenticated route execution: pending.
 - Malformed JSON parser handling and source-level regression assertion: committed; CI execution pending.
 - No SQL, migration, RLS, RPC or shared database changes were made.
+
+## 15. Worker retry boundaries and cursor persistence review (2026-11-23)
+
+### Confirmed behavior
+
+- All five worker loops use a process-local `workerBusy` guard and bounded exponential backoff after cycle-level exceptions. The Delivery LIMIT loop caps backoff at 30 seconds; Intraday, Futures, Options and Protective loops cap at 60 seconds. These controls prevent overlap only inside one Node.js process; the database lease remains the cross-instance coordination boundary.
+- The lease heartbeat helper is imported and used by the SSE market-stream lifecycle, not by any of the five order/protective workers. Its unit tests prove helper behavior only; they do not prove order-worker renewal.
+- Intraday, Futures and Options workers advance their persisted keyset cursor to the last row in the scanned batch after processing, including when individual user batches or fill attempts have incremented `summary.failed`. A failed row is therefore retried only after the cursor wraps and the next scan starts from the beginning; it is not immediately retried on the next cycle.
+- The three cursor-based derivative/equity LIMIT workers reset the cursor when a scan after the current cursor returns no rows. Cursor writes and resets filter by both `state_key` and the current `lease_token`, so a stale token cannot overwrite a replacement owner's cursor.
+- The cursor update checks the PostgREST `error` field but does not request/verify an affected-row count. A zero-row update caused by a lost lease can therefore look like a successful save to the old worker. This does not itself overwrite the new cursor, but it does not stop the stale worker from continuing to attempt per-order execution RPCs.
+- The Protective worker uses `worker_checked_at` ordering rather than a persisted keyset cursor. It updates that timestamp after evaluation and attempts to rotate invalid or failed user batches. If the timestamp update itself fails for the first rows in the ordered batch, those rows can remain at the head of the scan and repeatedly consume the bounded batch, delaying later protective orders.
+- Per-user worker errors are caught and summarized; retries are scan-driven rather than backed by a durable attempt counter/dead-letter state. There is no general durable retry schedule, maximum-attempt policy or operator-visible poison-order queue in the inspected worker modules.
+
+### Reliability implications
+
+1. **Retry latency is scan-cycle dependent:** a transient provider/token/fill error can be delayed until a complete cursor wrap, particularly with a large pending-order population. This is not permanent loss, but it is not a prompt retry guarantee.
+2. **Lease-loss handling is incomplete at the worker layer:** token-guarded cursor writes protect persisted progress, but workers do not heartbeat and do not consistently detect a zero-row cursor update as lease loss before attempting more work.
+3. **Execution fencing remains a database contract:** worker-side lease ownership is not passed as a fencing token to the inspected fill/expiry RPC calls. Each RPC must independently lock/validate current order state and enforce idempotent, reservation-safe transitions. A stale worker must never be able to mutate a terminal order or double-apply a fill.
+4. **Protective scan fairness depends on successful rotation:** failed `worker_checked_at` writes can cause head-of-scan repetition. Add a deterministic test for this failure mode before claiming starvation resistance.
+5. **Cycle-level exponential backoff is not per-order retry policy:** it handles thrown cycle failures, but individual per-user errors are summarized and the cycle can still complete and advance its cursor.
+
+### Required follow-up (no implementation authorized by this audit)
+
+- Add a deterministic test where one row fails processing, later rows succeed, the cursor advances, and the failed row is retried after wrap; document the maximum expected retry delay under realistic pending-order volume.
+- Add tests where a cursor update returns no error but affects zero rows; treat this as lease loss and stop the stale worker before any subsequent execution RPC. Coordinate any needed PostgREST representation/count contract with Chat 7 if the database contract must change.
+- Add lease-expiry takeover and stale-worker tests that attempt both cursor persistence and execution after a replacement owner claims the key.
+- Add protective-worker tests where `worker_checked_at` updates fail repeatedly; ensure one bad row cannot permanently monopolize the bounded scan.
+- Define durable retry classification for transient provider/auth/network failures versus permanent validation/terminal-state failures. Avoid unbounded hot retries and do not retry an execution with a changed idempotency identity.
+- Evaluate a bounded per-order attempt/backoff or dead-letter mechanism only after agreeing its schema and RPC ownership with Chat 7. No migration is included here.
+
+**Decision:** source audit and documentation only. No worker implementation, lease RPC, cursor schema, SQL migration, environment setting, activation or deployment was changed.
