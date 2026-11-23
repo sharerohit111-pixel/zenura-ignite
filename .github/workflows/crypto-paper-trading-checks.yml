@@ -76,6 +76,8 @@ jobs:
         run: psql -v ON_ERROR_STOP=1 -f supabase/tests/crypto_limit_buy_reservation.sql
       - name: Verify Crypto LIMIT worker lease expiry and stale-token safety
         run: psql -v ON_ERROR_STOP=1 -f supabase/tests/crypto_limit_worker_lease.sql
+      - name: Verify Crypto LIMIT BUY reservation survives FX drift
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/crypto_limit_fx_reservation_guard.sql
       - name: Check Crypto browser module syntax
         run: |
           node --input-type=module --check < crypto/supabase-client.js
