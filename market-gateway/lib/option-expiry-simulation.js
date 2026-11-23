@@ -4,7 +4,7 @@
 // Physical settlement and unverified settlement-price sources are deliberately blocked.
 function simulateLongIndexOptionExpiry({
   position,contract,settlementPricePaise,settlementDate,
-  settlementSource,settlementSourceSha256,verifiedAtMs,nowMs=Date.now()
+  settlementSource,settlementSourceSha256,settlementTimestampMs,verifiedAtMs,nowMs=Date.now()
 }){
   const fail=(message,status=422)=>{throw Object.assign(new Error(message),{status});};
   const safe=(v,min=0)=>Number.isSafeInteger(v)&&v>=min;
@@ -14,8 +14,10 @@ function simulateLongIndexOptionExpiry({
   if(position.instrumentKey!==contract.instrumentKey||position.instrumentType!==contract.instrumentType||position.expiry!==contract.expiryDate)fail("Position and expiry contract metadata do not match.",409);
   if(!safe(position.netQuantity,1)||position.netQuantity>1000000||!safe(position.costBasisPaise,1))fail("Only a valid existing long option position with fee-inclusive cost basis can be simulated.",409);
   if(!safe(contract.strikePricePaise,1)||!safe(settlementPricePaise,0))fail("Strike and official settlement prices must be integer paise.");
-  if(!safe(nowMs,1)||!safe(verifiedAtMs,1)||verifiedAtMs>nowMs)fail("Settlement price verification timestamp is invalid.");
+  if(!safe(nowMs,1)||!safe(verifiedAtMs,1)||verifiedAtMs>nowMs||!safe(settlementTimestampMs,1)||settlementTimestampMs>verifiedAtMs)fail("Settlement price verification timestamp is invalid.");
   if(settlementDate!==contract.expiryDate)fail("Settlement price must belong to the contract expiry date.");
+  const sourceDate=new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Kolkata",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date(settlementTimestampMs));
+  if(sourceDate!==settlementDate)fail("Settlement price timestamp does not belong to the contract expiry date.");
   if(typeof settlementSource!=="string"||!/^https:\/\/(?:[a-z0-9-]+\.)*nseindia\.com\//i.test(settlementSource))fail("An official NSE settlement-price source is required.");
   if(typeof settlementSourceSha256!=="string"||! /^[a-f0-9]{64}$/.test(settlementSourceSha256))fail("A verified SHA-256 digest for the settlement source is required.");
   const intrinsic=contract.instrumentType==="CE"
@@ -31,7 +33,7 @@ function simulateLongIndexOptionExpiry({
     feeInclusiveEntryCostBasisPaise:position.costBasisPaise,
     grossPnlBeforeSettlementChargesPaise:payout-position.costBasisPaise,
     settlementChargesPaise:null,netRealizedPnlPaise:null,
-    settlementSource,settlementSourceSha256,settlementDate,
+    settlementSource,settlementSourceSha256,settlementTimestampMs,verifiedAtMs,settlementDate,
     simulationOnly:true,ledgerPostingAllowed:false,
     note:"Indicative payoff only. No ledger posting; verify the applicable settlement charge schedule before calculating net realized P&L."
   });
