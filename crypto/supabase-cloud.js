@@ -101,9 +101,9 @@ async function saveRiskPlan({ symbol, quantity, stopLossPrice = null, takeProfit
   if (takeProfitPrice != null && takeProfitPrice !== 0 && (!Number.isFinite(takeProfitPrice) || takeProfitPrice <= 0)) throw new Error("Invalid target price.");
   if (stopLossPrice > 0 && takeProfitPrice > 0 && stopLossPrice >= takeProfitPrice) throw new Error("Stop loss must be below target.");
   const result = await api("/crypto/risk-plans", { method: "POST", body: {
-    symbol, quantity: quantity.toFixed(12).replace(/0+$/, "").replace(/\\.$/, ""),
-    stop_loss_price: stopLossPrice > 0 ? stopLossPrice.toFixed(8).replace(/0+$/, "").replace(/\\.$/, "") : null,
-    take_profit_price: takeProfitPrice > 0 ? takeProfitPrice.toFixed(8).replace(/0+$/, "").replace(/\\.$/, "") : null,
+    symbol, quantity: quantity.toFixed(12).replace(/0+$/, "").replace(/\.$/, ""),
+    stop_loss_price: stopLossPrice > 0 ? stopLossPrice.toFixed(8).replace(/0+$/, "").replace(/\.$/, "") : null,
+    take_profit_price: takeProfitPrice > 0 ? takeProfitPrice.toFixed(8).replace(/0+$/, "").replace(/\.$/, "") : null,
     idempotency_key: crypto.randomUUID()
   }});
   await load();
