@@ -154,3 +154,34 @@ No settlement posting code or migration until all gates are signed off:
 6. Staging parity and explicit user approval are obtained.
 
 Until then, keep the current non-posting simulator unchanged: `settlementChargesPaise=null`, `netRealizedPnlPaise=null`, and `ledgerPostingAllowed=false`.
+
+
+## 10. Regulatory charge-source audit (checked 2026-11-23)
+
+This section records source findings, not an authorization to post charges.
+
+### Verified statutory item
+
+- **STT on exercise:** NSE's STT computation page, updated 2026-04-01, states that sale of an option where the option is exercised attracts **0.15%**, payable by the purchaser, calculated on intrinsic value. It also says STT is levied on the settlement price on the exercise day when the contract is ITM, and its exercise report contains taxable exercise value and STT at client/contract level.
+- NSE Finance & Accounts Circular **NSE/FATAX/73524, dated 2026-03-31**, confirms Finance Act 2026 revised the exercised-option rate from 0.125% to 0.15%, effective **2026-04-01**.
+- For this simulator's cash-settled index option, the charge candidate is therefore:
+  `exercise_stt_paise = round_by_verified_exchange_rule(intrinsic_value_paise × 0.0015)`.
+  The exact rounding/aggregation method must still be taken from authoritative exchange/clearing specifications or actual exercise reports; do not assume per-unit versus contract/client aggregation rounding.
+
+Official sources:
+- NSE STT computation: https://www.nseindia.in/static/products-services/equity-derivatives-securities-transaction-tax
+- NSE Circular NSE/FATAX/73524: https://nsearchives.nseindia.com/content/circulars/FATAX73524.pdf
+- NSE SEBI turnover fees, STT and other levies: https://www.nseindia.com/static/invest/first-time-investor-sebi-turnover-fees-stt-other-levies
+- Finance Act 2026 / Budget memorandum: https://www.indiabudget.gov.in/doc/memo.pdf
+
+### Items not yet approved for the expiry charge schedule
+
+- **Stamp duty:** NSE's general levy page lists equity options at 0.003% payable by the buyer, but the cited public page does not sufficiently establish the taxable base and whether an automatic cash-settled expiry exercise event is assessed on premium, intrinsic value, or attracts a separate amount. Do not apply 0.003% to intrinsic payout by assumption.
+- **SEBI turnover fee:** NSE lists 0.0001% (₹10 per crore) for sale and purchase transactions in securities other than debt. The public summary does not settle the treatment/base/rounding for automatic expiry exercise specifically. Do not include it in expiry charges until exercise-specific applicability and taxable value are confirmed.
+- **Exchange transaction/clearing charges:** No sufficiently authoritative exercise-specific schedule was established in this pass. Ordinary option trade transaction charges must not be copied onto expiry exercise without proof.
+- **GST:** NSE's general page lists 18% GST on stock-broker services, payable by brokers and collected from clients. That does not establish GST on intrinsic settlement value. Only a verified taxable brokerage/service fee may carry GST; do not calculate GST on the cash settlement payout.
+- **Brokerage and other broker fees:** These are broker-plan/service-specific and no universal expiry-exercise brokerage amount was verified. Keep absent unless a configured, evidenced broker schedule explicitly applies.
+
+### Release decision
+
+The **STT rate and base are confirmed**, but the complete charge schedule, exercise-specific rounding, and any other applicable component are not. Consequently the overall expiry charge schedule remains **unverified**, `settlementChargesPaise` and `netRealizedPnlPaise` must remain null, and `ledgerPostingAllowed` must remain false. Obtain NSE Clearing/clearing-member exercise reports or a current official exercise-specific charge specification before implementing charge posting.
