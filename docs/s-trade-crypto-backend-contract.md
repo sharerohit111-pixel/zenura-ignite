@@ -80,3 +80,15 @@ No production database migration has been applied and no gateway deployment has 
 - Added `supabase/tests/crypto_limit_full_exit_reservation.sql` to verify fill status, final cash, realized P&L, position removal and both ledger entries.
 - Added `.github/workflows/crypto-paper-trading-checks.yml`, which applies only Crypto migrations to a disposable PostgreSQL 16 service and runs the Crypto-specific regression plus browser-module syntax/isolation checks. This workflow does not connect to the production Supabase project or deploy anything.
 - Static JavaScript parsing was checked for all three inline scripts and the three Crypto ES modules; all parsed successfully. PostgreSQL execution has not yet been run in this environment.
+
+
+## Dedicated Crypto gateway — 2026-11-23
+- Added `crypto-gateway/server.js`, a standalone Node.js 22 service exposing only Crypto paper account, portfolio, MARKET order, LIMIT order, cancellation and health routes. It has no import from `market-gateway`, no Upstox dependency, and no NSE/BSE endpoints.
+- The gateway verifies Supabase access tokens server-side, uses a server-only service-role client for allowlisted Crypto RPCs, and uses a user-token client for RLS-scoped portfolio reads.
+- It obtains fresh Binance Spot trade quotes and a USD/INR reference rate on the server; browser-supplied execution prices and fees are not accepted.
+- LIMIT processing uses the Crypto-specific leased worker. It remains disabled by default until an isolated staging Supabase environment has the reviewed Crypto migrations.
+- Added gateway validation tests and included them in the Crypto CI workflow.
+- GitHub Draft PR #85 opened against `main`; it is not merged. The clean branch remains 19 files changed at the PR snapshot, with additional follow-up commits since opening.
+- CI run `45103907133` completed successfully: Crypto migrations applied to disposable PostgreSQL 16, full-position LIMIT SELL regression passed, browser modules parsed, gateway tests passed, and Crypto/Indian Market client isolation check passed.
+- A previous CI attempt failed because the new gateway package did not yet define an npm test script; the package and workflow were corrected and the later run passed.
+- No production Supabase changes, secrets, gateway hosting, or deployment were performed. Live Supabase currently still has zero `paper_crypto_*` tables and no Supabase development branches.
