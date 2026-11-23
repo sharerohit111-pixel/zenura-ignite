@@ -84,6 +84,19 @@ BEGIN
     'source-trade-debit','TRADE_DEBIT',-10010,0,99989990,0
   ) RETURNING ledger_id INTO v_original;
 
+  -- A reversal must belong to the same user as its source event.
+  BEGIN
+    INSERT INTO public.paper_equity_cash_ledger(
+      user_id,event_key,event_type,cash_delta_paise,reserved_cash_delta_paise,
+      cash_balance_after_paise,reserved_cash_after_paise,reversal_of_ledger_id,reason
+    ) VALUES (
+      '99999999-9999-4999-9999-999999999999','wrong-owner-reversal',
+      'REVERSAL',10010,0,100000000,0,v_original,'Cross-user reversal must fail'
+    );
+    RAISE EXCEPTION 'Cross-user reversal was accepted';
+  EXCEPTION WHEN foreign_key_violation THEN NULL;
+  END;
+
   INSERT INTO public.paper_equity_cash_ledger(
     user_id,event_key,event_type,cash_delta_paise,reserved_cash_delta_paise,
     cash_balance_after_paise,reserved_cash_after_paise,reversal_of_ledger_id,reason
