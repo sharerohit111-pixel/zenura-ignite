@@ -68,3 +68,8 @@ Source review found that the Futures LIMIT worker treated every non-open session
 ## Options/Futures shared lease migration coordination
 
 The Options PR #91 migration `20261123220000_derivative_limit_worker_lease_keys.sql` already allowlists both `paper_futures_limit_orders` and `paper_option_limit_orders`, along with existing worker keys. The Futures-only migration in this branch was authored independently against its older base and is therefore a duplicate definition of the same shared RPC pair with a narrower allowlist. During integration, use one reconciled canonical migration (the combined allowlist from the coordinated Options/Futures integration) and do not apply both definitions as independent final states. This does not resolve the missing renewal RPC; that remains a multi-instance release blocker.
+
+
+## Latest disposable CI verification
+
+GitHub Actions run #1140 passed on commit `565778fdda0fdc74182e689e05b6b051dc026347`. It ran the complete market-gateway regression suite, applied ordered draft migrations to disposable PostgreSQL, and passed Futures LIMIT submit/reservation/cancel/expiry, partial-fill settlement conservation, concurrent fill/cancel/duplicate execution races, isolated Futures worker lease ownership/grants, and owner-bound worker lease renewal/expiry SQL checks. This is disposable CI evidence only; it does not authorize production migration, deployment, activation, or replace a separate two-connection renewal-vs-expiry race and staging rehearsal.
