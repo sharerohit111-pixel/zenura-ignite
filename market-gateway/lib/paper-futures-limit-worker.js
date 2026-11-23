@@ -197,7 +197,7 @@ function createPaperFuturesLimitWorker({
             if(fillsResult.error)throw new Error("Futures LIMIT execution ledger could not be read.");
             const fills=fillsResult.data||[];
             const executionId=crypto.createHash("sha256")
-              .update([order.order_id,decision.timestampMs,decision.pricePaise,decision.fillQuantity].join("|"))
+              .update([order.order_id,decision.timestampMs,decision.pricePaise,decision.fillQuantity,decision.bidPricePaise,decision.askPricePaise,decision.bidQuantity,decision.askQuantity].join("|"))
               .digest("hex");
             if(fills.some(fill=>fill.execution_id===executionId)){
               summary.notEligible++;
@@ -210,8 +210,10 @@ function createPaperFuturesLimitWorker({
             const result=await serviceDb.rpc("execute_paper_futures_limit_fill",{
               p_order_id:order.order_id,p_execution_id:executionId,
               p_fill_sequence:fillSequence,p_fill_quantity:decision.fillQuantity,
-              p_execution_price_paise:decision.pricePaise,p_charges_paise:chargesPaise,
-              p_quote_timestamp_ms:decision.timestampMs,p_now_ms:nowMs
+              p_execution_price_paise:decision.pricePaise,
+              p_bid_price_paise:decision.bidPricePaise,p_ask_price_paise:decision.askPricePaise,
+              p_bid_quantity:decision.bidQuantity,p_ask_quantity:decision.askQuantity,
+              p_charges_paise:chargesPaise,p_quote_timestamp_ms:decision.timestampMs,p_now_ms:nowMs
             });
             if(result?.error){
               if(["23514","22023","P0002"].includes(result.error.code))summary.notEligible++;
