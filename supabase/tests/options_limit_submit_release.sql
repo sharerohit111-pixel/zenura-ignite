@@ -23,6 +23,7 @@ DECLARE
   v_result jsonb;
   v_rejected boolean;
   v_reserved_cash bigint;
+  v_order_cash bigint;
   v_reserved_close integer;
   v_quantity integer;
   v_status text;
@@ -125,13 +126,13 @@ BEGIN
   SELECT reserved_cash_paise INTO v_reserved_cash
     FROM public.paper_accounts
    WHERE user_id='abababab-abab-4bab-8bab-abababababab';
-  SELECT status,reserved_cash_paise INTO v_status,v_reserved_cash
+  SELECT status,reserved_cash_paise INTO v_status,v_order_cash
     FROM public.paper_option_limit_orders WHERE order_id=repeat('9',64);
   IF v_result->>'status'<>'CANCELLED'
      OR (v_result->>'released_cash_paise')::bigint<>83646
-     OR v_status<>'PENDING' OR v_reserved_cash<>83646 THEN
+     OR v_reserved_cash<>83646 OR v_status<>'PENDING' OR v_order_cash<>83646 THEN
     RAISE EXCEPTION 'Cancelling one same-instrument BUY LIMIT order disturbed its sibling reservation: %, %, %',
-      v_result,v_status,v_reserved_cash;
+      v_result,v_status,v_order_cash;
   END IF;
   v_result:=public.cancel_paper_option_limit_order(
     'abababab-abab-4bab-8bab-abababababab',repeat('9',64)
