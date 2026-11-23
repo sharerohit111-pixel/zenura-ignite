@@ -1,12 +1,55 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-BUY_USER="c0c0c0c0-c0c0-4c0c-8c0c-c0c0c0c0c0c0"
-SELL_USER="d0d0d0d0-d0d0-4d0d-8d0d-d0d0d0d0d0d0"
-BUY_A="$(printf 'a%.0s' {1..64})"
-BUY_B="$(printf 'b%.0s' {1..64})"
-SELL_A="$(printf 'c%.0s' {1..64})"
-SELL_B="$(printf 'd%.0s' {1..64})"
+RUN_ID="$(cat /proc/sys/kernel/random/uuid)"
+BUY_USER="$RUN_ID"
+SELL_USER="$(cat /proc/sys/kernel/random/uuid)"
+BUY_A="$(printf '%s' "$RUN_ID-buy-a" | sha256sum | cut -d' ' -f1)"
+BUY_B="$(printf '%s' "$RUN_ID-buy-b" | sha256sum | cut -d' ' -f1)"
+SELL_A="$(printf '%s' "$RUN_ID-sell-a" | sha256sum | cut -d' ' -f1)"
+SELL_B="$(printf '%s' "$RUN_ID-sell-b" | sha256sum | cut -d' ' -f1)"
+BUY_KEY_A="$(cat /proc/sys/kernel/random/uuid)"
+BUY_KEY_B="$(cat /proc/sys/kernel/random/uuid)"
+SELL_KEY_A="$(cat /proc/sys/kernel/random/uuid)"
+SELL_KEY_B="$(cat /proc/sys/kernel/random/uuid)"
+BUY_FP_A="$(printf '%s' "$RUN_ID-buy-fp-a" | sha256sum | cut -d' ' -f1)"
+BUY_FP_B="$(printf '%s' "$RUN_ID-buy-fp-b" | sha256sum | cut -d' ' -f1)"
+SELL_FP_A="$(printf '%s' "$RUN_ID-sell-fp-a" | sha256sum | cut -d' ' -f1)"
+SELL_FP_B="$(printf '%s' "$RUN_ID-sell-fp-b" | sha256sum | cut -d' ' -f1)"
+SESSION_DATE="$(psql -Atqc "SELECT (clock_timestamp() AT TIME ZONE 'Asia/Kolkata')::date")"
+SESSION_SOURCE="https://www.nseindia.com/market-data/holidays?chat6-test=$RUN_ID"
+SESSION_BACKUP="$(psql -Atqc "SELECT COALESCE((SELECT to_jsonb(s)::text FROM public.paper_exchange_sessions s WHERE exchange='NSE' AND session_date='$SESSION_DATE'), '')")"
+
+cleanup() {
+  psql -v ON_ERROR_STOP=1 -v session_backup="$SESSION_BACKUP" <<SQL >/dev/null 2>&1 || true
+DROP TRIGGER IF EXISTS test_delay_option_cash_reservation ON public.paper_accounts;
+DROP TRIGGER IF EXISTS test_delay_option_close_reservation ON public.paper_derivative_positions;
+DROP FUNCTION IF EXISTS public.test_delay_option_cash_reservation();
+DROP FUNCTION IF EXISTS public.test_delay_option_close_reservation();
+DELETE FROM public.paper_option_limit_fills WHERE order_id IN ('$BUY_A','$BUY_B','$SELL_A','$SELL_B');
+DELETE FROM public.paper_option_limit_orders WHERE order_id IN ('$BUY_A','$BUY_B','$SELL_A','$SELL_B');
+DELETE FROM public.paper_derivative_positions WHERE user_id IN ('$BUY_USER','$SELL_USER');
+DELETE FROM public.paper_accounts WHERE user_id IN ('$BUY_USER','$SELL_USER');
+DELETE FROM auth.users WHERE id IN ('$BUY_USER','$SELL_USER');
+SQL
+  if [[ -n "$SESSION_BACKUP" ]]; then
+    psql -v ON_ERROR_STOP=1 -v session_backup="$SESSION_BACKUP" <<SQL >/dev/null 2>&1 || true
+INSERT INTO public.paper_exchange_sessions
+SELECT (jsonb_populate_record(NULL::public.paper_exchange_sessions, :'session_backup'::jsonb)).*
+ON CONFLICT(exchange,session_date) DO UPDATE SET
+  is_trading_day=EXCLUDED.is_trading_day,
+  open_minute=EXCLUDED.open_minute,
+  close_minute=EXCLUDED.close_minute,
+  session_kind=EXCLUDED.session_kind,
+  source_reference=EXCLUDED.source_reference,
+  verified_at=EXCLUDED.verified_at,
+  source_sha256=EXCLUDED.source_sha256;
+SQL
+  else
+    psql -v ON_ERROR_STOP=1 -c "DELETE FROM public.paper_exchange_sessions WHERE exchange='NSE' AND session_date='$SESSION_DATE' AND source_reference='$SESSION_SOURCE';" >/dev/null 2>&1 || true
+  fi
+}
+trap cleanup EXIT
 
 psql -v ON_ERROR_STOP=1 <<SQL
 INSERT INTO auth.users(id) VALUES ('$BUY_USER'),('$SELL_USER') ON CONFLICT(id) DO NOTHING;
@@ -17,12 +60,12 @@ INSERT INTO public.paper_exchange_sessions(
  session_kind,source_reference,verified_at,source_sha256
 ) VALUES (
  'NSE',(clock_timestamp() at time zone 'Asia/Kolkata')::date,
- true,0,1440,'SPECIAL','https://www.nseindia.com/market-data/holidays',
+ true,0,1440,'SPECIAL','$SESSION_SOURCE',
  clock_timestamp(),repeat('d',64)
 )
 ON CONFLICT(exchange,session_date) DO UPDATE SET
  is_trading_day=true,open_minute=0,close_minute=1440,session_kind='SPECIAL',
- source_reference='https://www.nseindia.com/market-data/holidays',
+ source_reference='$SESSION_SOURCE',
  verified_at=clock_timestamp(),source_sha256=repeat('d',64);
 
 UPDATE public.paper_accounts SET cash_paise=100000,reserved_cash_paise=0,
@@ -31,7 +74,7 @@ UPDATE public.paper_accounts SET cash_paise=100000,reserved_cash_paise=0,
 
 -- Seed the SELL race with one existing long CE lot.
 SELECT public.execute_paper_long_option_order(
- '$SELL_USER',repeat('e',64),'d0d0d0d0-0000-4000-8000-000000000001',repeat('e',64),
+ '$SELL_USER',repeat('e',64),'$SELL_KEY_A',repeat('e',64),
  'NSE_FO|OPTION_RESERVE_RACE_SELL','OPTION_RESERVE_RACE_SELL',
  'NSE','NSE_FO','CE',(clock_timestamp() at time zone 'Asia/Kolkata')::date+5,
  25000,65,5,1,'BUY',1000,
@@ -83,9 +126,9 @@ submit_sell() {
  );"
 }
 
-submit_buy "$BUY_A" "c0c0c0c0-0000-4000-8000-000000000001" "$(printf '1%.0s' {1..64})" >/tmp/options-buy-reserve-a.log 2>&1 &
+submit_buy "$BUY_A" "$BUY_KEY_A" "$BUY_FP_A" >/tmp/options-buy-reserve-a.log 2>&1 &
 P1=$!
-submit_buy "$BUY_B" "c0c0c0c0-0000-4000-8000-000000000002" "$(printf '2%.0s' {1..64})" >/tmp/options-buy-reserve-b.log 2>&1 &
+submit_buy "$BUY_B" "$BUY_KEY_B" "$BUY_FP_B" >/tmp/options-buy-reserve-b.log 2>&1 &
 P2=$!
 S1=0; S2=0
 wait "$P1" || S1=1
@@ -95,9 +138,9 @@ if [[ $((S1+S2)) -ne 1 ]]; then
  exit 1
 fi
 
-submit_sell "$SELL_A" "d0d0d0d0-0000-4000-8000-000000000001" "$(printf '3%.0s' {1..64})" >/tmp/options-sell-reserve-a.log 2>&1 &
+submit_sell "$SELL_A" "$SELL_KEY_A" "$SELL_FP_A" >/tmp/options-sell-reserve-a.log 2>&1 &
 P3=$!
-submit_sell "$SELL_B" "d0d0d0d0-0000-4000-8000-000000000002" "$(printf '4%.0s' {1..64})" >/tmp/options-sell-reserve-b.log 2>&1 &
+submit_sell "$SELL_B" "$SELL_KEY_B" "$SELL_FP_B" >/tmp/options-sell-reserve-b.log 2>&1 &
 P4=$!
 S3=0; S4=0
 wait "$P3" || S3=1
@@ -137,7 +180,7 @@ DELETE FROM public.paper_option_limit_fills WHERE order_id IN ('$BUY_A','$BUY_B'
 DELETE FROM public.paper_option_limit_orders WHERE order_id IN ('$BUY_A','$BUY_B','$SELL_A','$SELL_B');
 DELETE FROM public.paper_derivative_positions WHERE user_id IN ('$BUY_USER','$SELL_USER');
 DELETE FROM public.paper_exchange_sessions
- WHERE source_reference='https://www.nseindia.com/market-data/holidays';
+ WHERE source_reference='$SESSION_SOURCE';
 DELETE FROM public.paper_accounts WHERE user_id IN ('$BUY_USER','$SELL_USER');
 DELETE FROM auth.users WHERE id IN ('$BUY_USER','$SELL_USER');
 SQL

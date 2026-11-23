@@ -203,6 +203,8 @@ jobs:
         run: psql -v ON_ERROR_STOP=1 -f supabase/tests/options_limit_submit_release.sql
       - name: Exercise atomic NSE Options LIMIT partial/full fill accounting and reservation settlement
         run: psql -v ON_ERROR_STOP=1 -f supabase/tests/options_limit_atomic_fill.sql
+      - name: Verify repeated NSE Options LIMIT partial-close basis and P&L conservation
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/options_limit_partial_close_conservation.sql
       - name: Exercise concurrent NSE Options LIMIT fill, cancel and duplicate execution races
         run: bash supabase/tests/options_limit_fill_cancel_race.sh
       - name: Verify NSE Options LIMIT expiry preserves reservations without a verified session
