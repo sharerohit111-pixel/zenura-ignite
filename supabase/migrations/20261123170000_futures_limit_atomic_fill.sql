@@ -1,3 +1,43 @@
+-- Update the DELETE guard so only orders with live close reservations block a
+-- position deletion. The completing fill terminalizes its order in this same
+-- transaction before deleting a fully closed position.
+create or replace function public._guard_futures_close_reservation()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+begin
+  if tg_op = 'DELETE' then
+    if exists (
+      select 1 from public.paper_futures_orders o
+       where o.user_id=old.user_id
+         and o.instrument_key=old.instrument_key
+         and o.order_type='LIMIT'
+         and o.status in ('PENDING','PARTIALLY_FILLED')
+         and o.reserved_close_quantity>0
+    ) then
+      raise exception 'Futures position has active close quantity reservations.'
+        using errcode='23514';
+    end if;
+    return old;
+  end if;
+
+  if old.reserved_close_quantity > 0
+     and new.net_quantity <> 0
+     and sign(new.net_quantity) <> sign(old.net_quantity) then
+    raise exception 'Futures position cannot reverse while close quantity is reserved.'
+      using errcode='23514';
+  end if;
+
+  if new.net_quantity = 0 and new.reserved_close_quantity <> 0 then
+    raise exception 'All close reservations must be released before a Futures position is closed.'
+      using errcode='23514';
+  end if;
+  return new;
+end;
+$$;
+revoke all on function public._guard_futures_close_reservation() from public,anon,authenticated;
+
 -- Draft-only atomic Futures LIMIT partial/full fill settlement.
 -- Service-role only. No worker or order-route integration is introduced.
 
@@ -44,6 +84,7 @@ declare
   v_new_account_margin bigint;
   v_average_fill bigint;
   v_new_status text;
+  v_order_updated boolean := false;
   v_fill jsonb;
 begin
   if p_order_id is null or p_order_id !~ '^[a-f0-9]{64}$'
@@ -166,6 +207,11 @@ begin
   v_new_remaining := v_order.remaining_quantity-p_fill_quantity;
   v_signed_fill := case when v_order.side='BUY' then p_fill_quantity else -p_fill_quantity end;
   v_new_status := case when v_new_remaining=0 then 'FILLED' else 'PARTIALLY_FILLED' end;
+  v_average_fill := floor(
+    (coalesce(v_order.average_fill_price_paise,0)::numeric*v_order.filled_quantity
+      + p_execution_price_paise::numeric*p_fill_quantity)
+    /v_new_filled
+  )::bigint;
 
   select * into v_position
     from public.paper_futures_positions
@@ -224,6 +270,21 @@ begin
         raise exception 'Other Futures close reservations remain on a fully closed position.'
           using errcode='23514';
       end if;
+      -- Mark the completing order terminal before DELETE so the reservation
+      -- guard can distinguish this atomic fill from a MARKET close race.
+      update public.paper_futures_orders
+         set status=v_new_status,
+             filled_quantity=v_new_filled,
+             remaining_quantity=v_new_remaining,
+             average_fill_price_paise=v_average_fill,
+             reserved_open_margin_paise=0,
+             reserved_close_quantity=0,
+             charges_paise=charges_paise+p_charges_paise,
+             realized_pnl_paise=realized_pnl_paise+v_realized,
+             reservation_released=true,
+             updated_at=now(),filled_at=now()
+       where order_id=p_order_id;
+      v_order_updated := true;
       delete from public.paper_futures_positions
        where user_id=v_user_id and instrument_key=v_order.instrument_key;
     else
@@ -305,14 +366,9 @@ begin
      where user_id=v_user_id;
   end if;
 
-  v_average_fill := floor(
-    (coalesce(v_order.average_fill_price_paise,0)::numeric*v_order.filled_quantity
-      + p_execution_price_paise::numeric*p_fill_quantity)
-    /v_new_filled
-  )::bigint;
-
-  update public.paper_futures_orders
-     set status=v_new_status,
+  if not v_order_updated then
+    update public.paper_futures_orders
+       set status=v_new_status,
          filled_quantity=v_new_filled,
          remaining_quantity=v_new_remaining,
          average_fill_price_paise=v_average_fill,
@@ -323,8 +379,9 @@ begin
          realized_pnl_paise=realized_pnl_paise+v_realized,
          reservation_released=(v_new_remaining=0),
          updated_at=now(),
-         filled_at=case when v_new_remaining=0 then now() else filled_at end
-   where order_id=p_order_id;
+           filled_at=case when v_new_remaining=0 then now() else filled_at end
+     where order_id=p_order_id;
+  end if;
 
   insert into public.paper_futures_fills(
     order_id,user_id,execution_id,fill_sequence,quantity,
