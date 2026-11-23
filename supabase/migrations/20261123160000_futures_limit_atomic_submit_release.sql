@@ -227,6 +227,7 @@ declare
   v_close_release integer;
 begin
   if p_order_id is null or p_order_id !~ '^[a-f0-9]{64}$'
+     or p_target_status is null
      or p_target_status not in ('CANCELLED','EXPIRED') then
     raise exception 'Invalid Futures LIMIT release request.' using errcode='22023';
   end if;
