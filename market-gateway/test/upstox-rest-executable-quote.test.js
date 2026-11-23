@@ -81,7 +81,7 @@ test("rejects crossed books and malformed prices or quantities",()=>{
   assert.throws(()=>extractUpstoxRestExecutableQuote(response({bid:201.35,ask:201.30}),KEY,{nowMs:NOW}),{
     status:409,message:"Upstox V3 returned a crossed bid/ask book; executable quote rejected."
   });
-  for(const args of [{ask:0},{ask:201.301},{ask:"201.30"},{askQty:-1},{askQty:1.5}]){
+  for(const args of [{ask:0},{ask:201.301},{ask:"201.30"},{askQty:-1},{askQty:1.5},{askQty:2147483648}]){
     const quote=extractUpstoxRestExecutableQuote(response(args),KEY,{nowMs:NOW});
     assert.equal(quote.askPricePaise===null||quote.askQuantity===0,true);
   }
