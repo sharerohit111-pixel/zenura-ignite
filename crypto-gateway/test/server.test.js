@@ -4,7 +4,7 @@ process.env.SUPABASE_PUBLISHABLE_KEY="test-publishable-key";
 process.env.SUPABASE_SERVICE_ROLE_KEY="test-service-role-key";
 const test=require("node:test");
 const assert=require("node:assert/strict");
-const {validateOrderInput,validateRiskPlanInput,isFreshCryptoQuote,getRiskPlanTrigger,makeOrderId,runLimitWorker,createRateLimiter,isUuid}=require("../server");
+const {validateOrderInput,validateRiskPlanInput,isFreshCryptoQuote,getRiskPlanTrigger,makeOrderId,runLimitWorker,releaseWorkerLeaseSafely,createRateLimiter,isUuid}=require("../server");
 test("accepts supported market order and canonicalizes symbol",()=>{
  const v=validateOrderInput({symbol:"btcusdt",side:"buy",quantity:"0.001",idempotency_key:"123e4567-e89b-42d3-a456-426614174000"});
  assert.equal(v.symbol,"BTCUSDT"); assert.equal(v.side,"BUY"); assert.equal(v.quantityRaw,"0.001");
@@ -48,6 +48,24 @@ test("bounds combined Crypto LIMIT and SL/Target worker batches to protect the s
  for(const maxOrders of [0,-1,1.5,6,"5",null]) {
   await assert.rejects(runLimitWorker({maxOrders}),/between 1 and 5/);
  }
+});
+
+test("worker lease release helper is quiet on success",async()=>{
+ const logs=[];
+ await releaseWorkerLeaseSafely(async()=>({data:true,error:null}),message=>logs.push(message));
+ assert.deepEqual(logs,[]);
+});
+test("worker lease release helper logs returned database errors without throwing",async()=>{
+ const logs=[];
+ await assert.doesNotReject(releaseWorkerLeaseSafely(async()=>({error:new Error("db unavailable")}),message=>logs.push(message)));
+ assert.equal(logs.length,1);
+ assert.match(logs[0],/lease release failed/);
+});
+test("worker lease release helper contains network exceptions and preserves caller flow",async()=>{
+ const logs=[];
+ await assert.doesNotReject(releaseWorkerLeaseSafely(async()=>{throw new Error("socket closed");},message=>logs.push(message)));
+ assert.equal(logs.length,1);
+ assert.match(logs[0],/bounded lease will expire/);
 });
 
 test("rate limiter bounds order requests and returns a retry window",()=>{
