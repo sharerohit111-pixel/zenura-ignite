@@ -1,5 +1,7 @@
 "use strict";
 
+const {upstoxHttpError}=require("./upstox-http-policy");
+
 const crypto=require("node:crypto");
 const {normalizeWorkerCursor,groupOrdersByUser}=require("./paper-limit-worker");
 const {loadVerifiedExchangeSession,marketDateString}=require("./exchange-session-calendar");
@@ -163,7 +165,7 @@ function createPaperOptionLimitWorker({
             {headers:{Authorization:"Bearer "+token,Accept:"application/json"}}
           );
           const payload=await readProviderJson(response);
-          if(!response.ok)throw new Error("Upstox V3 NSE Options quote request failed.");
+          if(!response.ok)throw upstoxHttpError(response);
 
           for(const {order,instrument} of eligible){
             const nowMs=now();
@@ -215,7 +217,7 @@ function createPaperOptionLimitWorker({
           }
         }catch(error){
           summary.failed+=userOrders.length;
-          console.warn("Options LIMIT user batch skipped",{userId,errorName:error?.name||"Error",status:error?.status||500});
+          console.warn("Options LIMIT user batch skipped",{userId,errorName:error?.name||"Error",status:error?.status||500,code:error?.code||"unknown"});
         }
       };
       for(let offset=0;offset<groups.length;offset+=5)
