@@ -58,7 +58,7 @@ The SQL fill RPC must independently validate all facts; worker eligibility alone
 
 - Order is owned by the account, simulation-only, pending/partially-filled and not terminal.
 - Fill quantity is positive and no greater than remaining quantity or available close reservation.
-- Contract key, exchange, segment, expiry, lot size and tick size still match the verified instrument master.
+- The worker matches contract key, exchange, segment, expiry, lot size and tick size against the verified instrument master; SQL independently checks the stored order/position contract snapshot and tick alignment.
 - Execution price is on tick and satisfies BUY ask <= limit / SELL bid >= limit.
 - Quote timestamp is non-future and fresh; SQL validates the executable side, exact displayed depth quantity, exclusive expiry cutoff, and a verified open NSE/BSE session whose official-source reference and SHA-256 are present.
 - Caller clock and quote-age values match server time within a small documented tolerance.
