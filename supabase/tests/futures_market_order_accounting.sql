@@ -227,6 +227,61 @@ BEGIN
     RAISE EXCEPTION 'Stale close-only position snapshot allowed an unpriced futures reversal';
   END IF;
 
+  -- Repeated one-lot partial closes must release all original reserved margin.
+  -- The 200000-paise reservation is not evenly divisible by three; this checks
+  -- that per-close rounding leaves the exact residual for the final close.
+  v_now:=floor(extract(epoch from clock_timestamp())*1000)::bigint;
+  PERFORM public.execute_paper_futures_market_order(
+    'fefefefe-fefe-4efe-8efe-fefefefefefe',repeat('a',32)||repeat('0',32),
+    'fefefefe-0000-4000-8000-000000000020',repeat('1',64),
+    'NSE_FO|FUT_MARGIN_SPLIT','FUT_MARGIN_SPLIT','NSE','NSE_FO',current_date+5,
+    25,5,'BUY','DELIVERY',75,10000,200000,1000,v_now,v_now
+  );
+  v_now:=floor(extract(epoch from clock_timestamp())*1000)::bigint;
+  PERFORM public.execute_paper_futures_market_order(
+    'fefefefe-fefe-4efe-8efe-fefefefefefe',repeat('a',32)||repeat('1',32),
+    'fefefefe-0000-4000-8000-000000000021',repeat('2',64),
+    'NSE_FO|FUT_MARGIN_SPLIT','FUT_MARGIN_SPLIT','NSE','NSE_FO',current_date+5,
+    25,5,'SELL','DELIVERY',25,11000,0,1000,v_now,v_now
+  );
+  SELECT reserved_margin_paise INTO v_margin
+    FROM public.paper_futures_positions
+   WHERE user_id='fefefefe-fefe-4efe-8efe-fefefefefefe'
+     AND instrument_key='NSE_FO|FUT_MARGIN_SPLIT';
+  IF v_margin<>133334 THEN
+    RAISE EXCEPTION 'First one-lot futures close released an unexpected margin amount: %',v_margin;
+  END IF;
+  v_now:=floor(extract(epoch from clock_timestamp())*1000)::bigint;
+  PERFORM public.execute_paper_futures_market_order(
+    'fefefefe-fefe-4efe-8efe-fefefefefefe',repeat('a',32)||repeat('2',32),
+    'fefefefe-0000-4000-8000-000000000022',repeat('3',64),
+    'NSE_FO|FUT_MARGIN_SPLIT','FUT_MARGIN_SPLIT','NSE','NSE_FO',current_date+5,
+    25,5,'SELL','DELIVERY',25,11000,0,1000,v_now,v_now
+  );
+  SELECT reserved_margin_paise INTO v_margin
+    FROM public.paper_futures_positions
+   WHERE user_id='fefefefe-fefe-4efe-8efe-fefefefefefe'
+     AND instrument_key='NSE_FO|FUT_MARGIN_SPLIT';
+  IF v_margin<>66667 THEN
+    RAISE EXCEPTION 'Second one-lot futures close released an unexpected margin amount: %',v_margin;
+  END IF;
+  v_now:=floor(extract(epoch from clock_timestamp())*1000)::bigint;
+  PERFORM public.execute_paper_futures_market_order(
+    'fefefefe-fefe-4efe-8efe-fefefefefefe',repeat('a',32)||repeat('3',32),
+    'fefefefe-0000-4000-8000-000000000023',repeat('4',64),
+    'NSE_FO|FUT_MARGIN_SPLIT','FUT_MARGIN_SPLIT','NSE','NSE_FO',current_date+5,
+    25,5,'SELL','DELIVERY',25,11000,0,1000,v_now,v_now
+  );
+  SELECT reserved_margin_paise INTO v_account_margin
+    FROM public.paper_accounts
+   WHERE user_id='fefefefe-fefe-4efe-8efe-fefefefefefe';
+  IF v_account_margin<>0
+     OR EXISTS(SELECT 1 FROM public.paper_futures_positions
+       WHERE user_id='fefefefe-fefe-4efe-8efe-fefefefefefe'
+         AND instrument_key='NSE_FO|FUT_MARGIN_SPLIT') THEN
+    RAISE EXCEPTION 'Repeated one-lot futures closes did not release the exact original margin reservation';
+  END IF;
+
   -- Stale provider quote and expired contract are rejected before any write.
   v_rejected:=false;
   v_now:=floor(extract(epoch from clock_timestamp())*1000)::bigint;
