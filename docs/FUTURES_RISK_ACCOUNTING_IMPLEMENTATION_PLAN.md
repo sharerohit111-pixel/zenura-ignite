@@ -136,7 +136,7 @@ Opening-day positions require an explicitly approved basis convention. Until tha
 - NSE official F&O Daily Settlement Prices / All Reports – Derivatives: https://www.nseindia.com/all-reports-derivatives
 - NSE Clearing official Equity Derivatives settlement-price methodology: https://www.nseclearing.in/clearing-settlement/equity-derivatives/settlement-price
 - NSE official F&O consolidated circular register (includes NSE/FAOP/73928 dated 2026-04-28): https://www.nseindia.com/static/resources/consolidated-master-circulars
-- NCL/CMPT/77212, Updated SOP on Settlement Price Computation, dated 2026-10-30 (official NCL circular; complete Annexure A must be verified against the official attachment before coding): https://www.nseindia.com/all-reports-derivatives
+- NCL/CMPT/77212, Updated SOP on Settlement Price Computation, dated 2026-10-30 (official NCL circular; retrieve the original circular and complete Annexure A from NSE/NCL's official circular archive before coding; no direct public PDF URL was independently verified in this audit).
 - SEBI circular HO/47/11/11(3)2025-MRD-POD2/I/23843/2026 dated 2026-10-15; CAS/settlement methodology transition effective 2026-12-07. Use the regulator's original circular and NCL's issued SOP as the controlling documents; secondary summaries are discovery aids only.
 
 The official F&O Daily Settlement Prices report is the authoritative data-ingestion candidate. The report schema, settlement-kind mapping, correction/revision semantics, and exact row-level contract keys must be validated from an actual official sample before enabling ingestion. Do not infer that a report listing alone proves a particular field is an official final settlement value.
