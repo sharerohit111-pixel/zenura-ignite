@@ -189,3 +189,26 @@ test("rejects invalid Futures LIMIT worker batch sizes before acquiring a lease"
   await assert.rejects(()=>worker({maxOrders:101}),/batch size is invalid/);
   assert.equal(db.calls.some(call=>call.type==="rpc"&&call.name==="acquire_paper_market_worker_lease"),false);
 });
+
+test("uses a separate connected Upstox token for each Futures LIMIT account",async()=>{
+  const secondUser="abababab-abab-4bab-8bab-abababababab";
+  const secondOrder={...order,order_id:"b".repeat(64),user_id:secondUser};
+  const db=makeDb({orders:[order,secondOrder]});
+  const requestedUsers=[],authorizationHeaders=[];
+  const d=deps(db);
+  d.getUpstoxAccessToken=async userId=>{
+    requestedUsers.push(userId);
+    return {token:"token-for-"+userId};
+  };
+  d.fetchProvider=async(_url,options)=>{
+    authorizationHeaders.push(options.headers.Authorization);
+    return {ok:true};
+  };
+  const result=await createPaperFuturesLimitWorker(d)({maxOrders:10});
+  assert.equal(result.scanned,2);
+  assert.equal(result.partial,2);
+  assert.deepEqual(new Set(requestedUsers),new Set([USER,secondUser]));
+  assert.deepEqual(new Set(authorizationHeaders),new Set([
+    "Bearer token-for-"+USER,"Bearer token-for-"+secondUser
+  ]));
+});
