@@ -52,10 +52,11 @@ async function load() {
   const userId = sessionBefore?.data?.session?.user?.id || null;
   if (!userId) return;
   await api("/crypto/account", {}, token);
-  const portfolio = await api("/crypto/portfolio", {}, token);
+  const [portfolio, riskPlans] = await Promise.all([api("/crypto/portfolio", {}, token), api("/crypto/risk-plans", {}, token)]);
   const sessionAfter = await supabase.auth.getSession();
   if (generation !== loadGeneration || sessionAfter?.data?.session?.user?.id !== userId) return;
   publishPortfolio(portfolio);
+  window.dispatchEvent(new CustomEvent("zenura-cloud-risk-plans", { detail: riskPlans.plans || [] }));
 }
 
 async function placeOrder({ symbol, side, quantity }) {
