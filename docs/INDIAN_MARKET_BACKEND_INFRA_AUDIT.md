@@ -133,3 +133,45 @@ This branch now destructures `{user,userDb}` and adds a regression assertion to 
 - Options LIMIT fills are fetched only for the orders in the returned page.
 - No database migration is required; this relies on existing `created_at` and `order_id` columns. Regression tests cover cursor round-trip, malformed input, composite boundary construction, page sizing and all four route integrations.
 - This is keyset pagination, not a snapshot across multiple requests: newly inserted orders can appear ahead of the cursor, while the composite boundary prevents timestamp ties from duplicating or skipping rows.
+
+## 11. Distributed rate-limiting architecture audit
+
+**Finding:** the Supabase-native gateway has no shared route-wide rate-limit middleware. No Redis/Upstash package, endpoint, environment configuration or documented distributed limiter was found in the inspected gateway package/runtime configuration. Do not describe the process-local stream registry, worker busy flags, instrument-refresh cooldown or single-flight helpers as distributed rate limiting.
+
+### Existing controls (narrow scope)
+
+- POST /paper/derivative/margin-preview calls the database RPC consume_paper_margin_preview_slot after validating the instrument and before obtaining the user's Upstox token or calling the provider. The route currently returns 429 Retry-After: 5 when the RPC returns false **or when the RPC errors**. The latter is fail-closed but misclassifies limiter-backend unavailability as client throttling; a future common limiter should return 503 for backend failure, not 429.
+- POST /stream has an in-process per-user reservation plus a database-backed account lease and heartbeat. This enforces one active stream per account across gateway instances when the lease RPC is healthy; it does not rate-limit connection attempts, reconnections or other API routes. The process-local map is only an optimization.
+- OAuth callback state is consumed through a database RPC and is single-use, which protects replay but is not an IP/request-rate policy.
+- Instrument refresh has process-local single-flight and a 30-second attempt cooldown; it is not a distributed client limiter.
+- No common 429 response contract or route-level request budgets are currently enforced across orders, cancellations, history, portfolio, watchlists, candles, option-chain and OAuth routes.
+
+### Deployment / identity findings
+
+- The gateway package declares Express, Supabase JS, WebSocket and protobuf dependencies; no Redis/Upstash client is declared.
+- Deployment documentation describes Cloud Run autoscaling from one to five instances and request concurrency of 40. Per-process counters therefore cannot provide a global quota.
+- Express does not configure trust proxy in the inspected gateway. Do not use arbitrary X-Forwarded-For values as an IP identity. The correct client-IP source must be established from the actual Cloud Run ingress/load-balancer topology; if a trusted proxy chain is configured, trust only the known proxy boundary and test spoofed forwarding headers. Prefer an ingress/WAF policy for unauthenticated IP protection rather than relying solely on application parsing.
+- The public surface includes /health, /instruments and /upstox/oauth/callback; authenticated routes call Supabase Auth before user-scoped work. IP-level controls must protect expensive unauthenticated paths before provider/database work. User-level quotas can only be keyed after verified Supabase identity is available.
+
+### Recommended design (proposal only; not implemented)
+
+1. **Ingress / IP layer:** apply Cloud Armor or an equivalent trusted edge policy for unauthenticated traffic, especially OAuth callback attempts and public instrument-master requests. Keep health checks separately allowlisted with conservative protection. Do not trust caller-supplied IP headers.
+2. **Authenticated shared limiter:** prefer a single atomic shared backend. The existing Supabase/Postgres stack is a viable candidate for a dedicated atomic token-bucket/GCRA RPC, but it requires a new shared table/RPC/migration and therefore **must be reviewed with Chat 7 before any implementation**. Redis/Upstash is an alternative only after a service, credentials, network path, availability target and cost are explicitly selected; none is configured in the inspected branch.
+3. **Keys and scopes:** combine verified user ID + route family for authenticated budgets; use a trusted, privacy-preserving IP key at ingress for unauthenticated budgets. Separate expensive provider-backed reads (candles, option-chain, quotes, margin preview, stream start), state-changing order submit/cancel, low-cost history/account reads, and OAuth lifecycle. Apply per-user and global/provider concurrency budgets where needed.
+4. **Algorithm:** use an atomic token bucket or GCRA with explicit burst capacity and refill/window semantics. Avoid process-local counters and naive fixed windows that permit boundary bursts. The storage operation must be atomic across concurrent requests and all Cloud Run instances; keys need TTL/cleanup and bounded cardinality.
+5. **Ordering:** apply body-size and ingress protections first; authenticate before user-keyed quotas; validate cheap shape/instrument constraints before consuming expensive-provider budgets; consume the appropriate quota before external provider calls or costly RPCs. Preserve order idempotency and ensure safe retries do not create duplicate effects.
+6. **Failure policy:** fail closed for order mutations, OAuth token exchange, stream starts and expensive provider calls when the shared limiter is unavailable, returning 503 rate_limit_unavailable (not 429). Low-cost, non-sensitive reads may use a deliberately documented degraded policy only if an edge limit still protects the service. Never silently fall back to a per-process limiter.
+7. **Response contract:** quota exhaustion returns 429, a stable code: "rate_limited", integer Retry-After, request ID and a safe message. CORS must expose Retry-After (already present for allowed origins). Do not return remaining quota or raw keys unless intentionally designed.
+8. **Observability:** record route family, limiter decision, policy identifier, backend latency/failure, status and request ID. Never log raw IPs, bearer tokens, idempotency keys, OAuth codes/state, or limiter key material. Add dashboards/alerts for denied requests, backend errors, quota saturation and provider spend.
+
+### Required tests before rollout
+
+- Concurrent requests from multiple simulated gateway instances cannot exceed one shared budget.
+- Burst/refill timing, exact boundary behavior, TTL expiry and clock-skew assumptions are deterministic.
+- Verified users cannot consume another user's quota; spoofed user IDs and forwarding headers do not change identity.
+- Unauthenticated OAuth callback and public instrument endpoints are protected at the trusted ingress.
+- Limiter backend timeout/error maps to the documented fail-closed status; quota exhaustion maps to 429 + Retry-After.
+- Order idempotent retries, submit/cancel races and existing margin/stream lease semantics remain intact.
+- Load tests cover Cloud Run's documented instance concurrency and autoscaling; no production worker or gateway activation is part of this audit.
+
+**Decision:** architecture audit and documentation only. No limiter middleware, process-local substitute, Redis/Upstash dependency, secret, SQL migration, RPC, RLS change or infrastructure activation is introduced in this change. Shared database work remains blocked on Chat 7 coordination.
