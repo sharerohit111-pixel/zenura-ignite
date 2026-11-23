@@ -35,20 +35,36 @@ BEGIN
  END;
  IF NOT v_failed THEN RAISE EXCEPTION 'Risk plan must not reserve quantity already reserved by another exit.'; END IF;
 END $$;
-SELECT public.cancel_paper_crypto_risk_plan(
+-- Execute the SL threshold using the plan's reserved quantity, preserving
+-- the unrelated 0.2 BTC reservation; replay must not create a second exit.
+SELECT public.execute_paper_crypto_risk_exit(
  '31313131-3131-4131-8131-313131313131',
- '32323232-3232-4232-8232-323232323232'
+ '32323232-3232-4232-8232-323232323232',
+ 44000,80,1760,
+ floor(extract(epoch from clock_timestamp())*1000)::bigint
 );
-DO $$
-DECLARE v_reserved numeric; v_status text;
+SELECT public.execute_paper_crypto_risk_exit(
+ '31313131-3131-4131-8131-313131313131',
+ '32323232-3232-4232-8232-323232323232',
+ 44000,80,1760,
+ floor(extract(epoch from clock_timestamp())*1000)::bigint
+);
+DO $
+DECLARE v_reserved numeric; v_quantity numeric; v_status text; v_orders integer; v_ledger integer; v_reason text;
 BEGIN
- SELECT reserved_quantity INTO v_reserved FROM public.paper_crypto_positions
+ SELECT reserved_quantity,quantity INTO v_reserved,v_quantity FROM public.paper_crypto_positions
  WHERE user_id='31313131-3131-4131-8131-313131313131' AND symbol='BTCUSDT';
- SELECT status INTO v_status FROM public.paper_crypto_risk_plans
+ SELECT status,trigger_reason INTO v_status,v_reason FROM public.paper_crypto_risk_plans
  WHERE plan_id='32323232-3232-4232-8232-323232323232';
- IF v_reserved<>0.2 OR v_status<>'CANCELLED' THEN
-   RAISE EXCEPTION 'Risk plan cancellation failed to release its exact reservation.';
+ SELECT count(*) INTO v_orders FROM public.paper_crypto_orders
+ WHERE order_id='32323232-3232-4232-8232-323232323232' AND status='FILLED';
+ SELECT count(*) INTO v_ledger FROM public.paper_crypto_ledger
+ WHERE order_id='32323232-3232-4232-8232-323232323232';
+ IF v_reserved<>0.2 OR v_quantity<>0.5 OR v_status<>'EXECUTED' OR v_reason<>'STOP_LOSS'
+    OR v_orders<>1 OR v_ledger<>2 THEN
+   RAISE EXCEPTION 'Risk exit accounting/idempotency failed: reserved %, qty %, status %, reason %, orders %, ledger %',
+     v_reserved,v_quantity,v_status,v_reason,v_orders,v_ledger;
  END IF;
-END $$;
+END $;
 RESET ROLE;
 ROLLBACK;
