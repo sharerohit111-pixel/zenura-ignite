@@ -49,7 +49,7 @@ async function authenticate(req) {
   return { user: { id: user.id }, userDb };
 }
 async function userRpc(user, name, args) {
-  const allowed = new Set(["initialize_paper_crypto_account","execute_paper_crypto_market_order","create_paper_crypto_limit_order","cancel_paper_crypto_limit_order"]);
+  const allowed = new Set(["initialize_paper_crypto_account","execute_paper_crypto_market_order","create_paper_crypto_limit_order","cancel_paper_crypto_limit_order","reset_paper_crypto_account"]);
   if (!allowed.has(name)) throw httpError("Crypto operation is not allowlisted.", 400);
   const result = await serviceDb.rpc(name, { ...args, p_user_id: user.id });
   if (result?.error) {
@@ -140,6 +140,23 @@ app.get("/crypto/account", async(req,res) => {
     if (error || !data) throw httpError("Crypto paper account could not be initialized or read.",503);
     res.set("Cache-Control","private, no-store").json({ currency:data.currency,cashBalance:data.cash_balance,startingCash:data.starting_cash,realizedPnl:data.realized_pnl,version:data.version,created:initialized?.created===true,simulationOnly:true });
   } catch(e) { sendError(res,e,"Crypto paper account could not be loaded."); }
+});
+app.post("/crypto/account/reset", cryptoOrderRateLimit, async(req,res) => {
+  try {
+    const { user } = await authenticate(req);
+    const requestId = String(req.body?.request_id || "");
+    if (!isUuid(requestId)) throw httpError("A valid reset request UUID is required.",400);
+    const result = await userRpc(user,"reset_paper_crypto_account",{p_request_id:requestId});
+    res.set("Cache-Control","private, no-store").json({
+      resetId:result?.reset_id,
+      cashBalance:result?.cash_balance,
+      cancelledLimitOrders:result?.cancelled_limit_orders,
+      closedPositions:result?.closed_positions,
+      idempotentReplay:result?.idempotent_replay===true,
+      historyPreserved:result?.history_preserved===true,
+      simulationOnly:result?.simulation_only===true
+    });
+  } catch(e) { sendError(res,e,"Crypto paper account reset could not be completed."); }
 });
 app.get("/crypto/portfolio", async(req,res) => {
   try {
