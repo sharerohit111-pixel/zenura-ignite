@@ -10,12 +10,12 @@ new_owner="f3222222-2222-4222-8222-222222222222"
 
 seed_lease() {
   local token="$1"
-  local expiry_sql="$2"
-  psql -v ON_ERROR_STOP=1 -v token="$token" -v expiry_sql="$expiry_sql" <<'SQL'
+  local expiry_ms="$2"
+  psql -v ON_ERROR_STOP=1 -v token="$token" -v expiry_ms="$expiry_ms" <<'SQL'
 INSERT INTO public.paper_market_worker_state(
   state_key,cursor_order_id,cursor_created_at,lease_token,lease_expires_at,updated_at
 ) VALUES (
-  'paper_futures_limit_orders',NULL,NULL :'token'::uuid, :'expiry_sql'::timestamptz,clock_timestamp()
+  'paper_futures_limit_orders',NULL,NULL :'token'::uuid, to_timestamp((:expiry_ms)::double precision / 1000.0),clock_timestamp()
 )
 ON CONFLICT(state_key) DO UPDATE SET
   lease_token=EXCLUDED.lease_token,
@@ -39,7 +39,7 @@ assert_false() {
 # Race A: renewal wins the row lock first. A waiting reacquisition must see
 # the extended expiry and must not steal the still-live owner token.
 now_ms="$(date +%s%3N)"
-seed_lease "$old_owner" "to_timestamp(($now_ms + 5000)::double precision / 1000.0)"
+seed_lease "$old_owner" "$((now_ms + 5000))"
 (
   psql -v ON_ERROR_STOP=1 -c "BEGIN; SELECT public.renew_paper_market_worker_lease('$state_key','$old_owner',$now_ms,120000); SELECT pg_sleep(1); COMMIT;" >/dev/null
 ) &
@@ -51,7 +51,7 @@ wait "$renew_pid"
 # Race B: expired-lease reacquisition wins the row lock first. A waiting
 # stale renewal must observe the new owner token and must not resurrect it.
 now_ms="$(date +%s%3N)"
-seed_lease "$old_owner" "to_timestamp(($now_ms - 1000)::double precision / 1000.0)"
+seed_lease "$old_owner" "$((now_ms - 1000))"
 (
   psql -v ON_ERROR_STOP=1 -c "BEGIN; SELECT public.acquire_paper_market_worker_lease('$state_key','$new_owner',$now_ms,120000); SELECT pg_sleep(1); COMMIT;" >/dev/null
 ) &
