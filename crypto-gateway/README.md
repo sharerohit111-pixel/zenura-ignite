@@ -27,7 +27,7 @@ This service is deliberately separate from `market-gateway`. It exposes only Cry
 5. Obtain explicit approval before production migration or deployment.
 
 ## Latest CI result
-GitHub Actions run [#45104634648](https://github.com/sharerohit111-pixel/zenura-ignite/actions/runs/45104634648) completed successfully on 2026-11-23 at code commit `67b647556e5f03cbdefdf3e8ff5b8d4b1089dd71`; the current branch head includes subsequent documentation-only commits. It applied all Crypto migrations to disposable PostgreSQL 16 and passed:
+GitHub Actions run [#45105183954](https://github.com/sharerohit111-pixel/zenura-ignite/actions/runs/45105183954) completed successfully on 2026-11-23 at branch commit `054476c4b66c802cb72131b13de13e036ab608fa`, including the Crypto gateway changes and worker-batch safety adjustment. It applied all Crypto migrations to disposable PostgreSQL 16 and passed:
 - Full-position LIMIT SELL reservation release and ledger accounting
 - Reserved-position DELETE guard
 - MARKET SELL protection for quantity reserved by pending LIMIT SELL orders
