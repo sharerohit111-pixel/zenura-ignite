@@ -76,6 +76,23 @@ begin
     raise exception 'Derivative LIMIT worker lease release keys are not registered';
   end if;
 
+  -- Trusted gateway reads are service-role-only; internal worker state is writable only by service_role.
+  if not has_table_privilege('service_role','public.upstox_connections','SELECT')
+     or not has_table_privilege('service_role','public.paper_market_worker_state','SELECT')
+     or not has_table_privilege('service_role','public.paper_market_worker_state','UPDATE')
+     or not has_table_privilege('service_role','public.paper_orders','SELECT')
+     or not has_table_privilege('service_role','public.paper_protective_orders','SELECT')
+     or not has_table_privilege('service_role','public.paper_protective_orders','UPDATE')
+     or not has_table_privilege('service_role','public.paper_equity_positions','SELECT') then
+    raise exception 'Trusted market gateway service-role read/update grants are incomplete';
+  end if;
+  if has_table_privilege('authenticated','public.upstox_connections','SELECT')
+     or has_table_privilege('anon','public.upstox_connections','SELECT')
+     or has_table_privilege('authenticated','public.paper_market_worker_state','SELECT')
+     or has_table_privilege('anon','public.paper_market_worker_state','SELECT') then
+    raise exception 'Internal Upstox credentials/worker state must remain inaccessible to client roles';
+  end if;
+
   -- The existing derivative receipt remains MARKET-only and terminal.
   if not exists (
     select 1 from pg_constraint c
