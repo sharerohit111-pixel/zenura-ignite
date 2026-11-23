@@ -114,3 +114,11 @@ test("rejects unsafe feed timestamps and unsafe displayed quantities", () => {
   const unsafeQuantity = response({ bidQ: String(Number.MAX_SAFE_INTEGER + 1) });
   assert.equal(extractUpstoxExecutableQuote(unsafeQuantity, KEY, { nowMs: NOW }).bidPricePaise, null);
 });
+
+test("rejects a crossed executable order book", () => {
+  const crossed = response({ bidP: 201.4, askP: 201.3 });
+  assert.throws(() => extractUpstoxExecutableQuote(crossed, KEY, { nowMs: NOW }), {
+    status: 409,
+    message: "Upstox returned a crossed bid/ask book; executable quote rejected.",
+  });
+});
