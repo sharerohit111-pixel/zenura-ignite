@@ -25,7 +25,7 @@ test("derives deterministic user-scoped UUID order IDs",()=>{
  assert.equal(a,b); assert.notEqual(a,c); assert.match(a,/^[0-9a-f-]{36}$/);
 });
 
-test("rejects Crypto LIMIT worker batches that could exceed the lease budget",async()=>{ await assert.rejects(runLimitWorker({maxOrders:11}),/between 1 and 10/); });
+test("bounds combined Crypto LIMIT and SL/Target worker batches to protect the shared lease",async()=>{ await assert.rejects(runLimitWorker({maxOrders:6}),/between 1 and 5/); });
 
 test("rate limiter bounds order requests and returns a retry window",()=>{
  let now=1000, status=0, payload, headers={};
