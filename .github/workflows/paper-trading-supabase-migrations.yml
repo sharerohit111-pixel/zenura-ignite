@@ -189,6 +189,8 @@ jobs:
         run: psql -v ON_ERROR_STOP=1 -f supabase/tests/futures_market_order_accounting.sql
       - name: Exercise atomic Futures LIMIT submit, reservation, cancel and expiry
         run: psql -v ON_ERROR_STOP=1 -f supabase/tests/futures_limit_submit_release.sql
+      - name: Exercise atomic Futures LIMIT partial fills and settlement conservation
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/futures_limit_atomic_fill.sql
       - name: Reconcile Indian-market long Options ledger cash, charges and realized P&L
         run: psql -v ON_ERROR_STOP=1 -f supabase/tests/long_option_ledger_reconciliation.sql
       - name: Verify F&O LIMIT schema remains fail-closed until lifecycle release
@@ -1755,6 +1757,7 @@ jobs:
               OR to_regprocedure('public.cancel_paper_limit_order(uuid,text)') IS NULL
               OR to_regprocedure('public.initialize_paper_trading_account(uuid)') IS NULL
               OR to_regprocedure('public.execute_paper_futures_market_order(uuid,text,uuid,text,text,text,text,text,date,integer,integer,text,text,integer,bigint,bigint,bigint,bigint,bigint)') IS NULL
+              OR to_regprocedure('public.execute_paper_futures_limit_fill(text,text,integer,integer,bigint,bigint,bigint,bigint)') IS NULL
               OR to_regprocedure('public.execute_paper_long_option_order(uuid,text,uuid,text,text,text,text,text,text,date,numeric,integer,integer,integer,text,bigint,bigint,bigint)') IS NULL THEN
               RAISE EXCEPTION 'One or more expected trading RPC functions are missing';
             END IF;
