@@ -68,7 +68,7 @@ BEGIN
       'abababab-abab-4bab-8bab-abababababab',repeat('e',64),
       'abababab-0000-4000-8000-000000000004',repeat('d',64),
       'NSE_FO|FUT_LIMIT_CLOSE','FUT_LIMIT_CLOSE','NSE','NSE_FO',current_date+5,
-      25,5,'SELL','DELIVERY',30,11000,0,1000,v_now,v_now
+      25,5,'SELL','DELIVERY',50,11000,0,1000,v_now,v_now
     );
   EXCEPTION WHEN SQLSTATE '23514' THEN v_rejected:=true;
   END;
