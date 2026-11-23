@@ -14,6 +14,6 @@ function reconnectDelayMs(attempt,{retryAfterSeconds=null,random=Math.random}={}
  const jitter=Math.floor(sample*251);
  const providerDelay=Number.isFinite(retryAfterSeconds)&&retryAfterSeconds>0
   ?Math.min(MAX_PROVIDER_RETRY_AFTER_SECONDS,retryAfterSeconds)*1000:0;
- return Math.max(exponential+jitter,providerDelay);
+ return Math.max(Math.min(MAX_RECONNECT_DELAY_MS,exponential+jitter),providerDelay);
 }
 module.exports={MAX_RECONNECT_ATTEMPTS,MAX_RECONNECT_DELAY_MS,reconnectDelayMs};
