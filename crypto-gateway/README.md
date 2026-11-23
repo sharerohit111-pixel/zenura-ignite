@@ -12,18 +12,26 @@ This service is deliberately separate from `market-gateway`. It exposes only Cry
 
 ## Runtime
 - Node.js 22; install with `npm ci` after generating and reviewing the package lock in a controlled build environment.
-- Configure the three Supabase values and CORS allowlist using the host's secret manager. Never commit service-role credentials.
-- Set `CRYPTO_LIMIT_WORKER_ENABLED=true` only after Crypto-only migrations and regression tests pass in a disposable/staging database.
-- The service uses server-side Supabase Auth verification, server-only service role RPCs, user-scoped RLS reads, fresh Binance spot trade quotes, and a USD/INR reference rate.
-- All orders are simulated only. No exchange order, custody, deposit, withdrawal, leverage, or margin functionality exists.
+- Configure Supabase URL, publishable key, server-only service-role secret and exact CORS origins using the host secret manager. Never commit service-role credentials.
+- Set `CRYPTO_LIMIT_WORKER_ENABLED=true` only after Crypto migrations and regression tests pass in an isolated staging database.
+- The service verifies Supabase access tokens server-side, uses service-role access only for allowlisted Crypto RPCs, and uses the user's JWT for RLS-scoped reads.
+- MARKET execution uses a fresh Binance Spot trade quote; LIMIT fills use a fresh server-side quote and leased Crypto-only worker. USD/INR conversion is fetched server-side.
+- All orders are simulated only. No real exchange order, custody, deposit, withdrawal, leverage, or margin functionality exists.
 - No hosting, DNS, secret configuration, migration, or deployment has been performed.
 
 ## Safety gates
-1. Apply Crypto migrations only to an isolated staging Supabase project.
-2. Run all SQL regression tests against PostgreSQL/Supabase staging.
+1. Apply Crypto migrations only to an isolated staging Supabase project/branch.
+2. Run all SQL regression tests against staging, including auth and two-user RLS isolation.
 3. Configure CORS and secrets in the isolated gateway host.
-4. Exercise auth, market/limit buy/sell, idempotency, cancellation, reservation and worker recovery.
+4. Exercise auth, MARKET/LIMIT BUY/SELL, idempotency, cancellation, reservations and worker recovery.
 5. Obtain explicit approval before production migration or deployment.
 
-## Current CI result
-The Crypto-only CI run completed successfully on 2026-11-23. It applied the four draft Crypto migrations to a disposable PostgreSQL 16 instance, verified the full-quantity LIMIT SELL reservation release, parsed the frontend modules, and ran the standalone gateway input tests. This is not a staging Supabase integration test and does not authorize deployment.
+## Latest CI result
+GitHub Actions run [#45104317356](https://github.com/sharerohit111-pixel/zenura-ignite/actions/runs/45104317356) completed successfully on 2026-11-23 against the current Crypto branch head. It applied all Crypto migrations to disposable PostgreSQL 16 and passed:
+- Full-position LIMIT SELL reservation release and ledger accounting
+- Reserved-position DELETE guard
+- MARKET SELL protection for quantity reserved by pending LIMIT SELL orders
+- Authenticated row-level isolation across Crypto accounts, positions, orders and ledger
+- Browser module syntax, gateway unit tests and Crypto/Indian Market client isolation
+
+This is disposable PostgreSQL CI, not a live Supabase staging integration test, and does not authorize deployment.
