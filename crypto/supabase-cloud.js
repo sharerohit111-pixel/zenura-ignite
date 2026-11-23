@@ -94,6 +94,30 @@ async function placeLimitOrder({ symbol, side, quantity, limitPrice }) {
   return result;
 }
 
+async function saveRiskPlan({ symbol, quantity, stopLossPrice = null, takeProfitPrice = null }) {
+  if (!supportedSymbols.has(symbol) || !Number.isFinite(quantity) || quantity <= 0) throw new Error("Select a valid Crypto position and exit quantity.");
+  if ((stopLossPrice == null || stopLossPrice === 0) && (takeProfitPrice == null || takeProfitPrice === 0)) throw new Error("Set a stop-loss or target price.");
+  if (stopLossPrice != null && stopLossPrice !== 0 && (!Number.isFinite(stopLossPrice) || stopLossPrice <= 0)) throw new Error("Invalid stop-loss price.");
+  if (takeProfitPrice != null && takeProfitPrice !== 0 && (!Number.isFinite(takeProfitPrice) || takeProfitPrice <= 0)) throw new Error("Invalid target price.");
+  if (stopLossPrice > 0 && takeProfitPrice > 0 && stopLossPrice >= takeProfitPrice) throw new Error("Stop loss must be below target.");
+  const result = await api("/crypto/risk-plans", { method: "POST", body: {
+    symbol, quantity: quantity.toFixed(12).replace(/0+$/, "").replace(/\\.$/, ""),
+    stop_loss_price: stopLossPrice > 0 ? stopLossPrice.toFixed(8).replace(/0+$/, "").replace(/\\.$/, "") : null,
+    take_profit_price: takeProfitPrice > 0 ? takeProfitPrice.toFixed(8).replace(/0+$/, "").replace(/\\.$/, "") : null,
+    idempotency_key: crypto.randomUUID()
+  }});
+  await load();
+  return result;
+}
+
+async function cancelRiskPlan(planId) {
+  if (typeof planId !== "string" || !/^[0-9a-f-]{36}$/i.test(planId)) throw new Error("Invalid Crypto risk plan ID.");
+  const result = await api("/crypto/risk-plans/" + planId + "/cancel", { method: "POST", body: {} });
+  if (result.cancelled !== true) throw new Error("The cloud did not confirm SL/Target cancellation.");
+  await load();
+  return result;
+}
+
 async function resetAccount() {
   if (!pendingResetRequestId) pendingResetRequestId = crypto.randomUUID();
   const result = await api("/crypto/account/reset", {
@@ -118,7 +142,7 @@ async function cancelLimitOrder(orderId) {
   return result;
 }
 
-window.ZENURA_CRYPTO_TRADING = Object.freeze({ load, placeOrder, placeLimitOrder, cancelLimitOrder, resetAccount, isConfigured: () => Boolean(apiBase) });
+window.ZENURA_CRYPTO_TRADING = Object.freeze({ load, placeOrder, placeLimitOrder, cancelLimitOrder, saveRiskPlan, cancelRiskPlan, resetAccount, isConfigured: () => Boolean(apiBase) });
 
 supabase.auth.onAuthStateChange((_event, session) => {
   const nextUserId = session?.user?.id || null;
