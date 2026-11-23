@@ -88,3 +88,12 @@ This audit created a new branch from the PR #92 head. It did not modify PR #92, 
 - The Intraday LIMIT fill-vs-cancel race test now passes with immutable fill/ledger foreign keys enabled. Its cleanup retains the successfully filled BUY order and records a compensating CI-only cash adjustment rather than deleting the fill or leaving the account reset unaudited.
 - A subsequent MARKET settlement test exposed a global `paper_orders.order_id` collision: the race test intentionally retains its filled order ID (`repeat('a',64)`), while the MARKET test reused that same ID for a different user. The MARKET test fixtures now use distinct order IDs (`m` through `r`) to respect the global primary key. This is test isolation only; production order IDs remain unchanged.
 - Latest validation must be rerun against the updated branch head before marking the MARKET, Delivery LIMIT, ledger schema, and ledger integrity tests green.
+
+## LIMIT cash reservation ledger integration (draft)
+
+- Delivery and Intraday LIMIT BUY submission now writes an atomic `RESERVATION_CREATE` event with the reserved-cash snapshot.
+- Delivery and Intraday LIMIT BUY cancellation now writes an atomic `RESERVATION_RELEASE` event. Replayed or concurrent releases are idempotent by event key.
+- Intraday LIMIT session expiry now writes a release event for each BUY reservation released by the existing expiry worker. SELL-side share reservations remain position-reservation state and are not misrepresented as cash movements.
+- Existing fill wrappers continue to write `RESERVATION_CONSUME` alongside the trade debit. All events share the same transaction as the existing state transition.
+- Added disposable regression coverage for Delivery create/release, Intraday cancellation and expiry, plus updated Delivery LIMIT and Intraday LIMIT test expectations and CI workflow.
+- These changes are draft-only and await a fresh CI run. Do not apply migrations to production.
