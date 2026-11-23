@@ -97,3 +97,12 @@ This audit created a new branch from the PR #92 head. It did not modify PR #92, 
 - Existing fill wrappers continue to write `RESERVATION_CONSUME` alongside the trade debit. All events share the same transaction as the existing state transition.
 - Added disposable regression coverage for Delivery create/release, Intraday cancellation and expiry, plus updated Delivery LIMIT and Intraday LIMIT test expectations and CI workflow.
 - These changes are draft-only and await a fresh CI run. Do not apply migrations to production.
+
+## Deferred-trigger duplication fix (2026-11-23)
+
+- Dependency PR #92 installs a deferred order trigger that already records LIMIT reservation and fill events, plus a MARKET wrapper that records MARKET fills and cash movements.
+- The accounting branch's explicit wrappers initially layered on top of those mechanisms, which could create duplicate immutable fills and ledger events under different execution/event keys.
+- The accounting migration now drops the superseded deferred trigger before the explicit MARKET/LIMIT wrappers are installed.
+- The MARKET wrapper now calls the pre-audit settlement implementation directly instead of calling the dependency branch's audit-writing wrapper. It then writes exactly one fill and one trade event itself.
+- Existing MARKET, Delivery LIMIT, Intraday LIMIT, and reservation lifecycle tests assert exact row counts and are intended to catch recurrence. Fresh CI for the corrected branch head is still required.
+- No production migration, merge, or deployment was performed.
