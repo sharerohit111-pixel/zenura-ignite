@@ -24,6 +24,18 @@ ON CONFLICT(state_key) DO UPDATE SET
 SQL
 }
 
+wait_for_lock_holder() {
+  local app_name="$1"
+  for _ in $(seq 1 50); do
+    if [[ "$(psql -XAt -v ON_ERROR_STOP=1 -c "SELECT EXISTS (SELECT 1 FROM pg_stat_activity WHERE application_name='$app_name' AND wait_event='PgSleep' AND state='active');")" == "t" ]]; then
+      return 0
+    fi
+    sleep 0.1
+  done
+  echo "Timed out waiting for transaction '$app_name' to hold the lease row lock" >&2
+  return 1
+}
+
 assert_false() {
   local label="$1"
   local sql="$2"
@@ -41,10 +53,10 @@ assert_false() {
 now_ms="$(date +%s%3N)"
 seed_lease "$old_owner" "$((now_ms + 5000))"
 (
-  psql -v ON_ERROR_STOP=1 -c "BEGIN; SELECT public.renew_paper_market_worker_lease('$state_key','$old_owner',$now_ms,120000); SELECT pg_sleep(1); COMMIT;" >/dev/null
+  PGAPPNAME=lease_race_renew_first psql -v ON_ERROR_STOP=1 -c "BEGIN; SELECT public.renew_paper_market_worker_lease('$state_key','$old_owner',$now_ms,120000); SELECT pg_sleep(2); COMMIT;" >/dev/null
 ) &
 renew_pid=$!
-sleep 0.2
+wait_for_lock_holder "lease_race_renew_first"
 assert_false "Renewal-before-reacquisition race" "SELECT public.acquire_paper_market_worker_lease('$state_key','$new_owner',$((now_ms + 1000)),120000);"
 wait "$renew_pid"
 
@@ -53,10 +65,10 @@ wait "$renew_pid"
 now_ms="$(date +%s%3N)"
 seed_lease "$old_owner" "$((now_ms - 1000))"
 (
-  psql -v ON_ERROR_STOP=1 -c "BEGIN; SELECT public.acquire_paper_market_worker_lease('$state_key','$new_owner',$now_ms,120000); SELECT pg_sleep(1); COMMIT;" >/dev/null
+  PGAPPNAME=lease_race_acquire_first psql -v ON_ERROR_STOP=1 -c "BEGIN; SELECT public.acquire_paper_market_worker_lease('$state_key','$new_owner',$now_ms,120000); SELECT pg_sleep(2); COMMIT;" >/dev/null
 ) &
 acquire_pid=$!
-sleep 0.2
+wait_for_lock_holder "lease_race_acquire_first"
 assert_false "Reacquisition-before-stale-renewal race" "SELECT public.renew_paper_market_worker_lease('$state_key','$old_owner',$((now_ms + 1000)),120000);"
 wait "$acquire_pid"
 
