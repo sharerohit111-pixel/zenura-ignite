@@ -1,13 +1,5 @@
-/* Email/password sign-in for the isolated Indian-market Firebase account.
- * Google sign-in remains available through the existing Connect button. */
-import { auth } from "../../firebase-client.js";
-import {
-  createUserWithEmailAndPassword,
-  signInWithEmailAndPassword,
-  sendEmailVerification,
-  onAuthStateChanged,
-  signOut
-} from "https://www.gstatic.com/firebasejs/11.6.0/firebase-auth.js";
+/* Native Supabase email/password authentication for ZENURA IGNITE. */
+import { supabase } from "./supabase-client.js";
 
 const card = document.getElementById("connection");
 const connectButton = document.getElementById("upstox-connect");
@@ -26,13 +18,12 @@ if (card && connectButton) {
   document.head.append(style);
   const form = document.createElement("form");
   form.className = "email-auth";
-  form.hidden = false;
   form.innerHTML = `
-    <small id="email-auth-message">Or use your email and password. Google sign-in is also available.</small>
+    <small id="email-auth-message">Create a new Supabase account or sign in. Firebase is not used for this app.</small>
     <input id="market-email" type="email" autocomplete="username" placeholder="Email address" required maxlength="254">
-    <input id="market-password" type="password" autocomplete="current-password" placeholder="Password (minimum 6 characters)" required minlength="6" maxlength="128">
+    <input id="market-password" type="password" autocomplete="current-password" placeholder="Password (minimum 8 characters)" required minlength="8" maxlength="128">
     <div class="email-auth-actions">
-      <button type="submit" id="email-sign-in">SIGN IN WITH EMAIL</button>
+      <button type="submit" id="email-sign-in">SIGN IN</button>
       <button type="button" id="email-create">CREATE ACCOUNT</button>
       <button type="button" id="email-sign-out" hidden>SIGN OUT</button>
     </div>`;
@@ -47,66 +38,66 @@ if (card && connectButton) {
   create.addEventListener("click", () => {
     creating = !creating;
     password.autocomplete = creating ? "new-password" : "current-password";
-    signIn.textContent = creating ? "CREATE ACCOUNT" : "SIGN IN WITH EMAIL";
+    password.minLength = creating ? 8 : 1;
+    signIn.textContent = creating ? "CREATE ACCOUNT" : "SIGN IN";
     create.textContent = creating ? "USE EXISTING ACCOUNT" : "CREATE ACCOUNT";
     message.textContent = creating
-      ? "Create a new account with this email and password."
-      : "Sign in with your existing email and password.";
+      ? "Create a new account with Supabase Auth. Verify your email if confirmation is enabled."
+      : "Sign in with your Supabase email and password.";
   });
   form.addEventListener("submit", async event => {
     event.preventDefault();
     if (!form.reportValidity()) return;
     signIn.disabled = true;
     create.disabled = true;
-    message.textContent = creating ? "Creating your account…" : "Signing in securely…";
+    message.textContent = creating ? "Creating your account securely…" : "Signing in securely…";
     try {
-      const credential = creating
-        ? await createUserWithEmailAndPassword(auth, email.value.trim(), password.value)
-        : await signInWithEmailAndPassword(auth, email.value.trim(), password.value);
       if (creating) {
-        try {
-          await sendEmailVerification(credential.user);
-          message.textContent = "Account created. Verification email sent. Verify your email, then sign in and connect Upstox.";
-        } catch (verificationError) {
-          const verificationCode = verificationError?.code || "";
-          message.textContent = verificationCode === "auth/too-many-requests"
-            ? "Account created, but verification email was rate-limited. Wait before requesting another email."
-            : "Account created, but the verification email could not be sent. Check Firebase Email Templates and try again later.";
-        }
+        const { data, error } = await supabase.auth.signUp({
+          email: email.value.trim(),
+          password: password.value,
+          options: { emailRedirectTo: location.origin + location.pathname }
+        });
+        if (error) throw error;
+        message.textContent = data.session
+          ? "Account created and signed in. You can now connect Upstox."
+          : "Account created. Check your email to confirm the address, then sign in.";
       } else {
-        message.textContent = "Signed in. You can now connect your Upstox account.";
+        const { error } = await supabase.auth.signInWithPassword({
+          email: email.value.trim(),
+          password: password.value
+        });
+        if (error) throw error;
+        message.textContent = "Signed in securely with Supabase.";
       }
-      window.dispatchEvent(new Event("zenura-market-auth-ready"));
     } catch (error) {
-      const code = error?.code || "";
       const messages = {
-        "auth/email-already-in-use": "This email already has an account. Choose sign in.",
-        "auth/invalid-credential": "Email or password is incorrect.",
-        "auth/weak-password": "Choose a stronger password (at least 6 characters).",
-        "auth/invalid-email": "Enter a valid email address.",
-        "auth/operation-not-allowed": "Enable Email/Password in Firebase Authentication → Sign-in method.",
-        "auth/too-many-requests": "Too many attempts. Please wait and retry.",
-        "auth/network-request-failed": "Network error. Check your connection and retry."
+        "Invalid login credentials": "Email or password is incorrect.",
+        "Email not confirmed": "Verify your email address, then sign in again.",
+        "User already registered": "This email already has an account. Choose sign in.",
+        "Password should be at least 8 characters": "Choose a password with at least 8 characters.",
+        "Too many requests": "Too many attempts. Wait before trying again."
       };
-      message.textContent = messages[code] || error.message || "Email sign-in failed.";
+      message.textContent = messages[error?.message] || error?.message || "Authentication failed. Please retry.";
     } finally {
       signIn.disabled = false;
       create.disabled = false;
     }
   });
   signOutButton.addEventListener("click", async () => {
-    try { await signOut(auth); message.textContent = "Signed out."; }
-    catch (error) { message.textContent = error.message || "Sign out failed."; }
+    signOutButton.disabled = true;
+    const { error } = await supabase.auth.signOut();
+    message.textContent = error?.message || "Signed out.";
+    signOutButton.disabled = false;
   });
-  onAuthStateChanged(auth, user => {
-    if (user) {
-      message.textContent = "Signed in as " + (user.email || "your account") + ".";
+  supabase.auth.onAuthStateChange((_event, session) => {
+    if (session?.user) {
+      message.textContent = "Signed in as " + (session.user.email || "your account") + " using Supabase Auth.";
       email.hidden = true;
       password.hidden = true;
       signIn.hidden = true;
       create.hidden = true;
       signOutButton.hidden = false;
-      signOutButton.textContent = "SIGN OUT";
     } else {
       email.hidden = false;
       password.hidden = false;

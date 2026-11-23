@@ -5,15 +5,8 @@
 -- Intraday and supported long CE/PE option simulation. No live broker orders.
 -- Firebase UIDs are strings; never cast them to Supabase Auth UUIDs.
 
-create table if not exists public.paper_user_identity_map (
-  -- Internal relational UUID; Firebase remains the authentication provider.
-  supabase_user_id uuid primary key default gen_random_uuid(),
-  firebase_uid text not null unique check (length(firebase_uid) between 1 and 128),
-  created_at timestamptz not null default now()
-);
-
 create table if not exists public.paper_accounts (
-  user_id uuid primary key references public.paper_user_identity_map(supabase_user_id) on delete restrict,
+  user_id uuid primary key references auth.users(id) on delete cascade,
   currency text not null default 'INR' check (currency = 'INR'),
   starting_cash_paise bigint not null default 100000000 check (starting_cash_paise > 0),
   cash_paise bigint not null default 100000000 check (cash_paise >= 0),
@@ -30,7 +23,7 @@ create table if not exists public.paper_accounts (
 );
 
 create table if not exists public.paper_equity_positions (
-  user_id uuid not null references public.paper_user_identity_map(supabase_user_id) on delete restrict,
+  user_id uuid not null references auth.users(id) on delete cascade,
   product text not null check (product in ('DELIVERY','INTRADAY')),
   instrument_key text not null check (length(instrument_key) between 1 and 100),
   trading_symbol text,
@@ -45,7 +38,7 @@ create table if not exists public.paper_equity_positions (
 );
 
 create table if not exists public.paper_derivative_positions (
-  user_id uuid not null references public.paper_user_identity_map(supabase_user_id) on delete restrict,
+  user_id uuid not null references auth.users(id) on delete cascade,
   instrument_key text not null check (length(instrument_key) between 1 and 100),
   trading_symbol text,
   segment text,
@@ -62,7 +55,7 @@ create table if not exists public.paper_derivative_positions (
 
 create table if not exists public.paper_orders (
   order_id text primary key check (order_id ~ '^[a-f0-9]{64}$'),
-  user_id uuid not null references public.paper_user_identity_map(supabase_user_id) on delete restrict,
+  user_id uuid not null references auth.users(id) on delete cascade,
   idempotency_key uuid,
   request_fingerprint text not null check (request_fingerprint ~ '^[a-f0-9]{64}$'),
   instrument_key text not null,
@@ -96,7 +89,7 @@ create table if not exists public.paper_orders (
 
 create table if not exists public.paper_derivative_orders (
   order_id text primary key check (order_id ~ '^[a-f0-9]{64}$'),
-  user_id uuid not null references public.paper_user_identity_map(supabase_user_id) on delete restrict,
+  user_id uuid not null references auth.users(id) on delete cascade,
   idempotency_key uuid,
   request_fingerprint text not null check (request_fingerprint ~ '^[a-f0-9]{64}$'),
   instrument_key text not null,
@@ -130,7 +123,7 @@ create table if not exists public.paper_derivative_orders (
 );
 
 create table if not exists public.paper_watchlists (
-  user_id uuid not null references public.paper_user_identity_map(supabase_user_id) on delete restrict,
+  user_id uuid not null references auth.users(id) on delete cascade,
   name text not null check (name in ('My Stocks','Banking','NIFTY','F&O')),
   instrument_keys text[] not null default '{}',
   updated_at timestamptz not null default now(),
@@ -140,7 +133,7 @@ create table if not exists public.paper_watchlists (
 
 -- AES-256-GCM envelope is JSON {v,iv,tag,data}; key remains server-side.
 create table if not exists public.upstox_connections (
-  user_id uuid primary key references public.paper_user_identity_map(supabase_user_id) on delete restrict,
+  user_id uuid primary key references auth.users(id) on delete cascade,
   status text not null check (status in ('connected','disconnected')),
   token_ciphertext jsonb not null,
   token_type text not null default 'Bearer',
@@ -156,7 +149,7 @@ create table if not exists public.upstox_connections (
 
 create table if not exists public.upstox_oauth_states (
   state_hash text primary key check (state_hash ~ '^[a-f0-9]{64}$'),
-  user_id uuid not null references public.paper_user_identity_map(supabase_user_id) on delete restrict,
+  user_id uuid not null references auth.users(id) on delete cascade,
   connection_generation bigint not null default 0 check (connection_generation >= 0),
   used boolean not null default false,
   used_at timestamptz,
@@ -165,13 +158,13 @@ create table if not exists public.upstox_oauth_states (
 );
 
 create table if not exists public.upstox_connection_controls (
-  user_id uuid primary key references public.paper_user_identity_map(supabase_user_id) on delete restrict,
+  user_id uuid primary key references auth.users(id) on delete cascade,
   generation bigint not null default 0 check (generation >= 0),
   updated_at_ms bigint not null check (updated_at_ms >= 0)
 );
 
 create table if not exists public.paper_market_stream_leases (
-  user_id uuid primary key references public.paper_user_identity_map(supabase_user_id) on delete restrict,
+  user_id uuid primary key references auth.users(id) on delete cascade,
   lease_id uuid not null,
   expires_at_ms bigint not null check (expires_at_ms >= 0),
   updated_at_ms bigint not null check (updated_at_ms >= 0),
@@ -185,7 +178,7 @@ create table if not exists public.paper_market_worker_state (
 );
 
 create table if not exists public.paper_margin_preview_limits (
-  user_id uuid primary key references public.paper_user_identity_map(supabase_user_id) on delete restrict,
+  user_id uuid primary key references auth.users(id) on delete cascade,
   last_requested_at_ms bigint not null check (last_requested_at_ms >= 0),
   updated_at_ms bigint not null check (updated_at_ms >= 0)
 );
@@ -213,26 +206,8 @@ create index if not exists paper_market_stream_leases_expiry_idx
   on public.paper_market_stream_leases (expires_at_ms);
 
 
--- Firebase UID is a string JWT subject; resolve it through the private identity map.
-create or replace function public.current_paper_user_id()
-returns uuid
-language sql
-stable
-security definer
-set search_path = ''
-as $fn$
-  select m.supabase_user_id
-  from public.paper_user_identity_map as m
-  where m.firebase_uid = (select auth.jwt()->>'sub')
-  limit 1
-$fn$;
-
-revoke all on function public.current_paper_user_id() from public, anon;
-grant execute on function public.current_paper_user_id() to authenticated, service_role;
-grant select on public.paper_user_identity_map to service_role;
-
+-- New users authenticate directly with Supabase Auth; auth.uid() is the canonical owner UUID.
 -- Every table has RLS. Trading writes and all provider/worker state are server-only.
-alter table public.paper_user_identity_map enable row level security;
 alter table public.paper_accounts enable row level security;
 alter table public.paper_equity_positions enable row level security;
 alter table public.paper_derivative_positions enable row level security;
@@ -248,34 +223,34 @@ alter table public.paper_margin_preview_limits enable row level security;
 
 drop policy if exists paper_accounts_select_own on public.paper_accounts;
 create policy paper_accounts_select_own on public.paper_accounts
-  for select to authenticated using ((select public.current_paper_user_id()) = user_id);
+  for select to authenticated using ((select auth.uid()) = user_id);
 drop policy if exists paper_equity_positions_select_own on public.paper_equity_positions;
 create policy paper_equity_positions_select_own on public.paper_equity_positions
-  for select to authenticated using ((select public.current_paper_user_id()) = user_id);
+  for select to authenticated using ((select auth.uid()) = user_id);
 drop policy if exists paper_derivative_positions_select_own on public.paper_derivative_positions;
 create policy paper_derivative_positions_select_own on public.paper_derivative_positions
-  for select to authenticated using ((select public.current_paper_user_id()) = user_id);
+  for select to authenticated using ((select auth.uid()) = user_id);
 drop policy if exists paper_orders_select_own on public.paper_orders;
 create policy paper_orders_select_own on public.paper_orders
-  for select to authenticated using ((select public.current_paper_user_id()) = user_id);
+  for select to authenticated using ((select auth.uid()) = user_id);
 drop policy if exists paper_derivative_orders_select_own on public.paper_derivative_orders;
 create policy paper_derivative_orders_select_own on public.paper_derivative_orders
-  for select to authenticated using ((select public.current_paper_user_id()) = user_id);
+  for select to authenticated using ((select auth.uid()) = user_id);
 drop policy if exists paper_watchlists_select_own on public.paper_watchlists;
 create policy paper_watchlists_select_own on public.paper_watchlists
-  for select to authenticated using ((select public.current_paper_user_id()) = user_id);
+  for select to authenticated using ((select auth.uid()) = user_id);
 drop policy if exists paper_watchlists_insert_own on public.paper_watchlists;
 create policy paper_watchlists_insert_own on public.paper_watchlists
-  for insert to authenticated with check ((select public.current_paper_user_id()) = user_id);
+  for insert to authenticated with check ((select auth.uid()) = user_id);
 drop policy if exists paper_watchlists_update_own on public.paper_watchlists;
 create policy paper_watchlists_update_own on public.paper_watchlists
-  for update to authenticated using ((select public.current_paper_user_id()) = user_id) with check ((select public.current_paper_user_id()) = user_id);
+  for update to authenticated using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
 drop policy if exists paper_watchlists_delete_own on public.paper_watchlists;
 create policy paper_watchlists_delete_own on public.paper_watchlists
-  for delete to authenticated using ((select public.current_paper_user_id()) = user_id);
+  for delete to authenticated using ((select auth.uid()) = user_id);
 
 -- Sensitive tables have no authenticated/anon grants or user policies.
-revoke all on public.paper_user_identity_map, public.paper_accounts,
+revoke all on public.paper_accounts,
   public.paper_equity_positions, public.paper_derivative_positions,
   public.paper_orders, public.paper_derivative_orders, public.paper_watchlists,
   public.upstox_connections, public.upstox_oauth_states,

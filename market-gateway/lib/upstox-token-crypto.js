@@ -35,4 +35,22 @@ function decryptUpstoxToken(box, keyValue) {
   return token;
 }
 
-module.exports = {decryptUpstoxToken};
+
+function encryptUpstoxToken(token, keyValue) {
+  if (typeof token !== "string" || !token.trim() || token.length > 16384
+    || /[\u0000-\u001f\u007f]/.test(token)) {
+    throw new Error("Invalid Upstox token.");
+  }
+  const key = decodeCanonicalBase64(keyValue, 32, 32);
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv("aes-256-gcm", key, iv);
+  const encrypted = Buffer.concat([cipher.update(token, "utf8"), cipher.final()]);
+  return {
+    v: 1,
+    iv: iv.toString("base64"),
+    tag: cipher.getAuthTag().toString("base64"),
+    data: encrypted.toString("base64")
+  };
+}
+
+module.exports = {decryptUpstoxToken,encryptUpstoxToken};

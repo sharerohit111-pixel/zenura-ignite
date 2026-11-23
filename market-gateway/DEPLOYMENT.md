@@ -1,149 +1,136 @@
-# Indian Market deployment runbook
+# ZENURA IGNITE — Supabase Market Gateway Deployment
 
-The checked-in .firebaserc default points to the production Firebase project zenura-ignite-technologies. **Never rely on that default for testing.** All staging deployment commands must pass an explicit, separately verified non-production project ID. The deployment scripts below refuse the production project. No staging project or live provider credentials are assumed to exist until independently verified.
+## Architecture
 
-## 1. Firebase staging project and Authentication
+- **Supabase** is the application backend: native Auth, Postgres, RLS and transactional RPCs.
+- **Cloud Run** hosts one Node.js HTTP/SSE market gateway. It is not Firebase and does not use Firebase Auth, Firestore or Firebase Functions.
+- The same Cloud Run process runs the leased Delivery LIMIT worker and, when explicitly enabled, separately leased Intraday LIMIT and equity protective-order workers. There is **no separate Cloud Run Job or Cloud Scheduler** in the current design.
+- Each user authorizes their own Upstox account. The gateway resolves that user's encrypted token only after validating the user's Supabase access token.
+- All orders are virtual paper orders. The app does not submit orders to Upstox or an exchange.
+- The frontend's gateway URL remains blank until a verified gateway is deployed.
 
-1. Create or verify a dedicated non-production Firebase project and Firestore database. Record its exact project ID as FIREBASE_STAGING_PROJECT_ID.
-2. Confirm that this ID is not zenura-ignite-technologies and that the project is not shared with the Crypto or production app.
-3. In the staging Firebase Console, enable **Google** and **Email/Password** sign-in and add only the staging website host to Authorized domains.
-4. Confirm the staging web app configuration, Firestore rules and required indexes are deliberately configured for that staging project. Do not change the checked-in production web configuration as part of staging setup.
-5. Authenticate the Firebase CLI, then create the four OAuth secrets in that same staging project and deploy only the four connection Functions. Every secret operation must explicitly target staging; never let the Firebase CLI select the `.firebaserc` production default:
+## Important release gate: market-data rights
 
-```sh
-export FIREBASE_STAGING_PROJECT_ID=YOUR_VERIFIED_STAGING_PROJECT_ID
-test -n "$FIREBASE_STAGING_PROJECT_ID"
-test "$FIREBASE_STAGING_PROJECT_ID" != "zenura-ignite-technologies"
-firebase functions:secrets:set UPSTOX_CLIENT_ID --project "$FIREBASE_STAGING_PROJECT_ID"
-firebase functions:secrets:set UPSTOX_CLIENT_SECRET --project "$FIREBASE_STAGING_PROJECT_ID"
-firebase functions:secrets:set UPSTOX_REDIRECT_URI --project "$FIREBASE_STAGING_PROJECT_ID"
-firebase functions:secrets:set UPSTOX_TOKEN_ENCRYPTION_KEY --project "$FIREBASE_STAGING_PROJECT_ID"
-npm run --prefix functions deploy
-```
+Public real-time market-data deployment is blocked until written Upstox/provider permission and Indian securities counsel's applicability review are recorded. API credentials alone do not prove redistribution/display rights. See [MARKET-DATA-COMPLIANCE.md](./MARKET-DATA-COMPLIANCE.md). The manual deployment workflow fails closed unless `MARKET_DATA_RIGHTS_APPROVED=true` and a written approval reference are present.
 
-The deploy script passes --project "$FIREBASE_STAGING_PROJECT_ID" explicitly and refuses to run when the variable is missing or points at production. Do not use firebase use default or rely on .firebaserc for staging.
+Do not bypass this check. If public real-time display is not approved, use a licensed source or implement the required delayed-data mode before launch.
 
-The scheduled processPendingPaperLimitOrders worker is deliberately excluded. Keep it undeployed until staging OAuth, account isolation, quote-freshness, LIMIT placement/fill/cancel, reservation-release and operational monitoring checks pass, and separate staging worker-deployment approval is recorded. If approved, deploy only that worker to the same verified staging project:
+## Required Google Cloud configuration
 
-```sh
-npm run --prefix functions deploy:limit-worker
-```
+Use a dedicated Google Cloud project in `asia-south1` (Mumbai).
 
-Do not run either command until the staging project exists, its Firestore database and required secrets are configured, and staging deployment approval has been recorded. No production deployment is authorized by this runbook. Production rollout requires a separate explicit approval and a separately reviewed deployment plan.
+1. Enable billing and configure a budget alert before deploying.
+2. Create a deployer/runtime service account. The current workflow uses the same account for image push, Cloud Run deployment and runtime secret access.
+3. Grant the service account:
+   - Artifact Registry Writer
+   - Cloud Run Admin
+   - Service Account User on itself/runtime identity
+   - Secret Manager Secret Accessor on only the four secrets below
+4. Configure GitHub Workload Identity Federation for repository `sharerohit111-pixel/zenura-ignite`, restricted to branch `main`. Do not use a downloaded service-account JSON key.
+5. Create the Artifact Registry repository `zenura` in `asia-south1` (the workflow creates it if missing).
+6. Map the chosen HTTPS gateway domain to the Cloud Run service and configure DNS before deployment.
+7. Register the exact Upstox OAuth callback URL with the Upstox developer application.
 
-Do **not** use --only functions: that can redeploy existing Premium/Razorpay Functions. Firestore rules and indexes are project-wide resources, not isolated per feature. Review the complete rules/indexes and verify existing Crypto/Premium entitlements before deploying any rules or indexes, even to staging. Always pass the explicit staging project ID:
+### Secret Manager entries
 
-```sh
-firebase deploy --project "$FIREBASE_STAGING_PROJECT_ID" --only firestore:rules,firestore:indexes
-```
+Create these four secrets in the same Google Cloud project:
 
-## 2. Upstox OAuth secrets
+- `zenura-supabase-service-role`: the Supabase service-role secret key. Never place this in browser code or GitHub variables.
+- `zenura-upstox-encryption-key`: a strong 32-byte encryption key in the exact encoding expected by the gateway.
+- `zenura-upstox-client-id`: the Upstox API client ID.
+- `zenura-upstox-client-secret`: the Upstox API client secret.
 
-Create a fresh 32-byte encryption key locally and store it only in Secret Manager. For staging, every secret operation must explicitly target `FIREBASE_STAGING_PROJECT_ID`; do not use the production project or CLI default:
+The Supabase publishable key is public and is already configured in the browser client; the workflow passes it to Cloud Run. No service-role or Upstox secret is embedded in the app.
 
-```sh
-openssl rand -base64 32
-firebase functions:secrets:set UPSTOX_CLIENT_ID --project "$FIREBASE_STAGING_PROJECT_ID"
-firebase functions:secrets:set UPSTOX_CLIENT_SECRET --project "$FIREBASE_STAGING_PROJECT_ID"
-firebase functions:secrets:set UPSTOX_REDIRECT_URI --project "$FIREBASE_STAGING_PROJECT_ID"
-firebase functions:secrets:set UPSTOX_TOKEN_ENCRYPTION_KEY --project "$FIREBASE_STAGING_PROJECT_ID"
-```
+## GitHub Actions configuration
 
-Set the staging `UPSTOX_REDIRECT_URI` to the exact callback URL for the staging project (not production):
+The workflow `.github/workflows/deploy-supabase-market-gateway.yml` is manual-dispatch only and the job runs only from `main`.
 
-`https://asia-south1-${FIREBASE_STAGING_PROJECT_ID}.cloudfunctions.net/upstoxOAuthCallback`
+Configure GitHub Actions **secrets**:
 
-Register that exact staging URL in the staging Upstox Developer app. Use the same staging-only generated encryption key in the staging gateway's Secret Manager environment variable. Never reuse production OAuth credentials or encryption keys, commit a key, or paste it into browser configuration.
+- `GCP_PROJECT_ID`
+- `GCP_SERVICE_ACCOUNT`
+- `GCP_WORKLOAD_IDENTITY_PROVIDER` (full Workload Identity Provider resource name)
 
-### Upstox token lifecycle
+Configure GitHub Actions **variables**:
 
-The standard OAuth access token expires at **03:30 AM Asia/Kolkata time** (the same day if generated before the cutoff, otherwise the following day). Upstox does not provide a standard refresh-token flow for this OAuth grant; users must complete Upstox authorization again after expiry. The callback stores the calculated 03:30 IST cutoff, and the connection UI displays the expiry and reconnect guidance.
+- `MARKET_GATEWAY_URL`: verified HTTPS origin mapped to the Cloud Run service, without a trailing slash.
+- `FRONTEND_ORIGIN`: exact HTTPS frontend origin, without a trailing slash.
+- `UPSTOX_REDIRECT_URI`: exactly `MARKET_GATEWAY_URL/upstox/oauth/callback`.
+- `ZENURA_APP_REDIRECT_URI`: exactly `FRONTEND_ORIGIN/markets/stocks/`.
+- `MARKET_DATA_RIGHTS_APPROVED`: set to `true` only after written provider/legal approval is actually received.
+- `MARKET_DATA_RIGHTS_REFERENCE`: reference to the written approval (document ID or approved record).
 
-Upstox also documents a separate one-year Analytics Token, but it is strictly read-only and limited to supported GET APIs. It cannot be used for trading operations. Do not substitute it for a user's OAuth token or distribute it to app users; follow Upstox's credential and exchange-data terms.
-## 3. Indian paper-account starting balance
+The workflow validates these values and the four Secret Manager entries before it builds or deploys. It then:
 
-The existing product specification sets a ₹10,00,000 virtual starting capital. Cash equities and long-option paper orders share the same `indianPaperAccounts/{uid}` document and `cashPaise` balance; equity holdings remain in `positions`, while derivative holdings are isolated in `derivativePositions`. The authenticated `GET /paper/account` endpoint initializes this shared account once. Derivative orders are stored separately in `indianDerivativeOrders`. No second derivative starting balance is created. Set the starting capital server-side before enabling accounts:
+1. Builds the Docker image from the repository root (the shared OAuth helpers under `functions/lib` are included).
+2. Deploys `zenura-market-gateway` to Cloud Run.
+3. Runs one warm instance (2 vCPU / 2 GiB) with CPU always allocated.
+4. Enables the leased equity Delivery LIMIT worker at a 2-second polling interval.
+5. Waits for the instrument master and a successful worker cycle in the public health response.
+6. Updates both market-mode HTML pages to use the verified gateway URL.
 
-```sh
-INDIAN_PAPER_STARTING_CASH_PAISE=100000000
-```
+## Runtime and performance settings
 
-Do not put this value in client-side code. The server-side default is ₹10,00,000 when the variable is omitted; set the variable explicitly in each Cloud Run environment to make the intended starting balance auditable. An invalid explicit value causes account initialization to fail closed.
+The deployment uses:
 
-## 4. Cloud Run gateway
+- `--min 1 --max 5`: keep one instance warm; allow controlled scaling.
+- `--cpu 2 --memory 2Gi`: gateway and chart-data requests.
+- `--no-cpu-throttling`: required because the LIMIT worker runs in the background between HTTP requests.
+- `--concurrency 40`: limit request concurrency per instance.
+- `--timeout 3600`: supports long-lived Upstox V3 SSE streams.
+- `PAPER_LIMIT_WORKER_ENABLED=true` and `PAPER_LIMIT_WORKER_INTERVAL_MS=2000`.
+- `PAPER_INTRADAY_LIMIT_WORKER_ENABLED` remains unset/false by default. Do not enable it until the reviewed official NSE/BSE session calendar has been populated and verified in `paper_exchange_sessions`, the migration is approved/applied, and the live calendar/session smoke checks are complete. Optional interval: `PAPER_INTRADAY_LIMIT_WORKER_INTERVAL_MS`.
+- `PAPER_PROTECTIVE_WORKER_ENABLED` remains unset/false by default. Enable only after the protective-order UI, SQL migration checks, end-to-end tests, written market-data rights and compliance gates are complete. Optional interval: `PAPER_PROTECTIVE_WORKER_INTERVAL_MS`.
 
-Deploy `market-gateway/` as a separate Cloud Run service with Node.js 22. Configure:
-- `UPSTOX_TOKEN_ENCRYPTION_KEY`: the same Secret Manager value as the Firebase Function.
-- `ALLOWED_ORIGINS=https://zenuraignite.com` (use the exact production origin, no wildcard).
-- `INDIAN_PAPER_STARTING_CASH_PAISE=100000000`.
-- A dedicated service account with least-privilege Firestore IAM permissions for the target database. **Firestore IAM is database-level, not collection-level, and Admin SDK calls bypass Firestore Security Rules.** Keep gateway code access limited to `upstoxConnections`, `indianMarketWatchlists`, `indianPaperAccounts`, `indianPaperOrders`, `indianDerivativeOrders`, `indianMarketStreamLeases` (live-feed lease coordination), and `indianMarginPreviewLimits` (per-user margin-preview cooldown).
-- Public HTTPS ingress so browser requests can reach the service; the gateway itself validates Firebase ID tokens on protected endpoints. Do not disable application authentication.
+Every instance may start the worker loop, but the Postgres lease ensures only one worker is the active writer. Worker errors and instrument-master refresh failures use bounded exponential backoff. The public `/health` response exposes only safe readiness data: instrument-master availability, worker liveness and cycle counts. A cycle-level worker fault is distinguished from an individual user's expired token or rejected order; per-user failures are counted without falsely declaring the whole service unhealthy. It never exposes credentials or user data.
 
-After deployment, set the exact Cloud Run HTTPS URL in the `market-gateway-url` meta tag in `markets/stocks/index.html`. Do not point the frontend at a placeholder or unverified URL.
+**Cost warning:** one warm 2-vCPU/2-GiB instance with CPU always allocated creates ongoing Google Cloud charges. Keep deployment manual and configure a billing budget/alert first.
 
-### Staging Cloud Run deployment (separate project only)
+## Supabase Auth configuration
 
-After the staging Firebase project and staging-only secrets are verified, deploy the gateway with an explicit project flag. Replace the staging host and service-account placeholders with verified staging values. Do not run this against production.
+Before public testing:
 
-```sh
-: "${FIREBASE_STAGING_PROJECT_ID:?Set the verified staging project ID}"
-test "$FIREBASE_STAGING_PROJECT_ID" != "zenura-ignite-technologies"
-gcloud run deploy zenura-indian-market-gateway-staging \
-  --project "$FIREBASE_STAGING_PROJECT_ID" \
-  --source market-gateway \
-  --region asia-south1 \
-  --platform managed \
-  --allow-unauthenticated \
-  --service-account "YOUR_STAGING_GATEWAY_SERVICE_ACCOUNT@$FIREBASE_STAGING_PROJECT_ID.iam.gserviceaccount.com" \
-  --set-env-vars "ALLOWED_ORIGINS=https://YOUR_STAGING_WEB_HOST,INDIAN_PAPER_STARTING_CASH_PAISE=100000000,MAX_INSTRUMENT_KEYS=100" \
-  --set-secrets UPSTOX_TOKEN_ENCRYPTION_KEY=UPSTOX_TOKEN_ENCRYPTION_KEY:latest
-```
+- Set the Supabase Auth Site URL to the actual frontend origin.
+- Add the exact frontend origin and app return URL to the redirect allow-list.
+- Configure production SMTP and verify email delivery/rate limits.
+- Keep email/password or other enabled sign-in methods consistent with the actual UI and privacy policy.
 
-The staging runtime service account must have only the required staging Firestore access and Secret Manager access. Confirm the named secret exists in the staging project and contains the staging encryption key. Verify the returned staging URL and `/health`; do not update the production frontend's gateway URL. Configure a separate staging frontend with the staging Firebase web configuration and exact staging gateway URL. No staging resource is assumed to exist until verified in Google Cloud.
-### Reproducible production Cloud Run deployment — NOT AUTHORIZED
+These Auth settings are separate from the Cloud Run deployment workflow and must be verified in the Supabase project dashboard.
 
-The following production commands are reference documentation only. Do not execute them as part of staging preparation or this PR's current approval.
+## Current order-type coverage
 
-Run these commands from the repository root after replacing the service-account placeholder with a dedicated service account that has the required Firestore access and Secret Manager access. Do not grant project Owner or Editor.
+- Paper Trading equity MARKET orders are supported.
+- Equity LIMIT orders are currently supported for **Delivery** and are processed by the in-service worker.
+- Intraday LIMIT now has a separate SQL reservation/fill/cancel/expiry lifecycle, session-aware quote validation, a dedicated leased worker and gateway routing. It remains **disabled by default** until official verified calendar rows are loaded and reviewed; the deployment workflow does not enable it.
+- F&O LIMIT remains unsupported.
+- Futures and long CE/PE option market-order paths are separate transactional flows.
+- Paper Investing routes and its dedicated ledger have been retired under the Paper Trading-only product scope.
+- Equity SELL-to-close stop-loss/target execution has a separately leased, bounded, fresh-quote worker implementation and an owner-bound cancellation API. The worker is **opt-in and disabled by default**. Protective-order creation UI/API are now integrated in the isolated stock-terminal module, with authenticated create/list/cancel flows, per-user idempotent retry protection and a fail-closed worker-enabled gate. CI covers the module contract and backend fill/cancel row-lock race. A staging browser-to-gateway trigger/cancel rehearsal and production readiness checks remain incomplete; the worker stays opt-in and disabled by default. Do not claim always-on protective execution until those gates pass. Futures and Options protective exits remain unsupported.
 
-```sh
-gcloud config set project zenura-ignite-technologies
-gcloud run deploy zenura-indian-market-gateway \
-  --source market-gateway \
-  --region asia-south1 \
-  --platform managed \
-  --allow-unauthenticated \
-  --service-account YOUR_GATEWAY_SERVICE_ACCOUNT@zenura-ignite-technologies.iam.gserviceaccount.com \
-  --set-env-vars ALLOWED_ORIGINS=https://zenuraignite.com,INDIAN_PAPER_STARTING_CASH_PAISE=100000000,MAX_INSTRUMENT_KEYS=100 \
-  --set-secrets UPSTOX_TOKEN_ENCRYPTION_KEY=UPSTOX_TOKEN_ENCRYPTION_KEY:latest
-```
+## Manual build reference
 
-The service is intentionally internet-reachable for browser CORS requests; application routes still verify Firebase ID tokens. Grant the runtime service account Secret Manager Secret Accessor on the encryption-key secret and the minimum Firestore database IAM role needed by the Admin SDK. Confirm the Firestore database and Cloud Run service are in the same intended project. Do not copy the encryption key into `--set-env-vars`, source files, build arguments, or browser code.
-
-After deployment, obtain and verify the service URL before editing the frontend:
+The GitHub Actions workflow is the preferred deployment path. For a controlled local build from the repository root:
 
 ```sh
-gcloud run services describe zenura-indian-market-gateway --region asia-south1 --format='value(status.url)'
-curl --fail --show-error "$(gcloud run services describe zenura-indian-market-gateway --region asia-south1 --format='value(status.url)')/health"
+PROJECT_ID=YOUR_DEDICATED_GCP_PROJECT_ID
+REGION=asia-south1
+IMAGE="$REGION-docker.pkg.dev/$PROJECT_ID/zenura/market-gateway:release"
+
+gcloud auth configure-docker "$REGION-docker.pkg.dev"
+docker build -f market-gateway/Dockerfile -t "$IMAGE" .
+docker push "$IMAGE"
 ```
 
-The health response is a liveness check only; it does not prove Firebase authentication, Firestore permissions, Upstox OAuth, or live streaming works. Complete the end-to-end checks below before setting the frontend gateway URL or enabling production access. Deploy with the intended production origin only; preview origins must be added deliberately and explicitly.
+Do not manually deploy around the market-data rights gate or the health checks.
 
-## 5. Verification before production
+## Internal service-role privilege preflight
 
-1. Run `npm test` and `npm run check` in `market-gateway/`, plus the GitHub Actions workflow.
-2. Verify Google and Email/Password sign-in against the intended Firebase project.
-3. Complete Upstox OAuth and confirm the encrypted token is stored server-side only.
-4. Verify `/health`, official instrument search, candles, option chain, watchlist quotes and streaming using an authorized account.
-5. Test cash-equity BUY/SELL with fresh quotes, idempotent retry, insufficient cash, insufficient holdings, stale quote and cross-user access denial.
-6. Confirm balances and data remain separate from Crypto.
-7. Obtain confirmation that the Upstox account has the required API/data entitlements and that the intended exchange data display complies with provider/exchange terms.
+Before staging sign-off, verify the narrowly scoped `service_role` privileges required by direct server-side reads/updates: `SELECT` on `upstox_connections`, `paper_market_worker_state`, `paper_orders`, `paper_protective_orders` and `paper_equity_positions`, plus `UPDATE` on `paper_market_worker_state` and `paper_protective_orders`. Do not grant these privileges to `anon` or `authenticated`; keep internal tables inaccessible to client roles. The currently linked Supabase project lacks these service-role privileges, so OAuth lookup and worker runtime verification remain blocked until a corrective migration is rehearsed and verified in disposable staging. Never apply this fix directly to production as part of the draft PR.
 
-## Current product boundary
+## Release safety
 
-This release simulates market BUY/SELL for NSE/BSE cash equities and long CE/PE option BUY plus SELL-to-close orders only. Option BUY and SELL-to-close fills use a fresh server-fetched Upstox quote and atomically debit or credit the shared Indian-market virtual cash balance after itemized indicative Upstox fee estimates. Entry charges are included in long-option average cost and realized P&L includes exit charges. The option-The cash-equity paper-trading backend supports market BUY/SELL and pending LIMIT BUY/SELL orders. LIMIT orders reserve virtual cash or shares, execute only through the scheduled server-side worker when a fresh Upstox quote reaches the limit, and release reservations on cancellation. These remain paper simulations: no broker or exchange order is submitted. The LIMIT worker is not production-active until its explicitly allowlisted Firebase Function is deployed and staging verification is complete. Stop-loss/stop orders, opening short options, futures execution, margin reservation, complete cash-equity fee simulation, dividends and corporate actions are not enabled. Option charge estimates are not a broker contract note; verify current tariffs and exchange schedules before production. Do not enable the release until automated tests, Firebase/Upstox live checks, LIMIT-order staging tests, security review and provider entitlements are verified. Keep PR #28 in draft until all deployment and provider-account checks pass.
-
-
-### Futures margin preview verification
-
-The UI calls the authenticated `POST /paper/derivative/margin-preview` gateway route only for a selected official NSE/BSE futures contract. The route requires a fresh Upstox quote and calls the Upstox V2 margin endpoint with the selected product `D` (Delivery) or `I` (Intraday). It returns a preview and virtual-cash shortfall only. It does not reserve margin, persist an order, mutate the paper account, or submit an exchange/broker order. Verify this behavior with the gateway test suite and an authorized Upstox account before any production release. Futures execution remains disabled.
+- No legacy customer data is imported.
+- No Firebase production services are changed.
+- Do not put Supabase service-role or Upstox secrets in frontend code, GitHub variables, commits or logs.
+- Do not merge the draft PR, run production deployment, or submit to Google Play until the relevant backend, data-rights, Auth, device-performance and Android release gates pass.

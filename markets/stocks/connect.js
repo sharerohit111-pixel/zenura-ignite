@@ -1,131 +1,143 @@
-/* Indian Market account connection — uses the root ZENURA Firebase project,
- * intentionally separate from the legacy Crypto Firebase auth project. */
-import { auth } from "../../firebase-client.js";
-import { GoogleAuthProvider, signInWithPopup, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-auth.js";
-import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-functions.js";
+/* Native Supabase Auth connector for the ZENURA IGNITE Indian Market workspace. */
+import { supabase } from "./supabase-client.js";
 
-const REGION = "asia-south1";
-const functions = getFunctions(auth.app, REGION);
-const startAuthorization = httpsCallable(functions, "startUpstoxAuthorization");
-const getConnectionStatus = httpsCallable(functions, "getIndianMarketConnectionStatus");
-const disconnectAccount = httpsCallable(functions, "disconnectUpstoxAccount");
+// Shared only with same-origin chart persistence; authenticated requests still use the user session and RLS.
+window.ZENURA_SUPABASE = supabase;
+
 const button = document.getElementById("upstox-connect");
 const disconnectButton = document.getElementById("upstox-disconnect");
 const card = document.getElementById("connection");
 const heading = document.getElementById("connection-title");
 const detail = document.getElementById("connection-sub");
+const gateway = (document.querySelector('meta[name="market-gateway-url"]')?.content || "").trim().replace(/\/+$/, "");
 
 function setState(title, message, connected = false, showDisconnect = connected) {
   heading.textContent = title;
   detail.textContent = message;
   card.classList.toggle("connected", connected);
-  button.textContent = connected ? "RECONNECT UPSTOX" : (auth.currentUser ? "CONNECT UPSTOX" : "SIGN IN / CONNECT");
+  button.textContent = connected ? "RECONNECT UPSTOX" : "CONNECT UPSTOX";
   disconnectButton.hidden = !showDisconnect;
 }
-let authStateSequence = 0;
-
-function explainError(error) {
-  const code = error?.code || "";
-  if (code.includes("unauthenticated")) return "Sign-in required. Please sign in and retry.";
-  if (code.includes("permission-denied")) return "This account is not allowed to start authorization.";
-  if (code.includes("not-found") || code.includes("unavailable")) return "Backend functions are not deployed to the configured Firebase project yet.";
-  if (code.includes("unauthorized-domain")) return "Add this website domain in Firebase Authentication → Settings → Authorized domains.";
-  return error?.message || "Could not connect. Please retry.";
+function explainError(error, payload) {
+  const code = error?.code || payload?.code || "";
+  if (code === "session_not_found" || code === "invalid_jwt") return "Your sign-in session expired. Sign in again.";
+  if (code === "email_not_confirmed") return "Verify your email address before connecting Upstox.";
+  if (!gateway) return "Market gateway URL is not configured. Supabase sign-in is available; market connection awaits the new gateway.";
+  return payload?.error || error?.message || "The secure market service is unavailable. Please retry.";
 }
+async function sessionSnapshot() {
+  const { data, error } = await supabase.auth.getSession();
+  if (error) throw error;
+  return data.session || null;
+}
+async function api(path, options = {}) {
+  const session = await sessionSnapshot();
+  if (!session?.access_token) throw new Error("Sign in to continue.");
+  if (!gateway) throw new Error("Market gateway URL is not configured yet.");
+  const response = await fetch(gateway + path, {
+    ...options,
+    headers: {
+      Authorization: "Bearer " + session.access_token,
+      Accept: "application/json",
+      ...(options.body ? { "Content-Type": "application/json" } : {}),
+      ...(options.headers || {})
+    },
+    cache: "no-store",
+    signal: AbortSignal.timeout(15000)
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const error = new Error(payload.error || "Market service request failed (" + response.status + ").");
+    error.status = response.status;
+    error.payload = payload;
+    throw error;
+  }
+  return payload;
+}
+let authStateSequence = 0;
+let currentSession = null;
 async function refreshStatus(sequence = authStateSequence) {
-  const userAtStart = auth.currentUser;
-  if (!userAtStart) {
-    setState("SIGN IN REQUIRED", "Sign in with Google to securely connect your Upstox account.");
+  const session = await sessionSnapshot().catch(() => null);
+  if (!session?.user) {
+    setState("SIGN IN REQUIRED", "Create an account or sign in using Supabase below. No Firebase account is used.");
+    return;
+  }
+  if (!gateway) {
+    setState("SUPABASE SIGNED IN", "Signed in securely. Configure the Supabase-native market gateway to connect Upstox.");
     return;
   }
   try {
-    const result = await getConnectionStatus();
-    if (sequence !== authStateSequence || auth.currentUser?.uid !== userAtStart.uid) return;
-    const data = result.data || {};
+    const data = await api("/upstox/connection");
+    if (sequence !== authStateSequence) return;
     if (data.connected) {
       const expiry = Number.isFinite(data.expiresAt)
-        ? new Date(data.expiresAt).toLocaleString("en-IN", {timeZone:"Asia/Kolkata", dateStyle:"medium", timeStyle:"short"})
-        : "03:30 AM IST daily cutoff";
-      setState("UPSTOX AUTHORIZED", (data.feedReady
-        ? "Market feed gateway is ready."
-        : "Account authorized. Select an instrument to check live feed availability.")
-        + " Access token expires at " + expiry + "; reconnect after expiry.", true);
-    } else if (data.status === "token_expired") {
-      setState("UPSTOX TOKEN EXPIRED", "Upstox standard access tokens expire at 03:30 AM IST. Reconnect your account to continue, or disconnect the saved token.", false, true);
+        ? new Date(data.expiresAt).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", dateStyle: "medium", timeStyle: "short" })
+        : "provider expiry";
+      setState("UPSTOX AUTHORIZED", (data.feedReady ? "Market feed gateway is ready. " : "Account authorized. ")
+        + "Access token expires at " + expiry + ".", true);
     } else {
-      setState("UPSTOX NOT CONNECTED", "Authorize Upstox to link your trading account.");
+      setState("UPSTOX NOT CONNECTED", "Authorize Upstox to enable verified Indian market data.");
     }
   } catch (error) {
-    if (sequence === authStateSequence && auth.currentUser?.uid === userAtStart.uid) {
-      setState("BACKEND NOT READY", explainError(error));
-    }
+    if (sequence === authStateSequence) setState("MARKET BACKEND NOT READY", explainError(error, error.payload));
   }
 }
 disconnectButton.addEventListener("click", async () => {
-  const uid = auth.currentUser?.uid;
-  if (!uid) return;
   disconnectButton.disabled = true;
   try {
-    setState("DISCONNECTING UPSTOX", "Removing the locally saved token and ending this app's live feed…");
-    await disconnectAccount();
-    if (auth.currentUser?.uid !== uid) return;
-    const sequence = authStateSequence;
-    await refreshStatus(sequence);
-    if (sequence === authStateSequence && auth.currentUser?.uid === uid) {
-      setState("UPSTOX DISCONNECTED", "Saved token removed and this app's feed will close on its next lease check. This does not revoke app access at Upstox; remove that permission separately in your Upstox account.", false, false);
-    }
+    setState("DISCONNECTING UPSTOX", "Ending this app's market-data connection…", false, true);
+    await api("/upstox/connection", { method: "DELETE" });
+    await refreshStatus(authStateSequence);
   } catch (error) {
-    if (auth.currentUser?.uid === uid) setState("DISCONNECT FAILED", explainError(error));
+    setState("DISCONNECT FAILED", explainError(error, error.payload), false, true);
   } finally {
     disconnectButton.disabled = false;
   }
 });
 button.addEventListener("click", async () => {
   button.disabled = true;
-  let uid = auth.currentUser?.uid || null;
   try {
-    if (!auth.currentUser) {
-      setState("SIGNING IN", "Complete Google sign-in in the popup.");
-      await signInWithPopup(auth, new GoogleAuthProvider());
-      uid = auth.currentUser?.uid || null;
-    }
-    if (!uid || auth.currentUser?.uid !== uid) return;
-    const currentUser = auth.currentUser;
-    const usesPasswordProvider = currentUser.providerData?.some(provider => provider.providerId === "password");
-    if (usesPasswordProvider && !currentUser.emailVerified) {
-      setState("EMAIL VERIFICATION REQUIRED", "Verify your email address using the link sent by Firebase, then sign in again before connecting Upstox.");
+    const session = await sessionSnapshot();
+    if (!session?.user) {
+      setState("SIGN IN REQUIRED", "Create an account or sign in with Supabase below.");
+      document.getElementById("market-email")?.focus();
       return;
     }
-    const sequence = authStateSequence;
     setState("STARTING UPSTOX", "Preparing secure authorization…");
-    const result = await startAuthorization();
-    if (sequence !== authStateSequence || auth.currentUser?.uid !== uid) return;
-    const url = result.data?.authorizationUrl;
-    if (!url || !url.startsWith("https://api.upstox.com/")) {
+    const result = await api("/upstox/oauth/start", { method: "POST", body: "{}" });
+    const url = result.authorizationUrl;
+    if (typeof url !== "string" || !url.startsWith("https://api.upstox.com/")) {
       throw new Error("The server did not return a valid Upstox authorization URL.");
     }
     window.location.assign(url);
   } catch (error) {
-    if (!uid || auth.currentUser?.uid === uid) setState("CONNECTION NOT COMPLETED", explainError(error));
+    setState("CONNECTION NOT COMPLETED", explainError(error, error.payload), false, false);
   } finally {
     button.disabled = false;
   }
 });
-window.ZENURA_MARKET_CONNECTOR = {
-  isAuthenticated: () => !!auth.currentUser,
-  getUserId: () => auth.currentUser?.uid || null,
+window.ZENURA_MARKET_CONNECTOR = Object.freeze({
+  isAuthenticated: () => !!currentSession?.user,
+  getUserId: () => currentSession?.user?.id || null,
   getIdToken: async () => {
-    if (!auth.currentUser) throw new Error("Sign in to connect the live market feed.");
-    return auth.currentUser.getIdToken();
+    const session = await sessionSnapshot();
+    if (!session?.access_token) throw new Error("Sign in to connect the live market feed.");
+    return session.access_token;
+  },
+  getAccessToken: async () => {
+    const session = await sessionSnapshot();
+    if (!session?.access_token) throw new Error("Sign in to access your private Paper Trading account.");
+    return session.access_token;
   }
-};
-onAuthStateChanged(auth, async user => {
+});
+supabase.auth.onAuthStateChange((_event, session) => {
+  currentSession = session || null;
   const sequence = ++authStateSequence;
-  // Clear the previous account's private UI immediately on every auth transition.
-  // Do not wait for a network-backed connection-status lookup before notifying the market page.
-  window.dispatchEvent(new CustomEvent("zenura-market-auth-ready", { detail: { signedIn: !!user } }));
-  await refreshStatus(sequence);
+  window.dispatchEvent(new CustomEvent("zenura-market-auth-ready", { detail: { signedIn: !!session?.user } }));
+  // Defer network work until after the auth callback returns to avoid auth-lock deadlocks.
+  queueMicrotask(() => refreshStatus(sequence));
 });
 if (new URLSearchParams(location.search).get("upstox") === "connected") {
   history.replaceState({}, "", location.pathname);
+  queueMicrotask(() => refreshStatus());
 }

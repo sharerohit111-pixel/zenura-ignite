@@ -166,10 +166,10 @@
       const response=await fetch(gateway+'/paper/orders?'+params.toString(),{headers:{Authorization:'Bearer '+token,Accept:'application/json'}});
       const data=await response.json();if(seq!==paperHistoryLoadSeq||connector.getUserId()!==uid)return;if(!response.ok)throw new Error(data.error||'Order history unavailable');
       if(!append)paperHistory.textContent='';
-      if(!data.orders?.length&&!append)tableMessage(paperHistory,8,'No paper orders yet.');
+      if(!data.orders?.length&&!append)tableMessage(paperHistory,10,'No paper orders yet.');
       else data.orders.forEach(order=>{
         const tr=document.createElement('tr'),date=order.createdAt?new Date(order.createdAt).toLocaleString('en-IN'):'—';
-        [date,order.tradingSymbol,order.product==='INTRADAY'?'INTRADAY':'DELIVERY',order.side,order.orderType||'MARKET',order.quantity,Number.isSafeInteger(order.executionPricePaise)?inrPaise(order.executionPricePaise):'—',order.status+' · SIM'].forEach(v=>{const td=document.createElement('td');td.textContent=String(v);tr.append(td);});
+        [date,order.tradingSymbol,order.product==='INTRADAY'?'INTRADAY':'DELIVERY',order.side,order.orderType||'MARKET',order.quantity,Number.isSafeInteger(order.executionPricePaise)?inrPaise(order.executionPricePaise):'—',order.chargesBreakdown?.schedule_version?inrPaise(order.chargesPaise):'—',Number.isSafeInteger(order.realizedPnlPaise)?signedMoney(order.realizedPnlPaise):'—',order.status+' · SIM'].forEach(v=>{const td=document.createElement('td');td.textContent=String(v);tr.append(td);});
         paperHistory.append(tr);
       });
       paperHistoryCursor=data.nextCursor||null;
@@ -219,15 +219,48 @@
       }
     }catch(error){if(request===derivativePortfolioRequest&&connector.getUserId()===uid)status.textContent=error.message||'Derivative valuation unavailable';}
   }
-  async function refreshPaperViews(){await Promise.all([loadPaperPortfolio(),loadPaperHistory(),loadDerivativePortfolio()]);}
+  let futuresPortfolioRequest=0;
+  async function loadFuturesPortfolio(){
+    const connector=window.ZENURA_MARKET_CONNECTOR,uid=connector?.getUserId?.(),request=++futuresPortfolioRequest;
+    const body=document.getElementById('futures-positions'),historyBody=document.getElementById('futures-history'),status=document.getElementById('futures-portfolio-status');
+    if(!body||!historyBody||!status||!gateway||!connector?.getIdToken||!uid)return;
+    try{
+      const token=await connector.getIdToken();
+      if(request!==futuresPortfolioRequest||connector.getUserId()!==uid)return;
+      const [response,historyResponse]=await Promise.all([
+        fetch(gateway+'/paper/futures/portfolio',{headers:{Authorization:'Bearer '+token,Accept:'application/json'}}),
+        fetch(gateway+'/paper/futures/orders?limit=50',{headers:{Authorization:'Bearer '+token,Accept:'application/json'}})
+      ]);
+      const data=await response.json(),history=await historyResponse.json();
+      if(request!==futuresPortfolioRequest||connector.getUserId()!==uid)return;
+      if(!response.ok)throw new Error(data.error||'Futures portfolio unavailable');
+      if(!historyResponse.ok)throw new Error(history.error||'Futures order history unavailable');
+      body.textContent='';
+      if(!data.positions?.length)tableMessage(body,7,'No open futures positions.');
+      else data.positions.forEach(p=>{
+        const tr=document.createElement('tr');
+        [p.tradingSymbol||p.instrumentKey,p.product,p.netQuantity,inrPaise(p.averagePricePaise),p.marketPricePaise==null?'STALE':inrPaise(p.marketPricePaise),p.unrealizedPnlPaise==null?'—':signedMoney(p.unrealizedPnlPaise),inrPaise(p.marginReservedPaise)].forEach(v=>{const td=document.createElement('td');td.textContent=String(v);tr.append(td);});
+        body.append(tr);
+      });
+      status.textContent=data.stalePositions>0?'Stale/unavailable quotes for '+data.stalePositions+' of '+data.positions.length+' futures positions. Aggregate unrealized P&L and equity are withheld until every quote is fresh. Margin shown is the entry reservation estimate.':data.marginStatus==='entry_estimate'?'Fresh futures quotes · Margin shown is the entry reservation estimate.':'No open futures positions.';
+      historyBody.textContent='';
+      if(!history.orders?.length)tableMessage(historyBody,8,'No futures orders yet.');
+      else history.orders.forEach(order=>{
+        const tr=document.createElement('tr'),date=order.createdAt?new Date(order.createdAt).toLocaleString('en-IN'):'—';
+        [date,order.tradingSymbol,order.side,order.product,order.quantity/order.lotSize,inrPaise(order.executionPricePaise),inrPaise(order.chargesPaise),order.status+' · SIM'].forEach(v=>{const td=document.createElement('td');td.textContent=String(v);tr.append(td);});
+        historyBody.append(tr);
+      });
+    }catch(error){if(request===futuresPortfolioRequest&&connector.getUserId()===uid)status.textContent=error.message||'Futures portfolio unavailable';}
+  }
+  async function refreshPaperViews(){await Promise.all([loadPaperPortfolio(),loadPaperHistory(),loadDerivativePortfolio(),loadFuturesPortfolio()]);}
   paperRefresh.addEventListener('click',refreshPaperViews);
 
   let paperOrderSubmitting=false,paperOrderSubmitSeq=0;
   function updatePaperButtons(){
     const allowed=!paperOrderSubmitting&&!!selected&&['NSE_EQ','BSE_EQ'].includes(selected.segment)&&selected.instrument_type==='EQ'&&!!window.ZENURA_MARKET_CONNECTOR?.getIdToken&&!!window.ZENURA_MARKET_CONNECTOR?.getUserId?.()&&!!gateway;
-    paperBuy.disabled=!allowed;paperSell.disabled=!allowed;
+    paperBuy.disabled=!allowed;paperSell.disabled=!allowed;updateProtectiveButton?.();
   }
-  const pendingOrderStorage=(()=>{try{return window.sessionStorage;}catch(_){return null;}})();
+  const pendingOrderStorage=(()=>{try{return window.localStorage;}catch(_){return null;}})();
   const paperPendingStorageKey='zenura-indian-paper-order-pending-v1';
   const derivativePendingStorageKey='zenura-indian-derivative-order-pending-v1';
   const retryPolicy=window.ZenuraPaperOrderRetryPolicy;
@@ -256,7 +289,7 @@
       if(!window.crypto?.randomUUID){paperOrderStatus.textContent='A secure order request ID could not be created in this browser.';return;}
       pendingKey=window.crypto.randomUUID();
       if(!retryPolicy.writePendingPaperOrder(pendingOrderStorage,storageKey,{key:pendingKey,fingerprint})){
-        paperOrderStatus.textContent='Browser session storage is unavailable. The order was not sent because safe retry protection could not be saved.';
+        paperOrderStatus.textContent='Browser storage is unavailable. The order was not sent because safe retry protection could not be saved.';
         return;
       }
     }
@@ -280,15 +313,174 @@
   }
   paperBuy.addEventListener('click',()=>submitPaperOrder('BUY'));
   paperSell.addEventListener('click',()=>submitPaperOrder('SELL'));
+  const protectiveCreate=document.getElementById('paper-protective-create');
+  const protectiveType=document.getElementById('paper-protective-type');
+  const protectivePrice=document.getElementById('paper-protective-price');
+  const protectiveStatus=document.getElementById('paper-protective-status');
+  const protectiveListStatus=document.getElementById('paper-protective-list-status');
+  const protectiveBody=document.getElementById('paper-protective-orders-body');
+  const protectiveRefresh=document.getElementById('paper-protective-refresh');
+  let protectiveWorkerEnabled=false,protectiveSubmitting=false,protectiveLoadSeq=0;
+  function updateProtectiveButton(){
+    const allowed=!protectiveSubmitting&&protectiveWorkerEnabled&&!!selected
+      &&['NSE_EQ','BSE_EQ'].includes(selected.segment)&&selected.instrument_type==='EQ'
+      &&!!window.ZENURA_MARKET_CONNECTOR?.getIdToken&&!!window.ZENURA_MARKET_CONNECTOR?.getUserId?.()&&!!gateway;
+    if(protectiveCreate)protectiveCreate.disabled=!allowed;
+    if(protectivePrice)protectivePrice.disabled=!allowed;
+  }
+  function protectiveTime(value){
+    const ms=Date.parse(value||'');return Number.isFinite(ms)?new Date(ms).toLocaleString('en-IN'):'—';
+  }
+  async function loadProtectiveOrders(){
+    const connector=window.ZENURA_MARKET_CONNECTOR,uid=connector?.getUserId?.(),request=++protectiveLoadSeq;
+    if(!gateway||!connector?.getIdToken||!uid){protectiveWorkerEnabled=false;updateProtectiveButton();return;}
+    protectiveListStatus.textContent='Loading your private protective orders…';
+    try{
+      const token=await connector.getIdToken();
+      if(request!==protectiveLoadSeq||connector.getUserId()!==uid)return;
+      const response=await fetch(gateway+'/paper/protective-orders?limit=100',{headers:{Authorization:'Bearer '+token,Accept:'application/json'}});
+      const data=await response.json().catch(()=>({}));
+      if(request!==protectiveLoadSeq||connector.getUserId()!==uid)return;
+      if(!response.ok)throw new Error(data.error||'Protective orders could not be loaded.');
+      protectiveWorkerEnabled=data.workerEnabled===true;updateProtectiveButton();
+      protectiveBody.textContent='';
+      const orders=data.orders||[];
+      if(!orders.length)tableMessage(protectiveBody,8,'No protective orders yet.');
+      orders.forEach(order=>{
+        const tr=document.createElement('tr');
+        const instrument=items.find(x=>x.instrument_key===order.instrumentKey);
+        const values=[protectiveTime(order.createdAt),instrument?.trading_symbol||order.instrumentKey,order.product,
+          order.triggerType,order.quantity,inrPaise(order.triggerPricePaise),order.status];
+        values.forEach(value=>{const td=document.createElement('td');td.textContent=String(value);tr.append(td);});
+        const action=document.createElement('td');
+        if(['ACTIVE','TRIGGERED'].includes(order.status)){
+          const cancel=document.createElement('button');cancel.type='button';cancel.textContent='CANCEL';
+          cancel.addEventListener('click',()=>cancelProtectiveOrder(order.orderId));action.append(cancel);
+        }else action.textContent=order.executionPricePaise?('Filled '+inrPaise(order.executionPricePaise)):'—';
+        tr.append(action);protectiveBody.append(tr);
+      });
+      protectiveListStatus.textContent=protectiveWorkerEnabled
+        ?'Equity protective worker is enabled. Orders are simulated; share quantity is rechecked at execution and is not reserved.'
+        :'Protective execution is disabled on this gateway. No new protective exits can be created.';
+      protectiveStatus.textContent=protectiveWorkerEnabled
+        ?'NSE/BSE cash equities only · SELL-to-close · Simulated execution.'
+        :'Protective execution is not enabled on this gateway.';
+    }catch(error){
+      if(request===protectiveLoadSeq&&connector.getUserId()===uid){
+        protectiveWorkerEnabled=false;updateProtectiveButton();
+        protectiveListStatus.textContent=error.message||'Protective order list unavailable.';
+        protectiveStatus.textContent=protectiveListStatus.textContent;
+      }
+    }
+  }
+  async function submitProtectiveOrder(){
+    if(protectiveSubmitting||!protectiveWorkerEnabled||!selected)return;
+    const connector=window.ZENURA_MARKET_CONNECTOR,uid=connector?.getUserId?.();
+    if(!uid||!connector?.getIdToken)return;
+    const quantity=Number(paperQuantity.value),priceRupees=Number(protectivePrice.value);
+    const triggerPricePaise=Math.round(priceRupees*100),product=paperProductMode.value==='INTRADAY'?'INTRADAY':'DELIVERY';
+    const triggerType=protectiveType.value;
+    if(!Number.isSafeInteger(quantity)||quantity<1||quantity>1000000){protectiveStatus.textContent='Enter a valid whole-number exit quantity.';return;}
+    if(!Number.isFinite(priceRupees)||!Number.isSafeInteger(triggerPricePaise)||triggerPricePaise<1){protectiveStatus.textContent='Enter a valid trigger price in rupees.';return;}
+    if(!['NSE_EQ','BSE_EQ'].includes(selected.segment)||selected.instrument_type!=='EQ'){protectiveStatus.textContent='Select an NSE/BSE cash equity first.';return;}
+    if(!window.crypto?.randomUUID){protectiveStatus.textContent='Secure order identity is unavailable in this browser.';return;}
+    protectiveSubmitting=true;updateProtectiveButton();protectiveStatus.textContent='Validating held shares and creating the simulated protective exit…';
+    const instrumentKey=selected.instrument_key,orderId=window.crypto.randomUUID();
+    try{
+      const token=await connector.getIdToken();
+      if(connector.getUserId()!==uid||selected?.instrument_key!==instrumentKey)throw new Error('Account or selected instrument changed. Retry from the intended account and stock.');
+      const response=await fetch(gateway+'/paper/protective-orders',{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json',Accept:'application/json'},
+        body:JSON.stringify({order_id:orderId,instrument_key:instrumentKey,product,trigger_type:triggerType,trigger_price_paise:triggerPricePaise,quantity})});
+      const data=await response.json().catch(()=>({}));
+      if(connector.getUserId()!==uid)throw new Error('Account changed while the protective order was processing.');
+      if(!response.ok)throw new Error(data.error||'Protective order rejected.');
+      protectiveStatus.textContent=(data.idempotentReplay?'Verified existing':'Created')+' '+triggerType+' for '+quantity+' '+(data.tradingSymbol||instrumentKey)+' at '+inrPaise(triggerPricePaise)+'. Simulation only.';
+      await loadProtectiveOrders();
+    }catch(error){if(connector.getUserId()===uid)protectiveStatus.textContent=error.message||'Protective order could not be created.';}
+    finally{protectiveSubmitting=false;updateProtectiveButton();}
+  }
+  async function cancelProtectiveOrder(orderId){
+    const connector=window.ZENURA_MARKET_CONNECTOR,uid=connector?.getUserId?.();
+    if(!uid||!connector?.getIdToken)return;
+    try{
+      const token=await connector.getIdToken();
+      if(connector.getUserId()!==uid)return;
+      const response=await fetch(gateway+'/paper/protective-orders/'+encodeURIComponent(orderId)+'/cancel',{method:'POST',headers:{Authorization:'Bearer '+token,Accept:'application/json'}});
+      const data=await response.json().catch(()=>({}));
+      if(!response.ok)throw new Error(data.error||'Protective cancellation failed.');
+      protectiveStatus.textContent=data.alreadyFilled?'Order was already filled; its execution remains recorded.':data.cancelled?'Protective order cancelled.':'Protective order status: '+data.status+'.';
+      await loadProtectiveOrders();
+    }catch(error){if(connector.getUserId()===uid)protectiveStatus.textContent=error.message||'Protective cancellation failed.';}
+  }
+  protectiveCreate?.addEventListener('click',submitProtectiveOrder);
+  protectiveRefresh?.addEventListener('click',loadProtectiveOrders);
+  if(paperQuantity)paperQuantity.addEventListener('input',updateProtectiveButton);
+  if(paperProductMode)paperProductMode.addEventListener('change',updateProtectiveButton);
+
 
   const futuresMarginButton=document.getElementById('futures-margin-preview');
   const futuresMarginLots=document.getElementById('futures-margin-lots');
   const futuresMarginSide=document.getElementById('futures-margin-side');
   const futuresMarginProduct=document.getElementById('futures-margin-product');
   const futuresMarginStatus=document.getElementById('futures-margin-status');
+  let futuresOrderSubmitting=false;
+  function updateFuturesOrderButtons(){
+    const enabled=!futuresOrderSubmitting&&!!selected&&selected.instrument_type==='FUT'
+      &&['NSE_FO','BSE_FO'].includes(selected.segment)
+      &&!!window.ZENURA_MARKET_CONNECTOR?.getUserId?.()&&!!gateway;
+    const buy=document.getElementById('futures-order-buy'),sell=document.getElementById('futures-order-sell');
+    if(buy)buy.disabled=!enabled;if(sell)sell.disabled=!enabled;
+  }
+  async function submitFuturesOrder(side){
+    if(futuresOrderSubmitting)return;
+    if(!selected||selected.instrument_type!=='FUT'){futuresOrderStatus.textContent='Select a verified futures contract first.';return;}
+    const instrumentKey=selected.instrument_key,tradingSymbol=selected.trading_symbol||selected.name||selected.instrument_key;
+    const lots=Number(futuresOrderLots.value),product=futuresOrderProduct.value;
+    if(!Number.isSafeInteger(lots)||lots<1||lots>10000){futuresOrderStatus.textContent='Enter whole lots from 1 to 10,000.';return;}
+    const connector=window.ZENURA_MARKET_CONNECTOR,uid=connector?.getUserId?.();
+    if(!uid||!connector?.getIdToken){futuresOrderStatus.textContent='Sign in before placing a futures paper order.';return;}
+    const storageKey=retryPolicy.userScopedStorageKey(futuresPendingStorageKey,uid);
+    if(!storageKey){futuresOrderStatus.textContent='Could not identify the signed-in account.';return;}
+    const fingerprint=JSON.stringify({instrument_key:instrumentKey,side,lots,product});
+    const pending=retryPolicy.readPendingPaperOrder(pendingOrderStorage,storageKey);
+    let key=pending?.key||null;
+    if(key&&!retryPolicy.canRetryPendingPaperOrder(pending.fingerprint,fingerprint)){
+      futuresOrderStatus.textContent='A previous futures order response is uncertain. Retry the same contract, side, lots and product first.';return;
+    }
+    if(!key){
+      if(!window.crypto?.randomUUID){futuresOrderStatus.textContent='Secure request ID is unavailable.';return;}
+      key=window.crypto.randomUUID();
+      if(!retryPolicy.writePendingPaperOrder(pendingOrderStorage,storageKey,{key,fingerprint})){
+        futuresOrderStatus.textContent='Safe order retry storage is unavailable. No order was sent.';return;
+      }
+    }
+    futuresOrderSubmitting=true;updateFuturesOrderButtons();
+    futuresOrderStatus.textContent='Verifying fresh futures quote and Upstox margin…';
+    try{
+      const token=await connector.getIdToken();
+      if(connector.getUserId()!==uid)throw new Error('Account changed. Sign back into the original account to verify this order.');
+      if(selected?.instrument_key!==instrumentKey)throw new Error('Selected futures contract changed. Re-submit the order for the intended contract.');
+      const response=await fetch(gateway+'/paper/futures/orders',{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json',Accept:'application/json'},body:JSON.stringify({instrument_key:instrumentKey,side,lots,product,order_type:'MARKET',idempotency_key:key})});
+      const data=await response.json().catch(()=>({}));
+      if(connector.getUserId()!==uid)throw new Error('Account changed while the futures order was processing.');
+      if(!response.ok){if(response.status>=400&&response.status<500)retryPolicy.clearPendingPaperOrder(pendingOrderStorage,storageKey);throw new Error(data.error||'Futures paper order rejected.');}
+      if(typeof data.orderId!=='string'||!Number.isSafeInteger(data.executionPricePaise)||data.executionPricePaise<1)throw new Error('Order response could not be verified. Retry the same order to safely check its result.');
+      retryPolicy.clearPendingPaperOrder(pendingOrderStorage,storageKey);
+      futuresOrderStatus.textContent=side+' '+lots+' lot(s) · '+(data.tradingSymbol||tradingSymbol)+' filled at '+inrPaise(data.executionPricePaise)+' · Charges '+inrPaise(data.chargesPaise)+' · Conservative order-quantity margin estimate '+inrPaise(data.openingMarginPaise)+' · SIM';
+      await loadPaperAccount();await refreshPaperViews();
+    }catch(error){if(connector.getUserId()===uid)futuresOrderStatus.textContent=error.message||'Futures order failed.';}
+    finally{futuresOrderSubmitting=false;updateFuturesOrderButtons();}
+  }
+  const futuresOrderLots=document.getElementById('futures-order-lots');
+  const futuresOrderProduct=document.getElementById('futures-order-product');
+  const futuresOrderStatus=document.getElementById('futures-order-status');
+  const futuresPendingStorageKey='zenura-futures-paper-order-pending-v1';
+  document.getElementById('futures-order-buy')?.addEventListener('click',()=>submitFuturesOrder('BUY'));
+  document.getElementById('futures-order-sell')?.addEventListener('click',()=>submitFuturesOrder('SELL'));
   function updateFuturesMarginButton(){
     const signedIn=!!window.ZENURA_MARKET_CONNECTOR?.getUserId?.();
     if(futuresMarginButton)futuresMarginButton.disabled=!signedIn||!gateway||!selected||selected.instrument_type!=='FUT';
+    updateFuturesOrderButtons();
     if(futuresMarginStatus&&!signedIn)futuresMarginStatus.textContent='Sign in to request broker margin preview.';
     else if(futuresMarginStatus&&(!selected||selected.instrument_type!=='FUT'))futuresMarginStatus.textContent='Select a verified futures contract from the Futures watchlist.';
   }
@@ -427,37 +619,42 @@
     const d=new Date();d.setDate(d.getDate()+offset);
     return new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Kolkata',year:'numeric',month:'2-digit',day:'2-digit'}).format(d);
   }
-  function renderChart(candles){
-    chart.textContent='';
-    if(!candles.length){const b=document.createElement('b');b.textContent='No candle data returned';const span=document.createElement('span');span.textContent='Upstox returned no historical candles for this instrument and interval.';chart.append(b,span);return;}
-    const rows=candles.filter(c=>Array.isArray(c)&&c.length>=5&&[1,2,3,4].every(i=>Number.isFinite(Number(c[i]))));
-    if(!rows.length){const b=document.createElement('b');b.textContent='Candle response unavailable';chart.append(b);return;}
-    const width=900,height=300,pad=24,high=Math.max(...rows.map(c=>Number(c[2]))),low=Math.min(...rows.map(c=>Number(c[3]))),range=high-low||1;
-    const points=rows.slice().reverse().map((c,i)=>({x:pad+i*(width-2*pad)/Math.max(rows.length-1,1),y:height-pad-(Number(c[4])-low)*(height-2*pad)/range,c}));
-    const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.setAttribute('viewBox',`0 0 ${width} ${height}`);svg.setAttribute('role','img');svg.setAttribute('aria-label','Historical close price chart from Upstox');
-    for(let i=0;i<5;i++){const y=pad+i*(height-2*pad)/4;const line=document.createElementNS(svg.namespaceURI,'line');line.setAttribute('x1',pad);line.setAttribute('x2',width-pad);line.setAttribute('y1',y);line.setAttribute('y2',y);line.setAttribute('class','chart-gridline');svg.append(line);}
-    const poly=document.createElementNS(svg.namespaceURI,'polyline');poly.setAttribute('points',points.map(p=>p.x+','+p.y).join(' '));poly.setAttribute('class','chart-line');svg.append(poly);
-    const latest=rows[0],first=rows[rows.length-1],change=Number(latest[4])-Number(first[1]);
-    const summary=document.createElement('div');summary.className='candle-summary';
-    [['O',latest[1]],['H',latest[2]],['L',latest[3]],['C',latest[4]],['VOL',latest[5]??'—'],['OI',latest[6]??'—']].forEach(([k,v])=>{const cell=document.createElement('span');cell.textContent=k+' '+(typeof v==='number'?Number(v).toLocaleString('en-IN'):v);summary.append(cell);});
-    const rangeLabel=document.createElement('small');rangeLabel.className='chart-range';rangeLabel.textContent=rows.length+' candles · '+String(rows[rows.length-1][0])+' → '+String(rows[0][0])+' · Change '+(change>=0?'+':'')+change.toFixed(2);
-    chart.append(svg,summary,rangeLabel);
-  }
   async function loadCandles(){
     if(!selected||!gateway)return;
     const connector=window.ZENURA_MARKET_CONNECTOR,uid=connector?.getUserId?.();
     if(!connector?.getIdToken||!uid){chartStatus.textContent='Sign in to load historical candles';return;}
-    const request=++chartRequest,instrumentKey=selected.instrument_key,timeframe=activeTimeframe,[unit,interval,days]=frames[activeTimeframe];
-    chart.textContent='';const loading=document.createElement('b');loading.textContent='Loading verified historical candles…';chart.append(loading);chartStatus.textContent='Requesting Upstox V3';
+    const request=++chartRequest,instrument={...selected},timeframe=activeTimeframe;
+    chart.textContent='';
+    const loading=document.createElement('b');loading.textContent='Loading professional chart…';chart.append(loading);
+    chartStatus.textContent='Starting KLineChart 10.1.1';
     try{
-      const token=await connector.getIdToken(),to=localDate(),from=localDate(-days);
-      if(request!==chartRequest||connector.getUserId()!==uid||selected?.instrument_key!==instrumentKey)return;
-      const params=new URLSearchParams({instrument_key:instrumentKey,unit,interval:String(interval),to_date:to,from_date:from});
-      const response=await fetch(gateway+'/candles?'+params,{headers:{Authorization:'Bearer '+token,Accept:'application/json'}});
-      if(!response.ok)throw new Error('Historical candles unavailable ('+response.status+').');
-      const payload=await response.json();if(request!==chartRequest||connector.getUserId()!==uid||selected?.instrument_key!==instrumentKey)return;
-      renderChart(payload.data?.candles||[]);chartStatus.textContent='Historical candles · Upstox V3 · '+timeframe;
-    }catch(error){if(request!==chartRequest||connector.getUserId()!==uid)return;chart.textContent='';const b=document.createElement('b');b.textContent='Chart data unavailable';const span=document.createElement('span');span.textContent=error.message||'Could not load historical candles.';chart.append(b,span);chartStatus.textContent='Not connected';}
+      const engine=window.ZenuraProfessionalChart;
+      if(!engine)throw new Error('Professional chart engine is not available. Reload the page and retry.');
+      await engine.mount({
+        container:chart,instrument,timeframe,gateway,
+        getAccessToken:()=>connector.getIdToken(),
+        supabase:window.ZENURA_SUPABASE,
+        onTimeframeChange:next=>{
+          activeTimeframe=next;
+          timeframeButtons.forEach(button=>button.classList.toggle('active',button.dataset.timeframe===next));
+        },
+        onError:error=>{
+          if(request===chartRequest&&connector.getUserId()===uid&&selected?.instrument_key===instrument.instrument_key){
+            chartStatus.textContent='Historical data unavailable';
+            const status=document.createElement('span');status.className='chart-engine-error';status.textContent=error?.message||'Could not load historical candles.';
+            if(!chart.querySelector('.chart-engine-error'))chart.append(status);
+          }
+        }
+      });
+      if(request!==chartRequest||connector.getUserId()!==uid||selected?.instrument_key!==instrument.instrument_key)return;
+      chartStatus.textContent='Professional chart · Upstox V3 · '+timeframe;
+    }catch(error){
+      if(request!==chartRequest||connector.getUserId()!==uid)return;
+      chart.textContent='';
+      const b=document.createElement('b');b.textContent='Chart data unavailable';
+      const span=document.createElement('span');span.textContent=error.message||'Could not load historical candles.';
+      chart.append(b,span);chartStatus.textContent='Not connected';
+    }
   }
   timeframeButtons.forEach(button=>button.addEventListener('click',()=>{activeTimeframe=button.dataset.timeframe;timeframeButtons.forEach(x=>x.classList.toggle('active',x===button));loadCandles();}));
   function setFeedStatus(heading,message){const h=document.querySelector('.chart-placeholder b'),s=document.querySelector('.chart-placeholder span');if(h)h.textContent=heading;if(s)s.textContent=message;}
@@ -512,9 +709,10 @@
               if(reconnectTimer){clearTimeout(reconnectTimer);reconnectTimer=null;}
               reconnectAttempt=0;
               lastQuoteText='₹'+(quote.pricePaise/100).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});price.textContent=lastQuoteText;
+              window.ZenuraProfessionalChart?.updateQuote(quote);
               if(staleTimer)clearTimeout(staleTimer);
               staleTimer=setTimeout(()=>{if(connector.getUserId()===uid&&selected?.instrument_key===item.instrument_key){price.textContent='STALE · '+lastQuoteText;setFeedStatus('Live quote is stale','No fresh provider quote received for 15 seconds. Do not use this price for paper orders.');scheduleReconnect(item,uid);}},15000);
-              setFeedStatus('Live quote connected','Last traded price received from Upstox V3. Chart history is a separate integration.');
+              setFeedStatus('Live quote connected','Verified Upstox V3 ticks are updating the professional chart.');
             }
           }catch(_){}
       };
@@ -571,13 +769,13 @@
     price.textContent='—';title.textContent='No instrument selected';symbol.textContent='Sign in to load market data';
     setFeedStatus('SIGN IN REQUIRED','Your private market session has ended.');
     resetOptionChain('Sign in to load a private option chain.');
-    updatePaperButtons();updateFuturesMarginButton();
+    updatePaperButtons();updateFuturesMarginButton();protectiveWorkerEnabled=false;protectiveLoadSeq++;updateProtectiveButton();tableMessage(protectiveBody,8,"Sign in to view protective orders.");protectiveListStatus.textContent="Sign in required";protectiveStatus.textContent="Sign in to load protective execution status.";
   }
   window.addEventListener('zenura-market-auth-ready',event=>{
     // Never leave one account's private data visible while another account is loading.
     clearPrivateSession();
     if(!event.detail?.signedIn||!window.ZENURA_MARKET_CONNECTOR?.isAuthenticated?.())return;
-    loadInstruments();loadCandles();loadPaperAccount();refreshPaperViews();loadSavedWatchlist();
+    loadInstruments();loadCandles();loadPaperAccount();refreshPaperViews();loadSavedWatchlist();loadProtectiveOrders();
   });
   window.ZENURA_INDIAN_MARKET={mode:'indian-stocks',provider:'upstox',status:'gateway-configurable',activeList:()=>activeList,refresh:loadInstruments};
   loadInstruments();

@@ -24,10 +24,11 @@ test("BSE option BUY uses BSE exchange transaction rate",()=>{
  assert.equal(c.totalChargesPaise,2402);
 });
 
-test("NSE IPFT uses Upstox ₹0.50 per lakh option-premium schedule and is included in GST",()=>{
- const c=calculateLongOptionBuyCharges({grossPaise:10000000,exchange:"NSE"});
- assert.equal(c.ipftPaise,50);
- assert.equal(c.gstPaise,1009);
+test("NSE option IPFT contribution is ₹0.01 per crore and included in GST",()=>{
+ const c=calculateLongOptionBuyCharges({grossPaise:1000000000,exchange:"NSE"});
+ assert.equal(c.exchangeTransactionPaise,355200);
+ assert.equal(c.ipftPaise,1);
+ assert.equal(c.gstPaise,64296);
 });
 
 test("rejects invalid turnover, exchange and brokerage",()=>{
@@ -58,16 +59,16 @@ test("option sell reports a negative net settlement when charges exceed tiny pre
 });
 test("NSE option exchange and IPFT charges use the published premium turnover rates",()=>{
  const c=calculateLongOptionBuyCharges({grossPaise:100000000,exchange:"NSE"});
- assert.equal(c.exchangeTransactionPaise,35530);
- assert.equal(c.ipftPaise,500);
- assert.equal(c.gstPaise,6845);
+ assert.equal(c.exchangeTransactionPaise,35520);
+ assert.equal(c.ipftPaise,0);
+ assert.equal(c.gstPaise,6754);
 });
 
 test("half-paise boundaries round upward exactly like PostgreSQL floor(x + 0.5)",()=>{
  const {calculateLongOptionTradeCharges}=require("../lib/trading-charges");
  const nse=calculateLongOptionTradeCharges({grossPaise:5000000,exchange:"NSE",side:"BUY",brokeragePaise:0});
- assert.equal(nse.exchangeTransactionPaise,1777); // 1776.5
- assert.equal(nse.ipftPaise,25);
+ assert.equal(nse.exchangeTransactionPaise,1776);
+ assert.equal(nse.ipftPaise,0);
  assert.equal(nse.sebiPaise,5);
  assert.equal(nse.stampDutyPaise,150);
  const bse=calculateLongOptionTradeCharges({grossPaise:20000,exchange:"BSE",side:"BUY",brokeragePaise:0});
@@ -111,4 +112,131 @@ test("Firebase BigInt partial-close reference vectors conserve fee-inclusive bas
  assert.equal(second,32926);
  assert.equal(remaining2,32926);
  assert.equal(remaining2+second+first,98778);
+});
+
+test("NSE futures BUY applies 2026 brokerage, exchange, SEBI, stamp and GST charges",()=>{
+ const {calculateFuturesTradeCharges}=require("../lib/trading-charges");
+ const c=calculateFuturesTradeCharges({grossPaise:100000000,exchange:"NSE",side:"BUY"});
+ assert.equal(c.brokeragePaise,2000);
+ assert.equal(c.exchangeTransactionPaise,1830);
+ assert.equal(c.ipftPaise,0);
+ assert.equal(c.sebiPaise,100);
+ assert.equal(c.stampDutyPaise,2000);
+ assert.equal(c.sttPaise,0);
+ assert.equal(c.gstPaise,689);
+ assert.equal(c.totalChargesPaise,6619);
+ assert.equal(c.scheduleVersion,"2026-04-01");
+});
+test("NSE futures SELL applies the 0.05 percent STT rate effective April 2026",()=>{
+ const {calculateFuturesTradeCharges}=require("../lib/trading-charges");
+ const c=calculateFuturesTradeCharges({grossPaise:100000000,exchange:"NSE",side:"SELL"});
+ assert.equal(c.sttPaise,50000);
+ assert.equal(c.stampDutyPaise,0);
+ assert.equal(c.exchangeTransactionPaise,1830);
+ assert.equal(c.gstPaise,689);
+ assert.equal(c.totalChargesPaise,54619);
+});
+test("BSE futures schedule does not apply NSE exchange transaction charges",()=>{
+ const {calculateFuturesTradeCharges}=require("../lib/trading-charges");
+ const c=calculateFuturesTradeCharges({grossPaise:100000000,exchange:"BSE",side:"BUY"});
+ assert.equal(c.exchangeTransactionPaise,0);
+ assert.equal(c.totalChargesPaise,4460);
+});
+test("futures brokerage is the lower of 0.05 percent or Rs 20 per executed order",()=>{
+ const {calculateFuturesTradeCharges}=require("../lib/trading-charges");
+ const small=calculateFuturesTradeCharges({grossPaise:100000,exchange:"NSE",side:"BUY"});
+ const large=calculateFuturesTradeCharges({grossPaise:100000000,exchange:"NSE",side:"BUY"});
+ assert.equal(small.brokeragePaise,50);
+ assert.equal(large.brokeragePaise,2000);
+});
+test("futures charge calculator rejects invalid turnover, side, exchange and unsafe values",()=>{
+ const {calculateFuturesTradeCharges}=require("../lib/trading-charges");
+ assert.throws(()=>calculateFuturesTradeCharges({grossPaise:0,exchange:"NSE"}),/turnover/);
+ assert.throws(()=>calculateFuturesTradeCharges({grossPaise:1000,exchange:"MCX"}),/NSE and BSE/);
+ assert.throws(()=>calculateFuturesTradeCharges({grossPaise:1000,exchange:"NSE",side:"HOLD"}),/side/);
+ assert.throws(()=>calculateFuturesTradeCharges({grossPaise:Number.MAX_SAFE_INTEGER+1,exchange:"NSE"}),/turnover/);
+});
+
+test("NSE delivery BUY includes 2026 brokerage, STT, stamp duty, exchange, SEBI and GST",()=>{
+ const {calculateEquityDeliveryCharges}=require("../lib/trading-charges");
+ const c=calculateEquityDeliveryCharges({grossPaise:100000000,exchange:"NSE",side:"BUY"});
+ assert.equal(c.brokeragePaise,2000);
+ assert.equal(c.exchangeTransactionPaise,3070);
+ assert.equal(c.sttPaise,100000);
+ assert.equal(c.stampDutyPaise,15000);
+ assert.equal(c.dpChargesPaise,0);
+ assert.equal(c.gstPaise,913);
+ assert.equal(c.totalChargesPaise,121083);
+});
+test("NSE delivery SELL includes STT and estimated per-order DP charge",()=>{
+ const {calculateEquityDeliveryCharges}=require("../lib/trading-charges");
+ const c=calculateEquityDeliveryCharges({grossPaise:100000000,exchange:"NSE",side:"SELL"});
+ assert.equal(c.sttPaise,100000);
+ assert.equal(c.stampDutyPaise,0);
+ assert.equal(c.dpChargesPaise,2000);
+ assert.equal(c.gstPaise,1273);
+ assert.equal(c.totalChargesPaise,108443);
+});
+test("BSE delivery orders are blocked until exact scrip-group charges are known",()=>{
+ const {calculateEquityDeliveryCharges}=require("../lib/trading-charges");
+ assert.throws(()=>calculateEquityDeliveryCharges({grossPaise:100000,exchange:"BSE",side:"BUY"}),{status:422});
+});
+
+test("NSE intraday BUY includes capped brokerage, exchange, SEBI, stamp duty and GST",()=>{
+ const {calculateEquityIntradayCharges}=require("../lib/trading-charges");
+ const c=calculateEquityIntradayCharges({grossPaise:100000000,exchange:"NSE",side:"BUY"});
+ assert.equal(c.brokeragePaise,2000);
+ assert.equal(c.exchangeTransactionPaise,3070);
+ assert.equal(c.ipftPaise,0);
+ assert.equal(c.sebiPaise,100);
+ assert.equal(c.stampDutyPaise,3000);
+ assert.equal(c.sttPaise,0);
+ assert.equal(c.gstPaise,913);
+ assert.equal(c.totalChargesPaise,9083);
+ assert.equal(c.totalDebitPaise,100009083);
+ assert.equal(c.segment,"EQUITY_INTRADAY");
+ assert.equal(c.indicative,true);
+});
+test("NSE intraday SELL applies 0.025 percent STT and no buy-side stamp duty",()=>{
+ const {calculateEquityIntradayCharges}=require("../lib/trading-charges");
+ const c=calculateEquityIntradayCharges({grossPaise:100000000,exchange:"NSE",side:"SELL"});
+ assert.equal(c.sttPaise,25000);
+ assert.equal(c.stampDutyPaise,0);
+ assert.equal(c.totalChargesPaise,31083);
+ assert.equal(c.netCreditPaise,99968917);
+ assert.equal(c.totalDebitPaise,null);
+});
+test("intraday brokerage is lower of 0.10 percent turnover or Rs 20",()=>{
+ const {calculateEquityIntradayCharges}=require("../lib/trading-charges");
+ const small=calculateEquityIntradayCharges({grossPaise:100000,exchange:"NSE",side:"BUY"});
+ const large=calculateEquityIntradayCharges({grossPaise:100000000,exchange:"NSE",side:"BUY"});
+ assert.equal(small.brokeragePaise,100);
+ assert.equal(large.brokeragePaise,2000);
+});
+test("BSE intraday orders fail closed without the applicable scrip-group rate",()=>{
+ const {calculateEquityIntradayCharges}=require("../lib/trading-charges");
+ assert.throws(()=>calculateEquityIntradayCharges({grossPaise:100000,exchange:"BSE"}),{status:422});
+});
+test("intraday calculator rejects invalid turnover, side and brokerage cap",()=>{
+ const {calculateEquityIntradayCharges}=require("../lib/trading-charges");
+ assert.throws(()=>calculateEquityIntradayCharges({grossPaise:0,exchange:"NSE"}),/turnover/);
+ assert.throws(()=>calculateEquityIntradayCharges({grossPaise:1000,exchange:"NSE",side:"HOLD"}),/side/);
+ assert.throws(()=>calculateEquityIntradayCharges({grossPaise:1000,exchange:"NSE",brokerageCapPaise:-1}),/Brokerage cap/);
+});
+
+test("NSE delivery brokerage is flat ₹20 per executed order even on small turnover",()=>{
+ const {calculateEquityDeliveryCharges}=require("../lib/trading-charges");
+ const c=calculateEquityDeliveryCharges({grossPaise:100000,exchange:"NSE",side:"BUY"});
+ assert.equal(c.brokeragePaise,2000);
+ assert.equal(c.scheduleVersion,"2026-03-01");
+});
+test("NSE intraday schedule version tracks the 1 March 2026 transaction schedule",()=>{
+ const {calculateEquityIntradayCharges}=require("../lib/trading-charges");
+ const c=calculateEquityIntradayCharges({grossPaise:100000,exchange:"NSE",side:"BUY"});
+ assert.equal(c.scheduleVersion,"2026-03-01");
+});
+
+test("NSE delivery SELL fails closed when minimum charges consume all proceeds",()=>{
+ const {calculateEquityDeliveryCharges}=require("../lib/trading-charges");
+ assert.throws(()=>calculateEquityDeliveryCharges({grossPaise:1,exchange:"NSE",side:"SELL"}),{status:422});
 });
