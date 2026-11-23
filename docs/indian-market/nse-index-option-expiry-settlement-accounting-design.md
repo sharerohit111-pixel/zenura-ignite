@@ -1,0 +1,156 @@
+# NSE Index Options Expiry Settlement Accounting — Design Only
+
+Status: Draft design; no settlement posting implementation is authorized by this document.
+Branch: `feature/nse-index-option-expiry-settlement-design-2026-11-23`
+Baseline: PR #98 head `1617d48f2e0643e89042c63fa50f601e3bd897ec`
+
+## 1. Scope and explicit exclusions
+
+This design covers expiry settlement accounting for an already-open **long NSE index CE/PE** paper position whose contract master explicitly identifies it as cash-settled.
+
+In scope:
+- Freeze and eligibility checks after the verified contract expiry/session cutoff.
+- Verified official settlement-price ingestion and provenance.
+- Intrinsic-value payout calculation in integer paise.
+- Entry cost-basis release and realized P&L.
+- Versioned expiry charge schedule, immutable settlement record, idempotency, and account reconciliation.
+- Atomic position close and cash/account update.
+
+Out of scope and rejected:
+- Short-option opening or short-option expiry obligations.
+- NSE stock options, physical settlement, BSE options, unknown settlement types, or inferred settlement type.
+- Broker/live order routing, real-money settlement, or exchange connectivity.
+- Reusing a fake MARKET/SELL order to represent exercise/expiry.
+- Posting from a quote, LTP, option premium, user-supplied price, or unverified source.
+- Enabling production migrations or feature flags.
+
+## 2. Audited baseline and compatibility constraints
+
+The existing long-option MARKET transaction stores premium cash movement, charges, fee-inclusive position cost basis, and realized P&L in the account/order records. BUY entry charges are already included in `paper_derivative_positions.cost_basis_paise`. SELL-to-close releases a proportional part of that basis and subtracts exit charges.
+
+The existing derivative valuation uses fresh quotes for open positions. The existing expiry payoff simulator is explicitly non-posting: it returns gross intrinsic payout and gross P&L before expiry charges, leaves net realized P&L null, and sets `ledgerPostingAllowed=false`.
+
+PR #98 adds expiry-calendar fail-closed protection for outstanding LIMIT reservations and a concurrent reservation regression. This design must preserve those behaviours and the account-first lock order.
+
+Do not change Chat 5 Order Engine files, existing MARKET/LIMIT order RPC signatures, execution workers, or short-option policy.
+
+## 3. Settlement eligibility — fail closed
+
+A settlement attempt is eligible only if all conditions hold:
+
+1. Contract master record matches the position's instrument key, exchange `NSE`, segment `NSE_FO`, CE/PE type, strike, lot size, expiry date, and underlying identifier.
+2. Contract master explicitly attests `underlying_type=INDEX` and `settlement_type=CASH_SETTLED`; absence, stale metadata, or conflicting sources blocks posting.
+3. Position is long with positive quantity and positive fee-inclusive cost basis. Quantity must be a valid lot multiple.
+4. The contract expiry date and exchange session cutoff have passed according to a verified NSE calendar/session record. Do not infer expiry completion from local wall-clock alone.
+5. No PENDING/PARTIALLY_FILLED LIMIT order exists for the instrument and no close quantity/cash reservation remains. Pending orders must first reach a valid terminal state through the existing lifecycle.
+6. The settlement price is the official expiry settlement reference applicable to that exact underlying and expiry date, not an option quote or arbitrary underlying LTP.
+7. Settlement source evidence and the applicable charge schedule are independently authenticated, current, and effective for the settlement date.
+8. The position has not already been settled, and no conflicting settlement event exists.
+
+Any missing or ambiguous condition means **no posting and no position deletion**.
+
+## 4. Price evidence and provenance
+
+The upstream importer—not a client or API caller—must authenticate the NSE source and normalize the applicable settlement value. An `nseindia.com` URL and matching SHA-256 digest alone prove neither source authenticity nor that the value is the correct exchange settlement reference.
+
+Persist or immutably reference:
+- Exchange, segment, underlying identifier, expiry date, and settlement-price field name.
+- Price as integer paise plus original source precision and normalization rule.
+- Source URL, retrieval timestamp, source publication timestamp, raw payload object reference, SHA-256 digest, importer version, and importer verification/attestation identifier.
+- Contract-master version and verified settlement/session calendar version.
+- A deterministic payload fingerprint covering all fields above.
+
+Reject future-dated evidence, expiry-date mismatches, wrong underlying identifiers, stale/unverified imports, duplicate conflicting source records, and any price that cannot be losslessly normalized to the supported paise precision. Never silently round an unsupported precision.
+
+Raw source retention should use immutable/versioned storage with restricted writer access. The database must not trust caller-supplied `verified=true` flags.
+
+## 5. Calculation and accounting semantics
+
+For a long position:
+
+- CE intrinsic per unit = `max(settlement_price_paise - strike_price_paise, 0)`.
+- PE intrinsic per unit = `max(strike_price_paise - settlement_price_paise, 0)`.
+- Gross payout = intrinsic per unit × settled quantity.
+- Entry basis released = the complete fee-inclusive `cost_basis_paise` of the settled long position.
+- Expiry charges = sum of separately calculated, date-effective, independently verified charge components.
+- Net cash credit = gross payout − expiry charges.
+- Net realized P&L = gross payout − entry basis released − expiry charges.
+
+All values are integer paise; multiplication, addition, subtraction, and account totals must be checked against safe integer/database bounds before writes.
+
+If the option expires OTM, gross payout is zero. The position is still closed after verified settlement, the complete entry basis is recognized as a realized loss, and no payout is credited. Expiry charges must follow the verified charge rules for the actual outcome; do not assume a zero charge or invent a charge.
+
+**Charge schedule is a release blocker.** Before any posting implementation, independently verify the applicable statutory/exchange/brokerage charge components, taxable bases, rounding rules, effective dates, and whether each component applies to cash-settled expiry exercise. Store a versioned schedule identifier and component-level breakdown with the event. Do not copy the ordinary SELL-to-close fee function as a substitute for expiry exercise charges. If a charge component cannot be established, keep posting disabled.
+
+The existing entry cost basis already contains BUY-side entry charges. Do not subtract those charges again. Do not add hypothetical exit brokerage unless an authoritative schedule says it applies.
+
+## 6. Transaction boundary and lock order
+
+One service-role-only database RPC should own the entire posting transaction. It must:
+
+1. Validate authenticated backend identity and deterministic request fingerprint.
+2. Lock `paper_accounts` row first, consistent with the current account-first serialization rule.
+3. Lock the matching `paper_derivative_positions` row next.
+4. Read/lock the instrument's outstanding LIMIT orders and verify all are terminal, reservations are zero, and no worker lease can still fill them.
+5. Revalidate immutable contract, calendar, settlement evidence, and charge schedule inside the transaction.
+6. Insert a unique immutable settlement event (unique account + instrument + expiry + settlement type/event key).
+7. Credit account cash by net cash credit and add net realized P&L exactly once; increment account version.
+8. Delete/close the long position and record the exact released basis and quantity in the settlement event.
+9. Commit all changes atomically.
+
+A retry with the same idempotency key and identical fingerprint returns the original event without a second cash credit. Reuse of the key with a different fingerprint is a hard conflict. A duplicate settlement event under another key must also be rejected. Concurrent close-fill versus settlement is serialized by the same account-first lock; only one operation may consume the position. No partial state is acceptable.
+
+Do not update the account first and write the event later. Do not delete the position before all settlement evidence and charge calculations have passed.
+
+## 7. Data model proposal (not migration-ready)
+
+Introduce an immutable `paper_option_expiry_settlements` event table, separate from order/fill history. Candidate fields:
+
+- Event identity: settlement_id, user_id, instrument_key, expiry, idempotency_key, request_fingerprint.
+- Contract identity: exchange, segment, CE/PE, underlying identifier/type, strike, lot size, settlement type, contract-master version.
+- Quantity and basis: settled_quantity, entry_cost_basis_paise, entry_average_price_paise.
+- Price evidence: settlement_price_paise, source reference, payload object reference, payload SHA-256, source/publication/retrieval/verification timestamps, importer attestation/version, calendar version.
+- Calculation: intrinsic_per_unit_paise, gross_payout_paise, charge_schedule_id, charge_breakdown JSON, total_expiry_charges_paise, net_cash_credit_paise, net_realized_pnl_paise.
+- State/audit: simulation_only=true, posted_at, created_at, immutable evidence fingerprint.
+
+Use database constraints for nonnegative quantities and charges, positive basis, safe monetary bounds, valid NSE index CE/PE identity, and `net_cash_credit = gross_payout - charges`, `net_realized = gross_payout - basis - charges`. Enforce unique event identity and idempotency identity.
+
+Charge schedule definitions should be separately versioned and immutable with effective_from/effective_to, source evidence, calculation base, rate/flat amount, rounding method, and applicability conditions. Never edit a schedule version after an event references it.
+
+Whether to add a generic account-ledger table is a separate schema decision: audit current account-ledger conventions first. If no immutable cash journal exists, the settlement event must itself be a complete immutable audit record and reconcile to the account version/cash delta. Do not invent a second competing ledger.
+
+## 8. Required regression and reconciliation tests
+
+All tests must run in disposable PostgreSQL transactions and roll back fixtures.
+
+Eligibility and safety:
+- Long index CE ITM, long index PE ITM, CE/PE OTM, exactly ATM.
+- Reject stock option, physical settlement, unknown settlement type, short/zero position, invalid lot multiple, mismatched contract/underlying/expiry.
+- Reject missing/unverified/stale/future settlement evidence, wrong date, wrong source field, tampered payload digest, conflicting official records, unsupported precision.
+- Reject unverified or expired charge schedule and missing charge components.
+- Reject settlement while a LIMIT order is pending/partially filled, reservation remains, or worker lease is active.
+
+Accounting:
+- ITM payout credits exactly intrinsic × quantity less verified charges.
+- OTM payout is zero and releases full entry basis as realized loss.
+- Entry BUY charges are included once through fee-inclusive basis, never double counted.
+- Account cash, realized P&L, event amounts, position quantity, and released basis reconcile exactly.
+- Multiple lots, paise rounding boundaries, maximum supported values, and zero payout.
+- Same-key retry is a no-op; changed fingerprint conflicts; duplicate event under a new key conflicts.
+- Concurrent duplicate expiry attempts post once.
+- Concurrent settlement versus MARKET SELL/LIMIT fill/cancel cannot double-consume position or bypass reservations.
+- Failure at every step rolls back event, cash, P&L, and position changes together.
+- RLS prevents cross-user reads; only service_role can invoke posting RPC; event evidence is immutable to users.
+
+## 9. Release gates before implementation
+
+No settlement posting code or migration until all gates are signed off:
+
+1. Exchange product/contract source confirms eligible NSE index contracts and cash settlement.
+2. Trusted importer proves source authenticity and correct settlement field semantics.
+3. Current statutory/exchange charge schedule and rounding rules are verified for expiry exercise, with effective dates.
+4. The existing account journal/audit design is reviewed to avoid duplicate ledgers.
+5. Disposable PostgreSQL tests cover all cases above, including concurrent races and rollback.
+6. Staging parity and explicit user approval are obtained.
+
+Until then, keep the current non-posting simulator unchanged: `settlementChargesPaise=null`, `netRealizedPnlPaise=null`, and `ledgerPostingAllowed=false`.
