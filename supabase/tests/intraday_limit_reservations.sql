@@ -118,6 +118,31 @@ BEGIN
     RAISE EXCEPTION 'Intraday LIMIT BUY fill retry was not idempotent';
   END IF;
 
+  -- A stale quote must leave the pending order and its reservation untouched.
+  PERFORM public.submit_paper_intraday_limit_order(
+    '22222222-2222-4222-8222-222222222222',repeat('5',64),
+    '66666666-6666-4666-8666-666666666666',repeat('7',64),
+    'NSE_EQ|INTRA_STALE_CI','INTRA_STALE_CI','NSE','BUY',1,10000
+  );
+  SELECT reserved_cash_paise INTO v_reserved FROM public.paper_accounts
+   WHERE user_id='22222222-2222-4222-8222-222222222222';
+  v_now_ms:=floor(extract(epoch from clock_timestamp())*1000)::bigint;
+  BEGIN
+    PERFORM public.execute_paper_intraday_limit_fill(
+      repeat('5',64),9900,v_now_ms-16001,16001,v_now_ms
+    );
+    RAISE EXCEPTION 'Stale Intraday LIMIT quote was accepted';
+  EXCEPTION WHEN SQLSTATE '22023' THEN NULL;
+  END;
+  IF (SELECT status FROM public.paper_orders WHERE order_id=repeat('5',64))<>'PENDING'
+     OR (SELECT reserved_cash_paise FROM public.paper_accounts
+          WHERE user_id='22222222-2222-4222-8222-222222222222')<>v_reserved
+     OR (SELECT count(*) FROM public.paper_equity_positions
+          WHERE user_id='22222222-2222-4222-8222-222222222222'
+            AND product='INTRADAY' AND instrument_key='NSE_EQ|INTRA_STALE_CI')<>0 THEN
+    RAISE EXCEPTION 'Rejected stale Intraday LIMIT quote changed order, reservation or position state';
+  END IF;
+
   -- SELL fill realizes P&L and releases only the shares reserved by this order.
   PERFORM public.submit_paper_intraday_limit_order(
     '22222222-2222-4222-8222-222222222222',repeat('3',64),
@@ -178,10 +203,10 @@ BEGIN
 END
 $intraday_limit_checks$;
 
-DELETE FROM public.paper_orders WHERE order_id IN (repeat('a',64),repeat('c',64),repeat('e',64),repeat('1',64),repeat('3',64));
+DELETE FROM public.paper_orders WHERE order_id IN (repeat('a',64),repeat('c',64),repeat('e',64),repeat('1',64),repeat('3',64),repeat('5',64));
 DELETE FROM public.paper_equity_positions
  WHERE user_id='22222222-2222-4222-8222-222222222222'
-   AND product='INTRADAY' AND instrument_key IN ('NSE_EQ|INTRA_LIMIT_CI','NSE_EQ|INTRA_FILL_BUY');
+   AND product='INTRADAY' AND instrument_key IN ('NSE_EQ|INTRA_LIMIT_CI','NSE_EQ|INTRA_FILL_BUY','NSE_EQ|INTRA_STALE_CI');
 DELETE FROM public.paper_exchange_sessions
  WHERE source_reference='CI verified session fixture';
 -- Restore the shared CI account fixture so later independent MARKET/LIMIT tests
