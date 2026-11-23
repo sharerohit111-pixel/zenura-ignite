@@ -70,6 +70,17 @@ async function getFxRate() {
   if (fx?.result !== "success" || !Number.isFinite(rate) || rate < 40 || rate > 200) throw httpError("A valid USD/INR reference rate is unavailable.", 502);
   return rate;
 }
+function isFreshCryptoQuote(quote, nowMs=Date.now()) {
+  return Number.isFinite(quote?.priceUsdt) && quote.priceUsdt>0
+    && Number.isSafeInteger(quote?.tradeTimeMs) && quote.tradeTimeMs<=nowMs
+    && nowMs-quote.tradeTimeMs<=QUOTE_MAX_AGE_MS;
+}
+function getRiskPlanTrigger(plan, priceUsdt) {
+  if (!Number.isFinite(priceUsdt)||priceUsdt<=0) return null;
+  if (plan?.stop_loss_price!==null && plan?.stop_loss_price!==undefined && priceUsdt<=Number(plan.stop_loss_price)) return "STOP_LOSS";
+  if (plan?.take_profit_price!==null && plan?.take_profit_price!==undefined && priceUsdt>=Number(plan.take_profit_price)) return "TAKE_PROFIT";
+  return null;
+}
 function validateOrderInput(body, limit = false) {
   const symbol = typeof body?.symbol === "string" ? body.symbol.toUpperCase() : "";
   const side = String(body?.side || "").toUpperCase();
@@ -334,7 +345,7 @@ async function runLimitWorker({maxOrders=5}={}) {
           quote={priceUsdt:Number(trade?.price),tradeTimeMs:Number(trade?.time)}; quoteCache.set(order.symbol,quote);
         }
         const nowMs=Date.now();
-        if(!Number.isFinite(quote.priceUsdt)||quote.priceUsdt<=0||!Number.isSafeInteger(quote.tradeTimeMs)||quote.tradeTimeMs>nowMs||nowMs-quote.tradeTimeMs>QUOTE_MAX_AGE_MS) { summary.notEligible++; continue; }
+        if(!isFreshCryptoQuote(quote,nowMs)) { summary.notEligible++; continue; }
         const eligible=order.side==="BUY"?quote.priceUsdt<=Number(order.limit_price):quote.priceUsdt>=Number(order.limit_price);
         if(!eligible) { summary.notEligible++; continue; }
         if(fxRate===null) fxRate=await getFxRate();
@@ -363,10 +374,9 @@ async function runLimitWorker({maxOrders=5}={}) {
           quote={priceUsdt:Number(trade?.price),tradeTimeMs:Number(trade?.time)}; quoteCache.set(plan.symbol,quote);
         }
         const nowMs=Date.now();
-        if(!Number.isFinite(quote.priceUsdt)||quote.priceUsdt<=0||!Number.isSafeInteger(quote.tradeTimeMs)||quote.tradeTimeMs>nowMs||nowMs-quote.tradeTimeMs>QUOTE_MAX_AGE_MS) { summary.notEligible++; continue; }
-        const hitStop=plan.stop_loss_price!==null&&quote.priceUsdt<=Number(plan.stop_loss_price);
-        const hitTarget=plan.take_profit_price!==null&&quote.priceUsdt>=Number(plan.take_profit_price);
-        if(!hitStop&&!hitTarget) { summary.notEligible++; continue; }
+        if(!isFreshCryptoQuote(quote,nowMs)) { summary.notEligible++; continue; }
+        const trigger=getRiskPlanTrigger(plan,quote.priceUsdt);
+        if(!trigger) { summary.notEligible++; continue; }
         if(fxRate===null) fxRate=await getFxRate();
         const gross=Number(plan.quantity)*quote.priceUsdt*fxRate;
         if(!Number.isFinite(gross)||gross<=0||gross>MAX_ORDER_INR) { summary.failed++; continue; }
@@ -423,4 +433,4 @@ app.use((error, _req, res, next) => {
 });
 
 if(require.main===module) start().catch(error=>{console.error("Crypto gateway startup failed:",error.message);process.exit(1);});
-module.exports={app,runLimitWorker,validateOrderInput,validateRiskPlanInput,makeOrderId,createRateLimiter,isUuid};
+module.exports={app,runLimitWorker,validateOrderInput,validateRiskPlanInput,isFreshCryptoQuote,getRiskPlanTrigger,makeOrderId,createRateLimiter,isUuid};
