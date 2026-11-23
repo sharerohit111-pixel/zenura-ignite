@@ -106,3 +106,9 @@ This audit created a new branch from the PR #92 head. It did not modify PR #92, 
 - The MARKET wrapper now calls the pre-audit settlement implementation directly instead of calling the dependency branch's audit-writing wrapper. It then writes exactly one fill and one trade event itself.
 - Existing MARKET, Delivery LIMIT, Intraday LIMIT, and reservation lifecycle tests assert exact row counts and are intended to catch recurrence. Fresh CI for the corrected branch head is still required.
 - No production migration, merge, or deployment was performed.
+
+## CI helper-chain correction (2026-11-23)
+
+- First branch-push smoke run exposed that PR #92's _execute_paper_market_order_legacy helper is absent when the accounting branch is tested standalone (push workflow checks out the head branch without merging the PR base).
+- The MARKET migration now normalizes both migration-chain shapes: it renames the pre-audit core directly in standalone branch CI, or extracts the pre-audit core from PR #92's audit wrapper when the base branch is present. Both paths use _execute_paper_market_order_core.
+- The corrected migration is being revalidated by a new branch-push workflow. No pass is claimed until that exact run completes.
