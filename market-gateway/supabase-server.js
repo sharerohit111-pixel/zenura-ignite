@@ -521,12 +521,14 @@ app.get("/paper/portfolio",async(req,res)=>{
 app.post("/paper/derivative/margin-preview",async(req,res)=>{
   try{
     const {user,userDb}=await auth(req),{instrumentKey,lots,side,product}=parseMarginPreviewInput(req.body);
-    const {token}=await getUpstoxAccessToken(user.id);
     if(!instrumentCache.length||Date.now()-instrumentCacheUpdatedAt>6*60*60*1000)await refreshInstrumentCache();
     const instrument=instrumentCache.find(x=>x.instrument_key===instrumentKey&&x.instrument_type==="FUT"&&["NSE_FO","BSE_FO"].includes(x.segment));
     if(!instrument)return res.status(400).json({error:"Select a verified NSE/BSE futures contract from the official instrument master."});
+    // Reject invalid instruments before consuming provider credentials; rate-limit
+    // authenticated previews before any broker/network request.
     const rate=await serviceDb.rpc("consume_paper_margin_preview_slot",{p_user_id:user.id,p_now_ms:Date.now(),p_min_interval_ms:5000});
     if(rate.error||rate.data!==true)return res.status(429).set("Retry-After","5").json({error:"Please wait before requesting another broker margin preview."});
+    const {token}=await getUpstoxAccessToken(user.id);
     const {quote}=await getQuote(token,instrumentKey),normalized=normalizeProviderQuote(quote,instrumentKey,{maxAgeMs:15000});
     const contract=validateDerivativeContract(instrument,{lots,pricePaise:normalized.pricePaise,now:Date.now()});
     const upstream=await fetchProvider("https://api.upstox.com/v2/charges/margin",{
