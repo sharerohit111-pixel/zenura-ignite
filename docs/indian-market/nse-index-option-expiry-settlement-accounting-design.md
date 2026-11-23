@@ -257,3 +257,42 @@ Official source:
 The F_EX01 specification improves the evidence model for accepted exercise quantity and client/contract identity, but does not close the charge-calculation gap. UDiFF confirms dedicated STT and StampDuty report formats exist, but their schema and sample rows remain uninspected. No exercise posting, charge formula, or rounding method is authorized by this finding.
 
 Keep `settlementChargesPaise=null`, `netRealizedPnlPaise=null`, and `ledgerPostingAllowed=false`. The required evidence remains: (1) actual current NSE Clearing STT report/UDiFF sample rows showing client-level taxable base, STT amount, and rounding; and (2) the selected broker's client contract note/charge schedule proving which exercise-related components are passed through to the client.
+
+
+## 13. Official NSE STT report schema follow-up (checked 2026-11-23)
+
+### Current NSE India F_STT01 exercise detail
+
+The current NSE India Equity Derivatives STT page, updated 2026-04-01, publishes the F_STT01 trading-member report schema. Record Type 40 is explicitly the **client-contract-level exercise** record and contains:
+- STT date, trading-member code, trading-client code.
+- Instrument type, symbol, expiry date, strike, option type, CA level.
+- Exercise quantity and exercise value.
+- Taxable Exercise value, STT options, and Total STT.
+
+The same page states that for an exercised option the taxable transaction value is intrinsic value, and the post-1-April-2026 rate is 0.15%, payable by purchaser. It also states member/client STT liabilities are aggregated from client liabilities.
+
+This is stronger public evidence than the legacy F_STT02 PDF field list because the NSE India page currently exposes the F_STT01 Record Type 40 fields and the effective rate together. However, it still does **not** specify the rounding unit or sequence (per unit, contract, client, or aggregated record), nor does it expose actual member report rows with representative values. The existence of a Taxable Exercise value field and an STT options field does not, by itself, establish how the exchange rounds the calculation.
+
+Official source:
+- NSE India, Equity Derivatives STT computation and F_STT01 schema, updated 2026-04-01: https://www.nseindia.in/static/products-services/equity-derivatives-securities-transaction-tax
+
+### UDiFF Annexure B/C retrieval status
+
+The NSE Clearing UDiFF page (updated 2026-05-14) confirms Annexure B is the report-format workbook and Annexure C is the sample-report ZIP, covering STT, StampDuty, Position, Obligation and other report families. The direct links were identified:
+- Annexure B: https://www.nseclearing.in/sites/default/files/2026-05/Annexure%20B_1.xlsx
+- Annexure C: https://www.nseclearing.in/sites/default/files/2025-09/Annexure%20C%20-%20UdiFF%20Format%20Sample%20Reports.zip
+
+The browser retrieval endpoint rejected both binary file types (XLSX and ZIP), and the execution environment could not fetch them directly. Therefore their workbook sheets, field definitions and sample rows were **not inspected** in this pass. Do not claim UDiFF field-level verification. NSE Clearing lists the member query contact as udiffstandardformats@nsccl.co.in.
+
+Official source:
+- NSE Clearing UDiFF page: https://www.nseclearing.in/udiff
+
+### Revised finding and release status
+
+Confirmed from the current public NSE schema: a client-contract exercise record includes exercise quantity, exercise value, taxable exercise value, STT options and total STT. This confirms the intended reconciliation keys/values for a member-side evidence adapter and identifies the exact report family to request.
+
+Still not verified: rounding/aggregation semantics, actual client exercise STT report rows, current UDiFF STT/StampDuty schemas and samples, and which components a selected broker passes through to its client.
+
+For a future evidence adapter, retain the complete original record (not only the total) and reconcile at least client + instrument + expiry + strike + option type + CA level + exercise quantity/value + taxable exercise value + STT amount. Do not infer a rounding rule from the rate or reverse-engineer one from a single aggregate.
+
+No posting implementation is authorized. Keep settlementChargesPaise=null, netRealizedPnlPaise=null, and ledgerPostingAllowed=false.
