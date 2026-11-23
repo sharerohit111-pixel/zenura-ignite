@@ -323,8 +323,6 @@ jobs:
         run: psql -v ON_ERROR_STOP=1 -f supabase/tests/equity_ledger_schema.sql
       - name: Exercise atomic cash-equity LIMIT reservation and fill audit ledger
         run: psql -v ON_ERROR_STOP=1 -f supabase/tests/equity_order_audit_ledger.sql
-      - name: Exercise atomic NSE equity order fill and cash-ledger writes
-        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/equity_order_audit_ledger.sql
       - name: Exercise MARKET idempotency and LIMIT reservation lifecycle
         run: |
           psql -v ON_ERROR_STOP=1 <<'SQL'
