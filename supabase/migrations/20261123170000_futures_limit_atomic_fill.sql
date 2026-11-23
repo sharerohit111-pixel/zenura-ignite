@@ -41,12 +41,36 @@ revoke all on function public._guard_futures_close_reservation() from public,ano
 -- Draft-only atomic Futures LIMIT partial/full fill settlement.
 -- Service-role only. No worker or order-route integration is introduced.
 
+-- Persist the exact executable depth snapshot so replay checks and audit records
+-- include the quote side/size used to simulate the fill.
+alter table public.paper_futures_fills
+  add column if not exists bid_price_paise bigint,
+  add column if not exists ask_price_paise bigint,
+  add column if not exists bid_quantity integer,
+  add column if not exists ask_quantity integer;
+alter table public.paper_futures_fills
+  drop constraint if exists paper_futures_fills_quote_snapshot_check;
+alter table public.paper_futures_fills
+  add constraint paper_futures_fills_quote_snapshot_check
+  check (
+    (bid_price_paise is null and ask_price_paise is null
+      and bid_quantity is null and ask_quantity is null)
+    or
+    (bid_price_paise>0 and ask_price_paise>0
+      and bid_quantity>0 and ask_quantity>0
+      and bid_price_paise<=ask_price_paise)
+  );
+
 create or replace function public.execute_paper_futures_limit_fill(
   p_order_id text,
   p_execution_id text,
   p_fill_sequence integer,
   p_fill_quantity integer,
   p_execution_price_paise bigint,
+  p_bid_price_paise bigint,
+  p_ask_price_paise bigint,
+  p_bid_quantity integer,
+  p_ask_quantity integer,
   p_charges_paise bigint,
   p_quote_timestamp_ms bigint,
   p_now_ms bigint
@@ -92,6 +116,11 @@ begin
      or p_fill_sequence is null or p_fill_sequence<1
      or p_fill_quantity is null or p_fill_quantity<1
      or p_execution_price_paise is null or p_execution_price_paise<1
+     or p_bid_price_paise is null or p_bid_price_paise<1
+     or p_ask_price_paise is null or p_ask_price_paise<1
+     or p_bid_quantity is null or p_bid_quantity<1
+     or p_ask_quantity is null or p_ask_quantity<1
+     or p_bid_price_paise>p_ask_price_paise
      or p_charges_paise is null or p_charges_paise<0
      or p_quote_timestamp_ms is null or p_now_ms is null
      or p_quote_timestamp_ms<0 or p_now_ms<0 then
@@ -131,6 +160,10 @@ begin
     if v_existing_fill.fill_sequence<>p_fill_sequence
        or v_existing_fill.quantity<>p_fill_quantity
        or v_existing_fill.execution_price_paise<>p_execution_price_paise
+       or v_existing_fill.bid_price_paise is distinct from p_bid_price_paise
+       or v_existing_fill.ask_price_paise is distinct from p_ask_price_paise
+       or v_existing_fill.bid_quantity is distinct from p_bid_quantity
+       or v_existing_fill.ask_quantity is distinct from p_ask_quantity
        or v_existing_fill.charges_paise<>p_charges_paise
        or v_existing_fill.quote_timestamp_ms<>p_quote_timestamp_ms then
       raise exception 'Futures LIMIT execution ID was replayed with changed fill details.'
@@ -175,6 +208,13 @@ begin
   if (v_order.side='BUY' and p_execution_price_paise>v_order.limit_price_paise)
      or (v_order.side='SELL' and p_execution_price_paise<v_order.limit_price_paise) then
     raise exception 'Futures LIMIT execution price is worse than the limit price.'
+      using errcode='23514';
+  end if;
+  if (v_order.side='BUY' and
+        (p_execution_price_paise<>p_ask_price_paise or p_ask_quantity<p_fill_quantity))
+     or (v_order.side='SELL' and
+        (p_execution_price_paise<>p_bid_price_paise or p_bid_quantity<p_fill_quantity)) then
+    raise exception 'Futures LIMIT fill does not match the executable side and displayed depth quantity.'
       using errcode='23514';
   end if;
 
@@ -391,11 +431,13 @@ begin
 
   insert into public.paper_futures_fills(
     order_id,user_id,execution_id,fill_sequence,quantity,
-    execution_price_paise,gross_paise,allocated_margin_paise,
-    charges_paise,realized_pnl_paise,quote_timestamp_ms,simulation_only
+    execution_price_paise,bid_price_paise,ask_price_paise,bid_quantity,ask_quantity,
+    gross_paise,allocated_margin_paise,charges_paise,realized_pnl_paise,
+    quote_timestamp_ms,simulation_only
   ) values (
     p_order_id,v_user_id,p_execution_id,p_fill_sequence,p_fill_quantity,
-    p_execution_price_paise,v_gross,
+    p_execution_price_paise,p_bid_price_paise,p_ask_price_paise,p_bid_quantity,p_ask_quantity,
+    v_gross,
     case when v_order.reserved_close_quantity>0 then v_margin_release else v_allocated_margin end,
     p_charges_paise,v_realized,p_quote_timestamp_ms,true
   );
@@ -415,13 +457,13 @@ end;
 $$;
 
 revoke all on function public.execute_paper_futures_limit_fill(
-  text,text,integer,integer,bigint,bigint,bigint,bigint
+  text,text,integer,integer,bigint,bigint,bigint,integer,integer,bigint,bigint,bigint
 ) from public,anon,authenticated;
 grant execute on function public.execute_paper_futures_limit_fill(
-  text,text,integer,integer,bigint,bigint,bigint,bigint
+  text,text,integer,integer,bigint,bigint,bigint,integer,integer,bigint,bigint,bigint
 ) to service_role;
 
-comment on function public.execute_paper_futures_limit_fill(text,text,integer,integer,bigint,bigint,bigint,bigint) is
+comment on function public.execute_paper_futures_limit_fill(text,text,integer,integer,bigint,bigint,bigint,integer,integer,bigint,bigint,bigint) is
   'Atomic simulation-only Futures LIMIT fill. Validates session, quote freshness, limit price, order and reservations; execution events are idempotent.';
 
      and (
