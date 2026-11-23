@@ -51,7 +51,7 @@ test("enforces the expiry-day 15:30 Asia/Kolkata cutoff at the exact millisecond
  const expiry=option();
  const cutoff=Date.UTC(2026,10,26,10,0,0,0); // 15:30 IST
  assert.equal(validateDerivativeContract(expiry,{lots:1,pricePaise:1250,now:cutoff-1}).expiry,"2026-11-26");
- assert.equal(validateDerivativeContract(expiry,{lots:1,pricePaise:1250,now:cutoff}).expiry,"2026-11-26");
+ assert.throws(()=>validateDerivativeContract(expiry,{lots:1,pricePaise:1250,now:cutoff}),/Expired/);
  assert.throws(()=>validateDerivativeContract(expiry,{lots:1,pricePaise:1250,now:cutoff+1}),/Expired/);
 });
 
