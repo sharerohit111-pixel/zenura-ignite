@@ -35,6 +35,12 @@ Scope: Indian Market only. No Crypto changes. No live broker orders.
 - The two new isolation unit tests were executed in a temporary Node 22 harness using the exact committed helper and test source: 2 passed. This is a mocked query-builder unit test, not a live Supabase/RLS integration test; actual database isolation and service-role grants remain unverified until staging checks.
 - The complete `market-gateway` test suite has not been executed because a repository checkout/runtime with its dependencies was not available in this session. GitHub Actions currently has no workflow run associated with the latest branch commit.
 
+### OAuth replay, expiry and disconnect-generation regression coverage
+
+- Added `supabase/tests/upstox_oauth_state_generation.sql` (transactional, rolls back) to verify one-time state consumption/replay rejection, expired-state rejection, stale callback save rejection after disconnect, successful save for a fresh generation, and final disconnect cleanup.
+- Added `supabase/tests/upstox_oauth_generation_race.sh` to exercise both database lock orderings: save obtains the generation lock before disconnect, and disconnect obtains it before a stale save. It requires an explicitly configured disposable database URL plus `ALLOW_UPSTOX_DB_TESTS=1`; it must not be run against production.
+- These SQL integration/race tests have been added but **not executed** in this session because no dedicated disposable PostgreSQL test database was made available. Do not interpret committed tests as passing evidence. Run the SQL file and race script against a resettable local/staging Supabase database before release.
+
 ## Findings and gaps requiring implementation or further proof
 
 1. **No refresh-token flow is implemented.** The current standard OAuth access token is treated as a daily credential and expired connections require user reconnection. Upstox documents standard token expiry at 03:30 IST; the current code's behavior is consistent with this. Do not invent a refresh grant. Evaluate Upstox Analytics Token as a separate product/credential model only after confirming its account, static-IP and terms constraints; it must not become an undocumented shared end-user token.
