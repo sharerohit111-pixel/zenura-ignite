@@ -3,11 +3,22 @@
 const crypto=require("node:crypto");
 const {normalizeWorkerCursor,groupOrdersByUser}=require("./paper-limit-worker");
 const {loadVerifiedExchangeSession,marketDateString}=require("./exchange-session-calendar");
-const {isIntradaySessionOpen}=require("./intraday-limit-policy");
+const {marketClockParts}=require("./intraday-limit-policy");
 const {normalizeTickSizePaise,normalizeExpiryDate}=require("./derivative-contract");
 const {calculateFuturesTradeCharges}=require("./trading-charges");
 const {evaluateUpstoxRestDerivativeLimit}=require("./upstox-rest-executable-quote");
 
+function isVerifiedSessionOpen(nowMs,session){
+  if(!Number.isSafeInteger(nowMs)||nowMs<1||!session||session.isTradingDay!==true
+     ||!["NSE","BSE"].includes(session.exchange)
+     ||!Number.isInteger(session.openMinute)||!Number.isInteger(session.closeMinute)
+     ||session.openMinute<0||session.closeMinute>1440
+     ||session.openMinute>=session.closeMinute)return false;
+  const clock=marketClockParts(nowMs);
+  const date=clock.year+"-"+String(clock.month).padStart(2,"0")+"-"+String(clock.day).padStart(2,"0");
+  const minute=clock.hour*60+clock.minute;
+  return session.sessionDate===date&&minute>=session.openMinute&&minute<session.closeMinute;
+}
 function isContractExpired(order,nowMs){
   const expiry=normalizeExpiryDate(order?.expiry);
   if(!expiry||!Number.isSafeInteger(nowMs)||nowMs<1)return true;
@@ -130,7 +141,7 @@ function createPaperFuturesLimitWorker({
           const eligible=[];
           for(const order of userOrders){
             const session=await getSession(order.exchange,currentNow);
-            const sessionOpen=!!session&&isIntradaySessionOpen(currentNow,session);
+            const sessionOpen=isVerifiedSessionOpen(currentNow,session);
             const expiredByTime=Date.parse(order.expires_at)<=currentNow;
             if(expiredByTime||isContractExpired(order,currentNow)||!sessionOpen){
               const expired=await serviceDb.rpc("expire_paper_futures_limit_order",{p_order_id:order.order_id});
@@ -242,5 +253,5 @@ function createPaperFuturesLimitWorker({
 }
 
 module.exports={
-  createPaperFuturesLimitWorker,isContractExpired,isValidNseFuture,cumulativeFillCharges
+  createPaperFuturesLimitWorker,isContractExpired,isValidNseFuture,cumulativeFillCharges,isVerifiedSessionOpen
 };
