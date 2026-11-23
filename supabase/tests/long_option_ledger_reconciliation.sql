@@ -21,6 +21,8 @@ DECLARE
   v_total_charges bigint;
   v_order_realized bigint;
   v_expected_cash bigint;
+  v_buy_basis bigint;
+  v_closed_basis bigint;
 BEGIN
   -- Buy one long CE lot; premium and buy-side charges enter fee-inclusive cost basis.
   v_now:=floor(extract(epoch from clock_timestamp())*1000)::bigint;
@@ -98,6 +100,54 @@ BEGIN
       v_cash,v_expected_cash,v_realized,v_order_realized,v_reserved_margin,
       v_buy_gross,v_sell_gross,v_total_charges;
   END IF;
+
+  -- Repeated lot-by-lot partial closes must conserve the exact fee-inclusive
+  -- entry basis: the sum of all released basis must equal the original BUY basis.
+  v_now:=floor(extract(epoch from clock_timestamp())*1000)::bigint;
+  PERFORM public.execute_paper_long_option_order(
+    'cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd',
+    repeat('e',32)||repeat('1',32),'cdcdcdcd-0000-4000-8000-000000000010',repeat('a',64),
+    'NSE_FO|OPTION_PARTIAL_CLOSE','OPTION_PARTIAL_CLOSE',
+    'NSE','NSE_FO','CE',current_date+5,25000,25,5,3,'BUY',1250,v_now,v_now
+  );
+
+  v_now:=floor(extract(epoch from clock_timestamp())*1000)::bigint;
+  PERFORM public.execute_paper_long_option_order(
+    'cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd',
+    repeat('e',32)||repeat('2',32),'cdcdcdcd-0000-4000-8000-000000000011',repeat('b',64),
+    'NSE_FO|OPTION_PARTIAL_CLOSE','OPTION_PARTIAL_CLOSE',
+    'NSE','NSE_FO','CE',current_date+5,25000,25,5,1,'SELL',1500,v_now,v_now
+  );
+  v_now:=floor(extract(epoch from clock_timestamp())*1000)::bigint;
+  PERFORM public.execute_paper_long_option_order(
+    'cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd',
+    repeat('e',32)||repeat('3',32),'cdcdcdcd-0000-4000-8000-000000000012',repeat('c',64),
+    'NSE_FO|OPTION_PARTIAL_CLOSE','OPTION_PARTIAL_CLOSE',
+    'NSE','NSE_FO','CE',current_date+5,25000,25,5,1,'SELL',1400,v_now,v_now
+  );
+  v_now:=floor(extract(epoch from clock_timestamp())*1000)::bigint;
+  PERFORM public.execute_paper_long_option_order(
+    'cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd',
+    repeat('e',32)||repeat('4',32),'cdcdcdcd-0000-4000-8000-000000000013',repeat('d',64),
+    'NSE_FO|OPTION_PARTIAL_CLOSE','OPTION_PARTIAL_CLOSE',
+    'NSE','NSE_FO','CE',current_date+5,25000,25,5,1,'SELL',1300,v_now,v_now
+  );
+
+  SELECT coalesce(sum(gross_paise+charges_paise) FILTER (WHERE side='BUY'),0),
+         coalesce(sum(gross_paise-charges_paise-realized_pnl_paise) FILTER (WHERE side='SELL'),0)
+    INTO v_buy_basis,v_closed_basis
+    FROM public.paper_derivative_orders
+   WHERE user_id='cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd'
+     AND instrument_key='NSE_FO|OPTION_PARTIAL_CLOSE'
+     AND status='FILLED' AND simulation_only IS TRUE;
+  IF v_buy_basis<=0 OR v_closed_basis<>v_buy_basis
+     OR EXISTS(SELECT 1 FROM public.paper_derivative_positions
+       WHERE user_id='cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd'
+         AND instrument_key='NSE_FO|OPTION_PARTIAL_CLOSE') THEN
+    RAISE EXCEPTION 'Repeated partial option closes did not conserve the exact fee-inclusive entry basis: bought %, released %',
+      v_buy_basis,v_closed_basis;
+  END IF;
+
 END
 $option_ledger$;
 
