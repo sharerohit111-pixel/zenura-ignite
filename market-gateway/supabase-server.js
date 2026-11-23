@@ -1045,7 +1045,11 @@ app.get("/paper/futures/portfolio",async(req,res)=>{
 
 app.post("/stream",async(req,res)=>{
   let upstream,heartbeat,uid=null,reservation=null,leaseId=null,leaseAcquired=false;
+  let reconnectTimer=null,reconnectInFlight=false,reconnectAttempts=0,socketGeneration=0;
+  const MAX_RECONNECT_ATTEMPTS=5,BASE_RECONNECT_DELAY_MS=1000,MAX_RECONNECT_DELAY_MS=15000;
   const lifecycle=createStreamLifecycle(()=>{
+    if(reconnectTimer)clearTimeout(reconnectTimer);
+    reconnectTimer=null;
     if(heartbeat)heartbeat.stop();
     res.removeListener("drain",onDrain);
     if(uid&&reservation)releaseUserStream(activeUserStreams,uid,reservation);
@@ -1058,6 +1062,11 @@ app.post("/stream",async(req,res)=>{
     if(lifecycle.closed||res.destroyed||res.writableEnded)return false;
     try{return writeSseFrame(res,upstream,formatSseEvent(event,payload));}
     catch(error){if(error.status!==413)throw error;writeSseFrame(res,upstream,formatSseEvent("error",{message:"Market feed frame exceeded the safe size limit."}));stop();if(!res.writableEnded)res.end();return false;}
+  };
+  const finishStream=(message,code)=>{
+    writeEvent("error",{message,...(code?{code}:{})});
+    if(!res.writableEnded)res.end();
+    stop();
   };
   res.on("close",stop);
   try{
@@ -1073,42 +1082,85 @@ app.post("/stream",async(req,res)=>{
     heartbeat=createLeaseHeartbeat({
       renew:async()=>{const result=await serviceDb.rpc("renew_paper_market_stream_lease",{p_user_id:uid,p_lease_id:leaseId,p_now_ms:Date.now(),p_ttl_ms:30000});return !result.error&&result.data===true;},
       onRenewed:()=>{if(res.headersSent&&!lifecycle.closed&&!res.destroyed&&!res.writableEnded)writeSseFrame(res,upstream,formatSseComment("keep-alive"));},
-      onLost:()=>{writeEvent("error",{message:"Live market stream lease expired. Reconnect to continue."});if(!res.writableEnded)res.end();stop();},
-      onError:()=>{writeEvent("error",{message:"Live market stream lease could not be renewed."});if(!res.writableEnded)res.end();stop();}
+      onLost:()=>finishStream("Live market stream lease expired. Reconnect to continue.","stream_lease_expired"),
+      onError:()=>finishStream("Live market stream lease could not be renewed.","stream_lease_renewal_failed")
     });
     if(!instrumentCache.length||Date.now()-instrumentCacheUpdatedAt>6*60*60*1000)await refreshInstrumentCache();
     const keys=validateStreamInstrumentKeys(req.body?.instrumentKeys,instrumentCache.map(item=>item.instrument_key),MAX_KEYS);
     const mode=req.body?.mode||"ltpc";
     if(!["ltpc","full","option_greeks"].includes(mode))return res.status(400).json({error:"Unsupported feed mode."});
     const {token}=await getUpstoxAccessToken(uid);
-    const authResponse=await fetchProvider("https://api.upstox.com/v3/feed/market-data-feed/authorize",{headers:{Authorization:"Bearer "+token,Accept:"application/json"}});
-    const authData=await readProviderJson(authResponse).catch(()=>({}));
-    if(!authResponse.ok||!authData?.data?.authorized_redirect_uri)return res.status(502).json({error:"Upstox could not authorize the live market feed."});
-    const feedUrl=validateUpstoxFeedUrl(authData.data.authorized_redirect_uri);
-    if(res.destroyed||res.writableEnded)return;
+    const authorizeFeed=async()=>{
+      const authResponse=await fetchProvider("https://api.upstox.com/v3/feed/market-data-feed/authorize",{headers:{Authorization:"Bearer "+token,Accept:"application/json"}});
+      if(!authResponse.ok)throw upstoxHttpError(authResponse);
+      const authData=await readProviderJson(authResponse);
+      if(!authData?.data?.authorized_redirect_uri)throw Object.assign(new Error("Upstox did not return an authorized feed URL."),{status:502,code:"upstream_provider_error"});
+      return validateUpstoxFeedUrl(authData.data.authorized_redirect_uri);
+    };
+    const acceptOrdered=createMarketFeedEventOrderFilter();
+    const connectSocket=feedUrl=>{
+      if(lifecycle.closed||res.destroyed||res.writableEnded)return;
+      const generation=++socketGeneration;
+      const socket=new WebSocket(feedUrl,{followRedirects:false,handshakeTimeout:15000,maxPayload:16*1024*1024,perMessageDeflate:false});
+      upstream=socket;
+      socket.on("open",()=>{
+        if(lifecycle.closed||generation!==socketGeneration||upstream!==socket){socket.close();return;}
+        reconnectAttempts=0;
+        writeEvent("status",{connected:true,mode,keys:keys.length,reconnected:reconnectAttempts>0});
+        sendUpstoxSubscription(socket,{mode,instrumentKeys:keys}).catch(()=>scheduleReconnect(generation,null));
+      });
+      socket.on("message",(bytes,isBinary)=>{
+        if(lifecycle.closed||generation!==socketGeneration||upstream!==socket||res.destroyed||res.writableEnded)return;
+        if(!isBinary)return;
+        try{
+          const decoded=decodeFeedResponse(FeedResponse,bytes);
+          const fresh=filterFreshMarketFeeds(decoded,keys);
+          const ordered=fresh&&acceptOrdered(fresh);
+          if(ordered)writeEvent("market",ordered);
+        }catch(_){writeEvent("error",{message:"Market feed decode failed"});}
+      });
+      socket.on("error",()=>scheduleReconnect(generation,null));
+      socket.on("close",()=>scheduleReconnect(generation,null));
+    };
+    const scheduleReconnect=(generation,retryAfterSeconds)=>{
+      if(lifecycle.closed||generation!==socketGeneration||reconnectTimer||reconnectInFlight)return;
+      if(reconnectAttempts>=MAX_RECONNECT_ATTEMPTS){
+        finishStream("Live market feed could not recover. Reconnect to continue.","stream_reconnect_exhausted");
+        return;
+      }
+      reconnectAttempts++;
+      const exponential=Math.min(MAX_RECONNECT_DELAY_MS,BASE_RECONNECT_DELAY_MS*(2**(reconnectAttempts-1)));
+      const jitter=Math.floor(Math.random()*251);
+      const delay=Math.max(exponential+jitter,Number.isFinite(retryAfterSeconds)?retryAfterSeconds*1000:0);
+      writeEvent("status",{connected:false,reconnecting:true,attempt:reconnectAttempts,maxAttempts:MAX_RECONNECT_ATTEMPTS,retryInMs:delay});
+      reconnectTimer=setTimeout(async()=>{
+        reconnectTimer=null;
+        if(lifecycle.closed||generation!==socketGeneration)return;
+        reconnectInFlight=true;
+        try{
+          const nextUrl=await authorizeFeed();
+          if(lifecycle.closed||generation!==socketGeneration)return;
+          connectSocket(nextUrl);
+        }catch(error){
+          reconnectInFlight=false;
+          if(error?.status===401){
+            finishStream("Upstox authorization expired. Reconnect your Upstox account.","upstox_reconnect_required");
+            return;
+          }
+          scheduleReconnect(generation,error?.status===429?error.retryAfterSeconds:null);
+          return;
+        }finally{
+          if(!reconnectTimer)reconnectInFlight=false;
+        }
+      },delay);
+      reconnectTimer.unref?.();
+    };
+    const firstFeedUrl=await authorizeFeed();
+    if(res.destroyed||res.writableEnded||lifecycle.closed)return;
     res.status(200).set({"Content-Type":"text/event-stream","Cache-Control":"no-cache, no-transform","Connection":"keep-alive","X-Accel-Buffering":"no"});
     res.on("drain",onDrain);res.flushHeaders?.();
     writeEvent("status",{connected:false,connecting:true,mode,keys:keys.length});
-    upstream=new WebSocket(feedUrl,{followRedirects:false,handshakeTimeout:15000,maxPayload:16*1024*1024,perMessageDeflate:false});
-    const acceptOrdered=createMarketFeedEventOrderFilter();
-    upstream.on("open",()=>{
-      if(lifecycle.closed||res.destroyed||res.writableEnded){stop();return;}
-      writeEvent("status",{connected:true,mode,keys:keys.length});
-      sendUpstoxSubscription(upstream,{mode,instrumentKeys:keys}).catch(()=>{writeEvent("error",{message:"Market feed subscription could not be sent"});stop();if(!res.writableEnded)res.end();});
-    });
-    upstream.on("message",(bytes,isBinary)=>{
-      if(lifecycle.closed||res.destroyed||res.writableEnded)return;
-      // Ignore upstream text frames; never reflect provider-controlled raw text to clients.
-      if(!isBinary)return;
-      try{
-        const decoded=decodeFeedResponse(FeedResponse,bytes);
-        const fresh=filterFreshMarketFeeds(decoded,keys);
-        const ordered=fresh&&acceptOrdered(fresh);
-        if(ordered)writeEvent("market",ordered);
-      }catch(_){writeEvent("error",{message:"Market feed decode failed"});}
-    });
-    upstream.on("error",()=>{writeEvent("error",{message:"Upstream market feed connection failed"});stop();if(!res.writableEnded)res.end();});
-    upstream.on("close",()=>{if(!lifecycle.closed){writeEvent("status",{connected:false});stop();if(!res.writableEnded)res.end();}});
+    connectSocket(firstFeedUrl);
   }catch(error){
     if(!res.headersSent)sendError(res,error,"Market feed could not be started.");
     else{writeEvent("error",{message:"Market feed stopped unexpectedly"});if(!res.writableEnded)res.end();}
