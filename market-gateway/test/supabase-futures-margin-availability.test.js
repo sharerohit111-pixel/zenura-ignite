@@ -48,3 +48,15 @@ test("Futures margin preview validates the contract and consumes its rate-limit 
   assert.ok(rate>reject,"rate-limit slot must be consumed only after contract validation");
   assert.ok(token>rate&&quote>token,"provider credentials and quote must only be requested after rate limiting");
 });
+
+test("Futures LIMIT and unknown order types fail closed before instrument or provider access",()=>{
+  const route=server.slice(server.indexOf('app.post("/paper/futures/orders"'),server.indexOf('app.get("/paper/futures/orders"'));
+  const orderType=route.indexOf('const orderType=String(req.body?.order_type||"MARKET").toUpperCase()');
+  const reject=route.indexOf('if(orderType!=="MARKET")return res.status(400)');
+  const cache=route.indexOf("refreshInstrumentCache()");
+  const token=route.indexOf("getUpstoxAccessToken(user.id)");
+  const rpc=route.indexOf('execute_paper_futures_market_order');
+  assert.ok(orderType>=0&&reject>orderType,"unknown/Futures LIMIT types must be rejected explicitly");
+  assert.ok(cache>reject&&token>reject&&rpc>reject,"unsupported order types must be rejected before cache/provider/database execution");
+  assert.match(route,/Futures LIMIT orders will be enabled after the protected LIMIT worker is deployed/);
+});
