@@ -78,3 +78,22 @@ The test is explicitly wired into `.github/workflows/paper-trading-supabase-migr
 - No application code or other workstream branch overwritten.
 - No PR merged, no deployment triggered, and no feature activated.
 - Crypto intentionally excluded.
+## PostgreSQL 17 CI design review
+
+The Supabase migration workflow exists on both PR #91's exact head (`7a47bb29ff6ef2683a81f16cb01f70c37fdb473a`) and its base branch (`feature/indian-market-options-limit-design`). The PR-head workflow has a `pull_request` trigger with path filters including `supabase/**`, and no `branches` restriction. Therefore the earlier claim that PR #91's base branch is excluded from this workflow was incorrect; the dedicated migration workflow can trigger for this PR when its changed paths match.
+
+Current workflow behavior, verified from `.github/workflows/paper-trading-supabase-migrations.yml`:
+- Runs one disposable PostgreSQL 16 service (`postgres:16`).
+- Creates minimal Supabase-compatible roles/auth fixtures.
+- Replays every `supabase/migrations/*.sql` file in lexicographic order with `ON_ERROR_STOP=1`.
+- Runs `supabase/tests/market_gateway_service_role_grants.sql` immediately after migration replay, followed by accounting, reservation, fill, race, schema-guard and RLS tests.
+
+Recommended isolated CI enhancement (design only; not implemented):
+1. Add a matrix variable for PostgreSQL major versions `[16, 17]` and set the service image to `postgres:${{ matrix.postgres-version }}`.
+2. Keep the same migration replay, auth-role fixture, environment variables and complete SQL test sequence in both matrix legs; avoid a separate reduced PG17-only suite.
+3. Name jobs/steps with the PostgreSQL major version so failures are attributable.
+4. Preserve PG16 during the compatibility transition; require both matrix legs to pass before treating the SQL suite as green.
+5. Do not add a `pull_request.branches` filter. Retain the existing path filters and ensure migration, SQL test, workflow and gateway runtime changes continue to trigger the job.
+6. Keep this as disposable CI only. It does not replace a real Supabase staging rehearsal, production privilege verification, or the pending explicit production migration approval.
+
+No workflow or application code was changed during this design review.
