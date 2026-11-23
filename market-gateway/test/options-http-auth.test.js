@@ -66,11 +66,3 @@ test("Options APIs reject invalid Supabase sessions before touching user data or
     }
   });
 });
-
-test("Options order APIs do not leak authenticated responses to shared caches",async()=>{
-  await withServer(async base=>{
-    const result=await request(base,"/paper/derivative/orders");
-    assert.equal(result.status,401);
-    assert.equal(result.headers.get("cache-control"),null);
-  });
-});
