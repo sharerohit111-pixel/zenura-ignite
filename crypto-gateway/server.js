@@ -105,6 +105,32 @@ app.use((req,res,next) => {
   if (req.method === "OPTIONS") return res.sendStatus(origin && ALLOWED_ORIGINS.includes(origin) ? 204 : 403);
   next();
 });
+// Per-process abuse guard for state-changing HTTP routes. Uses the socket peer address
+// (not caller-controlled forwarding headers); a shared edge limiter is still required for multi-replica deployments.
+function createRateLimiter({ windowMs = 60000, max = 30, maxKeys = 10000, now = Date.now } = {}) {
+  const buckets = new Map();
+  return function rateLimit(req, res, next) {
+    const key = req.socket?.remoteAddress || "unknown";
+    const time = now();
+    let bucket = buckets.get(key);
+    if (!bucket || time - bucket.startedAt >= windowMs) {
+      if (!bucket && buckets.size >= maxKeys) {
+        for (const [address, entry] of buckets) if (time - entry.startedAt >= windowMs) buckets.delete(address);
+        if (buckets.size >= maxKeys) return res.set("Cache-Control", "no-store").status(503).json({ error: "Request capacity is temporarily limited." });
+      }
+      bucket = { startedAt: time, count: 0 };
+      buckets.set(key, bucket);
+    }
+    bucket.count += 1;
+    if (bucket.count > max) {
+      const retrySeconds = Math.max(1, Math.ceil((windowMs - (time - bucket.startedAt)) / 1000));
+      return res.set("Cache-Control", "no-store").set("Retry-After", String(retrySeconds)).status(429).json({ error: "Too many Crypto order requests. Retry later." });
+    }
+    next();
+  };
+}
+const cryptoOrderRateLimit = createRateLimiter({ windowMs: 60000, max: 30 });
+
 app.get("/health", (_req,res) => res.set("Cache-Control","no-store").json({ ok:true, service:"zenura-crypto-paper-gateway", simulationOnly:true }));
 app.get("/crypto/account", async(req,res) => {
   try {
@@ -131,7 +157,7 @@ app.get("/crypto/portfolio", async(req,res) => {
     });
   } catch(e) { sendError(res,e,"Crypto portfolio could not be loaded."); }
 });
-app.post("/crypto/orders", async(req,res) => {
+app.post("/crypto/orders", cryptoOrderRateLimit, async(req,res) => {
   try {
     const { user } = await authenticate(req);
     const {symbol,side,quantityRaw,key} = validateOrderInput(req.body);
@@ -160,7 +186,7 @@ app.post("/crypto/orders", async(req,res) => {
     });
   } catch(e) { sendError(res,e,"Crypto paper order could not be completed."); }
 });
-app.post("/crypto/limit-orders", async(req,res) => {
+app.post("/crypto/limit-orders", cryptoOrderRateLimit, async(req,res) => {
   try {
     const { user } = await authenticate(req);
     const {symbol,side,quantityRaw,priceRaw,key} = validateOrderInput(req.body,true);
@@ -183,7 +209,7 @@ app.post("/crypto/limit-orders", async(req,res) => {
     });
   } catch(e) { sendError(res,e,"Crypto LIMIT order could not be created."); }
 });
-app.post("/crypto/limit-orders/:orderId/cancel", async(req,res) => {
+app.post("/crypto/limit-orders/:orderId/cancel", cryptoOrderRateLimit, async(req,res) => {
   try {
     const { user } = await authenticate(req);
     const orderId = String(req.params.orderId||"");
@@ -282,4 +308,4 @@ app.use((error, _req, res, next) => {
 });
 
 if(require.main===module) start().catch(error=>{console.error("Crypto gateway startup failed:",error.message);process.exit(1);});
-module.exports={app,runLimitWorker,validateOrderInput,makeOrderId};
+module.exports={app,runLimitWorker,validateOrderInput,makeOrderId,createRateLimiter};
