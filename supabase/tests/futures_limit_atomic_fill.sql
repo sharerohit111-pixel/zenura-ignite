@@ -48,7 +48,7 @@ BEGIN
   v_now:=floor(extract(epoch from clock_timestamp())*1000)::bigint;
   v_first_quote:=v_now;
   v_result:=public.execute_paper_futures_limit_fill(
-    repeat('a',64),'UPSTOX-EXEC-001',1,10,9900,100,v_first_quote,v_now
+    repeat('a',64),'UPSTOX-EXEC-001',1,10,9900,9895,9900,100,10,100,v_first_quote,v_now
   );
   IF v_result->>'status'<>'PARTIALLY_FILLED'
      OR (v_result->>'filled_quantity')::integer<>10
@@ -89,7 +89,7 @@ BEGIN
   v_now:=floor(extract(epoch from clock_timestamp())*1000)::bigint;
   BEGIN
     PERFORM public.execute_paper_futures_limit_fill(
-      repeat('a',64),'UPSTOX-EXEC-001',1,9,9900,100,v_first_quote,v_now
+      repeat('a',64),'UPSTOX-EXEC-001',1,9,9900,9895,9900,100,10,100,v_first_quote,v_now
     );
   EXCEPTION WHEN SQLSTATE '23505' THEN v_rejected:=true;
   END;
@@ -98,7 +98,7 @@ BEGIN
   -- Final opening fill receives the exact 120000-paise reservation remainder.
   v_now:=floor(extract(epoch from clock_timestamp())*1000)::bigint;
   v_result:=public.execute_paper_futures_limit_fill(
-    repeat('a',64),'UPSTOX-EXEC-002',2,15,9800,200,v_now,v_now
+    repeat('a',64),'UPSTOX-EXEC-002',2,15,9800,9795,9800,100,15,200,v_now,v_now
   );
   SELECT status,filled_quantity,remaining_quantity,reserved_open_margin_paise,
          average_fill_price_paise
@@ -132,7 +132,7 @@ BEGIN
   v_now:=floor(extract(epoch from clock_timestamp())*1000)::bigint;
   BEGIN
     PERFORM public.execute_paper_futures_limit_fill(
-      repeat('b',64),'UPSTOX-EXEC-BAD',1,10,9800,100,v_now,v_now
+      repeat('b',64),'UPSTOX-EXEC-BAD',1,10,9800,9800,9805,10,100,100,v_now,v_now
     );
   EXCEPTION WHEN SQLSTATE '23514' THEN v_rejected:=true;
   END;
@@ -141,7 +141,7 @@ BEGIN
   -- Partial close releases proportional position margin and realizes P&L.
   v_now:=floor(extract(epoch from clock_timestamp())*1000)::bigint;
   v_result:=public.execute_paper_futures_limit_fill(
-    repeat('b',64),'UPSTOX-EXEC-003',1,10,10000,100,v_now,v_now
+    repeat('b',64),'UPSTOX-EXEC-003',1,10,10000,10000,10005,10,100,100,v_now,v_now
   );
   SELECT net_quantity,reserved_margin_paise,reserved_close_quantity
     INTO v_position_qty,v_position_margin,v_position_close_reserved
@@ -163,7 +163,7 @@ BEGIN
   -- and safely deletes the now-flat position.
   v_now:=floor(extract(epoch from clock_timestamp())*1000)::bigint;
   v_result:=public.execute_paper_futures_limit_fill(
-    repeat('b',64),'UPSTOX-EXEC-004',2,15,10000,100,v_now,v_now
+    repeat('b',64),'UPSTOX-EXEC-004',2,15,10000,10000,10005,15,100,100,v_now,v_now
   );
   SELECT status,filled_quantity,remaining_quantity
     INTO v_order_status,v_filled,v_remaining
@@ -187,13 +187,13 @@ BEGIN
   END IF;
 
   IF has_function_privilege('anon',
-       'public.execute_paper_futures_limit_fill(text,text,integer,integer,bigint,bigint,bigint,bigint)',
+       'public.execute_paper_futures_limit_fill(text,text,integer,integer,bigint,bigint,bigint,integer,integer,bigint,bigint,bigint)',
        'EXECUTE')
      OR has_function_privilege('authenticated',
-       'public.execute_paper_futures_limit_fill(text,text,integer,integer,bigint,bigint,bigint,bigint)',
+       'public.execute_paper_futures_limit_fill(text,text,integer,integer,bigint,bigint,bigint,integer,integer,bigint,bigint,bigint)',
        'EXECUTE')
      OR NOT has_function_privilege('service_role',
-       'public.execute_paper_futures_limit_fill(text,text,integer,integer,bigint,bigint,bigint,bigint)',
+       'public.execute_paper_futures_limit_fill(text,text,integer,integer,bigint,bigint,bigint,integer,integer,bigint,bigint,bigint)',
        'EXECUTE') THEN
     RAISE EXCEPTION 'Futures LIMIT fill RPC execution grants are not least-privilege';
   END IF;
