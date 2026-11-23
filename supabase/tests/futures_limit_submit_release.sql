@@ -194,6 +194,45 @@ BEGIN
     RAISE EXCEPTION 'Repeated Futures LIMIT expiry was not idempotent';
   END IF;
 
+  -- A future-dated DAY order cannot be expired while a verified exchange
+  -- session is open; missing verified session data must fail closed by expiring it.
+  PERFORM public.submit_paper_futures_limit_order(
+    'abababab-abab-4bab-8bab-abababababab',repeat('4',64),
+    'abababab-0000-4000-8000-000000000009',repeat('4',64),
+    'NSE_FO|FUT_LIMIT_NO_SESSION','FUT_LIMIT_NO_SESSION','NSE','NSE_FO',current_date+5,
+    25,5,'BUY','DELIVERY',25,10000,50000,clock_timestamp()+interval '10 minutes'
+  );
+  INSERT INTO public.paper_exchange_sessions(
+    exchange,session_date,is_trading_day,open_minute,close_minute,
+    session_kind,source_reference,verified_at,source_sha256
+  ) VALUES (
+    'NSE',(clock_timestamp() at time zone 'Asia/Kolkata')::date,
+    true,0,1440,'SPECIAL','https://www.nseindia.com/market-data/holidays',
+    clock_timestamp(),repeat('e',64)
+  )
+  ON CONFLICT(exchange,session_date) DO UPDATE SET
+    is_trading_day=true,open_minute=0,close_minute=1440,session_kind='SPECIAL',
+    source_reference='https://www.nseindia.com/market-data/holidays',
+    verified_at=clock_timestamp(),source_sha256=repeat('e',64);
+  v_rejected:=false;
+  BEGIN
+    PERFORM public.expire_paper_futures_limit_order(repeat('4',64));
+  EXCEPTION WHEN SQLSTATE '22023' THEN v_rejected:=true;
+  END;
+  IF NOT v_rejected THEN
+    RAISE EXCEPTION 'Futures LIMIT order expired during a verified open session';
+  END IF;
+  DELETE FROM public.paper_exchange_sessions
+   WHERE exchange='NSE'
+     AND session_date=(clock_timestamp() at time zone 'Asia/Kolkata')::date;
+  v_result:=public.expire_paper_futures_limit_order(repeat('4',64));
+  SELECT reserved_margin_paise INTO v_reserved
+    FROM public.paper_accounts
+   WHERE user_id='abababab-abab-4bab-8bab-abababababab';
+  IF v_result->>'status'<>'EXPIRED' OR v_reserved<>0 THEN
+    RAISE EXCEPTION 'Futures LIMIT order was not expired after verified session data disappeared';
+  END IF;
+
   IF has_function_privilege('anon',
        'public.submit_paper_futures_limit_order(uuid,text,uuid,text,text,text,text,text,date,integer,integer,text,text,integer,bigint,bigint,timestamp with time zone)',
        'EXECUTE')
