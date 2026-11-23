@@ -40,6 +40,7 @@ declare
   v_cash_delta bigint;
   v_limit_gross bigint;
   v_expected_reserve bigint;
+  v_fill_id uuid;
 begin
   if p_order_id is null or p_order_id !~ '^[a-f0-9]{64}$'
      or p_execution_price_paise is null or p_execution_price_paise <= 0
@@ -263,6 +264,7 @@ declare
   v_cash_delta bigint;
   v_limit_gross bigint;
   v_expected_reserve bigint;
+  v_fill_id uuid;
 begin
   if p_order_id is null or p_order_id !~ '^[a-f0-9]{64}$'
      or p_execution_price_paise is null or p_execution_price_paise<=0
@@ -509,6 +511,7 @@ declare
   v_net_gross bigint;
   v_cash_delta bigint;
   v_breakdown jsonb;
+  v_fill_id uuid;
 begin
   if p_user_id is null or p_idempotency_key is null
      or p_order_id is null or p_request_fingerprint is null
