@@ -200,3 +200,20 @@ The draft replaces the existing full-fill definitions for MARKET, Delivery LIMIT
 Static checks: all three signatures match the source definitions; all retain SECURITY DEFINER and empty/fixed search_path; each has one fill insert; each LIMIT function has trade and conditional reservation ledger insert sites; MARKET has one trade ledger insert.
 
 No SQL parser, disposable PostgreSQL, Supabase local test database, or pgTAP execution was available. Therefore SQL compilation and all runtime behavior remain unverified. The draft has not been promoted into `supabase/migrations/`, and no production DDL or RPC was changed. Do not merge/deploy until compilation, migration replay, replay/idempotency, concurrent workers, forced rollback, and tenant-FK regression tests pass.
+
+
+## Disposable PostgreSQL 17 validation harness (2026-11-23)
+
+Added `.github/workflows/indian-market-db-postgres17.yml` on the isolated infrastructure feature branch (commit `aa9c401f3e30927594aaa0c2f551efd86a97c229`).
+
+The workflow:
+- Starts a fresh `postgres:17` GitHub Actions service database; it does not connect to Supabase production and uses no production credentials.
+- Creates minimal Supabase-compatible `anon`, `authenticated`, `service_role`, `auth.users`, and `auth.uid()` fixtures.
+- Applies the ordered repository migrations to the disposable database.
+- Applies the Equity atomic fill/ledger RPC integration draft after the existing Equity ledger schema migration.
+- Runs the existing Equity ledger schema/append-only test, MARKET fee-settlement regression, and Intraday LIMIT reservation/fill lifecycle regression.
+- Runs on matching changes to the isolated feature branch, pull requests, or manual dispatch.
+
+Harness status at documentation time: workflow file committed and re-fetched from the feature branch; no GitHub Actions run result was available yet. This is test infrastructure, not evidence that SQL compiled or that tests passed. Runtime verification remains pending. The existing broader paper-trading migration workflow continues to use PostgreSQL 16; this new isolated job specifically adds a PostgreSQL 17 validation lane.
+
+No production database, production Supabase migration history, active migration file, or Crypto asset was changed by this harness addition.
