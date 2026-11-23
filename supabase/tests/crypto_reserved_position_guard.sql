@@ -1,5 +1,14 @@
 -- Regression: deleting a crypto position must not orphan pending LIMIT SELL reservations.
--- Run after the S-TRADE Crypto LIMIT lifecycle fixture has created BTCUSDT for user 333...
+-- Disposable PostgreSQL regression fixture; no production data is touched.
+BEGIN;
+INSERT INTO auth.users(id) VALUES ('33333333-3333-4333-8333-333333333333') ON CONFLICT (id) DO NOTHING;
+INSERT INTO public.paper_crypto_accounts(user_id,currency,starting_cash,cash_balance,reserved_cash,realized_pnl,version)
+VALUES ('33333333-3333-4333-8333-333333333333','INR',1000000,1000000,0,0,1)
+ON CONFLICT (user_id) DO NOTHING;
+INSERT INTO public.paper_crypto_positions(user_id,symbol,base_asset,quantity,reserved_quantity,average_entry_price,cost_basis,realized_pnl)
+VALUES ('33333333-3333-4333-8333-333333333333','BTCUSDT','BTC',0.008,0.008,8000000,64000,0)
+ON CONFLICT (user_id,symbol) DO UPDATE SET quantity=0.008,reserved_quantity=0.008,average_entry_price=8000000,cost_basis=64000;
+
 SET ROLE service_role;
 
 UPDATE public.paper_crypto_positions
@@ -60,3 +69,4 @@ END
 $reserved_position_guard$;
 
 RESET ROLE;
+ROLLBACK;
