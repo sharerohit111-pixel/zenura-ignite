@@ -249,3 +249,43 @@ This matrix classifies work by cost and side-effect risk so Chat 7 / backend own
 - Keep TTL and batch-duration limits aligned with Cloud Run/job execution timeout and provider latency budgets. Do not change production schedules or worker activation as part of this audit.
 
 **Decision:** audit/documentation only. No worker behavior, SQL, RPC, TTL, schedule, deployment or production activation was changed. A production-readiness claim for crash recovery remains blocked on the tests and fencing review above.
+
+## 11. Route-by-route API contract and authorization review (2026-11-23)
+
+Reviewed the current market-gateway/supabase-server.js, lib/supabase-runtime.js, history cursor helper and route regression tests on this branch.
+
+### Authentication boundary
+
+- All account, watchlist, quote-history, order, portfolio, derivative and SSE stream routes reviewed call the shared auth(req) helper before accessing user data or provider credentials.
+- auth(req) extracts a single Bearer token, validates it through Supabase Auth getUser(token), then creates a user-scoped Supabase client with the verified access token.
+- The OAuth callback and public instrument-master endpoint are intentionally unauthenticated protocol/public-data routes; they must remain narrowly scoped and must not expose account data.
+- /health is a public readiness endpoint. Keep its output limited to non-secret operational status.
+- The public /instruments route currently has bounded output (1–100) and bounded search text (60 chars), but no route-level or distributed rate limiter.
+- The SSE /stream route uses the shared authenticated user path and a per-user active-stream guard.
+
+### RPC and ownership boundary
+
+- createSupabaseRuntime.callUserRpc rejects unallowlisted RPC names and rejects caller-supplied p_user_id; it injects the verified user UUID.
+- User-owned reads use the user-scoped client and explicit user_id filters in the inspected order-history/account paths; RLS remains an independent required boundary.
+- Worker/service-role operations are separate from user request RPC calls.
+- Do not add service-role data reads to ordinary user routes as a shortcut.
+
+### Confirmed gaps / required follow-up
+
+1. **No gateway-wide distributed rate limiting:** the only explicit route-level throttle confirmed in this file is the 5-second database-backed margin-preview slot. This is not a global limiter. Public /instruments, authentication attempts, candles, option chain, portfolio and order routes need a designed shared policy. No Redis/Upstash dependency or implementation is present in market-gateway/package.json.
+2. **Malformed JSON error contract:** request-ID middleware now runs before express.json, but JSON parsing currently runs before the CORS middleware and no dedicated Express JSON-parser error handler was found at the end of the gateway. Malformed JSON can therefore bypass the route-level sendError JSON contract and the normal CORS response headers. Add a safe parser-error middleware after body parsing (and before routes), preserving the already assigned request ID; test malformed JSON and oversized payload behavior. Do not log request bodies or authorization headers.
+3. **Error taxonomy:** sendError returns a request ID and safe structured failure log, but it does not consistently map Supabase/Postgres error codes to stable public API codes. callUserRpc currently normalizes RPC failures to generic 409 while retaining an internal code on the thrown error. Define a route-independent internal taxonomy and safe public mapping without leaking database/provider details.
+4. **Input schemas:** route handlers use a mix of explicit checks and ad-hoc coercion (String, Number, parseInt). Complete a route contract matrix for required fields, types, bounds, unknown fields, and stable 400/401/403/409/429/502/503 responses before introducing a shared validator.
+5. **OAuth/public endpoints:** preserve the callback's state/redirect validation and test replay, missing/expired state, mismatched redirect and provider error paths. Keep public instrument search output restricted to official instrument-master fields.
+6. **Pagination:** order-history routes reviewed use the existing composite descending keyset cursor and limit + 1 lookahead. Preserve this contract and add route-level tests for equal timestamps, malformed cursor, page boundary and user isolation; do not replace it with offset pagination.
+
+### No-activation reminder
+
+The repository deployment workflow contains a manual production deployment path that sets PAPER_LIMIT_WORKER_ENABLED=true. This review did not execute the workflow, deploy a service, change environment variables, or activate any worker/scheduler. Treat that workflow as a separate, explicitly gated release operation and do not run it during infrastructure audit work.
+
+### API audit status
+
+- Source-level review: complete for the route/authentication patterns and shared runtime helpers inspected.
+- Full request/response schema matrix and end-to-end authenticated route execution: pending.
+- Malformed JSON parser handling and regression tests: pending.
+- No SQL, migration, RLS, RPC or shared database changes were made.
