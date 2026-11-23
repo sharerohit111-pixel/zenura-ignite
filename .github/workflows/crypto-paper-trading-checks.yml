@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - "crypto/**"
+      - "crypto-gateway/**"
       - "supabase/migrations/*_s_trade_crypto_*.sql"
       - "supabase/tests/crypto_*.sql"
       - ".github/workflows/crypto-paper-trading-checks.yml"
