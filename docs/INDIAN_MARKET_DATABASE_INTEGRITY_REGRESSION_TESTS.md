@@ -77,3 +77,17 @@ The current draft integration SQL must pass all existing Equity assertions plus:
 - Validate final account snapshots and ledger deltas against actual database state; do not accept static text inspection as proof.
 
 Status: source-level static checks only. SQL parse/compile, disposable DB, pgTAP, concurrency, and forced rollback tests are still NOT RUN.
+
+
+## Added executable Equity regression coverage (2026-11-23)
+
+The disposable PostgreSQL 17 workflow now runs the following assertions after applying the draft Equity RPC integration:
+
+- MARKET BUY/SELL fill rows and trade-ledger entries reconcile to the final cash balance; exact MARKET BUY replay creates no duplicate rows.
+- Delivery LIMIT BUY creates one fill, TRADE_DEBIT and RESERVATION_CONSUME with matching deltas and final snapshots; replay creates no duplicates.
+- Delivery LIMIT SELL creates one fill and one TRADE_CREDIT, with no cash reservation-consume event.
+- Intraday LIMIT BUY and SELL reconcile their fill/ledger rows, cash deltas and final cash snapshots; replay creates no duplicates.
+- An injected failure at the first ledger insert after a Delivery LIMIT fill insert aborts the whole RPC statement. The test asserts the order remains pending, no fill/ledger row remains, and account/position state is unchanged.
+- Existing Intraday LIMIT fill-vs-cancel and cancel-vs-fill race shell test is included in the PostgreSQL 17 workflow. Its cleanup retains the filled parent order so immutable fill/ledger foreign keys remain valid.
+
+These tests are committed but have not yet been observed passing in GitHub Actions. The tenant-composite-FK draft still requires a canonical combined Futures/Options/Equity migration chain before its cross-tenant integration tests can safely run. No production migration or production database write was performed.
