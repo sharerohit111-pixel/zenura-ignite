@@ -68,11 +68,13 @@ DECLARE
   v_before public.paper_orders%rowtype;
   v_result jsonb;
   v_account public.paper_accounts%rowtype;
+  v_had_order boolean:=false;
 BEGIN
   SELECT * INTO v_before FROM public.paper_orders
    WHERE order_id=p_order_id AND user_id=p_user_id;
+  v_had_order:=FOUND;
   v_result:=public._cancel_paper_limit_order_without_ledger(p_user_id,p_order_id);
-  IF FOUND AND v_before.status='PENDING' AND v_before.side='BUY'
+  IF v_had_order AND v_before.status='PENDING' AND v_before.side='BUY'
      AND v_before.reserved_cash_paise>0 THEN
     SELECT * INTO v_account FROM public.paper_accounts WHERE user_id=p_user_id;
     INSERT INTO public.paper_equity_cash_ledger(
@@ -130,11 +132,13 @@ DECLARE
   v_before public.paper_orders%rowtype;
   v_result jsonb;
   v_account public.paper_accounts%rowtype;
+  v_had_order boolean:=false;
 BEGIN
   SELECT * INTO v_before FROM public.paper_orders
    WHERE order_id=p_order_id AND user_id=p_user_id AND product='INTRADAY' AND order_type='LIMIT';
+  v_had_order:=FOUND;
   v_result:=public._cancel_paper_intraday_limit_order_without_ledger(p_user_id,p_order_id);
-  IF FOUND AND v_before.status='PENDING' AND v_before.side='BUY'
+  IF v_had_order AND v_before.status='PENDING' AND v_before.side='BUY'
      AND v_before.reserved_cash_paise>0 THEN
     SELECT * INTO v_account FROM public.paper_accounts WHERE user_id=p_user_id;
     INSERT INTO public.paper_equity_cash_ledger(
@@ -167,7 +171,7 @@ BEGIN
   SELECT order_id,user_id,reserved_cash_paise FROM public.paper_orders
    WHERE product='INTRADAY' AND order_type='LIMIT' AND status='PENDING'
      AND side='BUY' AND reserved_cash_paise>0
-   ORDER BY created_at,order_id LIMIT p_batch_size;
+   ORDER BY created_at,order_id;
 
   v_result:=public._expire_paper_intraday_limit_orders_without_ledger(p_batch_size);
   FOR v_before IN SELECT * FROM _equity_intraday_expiry_snapshot LOOP
