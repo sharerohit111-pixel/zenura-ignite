@@ -6,7 +6,20 @@ const {loadVerifiedExchangeSession,marketDateString}=require("./exchange-session
 const {marketClockParts}=require("./intraday-limit-policy");
 const {normalizeTickSizePaise,normalizeExpiryDate}=require("./derivative-contract");
 const {evaluateOptionLimitQuote}=require("./option-limit-policy");
-const {isVerifiedSessionOpen}=require("./paper-futures-limit-worker");
+
+function optionSessionState(nowMs,session){
+  if(!Number.isSafeInteger(nowMs)||nowMs<1||!session||session.isTradingDay!==true
+     ||session.exchange!=="NSE"||!Number.isInteger(session.openMinute)
+     ||!Number.isInteger(session.closeMinute)||session.openMinute<0
+     ||session.closeMinute>1440||session.openMinute>=session.closeMinute)return "MISSING";
+  const clock=marketClockParts(nowMs);
+  const date=clock.year+"-"+String(clock.month).padStart(2,"0")+"-"+String(clock.day).padStart(2,"0");
+  if(session.sessionDate!==date)return "MISSING";
+  const minute=clock.hour*60+clock.minute;
+  if(minute<session.openMinute)return "BEFORE_OPEN";
+  if(minute>=session.closeMinute)return "CLOSED";
+  return "OPEN";
+}
 
 function isContractExpired(order,nowMs){
   const expiry=normalizeExpiryDate(order?.expiry);
@@ -23,6 +36,8 @@ function isValidNseOptionLimitOrder(order,instrument){
     &&["CE","PE"].includes(order.instrument_type)
     &&instrument.exchange==="NSE"&&instrument.segment==="NSE_FO"
     &&instrument.instrument_type===order.instrument_type
+    &&typeof instrument.strike_price==="number"&&Number.isFinite(instrument.strike_price)
+    &&instrument.strike_price>0&&Number(order.strike_price)===instrument.strike_price
     &&instrument.instrument_key===order.instrument_key
     &&instrument.trading_symbol===order.trading_symbol
     &&normalizeExpiryDate(instrument.expiry)===normalizeExpiryDate(order.expiry)
@@ -115,16 +130,21 @@ function createPaperOptionLimitWorker({
       const processUserOrders=async([userId,userOrders])=>{
         try{
           const currentNow=now(),session=await getSession(currentNow);
-          const sessionOpen=isVerifiedSessionOpen(currentNow,session);
+          const sessionState=optionSessionState(currentNow,session);
           const eligible=[];
           for(const order of userOrders){
-            if(Date.parse(order.expires_at)<=currentNow||isContractExpired(order,currentNow)||!sessionOpen){
+            if(Date.parse(order.expires_at)<=currentNow||isContractExpired(order,currentNow)
+               ||sessionState==="MISSING"||sessionState==="CLOSED"){
               const expired=await serviceDb.rpc("expire_paper_option_limit_order",{p_order_id:order.order_id});
               if(expired?.error){
                 if(["22023","23514","P0002"].includes(expired.error.code))summary.notEligible++;
                 else{summary.failed++;console.warn("Options LIMIT expiry RPC failed",{orderId:order.order_id,code:expired.error.code||"unknown"});}
               }else if(expired.data?.status==="EXPIRED"&&!expired.data.idempotent_replay)summary.expired++;
               else summary.notEligible++;
+              continue;
+            }
+            if(sessionState==="BEFORE_OPEN"){
+              summary.notEligible++;
               continue;
             }
             const instrument=instruments.find(item=>item?.instrument_key===order.instrument_key);
@@ -223,4 +243,4 @@ function createPaperOptionLimitWorker({
   };
 }
 
-module.exports={createPaperOptionLimitWorker,isContractExpired,isValidNseOptionLimitOrder};
+module.exports={createPaperOptionLimitWorker,isContractExpired,isValidNseOptionLimitOrder,optionSessionState};
