@@ -556,6 +556,8 @@ app.post("/paper/derivative/orders",async(req,res)=>{
   try{
     const {user,userDb}=await auth(req),instrumentKey=String(req.body?.instrument_key||"");
     const lots=Number(req.body?.lots),side=String(req.body?.side||"").toUpperCase(),idempotencyKey=String(req.body?.idempotency_key||"");
+    const orderType=String(req.body?.order_type||"MARKET").toUpperCase();
+    if(orderType!=="MARKET")return res.status(400).json({error:"Options LIMIT orders are not supported yet. Only MARKET orders are currently available."});
     if(!isUuid(idempotencyKey))return res.status(400).json({error:"A valid UUID idempotency_key is required."});
     if(!["BUY","SELL"].includes(side))return res.status(400).json({error:"Only BUY and SELL to close existing long CE/PE positions are supported."});
     if(!instrumentCache.length||Date.now()-instrumentCacheUpdatedAt>6*60*60*1000)await refreshInstrumentCache();
