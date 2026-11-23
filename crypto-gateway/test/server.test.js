@@ -4,7 +4,7 @@ process.env.SUPABASE_PUBLISHABLE_KEY="test-publishable-key";
 process.env.SUPABASE_SERVICE_ROLE_KEY="test-service-role-key";
 const test=require("node:test");
 const assert=require("node:assert/strict");
-const {validateOrderInput,makeOrderId,runLimitWorker,createRateLimiter,isUuid}=require("../server");
+const {validateOrderInput,validateRiskPlanInput,makeOrderId,runLimitWorker,createRateLimiter,isUuid}=require("../server");
 test("accepts supported market order and canonicalizes symbol",()=>{
  const v=validateOrderInput({symbol:"btcusdt",side:"buy",quantity:"0.001",idempotency_key:"123e4567-e89b-42d3-a456-426614174000"});
  assert.equal(v.symbol,"BTCUSDT"); assert.equal(v.side,"BUY"); assert.equal(v.quantityRaw,"0.001");
@@ -62,4 +62,16 @@ test("rate limiter does not trust forwarded client address headers",()=>{
 test("accepts generated UUID reset request IDs and rejects malformed values",()=>{
  assert.equal(isUuid("123e4567-e89b-42d3-a456-426614174000"),true);
  for(const value of ["","not-a-uuid","123e4567-e89b-42d3-a456-42661417400z","00000000-0000-0000-0000-000000000000"]) assert.equal(isUuid(value),false);
+});
+
+test("accepts valid cloud SL/Target plan inputs and canonicalizes symbol",()=>{
+ const v=validateRiskPlanInput({symbol:"btcusdt",quantity:"0.001",stop_loss_price:"60000",take_profit_price:"70000",idempotency_key:"123e4567-e89b-42d3-a456-426614174000"});
+ assert.deepEqual(v,{symbol:"BTCUSDT",quantity:"0.001",stopLossPrice:"60000",takeProfitPrice:"70000",key:"123e4567-e89b-42d3-a456-426614174000"});
+});
+test("rejects malformed cloud SL/Target decimals, missing triggers and invalid ranges",()=>{
+ const base={symbol:"BTCUSDT",quantity:"0.01",stop_loss_price:"60000",take_profit_price:"70000",idempotency_key:"123e4567-e89b-42d3-a456-426614174000"};
+ for(const patch of [{quantity:"0"},{quantity:"1e2"},{quantity:"01"},{quantity:"1.1234567890123"},{stop_loss_price:"60000.123456789"},{stop_loss_price:"0",take_profit_price:null},{stop_loss_price:"80000",take_profit_price:"70000"},{symbol:"NOPEUSDT"}]) {
+  assert.throws(()=>validateRiskPlanInput({...base,...patch}));
+ }
+ assert.throws(()=>validateRiskPlanInput({...base,stop_loss_price:null,take_profit_price:null}));
 });
