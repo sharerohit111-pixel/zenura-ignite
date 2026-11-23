@@ -172,14 +172,9 @@
         const row=document.createElement("tr"),cell=document.createElement("td");
         cell.colSpan=10;cell.textContent="No Options LIMIT orders recorded yet.";row.append(cell);ordersBody.append(row);return;
       }
-      const fillsByOrder=new Map();
-      (data.fills||[]).forEach(fill=>{
-        if(!fillsByOrder.has(fill.orderId))fillsByOrder.set(fill.orderId,[]);
-        fillsByOrder.get(fill.orderId).push(fill);
-      });
       data.orders.forEach(order=>{
         const row=document.createElement("tr");
-        const lots=order.quantity?Math.ceil(order.quantity/Math.max(1,Number(instruments.get(order.instrumentKey)?.lot_size||order.quantity))):"—";
+        const lots=order.quantity?Math.ceil(order.quantity/Math.max(1,Number(order.lotSize||order.quantity))):"—";
         const values=[
           order.createdAt?new Date(order.createdAt).toLocaleString("en-IN"):"—",
           order.tradingSymbol+" · "+order.instrumentType,
@@ -230,6 +225,7 @@
   sellButton.addEventListener("click",()=>submit("SELL"));
   refreshButton.addEventListener("click",()=>{loadFeatureStatus();loadOrders();});
   document.addEventListener("visibilitychange",()=>{if(!document.hidden){loadFeatureStatus();loadOrders();}});
+  window.addEventListener("zenura-market-auth-ready",()=>{loadFeatureStatus();loadOrders();});
   loadFeatureStatus();
   loadOrders();
 })();
