@@ -7,6 +7,7 @@ let activeUserId = null;
 let loadGeneration = 0;
 let pendingOrder = null;
 let pendingLimitOrder = null;
+let pendingResetRequestId = null;
 
 async function accessToken() {
   const { data, error } = await supabase.auth.getSession();
@@ -93,6 +94,22 @@ async function placeLimitOrder({ symbol, side, quantity, limitPrice }) {
   return result;
 }
 
+async function resetAccount() {
+  if (!pendingResetRequestId) pendingResetRequestId = crypto.randomUUID();
+  const result = await api("/crypto/account/reset", {
+    method: "POST",
+    body: { request_id: pendingResetRequestId }
+  });
+  if (result.historyPreserved !== true || result.simulationOnly !== true) {
+    throw new Error("The cloud did not confirm a safe simulation-only account reset.");
+  }
+  pendingOrder = null;
+  pendingLimitOrder = null;
+  await load();
+  pendingResetRequestId = null;
+  return result;
+}
+
 async function cancelLimitOrder(orderId) {
   if (typeof orderId !== "string" || !/^[0-9a-f-]{36}$/i.test(orderId)) throw new Error("Invalid cloud LIMIT order ID.");
   const result = await api("/crypto/limit-orders/" + orderId + "/cancel", { method: "POST", body: {} });
@@ -101,7 +118,7 @@ async function cancelLimitOrder(orderId) {
   return result;
 }
 
-window.ZENURA_CRYPTO_TRADING = Object.freeze({ load, placeOrder, placeLimitOrder, cancelLimitOrder, isConfigured: () => Boolean(apiBase) });
+window.ZENURA_CRYPTO_TRADING = Object.freeze({ load, placeOrder, placeLimitOrder, cancelLimitOrder, resetAccount, isConfigured: () => Boolean(apiBase) });
 
 supabase.auth.onAuthStateChange((_event, session) => {
   const nextUserId = session?.user?.id || null;
