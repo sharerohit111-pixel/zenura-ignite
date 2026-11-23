@@ -32,10 +32,13 @@ BEGIN
    WHERE user_id='66666666-6666-4666-8666-666666666666' AND order_id=repeat('v',64);
   SELECT count(*) INTO v_ledger FROM public.paper_equity_cash_ledger
    WHERE user_id='66666666-6666-4666-8666-666666666666' AND order_id=repeat('v',64);
-  IF v_fills<>1 OR v_ledger<>2 OR v_reserved<>0
+  IF v_fills<>1 OR v_ledger<>3 OR v_reserved<>0
      OR NOT EXISTS (SELECT 1 FROM public.paper_equity_fills
        WHERE order_id=repeat('v',64) AND execution_id='limit:'||repeat('v',64)
          AND quantity=10 AND cash_delta_paise<0)
+     OR NOT EXISTS (SELECT 1 FROM public.paper_equity_cash_ledger
+       WHERE order_id=repeat('v',64) AND event_key='limit-reserve-create:'||repeat('v',64)
+         AND event_type='RESERVATION_CREATE' AND reserved_cash_delta_paise>0)
      OR NOT EXISTS (SELECT 1 FROM public.paper_equity_cash_ledger
        WHERE order_id=repeat('v',64) AND event_key='limit-trade:'||repeat('v',64)
          AND event_type='TRADE_DEBIT' AND cash_delta_paise<0)
@@ -54,7 +57,7 @@ BEGIN
    WHERE user_id='66666666-6666-4666-8666-666666666666' AND order_id=repeat('v',64);
   SELECT count(*) INTO v_ledger FROM public.paper_equity_cash_ledger
    WHERE user_id='66666666-6666-4666-8666-666666666666' AND order_id=repeat('v',64);
-  IF v_fills<>1 OR v_ledger<>2 THEN
+  IF v_fills<>1 OR v_ledger<>3 THEN
     RAISE EXCEPTION 'Delivery LIMIT BUY retry duplicated accounting rows';
   END IF;
 
@@ -72,7 +75,7 @@ BEGIN
    WHERE user_id='66666666-6666-4666-8666-666666666666';
   SELECT count(*) INTO v_ledger FROM public.paper_equity_cash_ledger
    WHERE user_id='66666666-6666-4666-8666-666666666666';
-  IF v_fills<>2 OR v_ledger<>3
+  IF v_fills<>2 OR v_ledger<>4
      OR NOT EXISTS (SELECT 1 FROM public.paper_equity_fills
        WHERE order_id=repeat('w',64) AND execution_id='limit:'||repeat('w',64)
          AND side='SELL' AND cash_delta_paise>0)
