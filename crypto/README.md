@@ -70,3 +70,13 @@ Next release gates: provision/identify isolated staging with approved cost, appl
 - Supabase returned a development-branch estimate of **$0.01344 per hour**. At continuous usage this is approximately **$0.32256 per day** or **$9.68 per 30-day month** (720 hours).
 - This is a quote/estimate only. No staging branch has been created and no cost has been incurred. Obtain explicit agreement to the quoted charge before creating the branch.
 - A development branch is based on the selected parent project's migrations; verify parent-project suitability and migration impact before creation. Do not use a production parent if it would expose production data/schema to unintended branch operations.
+
+
+## Virtual account reset implementation — 2026-11-23
+- Added `20261123150000_s_trade_crypto_account_reset.sql` with a service-role-only, idempotent reset RPC and a private reset audit table.
+- Reset cancels pending Crypto LIMIT BUY/SELL orders through the existing canonical cancellation RPC, verifies all cash/base-quantity reservations are released, closes open positions, and restores the account's original virtual starting cash.
+- Completed order and trade-ledger history is preserved; reset events are stored separately with previous/reset cash, previous realized P&L, cancelled-order count, and closed-position count.
+- Added authenticated gateway route `POST /crypto/account/reset` and a cloud adapter method. The adapter retains its request UUID after a failed request so a safe retry is idempotent.
+- Added disposable-PostgreSQL regression coverage for reservation release, position closure, balance restoration, history preservation and idempotent replay; added this test to the Crypto CI workflow.
+- **Validation pending:** GitHub Actions has not yet reported a run for the latest implementation commit. The reset migration remains unapplied to Supabase; no account has been reset.
+- Account reset is exposed as an API/client method but is not yet wired to a user-facing confirmation control.
