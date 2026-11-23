@@ -1,6 +1,7 @@
 "use strict";
 
 const {upstoxHttpError}=require("./upstox-http-policy");
+const {getUpstoxUserCooldown,recordUpstoxUserFailure,clearUpstoxUserCooldown}=require("./upstox-user-cooldown");
 
 const crypto=require("node:crypto");
 const {normalizeWorkerCursor,groupOrdersByUser}=require("./paper-limit-worker");
@@ -138,6 +139,7 @@ function createPaperFuturesLimitWorker({
 
       const groups=[...groupOrdersByUser(orders).entries()];
       const processUserOrders=async([userId,userOrders])=>{
+        if(getUpstoxUserCooldown(userId)){summary.failed+=userOrders.length;return;}
         try{
           const currentNow=now();
           const eligible=[];
@@ -171,6 +173,7 @@ function createPaperFuturesLimitWorker({
           );
           const payload=await readProviderJson(response);
           if(!response.ok)throw upstoxHttpError(response);
+          clearUpstoxUserCooldown(userId);
           for(const {order} of eligible){
             const nowMs=now();
             let decision;
@@ -227,6 +230,7 @@ function createPaperFuturesLimitWorker({
             }else summary.notEligible++;
           }
         }catch(error){
+          recordUpstoxUserFailure(userId,error);
           summary.failed+=userOrders.length;
           console.warn("Futures LIMIT user batch skipped",{userId,errorName:error?.name||"Error",status:error?.status||500,code:error?.code||"unknown"});
         }
