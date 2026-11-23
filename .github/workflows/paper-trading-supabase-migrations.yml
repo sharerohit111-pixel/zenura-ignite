@@ -38,6 +38,8 @@ on:
       - "market-gateway/test/trading-charges.test.js"
       - "market-gateway/test/derivative-order-transaction.test.js"
       - "market-gateway/test/derivative-contract.test.js"
+      - "market-gateway/lib/derivative-limit-quote-policy.js"
+      - "market-gateway/test/derivative-limit-quote-policy.test.js"
       - "supabase/tests/**"
       - "supabase/tests/protective_order_cancel.sql"
   push:
