@@ -1,6 +1,7 @@
 "use strict";
 
 const {upstoxHttpError}=require("./upstox-http-policy");
+const {getUpstoxUserCooldown,recordUpstoxUserFailure,clearUpstoxUserCooldown}=require("./upstox-user-cooldown");
 
 const crypto=require("node:crypto");
 const {normalizeWorkerCursor,groupOrdersByUser}=require("./paper-limit-worker");
@@ -68,6 +69,7 @@ function createPaperIntradayLimitWorker({
       summary.scanned=orders.length;
       const groups=[...groupOrdersByUser(orders).entries()];
       const processUserOrders=async([userId,userOrders])=>{
+        if(getUpstoxUserCooldown(userId)){summary.failed+=userOrders.length;return;}
         try{
           const validOrders=userOrders.filter(order=>{
             const instrument=instruments.find(item=>item.instrument_key===order.instrument_key);
@@ -85,6 +87,7 @@ function createPaperIntradayLimitWorker({
           );
           const payload=await readProviderJson(response);
           if(!response.ok)throw upstoxHttpError(response);
+          clearUpstoxUserCooldown(userId);
           const entries=Object.values(payload?.data||{});
           const sessionCache=new Map();
           for(const order of validOrders){
@@ -112,6 +115,7 @@ function createPaperIntradayLimitWorker({
             }else summary.notEligible++;
           }
         }catch(error){
+          recordUpstoxUserFailure(userId,error);
           summary.failed+=userOrders.length;
           console.warn("Intraday LIMIT user batch skipped",{userId,errorName:error?.name||"Error",status:error?.status||500,code:error?.code||"unknown"});
         }
