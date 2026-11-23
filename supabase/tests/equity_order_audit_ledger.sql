@@ -73,4 +73,43 @@ BEGIN
   END IF;
 END
 $fill_assertions$;
+
+-- A pending LIMIT cancellation records the released reservation exactly once.
+UPDATE public.paper_accounts
+   SET reserved_cash_paise=20020,version=version+1
+ WHERE user_id='77777777-7777-4777-8777-777777777777';
+INSERT INTO public.paper_orders(
+  order_id,user_id,request_fingerprint,instrument_key,exchange,side,product,
+  order_type,status,quantity,limit_price_paise,reserved_cash_paise,
+  reserved_quantity,reservation_released,simulation_only
+) VALUES (
+  repeat('c',64),'77777777-7777-4777-8777-777777777777',repeat('d',64),
+  'NSE_EQ|LEDGER_CANCEL_CI','NSE','BUY','DELIVERY','LIMIT','PENDING',2,10000,
+  20020,0,false,true
+);
+
+UPDATE public.paper_accounts
+   SET reserved_cash_paise=0,version=version+1
+ WHERE user_id='77777777-7777-4777-8777-777777777777';
+UPDATE public.paper_orders SET status='CANCELLED',reservation_released=true,
+  cancelled_at=clock_timestamp(),updated_at=clock_timestamp()
+ WHERE order_id=repeat('c',64);
+
+DO $release_assertions$
+DECLARE
+  v_create integer;
+  v_release integer;
+BEGIN
+  SELECT count(*) INTO v_create FROM public.paper_equity_cash_ledger
+   WHERE order_id=repeat('c',64) AND event_type='RESERVATION_CREATE'
+     AND reserved_cash_delta_paise=20020;
+  SELECT count(*) INTO v_release FROM public.paper_equity_cash_ledger
+   WHERE order_id=repeat('c',64) AND event_type='RESERVATION_RELEASE'
+     AND reserved_cash_delta_paise=-20020 AND reserved_cash_after_paise=0;
+  IF v_create<>1 OR v_release<>1 THEN
+    RAISE EXCEPTION 'LIMIT cancellation reservation audit mismatch: create %, release %',
+      v_create,v_release;
+  END IF;
+END
+$release_assertions$;
 ROLLBACK;
