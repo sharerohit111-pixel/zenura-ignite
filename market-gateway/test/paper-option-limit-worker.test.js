@@ -260,3 +260,26 @@ test("worker skips corrupted contract orders before requesting quotes or submitt
  assert.equal(fillCalls,0);
  assert.equal(expireCalls,0);
 });
+
+
+test("does not advance the Options LIMIT cursor past a transient fill failure",async()=>{
+ const secondOrder={...order,order_id:"b".repeat(64),created_at:"2026-11-23T04:01:00.000Z"};
+ const db=makeDb({orders:[order,secondOrder],onRpc:async(name,args)=>{
+  if(name==="execute_paper_option_limit_fill"){
+   if(args.p_order_id===secondOrder.order_id)
+    return {data:null,error:{code:"40001",message:"transient serialization failure"}};
+   return {data:{status:"PARTIALLY_FILLED"},error:null};
+  }
+  return {data:true,error:null};
+ }});
+ const result=await createPaperOptionLimitWorker(deps(db))({maxOrders:10});
+ assert.equal(result.partial,1);
+ assert.equal(result.failed,1);
+ const cursorWrite=db.calls.find(call=>call.type==="query"
+  &&call.table==="paper_market_worker_state"
+  &&call.state.operation==="update"
+  &&call.state.payload?.cursor_order_id);
+ assert.ok(cursorWrite,"completed rows before the failure should be checkpointed");
+ assert.equal(cursorWrite.state.payload.cursor_order_id,order.order_id);
+ assert.equal(cursorWrite.state.payload.cursor_created_at,order.created_at);
+});
