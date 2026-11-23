@@ -4,7 +4,7 @@ process.env.SUPABASE_PUBLISHABLE_KEY="test-publishable-key";
 process.env.SUPABASE_SERVICE_ROLE_KEY="test-service-role-key";
 const test=require("node:test");
 const assert=require("node:assert/strict");
-const {validateOrderInput,makeOrderId}=require("../server");
+const {validateOrderInput,makeOrderId,runLimitWorker}=require("../server");
 test("accepts supported market order and canonicalizes symbol",()=>{
  const v=validateOrderInput({symbol:"btcusdt",side:"buy",quantity:"0.001",idempotency_key:"123e4567-e89b-42d3-a456-426614174000"});
  assert.equal(v.symbol,"BTCUSDT"); assert.equal(v.side,"BUY"); assert.equal(v.quantityRaw,"0.001");
@@ -24,3 +24,5 @@ test("derives deterministic user-scoped UUID order IDs",()=>{
  const c=makeOrderId("22222222-2222-4222-8222-222222222222","123e4567-e89b-42d3-a456-426614174000");
  assert.equal(a,b); assert.notEqual(a,c); assert.match(a,/^[0-9a-f-]{36}$/);
 });
+
+test("rejects Crypto LIMIT worker batches that could exceed the lease budget",async()=>{ await assert.rejects(runLimitWorker({maxOrders:11}),/between 1 and 10/); });
