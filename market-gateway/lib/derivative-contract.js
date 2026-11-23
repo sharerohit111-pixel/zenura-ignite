@@ -40,7 +40,7 @@ function validateDerivativeContract(instrument,{lots,pricePaise,now=Date.now()}=
  if(!Number.isSafeInteger(now)||now<0)fail("Current time is invalid.");
  const [year,month,day]=expiry.split("-").map(Number);
  const expiryCutoffUtc=Date.UTC(year,month-1,day,15,30)-330*60*1000;
- if(now>expiryCutoffUtc)fail("Expired derivative contracts cannot be traded.");
+ if(now>=expiryCutoffUtc)fail("Expired derivative contracts cannot be traded.");
  if(instrument.instrument_type==="CE"||instrument.instrument_type==="PE"){
   if(typeof instrument.strike_price!=="number"||!Number.isFinite(instrument.strike_price)||instrument.strike_price<=0)fail("Option strike price is missing or invalid.");
  }else if(instrument.instrument_type==="FUT"&&instrument.strike_price!==undefined&&instrument.strike_price!==null&&Number(instrument.strike_price)!==0){
