@@ -144,6 +144,12 @@ BEGIN
     '66666666-6666-4666-8666-666666666666',repeat('7',64),
     'NSE_EQ|INTRA_STALE_CI','INTRA_STALE_CI','NSE','BUY',1,10000
   );
+  IF NOT EXISTS (SELECT 1 FROM public.paper_equity_cash_ledger
+       WHERE order_id=repeat('5',64)
+         AND event_key='intraday-limit-reserve-create:'||repeat('5',64)
+         AND event_type='RESERVATION_CREATE' AND reserved_cash_delta_paise>0) THEN
+    RAISE EXCEPTION 'Intraday LIMIT BUY reservation creation was not ledgered';
+  END IF;
   SELECT reserved_cash_paise INTO v_reserved FROM public.paper_accounts
    WHERE user_id='22222222-2222-4222-8222-222222222222';
   v_now_ms:=floor(extract(epoch from clock_timestamp())*1000)::bigint;
@@ -167,6 +173,13 @@ BEGIN
   PERFORM public.cancel_paper_intraday_limit_order(
     '22222222-2222-4222-8222-222222222222',repeat('5',64)
   );
+  IF NOT EXISTS (SELECT 1 FROM public.paper_equity_cash_ledger
+       WHERE order_id=repeat('5',64)
+         AND event_key='intraday-limit-reserve-release:'||repeat('5',64)
+         AND event_type='RESERVATION_RELEASE'
+         AND metadata->>'reason'='USER_CANCEL' AND reserved_cash_delta_paise<0) THEN
+    RAISE EXCEPTION 'Intraday LIMIT cancellation reservation release was not ledgered';
+  END IF;
 
   -- SELL fill realizes P&L and releases only the shares reserved by this order.
   PERFORM public.submit_paper_intraday_limit_order(
@@ -221,6 +234,13 @@ BEGIN
      OR (SELECT reservation_released FROM public.paper_orders WHERE order_id=repeat('e',64)) IS NOT TRUE THEN
     RAISE EXCEPTION 'Intraday expiry did not persist terminal cancellation state';
   END IF;
+  IF NOT EXISTS (SELECT 1 FROM public.paper_equity_cash_ledger
+       WHERE order_id=repeat('e',64)
+         AND event_key='intraday-limit-reserve-release:'||repeat('e',64)
+         AND event_type='RESERVATION_RELEASE'
+         AND metadata->>'reason'='SESSION_EXPIRY' AND reserved_cash_delta_paise<0) THEN
+    RAISE EXCEPTION 'Intraday expiry cash reservation release was not ledgered';
+  END IF;
 
   BEGIN
     PERFORM public.submit_paper_intraday_limit_order(
@@ -243,7 +263,10 @@ BEGIN
 END
 $intraday_limit_checks$;
 
-DELETE FROM public.paper_orders WHERE order_id IN (repeat('a',64),repeat('c',64),repeat('e',64),repeat('1',64),repeat('3',64),repeat('5',64)) AND status<>'FILLED';
+DELETE FROM public.paper_orders o
+ WHERE o.order_id IN (repeat('a',64),repeat('c',64),repeat('e',64),repeat('1',64),repeat('3',64),repeat('5',64))
+   AND o.status<>'FILLED'
+   AND NOT EXISTS (SELECT 1 FROM public.paper_equity_cash_ledger l WHERE l.order_id=o.order_id);
 DELETE FROM public.paper_equity_positions
  WHERE user_id='22222222-2222-4222-8222-222222222222'
    AND product='INTRADAY' AND instrument_key IN ('NSE_EQ|INTRA_LIMIT_CI','NSE_EQ|INTRA_FILL_BUY','NSE_EQ|INTRA_STALE_CI');
@@ -256,3 +279,14 @@ UPDATE public.paper_accounts
        realized_pnl_paise=0,delivery_realized_pnl_paise=0,
        intraday_realized_pnl_paise=0,version=version+1,updated_at=clock_timestamp()
  WHERE user_id='22222222-2222-4222-8222-222222222222';
+
+-- Reconcile the disposable test account reset against immutable trade events.
+INSERT INTO public.paper_equity_cash_ledger(
+  user_id,event_key,event_type,cash_delta_paise,reserved_cash_delta_paise,
+  cash_balance_after_paise,reserved_cash_after_paise,reason,metadata
+) VALUES (
+  '22222222-2222-4222-8222-222222222222',
+  'ci-reset:intraday-limit-reservations','ADJUSTMENT',-13126,0,
+  100000000,0,'Restore disposable CI account fixture',
+  jsonb_build_object('source','intraday_limit_reservations_test','simulation_only',true)
+);
