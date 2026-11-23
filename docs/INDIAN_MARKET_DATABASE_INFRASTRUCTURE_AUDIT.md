@@ -79,3 +79,45 @@ The PR #91 Options LIMIT chain and PR #92 Equity ledger branch diverge from the 
 ## Next implementation gate
 
 Before any schema migration is authored, reconcile the PR #91, #92, and #93 migration chains against the production migration history and select a single integration base. No production migration or branch merge is authorized by this audit.
+
+
+## Follow-up reconciliation — PR #91/#92/#93 (2026-11-23)
+
+### Exact branch lineage
+
+- PR #92 head: `feature/indian-equity-lifecycle-audit-2026-11-23` at `aea81ca8eed32e4b9c614eb39547ccf761f4d409`; base is the Supabase-native-auth integration branch. Its unique migration is `20261123130000_equity_append_only_fill_cash_ledgers.sql`.
+- PR #91 head: `feature/indian-market-options-limit-schema` at `7a47bb29ff6ef2683a81f16cb01f70c37fdb473a`; base is `feature/indian-market-options-limit-design`. Its migration chain includes Futures LIMIT foundations/submit/fill/lease, then Options LIMIT schema/submit/fill/worker lease and runtime grants. PR body reports disposable PostgreSQL and market-gateway checks passed on implementation head `df89617...`; current head adds deployment/security documentation.
+- PR #93 head: `feature/s-trade-nse-futures-worker-lease-2026-11-23` at `8100efdb459ebf3da8d56cad2520372cc184a2ff`; base is the Futures LIMIT atomic-fill branch. It adds a lease-key compatibility migration and its PR body says CI is pending.
+- Futures chain #87 → #88 → #89 is a sequential dependency chain. #89 includes later hardening to the schema and atomic RPC foundation, not just a standalone fill file.
+
+### Migration chain comparison
+
+The Options LIMIT branch includes the earlier common production migration sequence through `20261123120000_make_derivative_expiry_cutoff_exclusive.sql`, then Futures migrations at 14:00/16:00/17:00/18:00 and Options migrations at 18:00/20:00/21:00/22:00/23:00. It does not include the separate Equity ledger migration at 13:00.
+
+The Equity PR branch includes the common sequence and Equity ledger at 13:00, but not the Futures/Options LIMIT chain.
+
+The PR #93 branch contains the Futures LIMIT chain and a dedicated `20261123180000_futures_limit_worker_lease_key.sql` migration. The Options branch instead has `20261123220000_derivative_limit_worker_lease_keys.sql`, which allows both Futures and Options keys. These are overlapping implementations of the shared lease function and must not both be applied blindly. Compare function bodies and tests; choose one final migration that preserves the equity delivery/intraday/protective keys plus both derivative keys.
+
+### Newly verified schema-level risks (draft migrations only)
+
+1. Equity draft `paper_equity_fills` has `UNIQUE(order_id, execution_id)`, but `order_id` references `paper_orders(order_id)` without tenant-scoped composite ownership. `user_id` is independently tied to `auth.users`, so the FK does not prove the referenced order belongs to that user.
+2. Equity cash-ledger `order_id` and `fill_id` FKs are likewise single-column. A mismatched tenant/order/fill pair is not structurally excluded by those FKs.
+3. Futures draft `paper_futures_fills` has no `user_id, order_id` composite FK. It has order/execution and order/sequence uniqueness, but no append-only trigger. It grants service_role UPDATE and DELETE, contrary to immutable audit-ledger intent.
+4. Options LIMIT fills reference order_id only and do not carry their own user_id. The owner-scoped read policy derives ownership through the order, which is valid for reads, but the schema has no composite tenant FK if the table later gains tenant attribution.
+5. Options fill rows are granted service_role SELECT/INSERT only; this is safer than the Futures fill grant but append-only trigger/immutability should still be explicit and tested.
+6. Equity migration grants service_role SELECT/INSERT and installs append-only triggers. Its comment correctly states that existing Equity MARKET/LIMIT RPCs are not yet wired to insert fill/ledger rows atomically.
+7. Futures fill migration updates positions/accounts/orders/fills atomically within its SECURITY DEFINER RPC and exact execution replay is checked before quote freshness. Preserve that behavior while adding relational hardening.
+8. Options fill migration similarly locks account then order then position, performs replay validation, and updates fill/order/position/cash reservation state in one transaction. Preserve its established lock order and accounting semantics.
+
+### Required integration decision
+
+Do not cherry-pick PR #93 on top of the Options branch without resolving the lease migration overlap. Do not apply either branch's migrations to production. The canonical disposable integration branch should be assembled only after:
+- selecting the Options branch as the current fullest derivative lifecycle candidate;
+- porting the Equity ledger migration from PR #92 with tenant-safe composite keys;
+- selecting exactly one derivative worker-lease migration (or authoring one final combined migration);
+- checking that all parent unique keys exist before composite FKs are added;
+- validating the exact ordered chain from the production migration-history boundary in a fresh disposable PostgreSQL database.
+
+### Next database-only implementation unit
+
+The next safe code change should be a draft-only additive migration design/implementation for tenant-safe parent unique keys and composite foreign keys across Equity/Futures/Options fills and ledger rows, plus Futures fill immutability. Before writing it, inspect every table's existing PK/unique keys and the full affected RPC bodies so no current insert contract is broken. This work must remain on `feature/indian-market-db-infrastructure-2026-11-23`; it must not modify Crypto files or production.
