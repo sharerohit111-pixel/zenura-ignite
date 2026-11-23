@@ -148,9 +148,11 @@ test("Paper Trading discloses per-user Upstox authorization and data rights",()=
 });
 
 test("Equity LIMIT cancellation resolves the authenticated user's scoped Supabase client",()=>{
- const route=server.match(/app\\.post\\("\\/paper\\/orders\\/:orderId\\/cancel"[\\s\\S]*?\\n\\}\\);/);
- assert.ok(route,"Equity LIMIT cancellation route must exist");
- assert.match(route[0],/const \\{user,userDb\\}=await auth\\(req\\)/);
- assert.match(route[0],/userDb\\.from\\("paper_orders"\\)/);
- assert.match(route[0],/eq\\("user_id",user\\.id\\)/);
+ const start=server.indexOf('app.post("/paper/orders/:orderId/cancel"');
+ const end=server.indexOf('app.post("/paper/protective-orders"',start);
+ assert.ok(start>=0&&end>start,"Equity LIMIT cancellation route must exist");
+ const route=server.slice(start,end);
+ assert.match(route,/const \{user,userDb\}=await auth\(req\)/);
+ assert.match(route,/userDb\.from\("paper_orders"\)/);
+ assert.match(route,/eq\("user_id",user\.id\)/);
 });
