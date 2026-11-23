@@ -181,6 +181,23 @@ BEGIN
      OR (v_result->>'cash_delta_paise')::bigint<>32952 THEN
     RAISE EXCEPTION 'Intraday LIMIT SELL fill did not realize expected gross P&L';
   END IF;
+  IF (SELECT count(*) FROM public.paper_equity_fills WHERE order_id=repeat('3',64))<>1
+     OR (SELECT count(*) FROM public.paper_equity_cash_ledger
+          WHERE order_id=repeat('3',64) AND event_type='TRADE_CREDIT')<>1
+     OR (SELECT cash_delta_paise FROM public.paper_equity_cash_ledger
+          WHERE order_id=repeat('3',64) AND event_type='TRADE_CREDIT')<>32952
+     OR (SELECT cash_balance_after_paise FROM public.paper_equity_cash_ledger
+          WHERE order_id=repeat('3',64) AND event_type='TRADE_CREDIT')<>100013126 THEN
+    RAISE EXCEPTION 'Intraday LIMIT SELL fill/credit ledger does not reconcile to net proceeds';
+  END IF;
+  v_result:=public.execute_paper_intraday_limit_fill(
+    repeat('3',64),11000,v_now_ms-1000,1000,v_now_ms
+  );
+  IF (v_result->>'already_filled')::boolean IS NOT TRUE
+     OR (SELECT count(*) FROM public.paper_equity_fills WHERE order_id=repeat('3',64))<>1
+     OR (SELECT count(*) FROM public.paper_equity_cash_ledger WHERE order_id=repeat('3',64))<>1 THEN
+    RAISE EXCEPTION 'Intraday LIMIT SELL replay duplicated fill or cash-ledger rows';
+  END IF;
   SELECT quantity,reserved_quantity INTO v_qty,v_reserved
    FROM public.paper_equity_positions WHERE user_id='22222222-2222-4222-8222-222222222222'
      AND product='INTRADAY' AND instrument_key='NSE_EQ|INTRA_LIMIT_CI';
@@ -226,7 +243,8 @@ BEGIN
 END
 $intraday_limit_checks$;
 
-DELETE FROM public.paper_orders WHERE order_id IN (repeat('a',64),repeat('c',64),repeat('e',64),repeat('1',64),repeat('3',64),repeat('5',64));
+-- Filled orders '1' and '3' are retained: immutable fill/ledger history references them.
+DELETE FROM public.paper_orders WHERE order_id IN (repeat('a',64),repeat('c',64),repeat('e',64),repeat('5',64));
 DELETE FROM public.paper_equity_positions
  WHERE user_id='22222222-2222-4222-8222-222222222222'
    AND product='INTRADAY' AND instrument_key IN ('NSE_EQ|INTRA_LIMIT_CI','NSE_EQ|INTRA_FILL_BUY','NSE_EQ|INTRA_STALE_CI');
