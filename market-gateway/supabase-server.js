@@ -40,6 +40,7 @@ const {filterFreshMarketFeeds}=require("./lib/market-feed-validation");
 const {createMarketFeedEventOrderFilter}=require("./lib/market-feed-event-order");
 const {createLeaseHeartbeat}=require("./lib/lease-heartbeat");
 const {readProviderJson}=require("./lib/provider-json");
+const {upstoxHttpError}=require("./lib/upstox-http-policy");
 const {decryptUpstoxToken,encryptUpstoxToken}=require("./lib/upstox-token-crypto");
 const {readUserUpstoxConnection}=require("./lib/upstox-user-connection");
 const {nextUpstoxTokenExpiry}=require("../functions/lib/upstox-token-expiry");
@@ -93,7 +94,11 @@ function errorStatus(error){
   return 500;
 }
 function sendError(res,error,fallback){
-  if(!res.headersSent)res.status(errorStatus(error)).json({error:error.status?error.message:fallback});
+  if(res.headersSent)return;
+  if(Number.isInteger(error?.retryAfterSeconds))res.set("Retry-After",String(error.retryAfterSeconds));
+  const body={error:error.status?error.message:fallback};
+  if(typeof error?.code==="string")body.code=error.code;
+  res.status(errorStatus(error)).json(body);
 }
 function decryptToken(box){return decryptUpstoxToken(box,ENC_KEY);}
 function auth(req){
@@ -141,8 +146,8 @@ async function getUpstoxAccessToken(userId){
 async function getQuote(accessToken,instrumentKey){
   const url="https://api.upstox.com/v3/market-quote/quotes?"+new URLSearchParams({instrument_key:instrumentKey});
   const response=await fetchProvider(url,{headers:{Authorization:"Bearer "+accessToken,Accept:"application/json"}});
+  if(!response.ok)throw upstoxHttpError(response);
   const payload=await readProviderJson(response);
-  if(!response.ok)throw Object.assign(new Error("A current Upstox full quote could not be verified."),{status:response.status===401?403:502});
   const quote=Object.values(payload?.data||{}).find(x=>x&&x.instrument_token===instrumentKey);
   return {quote,payload};
 }
@@ -265,8 +270,8 @@ app.get("/candles",async(req,res)=>{
     const parts=[encodeURIComponent(instrumentKey),unit,String(interval),encodeURIComponent(toDate)];
     if(fromDate)parts.push(encodeURIComponent(fromDate));
     const upstream=await fetchProvider("https://api.upstox.com/v3/historical-candle/"+parts.join("/"),{headers:{Authorization:"Bearer "+token,Accept:"application/json"}});
+    if(!upstream.ok)throw upstoxHttpError(upstream);
     const payload=await readProviderJson(upstream);
-    if(!upstream.ok)return res.status(upstream.status===401?403:502).json({error:"Upstox historical candle request failed.",providerStatus:upstream.status});
     res.set("Cache-Control","private, no-store").json(payload);
   }catch(error){sendError(res,error,"Historical candles could not be loaded.");}
 });
@@ -282,8 +287,8 @@ app.get("/option-chain",async(req,res)=>{
     const {token}=await getUpstoxAccessToken(user.id);
     const params=new URLSearchParams({instrument_key:instrumentKey,expiry_date:expiry});
     const upstream=await fetchProvider("https://api.upstox.com/v2/option/chain?"+params,{headers:{Authorization:"Bearer "+token,Accept:"application/json"}});
+    if(!upstream.ok)throw upstoxHttpError(upstream);
     const payload=await readProviderJson(upstream);
-    if(!upstream.ok)return res.status(upstream.status===401?403:502).json({error:"Upstox option-chain request failed.",providerStatus:upstream.status});
     res.set("Cache-Control","private, no-store").json(payload);
   }catch(error){sendError(res,error,"Option chain could not be loaded.");}
 });
