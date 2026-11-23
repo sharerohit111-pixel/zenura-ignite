@@ -92,3 +92,13 @@ No production database migration has been applied and no gateway deployment has 
 - CI run `45103907133` completed successfully: Crypto migrations applied to disposable PostgreSQL 16, full-position LIMIT SELL regression passed, browser modules parsed, gateway tests passed, and Crypto/Indian Market client isolation check passed.
 - A previous CI attempt failed because the new gateway package did not yet define an npm test script; the package and workflow were corrected and the later run passed.
 - No production Supabase changes, secrets, gateway hosting, or deployment were performed. Live Supabase currently still has zero `paper_crypto_*` tables and no Supabase development branches.
+
+
+## Current verified state — 2026-11-23 (supersedes earlier pending-check notes)
+- The standalone Crypto gateway extraction is complete on this isolated branch; it is no longer an outstanding implementation blocker.
+- Draft PR #85 remains open and unmerged. Its changes are isolated from `main`; no production merge was performed.
+- Latest full Crypto-only CI: [run #45104317356](https://github.com/sharerohit111-pixel/zenura-ignite/actions/runs/45104317356), completed successfully against the then-current branch head.
+- CI applies the Crypto migrations to disposable PostgreSQL 16 and passes four SQL regressions: full-position LIMIT SELL reservation release/accounting, reserved-position DELETE guard, MARKET SELL protection for reserved LIMIT SELL quantity, and authenticated two-user RLS isolation across accounts/positions/orders/ledger. Frontend syntax, gateway unit tests and client-isolation checks also pass.
+- The earlier note saying PostgreSQL execution had not yet run is superseded by this CI evidence. CI is not a substitute for live Supabase staging integration.
+- Supabase currently has no Crypto development branch and no `paper_crypto_*` tables; none of the Crypto migrations has been applied to the connected live project.
+- Remaining gate: isolated Supabase staging validation and deployed-gateway integration. A Supabase development branch may incur hourly compute charges, so it will not be created until the user explicitly approves any cost. Production migration, merge and deployment remain prohibited without separate explicit approval.
