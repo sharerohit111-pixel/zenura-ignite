@@ -85,6 +85,8 @@ function createPaperOptionLimitWorker({
       return {locked:true,scanned:0,filled:0,partial:0,notEligible:0,failed:0,expired:0};
 
     const summary={locked:false,scanned:0,filled:0,partial:0,notEligible:0,failed:0,expired:0};
+    const failedOrderIds=new Set();
+    const markFailed=order=>{summary.failed++;if(order?.order_id)failedOrderIds.add(order.order_id);};
     try{
       const instruments=await ensureInstrumentCache();
       if(!Array.isArray(instruments)||!instruments.length)
@@ -138,7 +140,7 @@ function createPaperOptionLimitWorker({
               const expired=await serviceDb.rpc("expire_paper_option_limit_order",{p_order_id:order.order_id});
               if(expired?.error){
                 if(["22023","23514","P0002"].includes(expired.error.code))summary.notEligible++;
-                else{summary.failed++;console.warn("Options LIMIT expiry RPC failed",{orderId:order.order_id,code:expired.error.code||"unknown"});}
+                else{markFailed(order);console.warn("Options LIMIT expiry RPC failed",{orderId:order.order_id,code:expired.error.code||"unknown"});}
               }else if(expired.data?.status==="EXPIRED"&&!expired.data.idempotent_replay)summary.expired++;
               else summary.notEligible++;
               continue;
@@ -206,7 +208,7 @@ function createPaperOptionLimitWorker({
             });
             if(result?.error){
               if(["23514","22023","P0002"].includes(result.error.code))summary.notEligible++;
-              else{summary.failed++;console.warn("Options LIMIT fill RPC failed",{orderId:order.order_id,code:result.error.code||"unknown"});}
+              else{markFailed(order);console.warn("Options LIMIT fill RPC failed",{orderId:order.order_id,code:result.error.code||"unknown"});}
             }else if(result?.data?.status==="FILLED"){
               summary.filled++;
             }else if(result?.data?.status==="PARTIALLY_FILLED"){
@@ -214,7 +216,7 @@ function createPaperOptionLimitWorker({
             }else summary.notEligible++;
           }
         }catch(error){
-          summary.failed+=userOrders.length;
+          for(const order of userOrders)markFailed(order);
           console.warn("Options LIMIT user batch skipped",{userId,errorName:error?.name||"Error",status:error?.status||500});
         }
       };
@@ -222,11 +224,18 @@ function createPaperOptionLimitWorker({
         await Promise.all(groups.slice(offset,offset+5).map(processUserOrders));
 
       if(orders.length){
-        const last=orders[orders.length-1];
-        const saved=await serviceDb.from("paper_market_worker_state")
-          .update({cursor_created_at:last.created_at,cursor_order_id:last.order_id,updated_at:new Date(now()).toISOString()})
-          .eq("state_key","paper_option_limit_orders").eq("lease_token",leaseToken);
-        if(saved.error)throw new Error("Options LIMIT worker cursor could not be saved.");
+        const firstFailedIndex=orders.findIndex(order=>failedOrderIds.has(order.order_id));
+        // Never move the cursor past a transiently failed order. If earlier orders
+        // in this batch completed, resume immediately after the last one before
+        // the first failure; later rows may be safely revisited on the next cycle.
+        const cursorIndex=firstFailedIndex<0?orders.length-1:firstFailedIndex-1;
+        if(cursorIndex>=0){
+          const nextCursor=orders[cursorIndex];
+          const saved=await serviceDb.from("paper_market_worker_state")
+            .update({cursor_created_at:nextCursor.created_at,cursor_order_id:nextCursor.order_id,updated_at:new Date(now()).toISOString()})
+            .eq("state_key","paper_option_limit_orders").eq("lease_token",leaseToken);
+          if(saved.error)throw new Error("Options LIMIT worker cursor could not be saved.");
+        }
       }else{
         const saved=await serviceDb.from("paper_market_worker_state")
           .update({cursor_created_at:null,cursor_order_id:null,updated_at:new Date(now()).toISOString()})
