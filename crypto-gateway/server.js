@@ -307,6 +307,19 @@ app.post("/crypto/limit-orders/:orderId/cancel", cryptoOrderRateLimit, async(req
 
 // One lease covers both LIMIT orders and SL/Target plans. Keep each side to five
 // records so worst-case provider quote timeouts cannot consume the full 120-second lease.
+async function rotateRiskPlanSafely(update, log=console.error) {
+  try {
+    const result=await update();
+    if(result?.error) {
+      log("Crypto SL/Target worker plan rotation failed.");
+      return false;
+    }
+    return true;
+  } catch {
+    log("Crypto SL/Target worker plan rotation failed; plan remains eligible for the next scan.");
+    return false;
+  }
+}
 async function releaseWorkerLeaseSafely(releaseLease, log=console.error) {
   try {
     const result=await releaseLease();
@@ -399,9 +412,11 @@ async function runLimitWorker({maxOrders=5}={}) {
         else summary.notEligible++;
       } catch { summary.failed++; }
       finally {
-        const rotated=await serviceDb.from("paper_crypto_risk_plans").update({updated_at:new Date().toISOString()})
-          .eq("plan_id",plan.plan_id).eq("status","ACTIVE");
-        if(rotated.error) summary.failed++;
+        const rotated=await rotateRiskPlanSafely(
+          ()=>serviceDb.from("paper_crypto_risk_plans").update({updated_at:new Date().toISOString()})
+            .eq("plan_id",plan.plan_id).eq("status","ACTIVE")
+        );
+        if(!rotated) summary.failed++;
       }
     }
     if(orders.length) {
@@ -444,4 +459,4 @@ app.use((error, _req, res, next) => {
 });
 
 if(require.main===module) start().catch(error=>{console.error("Crypto gateway startup failed:",error.message);process.exit(1);});
-module.exports={app,runLimitWorker,releaseWorkerLeaseSafely,validateOrderInput,validateRiskPlanInput,isFreshCryptoQuote,getRiskPlanTrigger,makeOrderId,createRateLimiter,isUuid};
+module.exports={app,runLimitWorker,releaseWorkerLeaseSafely,rotateRiskPlanSafely,validateOrderInput,validateRiskPlanInput,isFreshCryptoQuote,getRiskPlanTrigger,makeOrderId,createRateLimiter,isUuid};
