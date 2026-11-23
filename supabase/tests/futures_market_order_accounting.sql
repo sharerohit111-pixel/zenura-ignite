@@ -33,7 +33,7 @@ BEGIN
   -- An exact replay must not debit charges or reserve margin a second time.
   v_now:=floor(extract(epoch from clock_timestamp())*1000)::bigint;
   v_result:=public.execute_paper_futures_market_order(
-    'fefefefe-fefe-4efe-8efe-fefefefefefe',repeat('a',64),
+    'fefefefe-fefe-4efe-8efe-fefefefefefe',repeat('f',32)||repeat('0',32),
     'fefefefe-0000-4000-8000-000000000001',repeat('b',64),
     'NSE_FO|FUT_CLOSE_TEST','FUT_CLOSE_TEST','NSE','NSE_FO',current_date+5,
     25,5,'BUY','DELIVERY',50,10000,200000,1000,v_now,v_now
