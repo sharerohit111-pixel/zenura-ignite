@@ -199,3 +199,87 @@ test("uses a separate connected Upstox token for each Options LIMIT account",asy
  assert.deepEqual(new Set(requestedUsers),new Set([USER,secondUser]));
  assert.deepEqual(new Set(authorizationHeaders),new Set(["Bearer token-for-"+USER,"Bearer token-for-"+secondUser]));
 });
+
+
+test("rejects corrupted contract identity, expiry, strike and lot/quantity reconciliation",()=>{
+ const badOrders=[
+  {...order,instrument_key:"NSE_FO|OTHER"},
+  {...order,trading_symbol:"NIFTY26NOV25000PE"},
+  {...order,instrument_type:"PE"},
+  {...order,expiry:"2026-11-27"},
+  {...order,strike_price:25100},
+  {...order,lot_size:25},
+  {...order,quantity:66},
+  {...order,quantity:130,filled_quantity:0,remaining_quantity:65},
+  {...order,filled_quantity:65,remaining_quantity:65},
+  {...order,quantity:65,filled_quantity:-1,remaining_quantity:66},
+  {...order,limit_price_paise:1251},
+  {...order,tick_size_paise:0}
+ ];
+ for(const candidate of badOrders){
+  assert.equal(isValidNseOptionLimitOrder(candidate,instrument),false,
+   "corrupted order should fail closed: "+JSON.stringify(candidate));
+ }
+});
+
+test("accepts a partially filled SELL close only when its remaining quantity stays reserved",()=>{
+ const sell={
+  ...order,side:"SELL",quantity:130,filled_quantity:65,remaining_quantity:65,
+  reserved_cash_paise:0,reserved_close_quantity:65,status:"PARTIALLY_FILLED"
+ };
+ assert.equal(isValidNseOptionLimitOrder(sell,instrument),true);
+ assert.equal(isValidNseOptionLimitOrder({...sell,reserved_close_quantity:64},instrument),false);
+ assert.equal(isValidNseOptionLimitOrder({...sell,reserved_cash_paise:1},instrument),false);
+ assert.equal(isValidNseOptionLimitOrder({...sell,remaining_quantity:66},instrument),false);
+});
+
+test("expires an option at the exact 15:30 Asia/Kolkata cutoff, not one millisecond earlier",()=>{
+ const expiryOrder={...order,expiry:"2026-11-23"};
+ const cutoff=Date.parse("2026-11-23T15:30:00+05:30");
+ assert.equal(isContractExpired(expiryOrder,cutoff-1),false);
+ assert.equal(isContractExpired(expiryOrder,cutoff),true);
+ assert.equal(isContractExpired(expiryOrder,cutoff+1),true);
+});
+
+
+test("worker skips corrupted contract orders before requesting quotes or submitting fills",async()=>{
+ const corrupted={...order,strike_price:25100};
+ const db=makeDb({orders:[corrupted]});
+ let tokenCalls=0,quoteCalls=0,fillCalls=0,expireCalls=0;
+ const d=deps(db);
+ d.getUpstoxAccessToken=async()=>{tokenCalls++;return {token:"unused"};};
+ d.fetchProvider=async()=>{quoteCalls++;return {ok:true};};
+ const result=await createPaperOptionLimitWorker(d)({maxOrders:10});
+ fillCalls=db.calls.filter(call=>call.type==="rpc"&&call.name==="execute_paper_option_limit_fill").length;
+ expireCalls=db.calls.filter(call=>call.type==="rpc"&&call.name==="expire_paper_option_limit_order").length;
+ assert.equal(result.scanned,1);
+ assert.equal(result.notEligible,1);
+ assert.equal(result.failed,0);
+ assert.equal(tokenCalls,0);
+ assert.equal(quoteCalls,0);
+ assert.equal(fillCalls,0);
+ assert.equal(expireCalls,0);
+});
+
+
+test("does not advance the Options LIMIT cursor past a transient fill failure",async()=>{
+ const secondOrder={...order,order_id:"b".repeat(64),created_at:"2026-11-23T04:01:00.000Z"};
+ const db=makeDb({orders:[order,secondOrder],onRpc:async(name,args)=>{
+  if(name==="execute_paper_option_limit_fill"){
+   if(args.p_order_id===secondOrder.order_id)
+    return {data:null,error:{code:"40001",message:"transient serialization failure"}};
+   return {data:{status:"PARTIALLY_FILLED"},error:null};
+  }
+  return {data:true,error:null};
+ }});
+ const result=await createPaperOptionLimitWorker(deps(db))({maxOrders:10});
+ assert.equal(result.partial,1);
+ assert.equal(result.failed,1);
+ const cursorWrite=db.calls.find(call=>call.type==="query"
+  &&call.table==="paper_market_worker_state"
+  &&call.state.operation==="update"
+  &&call.state.payload?.cursor_order_id);
+ assert.ok(cursorWrite,"completed rows before the failure should be checkpointed");
+ assert.equal(cursorWrite.state.payload.cursor_order_id,order.order_id);
+ assert.equal(cursorWrite.state.payload.cursor_created_at,order.created_at);
+});
