@@ -311,7 +311,20 @@ begin
          and is_trading_day is true and session_kind in ('REGULAR','SPECIAL')
          and verified_at<=v_expiry_now
          and length(btrim(source_reference)) between 1 and 500
-         and source_sha256 ~ '^[a-f0-9]{64}
+         and source_sha256 ~ '^[a-f0-9]{64}$'
+         and (
+           (v_order.exchange='NSE' and lower(source_reference) ~ '^https://([a-z0-9-]+[.])*nseindia[.]com(/|$)')
+           or
+           (v_order.exchange='BSE' and lower(source_reference) ~ '^https://([a-z0-9-]+[.])*bseindia[.]com(/|$)')
+         );
+      if found and v_expiry_local_minute>=v_expiry_session.open_minute
+         and v_expiry_local_minute<v_expiry_session.close_minute then
+        raise exception 'Futures LIMIT order is still inside a verified exchange session.'
+          using errcode='22023';
+      end if;
+    end if;
+  end if;
+
     if v_account.reserved_margin_paise<v_open_release then
       raise exception 'Futures LIMIT opening-margin reservation is inconsistent.'
         using errcode='23514';
