@@ -114,3 +114,12 @@ This branch now destructures `{user,userDb}` and adds a regression assertion to 
 - Crypto code and data paths are excluded.
 - The Equity cancellation fix has a source-level regression test added; CI execution must be checked before treating the fix as runtime-verified.
 - Keep this work in Draft until API contract, security, concurrency and staging checks pass.
+
+## 9. Request correlation and structured error logging hardening
+
+- The Supabase-native gateway now assigns a server-generated UUID request ID to each request and returns it in the `X-Request-Id` response header.
+- The shared `sendError` path includes the request ID in the JSON error response for backward-compatible correlation.
+- Failed requests emit one-line JSON logs with event name, request ID, HTTP status, method, route/path and error class.
+- Raw error messages, request headers, bearer tokens, query values and provider payloads are deliberately excluded from these structured logs.
+- Regression assertions cover request-ID generation/header propagation and the safe structured-log field set.
+- This is request correlation, not a full metrics/tracing system; route latency histograms, RPC/provider spans and centralized log retention remain follow-up work.
