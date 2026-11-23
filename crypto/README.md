@@ -52,5 +52,6 @@ The repository's existing GitHub Pages workflow publishes the repository root. T
 
 ## Isolated development branch status (2026-11-23)
 - Crypto frontend, auth/cloud adapters, and additive Crypto-only SQL migrations are staged on `feature/crypto-only-supabase-backend-2026-11-23`.
-- The shared Indian-market gateway implementation is deliberately not copied into this branch. A dedicated Crypto-only gateway extraction and staging verification are still required.
-- No Supabase migration has been applied and no production deployment has been performed.
+- The shared Indian-market gateway implementation is deliberately not copied into this branch. A dedicated Crypto-only Node.js gateway has been extracted under `crypto-gateway/` with its own environment configuration and worker boundary.
+- Crypto-only disposable PostgreSQL CI now covers five SQL regression suites, frontend syntax, gateway unit tests and Crypto/Indian Market isolation. The latest full run is [#45104563700](https://github.com/sharerohit111-pixel/zenura-ignite/actions/runs/45104563700).
+- Isolated Supabase staging validation and gateway hosting remain pending. No Supabase Crypto migration has been applied and no production deployment has been performed.
