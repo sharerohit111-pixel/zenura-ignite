@@ -13,7 +13,8 @@ Status: implementation in draft PRs #87–#89. This document does not enable Fut
 - BUY eligibility is based on executable ask <= limit; SELL eligibility is based on executable bid >= limit.
 - The SQL fill RPC receives and rechecks the exact bid/ask prices and displayed quantities used by the worker, and persists them in the fill ledger.
 - Futures MARKET accounting is implemented in execute_paper_futures_market_order.
-- The Futures LIMIT ledger adds filled/remaining quantities, average fill price, pending opening-margin and close-quantity reservations, expiry, and an append-only execution fill table.
+- The Futures LIMIT ledger adds filled/remaining quantities, average fill price, pending opening-margin and close-quantity reservations, expiry, executable bid/ask snapshot fields, and an append-only execution fill table.
+- Opening margin reservation requires a fresh trusted provider-margin timestamp; SQL checks the margin snapshot age at submit time. Close-only orders do not request or reserve opening margin.
 - Atomic service-role RPCs now cover submit, partial/full fill, cancel and expiry; account -> order -> position locking, execution-idempotency and reservation release are tested on disposable PostgreSQL.
 - The dedicated Futures LIMIT worker module is wired behind PAPER_FUTURES_LIMIT_WORKER_ENABLED=true; the flag defaults off. The worker currently supports NSE Futures only; BSE Futures remain blocked until their charge schedule is verified.
 - Long Options remain MARKET-only; derivative_limit_schema_guard.sql protects the Options order schema from premature LIMIT enablement.
@@ -82,7 +83,7 @@ Options remain long-only. BUY-to-open must reserve premium plus supported charge
 
 - Schema migration and client-role privilege boundaries.
 - Existing Futures MARKET compatibility with new LIMIT reservations.
-- Opening-margin and close-quantity reservation, idempotent submit, cancel and expiry.
+- Opening-margin and close-quantity reservation, fresh margin snapshot validation, idempotent submit (including replay after expiry), cancel and expiry.
 - Partial/full opening fills, weighted average price, charges, realized P&L and margin conservation.
 - Partial/full close fills, proportional margin release, no position reversal and final position deletion.
 - Exact execution replay and altered-payload replay rejection.
