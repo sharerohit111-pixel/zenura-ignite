@@ -2,7 +2,7 @@
 const test=require("node:test");
 const assert=require("node:assert/strict");
 const {
-  createPaperFuturesLimitWorker,isContractExpired,isValidNseFuture,cumulativeFillCharges
+  createPaperFuturesLimitWorker,isContractExpired,isValidNseFuture,cumulativeFillCharges,isVerifiedSessionOpen
 }=require("../lib/paper-futures-limit-worker");
 
 const NOW=Date.parse("2026-11-23T05:00:00.000Z");
@@ -92,6 +92,14 @@ test("validates only exact NSE futures contract master matches",()=>{
   assert.equal(isValidNseFuture(order,{...instrument,lot_size:50}),false);
   assert.equal(isValidNseFuture(order,{...instrument,tick_size:0.01}),false);
   assert.equal(isValidNseFuture(order,{...instrument,instrument_type:"CE"}),false);
+});
+
+test("honors verified special weekend sessions without weekday inference",()=>{
+  const saturday=Date.parse("2026-11-28T05:00:00.000Z");
+  const session={exchange:"NSE",sessionDate:"2026-11-28",isTradingDay:true,openMinute:555,closeMinute:930};
+  assert.equal(isVerifiedSessionOpen(saturday,session),true);
+  assert.equal(isVerifiedSessionOpen(saturday,{...session,closeMinute:600}),false);
+  assert.equal(isVerifiedSessionOpen(saturday,{...session,sessionDate:"2026-11-27"}),false);
 });
 
 test("treats invalid and reached contract expiry cutoffs as expired",()=>{
