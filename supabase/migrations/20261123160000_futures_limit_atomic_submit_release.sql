@@ -74,6 +74,8 @@ create or replace function public.submit_paper_futures_limit_order(
   p_quantity integer,
   p_limit_price_paise bigint,
   p_open_margin_paise bigint,
+  p_margin_quote_timestamp_ms bigint,
+  p_now_ms bigint,
   p_expires_at timestamptz
 ) returns jsonb
 language plpgsql
@@ -87,6 +89,7 @@ declare
   v_has_position boolean := false;
   v_close_only boolean := false;
   v_server_now timestamptz := clock_timestamp();
+  v_server_now_ms bigint;
   v_available_quantity integer;
 begin
   if p_user_id is null
@@ -109,6 +112,7 @@ begin
      or p_limit_price_paise is null or p_limit_price_paise <= 0
      or p_limit_price_paise % p_tick_size_paise <> 0
      or p_open_margin_paise is null or p_open_margin_paise < 0
+     or p_now_ms is null or p_now_ms<0
      or p_expires_at is null or p_expires_at <= v_server_now
      or p_expires_at > ((p_expiry + time '15:30') at time zone 'Asia/Kolkata')
   then
@@ -165,6 +169,15 @@ begin
                  or (v_position.net_quantity<0 and p_side='BUY');
   end if;
 
+  v_server_now:=clock_timestamp();
+  v_server_now_ms:=floor(extract(epoch from v_server_now)*1000)::bigint;
+  if abs(v_server_now_ms-p_now_ms)>2000
+     or p_expires_at<=v_server_now
+     or p_expires_at>((p_expiry + time '15:30') at time zone 'Asia/Kolkata') then
+    raise exception 'Futures LIMIT submit clock or expiry is not current.'
+      using errcode='22023';
+  end if;
+
   if v_close_only then
     v_available_quantity := abs(v_position.net_quantity)-v_position.reserved_close_quantity;
     if p_quantity>v_available_quantity then
@@ -182,6 +195,10 @@ begin
   else
     if p_open_margin_paise<=0 then
       raise exception 'A positive trusted provider margin reservation is required for opening Futures LIMIT orders.'
+        using errcode='22023';
+    end if;
+    if not public._paper_quote_age_is_fresh(p_margin_quote_timestamp_ms,v_server_now_ms) then
+      raise exception 'A fresh trusted provider margin snapshot is required for opening Futures LIMIT orders.'
         using errcode='22023';
     end if;
     if p_open_margin_paise > v_account.cash_paise
@@ -377,7 +394,7 @@ as $$
 $$;
 
 revoke all on function public.submit_paper_futures_limit_order(
-  uuid,text,uuid,text,text,text,text,text,date,integer,integer,text,text,integer,bigint,bigint,timestamptz
+  uuid,text,uuid,text,text,text,text,text,date,integer,integer,text,text,integer,bigint,bigint,bigint,bigint,timestamptz
 ) from public,anon,authenticated;
 revoke all on function public._release_paper_futures_limit_order(text,text)
   from public,anon,authenticated;
@@ -386,14 +403,14 @@ revoke all on function public.cancel_paper_futures_limit_order(uuid,text)
 revoke all on function public.expire_paper_futures_limit_order(text)
   from public,anon,authenticated;
 grant execute on function public.submit_paper_futures_limit_order(
-  uuid,text,uuid,text,text,text,text,text,date,integer,integer,text,text,integer,bigint,bigint,timestamptz
+  uuid,text,uuid,text,text,text,text,text,date,integer,integer,text,text,integer,bigint,bigint,bigint,bigint,timestamptz
 ) to service_role;
 grant execute on function public.cancel_paper_futures_limit_order(uuid,text)
   to service_role;
 grant execute on function public.expire_paper_futures_limit_order(text)
   to service_role;
 
-comment on function public.submit_paper_futures_limit_order(uuid,text,uuid,text,text,text,text,text,date,integer,integer,text,text,integer,bigint,bigint,timestamptz) is
+comment on function public.submit_paper_futures_limit_order(uuid,text,uuid,text,text,text,text,text,date,integer,integer,text,text,integer,bigint,bigint,bigint,bigint,timestamptz) is
   'Atomic simulation-only Futures LIMIT submission. Reserves opening margin or close quantity; does not execute fills.';
 comment on function public.cancel_paper_futures_limit_order(uuid,text) is
   'Atomic simulation-only Futures LIMIT cancellation and release of unfilled reservations.';
