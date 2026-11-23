@@ -36,7 +36,7 @@
 - A repeated submit/fill/cancel must return the saved receipt or terminal state and must never double-debit cash, double-release margin, double-book charges, or duplicate a fill.
 
 ### 4. Atomic concurrency and cancellation
-- Use one documented lock order across submit, fill, cancel, and expiry: account first, then position/reservation rows, then order row; re-read status after locks.
+- Use the verified existing writer lock order across submit, fill, cancel, and expiry: account row → order/idempotency row → position/reservation rows; re-read status after locks. Do not introduce a position-before-order writer while MARKET writers use order-before-position.
 - A fill racing cancellation must have exactly one winner. If cancellation wins, no later fill may change the order. If a fill wins, cancellation may only cancel the unfilled remainder.
 - Test two workers racing the same order, two orders competing for the same position, duplicate requests, partial fill versus cancel, and stale pre-transaction position snapshots.
 - Use transaction-level assertions to preserve account invariants:
@@ -95,3 +95,18 @@ The current order-table constraints are materially different and must be handled
 - The existing derivative orders are execution receipts, not a fill ledger. A future partial-fill implementation needs immutable per-fill records with unique execution identifiers and an atomic aggregate order-state transition; mutating one receipt row is not sufficient audit history.
 
 This is source/schema review only. No constraints were relaxed, no new tables or columns were added, and no production state was changed. The next safe implementation step is a disposable SQL design/test harness for Futures pending-margin accounting before introducing any production-facing worker or API.
+
+
+## Follow-up implementation review — deterministic reservation allocation primitive (2026-11-23)
+
+A pure gateway arithmetic helper now defines how an already-authorized Futures LIMIT reservation is transferred from pending-order reserve to filled-position reserve across partial fills:
+
+- All inputs and outputs are safe integer paise / integer quantities; floating-point money arithmetic is not used.
+- Each non-final fill receives floor(remaining reserved paise × fill quantity ÷ remaining quantity).
+- The final fill receives the exact remaining paise, eliminating rounding dust and guaranteeing cumulative transfers equal the original reservation.
+- Cancellation releases only the still-pending reservation remainder.
+- Unit tests cover 3-way allocation of ₹20.00 as 666/667/667 paise, uneven allocation with a final residual, cancellation remainder release, and invalid/unsafe inputs.
+
+Files: `market-gateway/lib/futures-limit-reservation.js` and `market-gateway/test/futures-limit-reservation.test.js`.
+
+This helper is deliberately not connected to any order route, worker, database RPC, or production ledger. It solves only deterministic integer-paise allocation; it does not calculate broker margin, lock close quantity, authorize a fill, or make fill/cancel atomic. Those responsibilities remain in a future SQL transaction and must be independently tested before F&O LIMIT is enabled.
