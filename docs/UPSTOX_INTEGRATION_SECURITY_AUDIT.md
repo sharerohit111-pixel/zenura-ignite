@@ -121,3 +121,13 @@ Paper simulation only. No broker order-placement endpoint, no live trading, no p
 - Superseded sockets are closed and their late events ignored by socket-generation checks. Stream cleanup cancels a pending reconnect timer and releases the user reservation/lease.
 - Added unit tests for retry delay, jitter, Retry-After cap, and attempt bounds. Isolated Node 22 harness verification: 3 passed, 0 failed; helper syntax check passed. These are helper-level tests; the WebSocket route has not yet been exercised against a mock Upstox server or staging.
 - No production deployment, provider call, database migration, or real broker order occurred.
+
+
+## REST quote and margin HTTP-policy coverage update (2026-11-23)
+
+- Follow-up review found remaining authenticated REST call sites that still collapsed Upstox 401/429 into generic 502 responses: equity portfolio valuation, derivative portfolio valuation, watchlist quotes, futures portfolio valuation, derivative margin preview, futures market/limit margin estimation, and the delivery LIMIT worker's batch quote request.
+- Updated those call sites in `market-gateway/supabase-server.js` to throw the existing sanitized `upstoxHttpError(response)` result. User-facing route handlers therefore use the same stable contract: 401 `upstox_reconnect_required`, 429 `upstox_rate_limited` with bounded `Retry-After`, and generic 502 `upstream_provider_error` for other provider failures.
+- The worker's batch-quote path now classifies provider failures using the same helper; it still does not retry order-fill RPCs or provider requests automatically. Worker-level cooldown/backoff behavior for a user's repeated 401/429 remains a follow-up item and must be verified before enabling workers broadly.
+- The change is limited to provider error classification; quote freshness, order/ledger logic, and retry policy are unchanged.
+- Verification so far: all eight targeted source replacements matched exactly once and were committed. Full gateway tests, route-level mocked HTTP tests, CI, staging and live Upstox checks remain unverified. Do not treat the earlier helper-only tests as route-level proof.
+- Latest change commit: `31942e0c3103b289ede75a97a9022deb2e7e06ae`. No production migration, deployment, provider call, Crypto change or real broker order occurred.
