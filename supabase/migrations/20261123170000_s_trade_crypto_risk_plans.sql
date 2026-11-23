@@ -172,6 +172,10 @@ begin
     raise exception 'Crypto risk exit idempotency conflict.' using errcode='23505';
   end if;
   if v_qty=0 then
+    -- Clear the plan's final reserve before DELETE; the shared reserved-position
+    -- guard intentionally blocks deleting rows with any nonzero old reserve.
+    update public.paper_crypto_positions set reserved_quantity=0,updated_at=now()
+     where user_id=p_user_id and symbol=v_plan.symbol;
     delete from public.paper_crypto_positions where user_id=p_user_id and symbol=v_plan.symbol;
   else
     v_cost:=round(v_pos.cost_basis-v_allocated,8);
