@@ -199,3 +199,37 @@ test("uses a separate connected Upstox token for each Options LIMIT account",asy
  assert.deepEqual(new Set(requestedUsers),new Set([USER,secondUser]));
  assert.deepEqual(new Set(authorizationHeaders),new Set(["Bearer token-for-"+USER,"Bearer token-for-"+secondUser]));
 });
+
+
+test("fills a PE SELL-to-close from executable bid and caps the partial fill to bid depth",async()=>{
+ const peKey="NSE_FO|NIFTY26NOV25000PE";
+ const peInstrument={
+  instrument_key:peKey,trading_symbol:"NIFTY26NOV25000PE",exchange:"NSE",
+  segment:"NSE_FO",instrument_type:"PE",expiry:"2026-11-26",
+  strike_price:25000,lot_size:65,tick_size:5
+ };
+ const sellOrder={
+  ...order,instrument_key:peKey,trading_symbol:"NIFTY26NOV25000PE",
+  instrument_type:"PE",side:"SELL",limit_price_paise:1200,
+  reserved_cash_paise:0,reserved_close_quantity:65
+ };
+ const db=makeDb({orders:[sellOrder]});
+ const payload={status:"success",data:{[peKey]:{
+  instrument_token:peKey,timestamp:new Date(NOW-1000).toISOString(),
+  depth:{buy:[{price:12.35,quantity:7}],sell:[{price:12.4,quantity:20}]}
+ }}};
+ const d=deps(db,{payload});
+ d.ensureInstrumentCache=async()=>[peInstrument];
+ const result=await createPaperOptionLimitWorker(d)({maxOrders:10});
+ assert.equal(result.scanned,1);
+ assert.equal(result.partial,1);
+ assert.equal(result.failed,0);
+ const call=db.calls.find(x=>x.type==="rpc"&&x.name==="execute_paper_option_limit_fill");
+ assert.ok(call);
+ assert.equal(call.args.p_fill_quantity,7);
+ assert.equal(call.args.p_execution_price_paise,1235);
+ assert.equal(call.args.p_bid_price_paise,1235);
+ assert.equal(call.args.p_ask_price_paise,1240);
+ assert.equal(call.args.p_bid_quantity,7);
+ assert.equal(call.args.p_ask_quantity,20);
+});
