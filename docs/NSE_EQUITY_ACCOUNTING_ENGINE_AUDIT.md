@@ -81,3 +81,10 @@ The code labels its charge breakdown as indicative and versioned. It must remain
 ## Isolation and safety
 
 This audit created a new branch from the PR #92 head. It did not modify PR #92, the shared integration branch, the dedicated NSE Equity Order Engine branch, Crypto, Futures or Options. Production Supabase and deployment were not touched.
+
+
+## CI regression follow-up (2026-11-23)
+
+- The Intraday LIMIT fill-vs-cancel race test now passes with immutable fill/ledger foreign keys enabled. Its cleanup retains the successfully filled BUY order and records a compensating CI-only cash adjustment rather than deleting the fill or leaving the account reset unaudited.
+- A subsequent MARKET settlement test exposed a global `paper_orders.order_id` collision: the race test intentionally retains its filled order ID (`repeat('a',64)`), while the MARKET test reused that same ID for a different user. The MARKET test fixtures now use distinct order IDs (`m` through `r`) to respect the global primary key. This is test isolation only; production order IDs remain unchanged.
+- Latest validation must be rerun against the updated branch head before marking the MARKET, Delivery LIMIT, ledger schema, and ledger integrity tests green.
