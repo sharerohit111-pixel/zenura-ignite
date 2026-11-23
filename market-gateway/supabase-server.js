@@ -825,13 +825,25 @@ app.post("/paper/futures/orders",async(req,res)=>{
     });
   }catch(error){sendError(res,error,"Futures paper order could not be completed.");}
 });
+app.post("/paper/futures/orders/:orderId/cancel",async(req,res)=>{
+  try{
+    const {user}=await auth(req),orderId=String(req.params?.orderId||"");
+    if(!/^[a-f0-9]{64}$/.test(orderId))return res.status(400).json({error:"A valid Futures order ID is required."});
+    const result=await runtime.callUserRpc(user,"cancel_paper_futures_limit_order",{p_order_id:orderId});
+    res.set("Cache-Control","private, no-store").json({
+      orderId,status:result?.status||result?.order?.status||"CANCELLED",
+      idempotentReplay:result?.idempotent_replay===true,simulationOnly:true
+    });
+  }catch(error){sendError(res,error,"Futures LIMIT order could not be cancelled.");}
+});
+
 app.get("/paper/futures/orders",async(req,res)=>{
   try{
     const {user,userDb}=await auth(req),raw=String(req.query.limit??"50");
     if(!/^\d+$/.test(raw)||Number(raw)<1)return res.status(400).json({error:"Futures order history limit must be from 1 to 100."});
     const {data,error}=await userDb.from("paper_futures_orders").select("*").eq("user_id",user.id).order("created_at",{ascending:false}).limit(Math.min(Number(raw),100));
     if(error)throw Object.assign(new Error("Futures order history could not be loaded."),{status:503});
-    const orders=(data||[]).map(o=>({id:o.order_id,tradingSymbol:o.trading_symbol,instrumentKey:o.instrument_key,exchange:o.exchange,expiry:o.expiry,side:o.side,product:o.product,quantity:o.quantity,lotSize:o.lot_size,executionPricePaise:o.execution_price_paise,marginReservedPaise:o.margin_reserved_paise,chargesPaise:o.charges_paise,realizedPnlPaise:o.realized_pnl_paise,status:o.status,orderType:o.order_type,simulationOnly:true,createdAt:o.created_at?Date.parse(o.created_at):null}));
+    const orders=(data||[]).map(o=>({id:o.order_id,tradingSymbol:o.trading_symbol,instrumentKey:o.instrument_key,exchange:o.exchange,expiry:o.expiry,side:o.side,product:o.product,quantity:o.quantity,filledQuantity:o.filled_quantity??(o.status==="FILLED"?o.quantity:0),remainingQuantity:o.remaining_quantity??(o.status==="FILLED"?0:o.quantity),lotSize:o.lot_size,orderType:o.order_type,limitPricePaise:o.limit_price_paise??null,executionPricePaise:o.execution_price_paise??null,averageFillPricePaise:o.average_fill_price_paise??null,marginReservedPaise:o.margin_reserved_paise??null,reservedOpenMarginPaise:o.reserved_open_margin_paise??0,reservedCloseQuantity:o.reserved_close_quantity??0,expiresAt:o.expires_at??null,chargesPaise:o.charges_paise??0,realizedPnlPaise:o.realized_pnl_paise??0,status:o.status,simulationOnly:true,createdAt:o.created_at?Date.parse(o.created_at):null}));
     res.set("Cache-Control","private, no-store").json({orders,simulationOnly:true});
   }catch(error){sendError(res,error,"Futures order history could not be loaded.");}
 });
