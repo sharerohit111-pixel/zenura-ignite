@@ -2,6 +2,21 @@
 -- No fill RPC, worker, route wiring, or feature enablement is introduced here.
 -- All writes are simulation-only and service-role-only.
 
+-- Preserve the tick-size snapshot used to validate every later partial fill.
+alter table public.paper_futures_orders
+  add column if not exists tick_size_paise integer;
+alter table public.paper_futures_orders
+  drop constraint if exists paper_futures_order_tick_size_check;
+alter table public.paper_futures_orders
+  add constraint paper_futures_order_tick_size_check
+  check (tick_size_paise is null or tick_size_paise between 1 and 1000000);
+alter table public.paper_futures_orders
+  drop constraint if exists paper_futures_limit_requires_tick_size;
+alter table public.paper_futures_orders
+  add constraint paper_futures_limit_requires_tick_size
+  check (order_type <> 'LIMIT' or tick_size_paise is not null);
+
+
 -- Prevent legacy Futures MARKET orders from consuming quantity reserved by
 -- outstanding close-only LIMIT orders. The row CHECK also guarantees that the
 -- remaining reservation never exceeds the remaining signed position.
@@ -186,14 +201,14 @@ begin
   insert into public.paper_futures_orders(
     order_id,user_id,idempotency_key,request_fingerprint,instrument_key,
     trading_symbol,exchange,segment,expiry,lot_size,side,product,order_type,
-    status,quantity,limit_price_paise,margin_reserved_paise,charges_paise,
+    status,quantity,limit_price_paise,tick_size_paise,margin_reserved_paise,charges_paise,
     realized_pnl_paise,reservation_released,simulation_only,created_at,updated_at,
     filled_quantity,remaining_quantity,average_fill_price_paise,
     reserved_open_margin_paise,reserved_close_quantity,expires_at
   ) values (
     p_order_id,p_user_id,p_idempotency_key,p_request_fingerprint,p_instrument_key,
     p_trading_symbol,p_exchange,p_segment,p_expiry,p_lot_size,p_side,p_product,'LIMIT',
-    'PENDING',p_quantity,p_limit_price_paise,p_open_margin_paise,0,
+    'PENDING',p_quantity,p_limit_price_paise,p_tick_size_paise,p_open_margin_paise,0,
     0,false,true,now(),now(),0,p_quantity,null,
     case when v_close_only then 0 else p_open_margin_paise end,
     case when v_close_only then p_quantity else 0 end,p_expires_at
