@@ -66,3 +66,13 @@ The SEBI circular specifies a 30-day lag for sharing and usage of price data for
 ## Explicit safety boundary
 
 Paper simulation only. No broker order-placement endpoint, no live trading, no production schema changes/deployment/merge, no Crypto files, and no market-data public launch without documented rights approval.
+
+## Follow-up OAuth security test and live-database permission check (2026-11-23)
+
+- Added `market-gateway/test/upstox-oauth-validation.test.js` covering valid and malformed OAuth callback inputs, strict 64-character hex state, authorization-code type/size/control-character checks, and token response validation.
+- The AES-GCM crypto tests and IST expiry tests already exist in the branch; they were inspected and retained.
+- GitHub Actions run lookup for the OAuth-test commit returned no workflow runs. Do not claim CI passed; execute `npm test` from `market-gateway` in the repository/CI before merge.
+- The live Supabase migration history currently ends at `20261122123415`. It does **not** include later repository migration `20261123230000_market_gateway_service_role_read_grants.sql`.
+- Live ACL inspection shows `service_role` currently has only `Dxtm` privileges on `upstox_connections` (no SELECT). The gateway's `getConnection(userId)` performs a direct service-client SELECT, so this connection-read path is expected to fail until the existing narrowly scoped read-grants migration is applied and verified. The same migration grants SELECT only to service_role and does not grant client-role access.
+- Do not apply the migration from this audit task: production database changes remain outside this branch-only scope. Before deployment, apply the repository migration through the approved release process and re-check effective privileges and OAuth connection read in staging.
+- The direct privilege probe's earlier false result was not an ACL ambiguity: table ACL inspection confirmed service_role has no SELECT on `upstox_connections`; the repository contains a later migration that remedies it, but the target project has not recorded that migration.
