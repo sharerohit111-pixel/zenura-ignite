@@ -18,7 +18,7 @@ DECLARE
 BEGIN
   -- NSE Delivery BUY: gross ₹1,000; fee-inclusive debit ₹1,024.79.
   v_result:=public.execute_paper_market_order(
-    '55555555-5555-4555-8555-555555555555',repeat('m',64),
+    '55555555-5555-4555-8555-555555555555',repeat('a',64),
     'aaaaaaaa-5555-4555-8555-555555555555',repeat('b',64),
     'NSE_EQ|FEE_DELIVERY','FEEDEL','NSE','BUY','DELIVERY',10,10000,
     floor(extract(epoch from clock_timestamp())*1000)::bigint,0
@@ -28,7 +28,7 @@ BEGIN
   SELECT cost_basis_paise,quantity INTO v_basis,v_qty FROM public.paper_equity_positions
    WHERE user_id='55555555-5555-4555-8555-555555555555'
      AND product='DELIVERY' AND instrument_key='NSE_EQ|FEE_DELIVERY';
-  SELECT * INTO v_order FROM public.paper_orders WHERE order_id=repeat('m',64);
+  SELECT * INTO v_order FROM public.paper_orders WHERE order_id=repeat('a',64);
   IF v_result->>'status'<>'FILLED' OR v_result->>'cash_paise' IS NULL
      OR v_cash<>99897521 OR v_basis<>102479 OR v_qty<>10
      OR v_order.gross_paise<>100000 OR v_order.charges_paise<>2479
@@ -40,18 +40,18 @@ BEGIN
       v_order.charges_breakdown,v_result;
   END IF;
   SELECT count(*) INTO v_fill_count FROM public.paper_equity_fills
-   WHERE user_id='55555555-5555-4555-8555-555555555555' AND order_id=repeat('m',64);
+   WHERE user_id='55555555-5555-4555-8555-555555555555' AND order_id=repeat('a',64);
   SELECT count(*) INTO v_ledger_count FROM public.paper_equity_cash_ledger
-   WHERE user_id='55555555-5555-4555-8555-555555555555' AND order_id=repeat('m',64);
+   WHERE user_id='55555555-5555-4555-8555-555555555555' AND order_id=repeat('a',64);
   IF v_fill_count<>1 OR v_ledger_count<>1
      OR NOT EXISTS (
        SELECT 1 FROM public.paper_equity_fills
-        WHERE order_id=repeat('m',64) AND execution_id='market:'||repeat('m',64)
+        WHERE order_id=repeat('a',64) AND execution_id='market:'||repeat('a',64)
           AND cash_delta_paise=-102479 AND gross_paise=100000
      )
      OR NOT EXISTS (
        SELECT 1 FROM public.paper_equity_cash_ledger
-        WHERE order_id=repeat('m',64) AND event_key='market-cash:'||repeat('m',64)
+        WHERE order_id=repeat('a',64) AND event_key='market-cash:'||repeat('a',64)
           AND event_type='TRADE_DEBIT' AND cash_delta_paise=-102479
           AND cash_balance_after_paise=99897521 AND reserved_cash_after_paise=0
      ) THEN
@@ -60,7 +60,7 @@ BEGIN
 
   -- Same idempotency key returns the stored charge snapshot without another debit.
   v_result:=public.execute_paper_market_order(
-    '55555555-5555-4555-8555-555555555555',repeat('m',64),
+    '55555555-5555-4555-8555-555555555555',repeat('a',64),
     'aaaaaaaa-5555-4555-8555-555555555555',repeat('b',64),
     'NSE_EQ|FEE_DELIVERY','FEEDEL','NSE','BUY','DELIVERY',10,10000,
     floor(extract(epoch from clock_timestamp())*1000)::bigint,0
@@ -73,16 +73,16 @@ BEGIN
   END IF;
 
   SELECT count(*) INTO v_fill_count FROM public.paper_equity_fills
-   WHERE user_id='55555555-5555-4555-8555-555555555555' AND order_id=repeat('m',64);
+   WHERE user_id='55555555-5555-4555-8555-555555555555' AND order_id=repeat('a',64);
   SELECT count(*) INTO v_ledger_count FROM public.paper_equity_cash_ledger
-   WHERE user_id='55555555-5555-4555-8555-555555555555' AND order_id=repeat('m',64);
+   WHERE user_id='55555555-5555-4555-8555-555555555555' AND order_id=repeat('a',64);
   IF v_fill_count<>1 OR v_ledger_count<>1 THEN
     RAISE EXCEPTION 'Idempotent MARKET replay duplicated fill or cash ledger rows';
   END IF;
 
   -- Delivery SELL: STT and DP reduce proceeds; realized P&L is net of both legs' costs.
   v_result:=public.execute_paper_market_order(
-    '55555555-5555-4555-8555-555555555555',repeat('n',64),
+    '55555555-5555-4555-8555-555555555555',repeat('b',64),
     'cccccccc-5555-4555-8555-555555555555',repeat('d',64),
     'NSE_EQ|FEE_DELIVERY','FEEDEL','NSE','SELL','DELIVERY',5,12000,
     floor(extract(epoch from clock_timestamp())*1000)::bigint,0
@@ -92,7 +92,7 @@ BEGIN
   SELECT cost_basis_paise,quantity INTO v_basis,v_qty FROM public.paper_equity_positions
    WHERE user_id='55555555-5555-4555-8555-555555555555'
      AND product='DELIVERY' AND instrument_key='NSE_EQ|FEE_DELIVERY';
-  SELECT charges_paise INTO v_charges FROM public.paper_orders WHERE order_id=repeat('n',64);
+  SELECT charges_paise INTO v_charges FROM public.paper_orders WHERE order_id=repeat('b',64);
   IF v_cash<>99952739 OR v_basis<>51239 OR v_qty<>5
      OR v_charges<>4782 OR v_realized<>3978
      OR (v_result->>'order_realized_pnl_paise')::bigint<>3978 THEN
@@ -101,22 +101,22 @@ BEGIN
 
   -- Intraday BUY and SELL use intraday STT/stamp rules and still settle atomically.
   PERFORM public.execute_paper_market_order(
-    '55555555-5555-4555-8555-555555555555',repeat('o',64),
+    '55555555-5555-4555-8555-555555555555',repeat('c',64),
     'eeeeeeee-5555-4555-8555-555555555555',repeat('f',64),
     'NSE_EQ|FEE_INTRADAY','FEEINTRA','NSE','BUY','INTRADAY',10,10000,
     floor(extract(epoch from clock_timestamp())*1000)::bigint,0
   );
-  SELECT charges_paise INTO v_charges FROM public.paper_orders WHERE order_id=repeat('o',64);
+  SELECT charges_paise INTO v_charges FROM public.paper_orders WHERE order_id=repeat('c',64);
   IF v_charges<>125 THEN RAISE EXCEPTION 'Intraday BUY fee schedule mismatch'; END IF;
   v_result:=public.execute_paper_market_order(
-    '55555555-5555-4555-8555-555555555555',repeat('p',64),
+    '55555555-5555-4555-8555-555555555555',repeat('d',64),
     '11111111-5555-4555-8555-555555555555',repeat('2',64),
     'NSE_EQ|FEE_INTRADAY','FEEINTRA','NSE','SELL','INTRADAY',10,10000,
     floor(extract(epoch from clock_timestamp())*1000)::bigint,0
   );
   SELECT cash_paise,realized_pnl_paise INTO v_cash,v_realized FROM public.paper_accounts
    WHERE user_id='55555555-5555-4555-8555-555555555555';
-  SELECT charges_paise INTO v_charges FROM public.paper_orders WHERE order_id=repeat('p',64);
+  SELECT charges_paise INTO v_charges FROM public.paper_orders WHERE order_id=repeat('d',64);
   IF v_charges<>147 OR v_cash<>99952467 OR v_realized<>3706
      OR (v_result->>'order_realized_pnl_paise')::bigint<>-272 THEN
     RAISE EXCEPTION 'Intraday SELL fee-inclusive cash or realized P&L mismatch';
@@ -125,7 +125,7 @@ BEGIN
   -- Tiny NSE SELLs whose minimum brokerage exceeds gross proceeds must fail closed.
   BEGIN
     PERFORM public.execute_paper_market_order(
-      '55555555-5555-4555-8555-555555555555',repeat('q',64),
+      '55555555-5555-4555-8555-555555555555',repeat('e',64),
       '99999999-5555-4555-8555-555555555555',repeat('8',64),
       'NSE_EQ|FEE_DELIVERY','FEEDEL','NSE','SELL','DELIVERY',1,1,
       floor(extract(epoch from clock_timestamp())*1000)::bigint,0
@@ -134,14 +134,14 @@ BEGIN
   EXCEPTION WHEN SQLSTATE '22003' THEN
     NULL;
   END;
-  IF EXISTS(SELECT 1 FROM public.paper_orders WHERE order_id=repeat('q',64)) THEN
+  IF EXISTS(SELECT 1 FROM public.paper_orders WHERE order_id=repeat('e',64)) THEN
     RAISE EXCEPTION 'Rejected tiny NSE SELL left a persisted order row';
   END IF;
 
   -- Unsupported BSE cash scrip fee classification is rejected before any mutation.
   BEGIN
     PERFORM public.execute_paper_market_order(
-      '55555555-5555-4555-8555-555555555555',repeat('r',64),
+      '55555555-5555-4555-8555-555555555555',repeat('f',64),
       '33333333-5555-4555-8555-555555555555',repeat('4',64),
       'BSE_EQ|UNCLASSIFIED','BSETEST','BSE','BUY','DELIVERY',1,10000,
       floor(extract(epoch from clock_timestamp())*1000)::bigint,0
@@ -150,7 +150,7 @@ BEGIN
   EXCEPTION WHEN SQLSTATE '22023' THEN
     NULL;
   END;
-  IF EXISTS(SELECT 1 FROM public.paper_orders WHERE order_id=repeat('r',64)) THEN
+  IF EXISTS(SELECT 1 FROM public.paper_orders WHERE order_id=repeat('f',64)) THEN
     RAISE EXCEPTION 'Rejected BSE cash order left a persisted order row';
   END IF;
 
