@@ -31,6 +31,25 @@ test("insufficient margin is explicit and is not silently clamped to zero", () =
   assert.equal(result.insufficientMargin, true);
 });
 
+test("margin reservation and release are bounded and preserve the account invariant", () => {
+  const reserved = risk.reserveSimulatedMargin({
+    cashPaise: 1000000, reservedCashPaise: 100000, usedMarginPaise: 300000, amountPaise: 200000
+  });
+  assert.equal(reserved.usedMarginPaise, 500000);
+  assert.equal(reserved.availableMarginPaise, 400000);
+  const released = risk.releaseSimulatedMargin({
+    cashPaise: 1000000, reservedCashPaise: 100000, usedMarginPaise: 500000, amountPaise: 200000
+  });
+  assert.equal(released.usedMarginPaise, 300000);
+  assert.equal(released.availableMarginPaise, 600000);
+  assert.throws(() => risk.reserveSimulatedMargin({
+    cashPaise: 100000, reservedCashPaise: 10000, usedMarginPaise: 80000, amountPaise: 20000
+  }), /Insufficient available/);
+  assert.throws(() => risk.releaseSimulatedMargin({
+    cashPaise: 1000000, usedMarginPaise: 1000, amountPaise: 1001
+  }), /exceeds the owned/);
+});
+
 test("unrealized P&L handles long and short positions", () => {
   assert.equal(risk.calculateUnrealizedPnl({netQuantity: 25, averagePricePaise: 10000, markPricePaise: 11000}).unrealizedPnlPaise, 25000);
   assert.equal(risk.calculateUnrealizedPnl({netQuantity: -25, averagePricePaise: 10000, markPricePaise: 11000}).unrealizedPnlPaise, -25000);
@@ -55,6 +74,25 @@ test("maintenance risk signals liquidation threshold but never executes it", () 
   assert.equal(result.maintenanceDeficitPaise, 1000);
   assert.equal(result.liquidationRequired, true);
   assert.equal(result.executesLiquidation, false);
+});
+
+test("rollover closes the old contract and opens a distinct new contract", () => {
+  const result = risk.simulatePositionRollover({
+    oldInstrumentKey: "NSE_FO|OLD", oldNetQuantity: -25, oldAveragePricePaise: 10000,
+    oldExitPricePaise: 9000, oldReservedMarginPaise: 150000,
+    newInstrumentKey: "NSE_FO|NEW", newNetQuantity: -25, newEntryPricePaise: 9500,
+    newInitialMarginBps: 1200, newMaintenanceMarginBps: 800
+  });
+  assert.equal(result.closedLeg.realizedPnlPaise, 25000);
+  assert.equal(result.closedLeg.releasedMarginPaise, 150000);
+  assert.equal(result.openedLeg.initialMarginPaise, 285000);
+  assert.equal(result.automaticContractCarry, false);
+  assert.throws(() => risk.simulatePositionRollover({
+    oldInstrumentKey: "NSE_FO|OLD", oldNetQuantity: 25, oldAveragePricePaise: 10000,
+    oldExitPricePaise: 10000, oldReservedMarginPaise: 100000,
+    newInstrumentKey: "NSE_FO|OLD", newNetQuantity: 25, newEntryPricePaise: 10000,
+    newInitialMarginBps: 1000, newMaintenanceMarginBps: 500
+  }), /distinct validated contract keys/);
 });
 
 test("expiry settlement requires expiry and explicit settlement provenance", () => {
