@@ -183,7 +183,29 @@ begin
      and is_trading_day is true and session_kind in ('REGULAR','SPECIAL')
      and verified_at<=v_server_now
      and length(btrim(source_reference)) between 1 and 500
-     and source_sha256 ~ '^[a-f0-9]{64}
+     and source_sha256 ~ '^[a-f0-9]{64}$'
+     and (
+       (p_exchange='NSE' and lower(source_reference) ~ '^https://([a-z0-9-]+[.])*nseindia[.]com(/|$)')
+       or
+       (p_exchange='BSE' and lower(source_reference) ~ '^https://([a-z0-9-]+[.])*bseindia[.]com(/|$)')
+     );
+  if not found
+     or abs(v_server_now_ms-p_now_ms)>2000
+     or p_expiry<v_submit_local_date
+     or p_expires_at<=v_server_now
+     or p_expires_at>((p_expiry + time '15:30') at time zone 'Asia/Kolkata')
+     or v_submit_local_minute<v_submit_session.open_minute
+     or v_submit_local_minute>=v_submit_session.close_minute then
+    raise exception 'A fresh clock and verified open exchange session are required for Futures LIMIT submit.'
+      using errcode='22023';
+  end if;
+  v_submit_session_close:=(v_submit_local_date::timestamp
+    +make_interval(mins=>v_submit_session.close_minute)) at time zone 'Asia/Kolkata';
+  if p_expires_at>v_submit_session_close then
+    raise exception 'Futures LIMIT expiry cannot exceed the verified session close.'
+      using errcode='22023';
+  end if;
+
   if v_close_only then
     v_available_quantity := abs(v_position.net_quantity)-v_position.reserved_close_quantity;
     if p_quantity>v_available_quantity then
