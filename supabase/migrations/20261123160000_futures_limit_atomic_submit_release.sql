@@ -240,6 +240,10 @@ declare
   v_position public.paper_futures_positions%rowtype;
   v_open_release bigint;
   v_close_release integer;
+  v_expiry_now timestamptz;
+  v_expiry_local_date date;
+  v_expiry_local_minute integer;
+  v_expiry_session public.paper_exchange_sessions%rowtype;
 begin
   if p_order_id is null or p_order_id !~ '^[a-f0-9]{64}$'
      or p_target_status is null
@@ -277,9 +281,136 @@ begin
       'idempotent_replay',true,'simulation_only',true
     );
   end if;
-  if p_target_status='EXPIRED' and v_order.expires_at>clock_timestamp() then
-    raise exception 'Futures LIMIT order has not reached its expiry time.'
-      using errcode='22023';
+  if p_target_status='EXPIRED' then
+    v_expiry_now:=clock_timestamp();
+    v_expiry_local_date:=(v_expiry_now at time zone 'Asia/Kolkata')::date;
+    v_expiry_local_minute:=extract(hour from (v_expiry_now at time zone 'Asia/Kolkata'))::integer*60
+      +extract(minute from (v_expiry_now at time zone 'Asia/Kolkata'))::integer;
+    if v_order.expires_at>v_expiry_now
+       and v_expiry_now<((v_order.expiry + time '15:30') at time zone 'Asia/Kolkata') then
+      select * into v_expiry_session
+        from public.paper_exchange_sessions
+       where exchange=v_order.exchange and session_date=v_expiry_local_date
+         and is_trading_day is true and session_kind in ('REGULAR','SPECIAL')
+         and verified_at<=v_expiry_now
+         and length(btrim(source_reference)) between 1 and 500
+         and source_sha256 ~ '^[a-f0-9]{64}
+
+  v_open_release := v_order.reserved_open_margin_paise;
+  v_close_release := v_order.reserved_close_quantity;
+
+  if v_open_release>0 then
+    if v_account.reserved_margin_paise<v_open_release then
+      raise exception 'Futures LIMIT opening-margin reservation is inconsistent.'
+        using errcode='23514';
+    end if;
+    update public.paper_accounts
+       set reserved_margin_paise=reserved_margin_paise-v_open_release,
+           version=version+1,updated_at=now()
+     where user_id=v_user_id;
+  end if;
+
+  if v_close_release>0 then
+    select * into v_position
+      from public.paper_futures_positions
+     where user_id=v_user_id and instrument_key=v_order.instrument_key
+     for update;
+    if not found or v_position.reserved_close_quantity<v_close_release then
+      raise exception 'Futures LIMIT close reservation is inconsistent.'
+        using errcode='23514';
+    end if;
+    update public.paper_futures_positions
+       set reserved_close_quantity=reserved_close_quantity-v_close_release,
+           updated_at=now()
+     where user_id=v_user_id and instrument_key=v_order.instrument_key;
+  end if;
+
+  update public.paper_futures_orders
+     set status=p_target_status,
+         reserved_open_margin_paise=0,
+         reserved_close_quantity=0,
+         reservation_released=true,
+         updated_at=now()
+   where order_id=p_order_id;
+
+  return jsonb_build_object(
+    'order_id',p_order_id,'status',p_target_status,
+    'released_open_margin_paise',v_open_release,
+    'released_close_quantity',v_close_release,
+    'idempotent_replay',false,'simulation_only',true
+  );
+end;
+$$;
+
+create or replace function public.cancel_paper_futures_limit_order(
+  p_user_id uuid,
+  p_order_id text
+) returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_owner uuid;
+begin
+  if p_user_id is null then
+    raise exception 'User is required.' using errcode='22023';
+  end if;
+  select user_id into v_owner
+    from public.paper_futures_orders
+   where order_id=p_order_id and order_type='LIMIT';
+  if not found or v_owner<>p_user_id then
+    raise exception 'Futures LIMIT order was not found.' using errcode='P0002';
+  end if;
+  return public._release_paper_futures_limit_order(p_order_id,'CANCELLED');
+end;
+$$;
+
+create or replace function public.expire_paper_futures_limit_order(
+  p_order_id text
+) returns jsonb
+language sql
+security definer
+set search_path = ''
+as $$
+  select public._release_paper_futures_limit_order(p_order_id,'EXPIRED');
+$$;
+
+revoke all on function public.submit_paper_futures_limit_order(
+  uuid,text,uuid,text,text,text,text,text,date,integer,integer,text,text,integer,bigint,bigint,timestamptz
+) from public,anon,authenticated;
+revoke all on function public._release_paper_futures_limit_order(text,text)
+  from public,anon,authenticated;
+revoke all on function public.cancel_paper_futures_limit_order(uuid,text)
+  from public,anon,authenticated;
+revoke all on function public.expire_paper_futures_limit_order(text)
+  from public,anon,authenticated;
+grant execute on function public.submit_paper_futures_limit_order(
+  uuid,text,uuid,text,text,text,text,text,date,integer,integer,text,text,integer,bigint,bigint,timestamptz
+) to service_role;
+grant execute on function public.cancel_paper_futures_limit_order(uuid,text)
+  to service_role;
+grant execute on function public.expire_paper_futures_limit_order(text)
+  to service_role;
+
+comment on function public.submit_paper_futures_limit_order(uuid,text,uuid,text,text,text,text,text,date,integer,integer,text,text,integer,bigint,bigint,timestamptz) is
+  'Atomic simulation-only Futures LIMIT submission. Reserves opening margin or close quantity; does not execute fills.';
+comment on function public.cancel_paper_futures_limit_order(uuid,text) is
+  'Atomic simulation-only Futures LIMIT cancellation and release of unfilled reservations.';
+comment on function public.expire_paper_futures_limit_order(text) is
+  'Atomic worker-only Futures LIMIT expiry and release of unfilled reservations.';
+
+         and (
+           (v_order.exchange='NSE' and lower(source_reference) ~ '^https://([a-z0-9-]+[.])*nseindia[.]com(/|$)')
+           or
+           (v_order.exchange='BSE' and lower(source_reference) ~ '^https://([a-z0-9-]+[.])*bseindia[.]com(/|$)')
+         );
+      if found and v_expiry_local_minute>=v_expiry_session.open_minute
+         and v_expiry_local_minute<v_expiry_session.close_minute then
+        raise exception 'Futures LIMIT order is still inside a verified exchange session.'
+          using errcode='22023';
+      end if;
+    end if;
   end if;
 
   v_open_release := v_order.reserved_open_margin_paise;
