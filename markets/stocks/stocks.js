@@ -466,7 +466,7 @@
       if(!response.ok){if(response.status>=400&&response.status<500)retryPolicy.clearPendingPaperOrder(pendingOrderStorage,storageKey);throw new Error(data.error||'Futures paper order rejected.');}
       if(typeof data.orderId!=='string'||!Number.isSafeInteger(data.executionPricePaise)||data.executionPricePaise<1)throw new Error('Order response could not be verified. Retry the same order to safely check its result.');
       retryPolicy.clearPendingPaperOrder(pendingOrderStorage,storageKey);
-      futuresOrderStatus.textContent=side+' '+lots+' lot(s) · '+(data.tradingSymbol||tradingSymbol)+' filled at '+inrPaise(data.executionPricePaise)+' · Charges '+inrPaise(data.chargesPaise)+' · Entry margin '+inrPaise(data.openingMarginPaise)+' · SIM';
+      futuresOrderStatus.textContent=side+' '+lots+' lot(s) · '+(data.tradingSymbol||tradingSymbol)+' filled at '+inrPaise(data.executionPricePaise)+' · Charges '+inrPaise(data.chargesPaise)+' · Conservative order-quantity margin estimate '+inrPaise(data.openingMarginPaise)+' · SIM';
       await loadPaperAccount();await refreshPaperViews();
     }catch(error){if(connector.getUserId()===uid)futuresOrderStatus.textContent=error.message||'Futures order failed.';}
     finally{futuresOrderSubmitting=false;updateFuturesOrderButtons();}
