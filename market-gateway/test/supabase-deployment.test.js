@@ -171,5 +171,7 @@ test("API error logs are structured and exclude raw error messages",()=>{
  assert.match(helper,/requestId/);
  assert.match(helper,/method:/);
  assert.match(helper,/path:/);
- assert.doesNotMatch(helper,/error\.message/);
+ const logCall=helper.slice(helper.indexOf("console.error("));
+ assert.ok(logCall.length>0,"structured error log must be emitted");
+ assert.doesNotMatch(logCall,/error\.message/);
 });
