@@ -1,0 +1,118 @@
+name: Validate Indian Market DB Infrastructure (PostgreSQL 17)
+
+on:
+  pull_request:
+    paths:
+      - "supabase/migrations/**"
+      - "supabase/drafts/indian_equity_atomic_fill_ledger_integration.sql"
+      - "supabase/tests/**"
+      - ".github/workflows/indian-market-db-postgres17.yml"
+  push:
+    branches:
+      - "feature/indian-market-db-infrastructure-2026-11-23"
+    paths:
+      - "supabase/migrations/**"
+      - "supabase/drafts/indian_equity_atomic_fill_ledger_integration.sql"
+      - "supabase/tests/**"
+      - ".github/workflows/indian-market-db-postgres17.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: indian-market-db-postgres17-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  postgres-17-disposable:
+    name: Disposable PostgreSQL 17 migration and Equity ledger checks
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: indian_market_db_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d indian_market_db_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      PGHOST: localhost
+      PGPORT: 5432
+      PGUSER: postgres
+      PGPASSWORD: postgres
+      PGDATABASE: indian_market_db_test
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Confirm isolated PostgreSQL 17 runtime
+        run: |
+          psql -v ON_ERROR_STOP=1 -Atc "SHOW server_version_num" | awk '{ if ($1 < 170000 || $1 >= 180000) exit 1; print "PostgreSQL " $1 " confirmed"; }'
+
+      - name: Prepare minimal Supabase Auth roles
+        run: |
+          psql -v ON_ERROR_STOP=1 <<'SQL'
+          CREATE ROLE anon NOLOGIN;
+          CREATE ROLE authenticated NOLOGIN;
+          CREATE ROLE service_role NOLOGIN BYPASSRLS;
+          CREATE SCHEMA auth;
+          CREATE TABLE auth.users (id uuid PRIMARY KEY);
+          CREATE FUNCTION auth.uid()
+          RETURNS uuid
+          LANGUAGE sql
+          STABLE
+          AS $uid$
+            SELECT NULLIF(COALESCE(
+              current_setting('request.jwt.claim.sub', true),
+              (NULLIF(current_setting('request.jwt.claims', true), '')::jsonb ->> 'sub')
+            ), '')::uuid
+          $uid$;
+          GRANT USAGE ON SCHEMA auth TO authenticated, service_role;
+          GRANT EXECUTE ON FUNCTION auth.uid() TO authenticated, service_role;
+          CREATE FUNCTION public.rls_auto_enable()
+          RETURNS event_trigger
+          LANGUAGE plpgsql
+          SECURITY DEFINER
+          SET search_path = pg_catalog
+          AS $fixture$
+          BEGIN
+            RETURN;
+          END
+          $fixture$;
+          GRANT EXECUTE ON FUNCTION public.rls_auto_enable() TO PUBLIC;
+          SQL
+
+      - name: Apply ordered repository migrations to disposable database
+        run: |
+          set -euo pipefail
+          for migration in supabase/migrations/*.sql; do
+            echo "Applying $migration"
+            psql -v ON_ERROR_STOP=1 -f "$migration"
+          done
+
+      - name: Apply draft Equity atomic fill and cash-ledger RPC integration
+        run: psql -v ON_ERROR_STOP=1 -f supabase/drafts/indian_equity_atomic_fill_ledger_integration.sql
+
+      - name: Verify Equity fill and cash-ledger schema and append-only guards
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/equity_ledger_schema.sql
+
+      - name: Exercise fee-inclusive MARKET settlement with integrated fill ledger
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/equity_market_fee_settlement.sql
+
+      - name: Seed disposable Intraday LIMIT test account
+        run: |
+          psql -v ON_ERROR_STOP=1 <<'SQL'
+          INSERT INTO auth.users(id)
+          VALUES ('22222222-2222-4222-8222-222222222222')
+          ON CONFLICT (id) DO NOTHING;
+          SELECT public.initialize_paper_trading_account('22222222-2222-4222-8222-222222222222');
+          SQL
+
+      - name: Exercise Intraday LIMIT reservation and atomic fill lifecycle
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/intraday_limit_reservations.sql
