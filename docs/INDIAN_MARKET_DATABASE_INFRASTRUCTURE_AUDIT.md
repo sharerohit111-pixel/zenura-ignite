@@ -169,3 +169,21 @@ A second source inspection confirmed:
 The draft SQL files have been renamed to neutral filenames under `supabase/drafts/`. The initial timestamp matched the Futures LIMIT foundation migration's timestamp, which would create ambiguous migration ordering if copied into the active migration directory. No timestamped active migration was created.
 
 This remains source-level contract review only; no PostgreSQL disposable test execution has been performed.
+
+
+## NSE Equity atomic fill/ledger integration design (2026-11-23)
+
+Created `docs/INDIAN_EQUITY_FILL_LEDGER_ATOMIC_INTEGRATION.md` after inspecting the complete current Equity schema and settlement RPC definitions on the Equity lifecycle branch.
+
+Verified settlement functions:
+- `execute_paper_market_order(...)` — final charges-aware definition is replaced by the later Equity LIMIT migration.
+- `execute_paper_limit_fill(text,bigint,bigint,bigint,bigint)`.
+- `execute_paper_intraday_limit_fill(text,bigint,bigint,bigint,bigint)`.
+
+The three functions currently settle full order quantity; they do not expose partial-fill execution IDs. The fill schema supports multiple execution IDs per order, but that alone does not mean partial fills are implemented. For the current contract, a deterministic order-scoped execution ID is required; any future partial-fill capability must first extend the worker/RPC contract with stable execution IDs and fill sequence.
+
+The design specifies in-transaction fill insertion and matching cash-ledger entries using the final settlement variables, not a paper_orders trigger. LIMIT BUY requires two distinct ledger facts: TRADE_DEBIT for actual cash debit and RESERVATION_CONSUME for the reserved-cash release. Both snapshots must match the post-settlement account state. MARKET trades have no cash reservation consumption. LIMIT SELL share-reservation release remains represented by position/order state, because the current cash ledger does not model reserved share quantities.
+
+Cancellation/rejection reservation-release ledger entries are explicitly out of scope for this fill-integration step and need a separate cancel/reject RPC integration review.
+
+No settlement RPC was modified in this step. No active migration was created, no disposable PostgreSQL integration tests were run, and production/Crypto remain unchanged.
