@@ -30,3 +30,52 @@ begin
 end;
 $$;
 reset role;
+
+-- Reject malformed lease requests, including TTL values outside the
+-- database-enforced 5s..120s window. Invalid requests must not mutate state.
+do $$
+declare
+  v_bad_ttl bigint;
+  v_failed boolean;
+  v_token uuid := '33333333-3333-4333-8333-333333333333';
+begin
+  foreach v_bad_ttl in array array[4999::bigint,120001::bigint,-1::bigint] loop
+    v_failed:=false;
+    begin
+      perform public.acquire_paper_crypto_limit_worker_lease(v_token,2000000,v_bad_ttl);
+    exception when invalid_parameter_value then
+      v_failed:=true;
+    end;
+    if not v_failed then
+      raise exception 'Worker lease must reject invalid TTL %',v_bad_ttl;
+    end if;
+  end loop;
+
+  v_failed:=false;
+  begin
+    perform public.acquire_paper_crypto_limit_worker_lease(v_token,-1,5000);
+  exception when invalid_parameter_value then
+    v_failed:=true;
+  end;
+  if not v_failed then
+    raise exception 'Worker lease must reject negative timestamps';
+  end if;
+
+  v_failed:=false;
+  begin
+    perform public.release_paper_crypto_limit_worker_lease(null,2000000);
+  exception when invalid_parameter_value then
+    v_failed:=true;
+  end;
+  if not v_failed then
+    raise exception 'Worker lease release must reject a null token';
+  end if;
+
+  if not public.acquire_paper_crypto_limit_worker_lease(v_token,2000000,5000) then
+    raise exception 'Worker lease must accept the minimum supported TTL';
+  end if;
+  if not public.release_paper_crypto_limit_worker_lease(v_token,2001000) then
+    raise exception 'Minimum-TTL worker lease cleanup failed';
+  end if;
+end;
+$$;
