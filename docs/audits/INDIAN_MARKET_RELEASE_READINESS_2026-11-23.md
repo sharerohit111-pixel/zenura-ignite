@@ -78,22 +78,18 @@ The test is explicitly wired into `.github/workflows/paper-trading-supabase-migr
 - No application code or other workstream branch overwritten.
 - No PR merged, no deployment triggered, and no feature activated.
 - Crypto intentionally excluded.
-## PostgreSQL 17 CI design review
+## PostgreSQL 16/17 CI patch — isolated and unexecuted
 
-The Supabase migration workflow exists on both PR #91's exact head (`7a47bb29ff6ef2683a81f16cb01f70c37fdb473a`) and its base branch (`feature/indian-market-options-limit-design`). The PR-head workflow has a `pull_request` trigger with path filters including `supabase/**`, and no `branches` restriction. Therefore the earlier claim that PR #91's base branch is excluded from this workflow was incorrect; the dedicated migration workflow can trigger for this PR when its changed paths match.
+The Supabase migration workflow exists on both PR #91's exact head (`7a47bb29ff6ef2683a81f16cb01f70c37fdb473a`) and its base branch (`feature/indian-market-options-limit-design`). Its `pull_request` trigger has path filters including `supabase/**` and no `branches` restriction, so PR #91 is not excluded by its base branch.
 
-Current workflow behavior, verified from `.github/workflows/paper-trading-supabase-migrations.yml`:
-- Runs one disposable PostgreSQL 16 service (`postgres:16`).
-- Creates minimal Supabase-compatible roles/auth fixtures.
-- Replays every `supabase/migrations/*.sql` file in lexicographic order with `ON_ERROR_STOP=1`.
-- Runs `supabase/tests/market_gateway_service_role_grants.sql` immediately after migration replay, followed by accounting, reservation, fill, race, schema-guard and RLS tests.
+Implemented only on audit branch `audit/indian-market-release-readiness-2026-11-23` in commit `d0cedf252c6231bf7a216034fd305abca7175f56`:
 
-Recommended isolated CI enhancement (design only; not implemented):
-1. Add a matrix variable for PostgreSQL major versions `[16, 17]` and set the service image to `postgres:${{ matrix.postgres-version }}`.
-2. Keep the same migration replay, auth-role fixture, environment variables and complete SQL test sequence in both matrix legs; avoid a separate reduced PG17-only suite.
-3. Name jobs/steps with the PostgreSQL major version so failures are attributable.
-4. Preserve PG16 during the compatibility transition; require both matrix legs to pass before treating the SQL suite as green.
-5. Do not add a `pull_request.branches` filter. Retain the existing path filters and ensure migration, SQL test, workflow and gateway runtime changes continue to trigger the job.
-6. Keep this as disposable CI only. It does not replace a real Supabase staging rehearsal, production privilege verification, or the pending explicit production migration approval.
+1. Added a non-fail-fast matrix for PostgreSQL major versions ["16", "17"].
+2. Changed the disposable service image to `postgres:${{ matrix.postgres-version }}`.
+3. Added a version-identifying job name.
+4. Preserved the complete existing 61-step job, including auth-role fixtures, environment variables, ordered migration replay, grant assertions, all accounting/reservation/fill/race/schema/RLS tests, and the existing PR path filters.
+5. Did not add a `pull_request.branches` restriction.
 
-No workflow or application code was changed during this design review.
+Verification performed by fetching the baseline and patched workflow from GitHub and comparing their complete contents: the patch consists exactly of the intended matrix/job-name/service-image change; all 61 named steps and their order are unchanged; migration replay still precedes the service-role grant test; the `supabase/**` path filter remains present.
+
+**Execution status:** this workflow patch has not run in GitHub Actions yet. No YAML parser or PostgreSQL 16/17 runtime execution was performed in this audit turn. The matrix is therefore prepared and source-verified, not CI-validated. The audit branch has not been merged and no PR has been opened. The patch does not replace a real Supabase staging rehearsal, production privilege verification, or explicit production migration approval.
