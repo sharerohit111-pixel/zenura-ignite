@@ -121,3 +121,37 @@ Do not cherry-pick PR #93 on top of the Options branch without resolving the lea
 ### Next database-only implementation unit
 
 The next safe code change should be a draft-only additive migration design/implementation for tenant-safe parent unique keys and composite foreign keys across Equity/Futures/Options fills and ledger rows, plus Futures fill immutability. Before writing it, inspect every table's existing PK/unique keys and the full affected RPC bodies so no current insert contract is broken. This work must remain on `feature/indian-market-db-infrastructure-2026-11-23`; it must not modify Crypto files or production.
+
+
+## Follow-up implementation — tenant/fill integrity draft (2026-11-23)
+
+Draft artifacts committed on the infrastructure branch:
+
+- `supabase/drafts/20261123140000_indian_market_tenant_fill_integrity.sql`
+- `supabase/drafts/20261123140000_indian_market_tenant_fill_integrity.down.sql`
+- `docs/INDIAN_MARKET_DATABASE_INTEGRITY_REGRESSION_TESTS.md`
+
+These files are deliberately under `supabase/drafts/`, not `supabase/migrations/`. The current infrastructure branch contains the Equity ledger migration but does not contain the Futures LIMIT and Options LIMIT schema/fill migrations. The proposed SQL requires all three asset subsystems and intentionally fails if prerequisites are absent; it must not be applied or moved into the active migration chain until a canonical integration branch contains the complete parent/child tables in reviewed order.
+
+### Draft contents
+
+- Adds composite parent unique keys for Equity and Futures orders, plus a composite user/fill key for Equity fills.
+- Adds tenant-consistent composite FKs for Equity fills → Equity orders, Equity cash-ledger → Equity orders/fills, and Futures fills → Futures orders.
+- Keeps Options fill ownership normalized through its globally unique order_id primary-key parent; it does not add a redundant user_id column to the Options fill table.
+- Adds append-only UPDATE/DELETE rejection triggers for Futures and Options LIMIT fills.
+- Revokes UPDATE/DELETE from service_role on the Equity/Futures/Options fill and Equity ledger tables while retaining service_role SELECT/INSERT.
+- Includes a rollback draft that restores the original Futures fill service_role DML grants; the Options fill baseline remains SELECT/INSERT only.
+- Adds a regression contract for cross-tenant FK rejection, immutable audit rows, RPC replay behavior, RLS isolation, grants, migration preconditions, and Crypto non-interference.
+
+### Review status and blockers
+
+- The draft is source-reviewed against the Equity ledger DDL, Futures order/fill DDL, Options LIMIT order/fill DDL, and the inspected settlement RPC lock/replay paths.
+- No disposable PostgreSQL integration test has been executed in this turn. The regression file is a test contract, not evidence of passing tests.
+- The composite FKs use `NOT VALID` followed by explicit `VALIDATE CONSTRAINT`; historical orphan/mismatched rows therefore fail closed.
+- The migration file intentionally has no explicit BEGIN/COMMIT wrappers; migration tooling controls transaction boundaries.
+- The rollback is intended for disposable environments only and does not authorize production rollback.
+- No active migration was added, no production SQL was executed, no Supabase migration was applied, and no Crypto file/object was modified.
+
+### Branch-base correction
+
+The infrastructure branch was created from the Equity lifecycle audit branch, not from the Options branch. Therefore it currently contains the Equity ledger but not the Futures/Options LIMIT migration chain. The Options branch remains a candidate integration source, not the current parent of this infrastructure branch. Do not infer that the complete three-asset schema is present on this branch.
