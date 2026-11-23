@@ -766,7 +766,7 @@ app.get("/paper/futures/portfolio",async(req,res)=>{
       unrealizedPnlPaise+=pnl;
       return {instrumentKey:p.instrument_key,tradingSymbol:p.trading_symbol,exchange:p.exchange,expiry:p.expiry,product:p.product,netQuantity:p.net_quantity,averagePricePaise:p.average_price_paise,marketPricePaise:q.pricePaise,unrealizedPnlPaise:pnl,marginReservedPaise:p.reserved_margin_paise,quoteAgeMs:q.quoteAgeMs,valuationStatus:"fresh"};
     });
-    res.set("Cache-Control","private, no-store").json({positions:valued,cashPaise:account.cash_paise,marketValuePaise:0,unrealizedPnlPaise,reservedMarginPaise:account.reserved_margin_paise||0,realizedPnlPaise:account.realized_pnl_paise||0,equityPaise:account.cash_paise+unrealizedPnlPaise,valuationStatus:stalePositions?"partial_stale":"fresh",stalePositions,marginStatus:"entry_estimate",simulationOnly:true});
+    res.set("Cache-Control","private, no-store").json({positions:valued,cashPaise:account.cash_paise,marketValuePaise:0,unrealizedPnlPaise:stalePositions?null:unrealizedPnlPaise,reservedMarginPaise:account.reserved_margin_paise||0,realizedPnlPaise:account.realized_pnl_paise||0,equityPaise:stalePositions?null:account.cash_paise+unrealizedPnlPaise,valuationStatus:stalePositions?"partial_stale":"fresh",stalePositions,marginStatus:"entry_estimate",simulationOnly:true});
   }catch(error){sendError(res,error,"Futures portfolio could not be loaded.");}
 });
 
