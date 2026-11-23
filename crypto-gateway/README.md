@@ -24,3 +24,6 @@ This service is deliberately separate from `market-gateway`. It exposes only Cry
 3. Configure CORS and secrets in the isolated gateway host.
 4. Exercise auth, market/limit buy/sell, idempotency, cancellation, reservation and worker recovery.
 5. Obtain explicit approval before production migration or deployment.
+
+## Current CI result
+The Crypto-only CI run completed successfully on 2026-11-23. It applied the four draft Crypto migrations to a disposable PostgreSQL 16 instance, verified the full-quantity LIMIT SELL reservation release, parsed the frontend modules, and ran the standalone gateway input tests. This is not a staging Supabase integration test and does not authorize deployment.
