@@ -37,6 +37,18 @@ BEGIN
       v_cash,v_basis,v_qty,v_order.gross_paise,v_order.charges_paise,v_order.cash_delta_paise,
       v_order.charges_breakdown,v_result;
   END IF;
+  -- The atomic integration draft must persist one fill and one matching trade-ledger event.
+  IF (SELECT count(*) FROM public.paper_equity_fills
+       WHERE order_id=repeat('a',64) AND execution_id='equity-order:'||repeat('a',64))<>1
+     OR (SELECT count(*) FROM public.paper_equity_cash_ledger
+          WHERE order_id=repeat('a',64) AND event_type='TRADE_DEBIT')<>1
+     OR (SELECT cash_delta_paise FROM public.paper_equity_cash_ledger
+          WHERE order_id=repeat('a',64) AND event_type='TRADE_DEBIT')<>-102479
+     OR (SELECT cash_after_paise FROM public.paper_equity_cash_ledger
+          WHERE order_id=repeat('a',64) AND event_type='TRADE_DEBIT')<>99897521 THEN
+    RAISE EXCEPTION 'MARKET BUY fill/cash-ledger rows do not reconcile to final account cash';
+  END IF;
+
   -- Same idempotency key returns the stored charge snapshot without another debit.
   v_result:=public.execute_paper_market_order(
     '55555555-5555-4555-8555-555555555555',repeat('a',64),
@@ -49,6 +61,11 @@ BEGIN
   IF (v_result->>'idempotent_replay')::boolean IS NOT TRUE
      OR (v_result->>'charges_paise')::bigint<>2479 OR v_cash<>99897521 THEN
     RAISE EXCEPTION 'Delivery BUY replay did not preserve the exact fee snapshot';
+  END IF;
+  IF (SELECT count(*) FROM public.paper_equity_fills WHERE order_id=repeat('a',64))<>1
+     OR (SELECT count(*) FROM public.paper_equity_cash_ledger
+          WHERE order_id=repeat('a',64) AND event_type='TRADE_DEBIT')<>1 THEN
+    RAISE EXCEPTION 'MARKET BUY idempotent replay duplicated fill or trade ledger rows';
   END IF;
 
   -- Delivery SELL: STT and DP reduce proceeds; realized P&L is net of both legs' costs.
