@@ -690,22 +690,18 @@ app.post("/paper/futures/orders",async(req,res)=>{
     const {token}=await getUpstoxAccessToken(user.id),{quote}=await getQuote(token,instrumentKey);
     const normalized=normalizeProviderQuote(quote,instrumentKey,{maxAgeMs:15000});
     const contract=validateDerivativeContract(instrument,{lots,pricePaise:normalized.pricePaise,now:Date.now()});
-    const {data:position,error:positionError}=await userDb.from("paper_futures_positions").select("net_quantity,product").eq("user_id",user.id).eq("instrument_key",instrumentKey).maybeSingle();
-    if(positionError)throw Object.assign(new Error("Current futures position could not be read."),{status:503});
-    if(position&&position.product!==product)return res.status(409).json({error:"Close the existing futures position before switching between Intraday and Delivery."});
-    const oldQuantity=position?.net_quantity||0;
-    const opensSameDirection=oldQuantity===0||(oldQuantity>0&&side==="BUY")||(oldQuantity<0&&side==="SELL");
-    const openingQuantity=opensSameDirection?contract.quantity:Math.max(0,contract.quantity-Math.abs(oldQuantity));
-    let openingMarginPaise=0;
-    if(openingQuantity>0){
-      const marginResponse=await fetchProvider("https://api.upstox.com/v2/charges/margin",{
-        method:"POST",headers:{Authorization:"Bearer "+token,Accept:"application/json","Content-Type":"application/json"},
-        body:JSON.stringify({instruments:[{instrument_key:instrumentKey,quantity:openingQuantity,product:product==="INTRADAY"?"I":"D",transaction_type:side,price:normalized.pricePaise/100}]})
-      });
-      const marginPayload=await readProviderJson(marginResponse);
-      if(!marginResponse.ok)return res.status(502).json({error:"Upstox futures margin requirement could not be verified."});
-      openingMarginPaise=normalizeUpstoxMarginResponse(marginPayload,instrumentKey).requiredMarginPaise;
-    }
+    // Margin is requested for the full submitted quantity. The database account lock
+    // serializes concurrent fills, but a position read here would become stale before
+    // the transaction and could under-reserve margin on a concurrent reversal.
+    // The SQL ledger applies this conservative full-order estimate only to the
+    // quantity that actually opens/increases exposure; close-only orders ignore it.
+    const marginResponse=await fetchProvider("https://api.upstox.com/v2/charges/margin",{
+      method:"POST",headers:{Authorization:"Bearer "+token,Accept:"application/json","Content-Type":"application/json"},
+      body:JSON.stringify({instruments:[{instrument_key:instrumentKey,quantity:contract.quantity,product:product==="INTRADAY"?"I":"D",transaction_type:side,price:normalized.pricePaise/100}]})
+    });
+    const marginPayload=await readProviderJson(marginResponse);
+    if(!marginResponse.ok)return res.status(502).json({error:"Upstox futures margin requirement could not be verified."});
+    const openingMarginPaise=normalizeUpstoxMarginResponse(marginPayload,instrumentKey).requiredMarginPaise;
     const {calculateFuturesTradeCharges}=require("./lib/trading-charges");
     const charges=calculateFuturesTradeCharges({grossPaise:contract.contractValuePaise,exchange:instrument.exchange,side});
     const now=Date.now();
@@ -723,7 +719,7 @@ app.post("/paper/futures/orders",async(req,res)=>{
       instrumentKey,exchange:instrument.exchange,expiry:contract.expiry,side,product,orderType:"MARKET",
       lots,lotSize:contract.lotSize,quantity:contract.quantity,executionPricePaise:normalized.pricePaise,
       grossPaise:contract.contractValuePaise,chargesPaise:charges.totalChargesPaise,charges,
-      openingMarginPaise:openingMarginPaise,cashPaise:result?.cash_paise??null,
+      openingMarginPaise:openingMarginPaise,marginEstimateScope:"full_submitted_quantity_conservative_on_reversal",cashPaise:result?.cash_paise??null,
       reservedMarginPaise:result?.reserved_margin_paise??null,
       realizedPnlPaise:result?.order_realized_pnl_paise??0,
       quoteAgeMs:normalized.quoteAgeMs,idempotentReplay:result?.idempotent_replay===true,simulationOnly:true
