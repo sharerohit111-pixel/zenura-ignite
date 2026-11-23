@@ -75,3 +75,10 @@ A source-level review of the current MARKET transaction functions confirms the a
 The generic lock-order sentence in the original checklist (account → position/reservation → order) must therefore not be implemented literally. Any future F&O LIMIT submit/fill/cancel/expiry RPC must preserve the established account → order → position sequence, including idempotent replay paths, or document and prove a safe global transition before changing all writers together. In particular, do not add a worker that locks position then order while existing MARKET RPCs lock order then position.
 
 This review remains design-only. No runtime, schema, API, worker, or production data was changed. The F&O LIMIT release gates remain closed.
+
+
+## Follow-up implementation review — worker lease isolation (2026-11-23)
+
+The existing Supabase lease RPC currently allowlists only `paper_limit_orders` and `paper_protective_orders`. It does not expose a derivative-specific lease namespace. F&O LIMIT must therefore receive its own dedicated lease state key (for example, `paper_derivative_limit_orders`) and a narrowly scoped forward-only migration/RPC allowlist update after the derivative worker is implemented and tested. Do not reuse the equity LIMIT or protective-order cursor/lease: doing so would couple independent worker batches and create ambiguous ownership/recovery behavior.
+
+The lease is not a substitute for order-level atomicity. The fill/cancel/expiry RPCs must revalidate order state and quote freshness under the established account → order → position lock sequence, even when a worker holds the lease. This remains a design finding only; no lease schema, worker, or runtime was changed.
