@@ -4,7 +4,7 @@ process.env.SUPABASE_PUBLISHABLE_KEY="test-publishable-key";
 process.env.SUPABASE_SERVICE_ROLE_KEY="test-service-role-key";
 const test=require("node:test");
 const assert=require("node:assert/strict");
-const {validateOrderInput,validateRiskPlanInput,makeOrderId,runLimitWorker,createRateLimiter,isUuid}=require("../server");
+const {validateOrderInput,validateRiskPlanInput,isFreshCryptoQuote,getRiskPlanTrigger,makeOrderId,runLimitWorker,createRateLimiter,isUuid}=require("../server");
 test("accepts supported market order and canonicalizes symbol",()=>{
  const v=validateOrderInput({symbol:"btcusdt",side:"buy",quantity:"0.001",idempotency_key:"123e4567-e89b-42d3-a456-426614174000"});
  assert.equal(v.symbol,"BTCUSDT"); assert.equal(v.side,"BUY"); assert.equal(v.quantityRaw,"0.001");
@@ -25,6 +25,25 @@ test("derives deterministic user-scoped UUID order IDs",()=>{
  assert.equal(a,b); assert.notEqual(a,c); assert.match(a,/^[0-9a-f-]{36}$/);
 });
 
+test("accepts only fresh, positive Binance Crypto trade quotes",()=>{
+ const now=1700000000000;
+ assert.equal(isFreshCryptoQuote({priceUsdt:100,tradeTimeMs:now},now),true);
+ assert.equal(isFreshCryptoQuote({priceUsdt:100,tradeTimeMs:now-15000},now),true);
+ assert.equal(isFreshCryptoQuote({priceUsdt:100,tradeTimeMs:now-15001},now),false);
+ assert.equal(isFreshCryptoQuote({priceUsdt:100,tradeTimeMs:now+2001},now),false);
+ assert.equal(isFreshCryptoQuote({priceUsdt:0,tradeTimeMs:now},now),false);
+ assert.equal(isFreshCryptoQuote({priceUsdt:100,tradeTimeMs:1.5},now),false);
+});
+test("evaluates SL and Target triggers without firing the opposite threshold",()=>{
+ const plan={stop_loss_price:"90",take_profit_price:"120"};
+ assert.equal(getRiskPlanTrigger(plan,89),"STOP_LOSS");
+ assert.equal(getRiskPlanTrigger(plan,90),"STOP_LOSS");
+ assert.equal(getRiskPlanTrigger(plan,119),null);
+ assert.equal(getRiskPlanTrigger(plan,120),"TAKE_PROFIT");
+ assert.equal(getRiskPlanTrigger({stop_loss_price:null,take_profit_price:"120"},90),null);
+ assert.equal(getRiskPlanTrigger({stop_loss_price:"90",take_profit_price:null},120),null);
+ assert.equal(getRiskPlanTrigger(plan,0),null);
+});
 test("bounds combined Crypto LIMIT and SL/Target worker batches to protect the shared lease",async()=>{ await assert.rejects(runLimitWorker({maxOrders:6}),/between 1 and 5/); });
 
 test("rate limiter bounds order requests and returns a retry window",()=>{
