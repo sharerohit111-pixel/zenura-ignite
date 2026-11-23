@@ -80,7 +80,7 @@ BEGIN
   -- ID is rejected and cannot debit charges or create another fill.
   v_now:=floor(extract(epoch from clock_timestamp())*1000)::bigint;
   v_result:=public.execute_paper_futures_limit_fill(
-    repeat('a',64),'UPSTOX-EXEC-001',1,10,9900,100,v_first_quote,v_now
+    repeat('a',64),'UPSTOX-EXEC-001',1,10,9900,9895,9900,100,10,100,v_first_quote,v_now
   );
   IF (v_result->>'idempotent_replay')::boolean IS NOT TRUE THEN
     RAISE EXCEPTION 'Exact Futures LIMIT fill replay was not idempotent';
