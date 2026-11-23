@@ -2,8 +2,8 @@
 
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const {isUsableUpstoxOAuthCallback} = require("../lib/upstox-oauth-callback-input");
-const {isUsableUpstoxTokenResponse} = require("../lib/upstox-token-response");
+const {isUsableUpstoxOAuthCallback} = require("../../functions/lib/upstox-oauth-callback-input");
+const {isUsableUpstoxTokenResponse} = require("../../functions/lib/upstox-token-response");
 
 test("accepts an opaque authorization code with a cryptographically sized hex state", () => {
   assert.equal(isUsableUpstoxOAuthCallback("opaque-provider-code", "a".repeat(64)), true);
