@@ -676,7 +676,7 @@ app.get("/paper/derivative/limit-orders",async(req,res)=>{
       orders:orders.map(o=>({
         id:o.order_id,tradingSymbol:o.trading_symbol,instrumentKey:o.instrument_key,
         instrumentType:o.instrument_type,expiry:o.expiry,strikePrice:o.strike_price,
-        side:o.side,quantity:o.quantity,filledQuantity:o.filled_quantity,
+        side:o.side,quantity:o.quantity,lotSize:o.lot_size,filledQuantity:o.filled_quantity,
         remainingQuantity:o.remaining_quantity,limitPricePaise:o.limit_price_paise,
         averageFillPricePaise:o.average_fill_price_paise,
         reservedCashPaise:o.reserved_cash_paise,reservedCloseQuantity:o.reserved_close_quantity,
