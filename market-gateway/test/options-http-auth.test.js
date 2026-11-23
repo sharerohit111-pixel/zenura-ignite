@@ -13,8 +13,11 @@ process.env.UPSTOX_TOKEN_ENCRYPTION_KEY="test-key-not-used-by-decrypt-stub";
 const TEST_USER_ID="11111111-2222-4333-8444-555555555555";
 let authenticated=false;
 let optionsLimitTestNowMs=null;
+let optionLimitPriorOrder=null;
+let optionLimitQueryFilters=[];
 const rpcCalls=[],userQueries=[];
 const TEST_INSTRUMENT_KEY="NSE_FO|NIFTY26NOV25000CE";
+const {makeOrderFingerprint}=require("../lib/order-idempotency");
 const TEST_INSTRUMENT={instrument_key:TEST_INSTRUMENT_KEY,trading_symbol:"NIFTY26NOV25000CE",exchange:"NSE",segment:"NSE_FO",instrument_type:"CE",expiry:"2026-11-26",strike_price:25000,lot_size:65,tick_size:5};
 const instrumentModule=require.resolve("../lib/instrument-master-download");
 require.cache[instrumentModule]={id:instrumentModule,filename:instrumentModule,loaded:true,exports:{downloadInstrumentMaster:async()=>[TEST_INSTRUMENT]}};
@@ -30,9 +33,10 @@ require.cache[supabaseModule]={
     from(table){
       userQueries.push({table,key});
       const query={
-        select(){return this;},eq(){return this;},order(){return this;},in(){return this;},
+        select(){return this;},eq(column,value){if(table==="paper_option_limit_orders")optionLimitQueryFilters.push({column,value});return this;},order(){return this;},in(){return this;},
         limit(){return Promise.resolve({data:[],error:null});},
         maybeSingle(){
+          if(table==="paper_option_limit_orders")return Promise.resolve({data:optionLimitPriorOrder,error:null});
           if(table==="upstox_connections")return Promise.resolve({data:{
             status:"connected",
             token_expires_at:new Date(Date.now()+60_000).toISOString(),
@@ -229,11 +233,12 @@ test("authenticated NSE Options MARKET SELL-to-close submits with fresh bid and 
   }
 });
 
-async function submitAuthenticatedOptionsLimit(side,idempotencyKey){
+async function submitAuthenticatedOptionsLimit(side,idempotencyKey,{priorOrder=null,bodyOverrides={}}={}){
   authenticated=true;
   process.env.PAPER_OPTIONS_LIMIT_ENABLED="true";
   process.env.PAPER_OPTIONS_LIMIT_WORKER_ENABLED="true";
   paperOptionLimitWorkerStatus.enabled=true;
+  optionLimitPriorOrder=priorOrder;optionLimitQueryFilters=[];
   const fixedNow=Date.parse("2026-11-23T05:30:00.000Z"); // 11:00 IST, inside verified NSE session.
   const originalNow=Date.now,originalFetch=global.fetch;
   Date.now=()=>fixedNow;
@@ -253,11 +258,12 @@ async function submitAuthenticatedOptionsLimit(side,idempotencyKey){
   try{
     return await withServer(async base=>request(base,"/paper/derivative/limit-orders",{
       method:"POST",headers:{Authorization:"Bearer valid-options-test-token"},
-      body:{instrument_key:TEST_INSTRUMENT_KEY,side,lots:1,limit_price_paise:1240,idempotency_key:idempotencyKey}
+      body:{instrument_key:TEST_INSTRUMENT_KEY,side,lots:1,limit_price_paise:1240,idempotency_key:idempotencyKey,...bodyOverrides}
     }));
   }finally{
     global.fetch=originalFetch;Date.now=originalNow;authenticated=false;
     paperOptionLimitWorkerStatus.enabled=false;
+    optionLimitPriorOrder=null;
     delete process.env.PAPER_OPTIONS_LIMIT_ENABLED;
     delete process.env.PAPER_OPTIONS_LIMIT_WORKER_ENABLED;
   }
@@ -294,5 +300,57 @@ test("authenticated NSE Options LIMIT SELL reserves only existing unreserved lon
   assert.equal(rpcCalls[0].args.p_quantity,65);
   assert.equal(rpcCalls[0].key,"test-service-role-key");
   assert.ok(userQueries.some(q=>q.table==="paper_derivative_positions"&&q.key==="test-publishable-key"));
+});
+
+function priorOptionsLimitOrder({idempotencyKey,side="BUY",limitPricePaise=1240,lots=1}={}){
+  return {
+    order_id:require("../lib/order-idempotency").makeOrderId(TEST_USER_ID,idempotencyKey),
+    idempotency_key:idempotencyKey,
+    request_fingerprint:makeOrderFingerprint({
+      instrumentKey:TEST_INSTRUMENT_KEY,side,quantity:lots,orderType:"LIMIT",limitPricePaise
+    }),
+    trading_symbol:"NIFTY26NOV25000CE",instrument_key:TEST_INSTRUMENT_KEY,
+    side,quantity:65,filled_quantity:0,remaining_quantity:65,
+    limit_price_paise:limitPricePaise,reserved_cash_paise:80600,
+    reserved_close_quantity:side==="SELL"?65:0,status:"PENDING"
+  };
+}
+
+test("identical authenticated NSE Options LIMIT retry replays stored order before market/session dependencies",async()=>{
+  const key="00000000-0000-4000-8000-000000000022";
+  const prior=priorOptionsLimitOrder({idempotencyKey:key});
+  const result=await submitAuthenticatedOptionsLimit("BUY",key,{priorOrder:prior});
+  assert.equal(result.status,200,JSON.stringify(result.body));
+  assert.equal(result.body.orderId,prior.order_id);
+  assert.equal(result.body.idempotentReplay,true);
+  assert.equal(result.body.status,"PENDING");
+  assert.equal(result.body.quantity,65);
+  assert.equal(rpcCalls.length,0,"identical replay must not call submit RPC again");
+  assert.ok(optionLimitQueryFilters.some(x=>x.column==="user_id"&&x.value===TEST_USER_ID));
+  assert.ok(optionLimitQueryFilters.some(x=>x.column==="idempotency_key"&&x.value===key));
+  assert.ok(!userQueries.some(q=>["paper_accounts","paper_derivative_positions","upstox_connections","paper_exchange_sessions"].includes(q.table)),
+    "identical replay must return before account, position, token, quote or session reads");
+});
+
+test("reused authenticated NSE Options LIMIT idempotency key with changed price is rejected",async()=>{
+  const key="00000000-0000-4000-8000-000000000023";
+  const prior=priorOptionsLimitOrder({idempotencyKey:key,side:"BUY",limitPricePaise:1240});
+  const result=await submitAuthenticatedOptionsLimit("BUY",key,{
+    priorOrder:prior,bodyOverrides:{limit_price_paise:1250}
+  });
+  assert.equal(result.status,409,JSON.stringify(result.body));
+  assert.match(result.body.error,/idempotency key was reused with different order details/i);
+  assert.equal(rpcCalls.length,0,"conflicting replay must not call submit RPC");
+  assert.ok(!userQueries.some(q=>["paper_accounts","upstox_connections","paper_exchange_sessions"].includes(q.table)),
+    "conflicting replay must stop before market/session/account dependencies");
+});
+
+test("reused authenticated NSE Options LIMIT idempotency key with changed side is rejected",async()=>{
+  const key="00000000-0000-4000-8000-000000000024";
+  const prior=priorOptionsLimitOrder({idempotencyKey:key,side:"BUY",limitPricePaise:1240});
+  const result=await submitAuthenticatedOptionsLimit("SELL",key,{priorOrder:prior});
+  assert.equal(result.status,409,JSON.stringify(result.body));
+  assert.match(result.body.error,/idempotency key was reused with different order details/i);
+  assert.equal(rpcCalls.length,0);
 });
 
