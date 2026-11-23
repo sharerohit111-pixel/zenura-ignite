@@ -271,5 +271,15 @@ async function start() {
   const shutdown=()=>{if(workerTimer)clearInterval(workerTimer);server.close(()=>process.exit(0));};
   process.on("SIGTERM",shutdown);process.on("SIGINT",shutdown);
 }
+// Normalize body-parser failures so malformed or oversized requests never leak Express HTML errors.
+app.use((error, _req, res, next) => {
+  if (res.headersSent) return next(error);
+  const tooLarge = error?.type === "entity.too.large";
+  const malformed = error instanceof SyntaxError && Object.prototype.hasOwnProperty.call(error, "body");
+  const status = tooLarge ? 413 : malformed ? 400 : 500;
+  const message = tooLarge ? "Request body is too large." : malformed ? "Request body must contain valid JSON." : "Request could not be processed.";
+  res.set("Cache-Control", "no-store").status(status).json({ error: message });
+});
+
 if(require.main===module) start().catch(error=>{console.error("Crypto gateway startup failed:",error.message);process.exit(1);});
 module.exports={app,runLimitWorker,validateOrderInput,makeOrderId};
