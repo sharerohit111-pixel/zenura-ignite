@@ -4,7 +4,7 @@ process.env.SUPABASE_PUBLISHABLE_KEY="test-publishable-key";
 process.env.SUPABASE_SERVICE_ROLE_KEY="test-service-role-key";
 const test=require("node:test");
 const assert=require("node:assert/strict");
-const {validateOrderInput,validateRiskPlanInput,isFreshCryptoQuote,getRiskPlanTrigger,makeOrderId,runLimitWorker,releaseWorkerLeaseSafely,createRateLimiter,isUuid}=require("../server");
+const {validateOrderInput,validateRiskPlanInput,isFreshCryptoQuote,getRiskPlanTrigger,makeOrderId,runLimitWorker,releaseWorkerLeaseSafely,rotateRiskPlanSafely,createRateLimiter,isUuid}=require("../server");
 test("accepts supported market order and canonicalizes symbol",()=>{
  const v=validateOrderInput({symbol:"btcusdt",side:"buy",quantity:"0.001",idempotency_key:"123e4567-e89b-42d3-a456-426614174000"});
  assert.equal(v.symbol,"BTCUSDT"); assert.equal(v.side,"BUY"); assert.equal(v.quantityRaw,"0.001");
@@ -50,6 +50,23 @@ test("bounds combined Crypto LIMIT and SL/Target worker batches to protect the s
  }
 });
 
+test("risk plan rotation helper succeeds without logging",async()=>{
+ const logs=[];
+ assert.equal(await rotateRiskPlanSafely(async()=>({error:null}),message=>logs.push(message)),true);
+ assert.deepEqual(logs,[]);
+});
+test("risk plan rotation helper contains returned database errors",async()=>{
+ const logs=[];
+ assert.equal(await rotateRiskPlanSafely(async()=>({error:new Error("db unavailable")}),message=>logs.push(message)),false);
+ assert.equal(logs.length,1);
+ assert.match(logs[0],/rotation failed/);
+});
+test("risk plan rotation helper contains network exceptions",async()=>{
+ const logs=[];
+ assert.equal(await rotateRiskPlanSafely(async()=>{throw new Error("socket closed");},message=>logs.push(message)),false);
+ assert.equal(logs.length,1);
+ assert.match(logs[0],/remains eligible/);
+});
 test("worker lease release helper is quiet on success",async()=>{
  const logs=[];
  await releaseWorkerLeaseSafely(async()=>({data:true,error:null}),message=>logs.push(message));
