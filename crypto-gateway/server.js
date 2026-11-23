@@ -83,6 +83,25 @@ function validateOrderInput(body, limit = false) {
   if (limit && (!/^(?:0|[1-9]\d*)(?:\.\d{1,8})?$/.test(priceRaw) || !Number.isFinite(Number(priceRaw)) || Number(priceRaw) <= 0 || Number(priceRaw) > MAX_QUANTITY)) throw httpError("Enter a valid LIMIT price with up to 8 decimal places.", 400);
   return { symbol, side, quantityRaw, priceRaw, key };
 }
+function validateRiskPlanInput(body) {
+  const symbol = typeof body?.symbol === "string" ? body.symbol.toUpperCase() : "";
+  const quantity = String(body?.quantity ?? "");
+  const stopLossPrice = body?.stop_loss_price == null || body.stop_loss_price === "" ? null : String(body.stop_loss_price);
+  const takeProfitPrice = body?.take_profit_price == null || body.take_profit_price === "" ? null : String(body.take_profit_price);
+  const key = String(body?.idempotency_key || "");
+  const validDecimal = (value, precision) => value === null || (
+    new RegExp("^(?:0|[1-9]\\\\d*)(?:\\\\.\\\\d{1,"+precision+"})?$").test(value)
+    && Number.isFinite(Number(value)) && Number(value) > 0 && Number(value) <= MAX_QUANTITY
+  );
+  if (!CRYPTO_SYMBOLS.has(symbol) || !validDecimal(quantity,12) || !isUuid(key)
+      || !validDecimal(stopLossPrice,8) || !validDecimal(takeProfitPrice,8)
+      || (stopLossPrice === null && takeProfitPrice === null)
+      || (stopLossPrice !== null && takeProfitPrice !== null && Number(stopLossPrice) >= Number(takeProfitPrice))) {
+    throw httpError("Enter a valid Crypto quantity, SL/Target prices and idempotency key.",400);
+  }
+  return {symbol,quantity,stopLossPrice,takeProfitPrice,key};
+}
+
 function makeOrderId(userId, key) {
   const hex = crypto.createHash("sha256").update(userId + ":" + key).digest("hex").slice(0,32).split("");
   hex[12] = "5"; hex[16] = ((parseInt(hex[16],16) & 3) | 8).toString(16);
@@ -239,18 +258,7 @@ app.get("/crypto/risk-plans", async(req,res) => {
 app.post("/crypto/risk-plans", cryptoOrderRateLimit, async(req,res) => {
   try {
     const { user } = await authenticate(req);
-    const symbol = typeof req.body?.symbol === "string" ? req.body.symbol.toUpperCase() : "";
-    const quantity = String(req.body?.quantity ?? "");
-    const slRaw = req.body?.stop_loss_price == null || req.body.stop_loss_price === "" ? null : String(req.body.stop_loss_price);
-    const tpRaw = req.body?.take_profit_price == null || req.body.take_profit_price === "" ? null : String(req.body.take_profit_price);
-    const key = String(req.body?.idempotency_key || "");
-    const validPrice = value => value === null || (/^(?:0|[1-9]\\d*)(?:\\.\\d{1,8})?$/.test(value) && Number.isFinite(Number(value)) && Number(value)>0 && Number(value)<=MAX_QUANTITY);
-    if (!CRYPTO_SYMBOLS.has(symbol) || !/^(?:0|[1-9]\\d*)(?:\\.\\d{1,12})?$/.test(quantity)
-        || !Number.isFinite(Number(quantity)) || Number(quantity)<=0 || Number(quantity)>MAX_QUANTITY
-        || !isUuid(key) || !validPrice(slRaw) || !validPrice(tpRaw) || (slRaw===null && tpRaw===null)
-        || (slRaw!==null && tpRaw!==null && Number(slRaw)>=Number(tpRaw))) {
-      throw httpError("Enter a valid Crypto quantity, SL/Target prices and idempotency key.",400);
-    }
+    const {symbol,quantity,stopLossPrice:slRaw,takeProfitPrice:tpRaw,key} = validateRiskPlanInput(req.body);
     const planId = makeOrderId(user.id,key);
     const result = await userRpc(user,"create_paper_crypto_risk_plan",{
       p_plan_id:planId,p_idempotency_key:key,p_symbol:symbol,p_base_asset:symbol.slice(0,-4),
@@ -414,4 +422,4 @@ app.use((error, _req, res, next) => {
 });
 
 if(require.main===module) start().catch(error=>{console.error("Crypto gateway startup failed:",error.message);process.exit(1);});
-module.exports={app,runLimitWorker,validateOrderInput,makeOrderId,createRateLimiter,isUuid};
+module.exports={app,runLimitWorker,validateOrderInput,validateRiskPlanInput,makeOrderId,createRateLimiter,isUuid};
