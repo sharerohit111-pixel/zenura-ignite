@@ -73,3 +73,10 @@ No production database migration has been applied and no gateway deployment has 
 - The existing Supabase project has no development branches and currently contains no `paper_crypto_*` tables. The four SQL migrations remain unapplied drafts. Do not apply them to production.
 - Previous mixed-branch CI claims are historical only; this clean branch requires its own Crypto-only PostgreSQL migration and API contract tests before staging approval.
 - Remaining implementation blocker: extract a standalone Crypto gateway with its own deployment/configuration boundary, then validate against an isolated Supabase staging database.
+
+
+## Regression fix and isolated checks — 2026-11-23
+- Added `20261123100000_s_trade_crypto_limit_full_exit_fix.sql`: a full-quantity LIMIT SELL now releases its own reserved quantity before deleting the position row, while the trigger continues to reject unrelated deletes with outstanding reservations.
+- Added `supabase/tests/crypto_limit_full_exit_reservation.sql` to verify fill status, final cash, realized P&L, position removal and both ledger entries.
+- Added `.github/workflows/crypto-paper-trading-checks.yml`, which applies only Crypto migrations to a disposable PostgreSQL 16 service and runs the Crypto-specific regression plus browser-module syntax/isolation checks. This workflow does not connect to the production Supabase project or deploy anything.
+- Static JavaScript parsing was checked for all three inline scripts and the three Crypto ES modules; all parsed successfully. PostgreSQL execution has not yet been run in this environment.
