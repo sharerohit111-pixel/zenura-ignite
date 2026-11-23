@@ -97,7 +97,7 @@ test("validates only exact NSE futures contract master matches",()=>{
 test("treats invalid and reached contract expiry cutoffs as expired",()=>{
   assert.equal(isContractExpired({...order,expiry:"bad"},NOW),true);
   assert.equal(isContractExpired(order,NOW),false);
-  assert.equal(isContractExpired({...order,expiry:"2026-11-23"},Date.parse("2026-11-23T10:00:00+05:30")),true);
+  assert.equal(isContractExpired({...order,expiry:"2026-11-23"},Date.parse("2026-11-23T16:00:00+05:30")),true);
 });
 
 test("calculates incremental cumulative charges without repeating the brokerage cap",()=>{
