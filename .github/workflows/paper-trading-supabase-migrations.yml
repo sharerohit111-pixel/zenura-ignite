@@ -181,6 +181,12 @@ jobs:
           done
       - name: Verify least-privilege Supabase market gateway service-role grants
         run: psql -v ON_ERROR_STOP=1 -f supabase/tests/market_gateway_service_role_grants.sql
+      - name: Reconcile Indian-market Futures ledger cash, charges, realized P&L and margin
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/futures_market_order_accounting.sql
+      - name: Reconcile Indian-market long Options ledger cash, charges and realized P&L
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/long_option_ledger_reconciliation.sql
+      - name: Verify long Options coexist with reserved Futures margin
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/option_buy_with_futures_margin.sql
       - name: Exercise BSE scrip master import and group-specific fee rules
         run: psql -v ON_ERROR_STOP=1 -f supabase/tests/bse_equity_fee_master.sql
       - name: Exercise verified NSE and BSE session calendar imports
