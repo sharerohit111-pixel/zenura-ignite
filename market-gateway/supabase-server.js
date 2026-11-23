@@ -18,10 +18,12 @@ const {isEligiblePaperLimitOrder,normalizeWorkerCursor,groupOrdersByUser}=requir
 const {createPaperProtectiveWorker}=require("./lib/paper-protective-worker");
 const {createPaperIntradayLimitWorker}=require("./lib/paper-intraday-limit-worker");
 const {createPaperFuturesLimitWorker,isVerifiedSessionOpen}=require("./lib/paper-futures-limit-worker");
+const {createPaperOptionLimitWorker}=require("./lib/paper-option-limit-worker");
 const {loadVerifiedExchangeSession}=require("./lib/exchange-session-calendar");
 const {buildPortfolioValuation}=require("./lib/paper-portfolio-valuation");
 const {calculateDerivativePortfolio}=require("./lib/derivative-portfolio");
 const {validateDerivativeContract,normalizeTickSizePaise}=require("./lib/derivative-contract");
+const {validateOptionLimitOrder,evaluateOptionLimitQuote}=require("./lib/option-limit-policy");
 const {parseMarginPreviewInput}=require("./lib/margin-preview-input");
 const {normalizeUpstoxMarginResponse}=require("./lib/upstox-margin");
 const {availablePaperCash}=require("./lib/available-paper-cash");
@@ -81,6 +83,7 @@ const paperLimitWorkerStatus={enabled:false,intervalMs:null,lastRunAt:null,lastC
 const paperProtectiveWorkerStatus={enabled:false,intervalMs:null,lastRunAt:null,lastCycle:null};
 const paperIntradayLimitWorkerStatus={enabled:false,intervalMs:null,lastRunAt:null,lastCycle:null};
 const paperFuturesLimitWorkerStatus={enabled:false,intervalMs:null,lastRunAt:null,lastCycle:null};
+const paperOptionLimitWorkerStatus={enabled:false,intervalMs:null,lastRunAt:null,lastCycle:null};
 const activeUserStreams=new Map();
 function fetchProvider(url,options={},timeoutMs=15000){return fetchProviderWithTimeout(fetch,url,options,timeoutMs);}
 function errorStatus(error){
@@ -146,7 +149,7 @@ app.get("/health",(_req,res)=>res.json({
   ok:true,service:"zenura-supabase-market-gateway",authProvider:"supabase",
   feedProtocol:"upstox-v3",instrumentMasterLoaded:instrumentCache.length>0,
   instrumentMasterUpdatedAt:instrumentCacheUpdatedAt||null,
-  limitWorker:{...paperLimitWorkerStatus},intradayLimitWorker:{...paperIntradayLimitWorkerStatus},futuresLimitSubmissionEnabled:process.env.PAPER_FUTURES_LIMIT_ENABLED==="true",futuresLimitWorker:{...paperFuturesLimitWorkerStatus},protectiveWorker:{...paperProtectiveWorkerStatus}
+  limitWorker:{...paperLimitWorkerStatus},intradayLimitWorker:{...paperIntradayLimitWorkerStatus},futuresLimitSubmissionEnabled:process.env.PAPER_FUTURES_LIMIT_ENABLED==="true",futuresLimitWorker:{...paperFuturesLimitWorkerStatus},optionsLimitSubmissionEnabled:process.env.PAPER_OPTIONS_LIMIT_ENABLED==="true",optionsLimitWorker:{...paperOptionLimitWorkerStatus},protectiveWorker:{...paperProtectiveWorkerStatus}
 }));
 
 app.get("/upstox/connection",async(req,res)=>{
@@ -555,6 +558,156 @@ app.post("/paper/derivative/margin-preview",async(req,res)=>{
     });
   }catch(error){sendError(res,error,"Futures margin preview could not be completed.");}
 });
+app.post("/paper/derivative/limit-orders",async(req,res)=>{
+  try{
+    const {user,userDb}=await auth(req);
+    if(process.env.PAPER_OPTIONS_LIMIT_ENABLED!=="true"
+       ||process.env.PAPER_OPTIONS_LIMIT_WORKER_ENABLED!=="true"
+       ||!paperOptionLimitWorkerStatus.enabled){
+      return res.status(503).json({error:"NSE Options LIMIT is not enabled on this gateway.",executionEnabled:false});
+    }
+    const instrumentKey=String(req.body?.instrument_key||"");
+    const lots=Number(req.body?.lots),side=String(req.body?.side||"").toUpperCase();
+    const idempotencyKey=String(req.body?.idempotency_key||"");
+    const limitPricePaise=Number(req.body?.limit_price_paise);
+    if(!isUuid(idempotencyKey))return res.status(400).json({error:"A valid UUID idempotency_key is required."});
+    if(!instrumentKey||instrumentKey.length>160||/[\r\n]/.test(instrumentKey))
+      return res.status(400).json({error:"A valid NSE option instrument_key is required."});
+    if(!["BUY","SELL"].includes(side))return res.status(400).json({error:"Options LIMIT side must be BUY or SELL."});
+    if(!Number.isSafeInteger(lots)||lots<1||lots>10000)
+      return res.status(400).json({error:"Lots must be a whole number between 1 and 10,000."});
+    if(!Number.isSafeInteger(limitPricePaise)||limitPricePaise<1)
+      return res.status(400).json({error:"LIMIT price must be a positive integer number of paise."});
+    const orderId=makeOrderId(user.id,idempotencyKey);
+    const fingerprint=makeOrderFingerprint({instrumentKey,side,lots,orderType:"LIMIT",limitPricePaise});
+    // Resolve an identical retry before checking today's session, quote or expiry.
+    // This lets users safely recover a response even after the order's session ends.
+    const {data:prior,error:priorError}=await userDb.from("paper_option_limit_orders")
+      .select("*").eq("user_id",user.id).eq("idempotency_key",idempotencyKey).maybeSingle();
+    if(priorError)throw Object.assign(new Error("Options LIMIT idempotency state could not be checked."),{status:503});
+    if(prior){
+      if(prior.order_id!==orderId||prior.request_fingerprint!==fingerprint)
+        return res.status(409).json({error:"Options LIMIT idempotency key was reused with different order details."});
+      return res.set("Cache-Control","private, no-store").json({
+        orderId:prior.order_id,tradingSymbol:prior.trading_symbol,instrumentKey:prior.instrument_key,
+        side:prior.side,quantity:prior.quantity,filledQuantity:prior.filled_quantity,
+        remainingQuantity:prior.remaining_quantity,limitPricePaise:prior.limit_price_paise,
+        reservedCashPaise:prior.reserved_cash_paise,reservedCloseQuantity:prior.reserved_close_quantity,
+        status:prior.status,idempotentReplay:true,simulationOnly:true
+      });
+    }
+    if(!instrumentCache.length||Date.now()-instrumentCacheUpdatedAt>6*60*60*1000)await refreshInstrumentCache();
+    const instrument=instrumentCache.find(x=>x.instrument_key===instrumentKey
+      &&x.exchange==="NSE"&&x.segment==="NSE_FO"&&["CE","PE"].includes(x.instrument_type));
+    if(!instrument)return res.status(400).json({error:"Select a verified NSE CE/PE contract from the official instrument master."});
+    const nowMs=Date.now();
+    const contract=validateDerivativeContract(instrument,{lots,pricePaise:limitPricePaise,now:nowMs});
+    const {data:account,error:accountError}=await userDb.from("paper_accounts")
+      .select("cash_paise,reserved_cash_paise,reserved_margin_paise")
+      .eq("user_id",user.id).maybeSingle();
+    if(accountError||!account)return res.status(409).json({error:"Initialize your Indian Paper Trading account first."});
+    let availableLongQuantity=0,reservedCloseQuantity=0;
+    if(side==="SELL"){
+      const {data:position,error:positionError}=await userDb.from("paper_derivative_positions")
+        .select("net_quantity,reserved_quantity").eq("user_id",user.id)
+        .eq("instrument_key",instrumentKey).maybeSingle();
+      if(positionError)throw Object.assign(new Error("Option position reservation could not be checked."),{status:503});
+      if(!position)return res.status(409).json({error:"SELL LIMIT can only close an existing long option position."});
+      availableLongQuantity=position.net_quantity;
+      reservedCloseQuantity=position.reserved_quantity||0;
+    }
+    const order=validateOptionLimitOrder({
+      instrument,side,lots,limitPricePaise,
+      availableCashPaise:availablePaperCash(account),
+      availableLongQuantity,reservedCloseQuantity,nowMs
+    });
+    const {token}=await getUpstoxAccessToken(user.id);
+    const {payload:quotePayload}=await getQuote(token,instrumentKey);
+    const quoteLimitPricePaise=side==="BUY"
+      ?Number.MAX_SAFE_INTEGER-(Number.MAX_SAFE_INTEGER%order.tickSizePaise)
+      :order.tickSizePaise;
+    const quoteSnapshot=evaluateOptionLimitQuote(quotePayload,instrument,{
+      side,limitPricePaise:quoteLimitPricePaise,remainingQuantity:1,
+      tickSizePaise:order.tickSizePaise
+    },{nowMs,maxAgeMs:15000});
+    if(!quoteSnapshot.eligible)
+      return res.status(409).json({error:"A fresh, valid NSE executable-depth quote is required to submit an Options LIMIT order."});
+    const session=await loadVerifiedExchangeSession(serviceDb,"NSE",nowMs);
+    if(!isVerifiedSessionOpen(nowMs,session))
+      return res.status(409).json({error:"A verified open NSE session is required to submit an Options LIMIT order."});
+    const sessionStartMs=Date.parse(session.sessionDate+"T00:00:00+05:30");
+    const expiresAt=new Date(sessionStartMs+session.closeMinute*60000).toISOString();
+    if(!Number.isFinite(Date.parse(expiresAt))||Date.parse(expiresAt)<=nowMs)
+      return res.status(409).json({error:"Verified NSE session close is invalid for this Options LIMIT order."});
+    const result=await runtime.callUserRpc(user,"submit_paper_option_limit_order",{
+      p_order_id:orderId,p_idempotency_key:idempotencyKey,p_request_fingerprint:fingerprint,
+      p_instrument_key:instrumentKey,p_trading_symbol:instrument.trading_symbol,
+      p_exchange:"NSE",p_segment:"NSE_FO",p_instrument_type:instrument.instrument_type,
+      p_expiry:order.expiry,p_strike_price:instrument.strike_price,
+      p_lot_size:order.lotSize,p_tick_size_paise:order.tickSizePaise,
+      p_side:side,p_quantity:order.quantity,p_limit_price_paise:limitPricePaise,
+      p_now_ms:nowMs,p_expires_at:expiresAt
+    });
+    res.set("Cache-Control","private, no-store").status(result?.idempotent_replay?200:201).json({
+      orderId:result?.order_id||orderId,tradingSymbol:instrument.trading_symbol,
+      instrumentKey,side,quantity:order.quantity,lots,limitPricePaise,
+      reservedCashPaise:result?.reserved_cash_paise??order.reservedCashPaise,
+      reservedCloseQuantity:result?.reserved_close_quantity??order.reservedCloseQuantity,
+      status:result?.status||"PENDING",idempotentReplay:result?.idempotent_replay===true,
+      simulationOnly:true
+    });
+  }catch(error){sendError(res,error,"NSE Options LIMIT order could not be submitted.");}
+});
+app.get("/paper/derivative/limit-orders",async(req,res)=>{
+  try{
+    const {user,userDb}=await auth(req),raw=String(req.query.limit??"50");
+    if(!/^\d+$/.test(raw)||Number(raw)<1)return res.status(400).json({error:"Options LIMIT history limit must be from 1 to 100."});
+    const {data,error}=await userDb.from("paper_option_limit_orders").select("*")
+      .eq("user_id",user.id).order("created_at",{ascending:false}).limit(Math.min(Number(raw),100));
+    if(error)throw Object.assign(new Error("Options LIMIT order history could not be loaded."),{status:503});
+    const orders=data||[],ids=orders.map(o=>o.order_id);
+    let fills=[];
+    if(ids.length){
+      const result=await userDb.from("paper_option_limit_fills").select("*").in("order_id",ids)
+        .order("created_at",{ascending:true}).order("fill_sequence",{ascending:true});
+      if(result.error)throw Object.assign(new Error("Options LIMIT fills could not be loaded."),{status:503});
+      fills=result.data||[];
+    }
+    res.set("Cache-Control","private, no-store").json({
+      orders:orders.map(o=>({
+        id:o.order_id,tradingSymbol:o.trading_symbol,instrumentKey:o.instrument_key,
+        instrumentType:o.instrument_type,expiry:o.expiry,strikePrice:o.strike_price,
+        side:o.side,quantity:o.quantity,lotSize:o.lot_size,filledQuantity:o.filled_quantity,
+        remainingQuantity:o.remaining_quantity,limitPricePaise:o.limit_price_paise,
+        averageFillPricePaise:o.average_fill_price_paise,
+        reservedCashPaise:o.reserved_cash_paise,reservedCloseQuantity:o.reserved_close_quantity,
+        cumulativeGrossPaise:o.cumulative_gross_paise,cumulativeChargesPaise:o.cumulative_charges_paise,
+        status:o.status,expiresAt:o.expires_at,createdAt:o.created_at
+      })),
+      fills:fills.map(f=>({
+        orderId:f.order_id,executionId:f.execution_id,fillSequence:f.fill_sequence,
+        quantity:f.fill_quantity,executionPricePaise:f.execution_price_paise,
+        grossPaise:f.gross_paise,chargesPaise:f.incremental_charges_paise,
+        realizedPnlPaise:f.realized_pnl_paise,quoteTimestampMs:f.quote_timestamp_ms
+      })),
+      simulationOnly:true,includesCharges:true
+    });
+  }catch(error){sendError(res,error,"NSE Options LIMIT history could not be loaded.");}
+});
+app.delete("/paper/derivative/limit-orders/:orderId",async(req,res)=>{
+  try{
+    const {user}=await auth(req),orderId=String(req.params.orderId||"");
+    if(!/^[a-f0-9]{64}$/.test(orderId))return res.status(400).json({error:"A valid Options LIMIT order ID is required."});
+    const result=await runtime.callUserRpc(user,"cancel_paper_option_limit_order",{p_order_id:orderId});
+    res.set("Cache-Control","private, no-store").json({
+      orderId:result?.order_id||orderId,status:result?.status||"CANCELLED",
+      releasedCashPaise:result?.released_cash_paise??0,
+      releasedCloseQuantity:result?.released_close_quantity??0,
+      idempotentReplay:result?.idempotent_replay===true,simulationOnly:true
+    });
+  }catch(error){sendError(res,error,"NSE Options LIMIT order could not be cancelled.");}
+});
+
 app.post("/paper/derivative/orders",async(req,res)=>{
   try{
     const {user,userDb}=await auth(req),instrumentKey=String(req.body?.instrument_key||"");
@@ -1080,6 +1233,15 @@ const runPaperFuturesLimitWorker=createPaperFuturesLimitWorker({
   getUpstoxAccessToken,fetchProvider,readProviderJson
 });
 
+const runPaperOptionLimitWorker=createPaperOptionLimitWorker({
+  serviceDb,
+  ensureInstrumentCache:async()=>{
+    if(!instrumentCache.length||Date.now()-instrumentCacheUpdatedAt>6*60*60*1000)await refreshInstrumentCache();
+    return instrumentCache;
+  },
+  getUpstoxAccessToken,fetchProvider,readProviderJson
+});
+
 async function start(){
   if(!ENC_KEY||!UPSTOX_CLIENT_ID||!UPSTOX_CLIENT_SECRET||!UPSTOX_REDIRECT_URI){
     throw new Error("Supabase gateway secrets and Upstox OAuth configuration are required.");
@@ -1176,6 +1338,38 @@ async function start(){
     workerTimer.unref?.();
     console.log("Paper Futures LIMIT worker enabled; interval",intervalMs,"ms");
   }
+  if(process.env.PAPER_OPTIONS_LIMIT_ENABLED==="true"
+     &&process.env.PAPER_OPTIONS_LIMIT_WORKER_ENABLED==="true"){
+    const intervalMs=Math.max(1000,Math.min(10000,Number(process.env.PAPER_OPTIONS_LIMIT_WORKER_INTERVAL_MS)||2000));
+    paperOptionLimitWorkerStatus.enabled=true;
+    paperOptionLimitWorkerStatus.intervalMs=intervalMs;
+    let workerBusy=false,nextWorkerRunAt=0,backoffMs=intervalMs;
+    const runWorker=async()=>{
+      if(workerBusy||Date.now()<nextWorkerRunAt)return;
+      workerBusy=true;
+      try{
+        const result=await runPaperOptionLimitWorker({maxOrders:10});
+        paperOptionLimitWorkerStatus.lastRunAt=Date.now();
+        paperOptionLimitWorkerStatus.lastCycle={scanned:result.scanned,filled:result.filled,
+          partial:result.partial,notEligible:result.notEligible,failed:result.failed,
+          expired:result.expired,locked:result.locked,cycleError:false};
+        backoffMs=intervalMs;nextWorkerRunAt=Date.now()+intervalMs;
+        if(result.filled||result.partial||result.failed||result.expired)
+          console.log("Paper NSE Options LIMIT worker cycle",JSON.stringify(result));
+      }catch(error){
+        paperOptionLimitWorkerStatus.lastRunAt=Date.now();
+        paperOptionLimitWorkerStatus.lastCycle={scanned:0,filled:0,partial:0,
+          notEligible:0,failed:1,expired:0,locked:false,cycleError:true};
+        nextWorkerRunAt=Date.now()+backoffMs;
+        backoffMs=Math.min(60000,backoffMs*2);
+        console.error("Paper NSE Options LIMIT worker cycle failed:",error.message);
+      }finally{workerBusy=false;}
+    };
+    runWorker().catch(()=>{});
+    const workerTimer=setInterval(runWorker,intervalMs);
+    workerTimer.unref?.();
+    console.log("Paper NSE Options LIMIT worker enabled; interval",intervalMs,"ms");
+  }
   if(process.env.PAPER_LIMIT_WORKER_ENABLED==="true"){
     const intervalMs=Math.max(1000,Math.min(10000,Number(process.env.PAPER_LIMIT_WORKER_INTERVAL_MS)||2000));
     paperLimitWorkerStatus.enabled=true;
@@ -1205,4 +1399,4 @@ async function start(){
   }
 }
 if(require.main===module)start().catch(error=>{console.error("Supabase gateway startup failed:",error.message);process.exit(1);});
-module.exports={app,start,runPaperLimitWorker,runPaperIntradayLimitWorker,runPaperProtectiveWorker,runPaperFuturesLimitWorker};
+module.exports={app,start,runPaperLimitWorker,runPaperIntradayLimitWorker,runPaperProtectiveWorker,runPaperFuturesLimitWorker,runPaperOptionLimitWorker};

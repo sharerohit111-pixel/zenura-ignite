@@ -44,6 +44,10 @@ on:
       - "market-gateway/test/upstox-executable-quote.test.js"
       - "supabase/tests/**"
       - "supabase/tests/protective_order_cancel.sql"
+      - "market-gateway/lib/**"
+      - "market-gateway/test/**"
+      - "market-gateway/supabase-server.js"
+      - "supabase/**"
   push:
     branches:
       - integration/supabase-native-auth-professional-launch-2026-11-22
@@ -195,8 +199,16 @@ jobs:
         run: bash supabase/tests/futures_limit_fill_cancel_race.sh
       - name: Reconcile Indian-market long Options ledger cash, charges and realized P&L
         run: psql -v ON_ERROR_STOP=1 -f supabase/tests/long_option_ledger_reconciliation.sql
+      - name: Exercise atomic NSE Options LIMIT submit, cash/close reservation, cancel and expiry
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/options_limit_submit_release.sql
+      - name: Exercise atomic NSE Options LIMIT partial/full fill accounting and reservation settlement
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/options_limit_atomic_fill.sql
+      - name: Exercise concurrent NSE Options LIMIT fill, cancel and duplicate execution races
+        run: bash supabase/tests/options_limit_fill_cancel_race.sh
       - name: Verify F&O LIMIT schema remains fail-closed until lifecycle release
         run: psql -v ON_ERROR_STOP=1 -f supabase/tests/derivative_limit_schema_guard.sql
+      - name: Verify isolated NSE Options LIMIT schema, RLS and MARKET SELL reservation guard
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/options_limit_schema.sql
       - name: Verify long Options coexist with reserved Futures margin
         run: psql -v ON_ERROR_STOP=1 -f supabase/tests/option_buy_with_futures_margin.sql
       - name: Exercise BSE scrip master import and group-specific fee rules

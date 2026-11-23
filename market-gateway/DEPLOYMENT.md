@@ -82,6 +82,7 @@ The deployment uses:
 - `PAPER_LIMIT_WORKER_ENABLED=true` and `PAPER_LIMIT_WORKER_INTERVAL_MS=2000`.
 - `PAPER_INTRADAY_LIMIT_WORKER_ENABLED` remains unset/false by default. Do not enable it until the reviewed official NSE/BSE session calendar has been populated and verified in `paper_exchange_sessions`, the migration is approved/applied, and the live calendar/session smoke checks are complete. Optional interval: `PAPER_INTRADAY_LIMIT_WORKER_INTERVAL_MS`.
 - `PAPER_PROTECTIVE_WORKER_ENABLED` remains unset/false by default. Enable only after the protective-order UI, SQL migration checks, end-to-end tests, written market-data rights and compliance gates are complete. Optional interval: `PAPER_PROTECTIVE_WORKER_INTERVAL_MS`.
+- `PAPER_OPTIONS_LIMIT_ENABLED` and `PAPER_OPTIONS_LIMIT_WORKER_ENABLED` remain unset/false by default. Both must be explicitly true before the NSE long CE/PE Options LIMIT API or worker can run. Enable only after staging submit/fill/cancel/expiry, concurrent race, Upstox token-isolation, instrument/session, UI, written market-data rights and compliance checks are complete. Optional interval: `PAPER_OPTIONS_LIMIT_WORKER_INTERVAL_MS`. BSE Options LIMIT is not supported.
 
 Every instance may start the worker loop, but the Postgres lease ensures only one worker is the active writer. Worker errors and instrument-master refresh failures use bounded exponential backoff. The public `/health` response exposes only safe readiness data: instrument-master availability, worker liveness and cycle counts. A cycle-level worker fault is distinguished from an individual user's expired token or rejected order; per-user failures are counted without falsely declaring the whole service unhealthy. It never exposes credentials or user data.
 
@@ -103,10 +104,19 @@ These Auth settings are separate from the Cloud Run deployment workflow and must
 - Paper Trading equity MARKET orders are supported.
 - Equity LIMIT orders are currently supported for **Delivery** and are processed by the in-service worker.
 - Intraday LIMIT now has a separate SQL reservation/fill/cancel/expiry lifecycle, session-aware quote validation, a dedicated leased worker and gateway routing. It remains **disabled by default** until official verified calendar rows are loaded and reviewed; the deployment workflow does not enable it.
-- F&O LIMIT remains unsupported.
+- Futures LIMIT and NSE long CE/PE Options LIMIT have isolated draft backend/RPC/worker implementations and a gated Options LIMIT ticket UI under review; none is deployed or enabled in production. Options LIMIT is NSE-only and long-only; BSE Options LIMIT and short-option opening remain unsupported.
 - Futures and long CE/PE option market-order paths are separate transactional flows.
 - Paper Investing routes and its dedicated ledger have been retired under the Paper Trading-only product scope.
 - Equity SELL-to-close stop-loss/target execution has a separately leased, bounded, fresh-quote worker implementation and an owner-bound cancellation API. The worker is **opt-in and disabled by default**. Protective-order creation UI/API are now integrated in the isolated stock-terminal module, with authenticated create/list/cancel flows, per-user idempotent retry protection and a fail-closed worker-enabled gate. CI covers the module contract and backend fill/cancel row-lock race. A staging browser-to-gateway trigger/cancel rehearsal and production readiness checks remain incomplete; the worker stays opt-in and disabled by default. Do not claim always-on protective execution until those gates pass. Futures and Options protective exits remain unsupported.
+
+## NSE Options LIMIT API surface (draft, disabled by default)
+
+- `POST /paper/derivative/limit-orders`: authenticated NSE CE/PE long-only LIMIT submit; requires a verified session, fresh executable depth, official instrument metadata, and an idempotency key.
+- `GET /paper/derivative/limit-orders`: owner-scoped order and fill history.
+- `DELETE /paper/derivative/limit-orders/:orderId`: owner-bound cancel for pending/partially-filled orders.
+- The Options LIMIT ticket checks `/health` and remains disabled unless both `PAPER_OPTIONS_LIMIT_ENABLED=true` and `PAPER_OPTIONS_LIMIT_WORKER_ENABLED=true` are explicitly set. Both flags are unset/false in the current deployment.
+- The worker uses the user's own connected Upstox token, fresh NSE bid/ask depth and a dedicated Postgres lease. No live broker/exchange order is sent.
+- Enable only after staging browser-to-gateway submit/fill/cancel rehearsal, race tests, session/instrument validation, market-data rights approval and compliance sign-off.
 
 ## Manual build reference
 
@@ -126,7 +136,14 @@ Do not manually deploy around the market-data rights gate or the health checks.
 
 ## Internal service-role privilege preflight
 
-Before staging sign-off, verify the narrowly scoped `service_role` privileges required by direct server-side reads/updates: `SELECT` on `upstox_connections`, `paper_market_worker_state`, `paper_orders`, `paper_protective_orders` and `paper_equity_positions`, plus `UPDATE` on `paper_market_worker_state` and `paper_protective_orders`. Do not grant these privileges to `anon` or `authenticated`; keep internal tables inaccessible to client roles. The currently linked Supabase project lacks these service-role privileges, so OAuth lookup and worker runtime verification remain blocked until a corrective migration is rehearsed and verified in disposable staging. Never apply this fix directly to production as part of the draft PR.
+Before staging sign-off, verify the narrowly scoped `service_role` privileges required by direct server-side reads/updates: `SELECT` on `upstox_connections`, `paper_market_worker_state`, `paper_orders`, `paper_protective_orders` and `paper_equity_positions`, plus `UPDATE` on `paper_market_worker_state` and `paper_protective_orders`. Draft migration `20261123230000_market_gateway_service_role_read_grants.sql` now grants only these server-side privileges; CI Run #1105 applied the ordered draft migrations to disposable PostgreSQL and passed explicit least-privilege assertions. Do not grant these privileges to `anon` or `authenticated`; keep internal tables inaccessible to client roles. The linked Supabase project has not had this draft migration applied, so live OAuth lookup and worker runtime remain unverified until the migration is reviewed and rehearsed in a separate staging Supabase project. Never apply this fix directly to production as part of the draft PR.
+
+
+### Supabase Security Advisor: internal tables
+
+The Security Advisor may report informational `rls_enabled_no_policy` findings for internal service-only tables such as `paper_market_worker_state`, `paper_market_stream_leases`, `upstox_connections`, `upstox_connection_controls`, `upstox_oauth_states` and `paper_margin_preview_limits`. These tables intentionally have RLS enabled without browser-role policies because access is mediated by narrowly scoped server-side RPCs and/or the trusted gateway; do not add broad `anon` or `authenticated` policies merely to silence the informational lint.
+
+Preflight evidence from the currently linked production project confirms these six tables have no direct `anon` or `authenticated` SELECT/INSERT/UPDATE grants. The inspected internal RPCs are `SECURITY DEFINER`, owned by `postgres`, executable by `service_role`, and not executable by `anon` or `authenticated`. The separate direct gateway table grants remain intentionally limited to the tables listed above and must be rehearsed in staging before production rollout. Re-run the Security Advisor after staging migration and investigate any new ERROR/WARN findings rather than blanket-suppressing lints.
 
 ## Release safety
 
