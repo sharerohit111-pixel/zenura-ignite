@@ -211,4 +211,32 @@ BEGIN
   IF NOT v_rejected THEN RAISE EXCEPTION 'Null BSE exclusive flag was accepted'; END IF;
 END
 $bse_fee_master$;
+
+-- BSE MARKET fills must be captured just like NSE MARKET fills; later LIMIT
+-- executions remain outside this first ledger integration slice.
+DO $bse_market_ledger_checks$
+DECLARE
+  v_fills integer;
+  v_events integer;
+  v_fill_delta bigint;
+  v_event_delta bigint;
+BEGIN
+  SELECT count(*),coalesce(sum(cash_delta_paise),0)
+    INTO v_fills,v_fill_delta
+    FROM public.paper_equity_fills
+   WHERE user_id='66666666-6666-4666-8666-666666666666'
+     AND exchange='BSE' AND order_id IN (repeat('d',64),repeat('f',64));
+  SELECT count(*),coalesce(sum(cash_delta_paise),0)
+    INTO v_events,v_event_delta
+    FROM public.paper_equity_cash_ledger
+   WHERE user_id='66666666-6666-4666-8666-666666666666'
+     AND event_type IN ('TRADE_DEBIT','TRADE_CREDIT')
+     AND order_id IN (repeat('d',64),repeat('f',64));
+  IF v_fills<>2 OR v_events<>2 OR v_fill_delta<>1990984
+     OR v_event_delta<>v_fill_delta THEN
+    RAISE EXCEPTION 'BSE MARKET fill/cash ledger mismatch: fills %, events %, fill delta %, event delta %',
+      v_fills,v_events,v_fill_delta,v_event_delta;
+  END IF;
+END
+$bse_market_ledger_checks$;
 ROLLBACK;

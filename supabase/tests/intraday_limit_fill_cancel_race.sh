@@ -13,19 +13,18 @@ wait_for_terminal_update_lock() {
   exit 1
 }
 
-USER_ID="22222222-2222-4222-8222-222222222222"
-BUY_ORDER="$(printf 'a%.0s' {1..64})"
-SELL_ORDER="$(printf 'b%.0s' {1..64})"
+# Use a fresh isolated account on every run; immutable order/fill audit rows stay intact.
+USER_ID="$(cat /proc/sys/kernel/random/uuid)"
+BUY_ORDER="$(printf '%s' "intraday-buy-$USER_ID-$(date +%s%N)" | sha256sum | cut -d' ' -f1)"
+SELL_ORDER="$(printf '%s' "intraday-sell-$USER_ID-$(date +%s%N)" | sha256sum | cut -d' ' -f1)"
 SELL_EXEC_NOW=""
-BUY_IDEMPOTENCY="44444444-4444-4444-8444-444444444444"
-SELL_IDEMPOTENCY="55555555-5555-4555-8555-555555555555"
+BUY_IDEMPOTENCY="$(cat /proc/sys/kernel/random/uuid)"
+SELL_IDEMPOTENCY="$(cat /proc/sys/kernel/random/uuid)"
 
 psql -v ON_ERROR_STOP=1 <<SQL
-UPDATE public.paper_accounts
-   SET starting_cash_paise=100000000,cash_paise=100000000,
-       reserved_cash_paise=0,reserved_margin_paise=0,realized_pnl_paise=0,
-       delivery_realized_pnl_paise=0,intraday_realized_pnl_paise=0,version=1
- WHERE user_id='$USER_ID';
+INSERT INTO auth.users(id) VALUES ('$USER_ID') ON CONFLICT (id) DO NOTHING;
+INSERT INTO public.paper_accounts(user_id,cash_paise,reserved_cash_paise,reserved_margin_paise)
+VALUES ('$USER_ID',100000000,0,0);
 
 INSERT INTO public.paper_exchange_sessions(
   exchange,session_date,is_trading_day,open_minute,close_minute,
@@ -40,7 +39,6 @@ ON CONFLICT(exchange,session_date) DO UPDATE SET
   source_reference=excluded.source_reference,verified_at=excluded.verified_at,
   source_sha256=excluded.source_sha256;
 
-DELETE FROM public.paper_orders WHERE order_id IN ('$BUY_ORDER','$SELL_ORDER');
 DELETE FROM public.paper_equity_positions
  WHERE user_id='$USER_ID' AND product='INTRADAY'
    AND instrument_key IN ('NSE_EQ|INTRADAY_RACE_BUY','NSE_EQ|INTRADAY_RACE_SELL');
@@ -137,15 +135,6 @@ END
 
 DROP TRIGGER IF EXISTS test_delay_intraday_limit_terminal_update ON public.paper_orders;
 DROP FUNCTION IF EXISTS public.test_delay_intraday_limit_terminal_update();
-DELETE FROM public.paper_orders WHERE order_id IN ('$BUY_ORDER','$SELL_ORDER');
-DELETE FROM public.paper_equity_positions
- WHERE user_id='$USER_ID' AND product='INTRADAY'
-   AND instrument_key IN ('NSE_EQ|INTRADAY_RACE_BUY','NSE_EQ|INTRADAY_RACE_SELL');
+-- Keep the isolated test account, positions and immutable audit rows for auditability.
 DELETE FROM public.paper_exchange_sessions
  WHERE source_reference='CI Intraday LIMIT fill-cancel race fixture';
-UPDATE public.paper_accounts
-   SET starting_cash_paise=100000000,cash_paise=100000000,
-       reserved_cash_paise=0,reserved_margin_paise=0,realized_pnl_paise=0,
-       delivery_realized_pnl_paise=0,intraday_realized_pnl_paise=0,
-       version=version+1,updated_at=clock_timestamp()
- WHERE user_id='$USER_ID';

@@ -126,4 +126,42 @@ BEGIN
   END IF;
 END
 $equity_market_fee_checks$;
+
+-- Every successful MARKET execution has exactly one immutable fill and one
+-- cash event; idempotent replay above must not duplicate either record.
+DO $equity_market_ledger_checks$
+DECLARE
+  v_fill_count integer;
+  v_ledger_count integer;
+  v_fill_delta bigint;
+  v_ledger_delta bigint;
+  v_cash bigint;
+BEGIN
+  SELECT count(*),coalesce(sum(cash_delta_paise),0)
+    INTO v_fill_count,v_fill_delta
+    FROM public.paper_equity_fills
+   WHERE user_id='55555555-5555-4555-8555-555555555555';
+  SELECT count(*),coalesce(sum(cash_delta_paise),0)
+    INTO v_ledger_count,v_ledger_delta
+    FROM public.paper_equity_cash_ledger
+   WHERE user_id='55555555-5555-4555-8555-555555555555'
+     AND event_type IN ('TRADE_DEBIT','TRADE_CREDIT');
+  SELECT cash_paise INTO v_cash FROM public.paper_accounts
+   WHERE user_id='55555555-5555-4555-8555-555555555555';
+
+  IF v_fill_count<>4 OR v_ledger_count<>4
+     OR v_fill_delta<>-47533 OR v_ledger_delta<>v_fill_delta
+     OR v_cash<>100000000+v_ledger_delta
+     OR EXISTS (
+       SELECT 1 FROM public.paper_equity_fills f
+       LEFT JOIN public.paper_equity_cash_ledger l
+         ON l.fill_id=f.fill_id AND l.user_id=f.user_id
+       WHERE f.user_id='55555555-5555-4555-8555-555555555555'
+         AND (l.ledger_id IS NULL OR l.cash_delta_paise<>f.cash_delta_paise)
+     ) THEN
+    RAISE EXCEPTION 'MARKET fill/cash ledger conservation failed: fills %, ledger %, fill delta %, ledger delta %, cash %',
+      v_fill_count,v_ledger_count,v_fill_delta,v_ledger_delta,v_cash;
+  END IF;
+END
+$equity_market_ledger_checks$;
 ROLLBACK;
