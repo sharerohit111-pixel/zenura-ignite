@@ -18,6 +18,8 @@ test("rejects missing, oversized, control-character, and malformed callback para
     assert.equal(isUsableUpstoxOAuthCallback("provider-code", invalidState), false);
   }
   assert.equal(isUsableUpstoxOAuthCallback(["code", "injected"], state), false);
+  assert.equal(isUsableUpstoxOAuthCallback(["provider-code"], state), false);
+  assert.equal(isUsableUpstoxOAuthCallback("provider-code", [state]), false);
 });
 
 test("accepts a minimally valid Upstox access-token response", () => {
