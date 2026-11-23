@@ -27,14 +27,14 @@ DECLARE
 BEGIN
   -- Delivery BUY: reservation creation is recorded with the same account snapshot.
   v_result:=public.submit_paper_limit_order(
-    '88888888-8888-4888-8888-888888888888',repeat('a',64),
+    '88888888-8888-4888-8888-888888888888',repeat('s',64),
     'aaaaaaaa-8888-4888-8888-888888888888',repeat('b',64),
     'NSE_EQ|RESERVE_DELIVERY','RESERVE_DELIVERY','NSE','BUY',2,10000
   );
   SELECT cash_paise,reserved_cash_paise INTO v_cash,v_reserved
    FROM public.paper_accounts WHERE user_id='88888888-8888-4888-8888-888888888888';
   IF NOT EXISTS(SELECT 1 FROM public.paper_equity_cash_ledger
-     WHERE order_id=repeat('a',64) AND event_key='limit-reserve-create:'||repeat('a',64)
+     WHERE order_id=repeat('s',64) AND event_key='limit-reserve-create:'||repeat('s',64)
        AND event_type='RESERVATION_CREATE' AND cash_delta_paise=0
        AND reserved_cash_delta_paise>0
        AND cash_balance_after_paise=v_cash AND reserved_cash_after_paise=v_reserved) THEN
@@ -43,39 +43,39 @@ BEGIN
 
   -- Cancellation releases exactly the same reservation, once only.
   PERFORM public.cancel_paper_limit_order(
-    '88888888-8888-4888-8888-888888888888',repeat('a',64)
+    '88888888-8888-4888-8888-888888888888',repeat('s',64)
   );
   PERFORM public.cancel_paper_limit_order(
-    '88888888-8888-4888-8888-888888888888',repeat('a',64)
+    '88888888-8888-4888-8888-888888888888',repeat('s',64)
   );
   SELECT reserved_cash_paise INTO v_reserved FROM public.paper_accounts
    WHERE user_id='88888888-8888-4888-8888-888888888888';
   SELECT count(*) INTO v_count FROM public.paper_equity_cash_ledger
-   WHERE order_id=repeat('a',64) AND event_type='RESERVATION_RELEASE';
+   WHERE order_id=repeat('s',64) AND event_type='RESERVATION_RELEASE';
   IF v_reserved<>0 OR v_count<>1
      OR NOT EXISTS(SELECT 1 FROM public.paper_equity_cash_ledger
-       WHERE order_id=repeat('a',64) AND event_key='limit-reserve-release:'||repeat('a',64)
+       WHERE order_id=repeat('s',64) AND event_key='limit-reserve-release:'||repeat('s',64)
          AND reserved_cash_delta_paise<0 AND reserved_cash_after_paise=0) THEN
     RAISE EXCEPTION 'Delivery LIMIT BUY cancellation release missing, duplicated or inconsistent';
   END IF;
 
   -- Intraday BUY: session expiry must write the matching release event.
   PERFORM public.submit_paper_intraday_limit_order(
-    '88888888-8888-4888-8888-888888888888',repeat('c',64),
+    '88888888-8888-4888-8888-888888888888',repeat('t',64),
     'cccccccc-8888-4888-8888-888888888888',repeat('d',64),
     'NSE_EQ|RESERVE_INTRADAY','RESERVE_INTRADAY','NSE','BUY',1,10000
   );
   UPDATE public.paper_orders SET created_at=clock_timestamp()-interval '1 day'
-   WHERE order_id=repeat('c',64);
+   WHERE order_id=repeat('t',64);
   v_expired:=public.expire_paper_intraday_limit_orders(100);
   SELECT reserved_cash_paise INTO v_reserved FROM public.paper_accounts
    WHERE user_id='88888888-8888-4888-8888-888888888888';
   SELECT count(*) INTO v_count FROM public.paper_equity_cash_ledger
-   WHERE order_id=repeat('c',64) AND event_type='RESERVATION_RELEASE';
+   WHERE order_id=repeat('t',64) AND event_type='RESERVATION_RELEASE';
   IF v_expired<>1 OR v_reserved<>0 OR v_count<>1
      OR NOT EXISTS(SELECT 1 FROM public.paper_equity_cash_ledger
-       WHERE order_id=repeat('c',64)
-         AND event_key='intraday-limit-reserve-release:'||repeat('c',64)
+       WHERE order_id=repeat('t',64)
+         AND event_key='intraday-limit-reserve-release:'||repeat('t',64)
          AND event_type='RESERVATION_RELEASE' AND reserved_cash_delta_paise<0
          AND metadata->>'reason'='SESSION_EXPIRY') THEN
     RAISE EXCEPTION 'Intraday LIMIT expiry did not record exactly one cash reservation release';
