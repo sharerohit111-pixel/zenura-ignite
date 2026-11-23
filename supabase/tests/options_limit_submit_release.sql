@@ -96,6 +96,56 @@ BEGIN
     RAISE EXCEPTION 'Repeated Options LIMIT cancel was not idempotent';
   END IF;
 
+  -- Two independent BUY LIMIT orders on the same instrument must reserve
+  -- cash cumulatively; cancelling one must not release its sibling's reserve.
+  v_now:=floor(extract(epoch from clock_timestamp())*1000)::bigint;
+  PERFORM public.submit_paper_option_limit_order(
+    'abababab-abab-4bab-8bab-abababababab',repeat('8',64),
+    'abababab-0000-4000-8000-000000000018',repeat('8',64),
+    'NSE_FO|OPTION_LIMIT_BUY_MULTI','OPTION_LIMIT_BUY_MULTI','NSE','NSE_FO','PE',
+    current_date+5,25000,65,5,'BUY',65,1250,v_now,clock_timestamp()+interval '10 minutes'
+  );
+  v_now:=floor(extract(epoch from clock_timestamp())*1000)::bigint;
+  PERFORM public.submit_paper_option_limit_order(
+    'abababab-abab-4bab-8bab-abababababab',repeat('9',64),
+    'abababab-0000-4000-8000-000000000019',repeat('9',64),
+    'NSE_FO|OPTION_LIMIT_BUY_MULTI','OPTION_LIMIT_BUY_MULTI','NSE','NSE_FO','PE',
+    current_date+5,25000,65,5,'BUY',65,1250,v_now,clock_timestamp()+interval '10 minutes'
+  );
+  SELECT reserved_cash_paise INTO v_reserved_cash
+    FROM public.paper_accounts
+   WHERE user_id='abababab-abab-4bab-8bab-abababababab';
+  IF v_reserved_cash<>167292 THEN
+    RAISE EXCEPTION 'Two same-instrument Options BUY LIMIT orders did not reserve cash cumulatively: %',v_reserved_cash;
+  END IF;
+
+  v_result:=public.cancel_paper_option_limit_order(
+    'abababab-abab-4bab-8bab-abababababab',repeat('8',64)
+  );
+  SELECT reserved_cash_paise INTO v_reserved_cash
+    FROM public.paper_accounts
+   WHERE user_id='abababab-abab-4bab-8bab-abababababab';
+  SELECT status,reserved_cash_paise INTO v_status,v_reserved_cash
+    FROM public.paper_option_limit_orders WHERE order_id=repeat('9',64);
+  IF v_result->>'status'<>'CANCELLED'
+     OR (v_result->>'released_cash_paise')::bigint<>83646
+     OR v_status<>'PENDING' OR v_reserved_cash<>83646 THEN
+    RAISE EXCEPTION 'Cancelling one same-instrument BUY LIMIT order disturbed its sibling reservation: %, %, %',
+      v_result,v_status,v_reserved_cash;
+  END IF;
+  v_result:=public.cancel_paper_option_limit_order(
+    'abababab-abab-4bab-8bab-abababababab',repeat('9',64)
+  );
+  SELECT reserved_cash_paise INTO v_reserved_cash
+    FROM public.paper_accounts
+   WHERE user_id='abababab-abab-4bab-8bab-abababababab';
+  IF v_result->>'status'<>'CANCELLED'
+     OR (v_result->>'released_cash_paise')::bigint<>83646
+     OR v_reserved_cash<>0 THEN
+    RAISE EXCEPTION 'Cancelling the final same-instrument BUY LIMIT order did not release the remaining cash: %, %',
+      v_result,v_reserved_cash;
+  END IF;
+
   -- Seed a two-lot long CE position through the unchanged MARKET RPC.
   v_now:=floor(extract(epoch from clock_timestamp())*1000)::bigint;
   PERFORM public.execute_paper_long_option_order(
