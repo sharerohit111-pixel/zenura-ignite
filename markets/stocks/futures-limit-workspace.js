@@ -66,7 +66,7 @@
     return "₹"+(paise/100).toLocaleString("en-IN",{minimumFractionDigits:2,maximumFractionDigits:2});
   }
   function dateText(value){
-    const time=Date.parse(value||"");
+    const time=typeof value==="number"?value:Date.parse(value||"");
     return Number.isFinite(time)?new Date(time).toLocaleString("en-IN",{timeZone:"Asia/Kolkata"}):"—";
   }
   function cell(row,value){
@@ -77,7 +77,7 @@
     const limits=(Array.isArray(orders)?orders:[]).filter(order=>order.orderType==="LIMIT");
     if(!limits.length){
       const row=document.createElement("tr"),td=document.createElement("td");
-      td.colSpan=9;td.textContent="No Futures LIMIT orders yet.";row.append(td);ordersBody.append(row);return;
+      td.colSpan=10;td.textContent="No Futures LIMIT orders yet.";row.append(td);ordersBody.append(row);return;
     }
     limits.forEach(order=>{
       const row=document.createElement("tr");
@@ -174,7 +174,7 @@
       await loadOrders();
     }catch(error){
       if(currentUser()!==uid)return;
-      if([400,401,403,404,422].includes(error.status))clearPending(uid);
+      if([400,401,403,404,409,422].includes(error.status))clearPending(uid);
       show(error.message||"Futures LIMIT submission failed.","error");
     }finally{
       submitting=false;
@@ -188,7 +188,6 @@
     try{
       const data=await api("/paper/futures/orders/"+encodeURIComponent(orderId)+"/cancel",{method:"POST",body:"{}"});
       show("Futures order status: "+String(data.status||"CANCELLED")+".","success");
-      await loadOrders();
     }catch(error){show(error.message||"Futures LIMIT cancellation failed.","error");}
     finally{cancelling=false;await loadOrders();}
   }
