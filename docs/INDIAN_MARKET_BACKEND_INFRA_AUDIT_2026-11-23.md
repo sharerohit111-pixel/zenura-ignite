@@ -57,3 +57,7 @@ The worker lease RPCs use bounded TTLs (5–300 seconds), allowed state keys, an
 ## Changes made
 - Created branch: `audit/indian-market-backend-infra-2026-11-23`
 - This audit report only. No application code, database schema, secrets, or production configuration changed.
+
+
+### Informational — performance advisor reports 17 unused indexes
+The Supabase performance advisor reported 17 indexes as unused at the observation time, including the market-worker pending-order indexes, Upstox OAuth state indexes, and several account/order/position indexes. This is not evidence that they are safe to drop: the project is newly created and workload coverage may be low. Preserve them until representative workload statistics and query plans are collected in staging. No index was removed. The health advisor returned no findings.
