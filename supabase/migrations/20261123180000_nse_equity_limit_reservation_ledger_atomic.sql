@@ -84,7 +84,7 @@ BEGIN
       p_user_id,p_order_id,'limit-reserve-release:'||p_order_id,'RESERVATION_RELEASE',
       0,-v_before.reserved_cash_paise,v_account.cash_paise,v_account.reserved_cash_paise,
       jsonb_build_object('product','DELIVERY','side','BUY','reason','USER_CANCEL','simulation_only',true)
-    );
+    ) ON CONFLICT (user_id,event_key) DO NOTHING;
   END IF;
   RETURN v_result;
 END;
@@ -148,7 +148,7 @@ BEGIN
       p_user_id,p_order_id,'intraday-limit-reserve-release:'||p_order_id,'RESERVATION_RELEASE',
       0,-v_before.reserved_cash_paise,v_account.cash_paise,v_account.reserved_cash_paise,
       jsonb_build_object('product','INTRADAY','side','BUY','reason','USER_CANCEL','simulation_only',true)
-    );
+    ) ON CONFLICT (user_id,event_key) DO NOTHING;
   END IF;
   RETURN v_result;
 END;
@@ -187,7 +187,7 @@ BEGIN
         'intraday-limit-reserve-release:'||v_before.order_id,'RESERVATION_RELEASE',
         0,-v_before.reserved_cash_paise,v_account.cash_paise,v_account.reserved_cash_paise,
         jsonb_build_object('product','INTRADAY','side','BUY','reason','SESSION_EXPIRY','simulation_only',true)
-      );
+      ) ON CONFLICT (user_id,event_key) DO NOTHING;
     END IF;
   END LOOP;
   RETURN v_result;
