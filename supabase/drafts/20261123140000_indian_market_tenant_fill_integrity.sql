@@ -4,7 +4,6 @@
 -- This migration intentionally fails if prerequisites are absent or historical
 -- rows violate the new relationships; it never silently skips a subsystem.
 
-begin;
 
 alter table public.paper_orders
   add constraint paper_orders_user_order_key unique (user_id, order_id);
@@ -82,4 +81,3 @@ grant select, insert on public.paper_equity_fills,
   public.paper_equity_cash_ledger, public.paper_futures_fills,
   public.paper_option_limit_fills to service_role;
 
-commit;
