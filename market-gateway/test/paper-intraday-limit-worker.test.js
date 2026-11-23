@@ -3,6 +3,8 @@ const test=require("node:test");
 const assert=require("node:assert/strict");
 const {createPaperIntradayLimitWorker}=require("../lib/paper-intraday-limit-worker");
 const {marketDateString}=require("../lib/exchange-session-calendar");
+const cooldown=require("../lib/upstox-user-cooldown");
+test.beforeEach(()=>cooldown.clearAllUpstoxUserCooldownsForTests());
 
 function makeDb({orders=[],locked=false,failExpiry=false}={}){
   const calls=[];
@@ -111,4 +113,24 @@ test("expiry failure aborts before instrument, quote or order processing",async(
   await assert.rejects(run(),/session expiry/);
   assert.equal(cacheLoads,0);
   assert.equal(db.calls.some(x=>x.name==="release_paper_market_worker_lease"),true);
+});
+
+
+test("provider 429 cools down the user across later worker cycles",async()=>{
+  const db=makeDb({orders:[pendingOrder()]});
+  let providerCalls=0;
+  const d=deps(db.serviceDb,{
+    fetchProvider:async()=>{
+      providerCalls++;
+      return {ok:false,status:429,headers:{get:name=>name==="retry-after"?"30":null}};
+    }
+  });
+  const run=createPaperIntradayLimitWorker(d);
+  const first=await run();
+  assert.equal(first.failed,1);
+  assert.equal(providerCalls,1);
+  assert.equal(cooldown.getUpstoxUserCooldown(pendingOrder().user_id).kind,"rate_limit");
+  const second=await run();
+  assert.equal(second.failed,1);
+  assert.equal(providerCalls,1);
 });
