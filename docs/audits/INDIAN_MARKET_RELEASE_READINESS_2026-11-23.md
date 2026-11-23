@@ -9,7 +9,7 @@
 
 ## Safety and disposition
 
-This report is documentation-only. No application source, SQL migration, feature flag, production database, PR merge, or deployment was changed. This audit branch was created from the exact PR #91 head so it does not overwrite another workstream.
+This audit branch was created from the exact PR #91 head so it does not overwrite another workstream. It now contains the audit report and one isolated CI workflow change: a PostgreSQL 16/17 matrix for the existing complete migration/regression job. No application source, SQL migration, feature flag, production database, PR #91 branch, merge, or deployment was changed.
 
 **Release verdict: NOT RELEASE READY.** Do not merge or deploy until critical gates below are resolved and independently reviewed.
 
