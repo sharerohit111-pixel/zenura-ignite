@@ -163,7 +163,7 @@ begin
     raise exception 'Expired Futures LIMIT orders cannot be filled.' using errcode='22023';
   end if;
   if v_order.expiry<=(v_server_now at time zone 'Asia/Kolkata')::date then
-    if v_server_now>((v_order.expiry + time '15:30') at time zone 'Asia/Kolkata') then
+    if v_server_now>=((v_order.expiry + time '15:30') at time zone 'Asia/Kolkata') then
       raise exception 'Expired Futures contracts cannot be filled.' using errcode='22023';
     end if;
   end if;
