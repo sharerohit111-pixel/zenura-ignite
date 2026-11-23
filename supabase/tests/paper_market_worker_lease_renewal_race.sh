@@ -15,7 +15,7 @@ seed_lease() {
 INSERT INTO public.paper_market_worker_state(
   state_key,cursor_order_id,cursor_created_at,lease_token,lease_expires_at,updated_at
 ) VALUES (
-  'paper_futures_limit_orders',NULL,NULL :'token'::uuid, to_timestamp((:expiry_ms)::double precision / 1000.0),clock_timestamp()
+  'paper_futures_limit_orders',NULL,NULL, :'token'::uuid, to_timestamp((:expiry_ms)::double precision / 1000.0),clock_timestamp()
 )
 ON CONFLICT(state_key) DO UPDATE SET
   lease_token=EXCLUDED.lease_token,
