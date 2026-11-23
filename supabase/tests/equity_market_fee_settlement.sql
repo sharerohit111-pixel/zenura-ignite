@@ -44,7 +44,7 @@ BEGIN
           WHERE order_id=repeat('a',64) AND event_type='TRADE_DEBIT')<>1
      OR (SELECT cash_delta_paise FROM public.paper_equity_cash_ledger
           WHERE order_id=repeat('a',64) AND event_type='TRADE_DEBIT')<>-102479
-     OR (SELECT cash_after_paise FROM public.paper_equity_cash_ledger
+     OR (SELECT cash_balance_after_paise FROM public.paper_equity_cash_ledger
           WHERE order_id=repeat('a',64) AND event_type='TRADE_DEBIT')<>99897521 THEN
     RAISE EXCEPTION 'MARKET BUY fill/cash-ledger rows do not reconcile to final account cash';
   END IF;
