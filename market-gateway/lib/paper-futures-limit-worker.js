@@ -1,6 +1,7 @@
 "use strict";
 
 const crypto=require("node:crypto");
+const {createLeaseHeartbeat}=require("./lease-heartbeat");
 const {normalizeWorkerCursor,groupOrdersByUser}=require("./paper-limit-worker");
 const {loadVerifiedExchangeSession,marketDateString}=require("./exchange-session-calendar");
 const {marketClockParts}=require("./intraday-limit-policy");
@@ -98,7 +99,20 @@ function createPaperFuturesLimitWorker({
     if(lease?.data!==true)
       return {locked:true,scanned:0,filled:0,partial:0,notEligible:0,failed:0,expired:0};
 
-    const summary={locked:false,scanned:0,filled:0,partial:0,notEligible:0,failed:0,expired:0};
+    const summary={locked:false,scanned:0,filled:0,partial:0,notEligible:0,failed:0,expired:0,leaseLost:false};
+    const heartbeat=createLeaseHeartbeat({
+      renew:async()=>{
+        const result=await serviceDb.rpc("renew_paper_market_worker_lease",{
+          p_state_key:"paper_futures_limit_orders",p_lease_token:leaseToken,
+          p_now_ms:now(),p_ttl_ms:240000
+        });
+        if(result?.error)throw new Error("Futures LIMIT worker lease renewal failed.");
+        return result?.data===true;
+      },
+      onLost:()=>{summary.leaseLost=true;},
+      onError:()=>{summary.leaseLost=true;},
+      intervalMs:60000
+    });
     try{
       const instruments=await ensureInstrumentCache();
       if(!Array.isArray(instruments)||!instruments.length)
@@ -180,6 +194,10 @@ function createPaperFuturesLimitWorker({
           const payload=await readProviderJson(response);
           if(!response.ok)throw new Error("Upstox V3 Futures quote request failed.");
           for(const {order} of eligible){
+            if(summary.leaseLost){
+              summary.notEligible++;
+              continue;
+            }
             const nowMs=now();
             let decision;
             try{
@@ -217,6 +235,10 @@ function createPaperFuturesLimitWorker({
             const chargesPaise=cumulativeFillCharges({
               fills,grossPaise,exchange:order.exchange,side:order.side
             });
+            if(summary.leaseLost){
+              summary.notEligible++;
+              continue;
+            }
             const result=await serviceDb.rpc("execute_paper_futures_limit_fill",{
               p_order_id:order.order_id,p_execution_id:executionId,
               p_fill_sequence:fillSequence,p_fill_quantity:decision.fillQuantity,
@@ -242,6 +264,7 @@ function createPaperFuturesLimitWorker({
       for(let offset=0;offset<groups.length;offset+=5)
         await Promise.all(groups.slice(offset,offset+5).map(processUserOrders));
 
+      if(summary.leaseLost)return summary;
       if(orders.length){
         const last=orders[orders.length-1];
         const saved=await serviceDb.from("paper_market_worker_state")
@@ -256,6 +279,7 @@ function createPaperFuturesLimitWorker({
       }
       return summary;
     }finally{
+      heartbeat.stop();
       const released=await serviceDb.rpc("release_paper_market_worker_lease",{
         p_state_key:"paper_futures_limit_orders",p_lease_token:leaseToken,p_now_ms:now()
       });
