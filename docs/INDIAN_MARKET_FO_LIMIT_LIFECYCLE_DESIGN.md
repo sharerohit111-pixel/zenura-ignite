@@ -1,14 +1,21 @@
 # Indian Market F&O LIMIT lifecycle — implementation contract
 
-Status: design checkpoint only. This document does not enable Futures or Options LIMIT orders.
+Status: implementation in draft PRs #87–#89. This document does not enable Futures or Options LIMIT orders. No production migration, merge, deployment or worker activation has occurred.
+
+- PR #87 — Futures LIMIT ledger schema foundation.
+- PR #88 — atomic submit, opening-margin/close-quantity reservation, cancellation and expiry.
+- PR #89 — atomic partial/full fill settlement, executable quote snapshot validation and opt-in worker module.
 
 ## Verified current boundary
 
-- The Upstox V3 quote-depth parser and derivative LIMIT trigger policy are isolated pure helpers.
-- The quote parser accepts FullFeed market depth and FirstLevelWithGreeks first depth, uses feed-level currentTs, checks instrument identity, displayed quantity, integer-paise conversion, freshness and crossed books.
+- The Upstox V3 WebSocket quote-depth parser and REST Full Market Quotes V3 parser are isolated pure helpers.
+- The REST parser uses the snapshot timestamp and top-of-book depth.buy[0]/depth.sell[0], checks exact instrument identity, displayed quantity, integer-paise conversion, freshness and crossed books; no LTP fallback is allowed.
 - BUY eligibility is based on executable ask <= limit; SELL eligibility is based on executable bid >= limit.
+- The SQL fill RPC receives and rechecks the exact bid/ask prices and displayed quantities used by the worker, and persists them in the fill ledger.
 - Futures MARKET accounting is implemented in execute_paper_futures_market_order.
-- paper_futures_orders currently has MARKET/LIMIT and PENDING/FILLED/CANCELLED/REJECTED schema values, but there is no complete Futures LIMIT submit/fill/cancel/expiry RPC lifecycle or dedicated Futures LIMIT worker.
+- The Futures LIMIT ledger adds filled/remaining quantities, average fill price, pending opening-margin and close-quantity reservations, expiry, and an append-only execution fill table.
+- Atomic service-role RPCs now cover submit, partial/full fill, cancel and expiry; account -> order -> position locking, execution-idempotency and reservation release are tested on disposable PostgreSQL.
+- The dedicated Futures LIMIT worker module is wired behind PAPER_FUTURES_LIMIT_WORKER_ENABLED=true; the flag defaults off. The worker currently supports NSE Futures only; BSE Futures remain blocked until their charge schedule is verified.
 - Long Options remain MARKET-only; derivative_limit_schema_guard.sql protects the Options order schema from premature LIMIT enablement.
 - F&O LIMIT must remain disabled until the database lifecycle and worker are complete.
 
@@ -53,23 +60,35 @@ The SQL fill RPC must independently validate all facts; worker eligibility alone
 - Fill quantity is positive and no greater than remaining quantity or available close reservation.
 - Contract key, exchange, segment, expiry, lot size and tick size still match the verified instrument master.
 - Execution price is on tick and satisfies BUY ask <= limit / SELL bid >= limit.
-- Quote timestamp is non-future, fresh, and tied to a verified open NSE/BSE session; expiry cutoff is exclusive.
+- Quote timestamp is non-future and fresh; SQL validates the executable side, exact displayed depth quantity, exclusive expiry cutoff, and a verified open NSE/BSE session whose official-source reference and SHA-256 are present.
 - Caller clock and quote-age values match server time within a small documented tolerance.
 - Opening margin reservation is sufficient; closing margin release is proportional and exact on full close.
 - The order's remaining quantity and reservation are updated atomically with position, account, realized P&L, charges and fill event.
 
 ## Worker requirements
 
-- Separate worker lease keys for Futures LIMIT and Options LIMIT; single-writer lease and bounded batch.
+- Separate Futures LIMIT lease key, single-writer lease and bounded batch are implemented; Options LIMIT remains a separate future phase.
 - Scan pending and partially-filled orders with a stable cursor and safe wraparound.
-- Group provider requests by user and instrument, use only the user's connected Upstox token, and fail closed on missing/stale/malformed/crossed depth or margin.
-- Revalidate the latest quote and session immediately before calling the SQL fill RPC.
+- Group provider requests by user, use only the user's connected Upstox token, and fail closed on missing/stale/malformed/crossed depth.
+- Revalidate the latest quote and verified session immediately before calling the SQL fill RPC.
 - Expire unfilled orders on session close, missing/unverified session data, or contract expiry; release remaining reservations exactly once.
-- Worker remains disabled until all SQL, race and rollback tests pass.
+- Worker remains disabled by default and has no production activation. The opt-in flag must not be enabled until staging and legal/provider gates are satisfied.
 
 ## Options LIMIT phase (separate follow-up)
 
 Options remain long-only. BUY-to-open must reserve premium plus supported charges; SELL-to-close must reserve available long quantity. No short-option opening, margin borrowing, or reversal. Use a separate Options lifecycle and preserve the existing long-option ledger and 50-position guard.
+
+## Implemented test coverage so far
+
+- Schema migration and client-role privilege boundaries.
+- Existing Futures MARKET compatibility with new LIMIT reservations.
+- Opening-margin and close-quantity reservation, idempotent submit, cancel and expiry.
+- Partial/full opening fills, weighted average price, charges, realized P&L and margin conservation.
+- Partial/full close fills, proportional margin release, no position reversal and final position deletion.
+- Exact execution replay and altered-payload replay rejection.
+- Fill-first/cancel-first races and concurrent duplicate provider execution.
+- REST quote parsing for best bid/ask, depth size, stale/future timestamps, crossed books and no LTP fallback.
+- Worker unit coverage for NSE contract matching, cumulative per-order charges, missing-session expiry and exact top-of-book fill quantity.
 
 ## Mandatory disposable-PostgreSQL tests before enabling
 
