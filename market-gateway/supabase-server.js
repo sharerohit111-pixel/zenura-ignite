@@ -48,6 +48,7 @@ const {readUserUpstoxConnection}=require("./lib/upstox-user-connection");
 const {nextUpstoxTokenExpiry}=require("../functions/lib/upstox-token-expiry");
 const {isUsableUpstoxTokenResponse}=require("../functions/lib/upstox-token-response");
 const {isUsableUpstoxOAuthCallback}=require("../functions/lib/upstox-oauth-callback-input");
+const {validateHttpsRedirectUri}=require("./lib/redirect-uri-policy");
 
 const PORT=Number(process.env.PORT||8080);
 const SUPABASE_URL=process.env.SUPABASE_URL;
@@ -58,6 +59,8 @@ const UPSTOX_CLIENT_ID=process.env.UPSTOX_CLIENT_ID;
 const UPSTOX_CLIENT_SECRET=process.env.UPSTOX_CLIENT_SECRET;
 const UPSTOX_REDIRECT_URI=process.env.UPSTOX_REDIRECT_URI;
 const APP_REDIRECT_URI=process.env.ZENURA_APP_REDIRECT_URI||"https://zenuraignite.com/markets/stocks/";
+const VALID_UPSTOX_REDIRECT_URI=validateHttpsRedirectUri(UPSTOX_REDIRECT_URI);
+const VALID_APP_REDIRECT_URI=validateHttpsRedirectUri(APP_REDIRECT_URI);
 const MAX_KEYS=Math.min(Math.max(Number(process.env.MAX_INSTRUMENT_KEYS||100)||100,1),500);
 const ALLOWED_ORIGINS=(process.env.ALLOWED_ORIGINS||"").split(",").map(x=>x.trim()).filter(Boolean);
 const INSTRUMENTS_URL="https://assets.upstox.com/market-quote/instruments/exchange/complete.json.gz";
@@ -172,14 +175,14 @@ app.post("/upstox/oauth/start",async(req,res)=>{
   try{
     const {user}=await auth(req);
     if(!user.emailConfirmedAt)return res.status(403).json({error:"Verify your Supabase email before connecting Upstox.",code:"email_not_confirmed"});
-    if(!UPSTOX_CLIENT_ID||!UPSTOX_REDIRECT_URI)return res.status(503).json({error:"Upstox OAuth server configuration is incomplete."});
+    if(!UPSTOX_CLIENT_ID||!VALID_UPSTOX_REDIRECT_URI||!VALID_APP_REDIRECT_URI)return res.status(503).json({error:"Upstox OAuth server configuration is incomplete or invalid."});
     const state=crypto.randomBytes(32).toString("hex"),stateHash=crypto.createHash("sha256").update(state).digest("hex");
     const expiresAt=new Date(Date.now()+5*60*1000).toISOString();
     const {error}=await serviceDb.rpc("begin_upstox_oauth",{
       p_user_id:user.id,p_state_hash:stateHash,p_expires_at:expiresAt,p_now_ms:Date.now()
     });
     if(error)throw Object.assign(new Error("Secure Upstox authorization could not be started."),{status:503});
-    const params=new URLSearchParams({client_id:UPSTOX_CLIENT_ID,redirect_uri:UPSTOX_REDIRECT_URI,response_type:"code",state});
+    const params=new URLSearchParams({client_id:UPSTOX_CLIENT_ID,redirect_uri:VALID_UPSTOX_REDIRECT_URI,response_type:"code",state});
     res.set("Cache-Control","no-store");
     res.json({authorizationUrl:"https://api.upstox.com/v2/login/authorization/dialog?"+params.toString()});
   }catch(error){sendError(res,error,"Upstox authorization could not be started.");}
@@ -187,18 +190,18 @@ app.post("/upstox/oauth/start",async(req,res)=>{
 app.get("/upstox/oauth/callback",async(req,res)=>{
   const finish=(status)=>{
     res.set({"Cache-Control":"no-store","Pragma":"no-cache","Referrer-Policy":"no-referrer"});
-    const target=new URL(APP_REDIRECT_URI);target.searchParams.set("upstox",status);res.redirect(303,target.toString());
+    const target=new URL(VALID_APP_REDIRECT_URI||"https://zenuraignite.com/markets/stocks/");target.searchParams.set("upstox",status);res.redirect(303,target.toString());
   };
   try{
     const {code,state}=req.query;
     if(!isUsableUpstoxOAuthCallback(code,state))return finish("error");
-    if(!UPSTOX_CLIENT_ID||!UPSTOX_CLIENT_SECRET||!UPSTOX_REDIRECT_URI||!ENC_KEY)return finish("error");
+    if(!UPSTOX_CLIENT_ID||!UPSTOX_CLIENT_SECRET||!VALID_UPSTOX_REDIRECT_URI||!VALID_APP_REDIRECT_URI||!ENC_KEY)return finish("error");
     const stateHash=crypto.createHash("sha256").update(state).digest("hex");
     const {data:stateData,error:stateError}=await serviceDb.rpc("consume_upstox_oauth_state",{p_state_hash:stateHash,p_now_ms:Date.now()});
     if(stateError||!stateData?.user_id)return finish("error");
     const tokenResponse=await fetchProvider("https://api.upstox.com/v2/login/authorization/token",{
       method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded",Accept:"application/json"},
-      body:new URLSearchParams({code,client_id:UPSTOX_CLIENT_ID,client_secret:UPSTOX_CLIENT_SECRET,redirect_uri:UPSTOX_REDIRECT_URI,grant_type:"authorization_code"})
+      body:new URLSearchParams({code,client_id:UPSTOX_CLIENT_ID,client_secret:UPSTOX_CLIENT_SECRET,redirect_uri:VALID_UPSTOX_REDIRECT_URI,grant_type:"authorization_code"})
     });
     const tokenPayload=await readProviderJson(tokenResponse);
     if(!tokenResponse.ok||!isUsableUpstoxTokenResponse(tokenPayload))return finish("error");
