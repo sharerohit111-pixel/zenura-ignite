@@ -98,9 +98,6 @@ begin
     raise exception 'Invalid Futures LIMIT fill input.' using errcode='22023';
   end if;
 
-  v_server_now := clock_timestamp();
-  v_server_now_ms := floor(extract(epoch from v_server_now)*1000)::bigint;
-
   -- Resolve the owner only to acquire the account lock first. Recheck after locking.
   select user_id into v_user_id
     from public.paper_futures_orders
@@ -149,6 +146,8 @@ begin
 
   -- A replay is a no-op even after its original quote has aged out. Freshness
   -- and clock checks apply only to a new execution event.
+  v_server_now := clock_timestamp();
+  v_server_now_ms := floor(extract(epoch from v_server_now)*1000)::bigint;
   if abs(v_server_now_ms-p_now_ms)>2000 then
     raise exception 'Futures LIMIT fill clock is not current.' using errcode='22023';
   end if;
