@@ -31,6 +31,30 @@ function signedPnl(quantity, fromPricePaise, toPricePaise) {
  * Calculate an explicitly configured simulation margin requirement.
  * Rates are scenario inputs in basis points, not exchange rates.
  */
+/** Reserve simulated margin without mutating the caller's persisted ledger. */
+function reserveSimulatedMargin({ cashPaise, reservedCashPaise = 0, usedMarginPaise, amountPaise }) {
+  nonNegativeInteger(amountPaise, "amountPaise");
+  const before = calculateMarginAvailability({ cashPaise, reservedCashPaise, usedMarginPaise });
+  if (amountPaise === 0 || before.availableMarginPaise < amountPaise) {
+    throw new Error("Insufficient available simulated margin.");
+  }
+  return { ...before, usedMarginPaise: safeNumber(BigInt(usedMarginPaise) + BigInt(amountPaise), "usedMarginPaise"),
+    availableMarginPaise: before.availableMarginPaise - amountPaise,
+    reservedAmountPaise: amountPaise, reservationAction: "RESERVE", simulationOnly: true };
+}
+
+/** Release only a caller-identified reservation; over-release is rejected. */
+function releaseSimulatedMargin({ cashPaise, reservedCashPaise = 0, usedMarginPaise, amountPaise }) {
+  nonNegativeInteger(amountPaise, "amountPaise");
+  nonNegativeInteger(usedMarginPaise, "usedMarginPaise");
+  if (amountPaise === 0 || amountPaise > usedMarginPaise) {
+    throw new Error("Margin release exceeds the owned simulated reservation.");
+  }
+  const nextUsed = usedMarginPaise - amountPaise;
+  const state = calculateMarginAvailability({ cashPaise, reservedCashPaise, usedMarginPaise: nextUsed });
+  return { ...state, releasedAmountPaise: amountPaise, reservationAction: "RELEASE", simulationOnly: true };
+}
+
 function calculateSimulatedMargin({ pricePaise, quantity, initialMarginBps, maintenanceMarginBps }) {
   positiveInteger(pricePaise, "pricePaise");
   positiveInteger(quantity, "quantity");
