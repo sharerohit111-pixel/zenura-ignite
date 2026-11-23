@@ -529,7 +529,7 @@ app.get("/paper/portfolio",async(req,res)=>{
     const {token}=await getUpstoxAccessToken(user.id),keys=positions.map(([key])=>key);
     const response=await fetchProvider("https://api.upstox.com/v3/market-quote/quotes?"+new URLSearchParams({instrument_key:keys.join(",")}),{headers:{Authorization:"Bearer "+token,Accept:"application/json"}});
     const payload=await readProviderJson(response);
-    if(!response.ok)return res.status(502).json({error:"Portfolio market valuation could not be retrieved."});
+    if(!response.ok)throw upstoxHttpError(response);
     const valuation=buildPortfolioValuation({positions,quotes:Object.values(payload?.data||{}),cashPaise:account.cash_paise,realizedPnlPaise:realized,instruments:instrumentCache,now:Date.now(),maxAgeMs:60000});
     res.set("Cache-Control","private, no-store").json({...valuation,product});
   }catch(error){sendError(res,error,"Portfolio valuation could not be loaded.");}
@@ -552,7 +552,7 @@ app.post("/paper/derivative/margin-preview",async(req,res)=>{
       body:JSON.stringify({instruments:[{instrument_key:instrumentKey,quantity:contract.quantity,product,transaction_type:side,price:normalized.pricePaise/100}]})
     });
     const payload=await readProviderJson(upstream);
-    if(!upstream.ok)return res.status(502).json({error:"Upstox broker margin preview failed."});
+    if(!upstream.ok)throw upstoxHttpError(upstream);
     const margin=normalizeUpstoxMarginResponse(payload,instrumentKey);
     const {data:account,error}=await userDb.from("paper_accounts").select("cash_paise,reserved_cash_paise,reserved_margin_paise").eq("user_id",user.id).maybeSingle();
     if(error||!account)return res.status(409).json({error:"Initialize your Paper Trading account before comparing margin."});
@@ -792,7 +792,7 @@ app.get("/paper/derivatives/portfolio",async(req,res)=>{
     const {token}=await getUpstoxAccessToken(user.id),keys=positions.map(p=>p.instrumentKey);
     const upstream=await fetchProvider("https://api.upstox.com/v3/market-quote/quotes?"+new URLSearchParams({instrument_key:keys.join(",")}),{headers:{Authorization:"Bearer "+token,Accept:"application/json"}});
     const payload=await readProviderJson(upstream);
-    if(!upstream.ok)return res.status(502).json({error:"Derivative portfolio quotes could not be retrieved."});
+    if(!upstream.ok)throw upstoxHttpError(upstream);
     const quotes=[];
     for(const p of positions){
       const entry=Object.values(payload?.data||{}).find(x=>x?.instrument_token===p.instrumentKey);
@@ -812,7 +812,7 @@ app.get("/watchlist/quotes",async(req,res)=>{
     const {token}=await getUpstoxAccessToken(user.id);
     const response=await fetchProvider("https://api.upstox.com/v3/market-quote/quotes?"+new URLSearchParams({instrument_key:keys.join(",")}),{headers:{Authorization:"Bearer "+token,Accept:"application/json"}});
     const payload=await readProviderJson(response);
-    if(!response.ok)return res.status(502).json({error:"Watchlist quotes could not be retrieved."});
+    if(!response.ok)throw upstoxHttpError(response);
     const entries=Object.values(payload?.data||{}),now=Date.now();
     const quotes=keys.map(instrumentKey=>{
       const entry=entries.find(x=>x?.instrument_token===instrumentKey),instrument=instrumentCache.find(x=>x.instrument_key===instrumentKey);
@@ -911,7 +911,7 @@ app.post("/paper/futures/orders",async(req,res)=>{
           }]})
         });
         const marginPayload=await readProviderJson(marginResponse);
-        if(!marginResponse.ok)return res.status(502).json({error:"Upstox Futures margin requirement could not be verified at the LIMIT price."});
+        if(!marginResponse.ok)throw upstoxHttpError(marginResponse);
         openingMarginPaise=normalizeUpstoxMarginResponse(marginPayload,instrumentKey).requiredMarginPaise;
         marginQuoteTimestampMs=Date.now();
       }
@@ -963,7 +963,7 @@ app.post("/paper/futures/orders",async(req,res)=>{
         body:JSON.stringify({instruments:[{instrument_key:instrumentKey,quantity:contract.quantity,product:product==="INTRADAY"?"I":"D",transaction_type:side,price:normalized.pricePaise/100}]})
       });
       const marginPayload=await readProviderJson(marginResponse);
-      if(!marginResponse.ok)return res.status(502).json({error:"Upstox futures margin requirement could not be verified."});
+      if(!marginResponse.ok)throw upstoxHttpError(marginResponse);
       openingMarginPaise=normalizeUpstoxMarginResponse(marginPayload,instrumentKey).requiredMarginPaise;
     }
     const {calculateFuturesTradeCharges}=require("./lib/trading-charges");
@@ -1027,7 +1027,7 @@ app.get("/paper/futures/portfolio",async(req,res)=>{
     const keys=positions.map(p=>p.instrument_key);
     const quoteResponse=await fetchProvider("https://api.upstox.com/v3/market-quote/quotes?"+new URLSearchParams({instrument_key:keys.join(",")}),{headers:{Authorization:"Bearer "+token,Accept:"application/json"}});
     const quotePayload=await readProviderJson(quoteResponse);
-    if(!quoteResponse.ok)return res.status(502).json({error:"Futures portfolio quotes could not be retrieved."});
+    if(!quoteResponse.ok)throw upstoxHttpError(quoteResponse);
     const entries=Object.values(quotePayload?.data||{}),now=Date.now();
     let unrealizedPnlPaise=0,stalePositions=0;
     const valued=positions.map(p=>{
@@ -1218,7 +1218,7 @@ async function runPaperLimitWorker({maxOrders=50}={}){
         const url="https://api.upstox.com/v3/market-quote/quotes?"+new URLSearchParams({instrument_key:keys.join(",")});
         const response=await fetchProvider(url,{headers:{Authorization:"Bearer "+token,Accept:"application/json"}});
         const payload=await readProviderJson(response);
-        if(!response.ok)throw new Error("Upstox batch quote request failed with status "+response.status);
+        if(!response.ok)throw upstoxHttpError(response);
         const entries=Object.values(payload?.data||{});
         for(const order of validOrders){
           const entry=entries.find(item=>item?.instrument_token===order.instrument_key);
