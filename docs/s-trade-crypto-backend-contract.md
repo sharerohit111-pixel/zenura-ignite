@@ -102,3 +102,10 @@ No production database migration has been applied and no gateway deployment has 
 - The earlier note saying PostgreSQL execution had not yet run is superseded by this CI evidence. CI is not a substitute for live Supabase staging integration.
 - Supabase currently has no Crypto development branch and no `paper_crypto_*` tables; none of the Crypto migrations has been applied to the connected live project.
 - Remaining gate: isolated Supabase staging validation and deployed-gateway integration. A Supabase development branch may incur hourly compute charges, so it will not be created until the user explicitly approves any cost. Production migration, merge and deployment remain prohibited without separate explicit approval.
+
+
+## Expanded LIMIT BUY regression — 2026-11-23
+- Added `supabase/tests/crypto_limit_buy_reservation.sql` and wired it into the Crypto-only workflow.
+- The disposable PostgreSQL test creates two independent LIMIT BUY reservations, verifies the combined reserved cash, cancels one order and checks the exact reservation release, fills the other at a better price, and replays the fill to verify no duplicate cash debit or ledger rows.
+- GitHub Actions run [#45104563700](https://github.com/sharerohit111-pixel/zenura-ignite/actions/runs/45104563700) completed successfully. All five SQL regressions passed: full-position LIMIT SELL lifecycle, reserved-position DELETE guard, MARKET SELL reservation protection, authenticated multi-user RLS isolation, and LIMIT BUY reserve/cancel/fill/idempotency accounting. Frontend syntax, gateway unit tests and Crypto/Indian Market isolation checks also passed.
+- The run used disposable PostgreSQL 16 only. It does not represent a live Supabase staging deployment.
