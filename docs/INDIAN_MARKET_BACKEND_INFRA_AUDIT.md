@@ -123,3 +123,13 @@ This branch now destructures `{user,userDb}` and adds a regression assertion to 
 - Raw error messages, request headers, bearer tokens, query values and provider payloads are deliberately excluded from these structured logs.
 - Regression assertions cover request-ID generation/header propagation and the safe structured-log field set.
 - This is request correlation, not a full metrics/tracing system; route latency histograms, RPC/provider spans and centralized log retention remain follow-up work.
+
+## 10. Stable keyset pagination for order histories
+
+- Added a bounded, validated opaque cursor helper using the composite `created_at` + `order_id` key.
+- Equity, Futures, Options derivative history and Options LIMIT history now use descending composite ordering and a `limit + 1` query to compute truthful `hasMore` and `nextCursor` values.
+- Cursor payloads are length-limited, base64url-only, timestamp-validated and order-ID-character-validated before being used in PostgREST filters.
+- Existing `limit` parameter remains supported (1–100); clients can pass the returned `cursor` on the next request. Responses include `hasMore` and `nextCursor`.
+- Options LIMIT fills are fetched only for the orders in the returned page.
+- No database migration is required; this relies on existing `created_at` and `order_id` columns. Regression tests cover cursor round-trip, malformed input, composite boundary construction, page sizing and all four route integrations.
+- This is keyset pagination, not a snapshot across multiple requests: newly inserted orders can appear ahead of the cursor, while the composite boundary prevents timestamp ties from duplicating or skipping rows.
