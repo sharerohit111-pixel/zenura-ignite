@@ -57,3 +57,12 @@ The Futures LIMIT worker currently acquires a 240-second lease and releases it i
 The existing generic `createLeaseHeartbeat` helper is used for a different market-stream lease and cannot safely renew this worker lease because the market-worker SQL API has no renewal operation. Do not reuse the stream renewal RPC or extend shared worker lease functions in this isolated Futures change without coordination with the Options/other worker branches: the lease functions and allowlist are shared infrastructure, and the Options branch already has an overlapping migration.
 
 **Required before enabling the Futures worker in a multi-instance deployment:** coordinate a service-role-only, owner-token-checked market-worker lease renewal RPC (including TTL and safe timestamp validation), reconcile the Futures/Options allowlists into one migration, add lease-loss handling that stops new fills, and test renewal-vs-expiry/reacquisition races in disposable PostgreSQL. Until then, keep `PAPER_FUTURES_LIMIT_WORKER_ENABLED` disabled in multi-instance environments. The current 240-second TTL is not proof of safe long-running ownership.
+
+
+## Follow-up worker session regression fix
+
+Source review found that the Futures LIMIT worker treated every non-open session as an expiry condition. That incorrectly expired pending orders when the verified calendar was missing, before the verified open, or on a verified non-trading day. The isolated worker now distinguishes `MISSING`, `BEFORE_OPEN`, `NOT_TRADING_DAY`, `OPEN` and `CLOSED`: it preserves pending orders for the first three states, processes eligible quotes only during `OPEN`, and invokes order expiry for a verified `CLOSED` session or the existing explicit order/contract expiry cutoffs. Regression cases cover each of these boundaries.
+
+## Options/Futures shared lease migration coordination
+
+The Options PR #91 migration `20261123220000_derivative_limit_worker_lease_keys.sql` already allowlists both `paper_futures_limit_orders` and `paper_option_limit_orders`, along with existing worker keys. The Futures-only migration in this branch was authored independently against its older base and is therefore a duplicate definition of the same shared RPC pair with a narrower allowlist. During integration, use one reconciled canonical migration (the combined allowlist from the coordinated Options/Futures integration) and do not apply both definitions as independent final states. This does not resolve the missing renewal RPC; that remains a multi-instance release blocker.
