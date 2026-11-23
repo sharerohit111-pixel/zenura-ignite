@@ -37,6 +37,18 @@ test("Long-option idempotent replay returns the original fill before requiring a
   assert.match(server,/pricePaise:normalizeTickSizePaise\(instrument\.tick_size\)/);
 });
 
+test("Options LIMIT and unknown order types fail closed before instrument or provider access",()=>{
+  const route=server.slice(server.indexOf('app.post("/paper/derivative/orders"'),server.indexOf('app.get("/paper/derivative/orders"'));
+  const orderType=route.indexOf('const orderType=String(req.body?.order_type||"MARKET").toUpperCase()');
+  const reject=route.indexOf('if(orderType!=="MARKET")return res.status(400)');
+  const cache=route.indexOf("refreshInstrumentCache()");
+  const token=route.indexOf("getUpstoxAccessToken(user.id)");
+  const rpc=route.indexOf('execute_paper_long_option_order');
+  assert.ok(orderType>=0&&reject>orderType,"unknown/Options LIMIT types must be rejected explicitly");
+  assert.ok(cache>reject&&token>reject&&rpc>reject,"unsupported order types must be rejected before cache/provider/database execution");
+  assert.match(route,/Options LIMIT orders are not supported yet/);
+});
+
 test("Futures margin preview validates the contract and consumes its rate-limit slot before provider access",()=>{
   const route=server.slice(server.indexOf('app.post("/paper/derivative/margin-preview"'),server.indexOf('app.post("/paper/derivative/orders"'));
   const instrument=route.indexOf('const instrument=instrumentCache.find');
