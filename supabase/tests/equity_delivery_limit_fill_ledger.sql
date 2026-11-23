@@ -16,6 +16,22 @@ INSERT INTO public.paper_equity_positions(
   5,10000,50000,0
 );
 
+CREATE FUNCTION public.test_fail_equity_ledger_insert()
+RETURNS trigger
+LANGUAGE plpgsql
+SET search_path=''
+AS $test$
+BEGIN
+  IF NEW.order_id=repeat('f',64) THEN
+    RAISE EXCEPTION USING ERRCODE='P0001',MESSAGE='injected Equity ledger failure';
+  END IF;
+  RETURN NEW;
+END
+$test$;
+CREATE TRIGGER test_fail_equity_ledger_insert
+BEFORE INSERT ON public.paper_equity_cash_ledger
+FOR EACH ROW EXECUTE FUNCTION public.test_fail_equity_ledger_insert();
+
 DO $delivery_limit_ledger_checks$
 DECLARE
   v_result jsonb;
@@ -26,6 +42,11 @@ DECLARE
   v_order_reserved bigint;
   v_fill_count integer;
   v_ledger_count integer;
+  v_before_cash bigint;
+  v_before_reserved bigint;
+  v_before_qty integer;
+  v_before_cost bigint;
+  v_failed boolean;
 BEGIN
   -- BUY: one fill, trade debit and reservation consumption; snapshots reconcile.
   v_result:=public.submit_paper_limit_order(
@@ -113,6 +134,47 @@ BEGIN
      OR (SELECT cash_balance_after_paise FROM public.paper_equity_cash_ledger
           WHERE order_id=repeat('e',64) AND event_type='TRADE_CREDIT')<>v_cash THEN
     RAISE EXCEPTION 'Delivery LIMIT SELL fill/credit ledger does not reconcile';
+  END IF;
+  -- Inject a failure after the fill INSERT (at the first ledger INSERT).
+  -- The entire settlement statement must roll back account, order, position, fill and ledger.
+  PERFORM public.submit_paper_limit_order(
+    '33333333-3333-4333-8333-333333333333',repeat('f',64),
+    'ffffffff-ffff-4fff-8fff-ffffffffffff',repeat('3',64),
+    'NSE_EQ|DELIVERY_LIMIT_LEDGER_CI','DELIVERY_LIMIT_LEDGER_CI',
+    'NSE','BUY',1,10000
+  );
+  SELECT cash_paise,reserved_cash_paise INTO v_before_cash,v_before_reserved
+    FROM public.paper_accounts WHERE user_id='33333333-3333-4333-8333-333333333333';
+  SELECT quantity,cost_basis_paise INTO v_before_qty,v_before_cost
+    FROM public.paper_equity_positions
+   WHERE user_id='33333333-3333-4333-8333-333333333333'
+     AND product='DELIVERY' AND instrument_key='NSE_EQ|DELIVERY_LIMIT_LEDGER_CI';
+  v_now_ms:=floor(extract(epoch from clock_timestamp())*1000)::bigint;
+  v_failed:=false;
+  BEGIN
+    PERFORM public.execute_paper_limit_fill(
+      repeat('f',64),9900,v_now_ms-1000,1000,v_now_ms
+    );
+  EXCEPTION WHEN SQLSTATE 'P0001' THEN
+    v_failed:=true;
+  END;
+  IF NOT v_failed THEN
+    RAISE EXCEPTION 'Injected ledger failure did not abort Delivery LIMIT settlement';
+  END IF;
+  IF (SELECT status FROM public.paper_orders WHERE order_id=repeat('f',64))<>'PENDING'
+     OR (SELECT count(*) FROM public.paper_equity_fills WHERE order_id=repeat('f',64))<>0
+     OR (SELECT count(*) FROM public.paper_equity_cash_ledger WHERE order_id=repeat('f',64))<>0
+     OR (SELECT cash_paise FROM public.paper_accounts
+          WHERE user_id='33333333-3333-4333-8333-333333333333')<>v_before_cash
+     OR (SELECT reserved_cash_paise FROM public.paper_accounts
+          WHERE user_id='33333333-3333-4333-8333-333333333333')<>v_before_reserved
+     OR (SELECT quantity FROM public.paper_equity_positions
+          WHERE user_id='33333333-3333-4333-8333-333333333333'
+            AND product='DELIVERY' AND instrument_key='NSE_EQ|DELIVERY_LIMIT_LEDGER_CI')<>v_before_qty
+     OR (SELECT cost_basis_paise FROM public.paper_equity_positions
+          WHERE user_id='33333333-3333-4333-8333-333333333333'
+            AND product='DELIVERY' AND instrument_key='NSE_EQ|DELIVERY_LIMIT_LEDGER_CI')<>v_before_cost THEN
+    RAISE EXCEPTION 'Injected ledger failure leaked partial Delivery LIMIT settlement state';
   END IF;
 END
 $delivery_limit_ledger_checks$;
