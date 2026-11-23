@@ -1,5 +1,11 @@
 -- Atomic NSE equity MARKET fill + cash-ledger integration.
--- The legacy settlement function is retained as a private transaction helper.
+-- Call the pre-audit accounting implementation directly. The dependency branch
+-- installed a wrapper that already writes ledger rows; calling that wrapper here
+-- would duplicate fills and cash events.
+-- The deferred order trigger is superseded by the explicit atomic MARKET and LIMIT
+-- wrappers in this accounting branch, so remove it before those wrappers run.
+drop trigger if exists paper_equity_orders_audit_deferred on public.paper_orders;
+
 -- PostgreSQL function calls share the caller transaction: any audit insert failure
 -- rolls back the cash, position, P&L and order mutation performed by the helper.
 alter function public.execute_paper_market_order(
@@ -35,7 +41,7 @@ declare
   v_account public.paper_accounts%rowtype;
   v_fill_id uuid;
 begin
-  v_result:=public._execute_paper_market_order_without_ledger(
+  v_result:=public._execute_paper_market_order_legacy(
     p_user_id,p_order_id,p_idempotency_key,p_request_fingerprint,
     p_instrument_key,p_trading_symbol,p_exchange,p_side,p_product,
     p_quantity,p_execution_price_paise,p_quote_timestamp_ms,p_quote_age_ms
