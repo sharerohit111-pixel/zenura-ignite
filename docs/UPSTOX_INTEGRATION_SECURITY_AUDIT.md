@@ -98,3 +98,15 @@ Paper simulation only. No broker order-placement endpoint, no live trading, no p
 - Live ACL inspection shows `service_role` currently has only `Dxtm` privileges on `upstox_connections` (no SELECT). The gateway's `getConnection(userId)` performs a direct service-client SELECT, so this connection-read path is expected to fail until the existing narrowly scoped read-grants migration is applied and verified. The same migration grants SELECT only to service_role and does not grant client-role access.
 - Do not apply the migration from this audit task: production database changes remain outside this branch-only scope. Before deployment, apply the repository migration through the approved release process and re-check effective privileges and OAuth connection read in staging.
 - The direct privilege probe's earlier false result was not an ACL ambiguity: table ACL inspection confirmed service_role has no SELECT on `upstox_connections`; the repository contains a later migration that remedies it, but the target project has not recorded that migration.
+
+## Provider HTTP response policy hardening (2026-11-23)
+
+- Added `market-gateway/lib/upstox-http-policy.js` with a bounded, provider-body-independent error contract:
+  - HTTP 401 -> HTTP 401, code `upstox_reconnect_required`; user is told to reconnect. No automatic refresh is attempted.
+  - HTTP 429 -> HTTP 429, code `upstox_rate_limited`; parses `Retry-After` as seconds or HTTP-date, clamps positive delays to 300 seconds, and exposes the sanitized delay via the response header.
+  - Other unsuccessful Upstox market-data responses -> generic HTTP 502, code `upstream_provider_error`; provider response body is not exposed.
+- Integrated the policy into full-quote, historical-candle, and option-chain requests. Existing error serializer now emits a stable machine-readable code and sanitized Retry-After header where present.
+- No automatic retries were introduced. In particular, order submission/fill and worker RPC paths remain non-retried; worker-specific provider failure handling remains a follow-up audit item.
+- Added focused unit tests for 401, 429, seconds/date Retry-After, clamping, invalid/past values, and generic upstream failures.
+- Test execution in an isolated Node 22 harness: 5 passed, 0 failed. This validates the helper tests only; it is not a full gateway test run or a live Upstox/staging test.
+- No provider calls, production configuration changes, migration, deployment, or real broker order occurred.
