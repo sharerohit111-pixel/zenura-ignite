@@ -12,6 +12,7 @@ process.env.UPSTOX_TOKEN_ENCRYPTION_KEY="test-key-not-used-by-decrypt-stub";
 
 const TEST_USER_ID="11111111-2222-4333-8444-555555555555";
 let authenticated=false;
+let optionsLimitTestNowMs=null;
 const rpcCalls=[],userQueries=[];
 const TEST_INSTRUMENT_KEY="NSE_FO|NIFTY26NOV25000CE";
 const TEST_INSTRUMENT={instrument_key:TEST_INSTRUMENT_KEY,trading_symbol:"NIFTY26NOV25000CE",exchange:"NSE",segment:"NSE_FO",instrument_type:"CE",expiry:"2026-11-26",strike_price:25000,lot_size:65,tick_size:5};
@@ -37,19 +38,29 @@ require.cache[supabaseModule]={
             token_expires_at:new Date(Date.now()+60_000).toISOString(),
             token_ciphertext:{iv:"test-iv",ciphertext:"test-ciphertext",tag:"test-tag"}
           },error:null});
+          if(table==="paper_accounts")return Promise.resolve({data:{cash_paise:100_000_000,reserved_cash_paise:0,reserved_margin_paise:0},error:null});
+          if(table==="paper_derivative_positions")return Promise.resolve({data:{net_quantity:65,reserved_quantity:0},error:null});
+          if(table==="paper_exchange_sessions")return Promise.resolve({data:{
+            exchange:"NSE",session_date:"2026-11-23",is_trading_day:true,
+            open_minute:555,close_minute:930,session_kind:"REGULAR",
+            source_reference:"official-test-session",verified_at:"2026-11-23T05:00:00.000Z",
+            source_sha256:"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },error:null});
           return Promise.resolve({data:null,error:null});
         }
       };
       return query;
     },
     rpc:async(name,args)=>{rpcCalls.push({name,args,key});return {data:{
-      order_id:args.p_order_id,status:"CANCELLED",released_cash_paise:0,
-      released_close_quantity:0,idempotent_replay:false
+      order_id:args.p_order_id,status:name==="submit_paper_option_limit_order"?"PENDING":"CANCELLED",
+      reserved_cash_paise:name==="submit_paper_option_limit_order"?80600:0,
+      reserved_close_quantity:name==="submit_paper_option_limit_order"&&args.p_side==="SELL"?65:0,
+      released_cash_paise:0,released_close_quantity:0,idempotent_replay:false
     },error:null};}
   })}
 };
 
-const {app}=require("../supabase-server");
+const {app,paperOptionLimitWorkerStatus}=require("../supabase-server");
 
 async function withServer(run){
   const server=http.createServer(app);
@@ -217,3 +228,71 @@ test("authenticated NSE Options MARKET SELL-to-close submits with fresh bid and 
     authenticated=false;
   }
 });
+
+async function submitAuthenticatedOptionsLimit(side,idempotencyKey){
+  authenticated=true;
+  process.env.PAPER_OPTIONS_LIMIT_ENABLED="true";
+  process.env.PAPER_OPTIONS_LIMIT_WORKER_ENABLED="true";
+  paperOptionLimitWorkerStatus.enabled=true;
+  const fixedNow=Date.parse("2026-11-23T05:30:00.000Z"); // 11:00 IST, inside verified NSE session.
+  const originalNow=Date.now,originalFetch=global.fetch;
+  Date.now=()=>fixedNow;
+  global.fetch=async(url,options={})=>{
+    if(String(url).startsWith("http://127.0.0.1:"))return originalFetch(url,options);
+    if(String(url).includes("assets.upstox.com/market-quote/instruments"))
+      return new Response("instrument-master-test",{status:200});
+    if(String(url).includes("api.upstox.com/v3/market-quote/quotes")){
+      return new Response(JSON.stringify({status:"success",data:{[TEST_INSTRUMENT_KEY]:{
+        instrument_token:TEST_INSTRUMENT_KEY,timestamp:new Date(Date.now()-500).toISOString(),
+        depth:{buy:[{price:12.35,quantity:130}],sell:[{price:12.4,quantity:130}]},last_price:99.99
+      }}}),{status:200,headers:{"Content-Type":"application/json"}});
+    }
+    throw new Error("Unexpected test fetch URL: "+url);
+  };
+  rpcCalls.length=0;userQueries.length=0;
+  try{
+    return await withServer(async base=>request(base,"/paper/derivative/limit-orders",{
+      method:"POST",headers:{Authorization:"Bearer valid-options-test-token"},
+      body:{instrument_key:TEST_INSTRUMENT_KEY,side,lots:1,limit_price_paise:1240,idempotency_key:idempotencyKey}
+    }));
+  }finally{
+    global.fetch=originalFetch;Date.now=originalNow;authenticated=false;
+    paperOptionLimitWorkerStatus.enabled=false;
+    delete process.env.PAPER_OPTIONS_LIMIT_ENABLED;
+    delete process.env.PAPER_OPTIONS_LIMIT_WORKER_ENABLED;
+  }
+}
+
+test("authenticated NSE Options LIMIT BUY validates account, quote and session before user-scoped RPC",async()=>{
+  const result=await submitAuthenticatedOptionsLimit("BUY","00000000-0000-4000-8000-000000000020");
+  assert.equal(result.status,201,JSON.stringify(result.body));
+  assert.equal(result.body.status,"PENDING");
+  assert.equal(result.body.quantity,65);
+  assert.equal(result.body.simulationOnly,true);
+  assert.equal(rpcCalls.length,1);
+  assert.equal(rpcCalls[0].name,"submit_paper_option_limit_order");
+  assert.equal(rpcCalls[0].args.p_user_id,TEST_USER_ID);
+  assert.equal(rpcCalls[0].args.p_side,"BUY");
+  assert.equal(rpcCalls[0].args.p_quantity,65);
+  assert.equal(rpcCalls[0].args.p_limit_price_paise,1240);
+  assert.equal(rpcCalls[0].key,"test-service-role-key");
+  assert.ok(userQueries.some(q=>q.table==="paper_option_limit_orders"&&q.key==="test-publishable-key"));
+  assert.ok(userQueries.some(q=>q.table==="paper_accounts"&&q.key==="test-publishable-key"));
+});
+
+test("authenticated NSE Options LIMIT SELL reserves only existing unreserved long quantity",async()=>{
+  const result=await submitAuthenticatedOptionsLimit("SELL","00000000-0000-4000-8000-000000000021");
+  assert.equal(result.status,201,JSON.stringify(result.body));
+  assert.equal(result.body.status,"PENDING");
+  assert.equal(result.body.quantity,65);
+  assert.equal(result.body.reservedCloseQuantity,65);
+  assert.equal(result.body.simulationOnly,true);
+  assert.equal(rpcCalls.length,1);
+  assert.equal(rpcCalls[0].name,"submit_paper_option_limit_order");
+  assert.equal(rpcCalls[0].args.p_user_id,TEST_USER_ID);
+  assert.equal(rpcCalls[0].args.p_side,"SELL");
+  assert.equal(rpcCalls[0].args.p_quantity,65);
+  assert.equal(rpcCalls[0].key,"test-service-role-key");
+  assert.ok(userQueries.some(q=>q.table==="paper_derivative_positions"&&q.key==="test-publishable-key"));
+});
+
