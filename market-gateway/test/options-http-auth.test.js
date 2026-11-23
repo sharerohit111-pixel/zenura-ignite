@@ -96,6 +96,7 @@ test("authenticated NSE Options MARKET BUY submits with fresh ask and verified u
   rpcCalls.length=0;userQueries.length=0;
   const originalFetch=global.fetch;
   global.fetch=async(url,options={})=>{
+    if(String(url).startsWith("http://127.0.0.1:"))return originalFetch(url,options);
     if(String(url).includes("assets.upstox.com/market-quote/instruments"))
       return new Response("instrument-master-test",{status:200});
     if(String(url).includes("api.upstox.com/v3/market-quote/quotes")){
