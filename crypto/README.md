@@ -13,14 +13,22 @@ This is an isolated app folder deployed alongside (not replacing) the ZENURA IGN
 - ₹10,00,000 virtual starting balance stored locally in the current browser.
 - Responsive PWA shell and versioned service worker; HTML navigation uses network-first caching to pick up app updates.
 
+## Supabase cloud paper-trading integration
+- The Crypto Terminal uses its own `crypto/supabase-client.js` module and Supabase Auth (email/password and Google OAuth). The client targets the existing Supabase project but does not import the Indian Market frontend module. It does not use Firebase Authentication for the crypto trading session.
+- Signed-in users receive a separate cloud crypto paper account initialized with ₹10,00,000 virtual INR. Cloud MARKET and LIMIT orders, portfolio/order history synchronization, and LIMIT cancellation are routed through the trusted Supabase gateway.
+- The browser sends only the market symbol, side, quantity, LIMIT price where applicable, and an idempotency key. The trusted gateway obtains the authenticated user from the Supabase session and derives execution prices, INR reference rate, fee and accounting inputs server-side.
+- The zenura-crypto-api-url meta value is intentionally blank until a verified gateway is deployed. Signed-in orders fail closed while it is blank; no local trade is silently substituted for a failed cloud request.
+- Cloud LIMIT processing requires the deployed gateway's leased worker. A pending LIMIT order remains reserved until it is filled or cancelled.
+- Signed-in cloud stop-loss/target execution and cloud account reset are not enabled yet. The UI blocks those actions rather than pretending they are server-backed.
+- Guest paper trading remains a separate local-browser simulation. Guest balances, positions, risk settings and history do not sync across devices and may be lost if browser storage is cleared.
+- Legacy Firebase files and payment-related integrations are outside this crypto trading backend migration; do not infer that their data or entitlements have been migrated to Supabase.
+
 ## Important limitations
-- Paper trading only: no real exchange orders, deposits, withdrawals, leverage or margin.
+- Paper trading only: no real exchange orders, custody, deposits, withdrawals, leverage or margin.
 - USDT-to-INR is estimated using a USD/INR reference rate; it is not a direct exchange USDT/INR quote.
-- Guest paper account data is local to one browser/device. Clearing browser storage or changing device/browser does not sync or restore this account.
-- Google and email sign-in controls are present as a planned integration surface but remain disabled until Firebase Authentication is configured with the correct project credentials and authorized domains. There is no real sign-in/sign-out session yet.
-- Stop-loss and target monitoring is client-side only. A production-grade always-on risk engine needs a backend market feed and server-side execution scheduler.
-- GitHub Pages hosts the static PWA only. The optional Node.js market gateway must be hosted separately; do not run it on GitHub Pages.
+- GitHub Pages hosts the static PWA only. The Node.js market gateway must be hosted separately; do not run it on GitHub Pages.
 - A live price feed is not guaranteed if the provider, ISP, browser or region blocks public market endpoints.
+- Public market-data display and gateway deployment remain subject to written provider permission and applicable legal/compliance review.
 
 ## UPI payments and manual Premium approval
 - The Premium plans use the UPI ID `9756591106-4@ybl` and payee label `Rohit Kumar`. The app generates a plan-specific UPI QR and UPI intent.
@@ -40,3 +48,9 @@ This is an isolated app folder deployed alongside (not replacing) the ZENURA IGN
 
 ## Deployment
 The repository's existing GitHub Pages workflow publishes the repository root. This app lives at `/crypto/`, so it can be visited without replacing the root website.
+
+
+## Isolated development branch status (2026-11-23)
+- Crypto frontend, auth/cloud adapters, and additive Crypto-only SQL migrations are staged on `feature/crypto-only-supabase-backend-2026-11-23`.
+- The shared Indian-market gateway implementation is deliberately not copied into this branch. A dedicated Crypto-only gateway extraction and staging verification are still required.
+- No Supabase migration has been applied and no production deployment has been performed.
