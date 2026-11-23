@@ -30,9 +30,11 @@
 
 ## Blocking finding and isolated fix
 
-The Futures LIMIT worker calls the shared lease RPC using state key `paper_futures_limit_orders`, but the existing lease RPC allowlist accepts only `paper_limit_orders` and `paper_protective_orders`. Consequently the Futures worker cannot acquire its lease and fails closed before scanning orders.
+The Futures LIMIT worker uses the dedicated state key `paper_futures_limit_orders`, while the Futures implementation baseline's shared lease RPC only accepts equity LIMIT and protective-order keys. This prevents the Futures worker from acquiring its lease.
 
-This branch adds a forward-only migration to allow the dedicated Futures state key in both acquire and release RPCs. It preserves the existing lease TTL bounds, owner-token check, and service-role-only grants. A disposable SQL regression verifies exclusive ownership, wrong-owner release rejection, owner release, re-acquisition and grants.
+This branch adds a forward-only migration allowing the Futures key while explicitly preserving the existing equity LIMIT, intraday LIMIT and protective keys. It also retains the 5–300 second TTL bounds, safe-integer millisecond timestamp validation, owner-token check and service-role-only grants. The rollback-only SQL regression checks exclusive ownership, wrong-owner release rejection, owner release, idempotent release, reacquisition, preservation of existing worker keys, unsafe timestamp rejection and RPC grants.
+
+A separate Options development branch contains a broader derivative lease-key migration that also adds an Options key. This Futures-only branch intentionally does not change or import Options code; integration should reconcile the shared lease migration rather than blindly applying duplicate allowlist migrations.
 
 ## Remaining release gates
 
@@ -45,4 +47,4 @@ This branch adds a forward-only migration to allow the dedicated Futures state k
 
 ## Safety boundary
 
-The worker remains disabled unless its explicit environment flag is enabled; submission is separately gated. This change does not enable either flag. No production Supabase migration or Cloud Run deployment was run. Equity, Options and Crypto source files are not changed by this work.
+The worker remains disabled unless its explicit environment flag is enabled; submission is separately gated. This change does not enable either flag. No production Supabase migration or Cloud Run deployment was run. Equity, Options and Crypto execution source files are not changed by this work.

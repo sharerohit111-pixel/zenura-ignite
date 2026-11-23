@@ -1,6 +1,6 @@
--- Dedicated lease namespace for the isolated NSE Futures LIMIT worker.
--- This is a forward-only change; it does not enable the worker or submit route.
--- Keep the existing 240-second lease and service-role-only execution boundary.
+-- Register the isolated NSE Futures LIMIT worker lease key.
+-- Preserve all existing equity LIMIT, intraday LIMIT and protective worker keys.
+-- The Futures worker remains opt-in and is not enabled by this migration.
 
 create or replace function public.acquire_paper_market_worker_lease(
   p_state_key text,p_lease_token uuid,p_now_ms bigint,p_ttl_ms bigint
@@ -10,8 +10,12 @@ as $$
 declare v_token uuid;
 begin
   if p_state_key is null
-     or p_state_key not in ('paper_limit_orders','paper_protective_orders','paper_futures_limit_orders')
+     or p_state_key not in (
+       'paper_limit_orders','paper_protective_orders',
+       'paper_intraday_limit_orders','paper_futures_limit_orders'
+     )
      or p_lease_token is null or p_now_ms is null or p_now_ms<0
+     or p_now_ms>9007199254740991
      or p_ttl_ms is null or p_ttl_ms not between 5000 and 300000 then
     raise exception 'Invalid paper market worker lease request' using errcode='22023';
   end if;
@@ -42,8 +46,12 @@ as $$
 declare v_rows integer;
 begin
   if p_state_key is null
-     or p_state_key not in ('paper_limit_orders','paper_protective_orders','paper_futures_limit_orders')
-     or p_lease_token is null or p_now_ms is null or p_now_ms<0 then
+     or p_state_key not in (
+       'paper_limit_orders','paper_protective_orders',
+       'paper_intraday_limit_orders','paper_futures_limit_orders'
+     )
+     or p_lease_token is null or p_now_ms is null or p_now_ms<0
+     or p_now_ms>9007199254740991 then
     raise exception 'Invalid paper market worker lease release' using errcode='22023';
   end if;
   update public.paper_market_worker_state
@@ -64,4 +72,4 @@ grant execute on function public.release_paper_market_worker_lease(text,uuid,big
   to service_role;
 
 comment on function public.acquire_paper_market_worker_lease(text,uuid,bigint,bigint) is
-  'Service-role-only single-writer lease for equity LIMIT, protective and isolated Futures LIMIT workers.';
+  'Service-role-only single-writer lease for equity, intraday, protective and isolated NSE Futures LIMIT workers.';

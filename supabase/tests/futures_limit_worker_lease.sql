@@ -1,4 +1,4 @@
--- Disposable PostgreSQL regression for the dedicated Futures LIMIT worker lease.
+-- Disposable PostgreSQL regression for isolated NSE Futures LIMIT worker leases.
 BEGIN;
 DO $futures_worker_lease$
 DECLARE
@@ -6,6 +6,7 @@ DECLARE
   v_owner uuid:='f1111111-1111-4111-8111-111111111111';
   v_other uuid:='f2222222-2222-4222-8222-222222222222';
   v_acquired boolean;
+  v_rejected boolean;
 BEGIN
   v_acquired:=public.acquire_paper_market_worker_lease(
     'paper_futures_limit_orders',v_owner,v_now,240000
@@ -47,6 +48,32 @@ BEGIN
   PERFORM public.release_paper_market_worker_lease(
     'paper_futures_limit_orders',v_other,v_now+6
   );
+
+  -- Existing equity/intraday/protective namespaces must remain usable.
+  FOREACH v_acquired IN ARRAY ARRAY[
+    public.acquire_paper_market_worker_lease('paper_limit_orders',v_owner,v_now+10,120000),
+    public.acquire_paper_market_worker_lease('paper_intraday_limit_orders',v_owner,v_now+11,120000),
+    public.acquire_paper_market_worker_lease('paper_protective_orders',v_owner,v_now+12,120000)
+  ] LOOP
+    IF v_acquired IS NOT TRUE THEN
+      RAISE EXCEPTION 'An existing paper market worker lease key regressed';
+    END IF;
+  END LOOP;
+  PERFORM public.release_paper_market_worker_lease('paper_limit_orders',v_owner,v_now+13);
+  PERFORM public.release_paper_market_worker_lease('paper_intraday_limit_orders',v_owner,v_now+14);
+  PERFORM public.release_paper_market_worker_lease('paper_protective_orders',v_owner,v_now+15);
+
+  v_rejected:=false;
+  BEGIN
+    PERFORM public.acquire_paper_market_worker_lease(
+      'paper_futures_limit_orders',v_owner,9007199254740992,5000
+    );
+  EXCEPTION WHEN SQLSTATE '22023' THEN
+    v_rejected:=true;
+  END;
+  IF NOT v_rejected THEN
+    RAISE EXCEPTION 'Unsafe Futures worker timestamp was accepted';
+  END IF;
 
   IF has_function_privilege('anon',
        'public.acquire_paper_market_worker_lease(text,uuid,bigint,bigint)','EXECUTE')
