@@ -1,10 +1,12 @@
 "use strict";
 
+const {createHash}=require("node:crypto");
+
 // Indicative, non-posting expiry simulation for long NSE index options only.
 // Physical settlement and unverified settlement-price sources are deliberately blocked.
 function simulateLongIndexOptionExpiry({
   position,contract,settlementPricePaise,settlementDate,
-  settlementSource,settlementSourceSha256,settlementTimestampMs,verifiedAtMs,nowMs=Date.now()
+  settlementSource,settlementSourceContent,settlementSourceSha256,settlementTimestampMs,verifiedAtMs,nowMs=Date.now()
 }){
   const fail=(message,status=422)=>{throw Object.assign(new Error(message),{status});};
   const safe=(v,min=0)=>Number.isSafeInteger(v)&&v>=min;
@@ -19,7 +21,10 @@ function simulateLongIndexOptionExpiry({
   const sourceDate=new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Kolkata",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date(settlementTimestampMs));
   if(sourceDate!==settlementDate)fail("Settlement price timestamp does not belong to the contract expiry date.");
   if(typeof settlementSource!=="string"||!/^https:\/\/(?:[a-z0-9-]+\.)*nseindia\.com\//i.test(settlementSource))fail("An official NSE settlement-price source is required.");
-  if(typeof settlementSourceSha256!=="string"||! /^[a-f0-9]{64}$/.test(settlementSourceSha256))fail("A verified SHA-256 digest for the settlement source is required.");
+  if(typeof settlementSourceContent!=="string"||settlementSourceContent.length===0)fail("Settlement source content from the trusted NSE importer is required.");
+  if(typeof settlementSourceSha256!=="string"||! /^[a-f0-9]{64}$/.test(settlementSourceSha256))fail("A SHA-256 digest for the settlement source is required.");
+  const actualDigest=createHash("sha256").update(settlementSourceContent,"utf8").digest("hex");
+  if(actualDigest!==settlementSourceSha256)fail("Settlement source content does not match its SHA-256 digest.");
   const intrinsic=contract.instrumentType==="CE"
     ?Math.max(settlementPricePaise-contract.strikePricePaise,0)
     :Math.max(contract.strikePricePaise-settlementPricePaise,0);
