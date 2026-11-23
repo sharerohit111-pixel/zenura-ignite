@@ -125,17 +125,18 @@ test("fills from executable ask, bounds by displayed depth and passes exact quot
  assert.ok(db.calls.some(x=>x.type==="rpc"&&x.name==="release_paper_market_worker_lease"));
 });
 
-test("expires pending orders when verified session data is missing without requesting provider tokens",async()=>{
- let expiredId=null,tokenRequested=false;
- const db=makeDb({onRpc:async(name,args)=>{
-  if(name==="expire_paper_option_limit_order"){expiredId=args.p_order_id;return {data:{status:"EXPIRED",idempotent_replay:false},error:null};}
+test("fails closed and preserves pending orders when verified session data is missing",async()=>{
+ let expireCalls=0,tokenRequested=false;
+ const db=makeDb({onRpc:async(name)=>{
+  if(name==="expire_paper_option_limit_order")expireCalls++;
   return {data:true,error:null};
  }});
  const d=deps(db,{session:false,token:false});
  d.getUpstoxAccessToken=async()=>{tokenRequested=true;throw new Error("must not request token");};
  const result=await createPaperOptionLimitWorker(d)({maxOrders:10});
- assert.equal(result.expired,1);
- assert.equal(expiredId,ORDER);
+ assert.equal(result.expired,0);
+ assert.equal(result.notEligible,1);
+ assert.equal(expireCalls,0);
  assert.equal(tokenRequested,false);
 });
 
