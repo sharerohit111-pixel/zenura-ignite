@@ -78,6 +78,12 @@ jobs:
           if (!scripts.length) throw new Error('No inline Crypto Terminal scripts found');
           for (const source of scripts) new Function(source);
           NODE
+      - name: Test standalone Crypto gateway
+        working-directory: crypto-gateway
+        run: |
+          npm install --ignore-scripts --no-audit --no-fund
+          npm test
+          node --check server.js
       - name: Enforce Crypto client isolation from Indian Market frontend
         run: |
           if grep -R "../markets/stocks/supabase-client.js" crypto/supabase-*.js; then
