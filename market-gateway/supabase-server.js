@@ -11,6 +11,7 @@ const {downloadInstrumentMaster}=require("./lib/instrument-master-download");
 const {validateUpstoxFeedUrl}=require("./lib/upstox-feed-url");
 const {WATCHLIST_NAMES,normalizeWatchlists,mergeWatchlistUpdate}=require("./lib/watchlists");
 const {isUuid,makeOrderId,makeOrderFingerprint}=require("./lib/order-idempotency");
+const {decodeHistoryCursor,applyHistoryCursor,paginateHistoryRows}=require("./lib/history-cursor");
 const {normalizeProductMode}=require("./lib/product-mode");
 const {parseLimitPricePaise}=require("./lib/limit-price");
 const {normalizeProviderQuote}=require("./lib/provider-quote");
@@ -505,13 +506,17 @@ app.post("/paper/protective-orders/:orderId/cancel",async(req,res)=>{
 });
 app.get("/paper/orders",async(req,res)=>{
   try{
-    const {user,userDb}=await auth(req),raw=String(req.query.limit??"50");
+    const {user,userDb}=await auth(req),raw=String(req.query.limit??"50"),decoded=decodeHistoryCursor(req.query.cursor);
     if(!/^\d+$/.test(raw)||Number(raw)<1)return res.status(400).json({error:"Order history limit must be a whole number from 1 to 100."});
+    if(!decoded.ok)return res.status(400).json({error:"Order history cursor is invalid."});
     const limit=Math.min(Number(raw),100);
-    const {data,error}=await userDb.from("paper_orders").select("*").eq("user_id",user.id).order("created_at",{ascending:false}).limit(limit);
+    let query=userDb.from("paper_orders").select("*").eq("user_id",user.id);
+    query=applyHistoryCursor(query,decoded.cursor);
+    const {data,error}=await query.order("created_at",{ascending:false}).order("order_id",{ascending:false}).limit(limit+1);
     if(error)throw Object.assign(new Error("Paper order history could not be loaded."),{status:503});
-    const orders=(data||[]).map(o=>({id:o.order_id,tradingSymbol:o.trading_symbol,exchange:o.exchange,side:o.side,quantity:o.quantity,product:o.product,executionPricePaise:o.execution_price_paise,limitPricePaise:o.limit_price_paise,grossPaise:o.gross_paise,chargesPaise:o.charges_paise??0,chargesBreakdown:o.charges_breakdown??{},cashDeltaPaise:o.cash_delta_paise??null,realizedPnlPaise:o.realized_pnl_paise,orderType:o.order_type,status:o.status,simulationOnly:true,createdAt:o.created_at?Date.parse(o.created_at):null}));
-    res.set("Cache-Control","private, no-store").json({orders,hasMore:false,nextCursor:null,simulationOnly:true});
+    const page=paginateHistoryRows(data||[],limit);
+    const orders=page.rows.map(o=>({id:o.order_id,tradingSymbol:o.trading_symbol,exchange:o.exchange,side:o.side,quantity:o.quantity,product:o.product,executionPricePaise:o.execution_price_paise,limitPricePaise:o.limit_price_paise,grossPaise:o.gross_paise,chargesPaise:o.charges_paise??0,chargesBreakdown:o.charges_breakdown??{},cashDeltaPaise:o.cash_delta_paise??null,realizedPnlPaise:o.realized_pnl_paise,orderType:o.order_type,status:o.status,simulationOnly:true,createdAt:o.created_at?Date.parse(o.created_at):null}));
+    res.set("Cache-Control","private, no-store").json({orders,hasMore:page.hasMore,nextCursor:page.nextCursor,simulationOnly:true});
   }catch(error){sendError(res,error,"Paper order history could not be loaded.");}
 });
 app.get("/paper/portfolio",async(req,res)=>{
@@ -673,12 +678,15 @@ app.post("/paper/derivative/limit-orders",async(req,res)=>{
 });
 app.get("/paper/derivative/limit-orders",async(req,res)=>{
   try{
-    const {user,userDb}=await auth(req),raw=String(req.query.limit??"50");
+    const {user,userDb}=await auth(req),raw=String(req.query.limit??"50"),decoded=decodeHistoryCursor(req.query.cursor);
     if(!/^\d+$/.test(raw)||Number(raw)<1)return res.status(400).json({error:"Options LIMIT history limit must be from 1 to 100."});
-    const {data,error}=await userDb.from("paper_option_limit_orders").select("*")
-      .eq("user_id",user.id).order("created_at",{ascending:false}).limit(Math.min(Number(raw),100));
+    if(!decoded.ok)return res.status(400).json({error:"Options LIMIT history cursor is invalid."});
+    const limit=Math.min(Number(raw),100);
+    let query=userDb.from("paper_option_limit_orders").select("*").eq("user_id",user.id);
+    query=applyHistoryCursor(query,decoded.cursor);
+    const {data,error}=await query.order("created_at",{ascending:false}).order("order_id",{ascending:false}).limit(limit+1);
     if(error)throw Object.assign(new Error("Options LIMIT order history could not be loaded."),{status:503});
-    const orders=data||[],ids=orders.map(o=>o.order_id);
+    const page=paginateHistoryRows(data||[],limit),orders=page.rows,ids=orders.map(o=>o.order_id);
     let fills=[];
     if(ids.length){
       const result=await userDb.from("paper_option_limit_fills").select("*").in("order_id",ids)
@@ -703,6 +711,7 @@ app.get("/paper/derivative/limit-orders",async(req,res)=>{
         grossPaise:f.gross_paise,chargesPaise:f.incremental_charges_paise,
         realizedPnlPaise:f.realized_pnl_paise,quoteTimestampMs:f.quote_timestamp_ms
       })),
+      hasMore:page.hasMore,nextCursor:page.nextCursor,
       simulationOnly:true,includesCharges:true
     });
   }catch(error){sendError(res,error,"NSE Options LIMIT history could not be loaded.");}
@@ -773,12 +782,17 @@ app.post("/paper/derivative/orders",async(req,res)=>{
 });
 app.get("/paper/derivative/orders",async(req,res)=>{
   try{
-    const {user,userDb}=await auth(req),raw=String(req.query.limit??"50");
+    const {user,userDb}=await auth(req),raw=String(req.query.limit??"50"),decoded=decodeHistoryCursor(req.query.cursor);
     if(!/^\d+$/.test(raw)||Number(raw)<1)return res.status(400).json({error:"Derivative order history limit must be from 1 to 100."});
-    const {data,error}=await userDb.from("paper_derivative_orders").select("*").eq("user_id",user.id).order("created_at",{ascending:false}).limit(Math.min(Number(raw),100));
+    if(!decoded.ok)return res.status(400).json({error:"Derivative order history cursor is invalid."});
+    const limit=Math.min(Number(raw),100);
+    let query=userDb.from("paper_derivative_orders").select("*").eq("user_id",user.id);
+    query=applyHistoryCursor(query,decoded.cursor);
+    const {data,error}=await query.order("created_at",{ascending:false}).order("order_id",{ascending:false}).limit(limit+1);
     if(error)throw Object.assign(new Error("Derivative order history could not be loaded."),{status:503});
-    const orders=(data||[]).map(o=>({id:o.order_id,tradingSymbol:o.trading_symbol,instrumentKey:o.instrument_key,instrumentType:o.instrument_type,expiry:o.expiry,side:o.side,quantity:o.quantity,lots:o.lots,executionPricePaise:o.execution_price_paise,grossPaise:o.gross_paise,chargesPaise:o.charges_paise||0,totalDebitPaise:o.total_debit_paise??null,netCreditPaise:o.net_credit_paise??null,status:o.status,orderType:o.order_type,simulationOnly:true,createdAt:o.created_at?Date.parse(o.created_at):null}));
-    res.set("Cache-Control","private, no-store").json({orders,simulationOnly:true,excludesCharges:false});
+    const page=paginateHistoryRows(data||[],limit);
+    const orders=page.rows.map(o=>({id:o.order_id,tradingSymbol:o.trading_symbol,instrumentKey:o.instrument_key,instrumentType:o.instrument_type,expiry:o.expiry,side:o.side,quantity:o.quantity,lots:o.lots,executionPricePaise:o.execution_price_paise,grossPaise:o.gross_paise,chargesPaise:o.charges_paise||0,totalDebitPaise:o.total_debit_paise??null,netCreditPaise:o.net_credit_paise??null,status:o.status,orderType:o.order_type,simulationOnly:true,createdAt:o.created_at?Date.parse(o.created_at):null}));
+    res.set("Cache-Control","private, no-store").json({orders,hasMore:page.hasMore,nextCursor:page.nextCursor,simulationOnly:true,excludesCharges:false});
   }catch(error){sendError(res,error,"Derivative order history could not be loaded.");}
 });
 app.get("/paper/derivatives/portfolio",async(req,res)=>{
@@ -1007,12 +1021,17 @@ app.post("/paper/futures/orders/:orderId/cancel",async(req,res)=>{
 
 app.get("/paper/futures/orders",async(req,res)=>{
   try{
-    const {user,userDb}=await auth(req),raw=String(req.query.limit??"50");
+    const {user,userDb}=await auth(req),raw=String(req.query.limit??"50"),decoded=decodeHistoryCursor(req.query.cursor);
     if(!/^\d+$/.test(raw)||Number(raw)<1)return res.status(400).json({error:"Futures order history limit must be from 1 to 100."});
-    const {data,error}=await userDb.from("paper_futures_orders").select("*").eq("user_id",user.id).order("created_at",{ascending:false}).limit(Math.min(Number(raw),100));
+    if(!decoded.ok)return res.status(400).json({error:"Futures order history cursor is invalid."});
+    const limit=Math.min(Number(raw),100);
+    let query=userDb.from("paper_futures_orders").select("*").eq("user_id",user.id);
+    query=applyHistoryCursor(query,decoded.cursor);
+    const {data,error}=await query.order("created_at",{ascending:false}).order("order_id",{ascending:false}).limit(limit+1);
     if(error)throw Object.assign(new Error("Futures order history could not be loaded."),{status:503});
-    const orders=(data||[]).map(o=>({id:o.order_id,tradingSymbol:o.trading_symbol,instrumentKey:o.instrument_key,exchange:o.exchange,expiry:o.expiry,side:o.side,product:o.product,quantity:o.quantity,filledQuantity:o.filled_quantity??(o.status==="FILLED"?o.quantity:0),remainingQuantity:o.remaining_quantity??(o.status==="FILLED"?0:o.quantity),lotSize:o.lot_size,orderType:o.order_type,limitPricePaise:o.limit_price_paise??null,executionPricePaise:o.execution_price_paise??null,averageFillPricePaise:o.average_fill_price_paise??null,marginReservedPaise:o.margin_reserved_paise??null,reservedOpenMarginPaise:o.reserved_open_margin_paise??0,reservedCloseQuantity:o.reserved_close_quantity??0,expiresAt:o.expires_at??null,chargesPaise:o.charges_paise??0,realizedPnlPaise:o.realized_pnl_paise??0,status:o.status,simulationOnly:true,createdAt:o.created_at?Date.parse(o.created_at):null}));
-    res.set("Cache-Control","private, no-store").json({orders,simulationOnly:true});
+    const page=paginateHistoryRows(data||[],limit);
+    const orders=page.rows.map(o=>({id:o.order_id,tradingSymbol:o.trading_symbol,instrumentKey:o.instrument_key,exchange:o.exchange,expiry:o.expiry,side:o.side,product:o.product,quantity:o.quantity,filledQuantity:o.filled_quantity??(o.status==="FILLED"?o.quantity:0),remainingQuantity:o.remaining_quantity??(o.status==="FILLED"?0:o.quantity),lotSize:o.lot_size,orderType:o.order_type,limitPricePaise:o.limit_price_paise??null,executionPricePaise:o.execution_price_paise??null,averageFillPricePaise:o.average_fill_price_paise??null,marginReservedPaise:o.margin_reserved_paise??null,reservedOpenMarginPaise:o.reserved_open_margin_paise??0,reservedCloseQuantity:o.reserved_close_quantity??0,expiresAt:o.expires_at??null,chargesPaise:o.charges_paise??0,realizedPnlPaise:o.realized_pnl_paise??0,status:o.status,simulationOnly:true,createdAt:o.created_at?Date.parse(o.created_at):null}));
+    res.set("Cache-Control","private, no-store").json({orders,hasMore:page.hasMore,nextCursor:page.nextCursor,simulationOnly:true});
   }catch(error){sendError(res,error,"Futures order history could not be loaded.");}
 });
 app.get("/paper/futures/portfolio",async(req,res)=>{
