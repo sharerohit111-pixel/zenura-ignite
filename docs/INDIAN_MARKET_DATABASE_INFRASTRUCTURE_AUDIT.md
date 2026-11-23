@@ -245,3 +245,23 @@ Latest relevant commits:
 - Regression contract update: `0e095acf1e7bab2698ea1b710935aa3c2e9eaba3`
 
 All changes remain on the isolated infrastructure feature branch. The SQL was source-reviewed only; no PostgreSQL runtime result has been observed yet. The cross-tenant composite-FK draft remains unexecuted because the branch still lacks a canonical merged Futures/Options migration chain. No production database or Crypto asset was modified.
+
+
+## PostgreSQL 17 disposable CI result (2026-11-23)
+
+<https://github.com/sharerohit111-pixel/zenura-ignite/actions/runs/45158171206>
+
+Run `45158171206`, commit `5dbf8eecbf24c72a5d436c378e86c269f7f8fdc3`, completed with **success** on PostgreSQL 17.12.
+
+All job steps passed:
+- Ordered repository migrations applied to disposable PostgreSQL.
+- Draft Equity atomic fill/ledger RPC integration compiled and applied.
+- Equity fill/ledger schema and append-only checks.
+- MARKET BUY/SELL fee settlement tests.
+- Delivery LIMIT BUY/SELL ledger reconciliation, replay and injected rollback test.
+- Intraday LIMIT reservation/fill lifecycle assertions.
+- Concurrent Intraday LIMIT fill-vs-cancel and cancel-vs-fill race script.
+
+The initial CI failure identified missing `v_fill_id uuid` declarations in all three replaced Equity RPCs. The draft was corrected and the successful run confirms the SQL compiles and the listed tests pass in this disposable fixture.
+
+Scope limitation: this does not validate the separate tenant composite-FK draft, canonical merged Futures/Options migration chain, Supabase production behavior, or production deployment. No production database writes were made.
