@@ -143,7 +143,7 @@ function createPaperOptionLimitWorker({
               else summary.notEligible++;
               continue;
             }
-            if(sessionState==="BEFORE_OPEN"){
+            if(sessionState==="MISSING"||sessionState==="BEFORE_OPEN"){
               summary.notEligible++;
               continue;
             }
