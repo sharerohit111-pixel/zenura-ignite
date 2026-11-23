@@ -16,6 +16,15 @@ test("Futures MARKET and LIMIT execution accept only NSE_FO contracts",()=>{
   assert.match(route,/Futures LIMIT currently supports NSE contracts only/);
 });
 
+test("Futures MARKET orders require a verified open NSE session after idempotent replay",()=>{
+  const replay=route.indexOf("idempotentReplay:true,simulationOnly:true");
+  const session=route.indexOf("loadVerifiedExchangeSession(serviceDb,instrument.exchange,marketNowMs)");
+  const quote=route.indexOf("getUpstoxAccessToken(user.id)",session);
+  assert.ok(replay>=0&&session>replay,"exact retries must return their stored receipt without a market-session dependency");
+  assert.ok(quote>session,"new MARKET orders must validate the verified session before provider access");
+  assert.match(route,/isVerifiedSessionOpen\(marketNowMs,marketSession\)/);
+});
+
 test("Futures MARKET execution uses fresh executable depth, not LTP fallback",()=>{
   assert.match(server,/extractUpstoxRestExecutableQuote/);
   assert.match(server,/resolveFuturesMarketExecution/);
