@@ -104,10 +104,19 @@ These Auth settings are separate from the Cloud Run deployment workflow and must
 - Paper Trading equity MARKET orders are supported.
 - Equity LIMIT orders are currently supported for **Delivery** and are processed by the in-service worker.
 - Intraday LIMIT now has a separate SQL reservation/fill/cancel/expiry lifecycle, session-aware quote validation, a dedicated leased worker and gateway routing. It remains **disabled by default** until official verified calendar rows are loaded and reviewed; the deployment workflow does not enable it.
-- Futures LIMIT and NSE long CE/PE Options LIMIT have isolated draft backend/RPC/worker implementations under review; neither is deployed or enabled in production. Options LIMIT is NSE-only and long-only; BSE Options LIMIT and short-option opening remain unsupported.
+- Futures LIMIT and NSE long CE/PE Options LIMIT have isolated draft backend/RPC/worker implementations and a gated Options LIMIT ticket UI under review; none is deployed or enabled in production. Options LIMIT is NSE-only and long-only; BSE Options LIMIT and short-option opening remain unsupported.
 - Futures and long CE/PE option market-order paths are separate transactional flows.
 - Paper Investing routes and its dedicated ledger have been retired under the Paper Trading-only product scope.
 - Equity SELL-to-close stop-loss/target execution has a separately leased, bounded, fresh-quote worker implementation and an owner-bound cancellation API. The worker is **opt-in and disabled by default**. Protective-order creation UI/API are now integrated in the isolated stock-terminal module, with authenticated create/list/cancel flows, per-user idempotent retry protection and a fail-closed worker-enabled gate. CI covers the module contract and backend fill/cancel row-lock race. A staging browser-to-gateway trigger/cancel rehearsal and production readiness checks remain incomplete; the worker stays opt-in and disabled by default. Do not claim always-on protective execution until those gates pass. Futures and Options protective exits remain unsupported.
+
+## NSE Options LIMIT API surface (draft, disabled by default)
+
+- `POST /paper/derivative/limit-orders`: authenticated NSE CE/PE long-only LIMIT submit; requires a verified session, fresh executable depth, official instrument metadata, and an idempotency key.
+- `GET /paper/derivative/limit-orders`: owner-scoped order and fill history.
+- `DELETE /paper/derivative/limit-orders/:orderId`: owner-bound cancel for pending/partially-filled orders.
+- The Options LIMIT ticket checks `/health` and remains disabled unless both `PAPER_OPTIONS_LIMIT_ENABLED=true` and `PAPER_OPTIONS_LIMIT_WORKER_ENABLED=true` are explicitly set. Both flags are unset/false in the current deployment.
+- The worker uses the user's own connected Upstox token, fresh NSE bid/ask depth and a dedicated Postgres lease. No live broker/exchange order is sent.
+- Enable only after staging browser-to-gateway submit/fill/cancel rehearsal, race tests, session/instrument validation, market-data rights approval and compliance sign-off.
 
 ## Manual build reference
 
