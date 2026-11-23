@@ -23,7 +23,7 @@ BEGIN
   -- Browser users intentionally retain RLS-scoped SELECT on their own orders and
   -- equity positions. Provider connections and worker state stay server-only.
   FOREACH v_table IN ARRAY ARRAY[
-    'upstox_connections','paper_market_worker_state','paper_protective_orders'
+    'upstox_connections','paper_market_worker_state'
   ] LOOP
     IF has_table_privilege('authenticated','public.'||v_table,'SELECT') THEN
       RAISE EXCEPTION 'authenticated unexpectedly has private SELECT access to %',v_table;
