@@ -25,3 +25,14 @@ test("Futures idempotent MARKET replay returns the original fill before requirin
   assert.match(server,/validateDerivativeContract,normalizeTickSizePaise/);
   assert.match(server,/pricePaise:normalizeTickSizePaise\(instrument\.tick_size\)/);
 });
+
+
+test("Long-option idempotent replay returns the original fill before requiring a live provider quote",()=>{
+  const replayLookup=server.indexOf('from("paper_derivative_orders").select("*").eq("user_id",user.id).eq("idempotency_key",idempotencyKey)');
+  const replayReturn=server.indexOf("idempotentReplay:true,simulationOnly:true,excludesCharges:false",replayLookup);
+  const providerQuote=server.indexOf("getUpstoxAccessToken(user.id)",replayLookup);
+  assert.ok(replayLookup>=0,"option idempotency lookup must exist");
+  assert.ok(replayReturn>replayLookup,"stored option fill must be returned on replay");
+  assert.ok(providerQuote>replayReturn,"provider token/quote must only be required for a new option order");
+  assert.match(server,/pricePaise:normalizeTickSizePaise\(instrument\.tick_size\)/);
+});
