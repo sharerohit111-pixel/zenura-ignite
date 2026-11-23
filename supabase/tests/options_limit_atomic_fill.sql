@@ -82,7 +82,7 @@ BEGIN
     RAISE EXCEPTION 'First Options BUY fill did not conserve order/account/position ledger';
   END IF;
 
-  -- Exact replay remains idempotent after the quote timestamp has aged out.
+  -- Exact execution replay is a no-op and does not debit the account twice.
   PERFORM pg_sleep(0.02);
   v_now:=floor(extract(epoch from clock_timestamp())*1000)::bigint;
   v_result:=public.execute_paper_option_limit_fill(
@@ -195,7 +195,7 @@ BEGIN
     'cdcdcdcd-0000-4000-8000-000000000003',repeat('c',64),
     'NSE_FO|OPTION_LIMIT_BAD_FILL','OPTION_LIMIT_BAD_FILL','NSE','NSE_FO','PE',
     current_date+5,25000,65,5,'BUY',65,1250,
-    floor(extract(epoch from clock_timestamp()*1000))::bigint,
+    floor(extract(epoch from clock_timestamp())*1000)::bigint,
     clock_timestamp()+interval '10 minutes'
   );
   v_rejected:=false;
