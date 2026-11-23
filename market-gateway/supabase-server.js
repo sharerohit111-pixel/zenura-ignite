@@ -711,6 +711,8 @@ app.post("/paper/futures/orders",async(req,res)=>{
     if(orderType==="LIMIT"){
       if(process.env.PAPER_FUTURES_LIMIT_ENABLED!=="true")
         return res.status(503).json({error:"Futures LIMIT submission is currently disabled."});
+      if(instrument.exchange!=="NSE"||instrument.segment!=="NSE_FO")
+        return res.status(400).json({error:"Futures LIMIT currently supports NSE contracts only; BSE remains disabled."});
       const submitNowMs=Date.now();
       const session=await loadVerifiedExchangeSession(serviceDb,instrument.exchange,submitNowMs);
       if(!isVerifiedSessionOpen(submitNowMs,session))
