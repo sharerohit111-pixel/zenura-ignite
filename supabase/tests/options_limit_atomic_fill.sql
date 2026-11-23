@@ -208,6 +208,62 @@ BEGIN
   END;
   IF NOT v_rejected THEN RAISE EXCEPTION 'Worse-than-limit Options BUY fill was accepted'; END IF;
 
+  -- Positive-path PE round trip: reserve, fill a long PE, then close it.
+  -- This proves the same fee-inclusive ledger path works for PE, not only CE.
+  v_now:=floor(extract(epoch from clock_timestamp())*1000)::bigint;
+  PERFORM public.submit_paper_option_limit_order(
+    'cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd',repeat('d',64),
+    'cdcdcdcd-0000-4000-8000-000000000004',repeat('d',64),
+    'NSE_FO|OPTION_LIMIT_PE_ROUNDTRIP','OPTION_LIMIT_PE_ROUNDTRIP','NSE','NSE_FO','PE',
+    current_date+5,25000,65,5,'BUY',65,1250,v_now,clock_timestamp()+interval '10 minutes'
+  );
+  v_now:=floor(extract(epoch from clock_timestamp())*1000)::bigint;
+  v_result:=public.execute_paper_option_limit_fill(
+    repeat('d',64),'UPSTOX-OPTION-PE-BUY',1,65,1240,1235,1240,100,65,v_now,v_now
+  );
+  SELECT instrument_type,net_quantity,cost_basis_paise,reserved_quantity
+    INTO v_status,v_position_qty,v_position_basis,v_position_reserved
+    FROM public.paper_derivative_positions
+   WHERE user_id='cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd'
+     AND instrument_key='NSE_FO|OPTION_LIMIT_PE_ROUNDTRIP';
+  IF v_result->>'status'<>'FILLED' OR v_status<>'PE'
+     OR v_position_qty<>65 OR v_position_basis<>82996 OR v_position_reserved<>0 THEN
+    RAISE EXCEPTION 'Positive-path PE BUY did not create the expected fee-inclusive long position: %, %, %, %',
+      v_result,v_status,v_position_qty,v_position_basis;
+  END IF;
+
+  v_now:=floor(extract(epoch from clock_timestamp())*1000)::bigint;
+  PERFORM public.submit_paper_option_limit_order(
+    'cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd',repeat('e',64),
+    'cdcdcdcd-0000-4000-8000-000000000005',repeat('e',64),
+    'NSE_FO|OPTION_LIMIT_PE_ROUNDTRIP','OPTION_LIMIT_PE_ROUNDTRIP','NSE','NSE_FO','PE',
+    current_date+5,25000,65,5,'SELL',65,1300,v_now,clock_timestamp()+interval '10 minutes'
+  );
+  v_now:=floor(extract(epoch from clock_timestamp())*1000)::bigint;
+  v_result:=public.execute_paper_option_limit_fill(
+    repeat('e',64),'UPSTOX-OPTION-PE-SELL',1,65,1300,1300,1305,65,100,v_now,v_now
+  );
+  SELECT cash_paise,realized_pnl_paise,reserved_cash_paise
+    INTO v_account_cash,v_account_realized,v_account_reserved
+    FROM public.paper_accounts
+   WHERE user_id='cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd';
+  SELECT count(*),coalesce(sum(incremental_charges_paise),0)
+    INTO v_fill_count,v_fill_charges
+    FROM public.paper_option_limit_fills
+   WHERE order_id in (repeat('d',64),repeat('e',64));
+  IF v_result->>'status'<>'FILLED'
+     OR v_account_cash<>99998414 OR v_account_realized<>-1586
+     OR v_account_reserved<>0 OR v_fill_count<>2 OR v_fill_charges<>4918
+     OR EXISTS(SELECT 1 FROM public.paper_derivative_positions
+       WHERE user_id='cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd'
+         AND instrument_key='NSE_FO|OPTION_LIMIT_PE_ROUNDTRIP')
+     OR (SELECT count(*) FROM public.paper_option_limit_orders
+       WHERE order_id in (repeat('d',64),repeat('e',64))
+         AND instrument_type='PE' AND status='FILLED')<>2 THEN
+    RAISE EXCEPTION 'Positive-path PE BUY/SELL round trip failed accounting/reservation reconciliation: %, cash %, realized %, reserved %, fill count %, charges %',
+      v_result,v_account_cash,v_account_realized,v_account_reserved,v_fill_count,v_fill_charges;
+  END IF;
+
   IF has_function_privilege('anon',
        'public.execute_paper_option_limit_fill(text,text,integer,integer,bigint,bigint,bigint,integer,integer,bigint,bigint)',
        'EXECUTE')
