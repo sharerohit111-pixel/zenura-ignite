@@ -63,3 +63,10 @@ Latest run #45109955835 completed all 16 primary workflow steps successfully, in
 Read-only inspection of the connected Supabase Production project confirms that no `paper_crypto_*` tables or Crypto migrations are installed there. No dedicated isolated Crypto staging database is currently available; the existing project must not receive these migrations as a substitute.
 No Crypto Edge Functions are deployed in the connected Supabase project. No Crypto gateway hosting, secrets, production migrations or deployment have been changed.
 Next release gates: provision/identify isolated staging with approved cost, apply only the reviewed Crypto migrations there, perform authenticated end-to-end MARKET/LIMIT tests, then implement server-side stop-loss/target and account reset before enabling those signed-in controls.
+
+
+## Supabase staging cost quote — 2026-11-23
+- The ZENURA IGNITE Supabase organization was verified as `afmowmxpfuykokvgjfxb`.
+- Supabase returned a development-branch estimate of **$0.01344 per hour**. At continuous usage this is approximately **$0.32256 per day** or **$9.81 per 30-day month** (720 hours).
+- This is a quote/estimate only. No staging branch has been created and no cost has been incurred. Obtain explicit agreement to the quoted charge before creating the branch.
+- A development branch is based on the selected parent project's migrations; verify parent-project suitability and migration impact before creation. Do not use a production parent if it would expose production data/schema to unintended branch operations.
