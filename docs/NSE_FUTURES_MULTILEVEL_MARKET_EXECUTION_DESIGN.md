@@ -105,7 +105,7 @@ Disposable PostgreSQL tests (required before integration):
 
 ## 7. Rollout gates
 
-1. Review this proposal with Futures Risk & Accounting (current candidate PR #105) and the Futures LIMIT/accounting owners.
+1. Review this proposal with Futures Risk & Accounting (current candidate PR #106; PR #105 is superseded) and the Futures LIMIT/accounting owners.
 2. Reconcile fill-ledger compatibility against the actual ordered migrations and hosted migration history; an open PR is not deployed schema.
 3. Implement the pure depth-sweep helper and unit tests separately from database work.
 4. Implement a coordinated atomic SQL batch RPC only after written accounting/margin approval.
