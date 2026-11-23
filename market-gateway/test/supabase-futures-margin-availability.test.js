@@ -36,3 +36,15 @@ test("Long-option idempotent replay returns the original fill before requiring a
   assert.ok(providerQuote>replayReturn,"provider token/quote must only be required for a new option order");
   assert.match(server,/pricePaise:normalizeTickSizePaise\(instrument\.tick_size\)/);
 });
+
+test("Futures margin preview validates the contract and consumes its rate-limit slot before provider access",()=>{
+  const route=server.slice(server.indexOf('app.post("/paper/derivative/margin-preview"'),server.indexOf('app.post("/paper/derivative/orders"'));
+  const instrument=route.indexOf('const instrument=instrumentCache.find');
+  const reject=route.indexOf('if(!instrument)return res.status(400)');
+  const rate=route.indexOf('consume_paper_margin_preview_slot');
+  const token=route.indexOf('getUpstoxAccessToken(user.id)');
+  const quote=route.indexOf('getQuote(token,instrumentKey)');
+  assert.ok(instrument>=0&&reject>instrument,"official instrument must be validated");
+  assert.ok(rate>reject,"rate-limit slot must be consumed only after contract validation");
+  assert.ok(token>rate&&quote>token,"provider credentials and quote must only be requested after rate limiting");
+});
