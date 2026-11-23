@@ -175,3 +175,11 @@ This branch now destructures `{user,userDb}` and adds a regression assertion to 
 - Load tests cover Cloud Run's documented instance concurrency and autoscaling; no production worker or gateway activation is part of this audit.
 
 **Decision:** architecture audit and documentation only. No limiter middleware, process-local substitute, Redis/Upstash dependency, secret, SQL migration, RPC, RLS change or infrastructure activation is introduced in this change. Shared database work remains blocked on Chat 7 coordination.
+
+
+## 12. Existing shared-schema coordination check
+
+- Repository PR #70 (draft Supabase migration foundation) describes a proposed rate-limit-state table among its draft schema objects. Its own PR description says the migration set remains draft, has not been applied, and still requires SQL/RLS/runtime/concurrency validation.
+- This is not evidence that a compatible shared limiter table/RPC exists in the current Indian Market migration chain or in the hosted database. Do not assume the PR #70 draft table is deployed, mergeable, or suitable for the new route-family/token-bucket policy.
+- Before implementation, Chat 7 should reconcile PR #70's proposed rate-limit state with the current ordered migration chain and current hosted migration history, then decide whether to extend an existing draft object or create a forward-only migration. Avoid duplicate tables, conflicting key formats, or broadening service-role grants.
+- No SQL file was copied, modified, applied, or merged as part of this coordination check.
