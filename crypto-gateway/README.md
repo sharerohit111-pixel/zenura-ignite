@@ -14,7 +14,7 @@ This service is deliberately separate from `market-gateway`. It exposes only Cry
 - Node.js 22; install with `npm ci` after generating and reviewing the package lock in a controlled build environment.
 - Configure Supabase URL, publishable key, server-only service-role secret and exact CORS origins using the host secret manager. Never commit service-role credentials.
 - Set `CRYPTO_LIMIT_WORKER_ENABLED=true` only after Crypto migrations and regression tests pass in an isolated staging database.
-- The service verifies Supabase access tokens server-side, uses service-role access only for allowlisted Crypto RPCs, and uses the user's JWT for RLS-scoped reads.
+- The service verifies Supabase access tokens server-side, uses service-role access only for allowlisted Crypto RPCs, and uses the user's JWT for RLS-scoped reads. State-changing Crypto order routes have a bounded per-process limit of 30 requests per minute per socket peer; deploy a shared edge/API-gateway limiter as well when running multiple replicas.
 - MARKET execution uses a fresh Binance Spot trade quote; LIMIT fills use a fresh server-side quote and leased Crypto-only worker. USD/INR conversion is fetched server-side.
 - All orders are simulated only. No real exchange order, custody, deposit, withdrawal, leverage, or margin functionality exists.
 - No hosting, DNS, secret configuration, migration, or deployment has been performed.
