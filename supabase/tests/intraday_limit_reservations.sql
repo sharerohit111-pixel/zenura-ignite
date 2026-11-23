@@ -423,16 +423,5 @@ BEGIN
 END
 $intraday_limit_checks$;
 
-DELETE FROM public.paper_orders WHERE order_id IN (repeat('a',64),repeat('c',64),repeat('e',64),repeat('1',64),repeat('3',64),repeat('5',64));
-DELETE FROM public.paper_equity_positions
- WHERE user_id='22222222-2222-4222-8222-222222222222'
-   AND product='INTRADAY' AND instrument_key IN ('NSE_EQ|INTRA_LIMIT_CI','NSE_EQ|INTRA_FILL_BUY','NSE_EQ|INTRA_STALE_CI');
-DELETE FROM public.paper_exchange_sessions
- WHERE source_reference='CI verified session fixture';
--- Restore the shared CI account fixture so later independent MARKET/LIMIT tests
--- begin from the same deterministic 10-lakh balance.
-UPDATE public.paper_accounts
-   SET cash_paise=100000000,reserved_cash_paise=0,reserved_margin_paise=0,
-       realized_pnl_paise=0,delivery_realized_pnl_paise=0,
-       intraday_realized_pnl_paise=0,version=version+1,updated_at=clock_timestamp()
- WHERE user_id='22222222-2222-4222-8222-222222222222';
+-- Roll back fixtures and deferred audit records; immutable history is never deleted.
+ROLLBACK;
