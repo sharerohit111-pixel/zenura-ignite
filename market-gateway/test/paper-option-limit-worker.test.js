@@ -199,3 +199,44 @@ test("uses a separate connected Upstox token for each Options LIMIT account",asy
  assert.deepEqual(new Set(requestedUsers),new Set([USER,secondUser]));
  assert.deepEqual(new Set(authorizationHeaders),new Set(["Bearer token-for-"+USER,"Bearer token-for-"+secondUser]));
 });
+
+
+test("rejects corrupted contract identity, expiry, strike and lot/quantity reconciliation",()=>{
+ const badOrders=[
+  {...order,instrument_key:"NSE_FO|OTHER"},
+  {...order,trading_symbol:"NIFTY26NOV25000PE"},
+  {...order,instrument_type:"PE"},
+  {...order,expiry:"2026-11-27"},
+  {...order,strike_price:25100},
+  {...order,lot_size:25},
+  {...order,quantity:66},
+  {...order,quantity:130,filled_quantity:0,remaining_quantity:65},
+  {...order,filled_quantity:65,remaining_quantity:65},
+  {...order,quantity:65,filled_quantity:-1,remaining_quantity:66},
+  {...order,limit_price_paise:1251},
+  {...order,tick_size_paise:0}
+ ];
+ for(const candidate of badOrders){
+  assert.equal(isValidNseOptionLimitOrder(candidate,instrument),false,
+   "corrupted order should fail closed: "+JSON.stringify(candidate));
+ }
+});
+
+test("accepts a partially filled SELL close only when its remaining quantity stays reserved",()=>{
+ const sell={
+  ...order,side:"SELL",quantity:130,filled_quantity:65,remaining_quantity:65,
+  reserved_cash_paise:0,reserved_close_quantity:65,status:"PARTIALLY_FILLED"
+ };
+ assert.equal(isValidNseOptionLimitOrder(sell,instrument),true);
+ assert.equal(isValidNseOptionLimitOrder({...sell,reserved_close_quantity:64},instrument),false);
+ assert.equal(isValidNseOptionLimitOrder({...sell,reserved_cash_paise:1},instrument),false);
+ assert.equal(isValidNseOptionLimitOrder({...sell,remaining_quantity:66},instrument),false);
+});
+
+test("expires an option at the exact 15:30 Asia/Kolkata cutoff, not one millisecond earlier",()=>{
+ const expiryOrder={...order,expiry:"2026-11-23"};
+ const cutoff=Date.parse("2026-11-23T15:30:00+05:30");
+ assert.equal(isContractExpired(expiryOrder,cutoff-1),false);
+ assert.equal(isContractExpired(expiryOrder,cutoff),true);
+ assert.equal(isContractExpired(expiryOrder,cutoff+1),true);
+});
