@@ -44,6 +44,7 @@ DECLARE
   v_fill_count integer;
   v_filled integer;
   v_status text;
+  v_expected_status text;
   v_fill_realized bigint;
   v_fill_charges bigint;
   v_released_basis bigint;
@@ -83,8 +84,8 @@ BEGIN
       repeat('2',64),'CHAT6-PARTIAL-CLOSE-'||i::text,i,65,1500,
       1500,1505,65,100,v_now,v_now
     );
-    IF v_result->>'status' IS DISTINCT FROM
-       CASE WHEN i=3 THEN 'FILLED' ELSE 'PARTIALLY_FILLED' END THEN
+    v_expected_status:=CASE WHEN i=3 THEN 'FILLED' ELSE 'PARTIALLY_FILLED' END;
+    IF v_result->>'status' IS DISTINCT FROM v_expected_status THEN
       RAISE EXCEPTION 'Unexpected status on repeated partial close %: %',i,v_result;
     END IF;
   END LOOP;
