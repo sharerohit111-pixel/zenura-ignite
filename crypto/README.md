@@ -78,5 +78,5 @@ Next release gates: provision/identify isolated staging with approved cost, appl
 - Completed order and trade-ledger history is preserved; reset events are stored separately with previous/reset cash, previous realized P&L, cancelled-order count, and closed-position count.
 - Added authenticated gateway route `POST /crypto/account/reset` and a cloud adapter method. The adapter retains its request UUID after a failed request so a safe retry is idempotent.
 - Added disposable-PostgreSQL regression coverage for reservation release, position closure, balance restoration, history preservation and idempotent replay; added this test to the Crypto CI workflow.
-- **Validation pending:** GitHub Actions has not yet reported a run for the latest implementation commit. The reset migration remains unapplied to Supabase; no account has been reset.
+- GitHub Actions run [#45110691382](https://github.com/sharerohit111-pixel/zenura-ignite/actions/runs/45110691382) passed all 17 workflow steps on the implementation head. All eight disposable-PostgreSQL regression suites passed, including the new reset lifecycle test; browser syntax, gateway tests and Crypto/Indian Market isolation also passed. This is CI against disposable PostgreSQL, not live Supabase staging.
 - Account reset is exposed as an API/client method but is not yet wired to a user-facing confirmation control.
