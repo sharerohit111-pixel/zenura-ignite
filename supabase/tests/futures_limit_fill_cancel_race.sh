@@ -2,9 +2,9 @@
 set -euo pipefail
 
 USER_ID="efefefef-efef-4fef-8fef-efefefefefef"
-ORDER_FILL="a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1"
-ORDER_CANCEL="b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2"
-ORDER_DUP="c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3"
+ORDER_FILL="$(printf 'a1%.0s' {1..32})"
+ORDER_CANCEL="$(printf 'b2%.0s' {1..32})"
+ORDER_DUP="$(printf 'c3%.0s' {1..32})"
 IDEM_FILL="efefefef-0000-4000-8000-000000000001"
 IDEM_CANCEL="efefefef-0000-4000-8000-000000000002"
 IDEM_DUP="efefefef-0000-4000-8000-000000000003"
