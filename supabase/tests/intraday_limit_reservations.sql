@@ -123,7 +123,7 @@ BEGIN
    WHERE order_id=repeat('1',64) AND user_id='22222222-2222-4222-8222-222222222222';
   SELECT count(*) INTO v_ledger_count FROM public.paper_equity_cash_ledger
    WHERE order_id=repeat('1',64) AND user_id='22222222-2222-4222-8222-222222222222';
-  IF v_fill_count<>1 OR v_ledger_count<>2
+  IF v_fill_count<>1 OR v_ledger_count<>3
      OR NOT EXISTS (SELECT 1 FROM public.paper_equity_fills
        WHERE order_id=repeat('1',64) AND execution_id='intraday-limit:'||repeat('1',64)
          AND quantity=2 AND cash_delta_paise=-19826)
@@ -208,7 +208,7 @@ BEGIN
   SELECT count(*) INTO v_ledger_count FROM public.paper_equity_cash_ledger
    WHERE user_id='22222222-2222-4222-8222-222222222222'
      AND order_id IN (repeat('1',64),repeat('3',64));
-  IF v_fill_count<>2 OR v_ledger_count<>3
+  IF v_fill_count<>2 OR v_ledger_count<>4
      OR NOT EXISTS (SELECT 1 FROM public.paper_equity_fills
        WHERE order_id=repeat('3',64) AND execution_id='intraday-limit:'||repeat('3',64)
          AND quantity=3 AND cash_delta_paise=32952 AND realized_pnl_paise=2952)
