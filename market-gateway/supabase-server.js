@@ -65,6 +65,12 @@ const serviceDb=runtime.serviceDb;
 const app=express();
 app.use(express.json({limit:"32kb"}));
 app.use((req,res,next)=>{
+  const requestId=crypto.randomUUID();
+  req.requestId=requestId;
+  res.set("X-Request-Id",requestId);
+  next();
+});
+app.use((req,res,next)=>{
   const origin=req.get("origin");
   if(origin&&ALLOWED_ORIGINS.includes(origin)){
     res.set("Access-Control-Allow-Origin",origin);res.set("Vary","Origin");
@@ -92,7 +98,14 @@ function errorStatus(error){
   return 500;
 }
 function sendError(res,error,fallback){
-  if(!res.headersSent)res.status(errorStatus(error)).json({error:error.status?error.message:fallback});
+  const status=errorStatus(error);
+  const requestId=res.req?.requestId||null;
+  if(!res.headersSent)res.status(status).json({error:error.status?error.message:fallback,requestId});
+  console.error(JSON.stringify({
+    event:"api_request_failed",requestId,status,
+    method:res.req?.method||null,path:res.req?.route?.path||res.req?.path||null,
+    errorName:error?.name||"Error"
+  }));
 }
 function decryptToken(box){return decryptUpstoxToken(box,ENC_KEY);}
 function auth(req){
