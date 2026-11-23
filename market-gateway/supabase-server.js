@@ -1101,12 +1101,13 @@ app.post("/stream",async(req,res)=>{
     const connectSocket=feedUrl=>{
       if(lifecycle.closed||res.destroyed||res.writableEnded)return;
       const generation=++socketGeneration;
+      const previous=upstream;
+      if(previous&&previous.readyState<WebSocket.CLOSING)previous.close();
       const socket=new WebSocket(feedUrl,{followRedirects:false,handshakeTimeout:15000,maxPayload:16*1024*1024,perMessageDeflate:false});
       upstream=socket;
       socket.on("open",()=>{
         if(lifecycle.closed||generation!==socketGeneration||upstream!==socket){socket.close();return;}
-        reconnectAttempts=0;
-        writeEvent("status",{connected:true,mode,keys:keys.length,reconnected:reconnectAttempts>0});
+        writeEvent("status",{connected:true,mode,keys:keys.length,reconnected:generation>1});
         sendUpstoxSubscription(socket,{mode,instrumentKeys:keys}).catch(()=>scheduleReconnect(generation,null));
       });
       socket.on("message",(bytes,isBinary)=>{
