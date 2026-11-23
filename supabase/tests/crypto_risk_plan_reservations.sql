@@ -49,7 +49,7 @@ SELECT public.execute_paper_crypto_risk_exit(
  44000,80,1760,
  floor(extract(epoch from clock_timestamp())*1000)::bigint
 );
-DO $
+DO $assert_exit$
 DECLARE v_reserved numeric; v_quantity numeric; v_status text; v_orders integer; v_ledger integer; v_reason text;
 BEGIN
  SELECT reserved_quantity,quantity INTO v_reserved,v_quantity FROM public.paper_crypto_positions
@@ -65,6 +65,6 @@ BEGIN
    RAISE EXCEPTION 'Risk exit accounting/idempotency failed: reserved %, qty %, status %, reason %, orders %, ledger %',
      v_reserved,v_quantity,v_status,v_reason,v_orders,v_ledger;
  END IF;
-END $;
+END $assert_exit$;
 RESET ROLE;
 ROLLBACK;
