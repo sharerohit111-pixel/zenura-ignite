@@ -1093,7 +1093,8 @@ app.post("/stream",async(req,res)=>{
     });
     upstream.on("message",(bytes,isBinary)=>{
       if(lifecycle.closed||res.destroyed||res.writableEnded)return;
-      if(!isBinary){writeEvent("upstream",{message:String(bytes).slice(0,300)});return;}
+      // Ignore upstream text frames; never reflect provider-controlled raw text to clients.
+      if(!isBinary)return;
       try{
         const decoded=decodeFeedResponse(FeedResponse,bytes);
         const fresh=filterFreshMarketFeeds(decoded,keys);
