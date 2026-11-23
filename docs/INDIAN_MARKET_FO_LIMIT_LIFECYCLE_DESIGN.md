@@ -16,6 +16,7 @@ Status: implementation in draft PRs #87–#89. This document does not enable Fut
 - The Futures LIMIT ledger adds filled/remaining quantities, average fill price, pending opening-margin and close-quantity reservations, expiry, executable bid/ask snapshot fields, and an append-only execution fill table.
 - Opening margin reservation requires a fresh trusted provider-margin timestamp; SQL checks the margin snapshot age at submit time. Close-only orders do not request or reserve opening margin.
 - Atomic service-role RPCs now cover submit, partial/full fill, cancel and expiry; account -> order -> position locking, execution-idempotency and reservation release are tested on disposable PostgreSQL.
+- The authenticated Futures LIMIT submit/cancel API is wired behind PAPER_FUTURES_LIMIT_ENABLED=true; the flag defaults off. Submission requires a verified open session and a fresh provider margin snapshot for opening exposure.
 - The dedicated Futures LIMIT worker module is wired behind PAPER_FUTURES_LIMIT_WORKER_ENABLED=true; the flag defaults off. The worker currently supports NSE Futures only; BSE Futures remain blocked until their charge schedule is verified.
 - Long Options remain MARKET-only; derivative_limit_schema_guard.sql protects the Options order schema from premature LIMIT enablement.
 - F&O LIMIT must remain disabled until the database lifecycle and worker are complete.
@@ -73,7 +74,7 @@ The SQL fill RPC must independently validate all facts; worker eligibility alone
 - Group provider requests by user, use only the user's connected Upstox token, and fail closed on missing/stale/malformed/crossed depth.
 - Revalidate the latest quote and verified session immediately before calling the SQL fill RPC.
 - Expire unfilled orders on session close, missing/unverified session data, or contract expiry; release remaining reservations exactly once.
-- Worker remains disabled by default and has no production activation. The opt-in flag must not be enabled until staging and legal/provider gates are satisfied.
+- Submit and worker flags both remain disabled by default and have no production activation. Neither opt-in flag may be enabled until staging and legal/provider gates are satisfied.
 
 ## Options LIMIT phase (separate follow-up)
 
