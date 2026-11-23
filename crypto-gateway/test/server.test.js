@@ -4,7 +4,7 @@ process.env.SUPABASE_PUBLISHABLE_KEY="test-publishable-key";
 process.env.SUPABASE_SERVICE_ROLE_KEY="test-service-role-key";
 const test=require("node:test");
 const assert=require("node:assert/strict");
-const {validateOrderInput,makeOrderId,runLimitWorker,createRateLimiter}=require("../server");
+const {validateOrderInput,makeOrderId,runLimitWorker,createRateLimiter,isUuid}=require("../server");
 test("accepts supported market order and canonicalizes symbol",()=>{
  const v=validateOrderInput({symbol:"btcusdt",side:"buy",quantity:"0.001",idempotency_key:"123e4567-e89b-42d3-a456-426614174000"});
  assert.equal(v.symbol,"BTCUSDT"); assert.equal(v.side,"BUY"); assert.equal(v.quantityRaw,"0.001");
@@ -57,4 +57,9 @@ test("rate limiter does not trust forwarded client address headers",()=>{
  limiter(req("203.0.113.2"),response,()=>nextCalls++);
  assert.equal(nextCalls,1);
  assert.equal(status,429);
+});
+
+test("accepts generated UUID reset request IDs and rejects malformed values",()=>{
+ assert.equal(isUuid("123e4567-e89b-42d3-a456-426614174000"),true);
+ for(const value of ["","not-a-uuid","123e4567-e89b-42d3-a456-42661417400z","00000000-0000-0000-0000-000000000000"]) assert.equal(isUuid(value),false);
 });
