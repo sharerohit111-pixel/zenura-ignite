@@ -41,6 +41,7 @@ const {createMarketFeedEventOrderFilter}=require("./lib/market-feed-event-order"
 const {createLeaseHeartbeat}=require("./lib/lease-heartbeat");
 const {readProviderJson}=require("./lib/provider-json");
 const {upstoxHttpError}=require("./lib/upstox-http-policy");
+const {getUpstoxUserCooldown,recordUpstoxUserFailure,clearUpstoxUserCooldown}=require("./lib/upstox-user-cooldown");
 const {MAX_RECONNECT_ATTEMPTS,reconnectDelayMs}=require("./lib/stream-reconnect-policy");
 const {decryptUpstoxToken,encryptUpstoxToken}=require("./lib/upstox-token-crypto");
 const {readUserUpstoxConnection}=require("./lib/upstox-user-connection");
@@ -1206,6 +1207,7 @@ async function runPaperLimitWorker({maxOrders=50}={}){
     const orders=batch.data||[];summary.scanned=orders.length;
     const groups=[...groupOrdersByUser(orders).entries()];
     const processUserOrders=async([userId,userOrders])=>{
+      if(getUpstoxUserCooldown(userId)){summary.failed+=userOrders.length;return;}
       try{
         const validOrders=userOrders.filter(order=>{
           const item=instrumentCache.find(x=>x.instrument_key===order.instrument_key);
@@ -1219,6 +1221,7 @@ async function runPaperLimitWorker({maxOrders=50}={}){
         const response=await fetchProvider(url,{headers:{Authorization:"Bearer "+token,Accept:"application/json"}});
         const payload=await readProviderJson(response);
         if(!response.ok)throw upstoxHttpError(response);
+        clearUpstoxUserCooldown(userId);
         const entries=Object.values(payload?.data||{});
         for(const order of validOrders){
           const entry=entries.find(item=>item?.instrument_token===order.instrument_key);
@@ -1240,6 +1243,7 @@ async function runPaperLimitWorker({maxOrders=50}={}){
         }
         summary.notEligible+=userOrders.length-validOrders.length;
       }catch(error){
+        recordUpstoxUserFailure(userId,error);
         summary.failed+=userOrders.length;
         console.warn("Paper LIMIT user batch skipped",{userId,errorName:error?.name||"Error",status:error?.status||500});
       }
