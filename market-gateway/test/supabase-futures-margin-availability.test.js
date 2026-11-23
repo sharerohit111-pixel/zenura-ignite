@@ -82,3 +82,14 @@ test("Futures portfolio withholds aggregate P&L and equity when any open-positio
   const ui=fs.readFileSync(path.join(__dirname,"../../markets/stocks/stocks.js"),"utf8");
   assert.match(ui,/Stale\/unavailable quotes for .*Aggregate unrealized P&L and equity are withheld/);
 });
+
+test("Futures order margin is based on the full submitted quantity, not a stale pre-transaction position read",()=>{
+  const route=server.slice(server.indexOf('app.post("/paper/futures/orders"'),server.indexOf('app.get("/paper/futures/orders"'));
+  assert.match(route,/quantity:contract\.quantity,product:product==="INTRADAY"\?"I":"D",transaction_type:side/);
+  assert.doesNotMatch(route,/from\("paper_futures_positions"\)/);
+  assert.doesNotMatch(route,/const openingQuantity=/);
+  assert.match(route,/concurrent reversal/);
+  assert.match(route,/marginEstimateScope:"full_submitted_quantity_conservative_on_reversal"/);
+  const ui=fs.readFileSync(path.join(__dirname,"../../markets/stocks/stocks.js"),"utf8");
+  assert.match(ui,/Conservative order-quantity margin estimate/);
+});
