@@ -552,17 +552,32 @@ app.post("/paper/derivative/margin-preview",async(req,res)=>{
 });
 app.post("/paper/derivative/orders",async(req,res)=>{
   try{
-    const {user}=await auth(req),instrumentKey=String(req.body?.instrument_key||"");
+    const {user,userDb}=await auth(req),instrumentKey=String(req.body?.instrument_key||"");
     const lots=Number(req.body?.lots),side=String(req.body?.side||"").toUpperCase(),idempotencyKey=String(req.body?.idempotency_key||"");
     if(!isUuid(idempotencyKey))return res.status(400).json({error:"A valid UUID idempotency_key is required."});
     if(!["BUY","SELL"].includes(side))return res.status(400).json({error:"Only BUY and SELL to close existing long CE/PE positions are supported."});
     if(!instrumentCache.length||Date.now()-instrumentCacheUpdatedAt>6*60*60*1000)await refreshInstrumentCache();
     const instrument=instrumentCache.find(x=>x.instrument_key===instrumentKey&&["CE","PE"].includes(x.instrument_type)&&["NSE_FO","BSE_FO"].includes(x.segment));
     if(!instrument)return res.status(400).json({error:"Select a verified NSE/BSE CE/PE contract from the official instrument master."});
+    // Resolve contract identity and idempotency before requiring a live quote.
+    const metadata=validateDerivativeContract(instrument,{lots,pricePaise:normalizeTickSizePaise(instrument.tick_size),now:Date.now()});
+    const orderId=makeOrderId(user.id,idempotencyKey),fingerprint=makeOrderFingerprint({instrumentKey,side,quantity:metadata.quantity});
+    const {data:prior,error:priorError}=await userDb.from("paper_derivative_orders").select("*").eq("user_id",user.id).eq("idempotency_key",idempotencyKey).maybeSingle();
+    if(priorError)throw Object.assign(new Error("Derivative order idempotency state could not be checked."),{status:503});
+    if(prior){
+      if(prior.request_fingerprint!==fingerprint||prior.order_id!==orderId)return res.status(409).json({error:"Derivative idempotency key was reused with different order details."});
+      const {data:account}=await userDb.from("paper_accounts").select("cash_paise,realized_pnl_paise").eq("user_id",user.id).maybeSingle();
+      return res.set("Cache-Control","private, no-store").json({
+        orderId:prior.order_id,tradingSymbol:prior.trading_symbol||instrument.trading_symbol,instrumentKey,
+        side:prior.side,quantity:prior.quantity,lots:prior.lots,executionPricePaise:prior.execution_price_paise,
+        grossPaise:prior.gross_paise,chargesPaise:prior.charges_paise,totalDebitPaise:prior.total_debit_paise,
+        netCreditPaise:prior.net_credit_paise,cashPaise:account?.cash_paise??null,
+        realizedPnlPaise:prior.realized_pnl_paise??0,idempotentReplay:true,simulationOnly:true,excludesCharges:false
+      });
+    }
     const {token}=await getUpstoxAccessToken(user.id),{quote}=await getQuote(token,instrumentKey);
     const normalized=normalizeProviderQuote(quote,instrumentKey,{maxAgeMs:15000});
     const contract=validateDerivativeContract(instrument,{lots,pricePaise:normalized.pricePaise,now:Date.now()});
-    const orderId=makeOrderId(user.id,idempotencyKey),fingerprint=makeOrderFingerprint({instrumentKey,side,quantity:contract.quantity});
     const result=await runtime.callUserRpc(user,"execute_paper_long_option_order",{
       p_order_id:orderId,p_idempotency_key:idempotencyKey,p_request_fingerprint:fingerprint,
       p_instrument_key:instrumentKey,p_trading_symbol:instrument.trading_symbol,p_exchange:instrument.exchange,
