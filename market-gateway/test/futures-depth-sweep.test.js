@@ -28,9 +28,9 @@ test("BUY sweeps asks in ascending order and preserves immutable per-level fills
   assert.deepEqual(result.fills.map(x => [x.pricePaise, x.quantity]), [
     [10005, 40], [10010, 35], [10015, 25]
   ]);
-  assert.equal(result.grossPaise, 1001000);
-  assert.equal(result.vwapPaise, 10010);
-  assert.equal(result.vwapNumeratorPaiseQty, "1001000");
+  assert.equal(result.grossPaise, 1000925);
+  assert.equal(result.vwapPaise, 10009);
+  assert.equal(result.vwapNumeratorPaiseQty, "1000925");
   assert.equal(result.vwapDenominatorQuantity, 100);
   assert.equal(result.partialFillAllowed, false);
   assert.equal(result.simulationOnly, true);
