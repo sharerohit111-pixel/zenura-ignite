@@ -66,3 +66,12 @@
 ## Release decision
 
 Keep Futures/Options LIMIT and protective exits disabled until every applicable test above passes in disposable PostgreSQL and gateway CI, the worker lease/recovery behavior is verified, and the implementation is reviewed as a complete ledger lifecycle. This audit is not a production-readiness approval.
+
+
+## Follow-up implementation review — existing SQL lock order (2026-11-23)
+
+A source-level review of the current MARKET transaction functions confirms the actual lock sequence is **account row → existing order/idempotency row → position row** in both the Futures and long-Options SQL functions. The account row is acquired first and serializes account writes; the order lookup follows; the position row is then locked before ledger mutation.
+
+The generic lock-order sentence in the original checklist (account → position/reservation → order) must therefore not be implemented literally. Any future F&O LIMIT submit/fill/cancel/expiry RPC must preserve the established account → order → position sequence, including idempotent replay paths, or document and prove a safe global transition before changing all writers together. In particular, do not add a worker that locks position then order while existing MARKET RPCs lock order then position.
+
+This review remains design-only. No runtime, schema, API, worker, or production data was changed. The F&O LIMIT release gates remain closed.
