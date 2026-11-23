@@ -40,6 +40,7 @@ function createPaperProtectiveWorker({
       const groups=[...groupOrdersByUser(orders).entries()];
       const processUserOrders=async([userId,userOrders])=>{
         if(getUpstoxUserCooldown(userId)){summary.failed+=userOrders.length;return;}
+        let providerHealthy=false;
         try{
           const validOrders=userOrders.filter(order=>{
             const instrument=instrumentCache.find(x=>x.instrument_key===order.instrument_key);
@@ -63,6 +64,7 @@ function createPaperProtectiveWorker({
             {headers:{Authorization:"Bearer "+token,Accept:"application/json"}});
           const payload=await readProviderJson(response);
           if(!response.ok)throw upstoxHttpError(response);
+          providerHealthy=true;
           clearUpstoxUserCooldown(userId);
           const entries=Object.values(payload?.data||{}),now=Date.now();
           const positionsResult=await serviceDb.from("paper_equity_positions")
@@ -102,7 +104,7 @@ function createPaperProtectiveWorker({
             else summary.notEligible++;
           }
         }catch(error){
-          recordUpstoxUserFailure(userId,error);
+          if(!providerHealthy)recordUpstoxUserFailure(userId,error);
           summary.failed+=userOrders.length;
           const checkedAt=new Date().toISOString();
           for(const order of userOrders){
