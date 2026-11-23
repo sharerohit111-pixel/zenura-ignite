@@ -17,7 +17,7 @@ BUY_FP_B="$(printf '%s' "$RUN_ID-buy-fp-b" | sha256sum | cut -d' ' -f1)"
 SELL_FP_A="$(printf '%s' "$RUN_ID-sell-fp-a" | sha256sum | cut -d' ' -f1)"
 SELL_FP_B="$(printf '%s' "$RUN_ID-sell-fp-b" | sha256sum | cut -d' ' -f1)"
 SESSION_DATE="$(psql -Atqc "SELECT (clock_timestamp() AT TIME ZONE 'Asia/Kolkata')::date")"
-SESSION_SOURCE="$SESSION_SOURCE?chat6-test=$RUN_ID"
+SESSION_SOURCE="https://www.nseindia.com/market-data/holidays?chat6-test=$RUN_ID"
 SESSION_BACKUP="$(psql -Atqc "SELECT COALESCE((SELECT to_jsonb(s)::text FROM public.paper_exchange_sessions s WHERE exchange='NSE' AND session_date='$SESSION_DATE'), '')")"
 
 cleanup() {
@@ -31,29 +31,23 @@ DELETE FROM public.paper_option_limit_orders WHERE order_id IN ('$BUY_A','$BUY_B
 DELETE FROM public.paper_derivative_positions WHERE user_id IN ('$BUY_USER','$SELL_USER');
 DELETE FROM public.paper_accounts WHERE user_id IN ('$BUY_USER','$SELL_USER');
 DELETE FROM auth.users WHERE id IN ('$BUY_USER','$SELL_USER');
-\if :{?session_backup}
-\endif
-DO \$restore_session\$
-BEGIN
-  IF :'session_backup' <> '' THEN
-    INSERT INTO public.paper_exchange_sessions
-    SELECT (jsonb_populate_record(NULL::public.paper_exchange_sessions, :'session_backup'::jsonb)).*
-    ON CONFLICT(exchange,session_date) DO UPDATE SET
-      is_trading_day=EXCLUDED.is_trading_day,
-      open_minute=EXCLUDED.open_minute,
-      close_minute=EXCLUDED.close_minute,
-      session_kind=EXCLUDED.session_kind,
-      source_reference=EXCLUDED.source_reference,
-      verified_at=EXCLUDED.verified_at,
-      source_sha256=EXCLUDED.source_sha256;
-  ELSE
-    DELETE FROM public.paper_exchange_sessions
-     WHERE exchange='NSE' AND session_date='$SESSION_DATE'
-       AND source_reference='$SESSION_SOURCE';
-  END IF;
-END
-\$restore_session\$;
 SQL
+  if [[ -n "$SESSION_BACKUP" ]]; then
+    psql -v ON_ERROR_STOP=1 -v session_backup="$SESSION_BACKUP" <<SQL >/dev/null 2>&1 || true
+INSERT INTO public.paper_exchange_sessions
+SELECT (jsonb_populate_record(NULL::public.paper_exchange_sessions, :'session_backup'::jsonb)).*
+ON CONFLICT(exchange,session_date) DO UPDATE SET
+  is_trading_day=EXCLUDED.is_trading_day,
+  open_minute=EXCLUDED.open_minute,
+  close_minute=EXCLUDED.close_minute,
+  session_kind=EXCLUDED.session_kind,
+  source_reference=EXCLUDED.source_reference,
+  verified_at=EXCLUDED.verified_at,
+  source_sha256=EXCLUDED.source_sha256;
+SQL
+  else
+    psql -v ON_ERROR_STOP=1 -c "DELETE FROM public.paper_exchange_sessions WHERE exchange='NSE' AND session_date='$SESSION_DATE' AND source_reference='$SESSION_SOURCE';" >/dev/null 2>&1 || true
+  fi
 }
 trap cleanup EXIT
 
@@ -132,9 +126,9 @@ submit_sell() {
  );"
 }
 
-submit_buy "$BUY_A" "c0c0c0c0-0000-4000-8000-000000000001" "$BUY_FP_A" >/tmp/options-buy-reserve-a.log 2>&1 &
+submit_buy "$BUY_A" "$BUY_KEY_A" "$BUY_FP_A" >/tmp/options-buy-reserve-a.log 2>&1 &
 P1=$!
-submit_buy "$BUY_B" "c0c0c0c0-0000-4000-8000-000000000002" "$BUY_FP_B" >/tmp/options-buy-reserve-b.log 2>&1 &
+submit_buy "$BUY_B" "$BUY_KEY_B" "$BUY_FP_B" >/tmp/options-buy-reserve-b.log 2>&1 &
 P2=$!
 S1=0; S2=0
 wait "$P1" || S1=1
@@ -144,9 +138,9 @@ if [[ $((S1+S2)) -ne 1 ]]; then
  exit 1
 fi
 
-submit_sell "$SELL_A" "d0d0d0d0-0000-4000-8000-000000000001" "$SELL_FP_A" >/tmp/options-sell-reserve-a.log 2>&1 &
+submit_sell "$SELL_A" "$SELL_KEY_A" "$SELL_FP_A" >/tmp/options-sell-reserve-a.log 2>&1 &
 P3=$!
-submit_sell "$SELL_B" "d0d0d0d0-0000-4000-8000-000000000002" "$SELL_FP_B" >/tmp/options-sell-reserve-b.log 2>&1 &
+submit_sell "$SELL_B" "$SELL_KEY_B" "$SELL_FP_B" >/tmp/options-sell-reserve-b.log 2>&1 &
 P4=$!
 S3=0; S4=0
 wait "$P3" || S3=1
