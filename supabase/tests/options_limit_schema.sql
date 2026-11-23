@@ -61,6 +61,21 @@ begin
     raise exception 'Options LIMIT worker scan index is missing';
   end if;
 
+  select pg_get_functiondef(
+    'public.acquire_paper_market_worker_lease(text,uuid,bigint,bigint)'::regprocedure
+  ) into v_definition;
+  if position('paper_option_limit_orders' in v_definition)=0
+     or position('paper_futures_limit_orders' in v_definition)=0 then
+    raise exception 'Derivative LIMIT worker lease keys are not registered';
+  end if;
+  select pg_get_functiondef(
+    'public.release_paper_market_worker_lease(text,uuid,bigint)'::regprocedure
+  ) into v_definition;
+  if position('paper_option_limit_orders' in v_definition)=0
+     or position('paper_futures_limit_orders' in v_definition)=0 then
+    raise exception 'Derivative LIMIT worker lease release keys are not registered';
+  end if;
+
   -- The existing derivative receipt remains MARKET-only and terminal.
   if not exists (
     select 1 from pg_constraint c
