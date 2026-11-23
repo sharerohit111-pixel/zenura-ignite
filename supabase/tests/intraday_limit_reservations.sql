@@ -53,7 +53,7 @@ BEGIN
   END IF;
 
   v_result:=public.submit_paper_intraday_limit_order(
-    '22222222-2222-4222-8222-222222222222',repeat('a',64),
+    '22222222-2222-4222-8222-222222222222',repeat('6',64),
     'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',repeat('b',64),
     'NSE_EQ|INTRA_BUY_CI','INTRA_BUY_CI','NSE','BUY',2,10000
   );
@@ -61,7 +61,7 @@ BEGIN
     RAISE EXCEPTION 'Intraday LIMIT BUY was not submitted with exact cash reservation';
   END IF;
   v_result:=public.submit_paper_intraday_limit_order(
-    '22222222-2222-4222-8222-222222222222',repeat('a',64),
+    '22222222-2222-4222-8222-222222222222',repeat('6',64),
     'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',repeat('b',64),
     'NSE_EQ|INTRA_BUY_CI','INTRA_BUY_CI','NSE','BUY',2,10000
   );
@@ -73,7 +73,7 @@ BEGIN
   IF v_reserved<>20026 THEN RAISE EXCEPTION 'Intraday BUY retry double-reserved cash'; END IF;
 
   PERFORM public.cancel_paper_intraday_limit_order(
-    '22222222-2222-4222-8222-222222222222',repeat('a',64)
+    '22222222-2222-4222-8222-222222222222',repeat('6',64)
   );
   SELECT reserved_cash_paise INTO v_reserved FROM public.paper_accounts
    WHERE user_id='22222222-2222-4222-8222-222222222222';
@@ -264,7 +264,7 @@ END
 $intraday_limit_checks$;
 
 DELETE FROM public.paper_orders o
- WHERE o.order_id IN (repeat('a',64),repeat('c',64),repeat('e',64),repeat('1',64),repeat('3',64),repeat('5',64))
+ WHERE o.order_id IN (repeat('6',64),repeat('c',64),repeat('e',64),repeat('1',64),repeat('3',64),repeat('5',64))
    AND o.status<>'FILLED'
    AND NOT EXISTS (SELECT 1 FROM public.paper_equity_cash_ledger l WHERE l.order_id=o.order_id);
 DELETE FROM public.paper_equity_positions
