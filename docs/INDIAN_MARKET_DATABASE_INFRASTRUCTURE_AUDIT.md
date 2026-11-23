@@ -127,8 +127,8 @@ The next safe code change should be a draft-only additive migration design/imple
 
 Draft artifacts committed on the infrastructure branch:
 
-- `supabase/drafts/20261123140000_indian_market_tenant_fill_integrity.sql`
-- `supabase/drafts/20261123140000_indian_market_tenant_fill_integrity.down.sql`
+- `supabase/drafts/indian_market_tenant_fill_integrity.sql`
+- `supabase/drafts/indian_market_tenant_fill_integrity.down.sql`
 - `docs/INDIAN_MARKET_DATABASE_INTEGRITY_REGRESSION_TESTS.md`
 
 These files are deliberately under `supabase/drafts/`, not `supabase/migrations/`. The current infrastructure branch contains the Equity ledger migration but does not contain the Futures LIMIT and Options LIMIT schema/fill migrations. The proposed SQL requires all three asset subsystems and intentionally fails if prerequisites are absent; it must not be applied or moved into the active migration chain until a canonical integration branch contains the complete parent/child tables in reviewed order.
@@ -155,3 +155,17 @@ These files are deliberately under `supabase/drafts/`, not `supabase/migrations/
 ### Branch-base correction
 
 The infrastructure branch was created from the Equity lifecycle audit branch, not from the Options branch. Therefore it currently contains the Equity ledger but not the Futures/Options LIMIT migration chain. The Options branch remains a candidate integration source, not the current parent of this infrastructure branch. Do not infer that the complete three-asset schema is present on this branch.
+
+
+### RPC contract verification and draft naming correction
+
+A second source inspection confirmed:
+
+- `paper_orders` already has globally unique `order_id` as its primary key and a non-null `user_id`; the proposed `(user_id, order_id)` unique key is therefore a valid composite FK target.
+- The Futures LIMIT fill RPC inserts both `order_id` and the order-resolved `v_user_id` into `paper_futures_fills`, so the proposed composite ownership FK matches the current insert contract.
+- Options LIMIT fills contain only `order_id`; their parent `paper_option_limit_orders` has globally unique `order_id` and `user_id`. Keeping ownership normalized through that parent is compatible with the existing RPC insert shape.
+- Existing Equity fill/cash-ledger tables are not yet written by the inspected Equity MARKET/LIMIT RPCs. The Equity ledger migration itself documents this gap. Do not treat Equity ledger persistence as complete until a separate atomic integration change and tests are implemented.
+
+The draft SQL files have been renamed to neutral filenames under `supabase/drafts/`. The initial timestamp matched the Futures LIMIT foundation migration's timestamp, which would create ambiguous migration ordering if copied into the active migration directory. No timestamped active migration was created.
+
+This remains source-level contract review only; no PostgreSQL disposable test execution has been performed.
