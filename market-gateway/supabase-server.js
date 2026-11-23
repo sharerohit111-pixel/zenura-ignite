@@ -81,6 +81,7 @@ let instrumentRefreshLastAttemptAt=0;
 const paperLimitWorkerStatus={enabled:false,intervalMs:null,lastRunAt:null,lastCycle:null};
 const paperProtectiveWorkerStatus={enabled:false,intervalMs:null,lastRunAt:null,lastCycle:null};
 const paperIntradayLimitWorkerStatus={enabled:false,intervalMs:null,lastRunAt:null,lastCycle:null};
+const routeTestOverrides={};
 const activeUserStreams=new Map();
 function fetchProvider(url,options={},timeoutMs=15000){return fetchProviderWithTimeout(fetch,url,options,timeoutMs);}
 function errorStatus(error){
@@ -389,16 +390,17 @@ app.post("/paper/orders",async(req,res)=>{
       });
     }
     const marketNowMs=Date.now();
-    const session=await loadVerifiedExchangeSession(serviceDb,instrument.exchange,marketNowMs);
-    if(!session||!isIntradaySessionOpen(marketNowMs,session))
+    const session=await (routeTestOverrides.loadVerifiedExchangeSession||loadVerifiedExchangeSession)(serviceDb,instrument.exchange,marketNowMs);
+    const sessionIsOpen=routeTestOverrides.isIntradaySessionOpen||isIntradaySessionOpen;
+    if(!session||!sessionIsOpen(marketNowMs,session))
       return res.status(409).json({error:"NSE/BSE cash MARKET orders are accepted only during a verified open exchange session."});
-    const {token}=await getUpstoxAccessToken(user.id);
-    const {quote}=await getQuote(token,instrumentKey);
+    const {token}=await (routeTestOverrides.getUpstoxAccessToken||getUpstoxAccessToken)(user.id);
+    const {quote}=await (routeTestOverrides.getQuote||getQuote)(token,instrumentKey);
     const normalized=normalizeProviderQuote(quote,instrumentKey);
     const tick=normalizeEquityTickSizePaise(instrument.tick_size);
     if(!isEquityExecutionPriceOnTick(normalized.pricePaise,tick))
       return res.status(502).json({error:"The verified market quote price does not align with the official instrument tick size."});
-    if(!isIntradaySessionOpen(normalized.tradeTimeMs,session))
+    if(!sessionIsOpen(normalized.tradeTimeMs,session))
       return res.status(409).json({error:"The market quote timestamp is outside the verified exchange session."});
     const result=await runtime.callUserRpc(user,"execute_paper_market_order",{
       p_order_id:orderId,p_idempotency_key:idempotencyKey,p_request_fingerprint:requestFingerprint,
@@ -1076,6 +1078,11 @@ function configureRouteTestState(state={}){
   if(process.env.NODE_ENV!=="test")throw new Error("Route test state is available only in NODE_ENV=test.");
   if(Array.isArray(state.instruments)){instrumentCache=state.instruments;instrumentCacheUpdatedAt=Date.now();instrumentRefreshLastAttemptAt=0;}
   if(typeof state.intradayLimitWorkerEnabled==="boolean")paperIntradayLimitWorkerStatus.enabled=state.intradayLimitWorkerEnabled;
+  for(const key of ["loadVerifiedExchangeSession","isIntradaySessionOpen","getUpstoxAccessToken","getQuote"]){
+    if(state[key]===undefined)delete routeTestOverrides[key];
+    else if(typeof state[key]==="function")routeTestOverrides[key]=state[key];
+    else throw new TypeError("Route test override "+key+" must be a function.");
+  }
 }
 module.exports={app,start,runPaperLimitWorker,runPaperIntradayLimitWorker,runPaperProtectiveWorker,
   ...(process.env.NODE_ENV==="test"?{configureRouteTestState}: {})};
