@@ -173,3 +173,27 @@ Keep the established account-first lock order across submit, fill, cancel, and e
 - [ ] Release owner approves staged rollout and rollback plan.
 
 **Until all applicable approvals are recorded, this contract remains design-only.**
+
+
+## 12. Follow-up schema and lifecycle audit — confirmed blockers
+
+A direct inspection of the existing core and lifecycle migrations confirms the following concrete constraints that must be addressed in a reviewed migration before partial fills can work:
+
+- `paper_orders.status` currently has a CHECK constraint allowing only `PENDING`, `FILLED`, `CANCELLED`, and `REJECTED`. It does not allow `PARTIALLY_FILLED`. There is also no `EXPIRED` status in this constraint.
+- The current schema stores only original `quantity`, one `execution_price_paise`, one `gross_paise`, order-level `realized_pnl_paise`, `reserved_cash_paise`, `reserved_quantity`, and `reservation_released`. It has no cumulative filled/remaining quantity or weighted-average execution fields.
+- Existing Delivery cancellation accepts only `PENDING`, releases the complete order reservation, and marks the order `CANCELLED`.
+- Existing Intraday cancellation likewise accepts only `PENDING`, releases the complete order reservation, and marks it `CANCELLED`.
+- Existing Intraday expiry scans only `PENDING` orders and, when session data is missing/closed/elapsed or the order belongs to another IST date, releases the full reservation and marks the order `CANCELLED`; it does not create an `EXPIRED` status.
+- Existing LIMIT fill functions require `PENDING`, calculate gross from the full original `quantity`, and settle/release the full reservation.
+- The fill table already has a unique constraint on `(order_id, execution_id)`; the cash ledger has a unique constraint on `(user_id, event_key)`. Both tables are append-only and inaccessible to authenticated/anonymous clients. A future execution RPC must use these constraints as part of its atomic idempotency design, not bypass them.
+- The core schema enforces `paper_equity_positions.reserved_quantity <= quantity` and account reserves within cash. Every partial-fill and cancellation/expiry transition must preserve these database invariants.
+
+### Decision required: expiry representation
+
+Do not add an `EXPIRED` state by assumption. The database and product owners must choose one of:
+1. Add `EXPIRED` to the order status constraint and update every API, worker, UI, analytics query, and idempotency response that interprets terminal statuses; or
+2. Keep `CANCELLED` as the terminal status for session expiry and add an explicit immutable/controlled terminal reason such as `SESSION_EXPIRED`.
+
+Whichever option is approved must preserve the current fail-safe behavior for missing or unverified session data and must release only the unfilled remainder after partial execution.
+
+These are verified repository-schema findings, not proposed production changes. No schema, SQL RPC, worker, or accounting code was modified during this follow-up audit.
