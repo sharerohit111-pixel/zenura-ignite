@@ -15,7 +15,7 @@ function filterFreshMarketFeeds(payload,instrumentKeys,{now=Date.now(),maxAgeMs=
  for(const [key,feed] of Object.entries(payload.feeds)){
   if(!allowed.has(key)||!feed||typeof feed!=="object")continue;
   const quote=feed.ltpc||feed.fullFeed?.marketFF?.ltpc||feed.fullFeed?.indexFF?.ltpc;
-  if(isFreshMarketFeedQuote(quote,{now,maxAgeMs,maxFutureSkewMs}))feeds[key]=feed;
+  if(isFreshMarketFeedQuote(quote,{now,maxAgeMs}))feeds[key]=feed;
  }
  return Object.keys(feeds).length?{...payload,feeds}:null;
 }
