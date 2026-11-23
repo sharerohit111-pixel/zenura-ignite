@@ -34,6 +34,8 @@ The Futures LIMIT worker uses the dedicated state key `paper_futures_limit_order
 
 This branch adds a forward-only migration allowing the Futures key while explicitly preserving the existing equity LIMIT, intraday LIMIT and protective keys. It also retains the 5–300 second TTL bounds, safe-integer millisecond timestamp validation, owner-token check and service-role-only grants. The rollback-only SQL regression checks exclusive ownership, wrong-owner release rejection, owner release, idempotent release, reacquisition, preservation of existing worker keys, unsafe timestamp rejection and RPC grants.
 
+A follow-up migration adds service-role-only `renew_paper_market_worker_lease`. Renewal is an atomic owner-token-and-unexpired-lease update; a wrong owner or already-expired token returns false and cannot resurrect the lease. The Futures worker renews every 60 seconds against its 240-second TTL, stops starting further fills if renewal fails or ownership is lost, and skips cursor persistence after lease loss. The renewal SQL regression covers owner mismatch, successful expiry extension, expired-token rejection, timestamp bounds and grants.
+
 A separate Options development branch contains a broader derivative lease-key migration that also adds an Options key. This Futures-only branch intentionally does not change or import Options code; integration should reconcile the shared lease migration rather than blindly applying duplicate allowlist migrations.
 
 ## Remaining release gates
@@ -56,7 +58,7 @@ The Futures LIMIT worker currently acquires a 240-second lease and releases it i
 
 The existing generic `createLeaseHeartbeat` helper is used for a different market-stream lease and cannot safely renew this worker lease because the market-worker SQL API has no renewal operation. Do not reuse the stream renewal RPC or extend shared worker lease functions in this isolated Futures change without coordination with the Options/other worker branches: the lease functions and allowlist are shared infrastructure, and the Options branch already has an overlapping migration.
 
-**Required before enabling the Futures worker in a multi-instance deployment:** coordinate a service-role-only, owner-token-checked market-worker lease renewal RPC (including TTL and safe timestamp validation), reconcile the Futures/Options allowlists into one migration, add lease-loss handling that stops new fills, and test renewal-vs-expiry/reacquisition races in disposable PostgreSQL. Until then, keep `PAPER_FUTURES_LIMIT_WORKER_ENABLED` disabled in multi-instance environments. The current 240-second TTL is not proof of safe long-running ownership.
+**Remaining before enabling the Futures worker in a multi-instance deployment:** reconcile the Futures/Options allowlists into one canonical migration; run the new renewal migration and SQL regression in disposable PostgreSQL; add and pass a two-connection renewal-vs-expiry/reacquisition race test; and verify worker lease-loss behavior in the complete CI suite. The renewal RPC and worker fail-closed integration are now present on this Draft branch, but are not yet release-verified. Until CI and staging validation pass, keep `PAPER_FUTURES_LIMIT_WORKER_ENABLED` disabled in multi-instance environments.
 
 
 ## Follow-up worker session regression fix
