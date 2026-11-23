@@ -23,7 +23,7 @@ const {loadVerifiedExchangeSession}=require("./lib/exchange-session-calendar");
 const {buildPortfolioValuation}=require("./lib/paper-portfolio-valuation");
 const {calculateDerivativePortfolio}=require("./lib/derivative-portfolio");
 const {validateDerivativeContract,normalizeTickSizePaise}=require("./lib/derivative-contract");
-const {validateOptionLimitOrder}=require("./lib/option-limit-policy");
+const {validateOptionLimitOrder,evaluateOptionLimitQuote}=require("./lib/option-limit-policy");
 const {parseMarginPreviewInput}=require("./lib/margin-preview-input");
 const {normalizeUpstoxMarginResponse}=require("./lib/upstox-margin");
 const {availablePaperCash}=require("./lib/available-paper-cash");
@@ -620,6 +620,17 @@ app.post("/paper/derivative/limit-orders",async(req,res)=>{
       availableCashPaise:availablePaperCash(account),
       availableLongQuantity,reservedCloseQuantity,nowMs
     });
+    const {token}=await getUpstoxAccessToken(user.id);
+    const {payload:quotePayload}=await getQuote(token,instrumentKey);
+    const quoteLimitPricePaise=side==="BUY"
+      ?Number.MAX_SAFE_INTEGER-(Number.MAX_SAFE_INTEGER%order.tickSizePaise)
+      :order.tickSizePaise;
+    const quoteSnapshot=evaluateOptionLimitQuote(quotePayload,instrument,{
+      side,limitPricePaise:quoteLimitPricePaise,remainingQuantity:1,
+      tickSizePaise:order.tickSizePaise
+    },{nowMs,maxAgeMs:15000});
+    if(!quoteSnapshot.eligible)
+      return res.status(409).json({error:"A fresh, valid NSE executable-depth quote is required to submit an Options LIMIT order."});
     const session=await loadVerifiedExchangeSession(serviceDb,"NSE",nowMs);
     if(!isVerifiedSessionOpen(nowMs,session))
       return res.status(409).json({error:"A verified open NSE session is required to submit an Options LIMIT order."});
