@@ -15,6 +15,10 @@ DECLARE
   v_account_margin bigint;
   v_account_realized bigint;
   v_cash bigint;
+  v_order_realized bigint;
+  v_order_charges bigint;
+  v_position_margin bigint;
+  v_expected_cash bigint;
   v_rejected boolean;
 BEGIN
   -- Open 50 contracts (two 25-unit lots).
@@ -142,6 +146,35 @@ BEGIN
        WHERE user_id='fefefefe-fefe-4efe-8efe-fefefefefefe'
          AND instrument_key='NSE_FO|FUT_CLOSE_TEST') THEN
     RAISE EXCEPTION 'Futures short close failed to reconcile cash, margin and realized P&L';
+  END IF;
+
+  -- Reconcile the complete futures sub-ledger against the shared account.
+  -- Closed-position P&L remains recoverable from immutable FILLED order history.
+  SELECT coalesce(sum(realized_pnl_paise),0),coalesce(sum(charges_paise),0)
+    INTO v_order_realized,v_order_charges
+    FROM public.paper_futures_orders
+   WHERE user_id='fefefefe-fefe-4efe-8efe-fefefefefefe'
+     AND status='FILLED' AND simulation_only IS TRUE;
+  SELECT coalesce(sum(reserved_margin_paise),0)
+    INTO v_position_margin
+    FROM public.paper_futures_positions
+   WHERE user_id='fefefefe-fefe-4efe-8efe-fefefefefefe';
+  SELECT starting_cash_paise+v_order_realized-v_order_charges
+    INTO v_expected_cash
+    FROM public.paper_accounts
+   WHERE user_id='fefefefe-fefe-4efe-8efe-fefefefefefe';
+  SELECT reserved_margin_paise,realized_pnl_paise,cash_paise
+    INTO v_account_margin,v_account_realized,v_cash
+    FROM public.paper_accounts
+   WHERE user_id='fefefefe-fefe-4efe-8efe-fefefefefefe';
+  IF v_account_margin<>v_position_margin
+     OR v_account_realized<>v_order_realized
+     OR v_cash<>v_expected_cash
+     OR v_order_realized<>50000
+     OR v_order_charges<>6000
+     OR v_expected_cash<>100044000 THEN
+    RAISE EXCEPTION 'Futures sub-ledger does not reconcile: account margin %, position margin %, account realized %, order realized %, cash %, expected cash %, charges %',
+      v_account_margin,v_position_margin,v_account_realized,v_order_realized,v_cash,v_expected_cash,v_order_charges;
   END IF;
 
   -- Excessive opening margin must reject atomically without an order or cash change.
