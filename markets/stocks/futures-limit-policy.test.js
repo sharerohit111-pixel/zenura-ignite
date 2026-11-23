@@ -8,6 +8,7 @@ const future={exchange:"NSE",segment:"NSE_FO",instrument_type:"FUT",
 
 test("supports only verified NSE Futures contracts",()=>{
   assert.equal(policy.isSupportedNseFuture(future),true);
+  assert.equal(policy.isSupportedNseFuture({...future,lot_size:"25",tick_size:"0.05"}),true);
   assert.equal(policy.isSupportedNseFuture({...future,exchange:"BSE",segment:"BSE_FO"}),false);
   assert.equal(policy.isSupportedNseFuture({...future,instrument_type:"CE"}),false);
   assert.equal(policy.isSupportedNseFuture({...future,lot_size:0}),false);
