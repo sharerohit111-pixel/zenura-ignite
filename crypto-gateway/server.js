@@ -325,4 +325,4 @@ app.use((error, _req, res, next) => {
 });
 
 if(require.main===module) start().catch(error=>{console.error("Crypto gateway startup failed:",error.message);process.exit(1);});
-module.exports={app,runLimitWorker,validateOrderInput,makeOrderId,createRateLimiter};
+module.exports={app,runLimitWorker,validateOrderInput,makeOrderId,createRateLimiter,isUuid};
