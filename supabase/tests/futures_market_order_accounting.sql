@@ -275,11 +275,11 @@ BEGIN
   SELECT reserved_margin_paise INTO v_account_margin
     FROM public.paper_accounts
    WHERE user_id='fefefefe-fefe-4efe-8efe-fefefefefefe';
-  IF v_account_margin<>0
+  IF v_account_margin<>100000
      OR EXISTS(SELECT 1 FROM public.paper_futures_positions
        WHERE user_id='fefefefe-fefe-4efe-8efe-fefefefefefe'
          AND instrument_key='NSE_FO|FUT_MARGIN_SPLIT') THEN
-    RAISE EXCEPTION 'Repeated one-lot futures closes did not release the exact original margin reservation';
+    RAISE EXCEPTION 'Repeated one-lot futures closes did not release exactly their own margin reservation';
   END IF;
 
   -- Stale provider quote and expired contract are rejected before any write.
