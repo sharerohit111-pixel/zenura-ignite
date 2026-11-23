@@ -23,6 +23,8 @@ const {loadVerifiedExchangeSession}=require("./lib/exchange-session-calendar");
 const {buildPortfolioValuation}=require("./lib/paper-portfolio-valuation");
 const {calculateDerivativePortfolio}=require("./lib/derivative-portfolio");
 const {validateDerivativeContract,normalizeTickSizePaise}=require("./lib/derivative-contract");
+const {resolveNseOptionMarketExecution}=require("./lib/option-market-execution");
+const {isNseOptionContract}=require("./lib/nse-option-instruments");
 const {validateOptionLimitOrder,evaluateOptionLimitQuote}=require("./lib/option-limit-policy");
 const {parseMarginPreviewInput}=require("./lib/margin-preview-input");
 const {normalizeUpstoxMarginResponse}=require("./lib/upstox-margin");
@@ -226,7 +228,7 @@ app.get("/instruments",async(req,res)=>{
       if(kind==="equities"&&!(item.instrument_type==="EQ"&&["NSE_EQ","BSE_EQ"].includes(item.segment)))return false;
       if(kind==="indices"&&!(item.instrument_type==="INDEX"&&["NSE_INDEX","BSE_INDEX"].includes(item.segment)))return false;
       if(kind==="futures"&&!(item.instrument_type==="FUT"&&["NSE_FO","BSE_FO"].includes(item.segment)))return false;
-      if(kind==="options"&&!((["CE","PE"].includes(item.instrument_type))&&["NSE_FO","BSE_FO"].includes(item.segment)))return false;
+      if(kind==="options"&&!isNseOptionContract(item))return false;
       if(q&&!String(item.trading_symbol||"").toLowerCase().includes(q)&&!String(item.name||"").toLowerCase().includes(q)&&!String(item.underlying_symbol||"").toLowerCase().includes(q))return false;
       return true;
     }).slice(0,limit).map(item=>({
@@ -579,7 +581,8 @@ app.post("/paper/derivative/limit-orders",async(req,res)=>{
     if(!Number.isSafeInteger(limitPricePaise)||limitPricePaise<1)
       return res.status(400).json({error:"LIMIT price must be a positive integer number of paise."});
     const orderId=makeOrderId(user.id,idempotencyKey);
-    const fingerprint=makeOrderFingerprint({instrumentKey,side,lots,orderType:"LIMIT",limitPricePaise});
+    // Fingerprint the caller's lot count so idempotent replay remains resolvable before instrument/session lookups.
+    const fingerprint=makeOrderFingerprint({instrumentKey,side,quantity:lots,orderType:"LIMIT",limitPricePaise});
     // Resolve an identical retry before checking today's session, quote or expiry.
     // This lets users safely recover a response even after the order's session ends.
     const {data:prior,error:priorError}=await userDb.from("paper_option_limit_orders")
@@ -713,12 +716,12 @@ app.post("/paper/derivative/orders",async(req,res)=>{
     const {user,userDb}=await auth(req),instrumentKey=String(req.body?.instrument_key||"");
     const lots=Number(req.body?.lots),side=String(req.body?.side||"").toUpperCase(),idempotencyKey=String(req.body?.idempotency_key||"");
     const orderType=String(req.body?.order_type||"MARKET").toUpperCase();
-    if(orderType!=="MARKET")return res.status(400).json({error:"Options LIMIT orders are not supported yet. Only MARKET orders are currently available."});
+    if(orderType!=="MARKET")return res.status(400).json({error:"Use /paper/derivative/limit-orders for NSE Options LIMIT orders.",code:"use_options_limit_endpoint"});
     if(!isUuid(idempotencyKey))return res.status(400).json({error:"A valid UUID idempotency_key is required."});
     if(!["BUY","SELL"].includes(side))return res.status(400).json({error:"Only BUY and SELL to close existing long CE/PE positions are supported."});
     if(!instrumentCache.length||Date.now()-instrumentCacheUpdatedAt>6*60*60*1000)await refreshInstrumentCache();
-    const instrument=instrumentCache.find(x=>x.instrument_key===instrumentKey&&["CE","PE"].includes(x.instrument_type)&&["NSE_FO","BSE_FO"].includes(x.segment));
-    if(!instrument)return res.status(400).json({error:"Select a verified NSE/BSE CE/PE contract from the official instrument master."});
+    const instrument=instrumentCache.find(x=>x.instrument_key===instrumentKey&&x.exchange==="NSE"&&x.segment==="NSE_FO"&&["CE","PE"].includes(x.instrument_type));
+    if(!instrument)return res.status(400).json({error:"Select a verified NSE CE/PE contract from the official instrument master."});
     // Resolve contract identity and idempotency before requiring a live quote.
     const metadata=validateDerivativeContract(instrument,{lots,pricePaise:normalizeTickSizePaise(instrument.tick_size),now:Date.now()});
     const orderId=makeOrderId(user.id,idempotencyKey),fingerprint=makeOrderFingerprint({instrumentKey,side,quantity:metadata.quantity});
@@ -735,22 +738,25 @@ app.post("/paper/derivative/orders",async(req,res)=>{
         realizedPnlPaise:prior.realized_pnl_paise??0,idempotentReplay:true,simulationOnly:true,excludesCharges:false
       });
     }
-    const {token}=await getUpstoxAccessToken(user.id),{quote}=await getQuote(token,instrumentKey);
-    const normalized=normalizeProviderQuote(quote,instrumentKey,{maxAgeMs:15000});
-    const contract=validateDerivativeContract(instrument,{lots,pricePaise:normalized.pricePaise,now:Date.now()});
+    const {token}=await getUpstoxAccessToken(user.id),{payload:quotePayload}=await getQuote(token,instrumentKey);
+    const quoteNowMs=Date.now();
+    const executable=resolveNseOptionMarketExecution(quotePayload,instrument,{
+      side,quantity:metadata.quantity,nowMs:quoteNowMs,maxAgeMs:15000
+    });
+    const contract=validateDerivativeContract(instrument,{lots,pricePaise:executable.pricePaise,now:quoteNowMs});
     const result=await runtime.callUserRpc(user,"execute_paper_long_option_order",{
       p_order_id:orderId,p_idempotency_key:idempotencyKey,p_request_fingerprint:fingerprint,
       p_instrument_key:instrumentKey,p_trading_symbol:instrument.trading_symbol,p_exchange:instrument.exchange,
       p_segment:instrument.segment,p_instrument_type:instrument.instrument_type,p_expiry:contract.expiry,
       p_strike_price:instrument.strike_price,p_lot_size:contract.lotSize,p_tick_size_paise:contract.tickSizePaise,
-      p_lots:lots,p_side:side,p_execution_price_paise:normalized.pricePaise,
-      p_quote_timestamp_ms:normalized.tradeTimeMs,p_now_ms:Date.now()
+      p_lots:lots,p_side:side,p_execution_price_paise:executable.pricePaise,
+      p_quote_timestamp_ms:executable.quoteTimestampMs,p_now_ms:quoteNowMs
     });
     const order=result?.order||{};
     res.set("Cache-Control","private, no-store").status(result?.idempotent_replay?200:201).json({
       orderId:result?.order_id||orderId,tradingSymbol:order.trading_symbol||instrument.trading_symbol,
       instrumentKey,side,quantity:order.quantity??contract.quantity,lots,
-      executionPricePaise:order.execution_price_paise??normalized.pricePaise,
+      executionPricePaise:order.execution_price_paise??executable.pricePaise,
       grossPaise:order.gross_paise??null,chargesPaise:order.charges_paise??0,
       totalDebitPaise:order.total_debit_paise??null,netCreditPaise:order.net_credit_paise??null,
       cashPaise:result?.cash_paise??null,realizedPnlPaise:result?.realized_pnl_paise??0,
@@ -1399,4 +1405,4 @@ async function start(){
   }
 }
 if(require.main===module)start().catch(error=>{console.error("Supabase gateway startup failed:",error.message);process.exit(1);});
-module.exports={app,start,runPaperLimitWorker,runPaperIntradayLimitWorker,runPaperProtectiveWorker,runPaperFuturesLimitWorker,runPaperOptionLimitWorker};
+module.exports={app,start,runPaperLimitWorker,runPaperIntradayLimitWorker,runPaperProtectiveWorker,runPaperFuturesLimitWorker,runPaperOptionLimitWorker,paperOptionLimitWorkerStatus};

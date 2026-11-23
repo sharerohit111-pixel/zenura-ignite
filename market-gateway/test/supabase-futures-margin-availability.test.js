@@ -46,7 +46,7 @@ test("Options LIMIT and unknown order types fail closed before instrument or pro
   const rpc=route.indexOf('execute_paper_long_option_order');
   assert.ok(orderType>=0&&reject>orderType,"unknown/Options LIMIT types must be rejected explicitly");
   assert.ok(cache>reject&&token>reject&&rpc>reject,"unsupported order types must be rejected before cache/provider/database execution");
-  assert.match(route,/Options LIMIT orders are not supported yet/);
+  assert.match(route,/Use \/paper\/derivative\/limit-orders for NSE Options LIMIT orders/);
 });
 
 test("Futures margin preview validates the contract and consumes its rate-limit slot before provider access",()=>{
