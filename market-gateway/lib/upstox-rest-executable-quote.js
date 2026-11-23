@@ -65,6 +65,10 @@ function evaluateUpstoxRestDerivativeLimit(payload,instrumentKey,{
     throw new TypeError("Invalid Futures LIMIT executable-side evaluation.");
   }
   const quote=extractUpstoxRestExecutableQuote(payload,instrumentKey,{nowMs,maxAgeMs});
+  if(quote.bidPricePaise===null||quote.askPricePaise===null
+     ||quote.bidQuantity<1||quote.askQuantity<1){
+    return Object.freeze({eligible:false,reason:"INCOMPLETE_DEPTH_BOOK",fillQuantity:0,pricePaise:null,...quote});
+  }
   const pricePaise=side==="BUY"?quote.askPricePaise:quote.bidPricePaise;
   const availableQuantity=side==="BUY"?quote.askQuantity:quote.bidQuantity;
   if(pricePaise===null||availableQuantity<1)
