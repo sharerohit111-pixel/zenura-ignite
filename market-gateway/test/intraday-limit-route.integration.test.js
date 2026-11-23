@@ -145,7 +145,7 @@ test("authenticated Intraday LIMIT submission reaches the RPC with verified iden
   assert.equal(rpcCalls[0].args.p_exchange, "NSE");
   assert.equal(rpcCalls[0].args.p_limit_price_paise, 10000);
   assert.equal(rpcCalls[0].args.p_quantity, 2);
-  configureRouteTestState();
+  configureRouteTestState({ intradayLimitWorkerEnabled: false });
 });
 
 test("Intraday LIMIT submission fails closed while its execution worker is disabled", async () => {
