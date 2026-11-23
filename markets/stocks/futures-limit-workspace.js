@@ -62,8 +62,9 @@
     }catch(_){health=null;updateTicket();}
   }
   function money(paise){
-    if(!Number.isSafeInteger(paise))return "—";
-    return "₹"+(paise/100).toLocaleString("en-IN",{minimumFractionDigits:2,maximumFractionDigits:2});
+    const value=Number(paise);
+    if(!Number.isSafeInteger(value))return "—";
+    return "₹"+(value/100).toLocaleString("en-IN",{minimumFractionDigits:2,maximumFractionDigits:2});
   }
   function dateText(value){
     const time=typeof value==="number"?value:Date.parse(value||"");
@@ -83,7 +84,7 @@
       const row=document.createElement("tr");
       cell(row,dateText(order.createdAt));cell(row,order.tradingSymbol||order.instrumentKey);
       cell(row,order.side);cell(row,order.product);
-      cell(row,Number.isSafeInteger(order.quantity)&&Number.isSafeInteger(order.lotSize)?order.quantity/order.lotSize:"—");
+      cell(row,Number.isSafeInteger(Number(order.quantity))&&Number.isSafeInteger(Number(order.lotSize))?Number(order.quantity)/Number(order.lotSize):"—");
       cell(row,money(order.limitPricePaise));
       cell(row,String(order.filledQuantity??0)+" / "+String(order.remainingQuantity??order.quantity));
       cell(row,order.status);cell(row,dateText(order.expiresAt));
