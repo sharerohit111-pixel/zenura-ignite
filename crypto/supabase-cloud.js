@@ -150,6 +150,9 @@ supabase.auth.onAuthStateChange((_event, session) => {
   if (nextUserId === activeUserId) return;
   activeUserId = nextUserId;
   loadGeneration++;
+  // Clear the previous account's private SL/Target list immediately on sign-out or account switch.
+  // The next authenticated load will publish only the newly verified user's plans.
+  window.dispatchEvent(new CustomEvent("zenura-cloud-risk-plans", { detail: [] }));
   if (nextUserId) load().catch(error => console.warn("Crypto cloud portfolio unavailable:", error.message));
 });
 supabase.auth.getSession().then(({ data, error }) => {
