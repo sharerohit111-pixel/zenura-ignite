@@ -25,7 +25,7 @@ function validateOptionLimitOrder({
   if(!Number.isSafeInteger(expiryCutoffMs)||nowMs>=expiryCutoffMs){
     throw Object.assign(new Error("Expired option contracts cannot accept LIMIT orders."),{status:422});
   }
-  let reservedCashPaise=0,reservedCloseQuantity=0,estimatedCharges=null;
+  let reservedCashPaise=0,reservedCloseQuantityToSet=0,estimatedCharges=null;
   if(side==="BUY"){
     assertSafeInteger(availableCashPaise,"availableCashPaise");
     const grossPaise=contract.contractValuePaise;
@@ -41,11 +41,11 @@ function validateOptionLimitOrder({
     if(availableToClose<contract.quantity){
       throw Object.assign(new Error("SELL LIMIT can only reserve unreserved quantity from an existing long option position."),{status:409});
     }
-    reservedCloseQuantity=contract.quantity;
+    reservedCloseQuantityToSet=contract.quantity;
   }
   return Object.freeze({
     ...contract,side,limitPricePaise,
-    reservedCashPaise,reservedCloseQuantity,
+    reservedCashPaise,reservedCloseQuantity:reservedCloseQuantityToSet,
     estimatedCharges,simulationOnly:true
   });
 }
