@@ -169,7 +169,7 @@ This section records source findings, not an authorization to post charges.
   The exact rounding/aggregation method must still be taken from authoritative exchange/clearing specifications or actual exercise reports; do not assume per-unit versus contract/client aggregation rounding.
 
 Official sources:
-- NSE STT computation: https://www.nseindia.in/static/products-services/equity-derivatives-securities-transaction-tax
+- NSE STT computation: https://www.nseindia.com/static/products-services/equity-derivatives-securities-transaction-tax
 - NSE Circular NSE/FATAX/73524: https://nsearchives.nseindia.com/content/circulars/FATAX73524.pdf
 - NSE SEBI turnover fees, STT and other levies: https://www.nseindia.com/static/invest/first-time-investor-sebi-turnover-fees-stt-other-levies
 - Finance Act 2026 / Budget memorandum: https://www.indiabudget.gov.in/doc/memo.pdf
@@ -210,7 +210,7 @@ Official source:
 NSE's investor levy page lists **0.003% for Equity Options**, payable by buyer, and says clearing corporations collect stamp duty on securities transactions from 2020-07-01. However, that summary does not specify an independent stamp-duty base or a second stamp-duty event for automatic cash-settled index-option exercise. The general option rate must not be multiplied by intrinsic value or applied again at expiry without a rule/exercise statement establishing that exact event and base.
 
 Official reference:
-- NSE levies page: https://www.nseindia.in/static/invest/first-time-investor-sebi-turnover-fees-stt-other-levies
+- NSE levies page: https://www.nseindia.com/static/invest/first-time-investor-sebi-turnover-fees-stt-other-levies
 - Indian Stamp Act, 1899, section 9A: https://indiacode.ecourtsindia.com/stamp-act/section/9A/
 
 ### Updated release decision
@@ -220,3 +220,40 @@ Verified: exercise STT rate/base (0.15% of intrinsic value); exercise turnover i
 Not verified for a client-level paper-account expiry debit: exercise STT rounding/aggregation, client allocation of SEBI turnover fee, a separate expiry-exercise stamp-duty event/base, any separate exchange/clearing charge, and broker-specific brokerage/service charges. GST can only be assessed on a verified taxable service-fee base, not presumed on intrinsic settlement payout.
 
 Therefore the complete **client-level expiry charge schedule remains unverified**. Keep `settlementChargesPaise=null`, `netRealizedPnlPaise=null`, and `ledgerPostingAllowed=false`. The next evidence required is a current NSE Clearing exercise/STT report plus a broker contract note/charge schedule for an ITM long index option expiry, with client-level component amounts and rounding. No posting implementation is authorized.
+
+
+## 12. NSE Clearing exercise-report and UDiFF audit (checked 2026-11-23)
+
+### Legacy F&O Exercise Report (F_EX01)
+
+NSE Clearing publishes a formal F&O Exercise Report specification. Its filename pattern is `F_EX01_<Member code>_DDMMYYYY.CSV.gz`, delivered under the member's `/FAOFTP/F<MEMBER CODE>/REPORTS` directory. The documented fields include date, exercise number/date, clearing-member and member codes, account type, client account code, settlement type, instrument type, symbol, expiry, strike, option type, requested quantity, exercise type/style, final exercise type, exercise/do-not-exercise flag, acceptance flag, rejected quantity/reason, and valid exercise quantity.
+
+This is useful evidence for contract/client-level exercise allocation and accepted quantity. **The published F_EX01 field list does not include the STT amount, taxable exercise value, settlement payout amount, or charge-rounding fields.** Therefore F_EX01 alone cannot settle the STT rounding or client charge-note questions. It should be joined only to authenticated official settlement/obligation and STT reports using stable member/client/contract/exercise identifiers, not used as a standalone cash-ledger instruction.
+
+Official source:
+- NSE Clearing, F&O Exercise Report specification: https://www.nseclearing.in/sites/default/files/2021-11/data_report_f_ex01.pdf
+
+### NSE Clearing STT reports and client-level calculation evidence
+
+NSE Clearing's current public STT computation page states that final exercise STT is levied on intrinsic value for an ITM option and that the member receives an end-of-day report containing total, trading-member-wise, client-wise STT liability and detailed client-wise computations. This confirms the existence of a more relevant STT evidence artifact than F_EX01. The public web page does not expose the report's detailed file schema, per-contract rounding sequence, or downloadable client report sample; member access appears necessary to inspect the actual computation rows.
+
+Official source:
+- NSE Clearing STT computation and member-report description: https://www.nseclearing.in/clearing-settlement/equity-derivatives/securities-transaction-tax
+
+### UDiFF report standardization — relevant next artifact, not yet inspected at field level
+
+NSE Clearing's UDiFF page states that Clearing Corporation reports have standardized formats for Trade, STT, CTT, StampDuty, Position, Obligation, Margin, Penalty, and Settlement Master reports, and publishes:
+- Annexure B: report-format workbook.
+- Annexure C: sample report ZIP.
+- Circular references for UDiFF report standardization.
+
+The page confirms these artifacts exist, but the linked XLSX/ZIP could not be parsed in this audit pass. No field names, rounding rule, or exercise charge base are inferred from the page title alone. The next research step is to inspect the current Annexure B STT/StampDuty/Obligation sheets and the corresponding F&O sample files, if publicly retrievable, and compare their field definitions with an actual member-side exercise/STT report.
+
+Official source:
+- NSE Clearing UDiFF formats and sample report links: https://www.nseclearing.in/udiff
+
+### Accounting and implementation decision
+
+The F_EX01 specification improves the evidence model for accepted exercise quantity and client/contract identity, but does not close the charge-calculation gap. UDiFF confirms dedicated STT and StampDuty report formats exist, but their schema and sample rows remain uninspected. No exercise posting, charge formula, or rounding method is authorized by this finding.
+
+Keep `settlementChargesPaise=null`, `netRealizedPnlPaise=null`, and `ledgerPostingAllowed=false`. The required evidence remains: (1) actual current NSE Clearing STT report/UDiFF sample rows showing client-level taxable base, STT amount, and rounding; and (2) the selected broker's client contract note/charge schedule proving which exercise-related components are passed through to the client.
