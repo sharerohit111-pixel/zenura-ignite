@@ -2,7 +2,7 @@
 
 const crypto=require("node:crypto");
 const {normalizeWorkerCursor,groupOrdersByUser}=require("./paper-limit-worker");
-const {loadVerifiedExchangeSession}=require("./exchange-session-calendar");
+const {loadVerifiedExchangeSession,marketDateString}=require("./exchange-session-calendar");
 const {isIntradaySessionOpen}=require("./intraday-limit-policy");
 const {normalizeTickSizePaise,normalizeExpiryDate}=require("./derivative-contract");
 const {calculateFuturesTradeCharges}=require("./trading-charges");
@@ -118,7 +118,7 @@ function createPaperFuturesLimitWorker({
       summary.scanned=orders.length;
       const sessionCache=new Map();
       const getSession=async(exchange,at)=>{
-        const key=exchange+":"+new Date(at).toISOString().slice(0,10);
+        const key=exchange+":"+marketDateString(at);
         if(!sessionCache.has(key))sessionCache.set(key,await loadSession(serviceDb,exchange,at));
         return sessionCache.get(key);
       };
