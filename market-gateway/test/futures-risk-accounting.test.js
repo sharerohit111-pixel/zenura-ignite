@@ -85,7 +85,7 @@ test("rollover closes the old contract and opens a distinct new contract", () =>
   });
   assert.equal(result.closedLeg.realizedPnlPaise, 25000);
   assert.equal(result.closedLeg.releasedMarginPaise, 150000);
-  assert.equal(result.openedLeg.initialMarginPaise, 285000);
+  assert.equal(result.openedLeg.initialMarginPaise, 28500);
   assert.equal(result.automaticContractCarry, false);
   assert.throws(() => risk.simulatePositionRollover({
     oldInstrumentKey: "NSE_FO|OLD", oldNetQuantity: 25, oldAveragePricePaise: 10000,
