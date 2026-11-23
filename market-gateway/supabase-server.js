@@ -146,7 +146,7 @@ app.get("/health",(_req,res)=>res.json({
   ok:true,service:"zenura-supabase-market-gateway",authProvider:"supabase",
   feedProtocol:"upstox-v3",instrumentMasterLoaded:instrumentCache.length>0,
   instrumentMasterUpdatedAt:instrumentCacheUpdatedAt||null,
-  limitWorker:{...paperLimitWorkerStatus},intradayLimitWorker:{...paperIntradayLimitWorkerStatus},futuresLimitWorker:{...paperFuturesLimitWorkerStatus},protectiveWorker:{...paperProtectiveWorkerStatus}
+  limitWorker:{...paperLimitWorkerStatus},intradayLimitWorker:{...paperIntradayLimitWorkerStatus},futuresLimitSubmissionEnabled:process.env.PAPER_FUTURES_LIMIT_ENABLED==="true",futuresLimitWorker:{...paperFuturesLimitWorkerStatus},protectiveWorker:{...paperProtectiveWorkerStatus}
 }));
 
 app.get("/upstox/connection",async(req,res)=>{
