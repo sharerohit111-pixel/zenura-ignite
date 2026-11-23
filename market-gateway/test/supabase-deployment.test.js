@@ -166,13 +166,13 @@ test("Equity, Futures and Options order histories use composite keyset paginatio
   'app.get("/paper/derivative/limit-orders"'
  ]){
   const start=server.indexOf(route);
-  const end=server.indexOf("\\napp.",start+5);
+  const end=server.indexOf("\napp.",start+5);
   assert.ok(start>=0&&end>start,route+" route must exist");
   const source=server.slice(start,end);
-  assert.match(source,/decodeHistoryCursor\\(req\\.query\\.cursor\\)/);
-  assert.match(source,/applyHistoryCursor\\(query,decoded\\.cursor\\)/);
-  assert.match(source,/order\\("created_at",\\{ascending:false\\}\\)\\.order\\("order_id",\\{ascending:false\\}\\)\\.limit\\(limit\\+1\\)/);
-  assert.match(source,/hasMore:page\\.hasMore,nextCursor:page\\.nextCursor/);
+  assert.match(source,/decodeHistoryCursor\(req\.query\.cursor\)/);
+  assert.match(source,/applyHistoryCursor\(query,decoded\.cursor\)/);
+  assert.match(source,/order\("created_at",\{ascending:false\}\)\.order\("order_id",\{ascending:false\}\)\.limit\(limit\+1\)/);
+  assert.match(source,/hasMore:page\.hasMore,nextCursor:page\.nextCursor/);
  }
 });
 test("Gateway attaches a server-generated request correlation ID",()=>{
