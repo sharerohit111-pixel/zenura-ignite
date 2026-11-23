@@ -209,3 +209,43 @@ This matrix classifies work by cost and side-effect risk so Chat 7 / backend own
 - Apply request/body limits and edge protection before parsing expensive payloads. Authenticate before user-keyed decisions. Perform cheap deterministic validation before consuming provider-heavy budgets.
 - Quota values, global concurrency caps, route exceptions, retention/TTL, clock source and alert thresholds remain open design decisions. Record approvals and load-test evidence before rollout.
 - Do not implement this matrix until Chat 7 confirms the shared schema/RPC contract and migration ordering. This section is a proposal, not an active policy.
+
+
+## 14. Worker lease expiry, renewal and crash-recovery audit
+
+### Observed implementation
+
+- The Supabase worker lease RPC is an atomic `INSERT ... ON CONFLICT DO UPDATE` claim keyed by `state_key`. A claim can replace a lease only when the stored token/expiry is null or its expiry is at/before the caller-supplied `p_now_ms`. The RPC returns true only when the persisted token matches the caller token.
+- The latest lease-key migration registers five isolated worker keys: Delivery LIMIT, Equity protective, Equity Intraday LIMIT, Futures LIMIT and Options LIMIT. The RPC accepts TTL values from 5,000 to 300,000 ms. The current worker modules inspected pass 240,000 ms.
+- Release is owner-token guarded (`WHERE state_key = ... AND lease_token = p_lease_token`), so an old owner cannot release a newer owner's lease. Release does not require that the lease is still unexpired.
+- The worker modules inspected acquire before scanning and release in `finally`. A process crash, forced termination, host loss or hard timeout skips `finally`; the lease remains until its persisted expiry and then becomes reclaimable. This is expected TTL-based crash recovery, but recovery latency can be up to the remaining lease duration.
+- The shared `createLeaseHeartbeat` helper is tested in isolation, including overlap suppression, lost-lease callback and renewal-error callback. The inspected Equity Delivery LIMIT, Equity Intraday LIMIT, Futures LIMIT, Options LIMIT and protective worker modules do not import/use this helper or invoke a renewal RPC. No renewal RPC was found in the inspected lease migrations. Therefore there is no active lease extension during a long-running worker batch in these implementations.
+- Cursor writes in the Intraday, Futures and Options LIMIT workers include both `state_key` and the current `lease_token`, which prevents an expired former owner from overwriting cursor state after a replacement claim. The inspected worker execution RPC calls do not pass the lease token as a fencing token; correctness during a stale worker's in-flight request must therefore rely on the order-level atomic status/reservation checks and execution-id/idempotency constraints inside each execution RPC.
+
+### Existing test coverage and gaps
+
+- Worker unit tests verify that a competing lease result (`data: false`) causes an early return without scanning or releasing another worker's lease. They also verify release is attempted after normal success and selected errors.
+- `lease-heartbeat.test.js` tests the helper only; it does not prove any production worker uses it.
+- `supabase/tests/intraday_limit_worker_lease.sql` verifies service-role-only grants, first acquisition, rejection of a concurrent second owner, rejection of non-owner release, owner release and reacquisition after explicit release.
+- The inspected SQL test does not simulate a worker crash or prove takeover after the lease expiry timestamp. It also does not exercise simultaneous SQL claim transactions. No equivalent SQL lease test was found for Delivery LIMIT, protective, Futures LIMIT or Options LIMIT keys in the inspected test paths.
+- The worker unit-test DB fakes generally return a preselected boolean for acquire/release. They do not model a real expiry clock, stale-owner takeover, release failure, process death between claim and cursor/fill, or a worker whose batch runs beyond 240 seconds.
+
+### Risk assessment
+
+1. **Long batch overlap:** without heartbeat renewal, a batch that exceeds its 240-second lease can overlap with a replacement worker. Per-order atomic RPCs should prevent duplicate accounting, but this needs explicit stale-worker fencing/race tests rather than assumption.
+2. **Crash recovery delay:** a crashed worker is not immediately unlocked; another worker must wait for TTL expiry. The 240-second TTL is a recovery bound, not a recovery guarantee if the database clock/claim path is unhealthy.
+3. **Clock authority:** acquire/takeover compares the caller-supplied millisecond timestamp to persisted expiry. Worker clocks should be synchronized, and the SQL contract should be reviewed for whether database time should be authoritative for lease expiry decisions.
+4. **Cursor fencing is not execution fencing:** token-guarded cursor writes protect scan progress, but do not stop a stale process from attempting a fill RPC already in flight after lease takeover. Order-level compare-and-set/idempotency is the last line of defense.
+5. **Heartbeat helper is currently orphaned from the inspected worker paths:** do not claim worker leases are renewed merely because the helper exists and has unit tests.
+
+### Required follow-up before production confidence
+
+- Add database-level expiry takeover tests with a controllable `p_now_ms`: active lease cannot be stolen; exact-expiry boundary can be reclaimed; expired owner cannot release replacement lease; invalid/overflow TTL inputs fail; independent state keys do not contend.
+- Add concurrent SQL claim tests using two sessions/transactions to prove exactly one winner.
+- Add stale-owner fencing tests: worker A claims, lease expires, worker B claims, then A attempts cursor update and execution RPC. A must not mutate cursor or create a duplicate fill; B must remain the sole valid lease owner.
+- Exercise each registered key (Delivery, protective, Intraday, Futures, Options) against the same RPC contract and grants.
+- Add deterministic worker tests for RPC failure after claim, provider timeout, cursor-save failure, release error, abrupt termination/restart, and batch duration beyond lease TTL.
+- Decide explicitly whether workers should renew leases. If so, coordinate a forward-only shared RPC/migration with Chat 7, integrate heartbeat with cancellation on lease loss, and ensure every state mutation is fenced by the current token. Do not add heartbeat-only code that still permits stale execution RPCs.
+- Keep TTL and batch-duration limits aligned with Cloud Run/job execution timeout and provider latency budgets. Do not change production schedules or worker activation as part of this audit.
+
+**Decision:** audit/documentation only. No worker behavior, SQL, RPC, TTL, schedule, deployment or production activation was changed. A production-readiness claim for crash recovery remains blocked on the tests and fencing review above.
