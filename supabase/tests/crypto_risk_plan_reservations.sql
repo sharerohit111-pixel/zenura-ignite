@@ -1,6 +1,9 @@
 -- Crypto SL/Target plan reservations share the position reservation pool with LIMIT SELL.
 BEGIN;
-INSERT INTO auth.users(id) VALUES ('31313131-3131-4131-8131-313131313131') ON CONFLICT DO NOTHING;
+INSERT INTO auth.users(id) VALUES
+ ('31313131-3131-4131-8131-313131313131'),
+ ('41414141-4141-4141-8141-414141414141')
+ON CONFLICT DO NOTHING;
 INSERT INTO public.paper_crypto_accounts(user_id,currency,starting_cash,cash_balance)
 VALUES ('31313131-3131-4131-8131-313131313131','INR',1000000,1000000);
 INSERT INTO public.paper_crypto_positions(user_id,symbol,base_asset,quantity,reserved_quantity,average_entry_price,cost_basis)
@@ -67,7 +70,6 @@ BEGIN
  END IF;
 END $assert_exit$;
 -- A second user can independently create and execute a full-position TAKE_PROFIT exit.
-INSERT INTO auth.users(id) VALUES ('41414141-4141-4141-8141-414141414141') ON CONFLICT DO NOTHING;
 INSERT INTO public.paper_crypto_accounts(user_id,currency,starting_cash,cash_balance)
 VALUES ('41414141-4141-4141-8141-414141414141','INR',1000000,1000000);
 INSERT INTO public.paper_crypto_positions(user_id,symbol,base_asset,quantity,reserved_quantity,average_entry_price,cost_basis)
