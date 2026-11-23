@@ -5,8 +5,9 @@
 })(typeof window!=="undefined"?window:globalThis,function(){
   "use strict";
   function normalizeTickSizePaise(value){
-    if(typeof value!=="number"||!Number.isFinite(value)||value<=0)return null;
-    const paise=value<1?value*100:value;
+    const number=Number(value);
+    if(!Number.isFinite(number)||number<=0)return null;
+    const paise=number<1?number*100:number;
     return Number.isSafeInteger(Math.round(paise))&&Math.abs(paise-Math.round(paise))<1e-7&&paise>0?Math.round(paise):null;
   }
   function parseLimitPricePaise(value,tickSizePaise){
@@ -22,7 +23,7 @@
       &&instrument.instrument_type==="FUT"
       &&typeof instrument.instrument_key==="string"&&instrument.instrument_key.length>0
       &&typeof instrument.trading_symbol==="string"&&instrument.trading_symbol.length>0
-      &&Number.isSafeInteger(instrument.lot_size)&&instrument.lot_size>0
+      &&Number.isSafeInteger(Number(instrument.lot_size))&&Number(instrument.lot_size)>0
       &&normalizeTickSizePaise(instrument.tick_size)!==null;
   }
   function isEnabled(health){
