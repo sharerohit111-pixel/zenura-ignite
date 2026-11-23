@@ -195,6 +195,8 @@ jobs:
         run: bash supabase/tests/futures_limit_fill_cancel_race.sh
       - name: Reconcile Indian-market long Options ledger cash, charges and realized P&L
         run: psql -v ON_ERROR_STOP=1 -f supabase/tests/long_option_ledger_reconciliation.sql
+      - name: Exercise atomic NSE Options LIMIT submit, cash/close reservation, cancel and expiry
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/options_limit_submit_release.sql
       - name: Verify F&O LIMIT schema remains fail-closed until lifecycle release
         run: psql -v ON_ERROR_STOP=1 -f supabase/tests/derivative_limit_schema_guard.sql
       - name: Verify isolated NSE Options LIMIT schema, RLS and MARKET SELL reservation guard
