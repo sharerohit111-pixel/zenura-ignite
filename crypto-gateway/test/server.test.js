@@ -4,7 +4,7 @@ process.env.SUPABASE_PUBLISHABLE_KEY="test-publishable-key";
 process.env.SUPABASE_SERVICE_ROLE_KEY="test-service-role-key";
 const test=require("node:test");
 const assert=require("node:assert/strict");
-const {validateOrderInput,validateRiskPlanInput,isFreshCryptoQuote,getRiskPlanTrigger,makeOrderId,runLimitWorker,releaseWorkerLeaseSafely,rotateRiskPlanSafely,createRateLimiter,isUuid}=require("../server");
+const {validateOrderInput,validateRiskPlanInput,isFreshCryptoQuote,getRiskPlanTrigger,makeOrderId,runLimitWorker,createSingleFlightTask,releaseWorkerLeaseSafely,rotateRiskPlanSafely,createRateLimiter,isUuid}=require("../server");
 test("accepts supported market order and canonicalizes symbol",()=>{
  const v=validateOrderInput({symbol:"btcusdt",side:"buy",quantity:"0.001",idempotency_key:"123e4567-e89b-42d3-a456-426614174000"});
  assert.equal(v.symbol,"BTCUSDT"); assert.equal(v.side,"BUY"); assert.equal(v.quantityRaw,"0.001");
@@ -132,4 +132,18 @@ test("rejects malformed cloud SL/Target decimals, missing triggers and invalid r
   assert.throws(()=>validateRiskPlanInput({...base,...patch}));
  }
  assert.throws(()=>validateRiskPlanInput({...base,stop_loss_price:null,take_profit_price:null}));
+});
+
+test("single-flight scheduler skips overlapping ticks and resumes after completion",async()=>{
+ let calls=0, release;
+ const gate=new Promise(resolve=>{release=resolve;});
+ const task=createSingleFlightTask(async()=>{calls++;await gate;});
+ const first=task();
+ await Promise.resolve();
+ assert.equal(await task(),false);
+ assert.equal(calls,1);
+ release();
+ assert.equal(await first,true);
+ assert.equal(await task(),true);
+ assert.equal(calls,2);
 });
