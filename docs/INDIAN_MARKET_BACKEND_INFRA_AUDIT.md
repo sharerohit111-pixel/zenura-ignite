@@ -320,3 +320,29 @@ The repository deployment workflow contains a manual production deployment path 
 - Evaluate a bounded per-order attempt/backoff or dead-letter mechanism only after agreeing its schema and RPC ownership with Chat 7. No migration is included here.
 
 **Decision:** source audit and documentation only. No worker implementation, lease RPC, cursor schema, SQL migration, environment setting, activation or deployment was changed.
+
+
+## 16. Reconciliation with open PR #93 lease-renewal work (2026-11-23)
+
+A follow-up review of PR #93's changed-file list and exact patches found additional work that is **not present in this audit branch snapshot**:
+
+- PR #93 proposes `supabase/migrations/20261123240000_paper_market_worker_lease_renewal.sql`, defining a service-role-only `renew_paper_market_worker_lease` RPC. It permits only registered worker state keys, requires the matching current token and an unexpired lease, bounds TTL to 5–300 seconds, and returns false for a non-owner/expired lease. This is a candidate PR migration, not proof that the migration is applied to any database.
+- PR #93 adds heartbeat integration to the Futures LIMIT worker at a 60-second interval against a 240-second lease. It checks the in-memory `leaseLost` flag at several boundaries and stops heartbeat in `finally`.
+- The PR #93 patch reviewed here changes the Futures worker only. The shared renewal RPC allowlist includes Equity Delivery, Equity Intraday, Protective, Futures and Options keys, but the other four workers in this audit branch do not thereby gain heartbeat integration.
+- PR #93's SQL regression patch tests active-owner renewal, non-owner rejection, expired-token non-resurrection, unsafe timestamp rejection, grants and the Options key namespace. It does not establish simultaneous renewal/expiry takeover behavior across all worker types.
+
+### Remaining PR #93 review risks
+
+1. **Renewal is not execution fencing:** Futures worker checks `leaseLost` before fill RPC calls, but a lease can be lost after the check and before or during the RPC. The execution RPC does not receive the lease token in the reviewed patch. A database-enforced fencing predicate or equivalent order-state/idempotency proof is still needed for the stale-owner race.
+2. **Heartbeat error is treated as lease loss:** this is appropriately fail-closed for further work, but the worker must reliably stop all outstanding concurrent user batches. The current `Promise.all` batches may already have in-flight work when the heartbeat reports loss.
+3. **Renewal uses caller-supplied time:** the SQL compares expiry to `p_now_ms`; confirm clock-skew assumptions or move authority to database time in a coordinated follow-up.
+4. **Cursor affected-row count remains unchecked:** token filtering prevents a stale cursor overwrite, but a zero-row update is not surfaced as lease loss by the worker.
+5. **Coverage is uneven:** a common RPC does not mean all worker implementations are renewed. Delivery, Intraday, Protective and Options still require separate heartbeat/loss handling or an explicit short-batch/lease-duration proof.
+
+### Branch and migration boundary
+
+- The renewal migration and Futures heartbeat integration are visible in PR #93's patch, but the corresponding files are absent from `feature/indian-market-backend-infra-supabase-2026-11-23` at this audit point.
+- Do not cherry-pick, merge, apply or deploy PR #93 as part of this audit. Chat 7 must confirm migration ordering and database state; the owning Futures/worker chat must review the heartbeat integration and its CI evidence.
+- This reconciliation corrects the broader repository-level picture: the earlier Section 14 statement that no renewal RPC was found describes the files in this audit branch, not the separate proposed PR #93 patch.
+
+**Decision:** reconciliation/documentation only. No PR #93 files were copied, no migration was applied, and no worker behavior or deployment setting was changed.
