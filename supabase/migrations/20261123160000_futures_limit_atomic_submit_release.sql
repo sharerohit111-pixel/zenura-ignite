@@ -102,7 +102,7 @@ begin
      or p_segment is null or p_segment not in ('NSE_FO','BSE_FO')
      or (p_exchange='NSE' and p_segment<>'NSE_FO')
      or (p_exchange='BSE' and p_segment<>'BSE_FO')
-     or p_expiry is null or p_expiry<current_date
+     or p_expiry is null
      or p_lot_size is null or p_lot_size not between 1 and 1000000
      or p_tick_size_paise is null or p_tick_size_paise not between 1 and 1000000
      or p_side is null or p_side not in ('BUY','SELL')
@@ -113,8 +113,7 @@ begin
      or p_limit_price_paise % p_tick_size_paise <> 0
      or p_open_margin_paise is null or p_open_margin_paise < 0
      or p_now_ms is null or p_now_ms<0
-     or p_expires_at is null or p_expires_at <= v_server_now
-     or p_expires_at > ((p_expiry + time '15:30') at time zone 'Asia/Kolkata')
+     or p_expires_at is null
   then
     raise exception 'Invalid or unsupported Futures LIMIT order input.'
       using errcode='22023';
@@ -172,6 +171,7 @@ begin
   v_server_now:=clock_timestamp();
   v_server_now_ms:=floor(extract(epoch from v_server_now)*1000)::bigint;
   if abs(v_server_now_ms-p_now_ms)>2000
+     or p_expiry<(v_server_now at time zone 'Asia/Kolkata')::date
      or p_expires_at<=v_server_now
      or p_expires_at>((p_expiry + time '15:30') at time zone 'Asia/Kolkata') then
     raise exception 'Futures LIMIT submit clock or expiry is not current.'
