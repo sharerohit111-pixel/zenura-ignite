@@ -41,6 +41,7 @@ const {createMarketFeedEventOrderFilter}=require("./lib/market-feed-event-order"
 const {createLeaseHeartbeat}=require("./lib/lease-heartbeat");
 const {readProviderJson}=require("./lib/provider-json");
 const {upstoxHttpError}=require("./lib/upstox-http-policy");
+const {MAX_RECONNECT_ATTEMPTS,reconnectDelayMs}=require("./lib/stream-reconnect-policy");
 const {decryptUpstoxToken,encryptUpstoxToken}=require("./lib/upstox-token-crypto");
 const {readUserUpstoxConnection}=require("./lib/upstox-user-connection");
 const {nextUpstoxTokenExpiry}=require("../functions/lib/upstox-token-expiry");
@@ -1046,7 +1047,6 @@ app.get("/paper/futures/portfolio",async(req,res)=>{
 app.post("/stream",async(req,res)=>{
   let upstream,heartbeat,uid=null,reservation=null,leaseId=null,leaseAcquired=false;
   let reconnectTimer=null,reconnectInFlight=false,reconnectAttempts=0,socketGeneration=0;
-  const MAX_RECONNECT_ATTEMPTS=5,BASE_RECONNECT_DELAY_MS=1000,MAX_RECONNECT_DELAY_MS=15000;
   const lifecycle=createStreamLifecycle(()=>{
     if(reconnectTimer)clearTimeout(reconnectTimer);
     reconnectTimer=null;
@@ -1130,9 +1130,7 @@ app.post("/stream",async(req,res)=>{
         return;
       }
       reconnectAttempts++;
-      const exponential=Math.min(MAX_RECONNECT_DELAY_MS,BASE_RECONNECT_DELAY_MS*(2**(reconnectAttempts-1)));
-      const jitter=Math.floor(Math.random()*251);
-      const delay=Math.max(exponential+jitter,Number.isFinite(retryAfterSeconds)?retryAfterSeconds*1000:0);
+      const delay=reconnectDelayMs(reconnectAttempts,{retryAfterSeconds});
       writeEvent("status",{connected:false,reconnecting:true,attempt:reconnectAttempts,maxAttempts:MAX_RECONNECT_ATTEMPTS,retryInMs:delay});
       reconnectTimer=setTimeout(async()=>{
         reconnectTimer=null;
