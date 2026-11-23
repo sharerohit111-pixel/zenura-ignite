@@ -78,7 +78,8 @@ function cumulativeFillCharges({fills,grossPaise,exchange,side}){
 
 function createPaperFuturesLimitWorker({
   serviceDb,ensureInstrumentCache,getUpstoxAccessToken,fetchProvider,
-  readProviderJson,loadSession=loadVerifiedExchangeSession,now=Date.now
+  readProviderJson,loadSession=loadVerifiedExchangeSession,now=Date.now,
+  scheduleHeartbeat=setInterval,cancelHeartbeat=clearInterval
 }){
   if(!serviceDb||typeof serviceDb.rpc!=="function"||typeof serviceDb.from!=="function"
      ||typeof ensureInstrumentCache!=="function"||typeof getUpstoxAccessToken!=="function"
@@ -111,7 +112,7 @@ function createPaperFuturesLimitWorker({
       },
       onLost:()=>{summary.leaseLost=true;},
       onError:()=>{summary.leaseLost=true;},
-      intervalMs:60000
+      intervalMs:60000,schedule:scheduleHeartbeat,cancel:cancelHeartbeat
     });
     try{
       const instruments=await ensureInstrumentCache();
