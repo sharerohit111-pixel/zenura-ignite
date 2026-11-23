@@ -66,5 +66,54 @@ BEGIN
      v_reserved,v_quantity,v_status,v_reason,v_orders,v_ledger;
  END IF;
 END $assert_exit$;
+-- A second user can independently create and execute a full-position TAKE_PROFIT exit.
+INSERT INTO auth.users(id) VALUES ('41414141-4141-4141-8141-414141414141') ON CONFLICT DO NOTHING;
+INSERT INTO public.paper_crypto_accounts(user_id,currency,starting_cash,cash_balance)
+VALUES ('41414141-4141-4141-8141-414141414141','INR',1000000,1000000);
+INSERT INTO public.paper_crypto_positions(user_id,symbol,base_asset,quantity,reserved_quantity,average_entry_price,cost_basis)
+VALUES ('41414141-4141-4141-8141-414141414141','ETHUSDT','ETH',0.25,0,2000,40000);
+SELECT public.create_paper_crypto_risk_plan(
+ '41414141-4141-4141-8141-414141414141',
+ '42424242-4242-4242-8242-424242424242',
+ '43434343-4343-4343-8343-434343434343',
+ 'ETHUSDT','ETH',0.25,NULL,2500
+);
+DO $isolation$
+BEGIN
+  BEGIN
+    PERFORM public.execute_paper_crypto_risk_exit(
+      '31313131-3131-4131-8131-313131313131',
+      '42424242-4242-4242-8242-424242424242',
+      2500,80,50,floor(extract(epoch from clock_timestamp())*1000)::bigint
+    );
+    RAISE EXCEPTION 'A different user must not execute another user risk plan.';
+  EXCEPTION WHEN no_data_found THEN
+    NULL;
+  END;
+END $isolation$;
+SELECT public.execute_paper_crypto_risk_exit(
+ '41414141-4141-4141-8141-414141414141',
+ '42424242-4242-4242-8242-424242424242',
+ 2500,80,50,floor(extract(epoch from clock_timestamp())*1000)::bigint
+);
+DO $full_exit$
+DECLARE v_position_count integer; v_status text; v_reason text; v_cash numeric; v_order_count integer; v_ledger_count integer;
+BEGIN
+ SELECT count(*) INTO v_position_count FROM public.paper_crypto_positions
+ WHERE user_id='41414141-4141-4141-8141-414141414141' AND symbol='ETHUSDT';
+ SELECT status,trigger_reason INTO v_status,v_reason FROM public.paper_crypto_risk_plans
+ WHERE plan_id='42424242-4242-4242-8242-424242424242';
+ SELECT cash_balance INTO v_cash FROM public.paper_crypto_accounts
+ WHERE user_id='41414141-4141-4141-8141-414141414141';
+ SELECT count(*) INTO v_order_count FROM public.paper_crypto_orders
+ WHERE order_id='42424242-4242-4242-8242-424242424242' AND status='FILLED';
+ SELECT count(*) INTO v_ledger_count FROM public.paper_crypto_ledger
+ WHERE order_id='42424242-4242-4242-8242-424242424242';
+ IF v_position_count<>0 OR v_status<>'EXECUTED' OR v_reason<>'TAKE_PROFIT'
+    OR v_cash<>1049950 OR v_order_count<>1 OR v_ledger_count<>2 THEN
+   RAISE EXCEPTION 'Full-position target exit failed: positions %, status %, reason %, cash %, orders %, ledger %',
+     v_position_count,v_status,v_reason,v_cash,v_order_count,v_ledger_count;
+ END IF;
+END $full_exit$;
 RESET ROLE;
 ROLLBACK;
