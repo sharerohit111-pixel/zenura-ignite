@@ -44,7 +44,11 @@ test("evaluates SL and Target triggers without firing the opposite threshold",()
  assert.equal(getRiskPlanTrigger({stop_loss_price:"90",take_profit_price:null},120),null);
  assert.equal(getRiskPlanTrigger(plan,0),null);
 });
-test("bounds combined Crypto LIMIT and SL/Target worker batches to protect the shared lease",async()=>{ await assert.rejects(runLimitWorker({maxOrders:6}),/between 1 and 5/); });
+test("bounds combined Crypto LIMIT and SL/Target worker batches to protect the shared lease",async()=>{
+ for(const maxOrders of [0,-1,1.5,6,"5",null]) {
+  await assert.rejects(runLimitWorker({maxOrders}),/between 1 and 5/);
+ }
+});
 
 test("rate limiter bounds order requests and returns a retry window",()=>{
  let now=1000, status=0, payload, headers={};
