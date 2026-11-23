@@ -47,3 +47,19 @@ Status: design/test contract only. Run only after integration in disposable Post
 Use the paired draft rollback only in disposable environments. Production recovery
 requires a separately reviewed compensating migration, never editing migration history.
 Verify grants and triggers against the pre-migration snapshot.
+
+
+## Equity settlement-specific assertions
+
+For the three current full-fill Equity settlement RPCs (MARKET, Delivery LIMIT, Intraday LIMIT), additionally assert:
+
+- Exactly one deterministic order-scoped fill row per successful full-fill order.
+- Fill row values exactly match the final order settlement variables (quantity, price, gross, charges, fee breakdown, cash delta, realized P&L, quote timestamp).
+- MARKET BUY/SELL append one TRADE_DEBIT/TRADE_CREDIT row respectively.
+- LIMIT BUY appends one TRADE_DEBIT and one RESERVATION_CONSUME event with stable distinct event keys and final cash/reserved-cash snapshots.
+- LIMIT SELL appends one TRADE_CREDIT; its reserved-share release matches the order and position state.
+- Exact retries append no additional rows; changed idempotency fingerprints remain rejected.
+- Concurrent duplicate LIMIT workers create only one fill and one set of ledger events.
+- An exception after the fill insert rolls back fill, ledger, order, account, and position changes together.
+- Do not assert partial Equity fill behavior: current Equity LIMIT fill RPCs settle the full remaining order quantity and have no caller-supplied execution ID/fill-sequence contract.
+- Cancellation/rejection reservation release requires separate RPC coverage and must not be marked complete by these fill tests.
