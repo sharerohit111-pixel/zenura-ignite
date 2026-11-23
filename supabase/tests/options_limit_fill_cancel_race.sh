@@ -18,11 +18,11 @@ wait_for_terminal_update_lock() {
   local pattern="$1"
   for _ in {1..100}; do
     local active
-    active="$(psql -Atqc "SELECT count(*) FROM pg_stat_activity WHERE query LIKE '%\${pattern}%' AND wait_event_type='Timeout' AND wait_event='PgSleep';")"
+    active="$(psql -Atqc "SELECT count(*) FROM pg_stat_activity WHERE query LIKE '%${pattern}%' AND wait_event_type='Timeout' AND wait_event='PgSleep';")"
     if [[ "$active" -ge 1 ]]; then return 0; fi
     sleep 0.05
   done
-  echo "Timed out waiting for Options LIMIT row-lock race stage: \${pattern}" >&2
+  echo "Timed out waiting for Options LIMIT row-lock race stage: ${pattern}" >&2
   exit 1
 }
 
