@@ -16,7 +16,7 @@ Status: implementation in draft PRs #87–#89. This document does not enable Fut
 - The Futures LIMIT ledger adds filled/remaining quantities, average fill price, pending opening-margin and close-quantity reservations, expiry, executable bid/ask snapshot fields, and an append-only execution fill table.
 - Opening margin reservation requires a fresh trusted provider-margin timestamp; SQL checks the margin snapshot age at submit time. Close-only orders do not request or reserve opening margin.
 - Atomic service-role RPCs now cover submit, partial/full fill, cancel and expiry; account -> order -> position locking, execution-idempotency and reservation release are tested on disposable PostgreSQL.
-- The authenticated Futures LIMIT submit/cancel API is wired behind PAPER_FUTURES_LIMIT_ENABLED=true; the flag defaults off. Submission requires a verified open session and a fresh provider margin snapshot for opening exposure.
+- The authenticated Futures LIMIT submit/cancel API and isolated NSE Futures LIMIT ticket/order-history UI are wired behind PAPER_FUTURES_LIMIT_ENABLED=true; the flag defaults off. The UI also requires the worker health flag before enabling submission. Submission requires a verified open session and a fresh provider margin snapshot for opening exposure.
 - The dedicated Futures LIMIT worker module is wired behind PAPER_FUTURES_LIMIT_WORKER_ENABLED=true; the flag defaults off. The worker currently supports NSE Futures only; BSE Futures remain blocked until their charge schedule is verified.
 - Long Options remain MARKET-only; derivative_limit_schema_guard.sql protects the Options order schema from premature LIMIT enablement.
 - F&O LIMIT must remain disabled until the database lifecycle and worker are complete.
