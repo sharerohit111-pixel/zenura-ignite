@@ -33,6 +33,8 @@ DECLARE
   v_reserved bigint;
   v_qty integer;
   v_expired integer;
+  v_fill_count integer;
+  v_ledger_count integer;
   v_now_ms bigint:=floor(extract(epoch from clock_timestamp())*1000)::bigint;
 BEGIN
   IF NOT has_function_privilege('service_role',
@@ -117,6 +119,24 @@ BEGIN
   IF (v_result->>'already_filled')::boolean IS NOT TRUE THEN
     RAISE EXCEPTION 'Intraday LIMIT BUY fill retry was not idempotent';
   END IF;
+  SELECT count(*) INTO v_fill_count FROM public.paper_equity_fills
+   WHERE order_id=repeat('1',64) AND user_id='22222222-2222-4222-8222-222222222222';
+  SELECT count(*) INTO v_ledger_count FROM public.paper_equity_cash_ledger
+   WHERE order_id=repeat('1',64) AND user_id='22222222-2222-4222-8222-222222222222';
+  IF v_fill_count<>1 OR v_ledger_count<>2
+     OR NOT EXISTS (SELECT 1 FROM public.paper_equity_fills
+       WHERE order_id=repeat('1',64) AND execution_id='intraday-limit:'||repeat('1',64)
+         AND quantity=2 AND cash_delta_paise=-19826)
+     OR NOT EXISTS (SELECT 1 FROM public.paper_equity_cash_ledger
+       WHERE order_id=repeat('1',64) AND event_key='intraday-limit-trade:'||repeat('1',64)
+         AND event_type='TRADE_DEBIT' AND cash_delta_paise=-19826
+         AND reserved_cash_delta_paise=0)
+     OR NOT EXISTS (SELECT 1 FROM public.paper_equity_cash_ledger
+       WHERE order_id=repeat('1',64) AND event_key='intraday-limit-reserve-consume:'||repeat('1',64)
+         AND event_type='RESERVATION_CONSUME' AND reserved_cash_delta_paise=-20026
+         AND cash_delta_paise=0 AND reserved_cash_after_paise=0) THEN
+    RAISE EXCEPTION 'Intraday LIMIT BUY fill/cash/reservation ledger rows are missing or inconsistent';
+  END IF;
 
   -- A stale quote must leave the pending order and its reservation untouched.
   PERFORM public.submit_paper_intraday_limit_order(
@@ -169,6 +189,21 @@ BEGIN
   IF v_qty<>7 OR v_reserved<>0 THEN
     RAISE EXCEPTION 'Intraday LIMIT SELL fill did not update quantity and release shares';
   END IF;
+  SELECT count(*) INTO v_fill_count FROM public.paper_equity_fills
+   WHERE user_id='22222222-2222-4222-8222-222222222222'
+     AND order_id IN (repeat('1',64),repeat('3',64));
+  SELECT count(*) INTO v_ledger_count FROM public.paper_equity_cash_ledger
+   WHERE user_id='22222222-2222-4222-8222-222222222222'
+     AND order_id IN (repeat('1',64),repeat('3',64));
+  IF v_fill_count<>2 OR v_ledger_count<>3
+     OR NOT EXISTS (SELECT 1 FROM public.paper_equity_fills
+       WHERE order_id=repeat('3',64) AND execution_id='intraday-limit:'||repeat('3',64)
+         AND quantity=3 AND cash_delta_paise=32952 AND realized_pnl_paise=2952)
+     OR NOT EXISTS (SELECT 1 FROM public.paper_equity_cash_ledger
+       WHERE order_id=repeat('3',64) AND event_key='intraday-limit-trade:'||repeat('3',64)
+         AND event_type='TRADE_CREDIT' AND cash_delta_paise=32952) THEN
+    RAISE EXCEPTION 'Intraday LIMIT SELL fill/cash ledger rows are missing or inconsistent';
+  END IF;
 
   PERFORM public.submit_paper_intraday_limit_order(
     '22222222-2222-4222-8222-222222222222',repeat('e',64),
@@ -208,7 +243,7 @@ BEGIN
 END
 $intraday_limit_checks$;
 
-DELETE FROM public.paper_orders WHERE order_id IN (repeat('a',64),repeat('c',64),repeat('e',64),repeat('1',64),repeat('3',64),repeat('5',64));
+DELETE FROM public.paper_orders WHERE order_id IN (repeat('a',64),repeat('c',64),repeat('e',64),repeat('1',64),repeat('3',64),repeat('5',64)) AND status<>'FILLED';
 DELETE FROM public.paper_equity_positions
  WHERE user_id='22222222-2222-4222-8222-222222222222'
    AND product='INTRADAY' AND instrument_key IN ('NSE_EQ|INTRA_LIMIT_CI','NSE_EQ|INTRA_FILL_BUY','NSE_EQ|INTRA_STALE_CI');

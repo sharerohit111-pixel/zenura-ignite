@@ -137,15 +137,31 @@ END
 
 DROP TRIGGER IF EXISTS test_delay_intraday_limit_terminal_update ON public.paper_orders;
 DROP FUNCTION IF EXISTS public.test_delay_intraday_limit_terminal_update();
-DELETE FROM public.paper_orders WHERE order_id IN ('$BUY_ORDER','$SELL_ORDER');
+
+-- The successful BUY has an immutable fill and cash-ledger event. Keep its
+-- parent order and position; only the cancelled SELL order is safe to remove.
+DELETE FROM public.paper_orders
+ WHERE order_id='$SELL_ORDER' AND status='CANCELLED';
 DELETE FROM public.paper_equity_positions
  WHERE user_id='$USER_ID' AND product='INTRADAY'
-   AND instrument_key IN ('NSE_EQ|INTRADAY_RACE_BUY','NSE_EQ|INTRADAY_RACE_SELL');
+   AND instrument_key='NSE_EQ|INTRADAY_RACE_SELL';
 DELETE FROM public.paper_exchange_sessions
  WHERE source_reference='CI Intraday LIMIT fill-cancel race fixture';
+
+-- Restore the shared CI account fixture with an auditable compensating
+-- adjustment, rather than leaving the immutable trade debit unreconciled.
 UPDATE public.paper_accounts
    SET starting_cash_paise=100000000,cash_paise=100000000,
        reserved_cash_paise=0,reserved_margin_paise=0,realized_pnl_paise=0,
        delivery_realized_pnl_paise=0,intraday_realized_pnl_paise=0,
        version=version+1,updated_at=clock_timestamp()
  WHERE user_id='$USER_ID';
+
+INSERT INTO public.paper_equity_cash_ledger(
+  user_id,event_key,event_type,cash_delta_paise,reserved_cash_delta_paise,
+  cash_balance_after_paise,reserved_cash_after_paise,reason,metadata
+) VALUES (
+  '$USER_ID','ci-reset:intraday-limit-fill-cancel-race','ADJUSTMENT',
+  19826,0,100000000,0,'Restore disposable CI account fixture',
+  jsonb_build_object('source','intraday_limit_fill_cancel_race_test','simulation_only',true)
+);

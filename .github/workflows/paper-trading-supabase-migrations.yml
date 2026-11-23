@@ -319,6 +319,12 @@ jobs:
         run: psql -v ON_ERROR_STOP=1 -f supabase/tests/rls_permissions.sql
       - name: Exercise fee-inclusive atomic NSE equity MARKET settlement
         run: psql -v ON_ERROR_STOP=1 -f supabase/tests/equity_market_fee_settlement.sql
+      - name: Exercise atomic NSE equity Delivery LIMIT fill and cash ledger settlement
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/equity_delivery_limit_ledger.sql
+      - name: Verify append-only NSE equity fill and cash ledger schema
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/equity_ledger_schema.sql
+      - name: Verify NSE equity ledger ownership, event shape and reversal constraints
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/equity_ledger_integrity.sql
       - name: Exercise MARKET idempotency and LIMIT reservation lifecycle
         run: |
           psql -v ON_ERROR_STOP=1 <<'SQL'

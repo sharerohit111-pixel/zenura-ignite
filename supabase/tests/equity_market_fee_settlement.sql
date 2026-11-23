@@ -13,6 +13,8 @@ DECLARE
   v_charges bigint;
   v_realized bigint;
   v_order public.paper_orders%rowtype;
+  v_fill_count integer;
+  v_ledger_count integer;
 BEGIN
   -- NSE Delivery BUY: gross ₹1,000; fee-inclusive debit ₹1,024.79.
   v_result:=public.execute_paper_market_order(
@@ -37,6 +39,25 @@ BEGIN
       v_cash,v_basis,v_qty,v_order.gross_paise,v_order.charges_paise,v_order.cash_delta_paise,
       v_order.charges_breakdown,v_result;
   END IF;
+  SELECT count(*) INTO v_fill_count FROM public.paper_equity_fills
+   WHERE user_id='55555555-5555-4555-8555-555555555555' AND order_id=repeat('a',64);
+  SELECT count(*) INTO v_ledger_count FROM public.paper_equity_cash_ledger
+   WHERE user_id='55555555-5555-4555-8555-555555555555' AND order_id=repeat('a',64);
+  IF v_fill_count<>1 OR v_ledger_count<>1
+     OR NOT EXISTS (
+       SELECT 1 FROM public.paper_equity_fills
+        WHERE order_id=repeat('a',64) AND execution_id='market:'||repeat('a',64)
+          AND cash_delta_paise=-102479 AND gross_paise=100000
+     )
+     OR NOT EXISTS (
+       SELECT 1 FROM public.paper_equity_cash_ledger
+        WHERE order_id=repeat('a',64) AND event_key='market-cash:'||repeat('a',64)
+          AND event_type='TRADE_DEBIT' AND cash_delta_paise=-102479
+          AND cash_balance_after_paise=99897521 AND reserved_cash_after_paise=0
+     ) THEN
+    RAISE EXCEPTION 'MARKET BUY fill/cash ledger rows are missing or inconsistent';
+  END IF;
+
   -- Same idempotency key returns the stored charge snapshot without another debit.
   v_result:=public.execute_paper_market_order(
     '55555555-5555-4555-8555-555555555555',repeat('a',64),
@@ -49,6 +70,14 @@ BEGIN
   IF (v_result->>'idempotent_replay')::boolean IS NOT TRUE
      OR (v_result->>'charges_paise')::bigint<>2479 OR v_cash<>99897521 THEN
     RAISE EXCEPTION 'Delivery BUY replay did not preserve the exact fee snapshot';
+  END IF;
+
+  SELECT count(*) INTO v_fill_count FROM public.paper_equity_fills
+   WHERE user_id='55555555-5555-4555-8555-555555555555' AND order_id=repeat('a',64);
+  SELECT count(*) INTO v_ledger_count FROM public.paper_equity_cash_ledger
+   WHERE user_id='55555555-5555-4555-8555-555555555555' AND order_id=repeat('a',64);
+  IF v_fill_count<>1 OR v_ledger_count<>1 THEN
+    RAISE EXCEPTION 'Idempotent MARKET replay duplicated fill or cash ledger rows';
   END IF;
 
   -- Delivery SELL: STT and DP reduce proceeds; realized P&L is net of both legs' costs.
@@ -123,6 +152,15 @@ BEGIN
   END;
   IF EXISTS(SELECT 1 FROM public.paper_orders WHERE order_id=repeat('3',64)) THEN
     RAISE EXCEPTION 'Rejected BSE cash order left a persisted order row';
+  END IF;
+
+  SELECT count(*) INTO v_fill_count FROM public.paper_equity_fills
+   WHERE user_id='55555555-5555-4555-8555-555555555555';
+  SELECT count(*) INTO v_ledger_count FROM public.paper_equity_cash_ledger
+   WHERE user_id='55555555-5555-4555-8555-555555555555';
+  IF v_fill_count<>4 OR v_ledger_count<>4 THEN
+    RAISE EXCEPTION 'Expected exactly four MARKET fills and four cash ledger events; got fills %, ledger %',
+      v_fill_count,v_ledger_count;
   END IF;
 END
 $equity_market_fee_checks$;
