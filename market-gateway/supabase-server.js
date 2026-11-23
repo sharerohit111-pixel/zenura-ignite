@@ -64,19 +64,19 @@ const runtime=createSupabaseRuntime({
 });
 const serviceDb=runtime.serviceDb;
 const app=express();
-app.use(express.json({limit:"32kb"}));
 app.use((req,res,next)=>{
   const requestId=crypto.randomUUID();
   req.requestId=requestId;
   res.set("X-Request-Id",requestId);
   next();
 });
+app.use(express.json({limit:"32kb"}));
 app.use((req,res,next)=>{
   const origin=req.get("origin");
   if(origin&&ALLOWED_ORIGINS.includes(origin)){
     res.set("Access-Control-Allow-Origin",origin);res.set("Vary","Origin");
     res.set("Access-Control-Allow-Headers","Authorization, Content-Type, Accept");
-    res.set("Access-Control-Expose-Headers","Retry-After");
+    res.set("Access-Control-Expose-Headers","Retry-After, X-Request-Id");
     res.set("Access-Control-Allow-Methods","GET, POST, PUT, DELETE, OPTIONS");
   }
   if(req.method==="OPTIONS")return res.sendStatus(origin&&ALLOWED_ORIGINS.includes(origin)?204:403);
