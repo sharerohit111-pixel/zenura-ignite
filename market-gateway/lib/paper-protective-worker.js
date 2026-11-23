@@ -39,7 +39,17 @@ function createPaperProtectiveWorker({
       const orders=batch.data||[];summary.scanned=orders.length;
       const groups=[...groupOrdersByUser(orders).entries()];
       const processUserOrders=async([userId,userOrders])=>{
-        if(getUpstoxUserCooldown(userId)){summary.failed+=userOrders.length;return;}
+        if(getUpstoxUserCooldown(userId)){
+          summary.failed+=userOrders.length;
+          const checkedAt=new Date().toISOString();
+          for(const order of userOrders){
+            const marked=await serviceDb.from("paper_protective_orders")
+              .update({worker_checked_at:checkedAt})
+              .eq("order_id",order.order_id).eq("status","ACTIVE");
+            if(marked.error)summary.failed++;
+          }
+          return;
+        }
         let providerHealthy=false;
         try{
           const validOrders=userOrders.filter(order=>{
