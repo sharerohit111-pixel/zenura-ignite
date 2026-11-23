@@ -6,7 +6,7 @@ function parseRetryAfter(value,nowMs=Date.now()){
   if(typeof value!=="string"||!value.trim())return null;
   const raw=value.trim();
   let seconds;
-  if(/^\\d+(?:\\.\\d+)?$/.test(raw))seconds=Math.ceil(Number(raw));
+  if(/^\d+(?:\.\d+)?$/.test(raw))seconds=Math.ceil(Number(raw));
   else{
     const date=Date.parse(raw);
     if(!Number.isFinite(date))return null;
