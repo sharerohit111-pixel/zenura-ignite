@@ -15,3 +15,11 @@ test("Futures MARKET and LIMIT execution accept only NSE_FO contracts",()=>{
   assert.doesNotMatch(route,/\["NSE_FO","BSE_FO"\]\.includes\(x\.segment\)/);
   assert.match(route,/Futures LIMIT currently supports NSE contracts only/);
 });
+
+test("Futures MARKET execution uses fresh executable depth, not LTP fallback",()=>{
+  assert.match(server,/extractUpstoxRestExecutableQuote/);
+  assert.match(server,/resolveFuturesMarketExecution/);
+  assert.match(route,/quote:book,side,quantity:metadata\.quantity,tickSizePaise:metadata\.tickSizePaise/);
+  assert.match(route,/pricePaise:execution\.pricePaise/);
+  assert.doesNotMatch(route,/normalizeProviderQuote\(quote,instrumentKey/);
+});
