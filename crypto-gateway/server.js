@@ -90,7 +90,7 @@ function validateRiskPlanInput(body) {
   const takeProfitPrice = body?.take_profit_price == null || body.take_profit_price === "" ? null : String(body.take_profit_price);
   const key = String(body?.idempotency_key || "");
   const validDecimal = (value, precision) => value === null || (
-    new RegExp("^(?:0|[1-9]\\\\d*)(?:\\\\.\\\\d{1,"+precision+"})?$").test(value)
+    new RegExp("^(?:0|[1-9]\\d*)(?:\\.\\d{1,"+precision+"})?$").test(value)
     && Number.isFinite(Number(value)) && Number(value) > 0 && Number(value) <= MAX_QUANTITY
   );
   if (!CRYPTO_SYMBOLS.has(symbol) || !validDecimal(quantity,12) || !isUuid(key)
