@@ -202,8 +202,10 @@ begin
       raise exception 'Expired Futures contracts cannot be filled.' using errcode='22023';
     end if;
   end if;
-  if p_execution_price_paise % v_order.tick_size_paise<>0 then
-    raise exception 'Futures LIMIT fill price is off tick.' using errcode='22023';
+  if p_execution_price_paise % v_order.tick_size_paise<>0
+     or p_bid_price_paise % v_order.tick_size_paise<>0
+     or p_ask_price_paise % v_order.tick_size_paise<>0 then
+    raise exception 'Futures LIMIT executable quote prices are off tick.' using errcode='22023';
   end if;
   if (v_order.side='BUY' and p_execution_price_paise>v_order.limit_price_paise)
      or (v_order.side='SELL' and p_execution_price_paise<v_order.limit_price_paise) then
