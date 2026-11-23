@@ -17,6 +17,7 @@ const {normalizeProviderQuote}=require("./lib/provider-quote");
 const {isEligiblePaperLimitOrder,normalizeWorkerCursor,groupOrdersByUser}=require("./lib/paper-limit-worker");
 const {createPaperProtectiveWorker}=require("./lib/paper-protective-worker");
 const {createPaperIntradayLimitWorker}=require("./lib/paper-intraday-limit-worker");
+const {createPaperFuturesLimitWorker}=require("./lib/paper-futures-limit-worker");
 const {buildPortfolioValuation}=require("./lib/paper-portfolio-valuation");
 const {calculateDerivativePortfolio}=require("./lib/derivative-portfolio");
 const {validateDerivativeContract,normalizeTickSizePaise}=require("./lib/derivative-contract");
@@ -78,6 +79,7 @@ let instrumentRefreshLastAttemptAt=0;
 const paperLimitWorkerStatus={enabled:false,intervalMs:null,lastRunAt:null,lastCycle:null};
 const paperProtectiveWorkerStatus={enabled:false,intervalMs:null,lastRunAt:null,lastCycle:null};
 const paperIntradayLimitWorkerStatus={enabled:false,intervalMs:null,lastRunAt:null,lastCycle:null};
+const paperFuturesLimitWorkerStatus={enabled:false,intervalMs:null,lastRunAt:null,lastCycle:null};
 const activeUserStreams=new Map();
 function fetchProvider(url,options={},timeoutMs=15000){return fetchProviderWithTimeout(fetch,url,options,timeoutMs);}
 function errorStatus(error){
@@ -143,7 +145,7 @@ app.get("/health",(_req,res)=>res.json({
   ok:true,service:"zenura-supabase-market-gateway",authProvider:"supabase",
   feedProtocol:"upstox-v3",instrumentMasterLoaded:instrumentCache.length>0,
   instrumentMasterUpdatedAt:instrumentCacheUpdatedAt||null,
-  limitWorker:{...paperLimitWorkerStatus},intradayLimitWorker:{...paperIntradayLimitWorkerStatus},protectiveWorker:{...paperProtectiveWorkerStatus}
+  limitWorker:{...paperLimitWorkerStatus},intradayLimitWorker:{...paperIntradayLimitWorkerStatus},futuresLimitWorker:{...paperFuturesLimitWorkerStatus},protectiveWorker:{...paperProtectiveWorkerStatus}
 }));
 
 app.get("/upstox/connection",async(req,res)=>{
@@ -967,6 +969,15 @@ const runPaperProtectiveWorker=createPaperProtectiveWorker({
   getUpstoxAccessToken,fetchProvider,readProviderJson,normalizeProviderQuote
 });
 
+const runPaperFuturesLimitWorker=createPaperFuturesLimitWorker({
+  serviceDb,
+  ensureInstrumentCache:async()=>{
+    if(!instrumentCache.length||Date.now()-instrumentCacheUpdatedAt>6*60*60*1000)await refreshInstrumentCache();
+    return instrumentCache;
+  },
+  getUpstoxAccessToken,fetchProvider,readProviderJson
+});
+
 async function start(){
   if(!ENC_KEY||!UPSTOX_CLIENT_ID||!UPSTOX_CLIENT_SECRET||!UPSTOX_REDIRECT_URI){
     throw new Error("Supabase gateway secrets and Upstox OAuth configuration are required.");
@@ -1032,6 +1043,37 @@ async function start(){
     runWorker().catch(()=>{});const timer=setInterval(runWorker,intervalMs);timer.unref?.();
     console.log("Paper Intraday LIMIT worker enabled; interval",intervalMs,"ms");
   }
+  if(process.env.PAPER_FUTURES_LIMIT_WORKER_ENABLED==="true"){
+    const intervalMs=Math.max(1000,Math.min(10000,Number(process.env.PAPER_FUTURES_LIMIT_WORKER_INTERVAL_MS)||2000));
+    paperFuturesLimitWorkerStatus.enabled=true;
+    paperFuturesLimitWorkerStatus.intervalMs=intervalMs;
+    let workerBusy=false,nextWorkerRunAt=0,workerBackoffMs=intervalMs;
+    const runWorker=async()=>{
+      if(workerBusy||Date.now()<nextWorkerRunAt)return;
+      workerBusy=true;
+      try{
+        const result=await runPaperFuturesLimitWorker({maxOrders:10});
+        paperFuturesLimitWorkerStatus.lastRunAt=Date.now();
+        paperFuturesLimitWorkerStatus.lastCycle={scanned:result.scanned,filled:result.filled,
+          partial:result.partial,notEligible:result.notEligible,failed:result.failed,
+          expired:result.expired,locked:result.locked,cycleError:false};
+        workerBackoffMs=intervalMs;nextWorkerRunAt=Date.now()+intervalMs;
+        if(result.filled||result.partial||result.failed||result.expired)
+          console.log("Paper Futures LIMIT worker cycle",JSON.stringify(result));
+      }catch(error){
+        paperFuturesLimitWorkerStatus.lastRunAt=Date.now();
+        paperFuturesLimitWorkerStatus.lastCycle={scanned:0,filled:0,partial:0,
+          notEligible:0,failed:1,expired:0,locked:false,cycleError:true};
+        nextWorkerRunAt=Date.now()+workerBackoffMs;
+        workerBackoffMs=Math.min(60000,workerBackoffMs*2);
+        console.error("Paper Futures LIMIT worker cycle failed:",error.message);
+      }finally{workerBusy=false;}
+    };
+    runWorker().catch(()=>{});
+    const workerTimer=setInterval(runWorker,intervalMs);
+    workerTimer.unref?.();
+    console.log("Paper Futures LIMIT worker enabled; interval",intervalMs,"ms");
+  }
   if(process.env.PAPER_LIMIT_WORKER_ENABLED==="true"){
     const intervalMs=Math.max(1000,Math.min(10000,Number(process.env.PAPER_LIMIT_WORKER_INTERVAL_MS)||2000));
     paperLimitWorkerStatus.enabled=true;
@@ -1061,4 +1103,4 @@ async function start(){
   }
 }
 if(require.main===module)start().catch(error=>{console.error("Supabase gateway startup failed:",error.message);process.exit(1);});
-module.exports={app,start,runPaperLimitWorker,runPaperIntradayLimitWorker,runPaperProtectiveWorker};
+module.exports={app,start,runPaperLimitWorker,runPaperIntradayLimitWorker,runPaperProtectiveWorker,runPaperFuturesLimitWorker};
