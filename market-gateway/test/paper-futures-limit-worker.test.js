@@ -145,6 +145,29 @@ test("fills only the displayed best ask quantity using a fresh V3 snapshot",asyn
   assert.ok(db.calls.some(x=>x.type==="rpc"&&x.name==="release_paper_market_worker_lease"));
 });
 
+test("stops new Futures LIMIT fills when lease renewal reports ownership loss",async()=>{
+  let scheduled=null,fillCalls=0,renewCalls=0;
+  const db=makeDb({onRpc:async(name)=>{
+    if(name==="renew_paper_market_worker_lease"){renewCalls++;return {data:false,error:null};}
+    if(name==="execute_paper_futures_limit_fill")fillCalls++;
+    return {data:true,error:null};
+  }});
+  const d=deps(db);
+  d.scheduleHeartbeat=callback=>{scheduled=callback;return 1;};
+  d.cancelHeartbeat=()=>{};
+  d.fetchProvider=async()=>{
+    assert.equal(typeof scheduled,"function");
+    scheduled();
+    await new Promise(resolve=>setImmediate(resolve));
+    return {ok:true};
+  };
+  const result=await createPaperFuturesLimitWorker(d)({maxOrders:10});
+  assert.equal(renewCalls,1);
+  assert.equal(result.leaseLost,true);
+  assert.equal(fillCalls,0);
+  assert.equal(db.calls.some(call=>call.type==="rpc"&&call.name==="release_paper_market_worker_lease"),true);
+});
+
 test("preserves pending Futures LIMIT orders when the verified session is missing",async()=>{
   let expiryCalls=0,tokenRequested=false;
   const db=makeDb({onRpc:async(name)=>{if(name==="expire_paper_futures_limit_order")expiryCalls++;return {data:true,error:null};}});
