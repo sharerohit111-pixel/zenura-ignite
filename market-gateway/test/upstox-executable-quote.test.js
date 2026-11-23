@@ -97,3 +97,20 @@ test("rejects malformed, non-positive and sub-paise depth prices", () => {
     assert.equal(quote.askPricePaise === null || quote.bidPricePaise === null, true);
   }
 });
+
+test("accepts the exact 15-second snapshot boundary and rejects one millisecond older", () => {
+  const boundary = response();
+  boundary.currentTs = String(NOW - 15000);
+  assert.equal(extractUpstoxExecutableQuote(boundary, KEY, { nowMs: NOW }).ageMs, 15000);
+  const stale = response();
+  stale.currentTs = String(NOW - 15001);
+  assert.throws(() => extractUpstoxExecutableQuote(stale, KEY, { nowMs: NOW }), { status: 409 });
+});
+
+test("rejects unsafe feed timestamps and unsafe displayed quantities", () => {
+  const unsafeTime = response();
+  unsafeTime.currentTs = String(Number.MAX_SAFE_INTEGER + 1);
+  assert.throws(() => extractUpstoxExecutableQuote(unsafeTime, KEY, { nowMs: NOW }), { status: 409 });
+  const unsafeQuantity = response({ bidQ: String(Number.MAX_SAFE_INTEGER + 1) });
+  assert.equal(extractUpstoxExecutableQuote(unsafeQuantity, KEY, { nowMs: NOW }).bidPricePaise, null);
+});
