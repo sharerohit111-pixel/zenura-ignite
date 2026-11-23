@@ -12,7 +12,7 @@ begin
   if p_state_key is null
      or p_state_key not in (
        'paper_limit_orders','paper_protective_orders',
-       'paper_intraday_limit_orders','paper_futures_limit_orders','paper_option_limit_orders','paper_option_limit_orders'
+       'paper_intraday_limit_orders','paper_futures_limit_orders','paper_option_limit_orders'
      )
      or p_lease_token is null or p_now_ms is null or p_now_ms<0
      or p_now_ms>9007199254740991
@@ -48,7 +48,7 @@ begin
   if p_state_key is null
      or p_state_key not in (
        'paper_limit_orders','paper_protective_orders',
-       'paper_intraday_limit_orders','paper_futures_limit_orders'
+       'paper_intraday_limit_orders','paper_futures_limit_orders','paper_option_limit_orders'
      )
      or p_lease_token is null or p_now_ms is null or p_now_ms<0
      or p_now_ms>9007199254740991 then
