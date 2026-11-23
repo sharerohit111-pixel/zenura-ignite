@@ -115,3 +115,14 @@ Before implementation, the shared database/accounting owner must approve a singl
 10. MARKET behavior remains atomic full fill unless a separately approved execution model explicitly changes it.
 
 No shared database schema, accounting RPC, worker, Crypto, Futures or Options implementation was modified as part of this audit. No migration was applied to production, no deployment occurred, and PR #94 remains Draft/unmerged.
+
+### Worker and lifecycle scan audit
+
+- The shared cash DELIVERY worker eligibility predicate currently accepts only `order.status === 'PENDING'`; it requires the complete order quantity and a valid fresh quote before the fill RPC is invoked.
+- The dedicated INTRADAY worker scans only `order_type='LIMIT'`, `status='PENDING'`, `product='INTRADAY'`; it obtains a single-writer lease, expires eligible stale orders, requests provider quotes, and invokes the whole-order intraday fill RPC.
+- Therefore merely adding a `PARTIALLY_FILLED` enum/status in SQL would strand partially filled orders: neither current worker scan nor eligibility predicate would resume their remaining quantity.
+- A future worker contract must explicitly scan both `PENDING` and `PARTIALLY_FILLED`, calculate remaining quantity from authoritative SQL order state, and never trust a worker-supplied remaining quantity. The fill RPC must re-check state and remaining quantity while holding the account/order locks.
+- Worker batch cursors, lease renewal, crash/retry behavior and expiry must be tested with partially filled orders. Expiry/cancel should release only the unfilled reservation and preserve already settled fills.
+- The worker should treat the database fill receipt as authoritative; a timeout after SQL commit must be safely retried with the same execution idempotency key, not a new logical execution.
+
+This worker audit is read-only. No worker, SQL function, schema, reservation, or accounting implementation was changed.
