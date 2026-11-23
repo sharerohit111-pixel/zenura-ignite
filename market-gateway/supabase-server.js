@@ -677,8 +677,8 @@ app.post("/paper/futures/orders",async(req,res)=>{
     if(orderType==="LIMIT"&&(!Number.isSafeInteger(limitPricePaise)||limitPricePaise<=0))return res.status(400).json({error:"LIMIT orders require a positive integer limit_price_paise."});
     if(!["BUY","SELL"].includes(side)||product===null)return res.status(400).json({error:"Choose BUY/SELL and a valid Intraday/Delivery futures product."});
     if(!instrumentCache.length||Date.now()-instrumentCacheUpdatedAt>6*60*60*1000)await refreshInstrumentCache();
-    const instrument=instrumentCache.find(x=>x.instrument_key===instrumentKey&&x.instrument_type==="FUT"&&["NSE_FO","BSE_FO"].includes(x.segment));
-    if(!instrument)return res.status(400).json({error:"Select a verified NSE/BSE futures contract from the official instrument master."});
+    const instrument=instrumentCache.find(x=>x.instrument_key===instrumentKey&&x.instrument_type==="FUT"&&x.exchange==="NSE"&&x.segment==="NSE_FO");
+    if(!instrument)return res.status(400).json({error:"Select a verified NSE Futures contract from the official instrument master."});
     // Resolve the immutable contract metadata first. A retry of an already-filled
     // order must return its original receipt even if the provider quote/token is
     // temporarily unavailable; never re-execute it at a new market price.
