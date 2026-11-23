@@ -32,6 +32,7 @@ GitHub Actions run [#45104317356](https://github.com/sharerohit111-pixel/zenura-
 - Reserved-position DELETE guard
 - MARKET SELL protection for quantity reserved by pending LIMIT SELL orders
 - Authenticated row-level isolation across Crypto accounts, positions, orders and ledger
+- LIMIT BUY reservation aggregation, cancellation release, better-price fill accounting and idempotent replay
 - Browser module syntax, gateway unit tests and Crypto/Indian Market client isolation
 
 This is disposable PostgreSQL CI, not a live Supabase staging integration test, and does not authorize deployment.
