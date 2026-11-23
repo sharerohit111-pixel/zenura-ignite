@@ -307,6 +307,15 @@ app.post("/crypto/limit-orders/:orderId/cancel", cryptoOrderRateLimit, async(req
 
 // One lease covers both LIMIT orders and SL/Target plans. Keep each side to five
 // records so worst-case provider quote timeouts cannot consume the full 120-second lease.
+async function releaseWorkerLeaseSafely(releaseLease, log=console.error) {
+  try {
+    const result=await releaseLease();
+    if(result?.error) log("Crypto LIMIT worker lease release failed.");
+  } catch {
+    log("Crypto LIMIT worker lease release failed; the bounded lease will expire.");
+  }
+}
+
 async function runLimitWorker({maxOrders=5}={}) {
   if (!Number.isInteger(maxOrders)||maxOrders<1||maxOrders>5) throw new TypeError("Crypto worker batch size must be between 1 and 5 to stay within the 120-second lease.");
   const leaseToken=crypto.randomUUID(), now=Date.now();
@@ -405,14 +414,10 @@ async function runLimitWorker({maxOrders=5}={}) {
     }
     return summary;
   } finally {
-    // A network-level release exception must not mask the worker result/error.
-    // The database lease has a bounded TTL and will expire if release is unavailable.
-    try {
-      const released=await serviceDb.rpc("release_paper_crypto_limit_worker_lease",{p_lease_token:leaseToken,p_now_ms:Date.now()});
-      if(released.error) console.error("Crypto LIMIT worker lease release failed.");
-    } catch {
-      console.error("Crypto LIMIT worker lease release failed; the bounded lease will expire.");
-    }
+    // A failed cleanup must never mask the worker result/error; lease TTL is the fallback.
+    await releaseWorkerLeaseSafely(
+      ()=>serviceDb.rpc("release_paper_crypto_limit_worker_lease",{p_lease_token:leaseToken,p_now_ms:Date.now()})
+    );
   }
 }
 
@@ -439,4 +444,4 @@ app.use((error, _req, res, next) => {
 });
 
 if(require.main===module) start().catch(error=>{console.error("Crypto gateway startup failed:",error.message);process.exit(1);});
-module.exports={app,runLimitWorker,validateOrderInput,validateRiskPlanInput,isFreshCryptoQuote,getRiskPlanTrigger,makeOrderId,createRateLimiter,isUuid};
+module.exports={app,runLimitWorker,releaseWorkerLeaseSafely,validateOrderInput,validateRiskPlanInput,isFreshCryptoQuote,getRiskPlanTrigger,makeOrderId,createRateLimiter,isUuid};
