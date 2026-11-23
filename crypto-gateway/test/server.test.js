@@ -1,4 +1,7 @@
 "use strict";
+process.env.SUPABASE_URL="https://example.supabase.co";
+process.env.SUPABASE_PUBLISHABLE_KEY="test-publishable-key";
+process.env.SUPABASE_SERVICE_ROLE_KEY="test-service-role-key";
 const test=require("node:test");
 const assert=require("node:assert/strict");
 const {validateOrderInput,makeOrderId}=require("../server");
