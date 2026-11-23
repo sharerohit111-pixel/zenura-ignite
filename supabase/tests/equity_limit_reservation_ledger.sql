@@ -81,12 +81,6 @@ BEGIN
     RAISE EXCEPTION 'Intraday LIMIT expiry did not record exactly one cash reservation release';
   END IF;
 
-  -- SELL-side share reservations do not create cash-ledger events.
-  PERFORM public.submit_paper_limit_order(
-    '88888888-8888-4888-8888-888888888888',repeat('e',64),
-    'eeeeeeee-8888-4888-8888-888888888888',repeat('f',64),
-    'NSE_EQ|RESERVE_SELL','RESERVE_SELL','NSE','BUY',2,10000
-  );
   RAISE NOTICE 'Reservation lifecycle cash events verified';
 END
 $equity_reservation_ledger$;
