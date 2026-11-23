@@ -118,11 +118,13 @@ function createPaperFuturesLimitWorker({
       const instruments=await ensureInstrumentCache();
       if(!Array.isArray(instruments)||!instruments.length)
         throw new Error("Official Upstox instrument master is unavailable for Futures LIMIT worker.");
+      if(summary.leaseLost)return summary;
 
       const stateResult=await serviceDb.from("paper_market_worker_state")
         .select("cursor_created_at,cursor_order_id")
         .eq("state_key","paper_futures_limit_orders").maybeSingle();
       if(stateResult.error)throw new Error("Futures LIMIT worker cursor could not be read.");
+      if(summary.leaseLost)return summary;
       let cursor=normalizeWorkerCursor(stateResult.data);
       const loadBatch=position=>{
         let query=serviceDb.from("paper_futures_orders")
@@ -137,6 +139,7 @@ function createPaperFuturesLimitWorker({
       let batch=await loadBatch(cursor);
       if(batch.error)throw new Error("Pending Futures LIMIT orders could not be scanned.");
       if(!(batch.data||[]).length&&(cursor.createdAt||cursor.orderId)){
+        if(summary.leaseLost)return summary;
         cursor={createdAt:null,orderId:null};
         const reset=await serviceDb.from("paper_market_worker_state")
           .update({cursor_created_at:null,cursor_order_id:null,updated_at:new Date(now()).toISOString()})
@@ -162,6 +165,7 @@ function createPaperFuturesLimitWorker({
           const eligible=[];
           for(const order of userOrders){
             const session=await getSession(order.exchange,currentNow);
+            if(summary.leaseLost){summary.notEligible++;continue;}
             const sessionState=futuresSessionState(currentNow,session);
             const expiredByTime=Date.parse(order.expires_at)<=currentNow;
             if(expiredByTime||isContractExpired(order,currentNow)||sessionState==="CLOSED"){

@@ -183,6 +183,29 @@ test("stops new Futures LIMIT fills when lease renewal reports ownership loss",a
   assert.equal(db.calls.some(call=>call.type==="rpc"&&call.name==="release_paper_market_worker_lease"),true);
 });
 
+test("does not expire Futures LIMIT orders after lease renewal reports ownership loss",async()=>{
+  let scheduled=null,expiryCalls=0;
+  const db=makeDb({onRpc:async(name)=>{
+    if(name==="renew_paper_market_worker_lease")return {data:false,error:null};
+    if(name==="expire_paper_futures_limit_order"){
+      expiryCalls++;
+      return {data:{status:"EXPIRED",idempotent_replay:false},error:null};
+    }
+    return {data:true,error:null};
+  }});
+  const d=deps(db);
+  d.scheduleHeartbeat=callback=>{scheduled=callback;return 1;};
+  d.cancelHeartbeat=()=>{};
+  d.loadSession=async()=>{
+    scheduled();
+    await new Promise(resolve=>setImmediate(resolve));
+    return {exchange:"NSE",sessionDate:"2026-11-23",isTradingDay:true,openMinute:555,closeMinute:600};
+  };
+  const result=await createPaperFuturesLimitWorker(d)({maxOrders:10});
+  assert.equal(result.leaseLost,true);
+  assert.equal(expiryCalls,0);
+});
+
 test("preserves pending Futures LIMIT orders when the verified session is missing",async()=>{
   let expiryCalls=0,tokenRequested=false;
   const db=makeDb({onRpc:async(name)=>{if(name==="expire_paper_futures_limit_order")expiryCalls++;return {data:true,error:null};}});
