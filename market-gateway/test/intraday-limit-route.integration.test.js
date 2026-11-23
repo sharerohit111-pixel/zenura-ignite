@@ -28,7 +28,7 @@ Module._load = function(request, parent, isMain) {
           },
           async rpc(name, args) {
             rpcCalls.push({ name, args, key });
-            return { data: name === "submit_paper_intraday_limit_order"
+            return { data: ["submit_paper_intraday_limit_order", "submit_paper_limit_order"].includes(name)
               ? { order_id: args.p_order_id, status: "PENDING", cash_paise: 10000000, reserved_cash_paise: 10000, idempotent_replay: false }
               : { status: "CANCELLED", cash_paise: 100000, reserved_cash_paise: 0 }, error: null };
           },
@@ -180,4 +180,48 @@ test("Intraday LIMIT cancellation rejects unauthenticated HTTP requests", async 
   });
   assert.equal(response.status, 401);
   assert.equal(rpcCalls.length, 0);
+});
+
+
+test("authenticated DELIVERY LIMIT submission reaches its RPC with server-derived identity", async () => {
+  rpcCalls.length = 0;
+  configureRouteTestState({
+    instruments: [{
+      instrument_key: "NSE_EQ|INE_TEST000001",
+      instrument_type: "EQ",
+      segment: "NSE_EQ",
+      tick_size: "0.05",
+      trading_symbol: "TESTCO",
+      exchange: "NSE"
+    }]
+  });
+  const idempotencyKey = "44444444-4444-4444-8444-444444444444";
+  const response = await fetch(baseUrl + "/paper/orders", {
+    method: "POST",
+    headers: {
+      Authorization: "Bearer " + token,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      instrument_key: "NSE_EQ|INE_TEST000001",
+      side: "SELL",
+      order_type: "LIMIT",
+      product: "DELIVERY",
+      quantity: 2,
+      limit_price_paise: 10000,
+      idempotency_key: idempotencyKey
+    })
+  });
+  const body = await response.json();
+
+  assert.equal(response.status, 201);
+  assert.equal(body.status, "PENDING");
+  assert.equal(body.product, "DELIVERY");
+  assert.equal(body.side, "SELL");
+  assert.equal(rpcCalls.length, 1);
+  assert.equal(rpcCalls[0].name, "submit_paper_limit_order");
+  assert.equal(rpcCalls[0].args.p_user_id, uid);
+  assert.equal(rpcCalls[0].args.p_idempotency_key, idempotencyKey);
+  assert.equal(rpcCalls[0].args.p_quantity, 2);
+  assert.equal(rpcCalls[0].args.p_limit_price_paise, 10000);
 });
