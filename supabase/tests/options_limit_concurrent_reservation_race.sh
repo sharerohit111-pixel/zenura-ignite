@@ -25,7 +25,7 @@ ON CONFLICT(exchange,session_date) DO UPDATE SET
  source_reference='https://www.nseindia.com/market-data/holidays',
  verified_at=clock_timestamp(),source_sha256=repeat('d',64);
 
-UPDATE public.paper_accounts SET cash_paise=10000000,reserved_cash_paise=0,
+UPDATE public.paper_accounts SET cash_paise=100000,reserved_cash_paise=0,
  reserved_margin_paise=0,realized_pnl_paise=0
  WHERE user_id='$BUY_USER';
 
