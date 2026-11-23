@@ -217,3 +217,12 @@ The workflow:
 Harness status at documentation time: workflow file committed and re-fetched from the feature branch; no GitHub Actions run result was available yet. This is test infrastructure, not evidence that SQL compiled or that tests passed. Runtime verification remains pending. The existing broader paper-trading migration workflow continues to use PostgreSQL 16; this new isolated job specifically adds a PostgreSQL 17 validation lane.
 
 No production database, production Supabase migration history, active migration file, or Crypto asset was changed by this harness addition.
+
+
+## Equity atomic-ledger regression assertions (2026-11-23)
+
+Extended the existing disposable PostgreSQL SQL regressions:
+- `supabase/tests/equity_market_fee_settlement.sql` now asserts MARKET BUY creates exactly one order-scoped fill and one TRADE_DEBIT event with the final cash snapshot; exact idempotent replay does not duplicate either row. MARKET SELL asserts one fill and one TRADE_CREDIT event whose net proceeds and cash snapshot reconcile to the settlement result.
+- `supabase/tests/intraday_limit_reservations.sql` now asserts an Intraday LIMIT BUY fill creates exactly one fill, a TRADE_DEBIT event and a RESERVATION_CONSUME event; the cash and reserved-cash deltas/snapshots must reconcile. Exact fill replay must not duplicate fill or ledger rows.
+
+These are additional assertions in the existing SQL test files; they have not yet been executed against PostgreSQL. Static review confirmed the cash snapshot column name matches the ledger DDL (`cash_balance_after_paise`). Delivery LIMIT fill, cross-tenant FK rejection, concurrent duplicate execution and forced post-insert rollback remain to be covered by dedicated runtime tests.
