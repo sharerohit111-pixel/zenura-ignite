@@ -1,14 +1,14 @@
 "use strict";
-function isFreshMarketFeedQuote(quote,{now=Date.now(),maxAgeMs=15000,maxFutureSkewMs=5000}={}){
+function isFreshMarketFeedQuote(quote,{now=Date.now(),maxAgeMs=15000}={}){
  if(!quote||typeof quote!=="object")return false;
  const ltp=Number(quote.ltp),tradeTime=Number(quote.ltt);
  if(!Number.isFinite(ltp)||ltp<=0||!Number.isSafeInteger(Math.round(ltp*100))||Math.round(ltp*100)<1)return false;
- if(!Number.isSafeInteger(now)||now<0||!Number.isSafeInteger(maxAgeMs)||maxAgeMs<0||!Number.isSafeInteger(maxFutureSkewMs)||maxFutureSkewMs<0)return false;
+ if(!Number.isSafeInteger(now)||now<0||!Number.isSafeInteger(maxAgeMs)||maxAgeMs<0)return false;
  if(!Number.isSafeInteger(tradeTime)||tradeTime<=0)return false;
  const age=now-tradeTime;
- return age<=maxAgeMs&&age>=-maxFutureSkewMs;
+ return age>=0&&age<=maxAgeMs;
 }
-function filterFreshMarketFeeds(payload,instrumentKeys,{now=Date.now(),maxAgeMs=15000,maxFutureSkewMs=5000}={}){
+function filterFreshMarketFeeds(payload,instrumentKeys,{now=Date.now(),maxAgeMs=15000}={}){
  if(!payload||typeof payload!=="object"||!payload.feeds||typeof payload.feeds!=="object"||!Array.isArray(instrumentKeys))return null;
  const allowed=new Set(instrumentKeys);
  const feeds={};
