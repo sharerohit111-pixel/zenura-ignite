@@ -75,6 +75,12 @@ jobs:
         run: node --check markets/stocks/demo-chart-data.mjs && node --check markets/stocks/demo-chart-workspace.mjs
       - name: Run deterministic chart fixture tests
         run: node --test market-gateway/test/demo-chart-data.test.mjs
+      - name: Install Chromium for desktop/mobile browser verification
+        run: |
+          npm --prefix market-gateway install --no-save --package-lock=false --ignore-scripts playwright@1.58.2
+          market-gateway/node_modules/.bin/playwright install --with-deps chromium
+      - name: Run chart browser E2E at desktop and mobile viewport sizes
+        run: node --test market-gateway/test/demo-chart-browser.e2e.mjs
       - name: Ensure fixture loader is not wired into production gateway
         run: |
           if grep -R "paper-mock-fixtures" market-gateway/supabase-server.js market-gateway/server.js; then
