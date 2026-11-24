@@ -163,6 +163,9 @@ test("market page wires a separate, clearly labelled demo order sandbox and resp
   assert.ok(js.includes("../../market-gateway/mock/fixtures/equity-execution.json"));
   assert.ok(js.includes("../../market-gateway/mock/fixtures/account.json"));
   assert.match(js,/reserved \"\+\(p\.reservedQuantity\|\|0\)/);
+  assert.match(js,/const describe=p=>p\?/);
+  assert.match(js,/demo-exec-unrealized/);
+  assert.match(js,/demo-exec-total-pnl/);
   assert.match(html,/No broker or exchange order is submitted/);
   assert.match(css,/@media\(max-width:760px\)/);
   assert.match(css,/@media\(max-width:420px\)/);
