@@ -37,19 +37,41 @@ require.cache[supabaseModule]={
             token_expires_at:new Date(Date.now()+60_000).toISOString(),
             token_ciphertext:{iv:"test-iv",ciphertext:"test-ciphertext",tag:"test-tag"}
           },error:null});
+          if(table==="paper_accounts")return Promise.resolve({data:{
+            cash_paise:100000000,reserved_cash_paise:0,reserved_margin_paise:0
+          },error:null});
+          if(table==="paper_derivative_positions")return Promise.resolve({data:{
+            net_quantity:65,reserved_quantity:0
+          },error:null});
+          if(table==="paper_exchange_sessions"){
+            const sessionDate=new Date(Date.now()+330*60_000).toISOString().slice(0,10);
+            return Promise.resolve({data:{
+              exchange:"NSE",session_date:sessionDate,is_trading_day:true,
+              open_minute:555,close_minute:930,session_kind:"REGULAR",
+              source_reference:"authenticated-options-test-fixture",
+              verified_at:new Date(Date.now()-60_000).toISOString(),
+              source_sha256:"a".repeat(64)
+            },error:null});
+          }
           return Promise.resolve({data:null,error:null});
         }
       };
       return query;
     },
-    rpc:async(name,args)=>{rpcCalls.push({name,args,key});return {data:{
-      order_id:args.p_order_id,status:"CANCELLED",released_cash_paise:0,
-      released_close_quantity:0,idempotent_replay:false
-    },error:null};}
+    rpc:async(name,args)=>{rpcCalls.push({name,args,key});
+      if(name==="submit_paper_option_limit_order")return {data:{
+        order_id:args.p_order_id,status:"PENDING",reserved_cash_paise:args.p_side==="BUY"?83646:0,
+        reserved_close_quantity:args.p_side==="SELL"?65:0,idempotent_replay:false
+      },error:null};
+      return {data:{
+        order_id:args.p_order_id,status:"CANCELLED",released_cash_paise:0,
+        released_close_quantity:0,idempotent_replay:false
+      },error:null};
+    }}
   })}
 };
 
-const {app}=require("../supabase-server");
+const {app,paperOptionLimitWorkerStatus}=require("../supabase-server");
 
 async function withServer(run){
   const server=http.createServer(app);
@@ -181,6 +203,79 @@ test("authenticated NSE Options MARKET SELL-to-close submits with fresh bid",asy
   }finally{
     global.fetch=originalFetch;
     authenticated=false;
+  }
+});
+
+test("authenticated NSE Options LIMIT BUY and SELL submit through verified session and user RPC",async()=>{
+  authenticated=true;
+  rpcCalls.length=0;userQueries.length=0;
+  const originalFetch=global.fetch;
+  const oldEnabled=paperOptionLimitWorkerStatus.enabled;
+  const oldLimitFlag=process.env.PAPER_OPTIONS_LIMIT_ENABLED;
+  const oldWorkerFlag=process.env.PAPER_OPTIONS_LIMIT_WORKER_ENABLED;
+  process.env.PAPER_OPTIONS_LIMIT_ENABLED="true";
+  process.env.PAPER_OPTIONS_LIMIT_WORKER_ENABLED="true";
+  paperOptionLimitWorkerStatus.enabled=true;
+  global.fetch=async(url,options={})=>{
+    if(String(url).startsWith("http://127.0.0.1:"))return originalFetch(url,options);
+    if(String(url).includes("assets.upstox.com/market-quote/instruments"))
+      return new Response("instrument-master-test",{status:200});
+    if(String(url).includes("api.upstox.com/v3/market-quote/quotes")){
+      const now=Date.now();
+      return new Response(JSON.stringify({status:"success",data:{[TEST_INSTRUMENT_KEY]:{
+        instrument_token:TEST_INSTRUMENT_KEY,timestamp:new Date(now-500).toISOString(),
+        depth:{buy:[{price:12.35,quantity:130}],sell:[{price:12.4,quantity:130}]},last_price:99.99
+      }}}),{status:200,headers:{"Content-Type":"application/json"}});
+    }
+    throw new Error("Unexpected test fetch URL: "+url);
+  };
+  try{
+    await withServer(async base=>{
+      const headers={Authorization:"Bearer valid-options-test-token"};
+      const buy=await request(base,"/paper/derivative/limit-orders",{
+        method:"POST",headers,body:{instrument_key:TEST_INSTRUMENT_KEY,side:"BUY",lots:1,
+          limit_price_paise:1250,idempotency_key:"00000000-0000-4000-8000-000000000020"}
+      });
+      assert.equal(buy.status,201,JSON.stringify(buy.body));
+      assert.equal(buy.body.side,"BUY");
+      assert.equal(buy.body.quantity,65);
+      assert.equal(buy.body.status,"PENDING");
+      assert.equal(buy.body.reservedCashPaise,83646);
+      assert.equal(buy.body.simulationOnly,true);
+      const buyRpc=rpcCalls.find(x=>x.name==="submit_paper_option_limit_order"&&x.args.p_side==="BUY");
+      assert.ok(buyRpc);
+      assert.equal(buyRpc.args.p_user_id,TEST_USER_ID);
+      assert.equal(buyRpc.args.p_quantity,65);
+      assert.equal(buyRpc.args.p_limit_price_paise,1250);
+      assert.equal(buyRpc.key,"test-service-role-key");
+
+      const sell=await request(base,"/paper/derivative/limit-orders",{
+        method:"POST",headers,body:{instrument_key:TEST_INSTRUMENT_KEY,side:"SELL",lots:1,
+          limit_price_paise:1235,idempotency_key:"00000000-0000-4000-8000-000000000021"}
+      });
+      assert.equal(sell.status,201,JSON.stringify(sell.body));
+      assert.equal(sell.body.side,"SELL");
+      assert.equal(sell.body.quantity,65);
+      assert.equal(sell.body.reservedCashPaise,0);
+      assert.equal(sell.body.reservedCloseQuantity,65);
+      const sellRpc=rpcCalls.find(x=>x.name==="submit_paper_option_limit_order"&&x.args.p_side==="SELL");
+      assert.ok(sellRpc);
+      assert.equal(sellRpc.args.p_user_id,TEST_USER_ID);
+      assert.equal(sellRpc.args.p_quantity,65);
+      assert.equal(sellRpc.args.p_limit_price_paise,1235);
+      assert.equal(sellRpc.key,"test-service-role-key");
+      assert.ok(userQueries.some(q=>q.table==="paper_accounts"&&q.key==="test-publishable-key"));
+      assert.ok(userQueries.some(q=>q.table==="paper_derivative_positions"&&q.key==="test-publishable-key"));
+      assert.ok(userQueries.some(q=>q.table==="paper_exchange_sessions"&&q.key==="test-service-role-key"));
+    });
+  }finally{
+    global.fetch=originalFetch;
+    authenticated=false;
+    paperOptionLimitWorkerStatus.enabled=oldEnabled;
+    if(oldLimitFlag===undefined)delete process.env.PAPER_OPTIONS_LIMIT_ENABLED;
+    else process.env.PAPER_OPTIONS_LIMIT_ENABLED=oldLimitFlag;
+    if(oldWorkerFlag===undefined)delete process.env.PAPER_OPTIONS_LIMIT_WORKER_ENABLED;
+    else process.env.PAPER_OPTIONS_LIMIT_WORKER_ENABLED=oldWorkerFlag;
   }
 });
 
