@@ -515,3 +515,19 @@ No direct service-role grants should be added to `paper_accounts`, `paper_future
 7. Run the full worker smoke suite using the same role and queries as production worker code, not a superuser-only test harness.
 
 This is a reviewed candidate privilege matrix, not an approved production grant. Production ACL snapshot from Section 15 remains unchanged. No grants, policies, functions or migrations were modified or applied.
+
+
+## 17. Existing service-role CI test scope — verified (2026-11-24)
+
+Inspected exact PR #99 branch file `supabase/tests/market_gateway_service_role_grants.sql` (blob `bcbb0e41ed171e611551e1d2686ece8e9c06e2ce`) and the PR #99 PostgreSQL smoke job log. The CI test currently:
+
+- Requires service_role SELECT on `upstox_connections`, `paper_market_worker_state`, `paper_orders`, `paper_protective_orders`, `paper_equity_positions`.
+- Requires service_role UPDATE on `paper_market_worker_state` and `paper_protective_orders`.
+- Denies anon SELECT and authenticated SELECT on the private provider/worker tables.
+- Rejects unnecessary service_role UPDATE on `upstox_connections`, `paper_orders`, `paper_equity_positions`.
+
+This focused test does **not** currently assert the newer derivative worker table ACLs (`paper_futures_orders`, `paper_futures_fills`, `paper_option_limit_orders`, `paper_option_limit_fills`), does not assert service_role SELECT-only for those fills, and does not test ledger UPDATE/DELETE denial. The CI run's green status therefore validates the older five-table gateway grant contract only, not the expanded Futures/Options worker matrix in Section 16.
+
+The test's `paper_futures_orders` appearance in `rls_permissions.sql` is a client-role denial check (authenticated cannot INSERT); it is not a service_role SELECT assertion. Do not interpret that as validating the Futures worker's direct serviceDb read.
+
+Next CI amendment should extend the focused grant test with the exact derivative ACL matrix and explicit fill immutability tests, then run the complete disposable PostgreSQL workflow. No SQL changed or applied in this audit step.
