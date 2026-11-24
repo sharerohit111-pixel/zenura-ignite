@@ -49,6 +49,15 @@ test("adapter returns detached deeply frozen view data and preserves unreconcile
   assert.equal(model.account.ledgerReconciled, false);
 });
 
+test("adapter rejects cross-fixture timestamp drift and Equity identity mismatch", async () => {
+  const stale = await allFixtures();
+  stale.derivatives.asOf = "2026-11-23T09:30:00+05:30";
+  assert.throws(() => createPaperDemoViewModel(stale,{enabled:true}),/MOCK_FIXTURE_SNAPSHOT_MISMATCH/);
+  const wrongEquity = await allFixtures();
+  wrongEquity.equity.data.symbol = "MOCKBETA";
+  assert.throws(() => createPaperDemoViewModel(wrongEquity,{enabled:true}),/MOCK_EQUITY_INSTRUMENT_MISMATCH/);
+});
+
 test("adapter rejects non-synthetic account IDs and personal profile fields", async () => {
   const invalidId = await allFixtures();
   invalidId.account.data.accountId = "customer-123";
