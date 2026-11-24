@@ -24,7 +24,7 @@ All monetary values are integer paise.
 - Lifetime net P&L is null unless every asset adapter declares its history complete. Bounded latest-N history must set complete=false.
 
 ## Adapter contract
-Exactly one snapshot per asset: { asset, complete, positions: [], orders: [], trades: [] }, asset is EQUITY, FUTURES or OPTIONS.
+Exactly one snapshot for each of EQUITY, FUTURES and OPTIONS is mandatory: { asset, complete, positions: [], orders: [], trades: [] }. An unused asset must still supply an empty snapshot; omission must never make a partial portfolio look complete.
 Positions include positionId, asset, quantity, costBasisPaise, quoteStatus and, for fresh marks, marketPricePaise, quoteTimestampMs, marketValuePaise, unrealizedPnlPaise. Equity DELIVERY positions are holdings; Equity intraday, Futures and Options remain positions.
 Orders include globally unique orderId, asset, status, remainingQuantity and createdAt. Trades include globally unique immutable tradeId, asset, realizedPnlPaise, chargesPaise and executedAt. Adapters own deterministic pagination and source deduplication.
 
