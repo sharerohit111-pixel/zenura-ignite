@@ -80,7 +80,7 @@
     watchBody.textContent='';
     if(!savedWatchlist.length){const empty=document.createElement('div');empty.className='empty';empty.textContent='No saved instruments yet.';watchBody.append(empty);}
     savedWatchlist.forEach(item=>{
-      const row=document.createElement('div');row.className='saved-watch-row';
+      const row=document.createElement('div');row.className='saved-watch-row';row.dataset.instrumentKey=item.instrument_key;
       const info=document.createElement('div');info.className='saved-watch-info';
       const pick=document.createElement('button');pick.type='button';pick.className='saved-watch-pick';pick.textContent=item.trading_symbol||item.name||item.instrument_key;pick.addEventListener('click',()=>select(item));
       const quote=watchQuotes.get(item.instrument_key),detail=document.createElement('small');detail.className='saved-watch-quote';
@@ -528,11 +528,12 @@
     if(!rows.length){const tr=document.createElement('tr'),td=document.createElement('td');td.colSpan=11;td.className='option-empty';td.textContent='No option contracts returned for this expiry.';tr.append(td);optionBody.append(tr);return;}
     rows.forEach(row=>{
       const ce=row.call_options||{},pe=row.put_options||{},cm=ce.market_data||{},pm=pe.market_data||{},cg=ce.option_greeks||{},pg=pe.option_greeks||{};
-      const tr=document.createElement('tr');
+      const tr=document.createElement('tr');tr.dataset.strikePrice=String(row.strike_price);
       [cm.ltp,cm.oi,cm.volume,cg.iv,cg.delta,row.strike_price,pg.delta,pg.iv,pm.volume,pm.oi,pm.ltp].forEach((v,i)=>{const td=document.createElement('td');td.textContent=cellValue(v);if(i===5)td.className='strike-cell';tr.append(td);});
       [[0,ce,'CE'],[10,pe,'PE']].forEach(([index,contract,type])=>{if(typeof contract.instrument_key!=='string'||!contract.instrument_key)return;const td=tr.children[index];['BUY','SELL'].forEach(side=>{const button=document.createElement('button');button.type='button';button.className='option-buy-button '+(side==='SELL'?'option-sell-button':'');button.textContent=side+' '+type;button.addEventListener('click',()=>submitDerivativeOrder(contract.instrument_key,type,row.strike_price,side));td.append(document.createTextNode(' '),button);});});
       optionBody.append(tr);
     });
+    window.dispatchEvent(new CustomEvent('zenura:option-chain-loaded',{detail:{rows}}));
   }
   let optionChainRequest=0;
   function resetOptionChain(message){
@@ -670,7 +671,7 @@
     const connector=window.ZENURA_MARKET_CONNECTOR,uid=connector?.getUserId?.();
     clearFeedTimers();
     if(streamAbort){streamAbort.abort();streamAbort=null;}
-    selected=item;if(!isReconnect)resetOptionChain('Underlying changed. Load the option chain for the selected instrument.');if(futuresMarginStatus)futuresMarginStatus.textContent=item.instrument_type==='FUT'?'Selected '+(item.trading_symbol||'futures contract')+'. Request a fresh broker margin preview.':'Select a verified futures contract from the Futures watchlist.';updateFuturesMarginButton();chartRequest++;lastQuoteText='';if(!isReconnect)reconnectAttempt=0;title.textContent=item.trading_symbol||item.name;symbol.textContent=item.instrument_key;price.textContent='—';
+    selected=item;window.dispatchEvent(new CustomEvent('zenura:instrument-selected',{detail:{instrument:item}}));if(!isReconnect)resetOptionChain('Underlying changed. Load the option chain for the selected instrument.');if(futuresMarginStatus)futuresMarginStatus.textContent=item.instrument_type==='FUT'?'Selected '+(item.trading_symbol||'futures contract')+'. Request a fresh broker margin preview.':'Select a verified futures contract from the Futures watchlist.';updateFuturesMarginButton();chartRequest++;lastQuoteText='';if(!isReconnect)reconnectAttempt=0;title.textContent=item.trading_symbol||item.name;symbol.textContent=item.instrument_key;price.textContent='—';
     setFeedStatus('Waiting for verified live quote','Connecting to Upstox V3 feed. Prices will appear only when received from the provider.');
     render(items);updatePaperButtons();renderSavedWatchlist();loadCandles();
     if(!gateway||!connector?.getIdToken||!uid){setFeedStatus('Market gateway not configured','Sign in and configure the deployed market gateway to start live quotes.');return;}
