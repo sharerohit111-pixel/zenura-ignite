@@ -30,6 +30,7 @@ on:
       - "markets/shared/paper-demo-adapter.mjs"
       - "market-gateway/test/paper-demo-adapter.test.mjs"
       - "markets/dashboard/**"
+      - "markets/stocks/demo-*"
       - ".github/workflows/s-trade-mock-contracts.yml"
 
 permissions:
