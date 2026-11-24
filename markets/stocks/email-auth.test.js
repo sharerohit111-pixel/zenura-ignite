@@ -102,7 +102,7 @@ test("auth module interactions call Supabase for registration, login, OAuth, rec
   assert.equal(calls[0][1].options.emailRedirectTo, "https://demo.example/markets/stocks/");
 
   await elements.get("email-create").dispatch("click");
-  await elements.get("email-sign-in").dispatch("click", { preventDefault() {} });
+  await form.dispatch("submit");
   assert.equal(calls[1][0], "signInWithPassword");
 
   await elements.get("email-google").dispatch("click");
