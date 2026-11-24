@@ -109,6 +109,7 @@ function buildOptionsAccountingSnapshot({
   limitOrders = [],
   limitFills = [],
   marketOrders = [],
+  expirySettlements = [],
   quotes = [],
   now = Date.now(),
   maxQuoteAgeMs = 15_000
@@ -269,6 +270,53 @@ function buildOptionsAccountingSnapshot({
     realizedPnlPaise = addSafe(realizedPnlPaise, orderRealized, "Options realized P&L");
     chargesPaidPaise = addSafe(chargesPaidPaise, orderCharges, "Options charges");
     history.push({ source: "LIMIT", id: order.order_id, tradingSymbol: order.trading_symbol ?? order.instrument_key, instrumentKey: order.instrument_key, side: order.side, quantity: order.quantity, filledQuantity: order.filled_quantity, grossPaise: order.cumulative_gross_paise, chargesPaise: order.cumulative_charges_paise, realizedPnlPaise: orderRealized, status: order.status, createdAt: order.created_at, fills: fills.map(fill => ({ executionId: fill.execution_id, sequence: fill.fill_sequence, quantity: fill.fill_quantity, pricePaise: fill.execution_price_paise, grossPaise: fill.gross_paise, chargesPaise: fill.incremental_charges_paise, chargeBreakdownPaise: { brokerage: fill.brokerage_paise ?? null, exchangeTransaction: fill.exchange_transaction_paise ?? null, ipft: fill.ipft_paise ?? null, sebi: fill.sebi_paise ?? null, stampDuty: fill.stamp_duty_paise ?? null, stt: fill.stt_paise ?? null, gst: fill.gst_paise ?? null }, chargeScheduleVersion: fill.charge_schedule_version ?? null, realizedPnlPaise: fill.realized_pnl_paise })) });
+  }
+  const settlementIds = new Set();
+  const settledContracts = new Set();
+  for (const settlement of expirySettlements) {
+    if (!settlement || typeof settlement.settlement_id !== "string"
+        || settlement.settlement_id.length !== 64 || !/^[a-f0-9]{64}$/.test(settlement.settlement_id)
+        || settlement.exchange !== "NSE" || settlement.segment !== "NSE_FO"
+        || !OPTION_TYPES.has(settlement.instrument_type)
+        || settlement.underlying_type !== "INDEX" || settlement.settlement_type !== "CASH_SETTLED"
+        || typeof settlement.instrument_key !== "string" || !settlement.instrument_key
+        || settlementIds.has(settlement.settlement_id)) {
+      fail("Options expiry settlement identity or contract classification is invalid.");
+    }
+    const contractIdentity = settlement.instrument_key + ":" + settlement.expiry;
+    if (settledContracts.has(contractIdentity)) fail("Duplicate Options expiry settlement exists for one contract.");
+    settlementIds.add(settlement.settlement_id);
+    settledContracts.add(contractIdentity);
+    const quantity = integer(settlement.settled_quantity, "Expiry settled quantity", { min: 1 });
+    const strike = integer(settlement.strike_price_paise, "Expiry strike", { min: 1 });
+    const settlementPrice = integer(settlement.settlement_price_paise, "Expiry settlement price");
+    const intrinsic = integer(settlement.intrinsic_value_paise, "Expiry intrinsic value");
+    const gross = integer(settlement.gross_payout_paise, "Expiry gross payout");
+    const exerciseStt = integer(settlement.exercise_stt_paise, "Expiry exercise STT");
+    const net = integer(settlement.net_payout_paise, "Expiry net payout");
+    const basis = integer(settlement.entry_cost_basis_paise, "Expiry entry cost basis", { min: 1 });
+    const realized = signedInteger(settlement.realized_pnl_paise, "Expiry realized P&L");
+    const expectedIntrinsic = settlement.instrument_type === "CE"
+      ? Math.max(settlementPrice - strike, 0) : Math.max(strike - settlementPrice, 0);
+    if (intrinsic !== expectedIntrinsic || multiplySafe(intrinsic, quantity, "Expiry payout") !== gross
+        || gross - exerciseStt !== net || net - basis !== realized
+        || typeof settlement.settlement_source_sha256 !== "string"
+        || !/^[a-f0-9]{64}$/.test(settlement.settlement_source_sha256)
+        || typeof settlement.settlement_source !== "string"
+        || !/^https:\/\/(?:[a-z0-9-]+\.)*nseindia\.com\//i.test(settlement.settlement_source)
+        || settlement.charge_schedule_version !== "NSE_EXERCISE_STT_2026_04_V1") {
+      fail("Options expiry settlement payout, STT, P&L, or official source does not reconcile.");
+    }
+    realizedPnlPaise = addSafe(realizedPnlPaise, realized, "Options realized P&L");
+    chargesPaidPaise = addSafe(chargesPaidPaise, exerciseStt, "Options charges");
+    history.push({
+      source: "EXPIRY", id: settlement.settlement_id, side: "SETTLEMENT",
+      quantity, grossPaise: gross, chargesPaise: exerciseStt,
+      realizedPnlPaise: realized, status: "SETTLED",
+      createdAt: settlement.created_at, expiry: settlement.expiry,
+      settlementPricePaise: settlementPrice, intrinsicValuePaise: intrinsic,
+      chargeScheduleVersion: settlement.charge_schedule_version
+    });
   }
   history.sort((a, b) => Date.parse(b.createdAt ?? 0) - Date.parse(a.createdAt ?? 0));
 
