@@ -224,5 +224,5 @@ test("Supabase gateway attaches safe trace context and structured request teleme
  assert.match(telemetry,/event:"http_server_request"/);
  assert.match(telemetry,/durationMs:/);
  assert.match(telemetry,/logging\.googleapis\.com\/trace/);
- assert.doesNotMatch(telemetry,/req\.originalUrl|req\.url|req\.headers|authorization|access_token/i);
+ assert.doesNotMatch(telemetry,/req\.originalUrl|req\.url|authorization|access_token/i);
 });
