@@ -75,6 +75,7 @@ const runtime=createSupabaseRuntime({
 });
 const serviceDb=runtime.serviceDb;
 const app=express();
+const AUTH_SESSION=Symbol("zenuraVerifiedSupabaseSession");
 app.use(express.json({limit:"32kb"}));
 app.use((req,res,next)=>{
   const origin=req.get("origin");
@@ -138,6 +139,7 @@ function sendError(res,error,fallback){
 }
 function decryptToken(box){return decryptUpstoxToken(box,ENC_KEY);}
 async function auth(req){
+  if(req[AUTH_SESSION])return req[AUTH_SESSION];
   const accessToken=readBearerToken(req);
   const user=await runtime.authenticateRequest(req);
   const bucket=apiRateLimitBucket(req.method,req.path);
@@ -149,7 +151,9 @@ async function auth(req){
       });
     }
   }
-  return {user,accessToken,userDb:runtime.createUserClient(accessToken)};
+  const session={user,accessToken,userDb:runtime.createUserClient(accessToken)};
+  Object.defineProperty(req,AUTH_SESSION,{value:session,configurable:false});
+  return session;
 }
 app.use("/s-trade",createSTradeRouter({express,serviceDb,authenticate:auth}));
 const ORDER_SUBMISSION_PATHS=new Set([
@@ -158,12 +162,13 @@ const ORDER_SUBMISSION_PATHS=new Set([
 app.use(async(req,res,next)=>{
   if(req.method!=="POST"||!ORDER_SUBMISSION_PATHS.has(req.path))return next();
   try{
+    await auth(req);
     const result=await serviceDb.from("s_trade_operational_controls")
       .select("enabled").eq("control_key","new_orders_enabled").maybeSingle();
     if(result.error)return res.status(503).json({error:"Trading operational control could not be verified."});
     if(result.data&&result.data.enabled===false)return res.status(503).json({error:"New simulated orders are temporarily paused by an administrator."});
     return next();
-  }catch(_error){return res.status(503).json({error:"Trading operational control could not be verified."});}
+  }catch(error){return sendError(res,error,"Trading operational control could not be verified.");}
 });
 function localNowMs(){return Date.now();}
 function validDate(value){
