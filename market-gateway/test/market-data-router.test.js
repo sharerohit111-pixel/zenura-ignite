@@ -116,3 +116,41 @@ test("rate-limit policy enforces per-provider, operation and user windows", () =
   now += 1000;
   assert.equal(policy.consume("upstox", "quote", { userId: "u1" }).remaining, 1);
 });
+
+
+test("distributed quota denial skips that provider and never calls its upstream adapter", async () => {
+  let primaryCalls = 0;
+  let fallbackCalls = 0;
+  const primary = provider("upstox", async () => { primaryCalls += 1; return quote("upstox"); });
+  const fallback = provider("dhan", async () => { fallbackCalls += 1; return quote("dhan"); });
+  const rateLimiter = {
+    consume: async (providerId) => {
+      if (providerId === "upstox") throw Object.assign(new Error("quota"), { status: 429 });
+      return { remaining: 5 };
+    },
+  };
+  const router = new MarketDataProviderRouter({
+    providers: new Map([["upstox", primary], ["dhan", fallback]]),
+    plan, rateLimiter,
+    entitlementResolver: async ({ providerId }) => ({ approved: true, reference: "rights-" + providerId }),
+    clock: () => NOW,
+  });
+  const result = await router.route("quote", {}, request);
+  assert.equal(result.providerId, "dhan");
+  assert.equal(primaryCalls, 0);
+  assert.equal(fallbackCalls, 1);
+});
+
+test("distributed quota service failure fails closed when no other provider is configured", async () => {
+  let providerCalls = 0;
+  const primary = provider("upstox", async () => { providerCalls += 1; return quote("upstox"); });
+  const router = new MarketDataProviderRouter({
+    providers: new Map([["upstox", primary]]),
+    plan: { ...plan, quote: ["upstox"] },
+    rateLimiter: { consume: async () => { throw Object.assign(new Error("quota db down"), { status: 503 }); } },
+    entitlementResolver: async () => ({ approved: true, reference: "rights-upstox" }),
+    clock: () => NOW,
+  });
+  await assert.rejects(router.route("quote", {}, request), { code: "market_data_unavailable", status: 503 });
+  assert.equal(providerCalls, 0);
+});
