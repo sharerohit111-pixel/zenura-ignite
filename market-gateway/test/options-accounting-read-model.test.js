@@ -49,6 +49,12 @@ test("rejects non-integer paise, broken lot sizes, over-reserved closes and rese
  assert.throws(()=>buildOptionsAccountingSnapshot({...base,positions:[{...base.positions[0],reserved_quantity:0}]}),/does not reconcile/);
 });
 
+test("rejects blocked premium beyond account reservation and fill-ledger drift",()=>{
+ assert.throws(()=>buildOptionsAccountingSnapshot({...base,account:{...base.account,reserved_cash_paise:50_000}}),/exceeds the account/);
+ assert.throws(()=>buildOptionsAccountingSnapshot({...base,limitOrders:base.limitOrders.map(order=>order.order_id==="sell1"?{...order,cumulative_charges_paise:99}:order)}),/do not reconcile/);
+ assert.throws(()=>buildOptionsAccountingSnapshot({...base,limitFills:[...base.limitFills,{...base.limitFills[0],order_id:"missing"}]}),/orphaned/);
+});
+
 test("rejects stale future quotes and unsafe arithmetic",()=>{
  assert.throws(()=>buildOptionsAccountingSnapshot({...base,quotes:[{instrumentKey:"NSE_FO|NIFTY_CE",pricePaise:Number.MAX_SAFE_INTEGER,observedAtMs:1_800_000_000_000}]}),/safe integer/);
  const future=buildOptionsAccountingSnapshot({...base,quotes:[{instrumentKey:"NSE_FO|NIFTY_CE",pricePaise:1500,observedAtMs:1_800_000_002_000}]});
