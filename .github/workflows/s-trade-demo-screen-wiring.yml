@@ -9,10 +9,14 @@ on:
       - "markets/stocks/demo.js"
       - "markets/stocks/index.html"
       - "market-gateway/test/paper-demo-dashboard.test.mjs"
+      - "market-gateway/test/paper-demo-adapter.test.mjs"
+      - "market-gateway/mock/fixtures/*.json"
+      - "market-gateway/mock/contracts/*.schema.json"
       - ".github/workflows/s-trade-demo-screen-wiring.yml"
   push:
     branches:
       - feature/s-trade-round2-demo-screen-wiring-2026-11-24
+      - feature/s-trade-mock-instrument-search-option-chain-v4-2026-11-24
     paths:
       - "markets/shared/paper-demo-adapter.mjs"
       - "markets/stocks/demo.html"
