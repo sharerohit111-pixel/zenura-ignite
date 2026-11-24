@@ -39,8 +39,8 @@ BEGIN
   END IF;
 
   v_deleted := public.prune_market_data_provider_quota_buckets(v_cutoff,100);
-  IF v_deleted<>1 THEN
-    RAISE EXCEPTION 'Expected second expired bucket cleanup to delete one row, got %',v_deleted;
+  IF v_deleted<>0 THEN
+    RAISE EXCEPTION 'Cleanup must preserve recently updated and active buckets, got %',v_deleted;
   END IF;
 
   DELETE FROM public.market_data_provider_quota_policies
