@@ -16,12 +16,12 @@ All monetary values are integer paise.
 - Lifetime realized P&L and charges are null unless every adapter proves complete lifetime history. Partial observations are exposed separately, never represented as lifetime totals.
 
 ## Adapter contract
-Exactly one snapshot for each of EQUITY, FUTURES and OPTIONS is mandatory: `{ asset, complete, positions: [], orders: [], trades: [] }`. An unused asset supplies an empty snapshot. Omitting an adapter must fail closed.
+Exactly one snapshot for each of EQUITY, FUTURES and OPTIONS is mandatory: `{ asset, history: { complete, scope, evidenceRef }, positions: [], orders: [], trades: [] }`. `scope` is `LIFETIME`, `PARTIAL` or `UNKNOWN`; a complete adapter must explicitly use `LIFETIME`. Every adapter must return a non-empty evidence reference identifying its bounded query/coverage proof. A boolean alone is not accepted as lifetime-completeness evidence. An unused asset supplies an empty snapshot. Omitting an adapter must fail closed.
 Positions include globally unique positionId, asset, side, positive quantity, costBasisPaise and quote status. Fresh marks require marketPricePaise, quoteTimestampMs, marketValuePaise and unrealizedPnlPaise. Unrealized P&L is market value minus cost basis for LONG and cost basis minus market value for SHORT. Equity DELIVERY/HOLDING rows must be long Equity positions.
 Orders include unique orderId, asset, status, remainingQuantity and createdAt. Trades include unique immutable tradeId, asset, explicitly present realizedPnlPaise and chargesPaise (never default missing values to zero), and executedAt. Orders must explicitly include remainingQuantity; PENDING/PARTIALLY_FILLED orders must have a positive remainder.
 
 ## Reconciliation and display contract
-This aggregator is not an authoritative reconciliation engine. It always returns `ledgerReconciled=false`, `reconciliationStatus=not_reconciled` and `snapshotConsistency=unverified`. Adapter history completeness must never be treated as ledger reconciliation. Keep blockers visible in operator and user-facing diagnostics.
+This aggregator is not an authoritative reconciliation engine. It always returns `ledgerReconciled=false`, `reconciliationStatus=not_reconciled` and `snapshotConsistency=unverified`. Adapter history completeness and its evidence reference must never be treated as ledger reconciliation. The read model returns per-asset history evidence references for audit, but does not independently verify the referenced query or attestations. Keep blockers visible in operator and user-facing diagnostics.
 No authenticated unified API route or UI integration is included. Account, positions, orders, fills, reservations and settlement receipts are not yet read under one verified transactionally consistent snapshot.
 
 ## Dummy mode
