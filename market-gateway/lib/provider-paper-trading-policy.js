@@ -27,7 +27,8 @@ function hasPaperTradingMarketDataRights(providerId, entitlement) {
     entitlement.paperTradingAllowed === true &&
     entitlement.redistributionAllowed === true &&
     typeof entitlement.reference === "string" && entitlement.reference.trim().length > 0 &&
-    typeof entitlement.rightsApprovalReference === "string" && entitlement.rightsApprovalReference.trim().length > 0;
+    typeof entitlement.rightsApprovalReference === "string" && entitlement.rightsApprovalReference.trim().length > 0 &&
+    typeof entitlement.regulatoryApprovalReference === "string" && entitlement.regulatoryApprovalReference.trim().length > 0;
 }
 
 module.exports = { PROVIDER_PAPER_TRADING_POLICY, providerPaperTradingPolicy, hasPaperTradingMarketDataRights };
