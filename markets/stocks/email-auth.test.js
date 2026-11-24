@@ -56,7 +56,7 @@ function createAuthHarness() {
     }
     append(...children) { this.children = [...(this.children || []), ...children]; }
     focus() {}
-    checkValidity() { return /^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$/.test(this.value); }
+    checkValidity() { return this.value.includes("@") && this.value.includes("."); }
     reportValidity() { return true; }
     set innerHTML(markup) {
       for (const match of markup.matchAll(/id="([^"]+)"/g)) {
