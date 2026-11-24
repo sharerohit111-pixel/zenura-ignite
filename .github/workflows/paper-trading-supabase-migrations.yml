@@ -340,6 +340,7 @@ jobs:
             v_reserved bigint;
             v_qty integer;
             v_replay boolean;
+            v_error text;
           BEGIN
             -- MARKET BUY: 10 shares at ₹100; retry must not debit twice.
             v_result := public.execute_paper_market_order(
@@ -378,8 +379,11 @@ jobs:
                 'BUY','DELIVERY',10,10000,floor(extract(epoch from clock_timestamp())*1000)::bigint,0
               );
               RAISE EXCEPTION 'Changed MARKET fingerprint was unexpectedly accepted';
-            EXCEPTION WHEN unique_violation THEN
-              NULL;
+            EXCEPTION WHEN SQLSTATE 'P0001' THEN
+              GET STACKED DIAGNOSTICS v_error = MESSAGE_TEXT;
+              IF v_error <> 'Idempotency key reused for a different order' THEN
+                RAISE;
+              END IF;
             END;
             -- SELL half the position: ₹10,000 gross spread; charges reduce net realized P&L, five shares remain.
             v_result := public.execute_paper_market_order(
