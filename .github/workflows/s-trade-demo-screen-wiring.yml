@@ -59,7 +59,7 @@ jobs:
         run: node --test market-gateway/test/paper-demo-adapter.test.mjs market-gateway/test/paper-demo-dashboard.test.mjs market-gateway/test/paper-demo-dashboard-alias.test.mjs market-gateway/test/paper-demo-pwa-cache.test.mjs
       - name: Install Chromium browser QA dependencies
         run: |
-          npm install --prefix "$RUNNER_TEMP/zenura-playwright" playwright@1.55.0 axe-core@4.10.3 --ignore-scripts --no-audit --no-fund
+          npm install --prefix "$RUNNER_TEMP/zenura-playwright" playwright@1.61.1 axe-core@4.10.3 --ignore-scripts --no-audit --no-fund
           "$RUNNER_TEMP/zenura-playwright/node_modules/.bin/playwright" install --with-deps chromium
       - name: Run desktop, mobile, accessibility, performance and offline PWA smoke
         run: |
