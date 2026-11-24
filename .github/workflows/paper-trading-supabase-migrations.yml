@@ -1,4 +1,5 @@
 name: Paper Trading Supabase SQL smoke test
+# Unified S-TRADE accounting verification is part of this workflow.
 
 on:
   pull_request:
