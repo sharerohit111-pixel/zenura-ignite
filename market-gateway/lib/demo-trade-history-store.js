@@ -70,7 +70,7 @@ function createDemoTradeHistoryStore(options = {}) {
       return {duplicate:true,order:orderCopy(order),trade:clone(prior)};
     }
     if (!OPEN.has(order.status) || input.quantity > order.remainingQuantity) fail("DEMO_FILL_EXCEEDS_REMAINING");
-    if (order.side === "SELL") {
+    if (order.side === "SELL" && order.assetClass !== "FUTURE") {
       const positionKey = keyOf(order.assetClass,order.product,order.instrumentKey);
       let held = 0;
       for (const priorFill of fills.values()) if (keyOf(priorFill.assetClass,priorFill.product,priorFill.instrumentKey) === positionKey) {
