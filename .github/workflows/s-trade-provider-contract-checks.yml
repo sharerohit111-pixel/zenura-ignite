@@ -10,6 +10,7 @@ on:
       - "market-gateway/lib/provider-rate-limit.js"
       - "market-gateway/test/provider-contract.test.js"
       - "market-gateway/test/market-data-router.test.js"
+      - "market-gateway/test/market-data-shapes.test.js"
       - "market-gateway/PROVIDER-CAPABILITY-MATRIX.md"
       - ".github/workflows/s-trade-provider-contract-checks.yml"
   pull_request:
@@ -21,6 +22,7 @@ on:
       - "market-gateway/lib/provider-rate-limit.js"
       - "market-gateway/test/provider-contract.test.js"
       - "market-gateway/test/market-data-router.test.js"
+      - "market-gateway/test/market-data-shapes.test.js"
       - "market-gateway/PROVIDER-CAPABILITY-MATRIX.md"
       - ".github/workflows/s-trade-provider-contract-checks.yml"
   workflow_dispatch:
@@ -42,5 +44,5 @@ jobs:
           node --check market-gateway/lib/broker-execution-provider-contract.js
           node --check market-gateway/lib/market-data-provider-router.js
           node --check market-gateway/lib/provider-rate-limit.js
-      - name: Run provider contract, routing and outage tests
-        run: node --test market-gateway/test/provider-contract.test.js market-gateway/test/market-data-router.test.js
+      - name: Run provider contract, routing, outage and market-shape tests
+        run: node --test market-gateway/test/provider-contract.test.js market-gateway/test/market-data-router.test.js market-gateway/test/market-data-shapes.test.js
