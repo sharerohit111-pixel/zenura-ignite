@@ -109,3 +109,11 @@ test("a delayed previous-user profile response cannot overwrite the newly active
  assert.equal(h.elements.get("s-trade-account-private").hidden,true);
  assert.equal(h.elements.get("s-trade-wallet-cash").textContent,"—");
 });
+
+
+test("private mutation and refresh responses are bound to the initiating user and auth sequence", () => {
+  assert.match(source, /function isCurrent\\(userId, sequence\\)/);
+  assert.ok((source.match(/if \\(isCurrent\\(userId, sequence\\)\\)/g) || []).length >= 5);
+  assert.match(source, /finally \\{ if \\(isCurrent\\(userId, sequence\\)\\)/);
+  assert.match(source, /loadWallet\\(userId, sequence\\)/);
+});
