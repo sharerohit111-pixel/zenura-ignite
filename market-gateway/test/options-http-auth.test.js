@@ -143,6 +143,47 @@ test("authenticated NSE Options MARKET BUY submits with fresh ask and verified u
   }
 });
 
+test("authenticated NSE Options MARKET SELL-to-close submits with fresh bid",async()=>{
+  authenticated=true;
+  rpcCalls.length=0;userQueries.length=0;
+  const originalFetch=global.fetch;
+  global.fetch=async(url,options={})=>{
+    if(String(url).startsWith("http://127.0.0.1:"))return originalFetch(url,options);
+    if(String(url).includes("assets.upstox.com/market-quote/instruments"))
+      return new Response("instrument-master-test",{status:200});
+    if(String(url).includes("api.upstox.com/v3/market-quote/quotes")){
+      const now=Date.now();
+      return new Response(JSON.stringify({status:"success",data:{[TEST_INSTRUMENT_KEY]:{
+        instrument_token:TEST_INSTRUMENT_KEY,timestamp:new Date(now-500).toISOString(),
+        depth:{buy:[{price:12.35,quantity:130}],sell:[{price:12.4,quantity:130}]},last_price:99.99
+      }}}),{status:200,headers:{"Content-Type":"application/json"}});
+    }
+    throw new Error("Unexpected test fetch URL: "+url);
+  };
+  try{
+    await withServer(async base=>{
+      const result=await request(base,"/paper/derivative/orders",{
+        method:"POST",headers:{Authorization:"Bearer valid-options-test-token"},
+        body:{instrument_key:TEST_INSTRUMENT_KEY,side:"SELL",lots:1,
+          idempotency_key:"00000000-0000-4000-8000-000000000011"}
+      });
+      assert.equal(result.status,201,JSON.stringify(result.body));
+      assert.equal(result.body.executionPricePaise,1235);
+      assert.equal(result.body.quantity,65);
+      assert.equal(result.body.simulationOnly,true);
+      assert.equal(rpcCalls.length,1);
+      assert.equal(rpcCalls[0].name,"execute_paper_long_option_order");
+      assert.equal(rpcCalls[0].args.p_user_id,TEST_USER_ID);
+      assert.equal(rpcCalls[0].args.p_side,"SELL");
+      assert.equal(rpcCalls[0].args.p_execution_price_paise,1235);
+      assert.equal(rpcCalls[0].key,"test-publishable-key");
+    });
+  }finally{
+    global.fetch=originalFetch;
+    authenticated=false;
+  }
+});
+
 test("authenticated Options history and cancellation APIs use verified user scope",async()=>{
   authenticated=true;
   rpcCalls.length=0;userQueries.length=0;
