@@ -4,6 +4,16 @@ INSERT INTO auth.users(id) VALUES
  ('12121212-1212-4212-8212-121212121212'),
  ('34343434-3434-4434-8434-343434343434')
 ON CONFLICT(id) DO NOTHING;
+INSERT INTO public.s_trade_notification_preferences(user_id,trade_confirmations,order_alerts,price_alerts)
+VALUES ('12121212-1212-4212-8212-121212121212',true,false,true)
+ON CONFLICT(user_id) DO UPDATE SET trade_confirmations=true,order_alerts=false,price_alerts=true;
+INSERT INTO public.paper_orders(
+ order_id,user_id,request_fingerprint,instrument_key,side,product,order_type,status,quantity
+) VALUES
+ (repeat('a',64),'12121212-1212-4212-8212-121212121212',repeat('1',64),'NSE_EQ|NOTIFY1','BUY','DELIVERY','MARKET','PENDING',1),
+ (repeat('b',64),'34343434-3434-4434-8434-343434343434',repeat('2',64),'NSE_EQ|NOTIFY2','BUY','DELIVERY','MARKET','PENDING',1);
+UPDATE public.paper_orders SET status='FILLED' WHERE order_id=repeat('a',64);
+UPDATE public.paper_orders SET status='CANCELLED' WHERE order_id=repeat('b',64);
 INSERT INTO public.s_trade_notifications(user_id,event_type,title,body)
 VALUES
  ('12121212-1212-4212-8212-121212121212','system','Own notification','Own tenant only'),
@@ -15,7 +25,7 @@ DO $security$
 DECLARE v_count integer;
 BEGIN
   SELECT count(*) INTO v_count FROM public.s_trade_notifications;
-  IF v_count<>1 THEN RAISE EXCEPTION 'Notification tenant isolation failed: visible rows=%',v_count; END IF;
+  IF v_count<>2 THEN RAISE EXCEPTION 'Notification tenant isolation or order confirmation failed: visible rows=%',v_count; END IF;
   IF has_table_privilege(current_user,'public.s_trade_admins','SELECT') THEN
     RAISE EXCEPTION 'Authenticated role unexpectedly has admin registry access';
   END IF;
@@ -39,6 +49,41 @@ BEGIN
 END;
 $security$;
 RESET ROLE;
+SET LOCAL ROLE service_role;
+DO $price_alert_evaluation$
+DECLARE v_alert uuid;
+BEGIN
+  SELECT alert_id INTO v_alert FROM public.s_trade_price_alerts
+   WHERE user_id='12121212-1212-4212-8212-121212121212' AND display_symbol='TEST' LIMIT 1;
+  IF v_alert IS NULL OR NOT public.s_trade_evaluate_price_alert(v_alert,101) THEN
+    RAISE EXCEPTION 'Price alert did not trigger at or above its target';
+  END IF;
+  IF public.s_trade_evaluate_price_alert(v_alert,102) THEN
+    RAISE EXCEPTION 'One-shot price alert triggered more than once';
+  END IF;
+END;
+$price_alert_evaluation$;
+RESET ROLE;
+DO $notification_assertions$
+BEGIN
+  IF (SELECT count(*) FROM public.s_trade_notifications
+       WHERE user_id='12121212-1212-4212-8212-121212121212' AND event_type='trade_confirmation')<>1 THEN
+    RAISE EXCEPTION 'Trade confirmation trigger did not create exactly one notification';
+  END IF;
+  IF (SELECT count(*) FROM public.s_trade_notifications
+       WHERE user_id='12121212-1212-4212-8212-121212121212' AND event_type='order_alert')<>0 THEN
+    RAISE EXCEPTION 'Disabled order alerts were not respected';
+  END IF;
+  IF (SELECT count(*) FROM public.s_trade_notifications
+       WHERE user_id='34343434-3434-4434-8434-343434343434' AND event_type='order_alert')<>1 THEN
+    RAISE EXCEPTION 'Default order alert was not generated';
+  END IF;
+  IF (SELECT count(*) FROM public.s_trade_notifications
+       WHERE user_id='12121212-1212-4212-8212-121212121212' AND event_type='price_alert')<>1 THEN
+    RAISE EXCEPTION 'Triggered price alert did not create exactly one notification';
+  END IF;
+END;
+$notification_assertions$;
 
 DO $service_privileges$
 BEGIN
