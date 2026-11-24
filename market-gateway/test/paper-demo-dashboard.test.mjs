@@ -19,7 +19,10 @@ test("demo route loads only shared synthetic fixtures with explicit opt-in",asyn
  for(const name of ["market","account","equity","derivatives"])assert.ok(js.includes('"'+name+'"'));
  assert.match(js,/credentials:"omit"/);
  assert.match(js,/createPaperDemoViewModel\(\{market,account,equity,derivatives\},\{enabled:true,production:false\}\)/);
- assert.match(js,/No live-data fallback/);\n assert.match(js,/searchPaperDemoInstruments/);\n assert.match(js,/getPaperDemoExpiries/);\n assert.match(js,/getPaperDemoOptionChain/);
+ assert.match(js,/No live-data fallback/);
+ assert.match(js,/searchPaperDemoInstruments/);
+ assert.match(js,/getPaperDemoExpiries/);
+ assert.match(js,/getPaperDemoOptionChain/);
 });
 test("screen rendering is read-only and clearly discloses synthetic and unreconciled data",async()=>{
  const html=await read("demo.html"),js=await read("demo.js");
