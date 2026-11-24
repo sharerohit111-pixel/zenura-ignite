@@ -27,6 +27,7 @@ function buildPaperPortfolioAccounting({account,assetSnapshots,mode="PERSISTED",
    if(!p||p.asset!==s.asset)fail("Position asset does not match adapter.");
    const positionId=id(p.positionId,"Position ID"),quantity=money(p.quantity,"Position quantity"),costBasisPaise=money(p.costBasisPaise,"Position cost basis");
    if(!["LONG","SHORT"].includes(p.side))fail("Position side must be LONG or SHORT.");
+   if((p.product==="DELIVERY"||p.positionType==="HOLDING")&&(s.asset!=="EQUITY"||p.side!=="LONG"))fail("Delivery holdings must be long Equity positions.");
    if(positionIds.has(positionId))fail("Duplicate position ID across assets.");positionIds.add(positionId);
    if(quantity<1)fail("Open position quantity must be positive.");
    let row={...p,positionId,costBasisPaise};
