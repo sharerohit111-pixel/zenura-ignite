@@ -4,6 +4,10 @@ on:
   pull_request:
     paths:
       - "markets/stocks/mock-demo-adapter.js"
+      - "markets/stocks/demo.html"
+      - "markets/stocks/demo.css"
+      - "markets/stocks/demo.js"
+      - "markets/stocks/index.html"
       - "market-gateway/test/mock-demo-adapter.test.js"
       - "market-gateway/mock/fixtures/**"
       - ".github/workflows/s-trade-round2-demo-adapter.yml"
@@ -21,6 +25,8 @@ jobs:
           node-version: "22"
       - name: Check adapter syntax
         run: node --check markets/stocks/mock-demo-adapter.js
+      - name: Check demo dashboard script syntax
+        run: node --check markets/stocks/demo.js
       - name: Run adapter and shared fixture tests
         working-directory: market-gateway
         run: node --test test/mock-demo-adapter.test.js test/paper-mock-fixtures.test.js
