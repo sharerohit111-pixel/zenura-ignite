@@ -24,9 +24,9 @@ Excluded: Crypto, production migration, deployment, staging writes, and live acc
 4. Added session refresh, auth-state synchronization, logout, and clearing of displayed wallet values when the active account changes or signs out.
 5. Added authenticated Supabase email-change and password-change controls; email activation remains subject to Supabase confirmation policy, and password changes require a valid active session.
 6. Added a localhost-only UI mock preview with no Supabase session, API access, order execution, or database writes. Mock mode explicitly blocks profile, email/password, session-refresh and wallet-refresh actions; the control is removed on non-local hosts.
-5. Added a private wallet snapshot panel for starting capital, cash, blocked funds and available funds.
-6. Added integer-paise wallet projection validation in `market-gateway/lib/paper-wallet.js`; it rejects negative, fractional, unsafe or inconsistent balances. The gateway still reads `paper_accounts` through the authenticated user's JWT/RLS.
-7. Added frontend and gateway regression tests covering local mock isolation and account-security updates, and wired the account module test into the disposable migration workflow.
+7. Added a private wallet snapshot panel for starting capital, cash, blocked funds and available funds.
+8. Added integer-paise wallet projection validation in `market-gateway/lib/paper-wallet.js`; it rejects negative, fractional, unsafe or inconsistent balances. The gateway still reads `paper_accounts` through the authenticated user's JWT/RLS.
+9. Added frontend and gateway regression tests covering local mock isolation and account-security updates, and wired the account module test into the disposable migration workflow.
 
 ## Wallet formula currently exposed
 
@@ -60,8 +60,17 @@ Required next ledger phase:
 
 ## Validation status
 
-- Latest exact-head GitHub Actions run: `45378387994` — **success, 67/67 steps, 0 failures**.
-- The native Auth module syntax checks, email-auth tests, account-settings tests, gateway regression suite, production image boundary checks, disposable PostgreSQL migration suite, account initialization/read isolation and RLS/tenant-isolation checks all completed successfully in that workflow.
+- Latest earlier exact-head GitHub Actions run: `45378387994` — **success, 67/67 steps, 0 failures**.
+- The native Auth module syntax checks, email-auth tests, account-settings tests, gateway regression suite, production image boundary checks, disposable PostgreSQL migration suite, account initialization/read isolation and RLS/tenant-isolation checks all completed successfully in that earlier workflow.
 - The earlier failed run was caused by a brittle test assertion that expected a different literal for localhost-only mock-button removal; the assertion was corrected and the exact-head workflow subsequently passed.
 - The current Auth tests are Node-based module/source and account behavior checks; they are not real browser-driven end-to-end tests. Browser-based registration, OAuth callback, SMS OTP, password recovery and two-user UI isolation tests remain release gates.
 - SMS delivery/provider setup and real Supabase Google/SMS provider verification remain external release gates. CI success does not establish that external providers are configured or that real users have completed sign-in.
+
+
+## Latest exact-head authentication interaction validation
+
+- PR head: `fb6b3d0c44ffa6f2aadd36a95437cba9b0de8d5f`.
+- GitHub Actions run `45379527794` (run #1613): **completed successfully**. The disposable PostgreSQL job completed all 64 listed steps successfully, including the native Supabase Auth browser-module checks and the account/RLS/tenant-isolation checks.
+- The new Node VM + mocked-DOM interaction harness passed in this exact-head run. It exercises the actual `email-auth.js` event handlers for registration, password login, Google OAuth initiation, password-reset request, password-recovery completion (`updateUser`), and sign-out.
+- This harness is interaction-level Node testing, **not** Playwright or real-browser E2E. Real browser coverage for provider callbacks, SMS delivery/OTP, and two independent users' UI isolation remains a release gate.
+- PR #131 remains Draft. No merge, deployment, production migration, or external provider configuration was performed.
