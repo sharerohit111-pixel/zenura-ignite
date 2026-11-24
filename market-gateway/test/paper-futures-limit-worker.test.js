@@ -313,3 +313,17 @@ test("rejects Futures LIMIT orders with invalid quantity conservation or lot mul
   assert.equal(isValidNseFuture({...order,remaining_quantity:24},instrument),false);
   assert.equal(isValidNseFuture({...order,quantity:50,filled_quantity:25,remaining_quantity:25},instrument),true);
 });
+
+
+test("does not submit a Futures LIMIT partial fill smaller than one contract lot",async()=>{
+  const payload=quotePayload();
+  payload.data["NSE_FO:NIFTY26NOVFUT"].depth.sell[0].quantity=24;
+  let fillCalls=0;
+  const db=makeDb({onRpc:async(name)=>{
+    if(name==="execute_paper_futures_limit_fill")fillCalls++;
+    return {data:true,error:null};
+  }});
+  const result=await createPaperFuturesLimitWorker(deps(db,{payload}))({maxOrders:10});
+  assert.equal(fillCalls,0);
+  assert.equal(result.notEligible,1);
+});
