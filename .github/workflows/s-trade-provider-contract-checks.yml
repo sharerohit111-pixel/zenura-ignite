@@ -6,7 +6,10 @@ on:
       - feature/s-trade-multi-provider-market-data-2026-11-24
     paths:
       - "market-gateway/lib/*provider-contract.js"
+      - "market-gateway/lib/market-data-provider-router.js"
+      - "market-gateway/lib/provider-rate-limit.js"
       - "market-gateway/test/provider-contract.test.js"
+      - "market-gateway/test/market-data-router.test.js"
       - "market-gateway/PROVIDER-CAPABILITY-MATRIX.md"
       - ".github/workflows/s-trade-provider-contract-checks.yml"
   pull_request:
@@ -14,7 +17,10 @@ on:
       - feature/s-trade-upstox-oauth-market-data-security-2026-11-23
     paths:
       - "market-gateway/lib/*provider-contract.js"
+      - "market-gateway/lib/market-data-provider-router.js"
+      - "market-gateway/lib/provider-rate-limit.js"
       - "market-gateway/test/provider-contract.test.js"
+      - "market-gateway/test/market-data-router.test.js"
       - "market-gateway/PROVIDER-CAPABILITY-MATRIX.md"
       - ".github/workflows/s-trade-provider-contract-checks.yml"
   workflow_dispatch:
@@ -30,9 +36,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-      - name: Check provider contract syntax
+      - name: Check provider contract and router syntax
         run: |
           node --check market-gateway/lib/market-data-provider-contract.js
           node --check market-gateway/lib/broker-execution-provider-contract.js
-      - name: Run provider contract tests
-        run: node --test market-gateway/test/provider-contract.test.js
+          node --check market-gateway/lib/market-data-provider-router.js
+          node --check market-gateway/lib/provider-rate-limit.js
+      - name: Run provider contract, routing and outage tests
+        run: node --test market-gateway/test/provider-contract.test.js market-gateway/test/market-data-router.test.js
