@@ -51,5 +51,8 @@ test("development mock login is localhost-only and never creates a backend auth 
   assert.match(source, /devMockActive = true/);
   assert.match(source, /if \(devMockActive\) return/);
   assert.match(source, /devMockActive = false/);
+  assert.ok(source.includes("Profile editing is disabled in the local mock preview."));
+  assert.ok(source.includes("There is no authenticated session to refresh in mock preview."));
+  assert.ok(source.includes("Wallet refresh is disabled in the local mock preview."));
   assert.doesNotMatch(source, /localStorage|sessionStorage|service_role|SUPABASE_SERVICE_ROLE_KEY/i);
 });
