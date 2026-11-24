@@ -2,7 +2,7 @@
 
 const ISIN_RE = /^[A-Z]{2}[A-Z0-9]{10}$/;
 const PROVIDER_RE = /^[a-z][a-z0-9_-]{1,39}$/;
-const DATE_RE = /^\\d{4}-\\d{2}-\\d{2}$/;
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const SEGMENTS = Object.freeze({
   NSE: new Set(["NSE_EQ", "NSE_FO"]),
   BSE: new Set(["BSE_EQ", "BSE_FO"]),
