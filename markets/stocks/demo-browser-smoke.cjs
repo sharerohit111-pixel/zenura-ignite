@@ -49,7 +49,7 @@ const axePath=require.resolve("axe-core/axe.min.js");
   const cached=await page.evaluate(async()=>{
    const cache=await caches.open("zenura-markets-shell-v4");
    const paths=["market","account","equity","derivatives"].map(name=>new URL("../../market-gateway/mock/fixtures/"+name+".json",location.href).href);
-   return paths.map(url=>({url,found:!!(await cache.match(url))}));
+   const found=[];\n   for(const url of paths)found.push({url,found:!!(await cache.match(url))});\n   return found;
   });
   assert.ok(cached.every(x=>x.found),"all four canonical fixture JSON files must be precached");
   await pwa.setOffline(true);
