@@ -1,8 +1,8 @@
-let fixturePromise=null,simulator=null;
+let fixturePromise=null,simulator=null,history=null;
 const el=(tag,cls,value)=>{const n=document.createElement(tag);if(cls)n.className=cls;if(value!==undefined)n.textContent=String(value);return n;};
 const money=value=>Number.isSafeInteger(value)?"₹"+(value/100).toLocaleString("en-IN",{minimumFractionDigits:2,maximumFractionDigits:2}):"—";
 const add=(select,value,label)=>{const o=document.createElement("option");o.value=value;o.textContent=label;select.append(o);};
-async function getSimulator(){
+function getHistory(){\n if(history)return history;\n const api=window.ZENURA_DEMO_TRADE_HISTORY;\n if(!api?.createDemoTradeHistoryStore)throw new Error("DEMO_TRADE_HISTORY_STORE_UNAVAILABLE");\n history=api.createDemoTradeHistoryStore({production:false,env:{NODE_ENV:"development"}});return history;\n}\nfunction syncHistory(engine){\n const store=getHistory(),snapshot=engine.snapshot();\n for(const order of snapshot.orders){\n  const key=order.idempotencyKey||("history_"+order.orderId);\n  store.submit({assetClass:order.assetClass,side:order.side,orderType:order.orderType,product:order.product||"DELIVERY",instrumentKey:order.instrumentKey,quantity:order.quantity,limitPricePaise:order.limitPricePaise||undefined,idempotencyKey:key,orderId:order.orderId,createdAt:order.createdAt,initialStatus:order.status==="REJECTED"?"REJECTED":undefined});\n  for(const fill of order.fills)store.recordFill({orderId:order.orderId,fillId:fill.fillId,quantity:fill.quantity,pricePaise:fill.pricePaise,filledAt:fill.executedAt});\n  if(order.status==="CANCELLED")store.cancel(order.orderId,order.updatedAt);\n }\n return store.snapshot();\n}\nasync function getSimulator(){
  if(simulator)return simulator;
  if(!fixturePromise)fixturePromise=fetch(new URL("../../market-gateway/mock/fixtures/derivatives.json",import.meta.url),{method:"GET",credentials:"omit",cache:"no-store",headers:{Accept:"application/json"}}).then(r=>{if(!r.ok)throw new Error("DEMO_DERIVATIVES_FIXTURE_UNAVAILABLE");return r.json();});
  const fixture=await fixturePromise;
@@ -49,7 +49,7 @@ export async function mountDerivativeDemo(container,screen){
   strike.replaceChildren();opts.filter(x=>x.expiry===expiry.value&&x.optionType===optionType.value).map(x=>x.strikePaise).filter((x,i,a)=>a.indexOf(x)===i).sort((a,b)=>a-b).forEach(x=>add(strike,String(x),money(x)));if([...strike.options].some(x=>x.value===oldStrike))strike.value=oldStrike;
  }
  function paint(){
-  const s=engine.snapshot();
+  const s=engine.snapshot();\n  syncHistory(engine);
   renderTable(positions,["CONTRACT","TYPE","EXPIRY","NET QTY","AVG PRICE","RESERVED CLOSE","AVAILABLE CLOSE"],s.positions.map(x=>[x.symbol,x.assetClass==="OPTION"?x.optionType:"FUT",x.expiry,x.netQuantity,money(x.averagePricePaise),x.reservedCloseQuantity,x.availableCloseQuantity]),"No open demo positions.");
   const wrap=el("div","table-wrap demo-fo-table-wrap"),t=el("table"),head=el("thead"),hr=el("tr"),body=el("tbody");
   ["ORDER ID","CONTRACT","SIDE","TYPE","LOTS / QTY","LIMIT","FILLED / REMAINING","AVG FILL","FILL RECEIPTS","STATUS","ACTION"].forEach(x=>hr.append(el("th","",x)));
@@ -61,14 +61,14 @@ export async function mountDerivativeDemo(container,screen){
    const action=el("td");
    if(["PENDING","PARTIALLY_FILLED"].includes(order.status)){
     const cancel=el("button","demo-fo-button secondary","CANCEL");
-    cancel.addEventListener("click",()=>{try{engine.cancel(order.orderId);status.textContent="DEMO order "+order.orderId+" cancelled; unfilled remainder released.";paint();}catch(error){status.textContent=error.message||"Cancellation failed.";}});action.append(cancel);
+    cancel.addEventListener("click",()=>{try{engine.cancel(order.orderId);syncHistory(engine);status.textContent="DEMO order "+order.orderId+" cancelled; unfilled remainder released.";paint();}catch(error){status.textContent=error.message||"Cancellation failed.";}});action.append(cancel);
    }else action.textContent="—";
    tr.append(action);body.append(tr);
   });
   t.append(head,body);wrap.append(t);orders.replaceChildren(wrap);
  }
  function parsePrice(v){if(!/^\d+(?:\.\d{1,2})?$/.test(String(v||"").trim()))return null;const p=String(v).split(".");const n=Number(p[0])*100+Number(((p[1]||"")+"00").slice(0,2));return Number.isSafeInteger(n)&&n>0?n:null;}
- function submit(which){try{const c=selected();if(!c)throw new Error("Select a valid synthetic contract.");const request={instrumentKey:c.instrumentKey,side:which,orderType:orderType.value,lots:Number(lots.value)};if(screen==="futures")request.product=product.value;if(orderType.value==="LIMIT"){request.limitPricePaise=parsePrice(limit.value);if(!request.limitPricePaise)throw new Error("Enter a valid LIMIT price in rupees.");}const receipt=engine.submit(request);status.textContent="DEMO receipt "+receipt.orderId+" · "+receipt.status+" · "+receipt.filledQuantity+"/"+receipt.quantity+" units filled.";paint();}catch(e){status.textContent=e.message||"Demo order rejected.";}}
+ function submit(which){try{const c=selected();if(!c)throw new Error("Select a valid synthetic contract.");const request={instrumentKey:c.instrumentKey,side:which,orderType:orderType.value,lots:Number(lots.value)};if(screen==="futures")request.product=product.value;if(orderType.value==="LIMIT"){request.limitPricePaise=parsePrice(limit.value);if(!request.limitPricePaise)throw new Error("Enter a valid LIMIT price in rupees.");}const fingerprint=JSON.stringify(request);if(fingerprint!==lastFingerprint){lastFingerprint=fingerprint;lastKey="demo_fo_"+String(++submissionSequence).padStart(8,"0");}request.idempotencyKey=lastKey;const receipt=engine.submit(request);syncHistory(engine);status.textContent="DEMO receipt "+receipt.orderId+" · "+receipt.status+" · "+receipt.filledQuantity+"/"+receipt.quantity+" units filled.";paint();}catch(e){status.textContent=e.message||"Demo order rejected.";}}
  try{
   engine=await getSimulator();contracts=engine.contracts().filter(x=>x.assetClass===(screen==="futures"?"FUTURE":"OPTION"));
   contract.replaceChildren();
@@ -77,7 +77,7 @@ export async function mountDerivativeDemo(container,screen){
   [contract,expiry,optionType,strike].forEach(x=>x.addEventListener("change",()=>{if(screen==="options")filters();const c=selected();status.textContent=c?"MOCK quote selected · "+c.symbol+" · "+c.expiry:"No matching contract.";paint();}));
   orderType.addEventListener("change",()=>{limit.disabled=orderType.value!=="LIMIT";});
   buy.addEventListener("click",()=>submit("BUY"));sell.addEventListener("click",()=>submit("SELL"));
-  match.addEventListener("click",()=>{const r=engine.processLimitFills();status.textContent="Manual DEMO match · "+r.filled+" filled · "+r.partial+" partial · "+r.notEligible+" not eligible. No worker ran.";paint();});
+  match.addEventListener("click",()=>{const r=engine.processLimitFills();syncHistory(engine);status.textContent="Manual DEMO match · "+r.filled+" filled · "+r.partial+" partial · "+r.notEligible+" not eligible. No worker ran.";paint();});
   refresh.addEventListener("click",()=>{const r=engine.refreshQuoteDepth();status.textContent="DEMO fixture depth reset · "+r.refreshed+" quotes.";paint();});
   const c=selected();status.textContent=c?"MOCK quote selected · "+c.symbol+" · "+c.expiry:"Synthetic contracts loaded.";paint();
  }catch(e){status.textContent="Demo unavailable · "+(e.message||"fixture validation failed")+". No live fallback.";buy.disabled=true;sell.disabled=true;match.disabled=true;refresh.disabled=true;}
@@ -99,7 +99,7 @@ export async function appendDerivativeSummary(container, screen) {
     if (screen === "positions" || screen === "portfolio") {
       renderTable(host,
         ["CONTRACT","ASSET","EXPIRY","NET QTY","AVG PRICE","RESERVED CLOSE","AVAILABLE CLOSE"],
-        snapshot.positions.map(x => [x.symbol,x.assetClass === "OPTION" ? x.optionType : "FUT",x.expiry,x.netQuantity,money(x.averagePricePaise),x.reservedCloseQuantity,x.availableCloseQuantity]),
+        historySnapshot.positions.filter(x=>x.assetClass!=="EQUITY").map(x => [x.instrumentKey,x.assetClass,x.product,x.quantity,money(x.averagePricePaise), "—", "—"]),
         "No local Futures/Options demo positions.");
     } else if (screen === "trades") {
       const rows = snapshot.orders.flatMap(order => order.fills.map(fill => [
@@ -109,7 +109,7 @@ export async function appendDerivativeSummary(container, screen) {
     } else {
       renderTable(host,
         ["ORDER ID","CONTRACT","SIDE","TYPE","QTY","FILLED / REMAINING","AVG FILL","STATUS"],
-        snapshot.orders.map(x => [x.orderId,x.symbol,x.side,x.orderType,x.quantity,x.filledQuantity+" / "+x.remainingQuantity,x.averageFillPricePaise?money(x.averageFillPricePaise):"—",x.status]),
+        historySnapshot.orders.map(x => [x.orderId,x.instrumentKey,x.side,x.orderType,x.quantity,x.filledQuantity+" / "+x.remainingQuantity,x.averagePricePaise?money(x.averagePricePaise):"—",x.status]),
         "No local Futures/Options demo orders.");
     }
   } catch (error) {
