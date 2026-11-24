@@ -789,13 +789,17 @@ app.get("/paper/options/accounting",async(req,res)=>{
     const optionLimitOrders=(limitOrders||[]).filter(isNseOption);
     const orderIds=optionLimitOrders.map(order=>order.order_id);
     const limitFills=[];
-    for(let offset=0;offset<orderIds.length;offset+=500){
-      const ids=orderIds.slice(offset,offset+500);
-      if(!ids.length)continue;
-      const {data,error}=await userDb.from("paper_option_limit_fills").select("*")
-        .in("order_id",ids).order("fill_id",{ascending:true});
-      if(error)throw Object.assign(new Error("Options immutable fill history could not be loaded."),{status:503});
-      limitFills.push(...(data||[]));
+    for(let orderOffset=0;orderOffset<orderIds.length;orderOffset+=500){
+      const ids=orderIds.slice(orderOffset,orderOffset+500);
+      for(let fillOffset=0;fillOffset<100000;fillOffset+=500){
+        const {data,error}=await userDb.from("paper_option_limit_fills").select("*")
+          .in("order_id",ids).order("fill_id",{ascending:true})
+          .range(fillOffset,fillOffset+499);
+        if(error)throw Object.assign(new Error("Options immutable fill history could not be loaded."),{status:503});
+        const page=data||[];limitFills.push(...page);
+        if(page.length<500)break;
+        if(fillOffset>=99500)throw Object.assign(new Error("Options fill history exceeds the supported reconciliation window."),{status:503});
+      }
     }
     const optionPositions=(positions||[]).filter(isNseOption);
     const quotes=[];
