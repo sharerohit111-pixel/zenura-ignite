@@ -217,7 +217,7 @@ function buildOptionsAccountingSnapshot({
     }
     realizedPnlPaise = addSafe(realizedPnlPaise, order.realized_pnl_paise ?? 0, "Options realized P&L");
     chargesPaidPaise = addSafe(chargesPaidPaise, order.charges_paise ?? 0, "Options charges");
-    history.push({ source: "MARKET", id: order.order_id, side: order.side, quantity, grossPaise: gross, chargesPaise: order.charges_paise ?? 0, realizedPnlPaise: order.realized_pnl_paise ?? 0, status: order.status, createdAt: order.created_at });
+    history.push({ source: "MARKET", id: order.order_id, tradingSymbol: order.trading_symbol ?? order.instrument_key, instrumentKey: order.instrument_key, side: order.side, quantity, filledQuantity: quantity, grossPaise: gross, chargesPaise: order.charges_paise ?? 0, realizedPnlPaise: order.realized_pnl_paise ?? 0, status: order.status, createdAt: order.created_at });
   }
   const fillsByOrder = new Map();
   const seenExecutions = new Set();
@@ -268,7 +268,7 @@ function buildOptionsAccountingSnapshot({
     }
     realizedPnlPaise = addSafe(realizedPnlPaise, orderRealized, "Options realized P&L");
     chargesPaidPaise = addSafe(chargesPaidPaise, orderCharges, "Options charges");
-    history.push({ source: "LIMIT", id: order.order_id, side: order.side, quantity: order.quantity, filledQuantity: order.filled_quantity, grossPaise: order.cumulative_gross_paise, chargesPaise: order.cumulative_charges_paise, realizedPnlPaise: orderRealized, status: order.status, createdAt: order.created_at, fills: fills.map(fill => ({ executionId: fill.execution_id, sequence: fill.fill_sequence, quantity: fill.fill_quantity, pricePaise: fill.execution_price_paise, grossPaise: fill.gross_paise, chargesPaise: fill.incremental_charges_paise, realizedPnlPaise: fill.realized_pnl_paise })) });
+    history.push({ source: "LIMIT", id: order.order_id, tradingSymbol: order.trading_symbol ?? order.instrument_key, instrumentKey: order.instrument_key, side: order.side, quantity: order.quantity, filledQuantity: order.filled_quantity, grossPaise: order.cumulative_gross_paise, chargesPaise: order.cumulative_charges_paise, realizedPnlPaise: orderRealized, status: order.status, createdAt: order.created_at, fills: fills.map(fill => ({ executionId: fill.execution_id, sequence: fill.fill_sequence, quantity: fill.fill_quantity, pricePaise: fill.execution_price_paise, grossPaise: fill.gross_paise, chargesPaise: fill.incremental_charges_paise, realizedPnlPaise: fill.realized_pnl_paise })) });
   }
   history.sort((a, b) => Date.parse(b.createdAt ?? 0) - Date.parse(a.createdAt ?? 0));
 
