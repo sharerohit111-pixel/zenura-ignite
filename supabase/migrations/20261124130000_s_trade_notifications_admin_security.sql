@@ -55,7 +55,7 @@ CREATE INDEX IF NOT EXISTS s_trade_price_alerts_active_instrument_idx
 
 -- Enforce a per-user cap atomically; route-level count checks are only an early UX guard.
 CREATE OR REPLACE FUNCTION public.s_trade_enforce_price_alert_cap()
-RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
 DECLARE v_active_count integer;
 BEGIN
   IF NOT NEW.active THEN RETURN NEW; END IF;
@@ -70,7 +70,7 @@ BEGIN
   END IF;
   RETURN NEW;
 END;
-$;
+$$;
 DROP TRIGGER IF EXISTS s_trade_price_alert_cap ON public.s_trade_price_alerts;
 CREATE TRIGGER s_trade_price_alert_cap BEFORE INSERT OR UPDATE OF active
   ON public.s_trade_price_alerts FOR EACH ROW
@@ -153,7 +153,7 @@ CREATE TRIGGER s_trade_audit_append_only BEFORE UPDATE OR DELETE ON public.s_tra
   FOR EACH ROW EXECUTE FUNCTION public.s_trade_reject_audit_mutation();
 
 CREATE OR REPLACE FUNCTION public.s_trade_audit_admin_registry_change()
-RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
 DECLARE v_actor uuid;
 DECLARE v_target uuid;
 DECLARE v_reason text;
@@ -177,17 +177,17 @@ BEGIN
   IF TG_OP='DELETE' THEN RETURN OLD; END IF;
   RETURN NEW;
 END;
-$;
+$$;
 DROP TRIGGER IF EXISTS s_trade_admin_registry_audit ON public.s_trade_admins;
 CREATE TRIGGER s_trade_admin_registry_audit AFTER INSERT OR DELETE ON public.s_trade_admins
   FOR EACH ROW EXECUTE FUNCTION public.s_trade_audit_admin_registry_change();
 
 CREATE OR REPLACE FUNCTION public.s_trade_reject_admin_registry_update()
-RETURNS trigger LANGUAGE plpgsql SET search_path='' AS $
+RETURNS trigger LANGUAGE plpgsql SET search_path='' AS $$
 BEGIN
   RAISE EXCEPTION 'S-TRADE administrator registry is immutable; revoke and re-grant with audit' USING ERRCODE='55000';
 END;
-$;
+$$;
 DROP TRIGGER IF EXISTS s_trade_admin_registry_no_update ON public.s_trade_admins;
 CREATE TRIGGER s_trade_admin_registry_no_update BEFORE UPDATE ON public.s_trade_admins
   FOR EACH ROW EXECUTE FUNCTION public.s_trade_reject_admin_registry_update();
