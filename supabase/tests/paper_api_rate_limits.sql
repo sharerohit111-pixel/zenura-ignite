@@ -9,6 +9,7 @@ DO $api_rate_limit$
 DECLARE
   v_result jsonb;
   v_i integer;
+  v_rows integer;
   v_user_a uuid:='abababab-abab-4bab-8bab-abababababab';
   v_user_b uuid:='bcbcbcbc-bcbc-4cbc-8cbc-bcbcbcbcbcbc';
 BEGIN
@@ -35,14 +36,30 @@ BEGIN
     RAISE EXCEPTION 'A separate bucket inherited the OAuth budget: %',v_result;
   END IF;
 
-  -- Expired windows reuse the same bounded row and reset their counter.
+  -- Seed an existing exhausted row, move it to an expired window, and
+  -- assert that the RPC resets that same row rather than inserting a new one.
+  INSERT INTO public.paper_api_rate_limits(user_id,bucket,window_start_ms,request_count)
+  VALUES(v_user_a,'market_data',
+         floor(extract(epoch FROM clock_timestamp())*1000)::bigint,30)
+  ON CONFLICT(user_id,bucket) DO UPDATE SET
+    window_start_ms=EXCLUDED.window_start_ms,request_count=30;
   UPDATE public.paper_api_rate_limits
      SET window_start_ms=window_start_ms-60000,request_count=30
    WHERE user_id=v_user_a AND bucket='market_data';
+  GET DIAGNOSTICS v_rows=ROW_COUNT;
+  IF v_rows<>1 THEN
+    RAISE EXCEPTION 'Expired-window fixture did not update exactly one existing row';
+  END IF;
   v_result:=public.consume_paper_api_rate_limit(v_user_a,'market_data');
   IF v_result->>'allowed'<>'true'
      OR (v_result->>'remaining')::integer<>29 THEN
     RAISE EXCEPTION 'An expired window did not reset its request budget: %',v_result;
+  END IF;
+  SELECT count(*) INTO v_rows
+    FROM public.paper_api_rate_limits
+   WHERE user_id=v_user_a AND bucket='market_data';
+  IF v_rows<>1 THEN
+    RAISE EXCEPTION 'Expired-window reset did not reuse exactly one bounded row';
   END IF;
 
   -- A fixed bucket cannot be selected with an arbitrary or unbounded name.
