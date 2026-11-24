@@ -117,3 +117,10 @@ test("private mutation and refresh responses are bound to the initiating user an
   assert.ok(source.includes("finally { if (isCurrent(userId, sequence))"));
   assert.ok(source.includes("loadWallet(userId, sequence); if (isCurrent(userId, sequence))"));
 });
+
+
+test("OTP completion messages are ignored after the active auth sequence changes", () => {
+  assert.ok(source.includes('const sequence = authSequence;'));
+  assert.ok(source.includes('if (sequence === authSequence) await syncAuth(data.session);'));
+  assert.ok(source.includes('if (sequence === authSequence) status.textContent = error.message || "OTP verification failed.";'));
+});
