@@ -143,6 +143,8 @@ jobs:
         run: node --test market-gateway/test/derivative-order-transaction.test.js
       - name: Run Existing transaction reference derivative contract validation tests
         run: node --test market-gateway/test/derivative-contract.test.js
+      - name: Verify provider-neutral NSE Options accounting read model
+        run: node --test market-gateway/test/options-accounting-read-model.test.js
       - name: Run complete market-gateway regression suite
         run: |
           npm install --prefix market-gateway --no-audit --no-fund --package-lock=false
