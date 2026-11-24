@@ -1,3 +1,4 @@
+import { appendUnifiedDemoSummary } from "./demo-trade-projection.mjs";
 import { createPaperDemoViewModel, searchPaperDemoInstruments, getPaperDemoExpiries, getPaperDemoOptionChain } from "../shared/paper-demo-adapter.mjs";
 import { mountDerivativeDemo, appendDerivativeSummary } from "./demo-derivative-panel.mjs";
 import { mountDemoChart } from "./demo-chart-panel.mjs";
@@ -200,8 +201,8 @@ function render(name){
   const selected=name==="trades"?orders.filter(o=>o.status==="FILLED"):orders;
   content.append(grid(card("Records",String(selected.length),"Current fixture only"),card("Filled",String(selected.filter(o=>o.status==="FILLED").length),"Sample statuses"),card("Pending",String(selected.filter(o=>o.status==="PENDING"||o.status==="PARTIALLY_FILLED").length),"No worker runs"),card("Cancelled",String(selected.filter(o=>o.status==="CANCELLED").length),"No cancellation action")));
   content.append(table(["ORDER ID","ASSET","INSTRUMENT","SIDE","TYPE","SIZE","STATUS","AVG / LIMIT","CHARGES"],orderRows(selected)));
-  appendEquitySummary(content,name);
-  appendDerivativeSummary(content,name);
+  appendUnifiedDemoSummary(content,name);
+  
   return;
  }
  if(name==="portfolio"||name==="positions"||name==="holdings"){
