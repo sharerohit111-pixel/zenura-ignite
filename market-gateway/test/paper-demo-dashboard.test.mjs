@@ -30,6 +30,11 @@ test("Demo screens disclose synthetic data and isolate local Equity execution fr
  assert.doesNotMatch(js,/order actions disabled/);
  assert.match(js,/ledgerReconciled/);
  assert.match(js,/mountEquityDemo\(content\)/);
+ assert.match(js,/searchPaperDemoInstruments/);
+ assert.match(js,/getPaperDemoExpiries/);
+ assert.match(js,/getPaperDemoOptionChain/);
+ assert.match(js,/renderInstrumentCatalog\(catalog\)/);
+ assert.match(js,/renderOptionsCatalog\(catalog\)/);
  const equityPanel=await read("demo-equity-panel.mjs");
  assert.match(equityPanel,/DEMO DATA · MOCK · SYNTHETIC ONLY/);
  assert.match(equityPanel,/not reconciled with the Wallet/);
