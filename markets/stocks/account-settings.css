@@ -1,0 +1,17 @@
+.s-trade-account{display:grid;gap:10px;flex:1 0 100%;padding:12px;margin-top:8px;border:1px solid #28445a;border-radius:12px;background:linear-gradient(145deg,#0c1b2a,#102638);color:#eaf3fa}
+.s-trade-account[hidden]{display:none}
+.s-trade-account h3{margin:0;font-size:13px;letter-spacing:.08em}
+.s-trade-account p{margin:0;color:#9fb8ca;font-size:11px;line-height:1.5}
+.s-trade-account label{display:grid;gap:5px;color:#b7ccda;font-size:10px}
+.s-trade-account input{width:100%;min-width:0;box-sizing:border-box;padding:9px 10px;border:1px solid #36536a;border-radius:7px;background:#071421;color:#f4fbff;font:inherit;font-size:12px}
+.s-trade-account .account-actions{display:flex;gap:7px;flex-wrap:wrap}
+.s-trade-account button{border:1px solid #287e70;background:#123c37;color:#70e8c8;border-radius:7px;padding:8px 10px;font-size:9px;font-weight:800;cursor:pointer}
+.s-trade-account button.primary{background:#35dfb7;color:#03251d}
+.s-trade-account button:disabled{opacity:.5;cursor:wait}
+.s-trade-account .wallet-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.s-trade-account .wallet-cell{padding:9px;border:1px solid #29465b;border-radius:8px;background:#081725}
+.s-trade-account .wallet-cell small{display:block;color:#93adbf;font-size:9px}
+.s-trade-account .wallet-cell b{display:block;margin-top:4px;font-size:14px;overflow-wrap:anywhere}
+.s-trade-account .account-note{font-size:9px;color:#8eaabd}
+.s-trade-account .account-status{min-height:14px;color:#70e8c8}
+@media(max-width:520px){.s-trade-account{padding:10px}.s-trade-account .wallet-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
