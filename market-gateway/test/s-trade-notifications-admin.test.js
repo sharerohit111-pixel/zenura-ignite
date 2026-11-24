@@ -18,7 +18,9 @@ test("validates and normalizes bounded price alert inputs",()=>{
 });
 
 test("preference updates accept only explicit boolean allowlisted keys",()=>{
- assert.deepEqual(normalizePreferences({trade_confirmations:false,push_enabled:true}),{trade_confirmations:false,push_enabled:true});
+ assert.deepEqual(normalizePreferences({trade_confirmations:false,price_alerts:true}),{trade_confirmations:false,price_alerts:true});
+ assert.throws(()=>normalizePreferences({push_enabled:true}),{status:400});
+ assert.throws(()=>normalizePreferences({email_enabled:true}),{status:400});
  assert.throws(()=>normalizePreferences({is_admin:true}),{status:400});
  assert.throws(()=>normalizePreferences({email_enabled:"true"}),{status:400});
  assert.throws(()=>normalizePreferences([]),{status:400});
