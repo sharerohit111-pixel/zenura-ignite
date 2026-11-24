@@ -9,6 +9,7 @@ const NOW = Date.parse("2026-11-24T04:30:00Z");
 const key = "NSE_EQ|INE002A01018";
 const mapping = {
   [key]: {
+    nativeInstrumentKey: key,
     instrumentId: "NSE_EQ|INE002A01018",
     exchange: "NSE",
     entitlementReference: "entitlement-1",
@@ -57,7 +58,7 @@ test("accepts Map mappings and Full-feed market LTPC", () => {
   assert.equal(result[0].lastPricePaise, 12500);
 });
 
-test("drops unknown instruments and incomplete entitlement mappings", () => {
+test("drops unknown instruments and mappings for a different native key", () => {
   const payload = frame({
     feeds: {
       ...frame().feeds,
