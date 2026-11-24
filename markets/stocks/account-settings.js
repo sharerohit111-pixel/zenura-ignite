@@ -158,6 +158,7 @@ if (host && !document.getElementById("s-trade-account")) {
     } finally { setBusy(["s-trade-send-otp","s-trade-verify-otp"], false); }
   });
   $("s-trade-save-profile").addEventListener("click", async () => {
+    if (devMockActive) { status.textContent = "Profile editing is disabled in the local mock preview."; return; }
     if (!currentUserId) return;
     const displayName = $("s-trade-display-name").value.trim();
     if (displayName.length > 80) { status.textContent = "Display name must be 80 characters or fewer."; return; }
@@ -171,6 +172,7 @@ if (host && !document.getElementById("s-trade-account")) {
     finally { $("s-trade-save-profile").disabled = false; }
   });
   $("s-trade-refresh-session").addEventListener("click", async () => {
+    if (devMockActive) { status.textContent = "There is no authenticated session to refresh in mock preview."; return; }
     $("s-trade-refresh-session").disabled = true;
     try {
       const { data, error } = await supabase.auth.refreshSession();
@@ -180,6 +182,7 @@ if (host && !document.getElementById("s-trade-account")) {
     finally { $("s-trade-refresh-session").disabled = false; }
   });
   $("s-trade-refresh-wallet").addEventListener("click", async () => {
+    if (devMockActive) { status.textContent = "Wallet refresh is disabled in the local mock preview."; return; }
     if (!currentUserId) return;
     try { await loadWallet(currentUserId); status.textContent = "Wallet refreshed."; }
     catch (error) { status.textContent = error.message || "Wallet refresh failed."; }
