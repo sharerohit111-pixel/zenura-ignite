@@ -49,7 +49,7 @@ Every mock response uses the same top-level envelope:
 - `meta.source`: `SYNTHETIC_FIXTURE` for fixture payloads or `PAPER_LEDGER` for backend-owned paper records
 - `data`: module-specific object
 
-Canonical JSON Schema: `market-gateway/mock/contracts/paper-trading-envelope.schema.json`.
+Canonical schemas: `market-gateway/mock/contracts/paper-trading-envelope.schema.json` (shared envelope) and `market-gateway/mock/contracts/paper-trading-domain.schema.json` (instrument, quote, order, position and account domain shapes).
 
 ## Module contracts and ownership
 
