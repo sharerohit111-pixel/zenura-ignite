@@ -70,6 +70,21 @@ test("canonical adapter can build the dashboard view model from shared fixtures"
  assert.equal(model.orders.length,3);
  assert.equal(model.account.ledgerReconciled,false);
 });
+test("private Demo watchlists use the canonical MOCK catalog and authenticated per-user API",async()=>{
+ const source=await read("demo-watchlist-persistence.mjs"),js=await read("demo.js"),html=await read("demo.html");
+ assert.match(js,/mountPrivateWatchlists\(host,\{model\}\)/);
+ assert.match(source,/supabase\.auth\.getSession/);
+ assert.match(source,/supabaseClient\.auth\.onAuthStateChange/);
+ assert.match(source,/Authorization:"Bearer "\+snapshot\.token/);
+ assert.match(source,/\/watchlist\?name=/);
+ assert.match(source,/instrumentKeys:next\.map\(x=>x\.instrument_key\)/);
+ assert.match(source,/new Set\(next\.map\(x=>x\.instrument_key\)\)/);
+ assert.match(source,/MAX_ITEMS=50/);
+ assert.match(source,/currentCatalogItem\(x\.instrument_key\)/);
+ assert.match(source,/Account changed/);
+ assert.match(source,/Demo Watchlists remain available without sign-in/);
+ assert.match(html,/name="market-gateway-url"/);
+});
 test("chart fixture requests omit account credentials",async()=>{
  const chart=await read("demo-chart-panel.mjs");
  assert.match(chart,/credentials: "omit"/);
