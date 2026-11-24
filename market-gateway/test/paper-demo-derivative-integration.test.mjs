@@ -16,6 +16,11 @@ test("Futures and Options Demo screens mount the shared local simulator", async 
   assert.match(js, /from "\.\/demo-derivative-panel\.mjs"/);
   assert.match(html, /derivative-position\.js/);
   assert.match(html, /derivative-mock-simulator\.js/);
+  assert.match(html, /demo-trade-history-store\.js/);
+  assert.match(panel, /syncHistory\(engine\)/);
+  assert.match(panel, /historySnapshot\.trades/);
+  assert.match(panel, /historySnapshot\.orders/);
+  assert.match(panel, /historySnapshot\.positions/);
   assert.match(panel, /createDerivativeMockSimulator/);
 });
 
@@ -26,6 +31,8 @@ test("Demo execution is manual, synthetic and isolated from production routes", 
   assert.match(panel, /DEMO DATA · MOCK/);
   assert.match(panel, /credentials:"omit"/);
   assert.match(panel, /processLimitFills/);
+  assert.match(panel, /idempotencyKey/);
+  assert.match(panel, /DEMO_TRADE_HISTORY_STORE_UNAVAILABLE/);
   assert.ok(panel.includes("engine.cancel"));
   assert.match(sw, /stocks\/demo-derivative-panel\.mjs/);
   assert.doesNotMatch(gateway, /derivative-mock-simulator|paper-demo-adapter|paper-mock-fixtures/);
