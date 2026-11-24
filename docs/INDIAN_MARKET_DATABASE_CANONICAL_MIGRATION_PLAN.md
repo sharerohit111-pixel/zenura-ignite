@@ -531,3 +531,15 @@ This focused test does **not** currently assert the newer derivative worker tabl
 The test's `paper_futures_orders` appearance in `rls_permissions.sql` is a client-role denial check (authenticated cannot INSERT); it is not a service_role SELECT assertion. Do not interpret that as validating the Futures worker's direct serviceDb read.
 
 Next CI amendment should extend the focused grant test with the exact derivative ACL matrix and explicit fill immutability tests, then run the complete disposable PostgreSQL workflow. No SQL changed or applied in this audit step.
+
+
+## 18. Added worker ACL/fencing regression contract (2026-11-24)
+
+A test-only SQL contract has been added on the PR #99 backend branch at `supabase/tests/market_worker_least_privilege_and_fencing.sql` (latest commit on that branch: `efe5bbcf24ce2a29efed449de6f45aabd7883411`). It covers:
+
+- exact SELECT/UPDATE candidate matrix for the nine serviceDb worker/provider tables;
+- denial of unnecessary service_role INSERT/UPDATE/DELETE and private client UPDATE;
+- required Futures/Options submit, cancel, expire and fill RPC existence plus service_role-only EXECUTE;
+- real lease acquisition/release RPC behavior under `SET LOCAL ROLE service_role`, proving a stale token cannot release the current token or update the cursor.
+
+The file is explicitly marked as a disposable-PostgreSQL regression contract and is intentionally not wired into CI yet. This is deliberate: current draft migrations are expected to fail its checks until the missing Futures orders SELECT and excess Futures/Options direct DML grants are corrected. It has not been run against production, and no production SQL/ACL was changed. After grant reconciliation, wire it into the ordered disposable PostgreSQL workflow and require a green run before any staging rehearsal.
