@@ -52,3 +52,12 @@ test("responsive demo assets are included in the Markets PWA shell",async()=>{
  assert.match(sw,/zenura-markets-shell-v3/);
  for(const asset of ["stocks/demo.html","stocks/demo.css","stocks/demo.js","shared/paper-demo-adapter.mjs"])assert.ok(sw.includes(asset));
 });
+
+test("Demo route exposes account return navigation and shared Hindi/English toggle without loading production auth", async () => {
+ const fs = await import("node:fs");
+ const html = fs.readFileSync(new URL("../../markets/stocks/demo.html", import.meta.url), "utf8");
+ assert.match(html, /href="\.\/#connection"/);
+ assert.match(html, /id="paper-language-toggle"/);
+ assert.match(html, /\.\.\/language-toggle\.js/);
+ assert.doesNotMatch(html, /account-settings\.js|supabase-client\.js|email-auth\.js/);
+});
