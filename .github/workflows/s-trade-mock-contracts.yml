@@ -19,6 +19,8 @@ on:
     paths:
       - "market-gateway/mock/**"
       - "market-gateway/lib/paper-mock-fixtures.js"
+      - "market-gateway/lib/equity-demo-execution-engine.js"
+      - "market-gateway/test/equity-demo-execution-engine.test.js"
       - "market-gateway/test/paper-mock-fixtures.test.js"
       - ".github/workflows/s-trade-mock-contracts.yml"
 
