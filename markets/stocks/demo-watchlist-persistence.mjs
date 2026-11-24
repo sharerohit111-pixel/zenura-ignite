@@ -54,8 +54,10 @@ export function mountPrivateWatchlists(host,{model,fetchImpl=fetch,supabaseClien
    const response=await fetchImpl(gateway+"/watchlist?name="+encodeURIComponent(name),{headers:{Authorization:"Bearer "+snapshot.token,Accept:"application/json"},cache:"no-store"});
    const data=await response.json();if(!response.ok)throw new Error(data.error||"Private watchlist could not be loaded.");
    const latest=await currentUser();if(!active(seq,snapshot.id,name)||latest?.id!==snapshot.id)return;
-   items=(data.items||[]).filter(x=>typeof x.instrument_key==="string"&&currentCatalogItem(x.instrument_key));
-   status.textContent=items.length+" / 50 saved to your account · private · restored from server";render();
+   const allItems=Array.isArray(data.items)?data.items:[];
+   preservedItems=allItems.filter(x=>typeof x.instrument_key==="string"&&!currentCatalogItem(x.instrument_key));
+   items=allItems.filter(x=>typeof x.instrument_key==="string"&&currentCatalogItem(x.instrument_key));
+   status.textContent=(items.length+preservedItems.length)+" / 50 saved to your account · "+items.length+" canonical MOCK shown"+(preservedItems.length?" · "+preservedItems.length+" other saved instruments preserved":"")+" · private";render();
   }catch(error){if(active(seq,snapshot.id,name)){status.textContent=error.message||"Private watchlist restore failed.";render();}}
  }
  async function persist(next,seq,uid,name){
