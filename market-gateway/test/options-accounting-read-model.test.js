@@ -8,7 +8,7 @@ const base={
  positions:[{instrument_key:"NSE_FO|NIFTY_CE",trading_symbol:"NIFTY CE",exchange:"NSE",segment:"NSE_FO",instrument_type:"CE",expiry:"2026-12-31",lot_size:65,net_quantity:65,reserved_quantity:65,cost_basis_paise:82_771,average_price_paise:1_273}],
  limitOrders:[{order_id:"buy1",instrument_key:"NSE_FO|NIFTY_PE",trading_symbol:"NIFTY PE",exchange:"NSE",segment:"NSE_FO",instrument_type:"PE",side:"BUY",status:"PENDING",lot_size:65,filled_quantity:0,remaining_quantity:65,reserved_cash_paise:70_000,reserved_close_quantity:0,quantity:65,created_at:"2026-11-24T10:00:00Z"},{order_id:"sell1",instrument_key:"NSE_FO|NIFTY_CE",trading_symbol:"NIFTY CE",exchange:"NSE",segment:"NSE_FO",instrument_type:"CE",side:"SELL",status:"PARTIALLY_FILLED",lot_size:65,reserved_cash_paise:0,reserved_close_quantity:65,quantity:130,filled_quantity:65,remaining_quantity:65,cumulative_gross_paise:97_500,cumulative_charges_paise:100,created_at:"2026-11-24T10:01:00Z"}],
  limitFills:[{order_id:"sell1",execution_id:"exec1",fill_sequence:1,fill_quantity:65,execution_price_paise:1500,gross_paise:97_500,incremental_charges_paise:100,realized_pnl_paise:14_629}],
- marketOrders:[{order_id:"m1",instrument_key:"NSE_FO|BANKNIFTY_PE",trading_symbol:"BANKNIFTY PE",exchange:"NSE",segment:"NSE_FO",instrument_type:"PE",side:"SELL",status:"FILLED",quantity:65,gross_paise:50_000,charges_paise:100,realized_pnl_paise:-500,created_at:"2026-11-24T09:00:00Z"}],
+ marketOrders:[{order_id:"m1",instrument_key:"NSE_FO|BANKNIFTY_PE",trading_symbol:"BANKNIFTY PE",exchange:"NSE",segment:"NSE_FO",instrument_type:"PE",side:"SELL",status:"FILLED",quantity:65,execution_price_paise:1000,gross_paise:65_000,charges_paise:100,realized_pnl_paise:-500,created_at:"2026-11-24T09:00:00Z"}],
  quotes:[{instrumentKey:"NSE_FO|NIFTY_CE",pricePaise:1500,observedAtMs:1_800_000_000_000}],
  now:1_800_000_001_000
 };
@@ -142,4 +142,18 @@ test("rejects partial or arithmetically inconsistent immutable fill charge break
  assert.equal(valid.history.some(order=>order.source==="LIMIT"&&order.fills?.[0]?.chargeBreakdownPaise?.brokerage===100),true);
  assert.throws(()=>buildOptionsAccountingSnapshot({...base,limitFills:[{...chargeFill,gst_paise:1}]}),/do not reconcile/);
  assert.throws(()=>buildOptionsAccountingSnapshot({...base,limitFills:[{...chargeFill,stt_paise:undefined}]}),/incomplete charge breakdown/);
+});
+
+
+test("validates and exposes the existing Options MARKET receipt charge breakdown",()=>{
+ const market={...base.marketOrders[0],charges_breakdown:{
+  grossPaise:65000,brokeragePaise:20,exchangeTransactionPaise:10,ipftPaise:0,
+  sebiPaise:5,stampDutyPaise:0,gstPaise:5,sttPaise:60,totalChargesPaise:100,
+  exchange:"NSE",side:"SELL",indicative:true,simulationOnly:true
+ }};
+ const r=buildOptionsAccountingSnapshot({...base,marketOrders:[market]});
+ const row=r.history.find(item=>item.source==="MARKET");
+ assert.equal(row.chargeBreakdownPaise.stt,60);
+ assert.equal(row.chargesPaise,100);
+ assert.throws(()=>buildOptionsAccountingSnapshot({...base,marketOrders:[{...market,charges_breakdown:{...market.charges_breakdown,sttPaise:61}}]}),/does not reconcile/);
 });
