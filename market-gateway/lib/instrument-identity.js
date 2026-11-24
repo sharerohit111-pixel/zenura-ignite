@@ -76,6 +76,10 @@ function buildInstrumentMaster({ providerId, exchange, generatedAtMs, sourceDate
   if (!Number.isSafeInteger(nowMs) || !Number.isSafeInteger(generatedAtMs) ||
       generatedAtMs <= 0 || generatedAtMs > nowMs || nowMs - generatedAtMs > maxAgeMs) fail("Instrument master generation time is future-dated or stale.");
   validDate(sourceDate, "Master source date");
+  const sourceDateMs = Date.parse(sourceDate + "T00:00:00Z");
+  if (sourceDateMs > nowMs || nowMs - sourceDateMs > maxAgeMs) {
+    fail("Instrument master source date is future-dated or stale.");
+  }
   requiredText(sourceReference, "Master source reference", 500);
   if (typeof sourceSha256 !== "string" || !/^[a-f0-9]{64}$/i.test(sourceSha256)) fail("Master source SHA-256 is invalid.");
   if (!Array.isArray(records) || records.length === 0 || records.length > 200000) fail("Instrument master record count is outside safe bounds.");
