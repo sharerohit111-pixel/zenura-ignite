@@ -51,6 +51,7 @@ const {nextUpstoxTokenExpiry}=require("../functions/lib/upstox-token-expiry");
 const {isUsableUpstoxTokenResponse}=require("../functions/lib/upstox-token-response");
 const {isUsableUpstoxOAuthCallback}=require("../functions/lib/upstox-oauth-callback-input");
 const {validateHttpsRedirectUri}=require("./lib/redirect-uri-policy");
+const {apiRateLimitBucket,consumeApiRateLimit}=require("./lib/api-rate-limit");
 
 const PORT=Number(process.env.PORT||8080);
 const SUPABASE_URL=process.env.SUPABASE_URL;
@@ -108,9 +109,19 @@ function sendError(res,error,fallback){
   res.status(errorStatus(error)).json(body);
 }
 function decryptToken(box){return decryptUpstoxToken(box,ENC_KEY);}
-function auth(req){
+async function auth(req){
   const accessToken=readBearerToken(req);
-  return runtime.authenticateRequest(req).then(user=>({user,accessToken,userDb:runtime.createUserClient(accessToken)}));
+  const user=await runtime.authenticateRequest(req);
+  const bucket=apiRateLimitBucket(req.method,req.path);
+  if(bucket){
+    const rate=await consumeApiRateLimit(serviceDb,user.id,bucket);
+    if(!rate.allowed){
+      throw Object.assign(new Error("Too many requests. Please wait before trying again."),{
+        status:429,retryAfterSeconds:rate.retryAfterSeconds
+      });
+    }
+  }
+  return {user,accessToken,userDb:runtime.createUserClient(accessToken)};
 }
 function localNowMs(){return Date.now();}
 function validDate(value){
