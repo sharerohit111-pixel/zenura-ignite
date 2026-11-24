@@ -85,3 +85,12 @@ test("rejects duplicate MARKET order identities and overfilled LIMIT orders",()=
   const orders=base.limitOrders.map(order=>order.order_id==="sell1"?{...order,filled_quantity:130,remaining_quantity:0}:order);
   assert.throws(()=>buildOptionsAccountingSnapshot({...base,limitOrders:orders}),/quantity, fills, remaining/);
 });
+
+
+test("rejects impossible LIMIT lifecycle states and reservation-release flags",()=>{
+  const mutate=(id,changes)=>base.limitOrders.map(order=>order.order_id===id?{...order,...changes}:order);
+  assert.throws(()=>buildOptionsAccountingSnapshot({...base,limitOrders:mutate("buy1",{status:"FILLED",reservation_released:true})}),/status, or lot size/);
+  assert.throws(()=>buildOptionsAccountingSnapshot({...base,limitOrders:mutate("buy1",{status:"UNKNOWN"})}),/status, or lot size/);
+  assert.throws(()=>buildOptionsAccountingSnapshot({...base,limitOrders:mutate("sell1",{reservation_released:true})}),/release flag/);
+  assert.throws(()=>buildOptionsAccountingSnapshot({...base,limitOrders:mutate("sell1",{status:"PARTIALLY_FILLED",filled_quantity:0})}),/status, or lot size/);
+});
