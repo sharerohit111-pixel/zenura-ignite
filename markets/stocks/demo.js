@@ -1,4 +1,4 @@
-import { createPaperDemoViewModel } from "../shared/paper-demo-adapter.mjs";
+import { createPaperDemoViewModel, searchPaperDemoInstruments, getPaperDemoExpiries, getPaperDemoOptionChain } from "../shared/paper-demo-adapter.mjs";
 import { mountDerivativeDemo, appendDerivativeSummary } from "./demo-derivative-panel.mjs";
 import { mountEquityDemo, appendEquitySummary } from "./demo-equity-panel.mjs";
 
@@ -17,6 +17,79 @@ const table=(headers,rows)=>{const wrap=el("div","table-wrap"),t=el("table"),hea
 const notice=text=>el("div","notice",text);
 function header(name,description){const row=el("div","screen-title"),left=el("div");left.append(el("h2","",titles[name]||name),el("p","",description));row.append(left,el("span","read-only","MOCK · LOCAL DEMO"));return row;}
 function quoteRows(){return model.market.instruments.map(x=>[x.symbol,x.exchange,x.assetClass,money(x.lastPricePaise),(x.changePaise>=0?"+":"")+money(x.changePaise),x.volume,x.timestamp]);}
+function field(label,control){const wrap=el("label","catalog-field");wrap.append(el("span","",label),control);return wrap;}
+function selectControl(id,options){const select=el("select");select.id=id;options.forEach(([value,label])=>{const option=el("option","",label);option.value=value;select.append(option);});return select;}
+function uniqueValues(items,key){return [...new Set(items.map(x=>x[key]).filter(Boolean))].sort();}
+function renderInstrumentCatalog(host,{assetClass=""}={}){
+ const controls=el("div","catalog-controls"),query=el("input");query.type="search";query.placeholder="Search MOCK symbol or underlying";query.setAttribute("aria-label","Search demo instruments");
+ const exchange=selectControl("catalog-exchange",[["","All exchanges"],["NSE","NSE"],["BSE","BSE"]]);
+ const kind=selectControl("catalog-kind",[["","All instruments"],["EQUITY","Equity"],["INDEX","Indices"],["FUTURE","Futures"],["OPTION","Options"]]);kind.value=assetClass;
+ controls.append(field("Search",query),field("Exchange",exchange),field("Asset class",kind));
+ const tableHost=el("div","catalog-results"),status=el("p","sub","");host.append(controls,status,tableHost);
+ function update(){
+  const rows=searchPaperDemoInstruments(model,{query:query.value,exchange:exchange.value,assetClass:kind.value});
+  status.textContent=rows.length+" MOCK instruments · filtered locally from canonical fixtures";
+  tableHost.replaceChildren(table(["SYMBOL","EXCHANGE","TYPE","UNDERLYING","EXPIRY","STRIKE","SAMPLE PRICE","BID / ASK"],rows.map(x=>[
+   x.symbol,x.exchange,x.assetClass,x.underlying,x.expiry||"—",x.strikePaise?money(x.strikePaise):"—",money(x.lastPricePaise),
+   x.bidPricePaise===null?"—":money(x.bidPricePaise)+" / "+money(x.askPricePaise)
+  ])));
+ }
+ [query,exchange,kind].forEach(control=>control.addEventListener("input",update));
+ [exchange,kind].forEach(control=>control.addEventListener("change",update));
+ update();
+}
+function renderFuturesCatalog(host){
+ const contracts=model.market.instruments.filter(x=>x.assetClass==="FUTURE");
+ const underlyings=uniqueValues(contracts,"underlying"),underlying=selectControl("futures-underlying",[...underlyings.map(x=>[x,x]),["","All underlyings"]]);
+ const exchange=selectControl("futures-exchange",[["","All exchanges"],["NSE","NSE"],["BSE","BSE"]]);
+ const expiry=selectControl("futures-expiry",[["","All expiries"]]);
+ const query=el("input");query.type="search";query.placeholder="Search Futures contract";
+ const controls=el("div","catalog-controls");controls.append(field("Underlying",underlying),field("Exchange",exchange),field("Expiry",expiry),field("Search",query));
+ const hostTable=el("div","catalog-results"),status=el("p","sub","");host.append(controls,status,hostTable);
+ function refreshExpiries(){const dates=[...new Set(contracts.filter(x=>(!underlying.value||x.underlying===underlying.value)&&(!exchange.value||x.exchange===exchange.value)).map(x=>x.expiry))].sort();const previous=expiry.value;expiry.replaceChildren(selectControl("unused",[["","All expiries"]]).firstChild);dates.forEach(x=>{const o=el("option","",x);o.value=x;expiry.append(o);});if(dates.includes(previous))expiry.value=previous;}
+ function update(){const rows=searchPaperDemoInstruments(model,{query:query.value,assetClass:"FUTURE",underlying:underlying.value,exchange:exchange.value,expiry:expiry.value});status.textContent=rows.length+" MOCK Futures contracts";hostTable.replaceChildren(table(["CONTRACT","EXCHANGE","UNDERLYING","EXPIRY","LOT SIZE","BID","ASK"],rows.map(x=>[x.symbol,x.exchange,x.underlying,x.expiry,x.lotSize,money(x.bidPricePaise),money(x.askPricePaise)])));}
+ underlying.addEventListener("change",()=>{refreshExpiries();update();});exchange.addEventListener("change",()=>{refreshExpiries();update();});expiry.addEventListener("change",update);query.addEventListener("input",update);refreshExpiries();update();
+}
+function renderOptionsCatalog(host){
+ const contracts=model.market.instruments.filter(x=>x.assetClass==="OPTION");
+ const underlyings=uniqueValues(contracts,"underlying");
+ const underlying=selectControl("options-underlying",underlyings.map(x=>[x,x]));
+ const exchange=selectControl("options-exchange",[["","All exchanges"],["NSE","NSE"],["BSE","BSE"]]);
+ const expiry=selectControl("options-expiry",[]);
+ const strike=selectControl("options-strike",[["","All strikes"]]);
+ const side=selectControl("options-side",[["","CE + PE"],["CE","CE only"],["PE","PE only"]]);
+ const query=el("input");query.type="search";query.placeholder="Search option symbol";
+ const controls=el("div","catalog-controls");controls.append(field("Underlying",underlying),field("Exchange",exchange),field("Expiry",expiry),field("Strike",strike),field("Option side",side),field("Search",query));
+ const status=el("p","sub",""),tableHost=el("div","catalog-results");host.append(controls,status,tableHost);
+ function refreshExpiry(){
+  const dates=getPaperDemoExpiries(model,{underlying:underlying.value,assetClass:"OPTION",exchange:exchange.value});
+  const previous=expiry.value;expiry.replaceChildren();dates.forEach(x=>{const o=el("option","",x);o.value=x;expiry.append(o);});if(dates.includes(previous))expiry.value=previous;
+  refreshStrikes();
+ }
+ function refreshStrikes(){
+  const chain=getPaperDemoOptionChain(model,{underlying:underlying.value,expiry:expiry.value,exchange:exchange.value});
+  const previous=strike.value;strike.replaceChildren();const all=el("option","","All strikes");all.value="";strike.append(all);
+  chain.forEach(row=>{const o=el("option","",money(row.strikePaise));o.value=String(row.strikePaise);strike.append(o);});
+  if([...strike.options].some(x=>x.value===previous))strike.value=previous;
+ }
+ function update(){
+  if(!expiry.value){status.textContent="No listed synthetic option expiry for this selection.";tableHost.replaceChildren();return;}
+  const chain=getPaperDemoOptionChain(model,{underlying:underlying.value,expiry:expiry.value,exchange:exchange.value,strikePaise:strike.value||undefined,optionType:side.value||undefined});
+  const filtered=chain.filter(row=>{
+   if(!query.value)return true;
+   const q=query.value.toLowerCase();
+   return [row.CE?.symbol,row.PE?.symbol,underlying.value].some(x=>String(x||"").toLowerCase().includes(q));
+  });
+  status.textContent=filtered.length+" strike rows · "+underlying.value+" · "+expiry.value+" · MOCK option chain";
+  tableHost.replaceChildren(table(["STRIKE","CE CONTRACT","CE BID","CE ASK","PE CONTRACT","PE BID","PE ASK"],filtered.map(row=>[
+   money(row.strikePaise),row.CE?.symbol||"—",row.CE?money(row.CE.bidPricePaise):"—",row.CE?money(row.CE.askPricePaise):"—",
+   row.PE?.symbol||"—",row.PE?money(row.PE.bidPricePaise):"—",row.PE?money(row.PE.askPricePaise):"—"
+  ])));
+ }
+ underlying.addEventListener("change",()=>{refreshExpiry();update();});exchange.addEventListener("change",()=>{refreshExpiry();update();});
+ expiry.addEventListener("change",()=>{refreshStrikes();update();});strike.addEventListener("change",update);side.addEventListener("change",update);query.addEventListener("input",update);
+ refreshExpiry();update();
+}
 function orderRows(orders){return orders.map(o=>[o.orderId,o.assetClass,o.instrumentKey,o.side,o.orderType,o.quantity??o.lots,o.status,money(o.averagePricePaise??o.limitPricePaise??0),money(o.chargesPaise??0)]);}
 function render(name){
  const a=model.account,equity=model.positions.find(x=>x.assetClass==="EQUITY"),orders=model.orders;
@@ -27,9 +100,9 @@ function render(name){
   return;
  }
  if(name==="market"||name==="watchlists"){
-  content.append(grid(card("Exchange",model.market.exchange||"NSE / BSE","Fixture metadata"),card("Market status",model.market.marketStatus||"—","Simulated status only"),card("Instrument count",String(model.market.instruments.length),"MOCK-only identities"),card("As of",model.asOf,"Fixed fixture timestamp")));
-  content.append(table(["SYMBOL","EXCHANGE","ASSET","SAMPLE PRICE","CHANGE","VOLUME","AS OF"],quoteRows()));
-  content.append(notice(name==="watchlists"?"The shared fixture contains sample instruments only. No private watchlist is read or modified in this isolated preview.":"Search and filtering against the authoritative instrument master are not simulated by this compact shared fixture."));
+  content.append(grid(card("Exchange","NSE + BSE","Synthetic identities only"),card("Market status",model.market.marketStatus||"—","Simulated status only"),card("Instrument count",String(model.market.instruments.length),"One canonical MOCK catalog"),card("As of",model.asOf,"Fixed fixture timestamp")));
+  const catalog=el("section","catalog-panel");content.append(catalog);renderInstrumentCatalog(catalog);
+  content.append(notice(name==="watchlists"?"This preview filters the shared MOCK instrument catalog only. Private per-user watchlists and saved ordering are not connected in this isolated route.":"Search and filters operate only on the canonical MOCK JSON instrument catalog."));
   return;
  }
  if(name==="charts"){
@@ -46,9 +119,10 @@ function render(name){
  if(name==="futures"||name==="options"){
   const x=name==="futures"?model.derivatives.futures:model.derivatives.options;
   const order=orders.find(o=>o.assetClass===(name==="futures"?"FUTURE":"OPTION"));
-  content.append(grid(card("Contract",x.symbol||x.underlying,"MOCK contract only"),card("Expiry",x.expiry,"Illustrative contract date"),card(name==="futures"?"Lot size":"Option type",name==="futures"?x.lotSize:x.optionType,"Fixture metadata"),card("Strike",name==="options"?money(x.strikePaise):"Not applicable",name==="options"?"Paise-based strike":"Futures contract")));
-  content.append(table(["ORDER ID","INSTRUMENT","SIDE","TYPE","SIZE","STATUS","AVG / LIMIT"],orderRows(order?[order]:[])));
-  content.append(notice("Canonical MOCK contracts power the local Futures/Options simulator below. Production execution and workers remain separate."));
+  content.append(grid(card("Available contracts",String(model.market.instruments.filter(i=>i.assetClass===(name==="futures"?"FUTURE":"OPTION")).length),"NSE + BSE MOCK catalog"),card("Sample contract",x.symbol||x.underlying,"Order receipt fixture"),card("Expiry choices",String(getPaperDemoExpiries(model,{underlying:name==="futures"?"MOCKNIFTY":x.underlying,assetClass:name==="futures"?"FUTURE":"OPTION"}).length),"Deterministic fixture dates"),card("Order record",order?.status||"—","Read-only sample")));
+  const catalog=el("section","catalog-panel");content.append(catalog);if(name==="futures")renderFuturesCatalog(catalog);else renderOptionsCatalog(catalog);
+  content.append(table(["ORDER ID","INSTRUMENT","SIDE","TYPE","SIZE","STATUS","AVG / LIMIT"],order?[order]:[]));
+  content.append(notice("Contracts, strikes and quotes are synthetic MOCK fixtures. The local simulator below is browser-memory only; no production order API or broker connection is called."));
   mountDerivativeDemo(content,name);
   return;
  }
