@@ -47,6 +47,8 @@ const axePath=require.resolve("axe-core/axe.min.js");
 
   const pwa=await browser.newContext({viewport:{width:390,height:844},serviceWorkers:"allow"});
   const page=await pwa.newPage();
+  page.on("console",message=>{if(message.type()==="warning"||message.type()==="error")console.log("PWA browser console:",message.text());});
+  page.on("requestfailed",request=>console.log("PWA request failed:",request.url(),request.failure()?.errorText||"unknown"));
   console.log("PWA: opening market shell");
   await page.goto("http://127.0.0.1:4173/markets/",{waitUntil:"domcontentloaded",timeout:30000});
   await page.waitForLoadState("load",{timeout:10000});
@@ -74,7 +76,7 @@ const axePath=require.resolve("axe-core/axe.min.js");
   const demoPage=controlledPage;
   await demoPage.waitForFunction(()=>document.querySelector("#demo-status")?.textContent.includes("4 canonical fixtures validated"),null,{timeout:10000});
   const cached=await demoPage.evaluate(async()=>{
-   const cache=await caches.open("zenura-markets-shell-v5");
+   const cache=await caches.open("zenura-markets-shell-v7");
    const paths=["market","account","equity","derivatives"].map(name=>new URL("../../market-gateway/mock/fixtures/"+name+".json",location.href).href);
    const found=[];
    for(const url of paths)found.push({url,found:!!(await cache.match(url))});
