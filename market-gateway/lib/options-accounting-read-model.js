@@ -258,6 +258,21 @@ function buildOptionsAccountingSnapshot({
       }
       fillQuantity = addSafe(fillQuantity, fillQty, "LIMIT filled quantity");
       fillGross = addSafe(fillGross, gross, "LIMIT fill gross");
+      const chargeFields = ["brokerage_paise","exchange_transaction_paise","ipft_paise","sebi_paise","stamp_duty_paise","stt_paise","gst_paise"];
+      const suppliedChargeFields = chargeFields.filter(field => fill[field] !== undefined && fill[field] !== null);
+      if (suppliedChargeFields.length !== 0 && suppliedChargeFields.length !== chargeFields.length) {
+        fail("Options LIMIT fill contains an incomplete charge breakdown.");
+      }
+      if (suppliedChargeFields.length === chargeFields.length) {
+        const componentTotal = chargeFields.reduce((sum,field) =>
+          addSafe(sum,integer(fill[field],field), "Options fill charge components"),0);
+        if (componentTotal !== integer(fill.incremental_charges_paise ?? 0, "LIMIT fill charges")) {
+          fail("Options LIMIT fill charge components do not reconcile to booked charges.");
+        }
+        if (typeof fill.charge_schedule_version !== "string" || !fill.charge_schedule_version) {
+          fail("Options LIMIT fill charge schedule version is missing.");
+        }
+      }
       orderRealized = addSafe(orderRealized, signedInteger(fill.realized_pnl_paise ?? 0, "LIMIT fill realized P&L"), "LIMIT order realized P&L");
       orderCharges = addSafe(orderCharges, integer(fill.incremental_charges_paise ?? 0, "LIMIT fill charges"), "LIMIT order charges");
     }
