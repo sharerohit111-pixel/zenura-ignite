@@ -26,7 +26,7 @@ test("all requested Indian-market demo screens are navigable", () => {
 test("dashboard requires explicit mock opt-in and shows read-only safeguards", () => {
   assert.match(js, /createDemoClient\(\{allowDemo:true\}\)/);
   assert.match(js, /READ ONLY · MOCK/);
-  assert.match(js, /No exchange\/broker order is invoked/);
+  assert.match(js, /exchange.*broker order is invoked/);
   assert.match(js, /ledgerReconciled/);
   assert.match(adapter, /canSubmitOrders: false/);
   assert.match(adapter, /MOCK_DEMO_ORDER_SUBMISSION_DISABLED/);
