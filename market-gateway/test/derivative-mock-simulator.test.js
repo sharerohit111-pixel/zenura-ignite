@@ -249,7 +249,7 @@ test("F&O derivative position arithmetic rejects unsafe fill value without retur
   const instrument=future();
   const altered=structuredClone(fixture);
   const quote=altered.data.quotes.find(item=>item.instrumentKey===instrument.instrumentKey);
-  quote.askPricePaise=Number.MAX_SAFE_INTEGER;
+  quote.askPricePaise=Math.floor(Number.MAX_SAFE_INTEGER/instrument.tickSizePaise)*instrument.tickSizePaise;
   quote.askQuantity=instrument.lotSize;
   const bounded=createDerivativeMockSimulator(altered,{now});
   const rejected=bounded.submit({
