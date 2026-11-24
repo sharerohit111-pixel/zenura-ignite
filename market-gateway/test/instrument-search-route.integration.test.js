@@ -52,7 +52,8 @@ test("GET /instruments includes NSE and BSE equities when exchange is not specif
   const response = await fetch(baseUrl + "/instruments?kind=equities&q=tcs");
   const body = await response.json();
   assert.equal(response.status, 200);
-  assert.deepEqual(body.results.map(x => x.instrument_key), ["NSE_EQ|TCS", "BSE_EQ|TCS", "NSE_EQ|TCSIND", "NSE_EQ|XTCS"]);
+  // Exact symbol matches tie; the documented lexical symbol/key tie-breaker puts BSE_EQ|TCS first.
+  assert.deepEqual(body.results.map(x => x.instrument_key), ["BSE_EQ|TCS", "NSE_EQ|TCS", "NSE_EQ|TCSIND", "NSE_EQ|XTCS"]);
 });
 
 test("GET /instruments retains exchange and instrument-kind filters before ranking", async () => {
