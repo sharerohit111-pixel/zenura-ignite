@@ -1,3 +1,4 @@
+import {partitionPrivateWatchlistItems,isCurrentWatchlistRequest,mutatePrivateWatchlist} from "./demo-watchlist-state.mjs";
 const PRIVATE_LISTS=["My Stocks","Banking","NIFTY","F&O"];
 const MAX_ITEMS=50;
 const make=(tag,cls,text)=>{const n=document.createElement(tag);if(cls)n.className=cls;if(text!==undefined)n.textContent=String(text);return n;};
@@ -36,14 +37,14 @@ export function mountPrivateWatchlists(host,{model,fetchImpl=fetch,supabaseClien
    const order=make("td"),up=make("button","catalog-action","↑"),down=make("button","catalog-action","↓");
    up.type=down.type="button";up.disabled=index===0;down.disabled=index===items.length-1;
    up.setAttribute("aria-label","Move "+(canonical?.symbol||item.trading_symbol)+" up");down.setAttribute("aria-label","Move "+(canonical?.symbol||item.trading_symbol)+" down");
-   up.addEventListener("click",()=>mutate(next=>{[next[index-1],next[index]]=[next[index],next[index-1]];}));
-   down.addEventListener("click",()=>mutate(next=>{[next[index],next[index+1]]=[next[index+1],next[index]];}));
-   order.append(up,down);const removeCell=make("td"),remove=make("button","catalog-action","REMOVE");remove.type="button";remove.addEventListener("click",()=>mutate(next=>next.splice(index,1)));
+   up.addEventListener("click",()=>mutate({type:"move",index,delta:-1}));
+   down.addEventListener("click",()=>mutate({type:"move",index,delta:1}));
+   order.append(up,down);const removeCell=make("td"),remove=make("button","catalog-action","REMOVE");remove.type="button";remove.addEventListener("click",()=>mutate({type:"remove",instrumentKey:item.instrument_key}));
    removeCell.append(remove);tr.append(order,removeCell);body.append(tr);
   });
   table.append(head,body);const wrap=make("div","table-wrap");wrap.tabIndex=0;wrap.setAttribute("role","region");wrap.setAttribute("aria-label","Private saved watchlist");wrap.append(table);rowsHost.append(wrap);
  }
- function active(seq,uid,name,edit){return !disposed&&seq===requestSeq&&uid===userId&&name===currentName()&&(edit===undefined||edit===editSeq);}
+ function active(seq,uid,name,edit){return isCurrentWatchlistRequest({disposed,requestSeq,userId,listName:currentName(),editSeq},{requestSeq:seq,userId:uid,listName:name,editSeq:edit});}
  async function load(){
   const seq=++requestSeq,name=currentName(),snapshot=await currentUser();
   if(disposed||seq!==requestSeq)return;
@@ -54,9 +55,9 @@ export function mountPrivateWatchlists(host,{model,fetchImpl=fetch,supabaseClien
    const response=await fetchImpl(gateway+"/watchlist?name="+encodeURIComponent(name),{headers:{Authorization:"Bearer "+snapshot.token,Accept:"application/json"},cache:"no-store"});
    const data=await response.json();if(!response.ok)throw new Error(data.error||"Private watchlist could not be loaded.");
    const latest=await currentUser();if(!active(seq,snapshot.id,name)||latest?.id!==snapshot.id)return;
-   const allItems=Array.isArray(data.items)?data.items:[];
-   preservedItems=allItems.filter(x=>typeof x.instrument_key==="string"&&!currentCatalogItem(x.instrument_key));
-   items=allItems.filter(x=>typeof x.instrument_key==="string"&&currentCatalogItem(x.instrument_key));
+   const partition=partitionPrivateWatchlistItems(data.items,catalog);
+   preservedItems=partition.preserved;
+   items=partition.visible;
    status.textContent=(items.length+preservedItems.length)+" / 50 saved to your account · "+items.length+" canonical MOCK shown"+(preservedItems.length?" · "+preservedItems.length+" other saved instruments preserved":"")+" · private";render();
   }catch(error){if(active(seq,snapshot.id,name)){status.textContent=error.message||"Private watchlist restore failed.";render();}}
  }
@@ -69,17 +70,18 @@ export function mountPrivateWatchlists(host,{model,fetchImpl=fetch,supabaseClien
    status.textContent=data.count+" / 50 saved to your account · private";return true;
   }catch(error){if(active(seq,uid,name))status.textContent=error.message||"Private watchlist save failed.";return false;}
  }
- async function mutate(change){
+ async function mutate(action){
   if(!userId||!gateway)return;
-  const uid=userId,name=currentName(),before=items.slice(),next=items.slice();change(next);
-  if(next.length+preservedItems.length>MAX_ITEMS||new Set([...next.map(x=>x.instrument_key),...preservedItems.map(x=>x.instrument_key)]).size!==next.length+preservedItems.length)return;
+  const uid=userId,name=currentName(),before=items.slice();
+  const next=mutatePrivateWatchlist(items,action,MAX_ITEMS-preservedItems.length);
+  if(next.map(x=>x.instrument_key).join("|")===before.map(x=>x.instrument_key).join("|"))return;
   items=next;const edit=++editSeq,seq=++requestSeq;render();status.textContent="Saving private watchlist…";
   if(!await persist(next,seq,uid,name)&&active(seq,uid,name,edit)){items=before;render();}
  }
  add.addEventListener("click",()=>{
   const key=instrumentSelect.value,item=currentCatalogItem(key);
   if(!item||items.some(x=>x.instrument_key===key)||items.length+preservedItems.length>=MAX_ITEMS)return;
-  mutate(next=>next.push({instrument_key:key,trading_symbol:item.symbol,name:item.symbol,exchange:item.exchange,instrument_type:item.assetClass}));
+  mutate({type:"add",item:{instrument_key:key,trading_symbol:item.symbol,name:item.symbol,exchange:item.exchange,instrument_type:item.assetClass}});
  });
  listSelect.addEventListener("change",()=>{requestSeq++;editSeq++;items=[];render();load();});
  const handleAuth=(_event,newSession)=>{
