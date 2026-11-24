@@ -346,3 +346,31 @@ A follow-up review of PR #93's changed-file list and exact patches found additio
 - This reconciliation corrects the broader repository-level picture: the earlier Section 14 statement that no renewal RPC was found describes the files in this audit branch, not the separate proposed PR #93 patch.
 
 **Decision:** reconciliation/documentation only. No PR #93 files were copied, no migration was applied, and no worker behavior or deployment setting was changed.
+
+
+## 17. Cross-chat worker heartbeat reconciliation (2026-11-24)
+
+This section supersedes the earlier point-in-time statement that none of the five order/protective workers used the heartbeat helper. That statement remains accurate for the older audit-branch snapshot, but the following isolated PR heads have since added worker-level renewal:
+
+- **Futures LIMIT (PR #93):** the latest PR description reports disposable PostgreSQL / full gateway validation passing through workflow run #1211. The worker imports the shared `createLeaseHeartbeat`, renews its own `paper_futures_limit_orders` lease every 60 seconds against the existing 240-second TTL, and stops subsequent work on renewal loss/error. This is still a Draft PR and its migration is not proof of hosted-schema application.
+- **Options LIMIT (PR #119):** the current branch `fix/options-limit-worker-lease-heartbeat-2026-11-24` imports the same helper and renews `paper_option_limit_orders` every 60 seconds against the 240-second TTL. It checks lease loss around instrument/cursor/session/quote and execution boundaries and suppresses cursor persistence after loss. PR #119's own description reports workflow run #1270 was interrupted during the full Node regression step and was being rerun; do not treat its full Node/SQL suite as passed until an exact-head successful run is recorded.
+- **Shared helper / migration:** both PRs intentionally use the same `createLeaseHeartbeat` implementation and renewal RPC contract. Integration must retain one canonical helper and one forward-only renewal migration with the complete approved worker-key allowlist. Do not apply both overlapping migration copies independently.
+- **Equity Delivery LIMIT, Equity Intraday LIMIT and Equity Protective:** the inspected PR #99 audit-branch snapshots still do not import/use the helper. The shared renewal RPC allowlist alone does not renew these workers. Their heartbeat integration, lease-loss handling and regressions remain outstanding.
+
+### Remaining cross-worker safety gaps
+
+1. A heartbeat is lease renewal, not a complete fencing guarantee. A worker may lose ownership after its last local check and before an execution RPC commits. Each side-effecting RPC must enforce order-state/idempotency invariants, and stale-owner execution must be explicitly tested. Any lease-token execution-fencing change is a shared database contract and requires Chat 7 approval.
+2. Renewal currently compares caller-supplied `p_now_ms` against stored expiry. Chat 7 must review whether database time should be authoritative and document the clock-skew bound before canonical migration approval.
+3. The Futures and Options PRs must be reconciled with the same current migration baseline, registered lease-key allowlist and shared helper before either is integrated. Confirm no duplicate function definitions, conflicting migration versions or grant widening.
+4. All five workers need explicit fault-injection coverage for renewal RPC error, ownership loss during provider wait, ownership loss during parallel user batches, cursor write returning zero affected rows, process crash and expiry takeover. Delivery/Intraday/Protective additionally need worker heartbeat integration or a tested, documented batch-duration bound below the lease TTL.
+5. Do not enable any worker or change production deployment settings as part of this work.
+
+### Updated status
+
+- Futures heartbeat implementation: present on PR #93 branch; PR description records successful run #1211.
+- Options heartbeat implementation: present on PR #119 branch; exact-head full regression status remains unconfirmed by its PR description.
+- Equity Delivery / Intraday / Protective heartbeat integration: outstanding.
+- Canonical shared migration integration and hosted migration verification: outstanding with Chat 7.
+- Stale-owner execution fencing and full five-worker crash-recovery confidence: outstanding.
+
+**Decision:** coordination/audit update only. No shared SQL, migration, worker runtime, feature flag, deployment, secret or production state was changed.
