@@ -160,9 +160,13 @@ DECLARE v_reason text;
 DECLARE v_action text;
 BEGIN
   IF TG_OP='INSERT' THEN
-    v_actor:=NEW.granted_by;v_target:=NEW.user_id;v_reason:=NEW.reason;v_action:='admin_grant';
+    v_actor:=nullif(current_setting('s_trade.actor_user_id',true),'')::uuid;
+    IF v_actor IS NULL THEN v_actor:=NEW.granted_by; END IF;
+    v_target:=NEW.user_id;v_reason:=NEW.reason;v_action:='admin_grant';
   ELSE
-    v_actor:=OLD.granted_by;v_target:=OLD.user_id;v_reason:=OLD.reason;v_action:='admin_revoke';
+    v_actor:=nullif(current_setting('s_trade.actor_user_id',true),'')::uuid;
+    IF v_actor IS NULL THEN v_actor:=OLD.granted_by; END IF;
+    v_target:=OLD.user_id;v_reason:=OLD.reason;v_action:='admin_revoke';
   END IF;
   INSERT INTO public.s_trade_admin_audit_log(
     actor_user_id,action,target_type,target_id,reason,outcome,metadata
