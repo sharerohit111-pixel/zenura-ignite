@@ -76,7 +76,7 @@ test("LIMIT BUY supports multiple partial fills, weighted average and cancel rem
   assert.equal(cancelled.remainingReservedCashPaise,0);
   assert.equal(engine.snapshot().reservedCashPaise,0);
   assert.equal(engine.getTradeReceipts(order.orderId).length,2);
-  assert.throws(()=>engine.processQuote(INFY,152335));
+  assert.deepEqual(engine.processQuote(INFY,152335), []); // Cancelled remainder must stay terminal and produce no new fill.
 });
 
 test("LIMIT SELL reserves shares, partially fills and releases only the remainder on cancel", () => {
