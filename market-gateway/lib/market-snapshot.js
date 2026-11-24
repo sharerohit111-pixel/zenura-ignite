@@ -59,6 +59,7 @@ function normalizeMarketStatus(payload,exchange,{nowMs=Date.now(),maxAgeMs=30000
     fail("Provider returned an invalid exchange market status.");
   const ageMs=nowMs-data.last_updated;
   if(ageMs<0)fail("Provider market-status timestamp is in the future.");
+  if(ageMs>maxAgeMs)fail("Provider returned an invalid exchange market status.");
   const cas=data.cas_eligible_status;
   let casStatus=null,casLastUpdatedMs=null,casAgeMs=null;
   if(cas!==undefined){
