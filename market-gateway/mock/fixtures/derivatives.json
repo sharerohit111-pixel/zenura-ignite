@@ -1,0 +1,12 @@
+{
+  "schemaVersion": "1.0.0",
+  "mode": "MOCK",
+  "simulated": true,
+  "requestId": "mock-derivatives-0001",
+  "asOf": "2026-11-24T09:30:00+05:30",
+  "meta": { "source": "SYNTHETIC_FIXTURE", "stale": false, "cursor": null },
+  "data": {
+    "futures": { "instrumentKey": "MOCK|NSE|FUT|0001", "symbol": "MOCKALPHA-FUT", "expiry": "2026-12-31", "lotSize": 1, "tickSizePaise": 5, "order": { "orderId": "mock-future-001", "side": "BUY", "orderType": "LIMIT", "lots": 1, "status": "PENDING", "limitPricePaise": 125000 } },
+    "options": { "instrumentKey": "MOCK|NSE|OPT|0001", "underlying": "MOCKALPHA", "optionType": "CE", "strikePaise": 125000, "expiry": "2026-12-31", "lotSize": 1, "tickSizePaise": 5, "order": { "orderId": "mock-option-001", "side": "BUY", "orderType": "MARKET", "lots": 1, "status": "FILLED", "averagePricePaise": 2500 } }
+  }
+}
