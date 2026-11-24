@@ -145,3 +145,19 @@ Read the current PR #96 route implementation and its exact helper dependencies o
 7. **Recommended provenance split for owner review (not an approved schema).** Keep one immutable snapshot/batch header per order with provider/source identity, instrument key, snapshot timestamp, canonical full-book hash, and request fingerprint. Keep one child fill row per consumed depth level with deterministic sequence/index, exact price, consumed quantity, gross notional, and deterministic allocations. Decide whether to extend `paper_futures_fills` or introduce a MARKET-specific batch/header table only after the LIMIT/accounting owners approve compatibility, RLS, retention and reconciliation semantics. Do not duplicate the full book payload into every fill unless audit/replay requirements justify it.
 
 **Implementation consequence:** this is not just a change to the sweep helper. The next executable slice requires (a) an additive full-depth provider parser contract with top-of-book compatibility for existing LIMIT consumers, (b) a MARKET-specific immutable batch receipt/fill contract, and (c) a new service-only atomic SQL transaction with approved margin/charge/rounding rules. Until those approvals exist, keep the current parser, route, MARKET RPC, LIMIT RPC, and schema unchanged.
+
+
+## 4C. Fill-ledger security gate (2026-11-24)
+
+A further read-only review of PR #87's exact ledger migration and SQL test found a release-blocking distinction: the table is described as append-only-by-contract, but append-only behavior is not enforced by the database today.
+
+Verified on PR #87 head `91ffb206693f4af3605d6734cc07b8029a5b0dbd`:
+- `paper_futures_fills` has a single-column `order_id` foreign key to `paper_futures_orders(order_id)` and a separate `user_id` foreign key to `auth.users(id)`; there is no composite FK proving that the fill's `user_id` matches the owner of its referenced order.
+- RLS is enabled and direct `anon` / `authenticated` privileges are revoked, but the migration grants `service_role` SELECT, INSERT, UPDATE and DELETE on the ledger.
+- There is no DB trigger rejecting UPDATE/DELETE and no separate append-only enforcement mechanism in this migration.
+- The foundation SQL test verifies table existence, unique execution identity, lifecycle constraints and absence of client-role grants. It does not attempt UPDATE/DELETE as service_role, test owner/order mismatch, or assert append-only behavior.
+- PR #89's fill RPC writes through SECURITY DEFINER, but the existence of that RPC does not itself remove the service_role table-level UPDATE/DELETE grants.
+
+**Hard gate for multi-level MARKET:** do not describe the existing table as database-immutable and do not use it as an immutable audit ledger until a coordinated forward-only hardening change establishes (a) database-enforced append-only behavior, (b) order-owner referential integrity, (c) narrowly scoped service-role privileges, and (d) disposable PostgreSQL tests proving UPDATE/DELETE and cross-owner rows are rejected. Any correction must use linked compensating/reversal events rather than mutating historical fills. Coordinate this with PR #87/#89 and the canonical migration plan PR #116; do not make a competing ledger migration in this design-only PR.
+
+This finding strengthens the earlier schema verdict: an atomic MARKET batch RPC is not ready to persist child fills until both the batch identity/provenance contract and the underlying ledger's database-enforced integrity/security contract are approved and tested.
