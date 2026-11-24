@@ -430,3 +430,20 @@ A fresh exact changed-file inventory corrects the earlier shorthand attribution:
 Their table privilege statements currently target the same five SELECT tables (`upstox_connections`, `paper_market_worker_state`, `paper_orders`, `paper_protective_orders`, `paper_equity_positions`) and the same two UPDATE tables (`paper_market_worker_state`, `paper_protective_orders`). They are not byte-identical migrations: they have different timestamps and comments. Do not automatically delete either migration. Inspect intervening REVOKE statements and branch ancestry to determine whether the later grant intentionally restores privileges removed by the Options chain. Canonicalization must preserve the final least-privilege state and avoid unnecessary duplicate grants. Exact gateway and worker callsites still need to be checked against these grants.
 
 This supersedes the earlier statement that both grant migrations were PR #99-owned. No grant was changed or applied.
+
+
+## 14. Futures worker table ACL cross-check — PR #99 worker source (2026-11-24)
+
+Exact worker implementation inspected from PR #99 branch `feature/indian-market-backend-infra-supabase-2026-11-23`:
+
+- `market-gateway/lib/paper-futures-limit-worker.js`, blob `fb0190e5b685919779bd0fe973c4a9fc51d3c16b`.
+- The worker directly reads `paper_market_worker_state`, `paper_futures_orders` and `paper_futures_fills`; it updates `paper_market_worker_state` cursor rows and calls lease / expiry / atomic fill RPCs.
+- PR #87 migration `20261123140000_futures_limit_ledger_foundation.sql` grants service_role on `paper_futures_fills` but does not grant privileges on `paper_futures_orders`.
+- PR #83 grant migration `20261123110000_market_gateway_service_role_runtime_grants.sql` and PR #91 grant migration `20261123230000_market_gateway_service_role_read_grants.sql` both omit `paper_futures_orders` from their five-table SELECT list.
+- PR #89 Futures LIMIT submit/release and fill migrations expose RPC EXECUTE grants but do not add a direct table SELECT grant for `paper_futures_orders`.
+
+**Release blocker:** the worker's direct `paper_futures_orders` SELECT has no matching explicit service_role table grant in the inspected migration sources. Before activation, either grant only SELECT on this table to service_role (if direct reads remain the intended architecture), or move the read behind a narrowly scoped server-side RPC. Add a disposable PostgreSQL assertion that the worker's actual query succeeds with the intended role and that other roles remain denied. Do not grant broad write privileges to compensate.
+
+The `paper_futures_fills` SELECT/INSERT/UPDATE/DELETE grant remains separately blocked by the append-only requirement in Section 12. `paper_market_worker_state` UPDATE is required for lease/cursor lifecycle and should remain narrowly scoped; the worker's cursor writes are filtered by the current lease token in its query.
+
+No SQL or production grants were changed. No worker was activated.
