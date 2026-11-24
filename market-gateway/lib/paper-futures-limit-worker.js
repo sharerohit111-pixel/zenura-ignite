@@ -220,7 +220,8 @@ function createPaperFuturesLimitWorker({
               summary.notEligible++;
               continue;
             }
-            if(!decision.eligible||decision.fillQuantity<1){
+            if(!decision.eligible||decision.fillQuantity<1
+               ||decision.fillQuantity%order.lot_size!==0){
               summary.notEligible++;
               continue;
             }
