@@ -6,7 +6,6 @@
 
 const OPEN_ORDER_STATUSES = new Set(["PENDING", "PARTIALLY_FILLED"]);
 const OPTION_TYPES = new Set(["CE", "PE"]);
-const MAX_SAFE = Number.MAX_SAFE_INTEGER;
 
 function fail(message) {
   throw Object.assign(new Error(message), { status: 422 });
@@ -36,6 +35,35 @@ function multiplySafe(a, b, label) {
 
 function isNseOption(row) {
   return row && row.exchange === "NSE" && row.segment === "NSE_FO" && OPTION_TYPES.has(row.instrument_type ?? row.instrumentType);
+}
+
+function normalizeLimitOrder(order) {
+  if (!order || typeof order.order_id !== "string" || !order.order_id
+      || typeof order.instrument_key !== "string" || !order.instrument_key
+      || !isNseOption(order) || !["BUY", "SELL"].includes(order.side)
+      || typeof order.status !== "string") {
+    fail("Options LIMIT order identity, contract, side, or status is invalid.");
+  }
+  const quantity = integer(order.quantity, "LIMIT order quantity", { min: 1 });
+  const filled = integer(order.filled_quantity ?? 0, "LIMIT filled quantity");
+  const remaining = integer(order.remaining_quantity ?? quantity - filled, "LIMIT remaining quantity");
+  const lotSize = integer(order.lot_size, "LIMIT lot size", { min: 1 });
+  if (quantity % lotSize !== 0 || filled > quantity || filled + remaining !== quantity) {
+    fail("Options LIMIT order quantity, fills, remaining quantity, or lot size do not reconcile.");
+  }
+  const reservedCash = integer(order.reserved_cash_paise ?? 0, "Order reserved premium");
+  const reservedClose = integer(order.reserved_close_quantity ?? 0, "Order reserved close quantity");
+  const active = OPEN_ORDER_STATUSES.has(order.status);
+  if (order.side === "BUY") {
+    if (reservedClose !== 0 || (active && reservedCash < 1) || (!active && reservedCash !== 0)) {
+      fail("Options LIMIT BUY reservation does not match its lifecycle state.");
+    }
+  } else if (reservedCash !== 0
+      || (active && reservedClose !== remaining)
+      || (!active && reservedClose !== 0)) {
+    fail("Options LIMIT SELL reservation does not match its remaining close quantity.");
+  }
+  return { quantity, filled, remaining, lotSize, reservedCash, reservedClose, active };
 }
 
 function normalizePosition(row) {
@@ -87,9 +115,19 @@ function buildOptionsAccountingSnapshot({
   if (accountReservedCashPaise + reservedMarginPaise > cashPaise) {
     fail("Account reservations exceed cash balance.");
   }
-  const availableCashPaise = cashPaise - accountReservedCashPaise - reservedMarginPaise;
+  const availableCashPaise = cashPaise - totalReservations;
 
   const normalizedPositions = positions.map(normalizePosition).filter(Boolean);
+  const positionKeys = new Set();
+  for (const position of normalizedPositions) {
+    if (typeof position.instrumentKey !== "string" || !position.instrumentKey
+        || positionKeys.has(position.instrumentKey)) {
+      fail("Options position snapshot contains a missing or duplicate instrument key.");
+    }
+    positionKeys.add(position.instrumentKey);
+  }
+  const totalReservations = addSafe(accountReservedCashPaise, reservedMarginPaise, "Account reservations");
+  if (totalReservations > cashPaise) fail("Account reservations exceed cash balance.");
   const quoteMap = new Map();
   for (const quote of quotes) {
     if (!quote || typeof quote.instrumentKey !== "string" || quoteMap.has(quote.instrumentKey)) {
@@ -124,19 +162,20 @@ function buildOptionsAccountingSnapshot({
   let reservedCloseQuantity = 0;
   const reservedCloseByInstrument = new Map();
   const activeLimitOrders = [];
+  const limitOrderById = new Map();
   for (const order of limitOrders) {
-    if (!isNseOption(order) || !OPEN_ORDER_STATUSES.has(order.status)) continue;
-    const reservedCash = integer(order.reserved_cash_paise ?? 0, "Order reserved premium");
-    const reservedClose = integer(order.reserved_close_quantity ?? 0, "Order reserved close quantity");
+    if (!isNseOption(order)) continue;
+    const normalized = normalizeLimitOrder(order);
+    if (limitOrderById.has(order.order_id)) fail("Options LIMIT order history contains a duplicate order ID.");
+    limitOrderById.set(order.order_id, order);
+    if (!normalized.active) continue;
     if (order.side === "BUY") {
-      if (reservedClose !== 0) fail("BUY order cannot reserve close quantity.");
-      blockedPremiumPaise = addSafe(blockedPremiumPaise, reservedCash, "Blocked premium");
-    } else if (order.side === "SELL") {
-      if (reservedCash !== 0) fail("SELL order cannot reserve premium.");
-      reservedCloseQuantity = addSafe(reservedCloseQuantity, reservedClose, "Reserved close quantity");
+      blockedPremiumPaise = addSafe(blockedPremiumPaise, normalized.reservedCash, "Blocked premium");
+    } else {
+      reservedCloseQuantity = addSafe(reservedCloseQuantity, normalized.reservedClose, "Reserved close quantity");
       reservedCloseByInstrument.set(order.instrument_key,
-        addSafe(reservedCloseByInstrument.get(order.instrument_key) ?? 0, reservedClose, "Per-contract close reservation"));
-    } else fail("Options order side is invalid.");
+        addSafe(reservedCloseByInstrument.get(order.instrument_key) ?? 0, normalized.reservedClose, "Per-contract close reservation"));
+    }
     activeLimitOrders.push(order);
   }
   for (const position of normalizedPositions) {
@@ -156,11 +195,24 @@ function buildOptionsAccountingSnapshot({
   let realizedPnlPaise = 0;
   let chargesPaidPaise = 0;
   const history = [];
+  const marketOrderIds = new Set();
   for (const order of marketOrders) {
     if (!isNseOption(order) || order.status !== "FILLED") continue;
-    realizedPnlPaise = addSafe(realizedPnlPaise, signedInteger(order.realized_pnl_paise ?? 0, "Market order realized P&L"), "Options realized P&L");
-    chargesPaidPaise = addSafe(chargesPaidPaise, integer(order.charges_paise ?? 0, "Market order charges"), "Options charges");
-    history.push({ source: "MARKET", id: order.order_id, side: order.side, quantity: order.quantity, grossPaise: order.gross_paise, chargesPaise: order.charges_paise ?? 0, realizedPnlPaise: order.realized_pnl_paise ?? 0, status: order.status, createdAt: order.created_at });
+    if (typeof order.order_id !== "string" || !order.order_id || marketOrderIds.has(order.order_id)
+        || !["BUY", "SELL"].includes(order.side)) {
+      fail("Options MARKET order history contains an invalid or duplicate order.");
+    }
+    marketOrderIds.add(order.order_id);
+    const quantity = integer(order.quantity, "MARKET order quantity", { min: 1 });
+    const gross = integer(order.gross_paise, "MARKET order gross", { min: 1 });
+    integer(order.charges_paise ?? 0, "MARKET order charges");
+    signedInteger(order.realized_pnl_paise ?? 0, "Market order realized P&L");
+    if (order.side === "BUY" && (order.realized_pnl_paise ?? 0) !== 0) {
+      fail("A long Options MARKET BUY cannot realize P&L.");
+    }
+    realizedPnlPaise = addSafe(realizedPnlPaise, order.realized_pnl_paise ?? 0, "Options realized P&L");
+    chargesPaidPaise = addSafe(chargesPaidPaise, order.charges_paise ?? 0, "Options charges");
+    history.push({ source: "MARKET", id: order.order_id, side: order.side, quantity, grossPaise: gross, chargesPaise: order.charges_paise ?? 0, realizedPnlPaise: order.realized_pnl_paise ?? 0, status: order.status, createdAt: order.created_at });
   }
   const fillsByOrder = new Map();
   const seenExecutions = new Set();
@@ -192,12 +244,19 @@ function buildOptionsAccountingSnapshot({
       if (integer(fill.fill_sequence, "LIMIT fill sequence", { min: 1 }) !== index + 1) {
         fail("Options fill sequence is not contiguous.");
       }
-      fillQuantity = addSafe(fillQuantity, integer(fill.fill_quantity, "LIMIT fill quantity", { min: 1 }), "LIMIT filled quantity");
-      fillGross = addSafe(fillGross, integer(fill.gross_paise, "LIMIT fill gross", { min: 1 }), "LIMIT fill gross");
+      const fillQty = integer(fill.fill_quantity, "LIMIT fill quantity", { min: 1 });
+      const fillPrice = integer(fill.execution_price_paise, "LIMIT execution price", { min: 1 });
+      const gross = integer(fill.gross_paise, "LIMIT fill gross", { min: 1 });
+      if (multiplySafe(fillPrice, fillQty, "LIMIT fill notional") !== gross) {
+        fail("Options LIMIT fill gross does not equal execution price multiplied by quantity.");
+      }
+      fillQuantity = addSafe(fillQuantity, fillQty, "LIMIT filled quantity");
+      fillGross = addSafe(fillGross, gross, "LIMIT fill gross");
       orderRealized = addSafe(orderRealized, signedInteger(fill.realized_pnl_paise ?? 0, "LIMIT fill realized P&L"), "LIMIT order realized P&L");
       orderCharges = addSafe(orderCharges, integer(fill.incremental_charges_paise ?? 0, "LIMIT fill charges"), "LIMIT order charges");
     }
-    if (fillQuantity !== integer(order.filled_quantity ?? 0, "LIMIT order filled quantity")
+    const orderState = normalizeLimitOrder(order);
+    if (fillQuantity !== orderState.filled || fillQuantity > orderState.quantity
         || fillGross !== integer(order.cumulative_gross_paise ?? 0, "LIMIT cumulative gross")
         || orderCharges !== integer(order.cumulative_charges_paise ?? 0, "LIMIT cumulative charges")) {
       fail("Options LIMIT order totals do not reconcile to its immutable fills.");
