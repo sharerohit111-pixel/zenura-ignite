@@ -346,7 +346,9 @@ function buildOptionsAccountingSnapshot({
     const expiryDate = new Intl.DateTimeFormat("en-CA", {
       timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit"
     }).format(new Date(settlementTimestamp));
-    if (intrinsic !== expectedIntrinsic || multiplySafe(intrinsic, quantity, "Expiry payout") !== gross
+    const expiryCutoff = new Date(`${settlement.expiry}T15:30:00+05:30`).getTime();
+    if (!Number.isSafeInteger(expiryCutoff) || settlementTimestamp < expiryCutoff
+        || intrinsic !== expectedIntrinsic || multiplySafe(intrinsic, quantity, "Expiry payout") !== gross
         || exerciseStt !== expectedExerciseStt || gross - exerciseStt !== net || net - basis !== realized
         || verifiedTimestamp < settlementTimestamp || verifiedTimestamp > now
         || expiryDate !== settlement.expiry
