@@ -17,6 +17,11 @@ function integer(value, label, { min = 0 } = {}) {
   return value;
 }
 
+function signedInteger(value, label) {
+  if (!Number.isSafeInteger(value)) fail(`${label} must be a safe integer.`);
+  return value;
+}
+
 function addSafe(a, b, label) {
   const result = a + b;
   if (!Number.isSafeInteger(result)) fail(`${label} exceeds safe integer limits.`);
@@ -77,7 +82,7 @@ function buildOptionsAccountingSnapshot({
   const cashPaise = integer(account.cash_paise, "Cash balance");
   const accountReservedCashPaise = integer(account.reserved_cash_paise ?? 0, "Account reserved cash");
   const reservedMarginPaise = integer(account.reserved_margin_paise ?? 0, "Reserved margin");
-  const realizedAccountPnlPaise = integer(account.realized_pnl_paise ?? 0, "Account realized P&L");
+  const realizedAccountPnlPaise = signedInteger(account.realized_pnl_paise ?? 0, "Account realized P&L");
   if (accountReservedCashPaise + reservedMarginPaise > cashPaise) {
     fail("Account reservations exceed cash balance.");
   }
@@ -152,7 +157,7 @@ function buildOptionsAccountingSnapshot({
   const history = [];
   for (const order of marketOrders) {
     if (!isNseOption(order) || order.status !== "FILLED") continue;
-    realizedPnlPaise = addSafe(realizedPnlPaise, integer(order.realized_pnl_paise ?? 0, "Market order realized P&L"), "Options realized P&L");
+    realizedPnlPaise = addSafe(realizedPnlPaise, signedInteger(order.realized_pnl_paise ?? 0, "Market order realized P&L"), "Options realized P&L");
     chargesPaidPaise = addSafe(chargesPaidPaise, integer(order.charges_paise ?? 0, "Market order charges"), "Options charges");
     history.push({ source: "MARKET", id: order.order_id, side: order.side, quantity: order.quantity, grossPaise: order.gross_paise, chargesPaise: order.charges_paise ?? 0, realizedPnlPaise: order.realized_pnl_paise ?? 0, status: order.status, createdAt: order.created_at });
   }
@@ -188,7 +193,7 @@ function buildOptionsAccountingSnapshot({
       }
       fillQuantity = addSafe(fillQuantity, integer(fill.fill_quantity, "LIMIT fill quantity", { min: 1 }), "LIMIT filled quantity");
       fillGross = addSafe(fillGross, integer(fill.gross_paise, "LIMIT fill gross", { min: 1 }), "LIMIT fill gross");
-      orderRealized = addSafe(orderRealized, integer(fill.realized_pnl_paise ?? 0, "LIMIT fill realized P&L"), "LIMIT order realized P&L");
+      orderRealized = addSafe(orderRealized, signedInteger(fill.realized_pnl_paise ?? 0, "LIMIT fill realized P&L"), "LIMIT order realized P&L");
       orderCharges = addSafe(orderCharges, integer(fill.incremental_charges_paise ?? 0, "LIMIT fill charges"), "LIMIT order charges");
     }
     if (fillQuantity !== integer(order.filled_quantity ?? 0, "LIMIT order filled quantity")
