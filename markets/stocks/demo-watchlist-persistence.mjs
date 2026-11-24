@@ -1,10 +1,8 @@
-import {supabase} from "./supabase-client.js";
-
 const PRIVATE_LISTS=["My Stocks","Banking","NIFTY","F&O"];
 const MAX_ITEMS=50;
 const make=(tag,cls,text)=>{const n=document.createElement(tag);if(cls)n.className=cls;if(text!==undefined)n.textContent=String(text);return n;};
 
-export function mountPrivateWatchlists(host,{model,fetchImpl=fetch,supabaseClient=supabase,gatewayUrl}={}){
+export function mountPrivateWatchlists(host,{model,fetchImpl=fetch,supabaseClient=window.ZENURA_SUPABASE,gatewayUrl}={}){
  const catalog=model?.market?.instruments;
  if(!Array.isArray(catalog))throw new Error("CANONICAL_MOCK_CATALOG_REQUIRED");
  const gateway=(gatewayUrl??document.querySelector('meta[name="market-gateway-url"]')?.content??"").trim().replace(/\/+$/,"");
@@ -20,7 +18,7 @@ export function mountPrivateWatchlists(host,{model,fetchImpl=fetch,supabaseClien
  controls.append(listField,instrumentField,add);panel.append(title,disclosure,controls,status,rowsHost);host.append(panel);
  let userId=null,items=[],preservedItems=[],requestSeq=0,editSeq=0,authSubscription=null,disposed=false;
  const currentName=()=>listSelect.value;
- const session=async()=>{const {data,error}=await supabaseClient.auth.getSession();if(error)throw error;return data.session||null;};
+ const getClient=()=>supabaseClient||window.ZENURA_SUPABASE||null;\n const session=async()=>{const client=getClient();if(!client?.auth?.getSession)throw new Error("Account sign-in integration is not loaded on this Demo route yet.");const {data,error}=await client.auth.getSession();if(error)throw error;return data.session||null;};
  const currentUser=async()=>{const s=await session();return s?.user?.id?{id:s.user.id,token:s.access_token}:null;};
  const currentCatalogItem=key=>catalog.find(x=>x.instrumentKey===key);
  function render(){
