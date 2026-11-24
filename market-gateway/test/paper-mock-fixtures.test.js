@@ -2,7 +2,7 @@
 
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { createMockFixtureStore } = require("../mock/paper-mock-fixtures");
+const { createMockFixtureStore } = require("../lib/paper-mock-fixtures");
 
 test("all published mock fixtures use the shared simulated envelope", () => {
   const store = createMockFixtureStore({ env: { NODE_ENV: "test" } });
@@ -41,4 +41,14 @@ test("returned fixtures are detached copies", () => {
   const first = store.read("market");
   first.data.quotes[0].symbol = "MUTATED";
   assert.equal(store.read("market").data.quotes[0].symbol, "MOCKALPHA");
+});
+
+test("derivatives fixture contains deterministic MOCK-only Futures and CE/PE contracts", () => {
+  const fixture = createMockFixtureStore({ env: { NODE_ENV: "test" } }).read("derivatives");
+  assert.ok(fixture.data.contracts.length >= 8);
+  assert.equal(fixture.data.quotes.length, fixture.data.contracts.length);
+  assert.ok(fixture.data.contracts.every(item => item.instrumentKey.startsWith("MOCK|") && item.symbol.startsWith("MOCK")));
+  assert.ok(fixture.data.contracts.some(item => item.assetClass === "FUTURE"));
+  assert.ok(fixture.data.contracts.some(item => item.assetClass === "OPTION" && item.optionType === "CE"));
+  assert.ok(fixture.data.contracts.some(item => item.assetClass === "OPTION" && item.optionType === "PE"));
 });
