@@ -44,4 +44,6 @@ test("shared catalog accepts ISO dates and rejects malformed expiry/as-of filter
  assert.equal(filterAndRankInstrumentCatalog(catalog,{kind:"futures",asOf:"2026-12-01"}).length,1);
  assert.throws(()=>filterAndRankInstrumentCatalog(catalog,{expiry:"2026/12/31"}),/Expiry must use YYYY-MM-DD/);
  assert.throws(()=>filterAndRankInstrumentCatalog(catalog,{asOf:"26-12-01"}),/As-of date must use YYYY-MM-DD/);
+ assert.throws(()=>filterAndRankInstrumentCatalog(catalog,{expiry:"2026-02-31"}),/Expiry must use YYYY-MM-DD/);
+ assert.throws(()=>filterAndRankInstrumentCatalog(catalog,{asOf:"2026-02-31"}),/As-of date must use YYYY-MM-DD/);
 });
