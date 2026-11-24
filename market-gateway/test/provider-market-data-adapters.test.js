@@ -57,4 +57,5 @@ test("fails closed when a provider cannot resolve a native instrument for candle
  await assert.rejects(up.openStream(args),/instrument mapping is missing/);
  const angel=createAngelOneMarketDataAdapter({client:clientFor("angelone",angelQuote),resolveInstrument:async()=>({symbolToken:"3045",exchangeSegment:"NSE"}),now:()=>NOW});
  await assert.rejects(angel.getCandles(args),/instrument mapping is missing/);
+ await assert.rejects(angel.openStream(args),/instrument mapping is missing/);
 });
