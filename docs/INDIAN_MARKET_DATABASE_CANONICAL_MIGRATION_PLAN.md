@@ -310,3 +310,24 @@ Source ref: `integration/supabase-native-auth-professional-launch-2026-11-22` (P
 4. Review exact grants against every worker/gateway callsite; protect financial ledger tables from UPDATE/DELETE and add database-enforced append-only controls where absent.
 5. Build the full chain in a disposable PostgreSQL database and run every schema, RLS, accounting, race, idempotency and worker-fencing test.
 6. No staging/production apply until a staging target is explicitly provisioned, rehearsed, and separately approved.
+
+
+## 12. Futures fill-ledger hardening blocker — exact SQL review (2026-11-24)
+
+Reviewed the fetched SQL bodies for PR #87's `20261123140000_futures_limit_ledger_foundation.sql` (blob `f9f0979e960ad0966ff2b00f3b05634c8428d1c5`), PR #89's atomic submit/release and fill migrations.
+
+Confirmed blockers in the PR #87 foundation:
+- `paper_futures_fills` is described as append-only-by-contract but grants `service_role` SELECT, INSERT, UPDATE and DELETE.
+- No database trigger rejects UPDATE/DELETE on `paper_futures_fills`.
+- The order FK is only `order_id -> paper_futures_orders(order_id)`; it does not prove that the fill's `user_id` owns that order. Add a parent unique key and composite `(order_id,user_id)` FK after checking existing key/data compatibility.
+- The fill's `user_id` FK uses `ON DELETE CASCADE`, which can erase financial history with an account deletion. Require a non-cascading retention/anonymization policy.
+- The atomic fill RPC inserts the fill in the same transaction as accounting changes, which is good, but transaction atomicity does not make the resulting table immutable or enforce tenant/order ownership by itself.
+
+Required forward-only remedy (do not rewrite the draft or any applied migration):
+1. Add a unique parent key on `paper_futures_orders(order_id,user_id)` if not already present and a composite FK from fills.
+2. Add a DB-enforced BEFORE UPDATE OR DELETE trigger that raises, with a narrowly scoped trusted migration owner bypass only if an explicit operational correction path is justified. Prefer no bypass and compensating events.
+3. Revoke service_role UPDATE/DELETE and grant only the operations actually required by verified worker/RPC callsites (expected SELECT/INSERT; verify before finalizing).
+4. Replace cascading user deletion with retention-safe ownership/anonymization semantics; never cascade-delete fills.
+5. Add disposable PostgreSQL tests for direct UPDATE/DELETE denial, cross-owner fill insertion denial, account deletion restriction, atomic fill insert success and replay idempotency.
+
+Coordination comments were posted on PR #87 (comment `7127483113`) and PR #89 (comment `7127483883`). This is a release blocker; no SQL migration was authored/applied and no staging/production database was touched.
