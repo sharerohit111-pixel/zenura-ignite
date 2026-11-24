@@ -14,7 +14,7 @@ This is not evidence that all screens are running on one Dummy JSON source. No s
 ## PR / branch integration findings
 
 - PR #137 is Draft and targets `feature/s-trade-mock-contract-architecture-2026-11-24`. It adds architecture and fixtures, not runtime screen integration.
-- The latest observed workflow associated with the PR #137 head was run **#1537** (Paper Trading Supabase SQL smoke test), still in progress at audit time. Its PostgreSQL job had reached protective-order steps; steps 64–67 were pending. This is not a completed green run.
+- PR #137's exact head `c2c337383ba9475858c9e69a8cf651c6b673cb9e` subsequently passed the dedicated Mock Contract Tests and the full Paper Trading Supabase SQL smoke workflow (71/71 steps successful, including migration/RLS, tenant isolation and protective-order concurrency checks). This validates that PR #137's base branch checks passed; it does not validate independent PR heads or browser/mobile screen integration.
 - The dedicated `s-trade-mock-contracts.yml` workflow runs JSON parsing, the focused fixture test and a grep guard against importing the fixture loader into production gateway entrypoints. It does not run the full `npm test`, `npm run check`, browser E2E, mobile viewport/device tests or the full security/RLS suite.
 - `market-gateway/package.json` defines `npm test` as all Node tests and `npm run check` as a selected syntax-check list. Those commands were not executed by this remote audit.
 - PRs #92, #94, #100, #102, #111, #121, #124, #126, #131, #134, #135, #136 and #137 are open Draft PRs in the inspected inventory. PR #123 is closed/unmerged and superseded by refreshed PR #126. These are separate heads/bases, not one tested integrated branch. Their code must not be presumed present together.
@@ -91,7 +91,7 @@ No live API purchase or integration, broker credentials, real orders, production
 - Adapter requires explicit `{ enabled: true }`, rejects production mode, accepts only `MOCK|` instrument keys and `MOCK` provider quotes, preserves integer paise, and carries `ledgerReconciled=false` without upgrading it.
 - It does not fetch, authenticate, persist, submit orders, import a provider, or touch the ledger. It is not yet wired into dashboard or chart screens.
 - Exact-head PR #145 dedicated contract/adapter workflow passed at commit `583a86b3ff0eaac4cd5ea42e620cb710680594fb`: JSON parsing, fixture regression tests, adapter tests and production gateway import guard all succeeded.
-- PR #145's full PostgreSQL smoke workflow is still running; no full-stack or database pass is claimed.
+- PR #145's full PostgreSQL smoke workflow is not yet complete; the latest observed run was still in progress. Do not claim a full-stack/database pass for PR #145 until that exact head finishes.
 
 ### Newly confirmed consumer mismatches
 - PR #138's dashboard fixture uses real-looking NSE symbols (e.g. RELIANCE/HDFCBANK) with illustrative price values. Although the fixture labels itself DEMO/DUMMY_JSON, it does not meet the canonical non-tradable MOCK-symbol rule. Do not connect these prices to live quote, valuation, order execution or the canonical adapter. Before integration, replace them with synthetic MOCK instrument identities and revalidate the dashboard calculations.
