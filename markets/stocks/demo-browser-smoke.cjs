@@ -42,9 +42,8 @@ const axePath=require.resolve("axe-core/axe.min.js");
   const page=await pwa.newPage();
   await page.goto("http://127.0.0.1:4173/markets/",{waitUntil:"networkidle"});
   await page.waitForFunction(()=>navigator.serviceWorker.getRegistration().then(r=>!!r?.active),null,{timeout:15000});
-  await page.reload({waitUntil:"networkidle"});
-  await page.waitForFunction(()=>!!navigator.serviceWorker.controller,null,{timeout:10000});
   await page.goto("http://127.0.0.1:4173/markets/stocks/demo.html",{waitUntil:"networkidle"});
+  await page.waitForFunction(()=>!!navigator.serviceWorker.controller,null,{timeout:15000});
   await page.waitForFunction(()=>document.querySelector("#demo-status")?.textContent.includes("4 canonical fixtures validated"),null,{timeout:10000});
   const cached=await page.evaluate(async()=>{
    const cache=await caches.open("zenura-markets-shell-v4");
