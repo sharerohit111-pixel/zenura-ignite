@@ -43,6 +43,15 @@ const axePath=require.resolve("axe-core/axe.min.js");
   const page=await pwa.newPage();
   await page.goto("http://127.0.0.1:4173/markets/",{waitUntil:"networkidle"});
   await page.waitForFunction(()=>navigator.serviceWorker.getRegistration().then(r=>!!r?.active),null,{timeout:15000});
+  await page.evaluate(async()=>{
+   const registration=await navigator.serviceWorker.ready;
+   if(!registration.active)throw new Error("PWA_SERVICE_WORKER_NOT_ACTIVE");
+  });
+  // The first navigation installs the worker but is not guaranteed to be controlled
+  // until the activation/claim lifecycle completes. Reload only after ready so the
+  // next navigation is deterministically within the active worker's scope.
+  await page.reload({waitUntil:"networkidle"});
+  await page.waitForFunction(()=>!!navigator.serviceWorker.controller,null,{timeout:15000});
   const controlledPage=await pwa.newPage();
   await controlledPage.goto("http://127.0.0.1:4173/markets/stocks/demo.html",{waitUntil:"networkidle"});
   await controlledPage.waitForFunction(()=>!!navigator.serviceWorker.controller,null,{timeout:15000});
