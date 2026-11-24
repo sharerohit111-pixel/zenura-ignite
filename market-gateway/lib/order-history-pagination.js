@@ -1,7 +1,7 @@
 "use strict";
 
 const ORDER_ID_PATTERN=/^[a-f0-9]{64}$/;
-const TIMESTAMP_PATTERN=/^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|[+-]\\d{2}:\\d{2})$/;
+const TIMESTAMP_PATTERN=/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/;
 const MAX_CURSOR_LENGTH=512;
 
 function isValidTimestamp(value){
