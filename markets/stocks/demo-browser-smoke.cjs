@@ -12,7 +12,7 @@ const axePath=require.resolve("axe-core/axe.min.js");
    const pageErrors=[];
    page.on("pageerror",error=>pageErrors.push(error.message));
    await page.goto("http://127.0.0.1:4173/markets/stocks/demo.html",{waitUntil:"networkidle"});
-   await page.waitForFunction(()=>document.querySelector("#demo-status")?.textContent.includes("4 canonical fixtures validated"),{timeout:10000});
+   await page.waitForFunction(()=>document.querySelector("#demo-status")?.textContent.includes("4 canonical fixtures validated"),null,{timeout:10000});
    assert.equal(await page.locator("#screen-nav button[data-screen]").count(),15,viewport.name+" screen count");
    for(const name of ["home","market","watchlists","charts","equity","futures","options","orders","trades","portfolio","positions","holdings","account","profile","settings"]){
     await page.locator('#screen-nav button[data-screen="'+name+'"]').click();
@@ -45,7 +45,7 @@ const axePath=require.resolve("axe-core/axe.min.js");
   await page.reload({waitUntil:"networkidle"});
   await page.waitForFunction(()=>!!navigator.serviceWorker.controller,null,{timeout:10000});
   await page.goto("http://127.0.0.1:4173/markets/stocks/demo.html",{waitUntil:"networkidle"});
-  await page.waitForFunction(()=>document.querySelector("#demo-status")?.textContent.includes("4 canonical fixtures validated"),{timeout:10000});
+  await page.waitForFunction(()=>document.querySelector("#demo-status")?.textContent.includes("4 canonical fixtures validated"),null,{timeout:10000});
   const cached=await page.evaluate(async()=>{
    const cache=await caches.open("zenura-markets-shell-v4");
    const paths=["market","account","equity","derivatives"].map(name=>new URL("../../market-gateway/mock/fixtures/"+name+".json",location.href).href);
@@ -54,7 +54,7 @@ const axePath=require.resolve("axe-core/axe.min.js");
   assert.ok(cached.every(x=>x.found),"all four canonical fixture JSON files must be precached");
   await pwa.setOffline(true);
   await page.reload({waitUntil:"networkidle"});
-  await page.waitForFunction(()=>document.querySelector("#demo-status")?.textContent.includes("4 canonical fixtures validated"),{timeout:10000});
+  await page.waitForFunction(()=>document.querySelector("#demo-status")?.textContent.includes("4 canonical fixtures validated"),null,{timeout:10000});
   console.log(JSON.stringify({pwa:"offline demo fixture load PASS",cachedFixtures:cached.length}));
   await pwa.close();
  }finally{
