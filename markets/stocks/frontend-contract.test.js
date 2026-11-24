@@ -31,6 +31,11 @@ test("Equity, Futures and Options screens call authenticated backend routes", ()
   for (const route of ["/paper/derivative/limit-orders", "/paper/derivative/limit-orders/"]) assert.ok(optionsLimits.includes(route));
 });
 
+test("pending LIMIT modify limitation is disclosed without unsafe cancel-and-replace", () => {
+  assert.equal((html.match(/Atomic modification is not available yet/g) || []).length, 3);
+  assert.match(html, /cancel-and-replace is not a safe substitute/);
+});
+
 test("Options MARKET lot entry is an in-page control, not a browser prompt", () => {
   assert.match(html, /id="option-order-lots"/);
   assert.doesNotMatch(stocks, /window\.prompt\s*\(/);
