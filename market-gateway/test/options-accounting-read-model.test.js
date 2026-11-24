@@ -94,3 +94,14 @@ test("rejects impossible LIMIT lifecycle states and reservation-release flags",(
   assert.throws(()=>buildOptionsAccountingSnapshot({...base,limitOrders:mutate("sell1",{reservation_released:true})}),/release flag/);
   assert.throws(()=>buildOptionsAccountingSnapshot({...base,limitOrders:mutate("sell1",{status:"PARTIALLY_FILLED",filled_quantity:0})}),/status, or lot size/);
 });
+
+
+test("includes contract identity in the reconciled MARKET and LIMIT history read model",()=>{
+ const snapshot=buildOptionsAccountingSnapshot(base);
+ const market=snapshot.history.find(row=>row.source==="MARKET");
+ const limit=snapshot.history.find(row=>row.source==="LIMIT");
+ assert.equal(market.tradingSymbol,base.marketOrders[0].trading_symbol);
+ assert.equal(market.instrumentKey,base.marketOrders[0].instrument_key);
+ assert.equal(limit.tradingSymbol,base.limitOrders[0].trading_symbol);
+ assert.equal(limit.instrumentKey,base.limitOrders[0].instrument_key);
+});
