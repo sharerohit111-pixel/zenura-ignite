@@ -7,6 +7,7 @@ on:
       - feature/s-trade-mock-contract-architecture-2026-11-24
       - feature/s-trade-shared-demo-consumer-adapter-2026-11-24
       - feature/s-trade-dashboard-mock-normalization-2026-11-24
+      - feature/s-trade-charts-mock-contract-alignment-2026-11-24
     paths:
       - "market-gateway/mock/**"
       - "market-gateway/lib/paper-mock-fixtures.js"
@@ -14,12 +15,14 @@ on:
       - "markets/shared/paper-demo-adapter.mjs"
       - "market-gateway/test/paper-demo-adapter.test.mjs"
       - "markets/dashboard/**"
+      - "markets/stocks/demo-*"
       - ".github/workflows/s-trade-mock-contracts.yml"
   push:
     branches:
       - feature/s-trade-mock-contract-architecture-2026-11-24
       - feature/s-trade-shared-demo-consumer-adapter-2026-11-24
       - feature/s-trade-dashboard-mock-normalization-2026-11-24
+      - feature/s-trade-charts-mock-contract-alignment-2026-11-24
     paths:
       - "market-gateway/mock/**"
       - "market-gateway/lib/paper-mock-fixtures.js"
@@ -27,6 +30,7 @@ on:
       - "markets/shared/paper-demo-adapter.mjs"
       - "market-gateway/test/paper-demo-adapter.test.mjs"
       - "markets/dashboard/**"
+      - "markets/stocks/demo-*"
       - ".github/workflows/s-trade-mock-contracts.yml"
 
 permissions:
@@ -49,6 +53,7 @@ jobs:
             'market-gateway/mock/contracts/paper-trading-envelope.schema.json',
             'market-gateway/mock/contracts/paper-trading-domain.schema.json',
             'markets/dashboard/mock-data.json',
+            'markets/stocks/demo-market-data.json',
             ...fs.readdirSync('market-gateway/mock/fixtures').filter(x => x.endsWith('.json'))
               .map(x => 'market-gateway/mock/fixtures/' + x)
           ];
@@ -63,6 +68,10 @@ jobs:
         run: node --check markets/dashboard/dashboard-model.js && node --check markets/dashboard/dashboard.js
       - name: Run dashboard synthetic fixture validation
         run: node --test markets/dashboard/dashboard-model.test.js
+      - name: Check chart demo module syntax
+        run: node --check markets/stocks/demo-chart-data.js && node --check markets/stocks/demo-chart-workspace.js
+      - name: Run deterministic chart fixture tests
+        run: node --test market-gateway/test/demo-chart-data.test.js
       - name: Ensure fixture loader is not wired into production gateway
         run: |
           if grep -R "paper-mock-fixtures" market-gateway/supabase-server.js market-gateway/server.js; then
