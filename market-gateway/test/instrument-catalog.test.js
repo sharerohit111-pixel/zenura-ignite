@@ -38,3 +38,10 @@ test("live-style and Dummy JSON catalogs share filter behavior without merging d
  assert.deepEqual(dummy.map(x=>x.instrument_key),generic.map(x=>x.instrument_key));
  assert.ok(dummy.every(x=>x.data_class==="SYNTHETIC_FIXTURE"));
 });
+
+test("shared catalog accepts ISO dates and rejects malformed expiry/as-of filters",()=>{
+ assert.equal(filterAndRankInstrumentCatalog(catalog,{kind:"futures",expiry:"2026-12-31"}).length,1);
+ assert.equal(filterAndRankInstrumentCatalog(catalog,{kind:"futures",asOf:"2026-12-01"}).length,1);
+ assert.throws(()=>filterAndRankInstrumentCatalog(catalog,{expiry:"2026/12/31"}),/Expiry must use YYYY-MM-DD/);
+ assert.throws(()=>filterAndRankInstrumentCatalog(catalog,{asOf:"26-12-01"}),/As-of date must use YYYY-MM-DD/);
+});
