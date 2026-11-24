@@ -15,6 +15,7 @@ test("execution fixture is synthetic-only, fixed and fee model is explicitly abs
   assert.equal(validateEquityDemoFixture(fixture).meta.exchange,"NONE");
   assert.equal(fixture.mode,"MOCK");assert.equal(fixture.simulated,true);
   assert.equal(fixture.meta.source,"SYNTHETIC_FIXTURE");assert.equal(fixture.meta.fees,"NOT_MODELED");
+  assert.equal(fixture.data.instrument.markPricePaise,125000);
 });
 test("production mode fails closed and invalid/crossed fixtures are rejected",()=>{
   assert.throws(()=>createEquityDemoExecutionEngine({fixture,account:account(),env:{NODE_ENV:"production"}}),/EQUITY_DEMO_EXECUTION_DISABLED_IN_PRODUCTION/);
@@ -36,6 +37,7 @@ test("market BUY sweeps deterministic ask levels and returns one immutable recei
   assert.equal(snap.account.blockedFundsPaise,0);assert.equal(snap.account.availableFundsPaise,snap.account.cashBalancePaise);
   assert.equal(snap.account.positions[fixture.data.instrument.instrumentKey].quantity,7);
   assert.equal(snap.account.positions[fixture.data.instrument.instrumentKey].costBasisPaise,875700);
+  assert.deepEqual(snap.valuation,{instrumentKey:fixture.data.instrument.instrumentKey,markPricePaise:125000,quantity:7,costBasisPaise:875700,marketValuePaise:875000,unrealizedPnlPaise:-700,totalPnlPaise:-700});
 });
 test("limit BUY fills only marketable levels and cancel releases only the unfilled reservation",()=>{
   const e=engine(),order=e.submitOrder(buy({idempotencyKey:"demo-limit-001",orderType:"LIMIT",quantity:7,limitPricePaise:125100}));
