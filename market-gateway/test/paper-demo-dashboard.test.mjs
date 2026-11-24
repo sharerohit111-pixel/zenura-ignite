@@ -36,6 +36,11 @@ test("Demo screens disclose synthetic data and isolate local Equity execution fr
  assert.match(js,/mountDemoChart\(chart\)/);
  assert.match(js,/renderInstrumentCatalog\(catalog\)/);
  assert.match(js,/renderOptionsCatalog\(catalog\)/);
+ assert.match(js,/renderMarketDashboard\(content\)/);
+ assert.match(js,/renderDemoWatchlists\(content\)/);
+ assert.match(js,/Move .* up/);
+ assert.match(js,/current-page memory only/);
+ assert.match(js,/list\.length>=50/);
  assert.match(js,/searchPaperDemoInstruments/);
  assert.match(js,/getPaperDemoExpiries/);
  assert.match(js,/getPaperDemoOptionChain/);
