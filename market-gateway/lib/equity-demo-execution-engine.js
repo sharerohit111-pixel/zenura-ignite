@@ -21,6 +21,7 @@ function validateFixture(fixture){
   if(!instrument||typeof instrument.instrumentKey!=="string"||!instrument.instrumentKey.startsWith("MOCK|SIM|EQ|")||
     typeof instrument.symbol!=="string"||!instrument.symbol.startsWith("MOCK")||
     !Number.isSafeInteger(instrument.tickSizePaise)||instrument.tickSizePaise<1||
+    !Number.isSafeInteger(instrument.markPricePaise)||instrument.markPricePaise<1||instrument.markPricePaise%instrument.tickSizePaise!==0||
     !Array.isArray(book?.asks)||!book.asks.length||!Array.isArray(book?.bids)||!book.bids.length)fail("INVALID_EQUITY_DEMO_FIXTURE",500);
   for(const [side,levels] of Object.entries(book)){
     let previous=side==="asks"?0:Number.MAX_SAFE_INTEGER;
@@ -32,6 +33,7 @@ function validateFixture(fixture){
     }
   }
   if(book.bids[0].pricePaise>=book.asks[0].pricePaise)fail("CROSSED_EQUITY_DEMO_ORDER_BOOK",500);
+  if(instrument.markPricePaise<book.bids[0].pricePaise||instrument.markPricePaise>book.asks[0].pricePaise)fail("INVALID_EQUITY_DEMO_MARK_PRICE",500);
   return fixture;
 }
 function normalizeAccount(account){
@@ -171,7 +173,15 @@ function createEquityDemoExecutionEngine({fixture,account,env=(typeof process!==
     return {cancelled:true,order:orderView(order),releasedCashPaise,releasedShareQuantity};
   }
   function snapshot(){
+    const delivery=state.account.positions[instrument.instrumentKey]||{quantity:0,costBasisPaise:0};
+    const intraday=state.account.intradayPositions[instrument.instrumentKey]||{quantity:0,costBasisPaise:0};
+    const quantity=delivery.quantity+intraday.quantity;
+    const costBasisPaise=delivery.costBasisPaise+intraday.costBasisPaise;
+    const marketValuePaise=safeProduct(instrument.markPricePaise,quantity);
+    const unrealizedPnlPaise=marketValuePaise-costBasisPaise;
+    const totalPnlPaise=state.account.realizedPnlPaise+unrealizedPnlPaise;
     return clone({mode:"MOCK",simulated:true,source:"SYNTHETIC_FIXTURE",fees:"NOT_MODELED",
+      valuation:{instrumentKey:instrument.instrumentKey,markPricePaise:instrument.markPricePaise,quantity,costBasisPaise,marketValuePaise,unrealizedPnlPaise,totalPnlPaise},
       account:state.account,orders:[...state.orders.values()],fills:state.fills,
       orderBook:{asks:state.book.asks,bids:state.book.bids}});
   }
