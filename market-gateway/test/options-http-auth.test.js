@@ -176,7 +176,7 @@ test("authenticated NSE Options MARKET SELL-to-close submits with fresh bid",asy
       assert.equal(rpcCalls[0].args.p_user_id,TEST_USER_ID);
       assert.equal(rpcCalls[0].args.p_side,"SELL");
       assert.equal(rpcCalls[0].args.p_execution_price_paise,1235);
-      assert.equal(rpcCalls[0].key,"test-publishable-key");
+      assert.equal(rpcCalls[0].key,"test-service-role-key");
     });
   }finally{
     global.fetch=originalFetch;
