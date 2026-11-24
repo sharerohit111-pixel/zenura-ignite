@@ -40,6 +40,7 @@
     const quotes = new Map();
     const positions = new Map();
     const orders = [];
+    const idempotency = new Map();
     let sequence = 0;
 
     data.contracts.forEach(contract => {
@@ -180,9 +181,20 @@
           !["INTRADAY", "DELIVERY"].includes(request.product || "DELIVERY")) {
         fail("Choose an Intraday or Delivery Futures product.");
       }
+      let requestFingerprint = null;
+      if (request.idempotencyKey !== undefined) {
+        if (typeof request.idempotencyKey !== "string" || !/^[A-Za-z0-9_-]{8,80}$/.test(request.idempotencyKey)) fail("Invalid demo idempotency key.");
+        requestFingerprint = JSON.stringify({instrumentKey:contract.instrumentKey,side:request.side,orderType:request.orderType,lots,product:contract.assetClass === "FUTURE" ? (request.product || "DELIVERY") : "DELIVERY",limitPricePaise});
+        const prior = idempotency.get(request.idempotencyKey);
+        if (prior) {
+          if (prior.fingerprint !== requestFingerprint) fail("Demo idempotency key was reused with a different order payload.");
+          return copy(prior.order);
+        }
+      }
       sequence += 1;
       const order = {
         orderId: "MOCK-FO-" + String(sequence).padStart(6, "0"),
+        idempotencyKey: request.idempotencyKey || null,
         instrumentKey: contract.instrumentKey,
         symbol: contract.symbol,
         assetClass: contract.assetClass,
@@ -208,6 +220,7 @@
         simulationOnly: true
       };
       orders.unshift(order);
+      if (request.idempotencyKey) idempotency.set(request.idempotencyKey,{fingerprint:requestFingerprint,order:copy(order)});
       if (request.orderType === "MARKET") {
         const executionPrice = request.side === "BUY" ? quote.base.askPricePaise : quote.base.bidPricePaise;
         const availableDepth = request.side === "BUY" ? quote.askRemaining : quote.bidRemaining;
