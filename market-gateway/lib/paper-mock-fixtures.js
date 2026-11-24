@@ -7,6 +7,7 @@ const FIXTURES = Object.freeze({
   market: "market.json",
   account: "account.json",
   equity: "equity.json",
+  equityExecution: "equity-execution.json",
   derivatives: "derivatives.json",
   error: "error.json"
 });
