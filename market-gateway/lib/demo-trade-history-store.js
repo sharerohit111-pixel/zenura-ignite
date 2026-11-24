@@ -101,7 +101,7 @@ function createDemoTradeHistoryStore(options = {}) {
 
   function snapshot() {
     const orderList = [...orders.values()].map(orderCopy);
-    const tradeList = [...fills.values()].map(clone).sort((a,b)=>a.filledAt.localeCompare(b.filledAt)||a.fillId.localeCompare(b.fillId));
+    const tradeList = [...fills.values()].map(clone); // append order is the deterministic event sequence
     const positions = new Map();
     for (const trade of tradeList) {
       const key = keyOf(trade.assetClass,trade.product,trade.instrumentKey);
