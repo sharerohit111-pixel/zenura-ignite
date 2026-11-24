@@ -1,0 +1,84 @@
+# S-TRADE Round 1 — Integration Audit & Round 2 Plan
+
+Date: 2026-11-24
+Repository: sharerohit111-pixel/zenura-ignite
+Audit baseline: PR #137 head `1dfa19e1b7d30c494c7edff8c3ca77acecc48acc`
+Scope: Indian Market Paper Trading only (NSE/BSE). Crypto is excluded.
+
+## Executive result
+
+Round 1 is **not integration-complete**. PR #137 supplies a sound first shared Dummy JSON contract/fixture foundation, but it is deliberately test-only and is not consumed by the existing browser workspaces or authenticated gateway. The currently visible branch contains five fixture payloads (market, account, equity, derivatives, error), two JSON schemas, a fixture loader and one focused Node test file. The focused tests cover envelope metadata, ₹10,00,000 starting capital (100,000,000 paise), unknown fixture rejection, production guard and detached copies.
+
+This is not evidence that all screens are running on one Dummy JSON source. No screen-level adapter or browser/mobile harness is present in the PR #137 changed scope. Do not describe the screens as integrated until Round 2 completes those consumer tests.
+
+## PR / branch integration findings
+
+- PR #137 is Draft and targets `feature/s-trade-mock-contract-architecture-2026-11-24`. It adds architecture and fixtures, not runtime screen integration.
+- The latest observed workflow associated with the PR #137 head was run **#1537** (Paper Trading Supabase SQL smoke test), still in progress at audit time. Its PostgreSQL job had reached protective-order steps; steps 64–67 were pending. This is not a completed green run.
+- The dedicated `s-trade-mock-contracts.yml` workflow runs JSON parsing, the focused fixture test and a grep guard against importing the fixture loader into production gateway entrypoints. It does not run the full `npm test`, `npm run check`, browser E2E, mobile viewport/device tests or the full security/RLS suite.
+- `market-gateway/package.json` defines `npm test` as all Node tests and `npm run check` as a selected syntax-check list. Those commands were not executed by this remote audit.
+- PRs #92, #94, #100, #102, #111, #121, #124, #126, #131, #134, #135, #136 and #137 are open Draft PRs in the inspected inventory. PR #123 is closed/unmerged and superseded by refreshed PR #126. These are separate heads/bases, not one tested integrated branch. Their code must not be presumed present together.
+- PR #131 explicitly marks the wallet snapshot `ledgerReconciled=false`; a unified Equity/Futures/Options balance and P&L must remain visibly unreconciled until a canonical cross-asset ledger/read model is verified.
+- PR #136's price-alert worker is provider-backed and separate from deterministic fixture playback. It must not be silently activated or used as a source for MOCK screens.
+- PR #135 is a Futures risk/MTM/settlement workstream; its margin and settlement logic must remain the authoritative owner rather than being copied into a mock layer.
+- Crypto PRs/paths remain excluded. No Crypto code, schema, fixtures or workflow should be included in this integration chain.
+
+## Required Round 1 status by area
+
+| Area | Audit status | Evidence / blocker |
+|---|---|---|
+| Shared JSON envelope | Foundation exists | v1.0.0 envelope and domain schema in PR #137 |
+| Deterministic fixtures | Partial foundation | Five fixtures; test-only loader |
+| Equity / Futures / Options screens | Not verified integrated | No screen consumer adapter in PR #137 |
+| Market / Watchlist / Charts | Not verified integrated | Fixture exists, but no verified shared screen binding |
+| Login / Account / Wallet | Not reconciled | Auth PR #131 is Draft; wallet explicitly unreconciled |
+| Orders / Trades / Positions / Holdings | Not reconciled end-to-end | Existing domain engines/read models span separate Draft PR heads |
+| Charges / Realized / Unrealized P&L | Not reconciled end-to-end | Requires canonical ledger/read-model parity across assets |
+| Unit tests | Partial | Focused fixture tests exist; full suite not run here |
+| Integration tests | Not verified | No single combined stack result |
+| Browser tests | Gap | No verified browser E2E result for all screens |
+| Security / tenant isolation | Partial / unverified as combined stack | Existing PR tests are separate; exact integrated branch not green |
+| Mobile responsive tests | Gap | Static/UI code exists; no real-device or automated viewport matrix result |
+| PostgreSQL migration/RLS | In progress, not passed | Run #1537 was still running; pending steps at audit time |
+
+## Integration rules to preserve
+
+1. Keep one versioned envelope: `schemaVersion`, `mode`, `simulated`, `requestId`, `asOf`, `meta.source`, `data`.
+2. Synthetic fixtures must use `mode=MOCK`, `simulated=true`, synthetic non-tradable symbols and explicit DEMO DATA labeling.
+3. All money is integer paise; quantities/lots are integers; timestamps carry an explicit timezone.
+4. A single fixture/adapter layer may supply screen test data, but must never be imported into production gateway routes or become a fallback for authenticated APIs.
+5. Reuse existing Equity/Futures/Options order engines, workers, reservation rules, fees, margin and ledger RPCs. Do not add a second fill engine, account, instrument master, worker or ledger.
+6. Never merge stacked PRs merely by number. First establish a dependency graph, one canonical migration chain, exact commit ancestry and a clean integration branch.
+7. Keep Crypto in its separate project boundary.
+
+## Round 2 implementation plan
+
+### R2.1 — Build a clean integration branch
+- Select a single reviewed base and record the exact head SHA of every candidate PR.
+- Resolve dependencies for PR #92/#94/#100/#102/#111 (Equity), #121/#124/#126/#134 (market/instruments), #122/#129/#135 (Options/Futures accounting/risk), #131 (accounts), #130 (frontend UX), #136 (notifications/security), and #137 (fixtures).
+- Explicitly exclude superseded #123 and retain Crypto PRs outside the branch.
+- Detect duplicate migration timestamps, helper functions, route mounts, browser script imports and overlapping ownership before any consolidation.
+
+### R2.2 — Screen consumer adapters (fixture-only)
+- Add one browser-safe adapter that validates the shared envelope and returns detached fixture data only when an explicit non-production test/demo harness is selected.
+- Map Home/Market/Index, Watchlists, Equity, Futures, Options, Charts/Depth, Orders, Portfolio/Positions/Holdings, Account/Wallet, Trade History and Settings to the existing UI components.
+- Show a persistent DEMO DATA label; never imply live exchange prices or real broker execution.
+- Keep the signed-in production path on the authenticated backend. No runtime silent fallback.
+
+### R2.3 — Accounting contract parity
+- Add golden-vector tests for ₹10 lakh initial capital, available/blocked cash, equity delivery/intraday, FUT margin/MTM, CE/PE premium, fees/charges, partial fills, cancel/expiry, realized/unrealized P&L and replay/idempotency.
+- Assert the same order/fill/position/ledger identifiers across UI read models and backend records.
+- Keep wallet reconciliation visibly false until one canonical snapshot is proven transactionally consistent.
+
+### R2.4 — Test gates
+- Unit: all gateway Node tests, schema validation, fixture immutability and adapter mapping.
+- Integration: auth/RLS tenant isolation, order lifecycle, worker lease, partial fill/cancel races, ledger reconciliation and pagination.
+- Browser: all screens render fixture and empty/loading/error states; no console errors; navigation and actions are wired.
+- Security: production fixture import guard, auth required, verified user identity, cross-user isolation, no client-trusted roles, no secrets in browser, no live provider/order side effects in MOCK mode.
+- Mobile: 320/360/390/412 px widths, portrait/landscape, safe areas, no horizontal overflow, touch targets, drawer/scroll and chart/order-ticket usability.
+- PostgreSQL: disposable database only; ordered migration chain and privilege/RLS tests.
+- Publish exact commit SHA, workflow URL, test counts and failures. Never mark unrun tests as passed.
+
+## Out of scope / prohibited
+
+No live API purchase or integration, broker credentials, real orders, production/staging migration, PR merge, feature activation, deployment, or Crypto work. Any later release action requires separate explicit approval.
