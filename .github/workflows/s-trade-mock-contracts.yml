@@ -15,7 +15,7 @@ on:
       - "markets/shared/paper-demo-adapter.mjs"
       - "market-gateway/test/paper-demo-adapter.test.mjs"
       - "markets/dashboard/**"
-      - "markets/stocks/demo-*"
+      - "markets/stocks/demo-*"\n      - "markets/shared/paper-demo-adapter.mjs"\n      - "market-gateway/mock/fixtures/*.json"
       - ".github/workflows/s-trade-mock-contracts.yml"
   push:
     branches:
@@ -69,9 +69,9 @@ jobs:
       - name: Run dashboard synthetic fixture validation
         run: node --test markets/dashboard/dashboard-model.test.js
       - name: Check chart demo module syntax
-        run: node --check markets/stocks/demo-chart-data.js && node --check markets/stocks/demo-chart-workspace.js
+        run: node --check markets/stocks/demo-chart-data.mjs && node --check markets/stocks/demo-chart-workspace.mjs
       - name: Run deterministic chart fixture tests
-        run: node --test market-gateway/test/demo-chart-data.test.js
+        run: node --test market-gateway/test/demo-chart-data.test.mjs
       - name: Ensure fixture loader is not wired into production gateway
         run: |
           if grep -R "paper-mock-fixtures" market-gateway/supabase-server.js market-gateway/server.js; then
