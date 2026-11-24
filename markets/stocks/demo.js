@@ -191,7 +191,7 @@ function render(name){
   const order=orders.find(o=>o.assetClass===(name==="futures"?"FUTURE":"OPTION"));
   content.append(grid(card("Available contracts",String(model.market.instruments.filter(i=>i.assetClass===(name==="futures"?"FUTURE":"OPTION")).length),"NSE + BSE MOCK catalog"),card("Sample contract",x.symbol||x.underlying,"Order receipt fixture"),card("Expiry choices",String(getPaperDemoExpiries(model,{underlying:name==="futures"?"MOCKNIFTY":x.underlying,assetClass:name==="futures"?"FUTURE":"OPTION"}).length),"Deterministic fixture dates"),card("Order record",order?.status||"—","Read-only sample")));
   const catalog=el("section","catalog-panel");content.append(catalog);if(name==="futures")renderFuturesCatalog(catalog);else renderOptionsCatalog(catalog);
-  content.append(table(["ORDER ID","INSTRUMENT","SIDE","TYPE","SIZE","STATUS","AVG / LIMIT"],order?[order]:[]));
+  content.append(table(["ORDER ID","INSTRUMENT","SIDE","TYPE","SIZE","STATUS","AVG / LIMIT"],orderRows(order?[order]:[])));
   content.append(notice("Contracts, strikes and quotes are synthetic MOCK fixtures. The local simulator below is browser-memory only; no production order API or broker connection is called."));
   mountDerivativeDemo(content,name);
   return;
