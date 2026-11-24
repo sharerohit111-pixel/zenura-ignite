@@ -31,6 +31,12 @@ on:
       - "markets/stocks/demo.js"
       - "markets/stocks/index.html"
       - "market-gateway/test/paper-demo-dashboard.test.mjs"
+      - "markets/stocks/demo-watchlist-persistence.mjs"
+      - "markets/stocks/demo-watchlist-state.mjs"
+      - "market-gateway/lib/watchlist-instrument-resolver.js"
+      - "market-gateway/test/watchlist-instrument-resolver.test.js"
+      - "market-gateway/test/demo-watchlist-state.test.mjs"
+      - "market-gateway/supabase-server.js"
       - ".github/workflows/s-trade-demo-screen-wiring.yml"
 
 permissions:
