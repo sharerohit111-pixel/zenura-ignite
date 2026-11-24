@@ -53,6 +53,30 @@ CREATE TABLE IF NOT EXISTS public.s_trade_price_alerts (
 CREATE INDEX IF NOT EXISTS s_trade_price_alerts_active_instrument_idx
   ON public.s_trade_price_alerts(instrument_key,condition,target_price) WHERE active=true;
 
+-- Enforce a per-user cap atomically; route-level count checks are only an early UX guard.
+CREATE OR REPLACE FUNCTION public.s_trade_enforce_price_alert_cap()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $
+DECLARE v_active_count integer;
+BEGIN
+  IF NOT NEW.active THEN RETURN NEW; END IF;
+  PERFORM pg_catalog.pg_advisory_xact_lock(
+    pg_catalog.hashtextextended(NEW.user_id::text,20261124)
+  );
+  SELECT count(*) INTO v_active_count FROM public.s_trade_price_alerts
+   WHERE user_id=NEW.user_id AND active=true
+     AND alert_id IS DISTINCT FROM NEW.alert_id;
+  IF v_active_count>=50 THEN
+    RAISE EXCEPTION 'Maximum 50 active price alerts per account' USING ERRCODE='23514';
+  END IF;
+  RETURN NEW;
+END;
+$;
+DROP TRIGGER IF EXISTS s_trade_price_alert_cap ON public.s_trade_price_alerts;
+CREATE TRIGGER s_trade_price_alert_cap BEFORE INSERT OR UPDATE OF active
+  ON public.s_trade_price_alerts FOR EACH ROW
+  EXECUTE FUNCTION public.s_trade_enforce_price_alert_cap();
+REVOKE ALL ON FUNCTION public.s_trade_enforce_price_alert_cap() FROM PUBLIC,anon,authenticated,service_role;
+
 CREATE TABLE IF NOT EXISTS public.s_trade_provider_health (
   provider text PRIMARY KEY CHECK (provider IN ('upstox')),
   status text NOT NULL CHECK (status IN ('healthy','degraded','down','unknown')),
