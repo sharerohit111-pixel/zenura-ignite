@@ -1,3 +1,4 @@
+import { syncDemoProjection } from "./demo-trade-projection.mjs";
 let fixturePromise=null,enginePromise=null,engine=null,orderSequence=0;
 const el=(tag,cls,value)=>{const node=document.createElement(tag);if(cls)node.className=cls;if(value!==undefined)node.textContent=String(value);return node;};
 const money=paise=>Number.isSafeInteger(paise)?"₹"+(paise/100).toLocaleString("en-IN",{minimumFractionDigits:2,maximumFractionDigits:2}):"—";
@@ -69,7 +70,7 @@ export async function mountEquityDemo(container){
  let activeOrderId="";
  function paint(){
   if(!engine)return;
-  const s=engine.snapshot(),a=s.account;
+  const s=engine.snapshot(),a=s.account;syncDemoProjection("EQUITY",s);
   stats.replaceChildren(
    stat("Cash balance",money(a.cashBalancePaise)),
    stat("Blocked funds",money(a.blockedFundsPaise)),
