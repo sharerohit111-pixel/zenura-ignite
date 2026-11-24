@@ -3,7 +3,7 @@ const assert=require("node:assert/strict");
 const fs=require("node:fs");
 const {chromium}=require("playwright");
 const serviceWorker=fs.readFileSync("markets/service-worker.js","utf8");
-const shellBlock=serviceWorker.match(/const SHELL=\\[([\\s\\S]*?)\\]\\.map/);
+const shellBlock=serviceWorker.match(/const SHELL=\[([\s\S]*?)\]\.map/);
 assert.ok(shellBlock,"service worker shell precache list must exist");
 const shellEntries=[...shellBlock[1].matchAll(/"([^"]*)"/g)].map(match=>match[1]);
 assert.equal(new Set(shellEntries).size,shellEntries.length,"duplicate precache URLs prevent reliable service worker installation");
