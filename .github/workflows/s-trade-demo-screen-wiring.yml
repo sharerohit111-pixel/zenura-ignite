@@ -7,11 +7,13 @@ on:
       - "markets/stocks/demo.html"
       - "markets/stocks/demo.css"
       - "markets/stocks/demo.js"
+      - "markets/service-worker.js"
       - "markets/stocks/index.html"
       - "markets/dashboard/index.html"
       - "market-gateway/test/paper-demo-adapter.test.mjs"
       - "market-gateway/test/paper-demo-dashboard.test.mjs"
       - "market-gateway/test/paper-demo-dashboard-alias.test.mjs"
+      - "market-gateway/test/paper-demo-pwa-cache.test.mjs"
       - ".github/workflows/s-trade-demo-screen-wiring.yml"
   push:
     branches:
@@ -41,7 +43,7 @@ jobs:
         with:
           node-version: "22"
       - name: Check browser module syntax
-        run: node --check markets/shared/paper-demo-adapter.mjs && node --check markets/stocks/demo.js
+        run: node --check markets/shared/paper-demo-adapter.mjs && node --check markets/stocks/demo.js && node --check markets/service-worker.js
       - name: Validate shared fixtures
         run: |
           node - <<'NODE'
@@ -50,7 +52,7 @@ jobs:
           console.log('Parsed all four canonical screen fixtures.');
           NODE
       - name: Run adapter, screen and compatibility tests
-        run: node --test market-gateway/test/paper-demo-adapter.test.mjs market-gateway/test/paper-demo-dashboard.test.mjs market-gateway/test/paper-demo-dashboard-alias.test.mjs
+        run: node --test market-gateway/test/paper-demo-adapter.test.mjs market-gateway/test/paper-demo-dashboard.test.mjs market-gateway/test/paper-demo-dashboard-alias.test.mjs market-gateway/test/paper-demo-pwa-cache.test.mjs
       - name: Guard production gateway isolation
         run: |
           if grep -R "paper-demo-adapter\|paper-mock-fixtures" market-gateway/supabase-server.js market-gateway/server.js; then
