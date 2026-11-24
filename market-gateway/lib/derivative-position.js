@@ -29,4 +29,6 @@ function applyDerivativeFill({instrumentType,side,quantity,pricePaise,position={
  if(!Number.isSafeInteger(cashDeltaPaise))fail("Derivative cash movement exceeds safe calculation limits.");
  return {instrumentType,netQuantity:newQty,averagePricePaise:nextAverage,realizedPnlPaise,closedQuantity,openedQuantity,cashDeltaPaise,optionPremiumCashDeltaPaise,futuresSettlementCashDeltaPaise,positionStatus:newQty===0?"CLOSED":newQty>0?"LONG":"SHORT",simulationOnly:true,excludesCharges:true,executedAtMs:now};
 }
-module.exports={applyDerivativeFill};
+const derivativePositionApi={applyDerivativeFill};
+if(typeof module==="object"&&module.exports)module.exports=derivativePositionApi;
+if(typeof window!=="undefined")window.ZENURA_DERIVATIVE_POSITION=derivativePositionApi;
