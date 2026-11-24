@@ -390,3 +390,11 @@ Added an isolated, dependency-free HTTP telemetry helper and wired it into the S
 ### Scope and limitations
 
 This is **structured request telemetry and trace-context correlation**, not yet a complete distributed tracing or metrics backend. It does not create/export OpenTelemetry spans, propagate child context into Supabase/provider calls, expose Prometheus metrics, or configure Cloud Monitoring log-based metrics/alerts. Those require an agreed exporter/collector and operational configuration. The new code is on this PR branch; its exact-head CI result is pending. No production telemetry configuration or deployment was changed.
+
+
+## 19. Telemetry CI correction (2026-11-24)
+
+- The first workflow run after telemetry wiring was Run #1290, commit `f05e81e55e819e28b7fafe92069995317a438dcd`. It failed in the static gateway deployment-boundary test before the full Node suite or disposable PostgreSQL migration tests ran.
+- The failing assertion prohibited all `req.headers` access, which also prohibited the intentionally supported, strictly validated `traceparent` header. The helper reads only that one header (or Express's `req.get("traceparent")`) and does not log headers or sensitive values.
+- Corrected the assertion to prohibit raw URL/path and credential access while allowing the validated trace-context header. Added a regression test that malformed trace context is discarded and replaced by a fresh server-generated trace ID.
+- The corrected commits are on the PR #99 head. No subsequent workflow run is visible for the corrected head at the time of this update; do not mark CI passed. Re-run the full PR workflow on the corrected head and require all gateway Node and disposable PostgreSQL jobs to pass.
