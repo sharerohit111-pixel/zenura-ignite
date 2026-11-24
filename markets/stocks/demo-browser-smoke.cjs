@@ -27,6 +27,49 @@ const axePath=require.resolve("axe-core/axe.min.js");
     const overflow=await page.evaluate(()=>document.documentElement.scrollWidth>window.innerWidth+1);
     assert.equal(overflow,false,viewport.name+" horizontal document overflow on "+name);
    }
+   if(viewport.name==="desktop"){
+    // Watchlist add / reorder / remove must mutate only the session Demo list.
+    await page.locator('#screen-nav button[data-screen="watchlists"]').click();
+    const candidate=page.locator("#demo-watchlist-instrument option:not([disabled])").last();
+    await page.locator("#demo-watchlist-instrument").selectOption(await candidate.getAttribute("value"));
+    await page.getByRole("button",{name:"ADD TO WATCHLIST"}).click();
+    const watchRows=page.locator(".catalog-results tbody tr");
+    const countAfterAdd=await watchRows.count();
+    assert.ok(countAfterAdd>0,"watchlist add should create a row");
+    const moveDown=page.getByRole("button",{name:/Move .* down/}).first();
+    if(await moveDown.count()) await moveDown.click();
+    await page.getByRole("button",{name:"REMOVE"}).first().click();
+    assert.equal(await watchRows.count(),countAfterAdd-1,"watchlist remove should remove one row");
+
+    // Chart controls must switch timeframe and rendering style.
+    await page.locator('#screen-nav button[data-screen="charts"]').click();
+    await page.locator('[data-demo-timeframe="1m"]').click();
+    assert.ok(await page.locator('[data-demo-timeframe="1m"]').evaluate(node=>node.classList.contains("active")),"chart timeframe control");
+    await page.locator('[data-demo-chart-type="LINE"]').click();
+    assert.ok(await page.locator('[data-demo-chart-type="LINE"]').evaluate(node=>node.classList.contains("active")),"chart style control");
+
+    // Option chain filters and paired CE/PE rows must render from canonical MOCK catalog.
+    await page.locator('#screen-nav button[data-screen="options"]').click();
+    await page.locator("#options-expiry").waitFor();
+    assert.ok(await page.locator(".catalog-results tbody tr").count()>0,"option chain rows");
+    await page.locator("#options-side").selectOption("CE");
+    assert.ok(await page.locator(".catalog-results tbody tr").count()>0,"filtered CE option chain rows");
+
+    // Equity market order -> manual deterministic fill -> immutable receipt.
+    await page.locator('#screen-nav button[data-screen="equity"]').click();
+    await page.getByRole("button",{name:"PLACE DEMO ORDER"}).click();
+    await page.getByRole("button",{name:"SIMULATE NEXT FILL"}).click();
+    assert.ok((await page.locator(".demo-eq-status").textContent()).includes("Synthetic fill"),"Equity order fill flow");
+    assert.ok(await page.locator(".demo-eq-table-wrap").nth(2).locator("tbody tr").count()>0,"Equity immutable fill receipt");
+
+    // Futures and Options MARKET order entry must accept a local synthetic order.
+    await page.locator('#screen-nav button[data-screen="futures"]').click();
+    await page.getByRole("button",{name:"BUY",exact:true}).last().click();
+    assert.ok((await page.locator(".demo-fo-status").textContent()).includes("DEMO receipt"),"Futures order entry");
+    await page.locator('#screen-nav button[data-screen="options"]').click();
+    await page.getByRole("button",{name:"BUY",exact:true}).last().click();
+    assert.ok((await page.locator(".demo-fo-status").textContent()).includes("DEMO receipt"),"Options order entry");
+   }
    await page.goto("http://127.0.0.1:4173/markets/stocks/demo.html",{waitUntil:"domcontentloaded",timeout:30000});
    await page.addScriptTag({path:axePath});
    const axe=await page.evaluate(async()=>window.axe.run(document,{runOnly:{type:"tag",values:["wcag2a","wcag2aa","wcag21a","wcag21aa"]}}));
