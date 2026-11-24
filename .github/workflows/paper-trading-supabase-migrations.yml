@@ -333,6 +333,8 @@ jobs:
       - name: Exercise MARKET idempotency and LIMIT reservation lifecycle
         run: |
           psql -v ON_ERROR_STOP=1 <<'SQL'
+          INSERT INTO auth.users(id) VALUES ('abababab-abab-4bab-8bab-abababababab') ON CONFLICT (id) DO NOTHING;
+          SELECT public.initialize_paper_trading_account('abababab-abab-4bab-8bab-abababababab');
           DO $$
           DECLARE
             v_result jsonb;
@@ -344,7 +346,7 @@ jobs:
           BEGIN
             -- MARKET BUY: 10 shares at ₹100; retry must not debit twice.
             v_result := public.execute_paper_market_order(
-              '22222222-2222-4222-8222-222222222222',
+              'abababab-abab-4bab-8bab-abababababab',
               repeat('a',64),
               '33333333-3333-4333-8333-333333333333',
               repeat('b',64),'NSE_EQ|TEST001','TEST001','NSE',
@@ -355,7 +357,7 @@ jobs:
               RAISE EXCEPTION 'MARKET BUY did not debit gross plus estimated charges';
             END IF;
             v_result := public.execute_paper_market_order(
-              '22222222-2222-4222-8222-222222222222',
+              'abababab-abab-4bab-8bab-abababababab',
               repeat('a',64),
               '33333333-3333-4333-8333-333333333333',
               repeat('b',64),'NSE_EQ|TEST001','TEST001','NSE',
@@ -365,14 +367,14 @@ jobs:
               RAISE EXCEPTION 'MARKET retry was not idempotent';
             END IF;
             SELECT cash_paise INTO v_cash FROM public.paper_accounts
-             WHERE user_id='22222222-2222-4222-8222-222222222222';
+             WHERE user_id='abababab-abab-4bab-8bab-abababababab';
             IF v_cash <> 99897521 THEN
               RAISE EXCEPTION 'MARKET idempotent retry debited cash more than once';
             END IF;
             -- Reuse the exact idempotency key and order identity; change only the limit price fingerprint.
             BEGIN
               PERFORM public.execute_paper_market_order(
-                '22222222-2222-4222-8222-222222222222',
+                'abababab-abab-4bab-8bab-abababababab',
                 repeat('a',64),
                 '33333333-3333-4333-8333-333333333333',
                 repeat('b',64),'NSE_EQ|TEST001','TEST001','NSE',
@@ -387,21 +389,21 @@ jobs:
             END;
             -- SELL half the position: ₹10,000 gross spread; charges reduce net realized P&L, five shares remain.
             v_result := public.execute_paper_market_order(
-              '22222222-2222-4222-8222-222222222222',
+              'abababab-abab-4bab-8bab-abababababab',
               repeat('e',64),
               '44444444-4444-4444-8444-444444444444',
               repeat('f',64),'NSE_EQ|TEST001','TEST001','NSE',
               'SELL','DELIVERY',5,12000,floor(extract(epoch from clock_timestamp())*1000)::bigint,0
             );
             SELECT quantity INTO v_qty FROM public.paper_equity_positions
-             WHERE user_id='22222222-2222-4222-8222-222222222222'
+             WHERE user_id='abababab-abab-4bab-8bab-abababababab'
                AND product='DELIVERY' AND instrument_key='NSE_EQ|TEST001';
             IF v_qty <> 5 OR (v_result->>'order_realized_pnl_paise')::bigint <> 3978 THEN
               RAISE EXCEPTION 'MARKET SELL net realized P&L or position is incorrect';
             END IF;
             BEGIN
               PERFORM public.submit_paper_limit_order(
-                '22222222-2222-4222-8222-222222222222',repeat('9',64),
+                'abababab-abab-4bab-8bab-abababababab',repeat('9',64),
                 '99999999-9999-4999-8999-999999999999',repeat('a',64),
                 'BSE_EQ|LIMIT_BSE_BLOCK','LIMIT_BSE_BLOCK','BSE','BUY',1,10000
               );
@@ -411,7 +413,7 @@ jobs:
             -- Reject a LIMIT SELL whose minimum charges exceed gross proceeds.
             BEGIN
               PERFORM public.submit_paper_limit_order(
-                '22222222-2222-4222-8222-222222222222',repeat('b',64),
+                'abababab-abab-4bab-8bab-abababababab',repeat('b',64),
                 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',repeat('c',64),
                 'NSE_EQ|TEST001','TEST001','NSE','SELL',1,1
               );
@@ -425,28 +427,28 @@ jobs:
             END IF;
             -- LIMIT BUY reservation then cancellation must release all reserved cash.
             v_result := public.submit_paper_limit_order(
-              '22222222-2222-4222-8222-222222222222',
+              'abababab-abab-4bab-8bab-abababababab',
               repeat('1',64),
               '55555555-5555-4555-8555-555555555555',
               repeat('2',64),'NSE_EQ|TEST002','TEST002','NSE',
               'BUY',2,20000
             );
             SELECT reserved_cash_paise INTO v_reserved FROM public.paper_accounts
-             WHERE user_id='22222222-2222-4222-8222-222222222222';
+             WHERE user_id='abababab-abab-4bab-8bab-abababababab';
             IF v_reserved <> 42407 THEN
               RAISE EXCEPTION 'LIMIT BUY did not reserve expected cash';
             END IF;
             PERFORM public.cancel_paper_limit_order(
-              '22222222-2222-4222-8222-222222222222',repeat('1',64)
+              'abababab-abab-4bab-8bab-abababababab',repeat('1',64)
             );
             SELECT reserved_cash_paise INTO v_reserved FROM public.paper_accounts
-             WHERE user_id='22222222-2222-4222-8222-222222222222';
+             WHERE user_id='abababab-abab-4bab-8bab-abababababab';
             IF v_reserved <> 0 THEN
               RAISE EXCEPTION 'LIMIT BUY cancellation did not release reservation';
             END IF;
             -- LIMIT BUY fill at a better price releases reservation and debits actual fill.
             PERFORM public.submit_paper_limit_order(
-              '22222222-2222-4222-8222-222222222222',
+              'abababab-abab-4bab-8bab-abababababab',
               repeat('3',64),
               '66666666-6666-4666-8666-666666666666',
               repeat('4',64),'NSE_EQ|TEST003','TEST003','NSE',
@@ -457,7 +459,7 @@ jobs:
             );
             SELECT reserved_cash_paise,cash_paise INTO v_reserved,v_cash
               FROM public.paper_accounts
-             WHERE user_id='22222222-2222-4222-8222-222222222222';
+             WHERE user_id='abababab-abab-4bab-8bab-abababababab';
             IF v_result->>'status' <> 'FILLED' OR v_reserved <> 0 OR v_cash <> 99892310
                OR (v_result->>'charges_paise')::bigint <> 2429
                OR (v_result->>'cash_delta_paise')::bigint <> -60429 THEN
@@ -465,7 +467,7 @@ jobs:
             END IF;
             -- LIMIT SELL must reserve shares, reject stale quotes, and release on cancel.
             PERFORM public.submit_paper_limit_order(
-              '22222222-2222-4222-8222-222222222222',
+              'abababab-abab-4bab-8bab-abababababab',
               repeat('5',64),
               '77777777-7777-4777-8777-777777777777',
               repeat('6',64),'NSE_EQ|TEST001','TEST001','NSE',
@@ -473,7 +475,7 @@ jobs:
             );
             SELECT quantity,reserved_quantity INTO v_qty,v_reserved
               FROM public.paper_equity_positions
-             WHERE user_id='22222222-2222-4222-8222-222222222222'
+             WHERE user_id='abababab-abab-4bab-8bab-abababababab'
                AND product='DELIVERY' AND instrument_key='NSE_EQ|TEST001';
             IF v_qty <> 5 OR v_reserved <> 2 THEN
               RAISE EXCEPTION 'LIMIT SELL did not reserve the expected shares';
@@ -485,18 +487,18 @@ jobs:
               NULL;
             END;
             PERFORM public.cancel_paper_limit_order(
-              '22222222-2222-4222-8222-222222222222',repeat('5',64)
+              'abababab-abab-4bab-8bab-abababababab',repeat('5',64)
             );
             SELECT quantity,reserved_quantity INTO v_qty,v_reserved
               FROM public.paper_equity_positions
-             WHERE user_id='22222222-2222-4222-8222-222222222222'
+             WHERE user_id='abababab-abab-4bab-8bab-abababababab'
                AND product='DELIVERY' AND instrument_key='NSE_EQ|TEST001';
             IF v_qty <> 5 OR v_reserved <> 0 THEN
               RAISE EXCEPTION 'LIMIT SELL cancellation did not release reserved shares';
             END IF;
             -- A second LIMIT SELL fills at a better price and realizes allocated gain.
             PERFORM public.submit_paper_limit_order(
-              '22222222-2222-4222-8222-222222222222',
+              'abababab-abab-4bab-8bab-abababababab',
               repeat('7',64),
               '88888888-8888-4888-8888-888888888888',
               repeat('8',64),'NSE_EQ|TEST001','TEST001','NSE',
@@ -505,10 +507,10 @@ jobs:
             v_result := public.execute_paper_limit_fill(repeat('7',64),13000,floor(extract(epoch from clock_timestamp())*1000)::bigint,0,floor(extract(epoch from clock_timestamp())*1000)::bigint);
             SELECT quantity,reserved_quantity INTO v_qty,v_reserved
               FROM public.paper_equity_positions
-             WHERE user_id='22222222-2222-4222-8222-222222222222'
+             WHERE user_id='abababab-abab-4bab-8bab-abababababab'
                AND product='DELIVERY' AND instrument_key='NSE_EQ|TEST001';
             SELECT cash_paise INTO v_cash FROM public.paper_accounts
-             WHERE user_id='22222222-2222-4222-8222-222222222222';
+             WHERE user_id='abababab-abab-4bab-8bab-abababababab';
             IF v_result->>'status' <> 'FILLED' OR v_qty <> 3 OR v_reserved <> 0
                OR v_cash <> 99913563
                OR (v_result->>'charges_paise')::bigint <> 4747
