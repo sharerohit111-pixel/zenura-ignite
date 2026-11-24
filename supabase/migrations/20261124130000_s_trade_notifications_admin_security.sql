@@ -128,16 +128,12 @@ GRANT SELECT,INSERT,UPDATE ON public.s_trade_provider_health,
 GRANT SELECT ON public.s_trade_admins TO service_role;
 GRANT SELECT,INSERT ON public.s_trade_admin_audit_log TO service_role;
 GRANT USAGE,SELECT ON SEQUENCE public.s_trade_admin_audit_log_audit_id_seq TO service_role;
-GRANT SELECT,INSERT,UPDATE ON public.s_trade_notification_preferences TO authenticated;
+GRANT SELECT ON public.s_trade_notification_preferences TO authenticated;
 GRANT SELECT,UPDATE(read_at) ON public.s_trade_notifications TO authenticated;
-GRANT SELECT,INSERT,UPDATE,DELETE ON public.s_trade_price_alerts TO authenticated;
+GRANT SELECT ON public.s_trade_price_alerts TO authenticated;
 
 CREATE POLICY s_trade_preferences_select_own ON public.s_trade_notification_preferences
   FOR SELECT TO authenticated USING ((SELECT auth.uid())=user_id);
-CREATE POLICY s_trade_preferences_insert_own ON public.s_trade_notification_preferences
-  FOR INSERT TO authenticated WITH CHECK ((SELECT auth.uid())=user_id);
-CREATE POLICY s_trade_preferences_update_own ON public.s_trade_notification_preferences
-  FOR UPDATE TO authenticated USING ((SELECT auth.uid())=user_id) WITH CHECK ((SELECT auth.uid())=user_id);
 CREATE POLICY s_trade_notifications_select_own ON public.s_trade_notifications
   FOR SELECT TO authenticated USING ((SELECT auth.uid())=user_id);
 CREATE POLICY s_trade_notifications_mark_read_own ON public.s_trade_notifications
@@ -145,12 +141,6 @@ CREATE POLICY s_trade_notifications_mark_read_own ON public.s_trade_notification
   WITH CHECK ((SELECT auth.uid())=user_id);
 CREATE POLICY s_trade_price_alerts_select_own ON public.s_trade_price_alerts
   FOR SELECT TO authenticated USING ((SELECT auth.uid())=user_id);
-CREATE POLICY s_trade_price_alerts_insert_own ON public.s_trade_price_alerts
-  FOR INSERT TO authenticated WITH CHECK ((SELECT auth.uid())=user_id);
-CREATE POLICY s_trade_price_alerts_update_own ON public.s_trade_price_alerts
-  FOR UPDATE TO authenticated USING ((SELECT auth.uid())=user_id) WITH CHECK ((SELECT auth.uid())=user_id);
-CREATE POLICY s_trade_price_alerts_delete_own ON public.s_trade_price_alerts
-  FOR DELETE TO authenticated USING ((SELECT auth.uid())=user_id);
 
 CREATE OR REPLACE FUNCTION public.s_trade_reject_audit_mutation()
 RETURNS trigger LANGUAGE plpgsql SET search_path='' AS $$
