@@ -9,6 +9,7 @@ const screens=["home","market","watchlists","charts","equity","futures","options
 
 test("demo route loads the canonical shared adapter and exposes all 15 screens",async()=>{
  const html=await read("demo.html"),js=await read("demo.js"),index=await read("index.html");
+ assert.match(html,/<nav[^>]*aria-label="Demo screens"[^>]*tabindex="0"/);
  assert.match(html,/type="module" src="\.\/demo.js"/);
  assert.match(js,/from "\.\.\/shared\/paper-demo-adapter\.mjs"/);
  for(const screen of screens)assert.match(html,new RegExp('data-screen="'+screen+'"'));
