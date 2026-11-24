@@ -31,6 +31,8 @@ function makeDb({orders=[order],fills=[],lease=true,onRpc}={}){
    calls.push({type:"rpc",name,args});
    if(name==="acquire_paper_market_worker_lease")return {data:lease,error:null};
    if(name==="release_paper_market_worker_lease")return {data:true,error:null};
+   if(name==="renew_paper_market_worker_lease"&&onRpc)return onRpc(name,args);
+   if(name==="renew_paper_market_worker_lease")return {data:true,error:null};
    if(onRpc)return onRpc(name,args);
    if(name==="execute_paper_option_limit_fill")return {data:{status:"PARTIALLY_FILLED"},error:null};
    return {data:{status:"EXPIRED",idempotent_replay:false},error:null};
@@ -40,6 +42,7 @@ function makeDb({orders=[order],fills=[],lease=true,onRpc}={}){
    const builder={
     select(columns){state.columns=columns;return builder;},
     eq(key,value){state.filters.push([key,value]);return builder;},
+    gt(key,value){state.filters.push(["gt",key,value]);return builder;},
     in(key,value){state.filters.push([key,value]);return builder;},
     order(){return builder;},
     limit(){return builder;},
@@ -63,7 +66,8 @@ function quotePayload(){
   depth:{buy:[{price:12.35,quantity:20}],sell:[{price:12.4,quantity:10}]}
  }}};
 }
-function deps(db,{session=true,payload=quotePayload(),token=true,now=()=>NOW}={}){
+function deps(db,{session=true,payload=quotePayload(),token=true,now=()=>NOW,
+ scheduleHeartbeat=setInterval,cancelHeartbeat=clearInterval}={}){
  return {
   serviceDb:db,ensureInstrumentCache:async()=>[instrument],
   getUpstoxAccessToken:async()=>token?{token:"token-"+USER}:Promise.reject(new Error("no token")),
@@ -72,7 +76,7 @@ function deps(db,{session=true,payload=quotePayload(),token=true,now=()=>NOW}={}
    exchange:"NSE",sessionDate:"2026-11-23",isTradingDay:true,
    openMinute:555,closeMinute:930
   }:null,
-  now
+  now,scheduleHeartbeat,cancelHeartbeat
  };
 }
 
@@ -143,6 +147,50 @@ test("SELL LIMIT closes only displayed bid depth and sends the bid-side snapshot
  assert.equal(call.args.p_bid_quantity,20);
  assert.equal(call.args.p_ask_quantity,10);
  assert.equal(call.args.p_now_ms,NOW);
+});
+
+test("stops new Options LIMIT fills when lease renewal reports ownership loss",async()=>{
+ let scheduled=null,fillCalls=0,renewCalls=0;
+ const db=makeDb({onRpc:async(name)=>{
+  if(name==="renew_paper_market_worker_lease"){renewCalls++;return {data:false,error:null};}
+  if(name==="execute_paper_option_limit_fill")fillCalls++;
+  return {data:true,error:null};
+ }});
+ const d=deps(db);
+ d.scheduleHeartbeat=callback=>{scheduled=callback;return 1;};
+ d.cancelHeartbeat=()=>{};
+ d.fetchProvider=async()=>{
+  assert.equal(typeof scheduled,"function");
+  await scheduled();
+  return {ok:true};
+ };
+ const result=await createPaperOptionLimitWorker(d)({maxOrders:10});
+ assert.equal(renewCalls,1);
+ assert.equal(result.leaseLost,true);
+ assert.equal(fillCalls,0);
+ assert.equal(db.calls.some(call=>call.type==="rpc"&&call.name==="release_paper_market_worker_lease"),true);
+});
+
+test("does not expire Options LIMIT orders after lease renewal reports ownership loss",async()=>{
+ let scheduled=null,expiryCalls=0;
+ const db=makeDb({onRpc:async(name)=>{
+  if(name==="renew_paper_market_worker_lease")return {data:false,error:null};
+  if(name==="expire_paper_option_limit_order"){
+   expiryCalls++;
+   return {data:{status:"EXPIRED",idempotent_replay:false},error:null};
+  }
+  return {data:true,error:null};
+ }});
+ const d=deps(db);
+ d.scheduleHeartbeat=callback=>{scheduled=callback;return 1;};
+ d.cancelHeartbeat=()=>{};
+ d.loadSession=async()=>{
+  await scheduled();
+  return {exchange:"NSE",sessionDate:"2026-11-23",isTradingDay:true,openMinute:555,closeMinute:600};
+ };
+ const result=await createPaperOptionLimitWorker(d)({maxOrders:10});
+ assert.equal(result.leaseLost,true);
+ assert.equal(expiryCalls,0);
 });
 
 test("fails closed and preserves pending orders when verified session data is missing",async()=>{
@@ -241,4 +289,7 @@ test("does not advance the Options LIMIT cursor past a transient fill failure",a
  assert.ok(cursorWrite,"completed rows before the failure should be checkpointed");
  assert.equal(cursorWrite.state.payload.cursor_order_id,order.order_id);
  assert.equal(cursorWrite.state.payload.cursor_created_at,order.created_at);
+ assert.ok(cursorWrite.state.filters.some(filter=>filter[0]==="gt"
+  &&filter[1]==="lease_expires_at"&&Date.parse(filter[2])>0),
+  "cursor checkpoint must require an unexpired lease in addition to the owner token");
 });
