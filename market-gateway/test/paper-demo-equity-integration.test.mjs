@@ -62,8 +62,10 @@ test("PWA caches the simulator and synthetic fixtures; production gateway stays 
     read("market-gateway/supabase-server.js"),
     read(".github/workflows/s-trade-fo-demo-ui-integration.yml")
   ]);
-  assert.match(sw, /zenura-markets-shell-v4/);
+  assert.match(sw, /zenura-markets-shell-v5/);
   assert.match(sw, /stocks\/demo-equity-panel\.mjs/);
+  assert.match(sw, /stocks\/demo-chart-panel\.mjs/);
+  assert.match(sw, /stocks\/demo-chart-data\.mjs/);
   assert.match(sw, /equity-demo-execution-engine\.js/);
   assert.match(sw, /fixtures\/equity-execution\.json/);
   assert.match(sw, /SHELL\.includes\(url\.toString\(\)\)/);
