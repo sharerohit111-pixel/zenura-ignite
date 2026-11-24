@@ -3,6 +3,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const { normalizeUpstoxFeedQuotes, rupeesToPaise } = require("../lib/upstox-stream-normalizer");
+const { normalizeMarketDataSnapshot } = require("../lib/market-data-provider-contract");
 
 const NOW = Date.parse("2026-11-24T04:30:00Z");
 const key = "NSE_EQ|INE002A01018";
@@ -37,6 +38,10 @@ test("normalizes Upstox LTPC into an attributed integer-paise snapshot", () => {
   assert.equal(snapshot.entitlementReference, "entitlement-1");
   assert.equal(snapshot.attribution.displayName, "Upstox");
   assert.ok(snapshot.sourceSequence);
+  const accepted = normalizeMarketDataSnapshot(snapshot, {
+    expectedProviderId: "upstox", expectedInstrumentId: key, nowMs: NOW, maxAgeMs: 15000,
+  });
+  assert.equal(accepted.lastPricePaise, 12345);
 });
 
 test("accepts Map mappings and Full-feed market LTPC", () => {
