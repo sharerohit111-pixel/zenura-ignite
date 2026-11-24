@@ -64,7 +64,7 @@ export function mountDemoChart(root) {
   async function load() {
     try {
       const paths = ["market","account","equity","derivatives"];
-      const responses = await Promise.all(paths.map(name => fetch("../../market-gateway/mock/fixtures/"+name+".json", { cache: "no-store" })));
+      const responses = await Promise.all(paths.map(name => fetch("../../market-gateway/mock/fixtures/"+name+".json", { method: "GET", credentials: "omit", cache: "no-store", headers: { Accept: "application/json" } })));
       if (responses.some(response => !response.ok)) throw new Error("MOCK_FIXTURE_UNAVAILABLE");
       const values = await Promise.all(responses.map(response => response.json()));
       const fixtures = Object.fromEntries(paths.map((name,index) => [name, values[index]]));
