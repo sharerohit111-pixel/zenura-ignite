@@ -86,3 +86,17 @@ Official terms reviewed:
 - SEBI 8 May 2026 circular: https://www.sebi.gov.in/sebi_data/attachdocs/may-2026/1778242522289.pdf
 
 This code does not activate any provider, add credentials, open a WebSocket, create real broker orders, or authorize production use.
+
+## Additional product-level SEBI blocker
+
+SEBI's Press Release PR No. 27/2024 dated 4 November 2024, **Advisory on unauthorized virtual trading / gaming platforms**, explicitly addresses public apps/web apps offering virtual trading or paper trading based on listed-company stock-price data and warns that such activity may violate the Securities Contracts (Regulation) Act, 1956 and SEBI Act, 1992. It reiterates that public investment/trading activity must be through/with registered intermediaries and that SEBI/exchange investor grievance protections are unavailable for unauthorized platforms.
+
+Official source: https://www.sebi.gov.in/sebi_data/attachdocs/may-2025/1746683724445.pdf
+
+Therefore, a signed data licence alone is not sufficient. The entire S-TRADE product model and user distribution must be reviewed by qualified Indian securities counsel, and any required regulatory, exchange and provider approvals must be obtained in writing. The 30-day educational-data lag in the 8 May 2026 circular is not an automatic safe harbour or general permission for a public paper-trading platform.
+
+The deployment and runtime gate now requires both:
+- written market-data provider/exchange rights (`MARKET_DATA_RIGHTS_APPROVED` + reference); and
+- separate securities-law/regulatory clearance (`MARKET_DATA_REGULATORY_APPROVED` + reference).
+
+Neither may be populated with placeholder values. Until both are genuinely approved, all Upstox data retrieval and paper fills remain disabled at the active gateway token boundary.
