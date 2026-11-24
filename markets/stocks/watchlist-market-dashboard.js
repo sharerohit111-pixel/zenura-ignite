@@ -46,7 +46,8 @@
    listSelect.textContent="";Object.keys(d.watchlists).forEach(name=>listSelect.append(make("option","",name)));activeList=listSelect.value;
    stockSelect.textContent="";d.stocks.forEach(s=>{const o=make("option","",s.symbol+" · "+s.name);o.value=s.symbol;stockSelect.append(o);});
    listSelect.addEventListener("change",()=>{activeList=listSelect.value;renderDemoWatchlist();});
-   stockSelect.addEventListener("change",renderDemoWatchlist);\n   addButton.addEventListener("click",()=>{if(!fixtureData||!stockSelect.value)return;fixtureData.watchlists[activeList]=addWatchlistItem(fixtureData.watchlists[activeList],stockSelect.value);renderDemoWatchlist();});
+   stockSelect.addEventListener("change",renderDemoWatchlist);
+   addButton.addEventListener("click",()=>{if(!fixtureData||!stockSelect.value)return;fixtureData.watchlists[activeList]=addWatchlistItem(fixtureData.watchlists[activeList],stockSelect.value);renderDemoWatchlist();});
    renderDemoWatchlist();foot.textContent="Fixture source: local JSON · "+f.asOf+" · deterministic synthetic values · not live prices or official exchange status. Demo watchlist edits remain in memory for this page session.";
   }
   fetch("./mock/market-dashboard.json",{cache:"no-store"}).then(r=>{if(!r.ok)throw Error("Demo market fixture unavailable.");return r.json();}).then(render).catch(e=>{status.textContent="Demo dashboard unavailable: "+e.message;});
