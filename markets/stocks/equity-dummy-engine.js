@@ -127,30 +127,39 @@
       assert(safeInt(totalPaise), 'Execution total exceeds safe integer range.');
 
       if (order.side === 'BUY') {
+        let reservedRelease = 0;
         if (order.orderType === 'LIMIT') {
-          const reservedRelease = order.reservedCashRemainingPaise === order.remainingReservedCashPaise
+          reservedRelease = quantity === order.remainingQuantity
             ? order.remainingReservedCashPaise
             : Math.floor(order.remainingReservedCashPaise * quantity / order.remainingQuantity);
+          assert(reservedRelease <= state.reservedCashPaise, 'Invalid demo cash reservation.');
+        }
+        // Validate before changing reservations or balances so a rejected fill is atomic.
+        assert(availableCashPaise() + reservedRelease >= totalPaise, 'Insufficient available demo cash for execution.');
+        if (order.orderType === 'LIMIT') {
           order.remainingReservedCashPaise -= reservedRelease;
           state.reservedCashPaise -= reservedRelease;
         }
-        assert(availableCashPaise() >= totalPaise, 'Insufficient available demo cash for execution.');
         state.cashPaise -= totalPaise;
         p.quantity += quantity;
         p.costBasisPaise += totalPaise;
       } else {
-        if (order.orderType === 'LIMIT') {
-          p.reservedQuantity -= quantity;
-          order.remainingReservedQuantity -= quantity;
-        }
         assert(p.quantity >= quantity, 'Insufficient demo shares for SELL execution.');
+        if (order.orderType === 'LIMIT') {
+          assert(p.reservedQuantity >= quantity && order.remainingReservedQuantity >= quantity, 'Invalid demo share reservation.');
+        }
+        const proceedsPaise = grossPaise - chargesPaise;
+        assert(proceedsPaise >= 0, 'Demo charges cannot exceed SELL proceeds.');
         // Assign the exact residual basis to the final close; intermediate rounding is deterministic.
         const basisPaise = quantity === p.quantity
           ? p.costBasisPaise
           : Math.floor(p.costBasisPaise * quantity / p.quantity);
+        if (order.orderType === 'LIMIT') {
+          p.reservedQuantity -= quantity;
+          order.remainingReservedQuantity -= quantity;
+        }
         p.quantity -= quantity;
         p.costBasisPaise -= basisPaise;
-        const proceedsPaise = grossPaise - chargesPaise;
         state.cashPaise += proceedsPaise;
         order.realizedPnlPaise += proceedsPaise - basisPaise;
       }
