@@ -20,55 +20,68 @@ require.cache[instrumentModule]={id:instrumentModule,filename:instrumentModule,l
 const tokenModule=require.resolve("../lib/upstox-token-crypto");
 require.cache[tokenModule]={id:tokenModule,filename:tokenModule,loaded:true,exports:{decryptUpstoxToken:()=>"test-upstox-access-token",encryptUpstoxToken:()=>({})}};
 const supabaseModule=require.resolve("@supabase/supabase-js");
-require.cache[supabaseModule]={
-  id:supabaseModule,filename:supabaseModule,loaded:true,
-  exports:{createClient:(_url,key)=>({
-    auth:{getUser:async token=>authenticated&&token==="valid-options-test-token"
-      ?{data:{user:{id:TEST_USER_ID,email:"options@example.test"}},error:null}
-      :{data:{user:null},error:{message:"invalid token"}}},
-    from(table){
-      userQueries.push({table,key});
-      const query={
-        select(){return this;},eq(){return this;},order(){return this;},in(){return this;},
-        limit(){return Promise.resolve({data:[],error:null});},
-        maybeSingle(){
-          if(table==="upstox_connections")return Promise.resolve({data:{
-            status:"connected",
-            token_expires_at:new Date(Date.now()+60_000).toISOString(),
-            token_ciphertext:{iv:"test-iv",ciphertext:"test-ciphertext",tag:"test-tag"}
-          },error:null});
-          if(table==="paper_accounts")return Promise.resolve({data:{
-            cash_paise:100000000,reserved_cash_paise:0,reserved_margin_paise:0
-          },error:null});
-          if(table==="paper_derivative_positions")return Promise.resolve({data:{
-            net_quantity:65,reserved_quantity:0
-          },error:null});
-          if(table==="paper_exchange_sessions"){
-            const sessionDate=new Date(Date.now()+330*60_000).toISOString().slice(0,10);
-            return Promise.resolve({data:{
-              exchange:"NSE",session_date:sessionDate,is_trading_day:true,
-              open_minute:555,close_minute:930,session_kind:"REGULAR",
-              source_reference:"authenticated-options-test-fixture",
-              verified_at:new Date(Date.now()-60_000).toISOString(),
-              source_sha256:"a".repeat(64)
+require.cache[supabaseModule] = {
+  id: supabaseModule,
+  filename: supabaseModule,
+  loaded: true,
+  exports: {
+    createClient: (_url, key) => ({
+      auth: {
+        getUser: async token => authenticated && token === "valid-options-test-token"
+          ? {data:{user:{id:TEST_USER_ID,email:"options@example.test"}},error:null}
+          : {data:{user:null},error:{message:"invalid token"}}
+      },
+      from(table) {
+        userQueries.push({table,key});
+        const query = {
+          select(){return this;},
+          eq(){return this;},
+          order(){return this;},
+          in(){return this;},
+          limit(){return Promise.resolve({data:[],error:null});},
+          maybeSingle(){
+            if(table==="upstox_connections")return Promise.resolve({data:{
+              status:"connected",
+              token_expires_at:new Date(Date.now()+60_000).toISOString(),
+              token_ciphertext:{iv:"test-iv",ciphertext:"test-ciphertext",tag:"test-tag"}
             },error:null});
+            if(table==="paper_accounts")return Promise.resolve({data:{
+              cash_paise:100000000,reserved_cash_paise:0,reserved_margin_paise:0
+            },error:null});
+            if(table==="paper_derivative_positions")return Promise.resolve({data:{
+              net_quantity:65,reserved_quantity:0
+            },error:null});
+            if(table==="paper_exchange_sessions"){
+              const sessionDate=new Date(Date.now()+330*60_000).toISOString().slice(0,10);
+              return Promise.resolve({data:{
+                exchange:"NSE",session_date:sessionDate,is_trading_day:true,
+                open_minute:555,close_minute:930,session_kind:"REGULAR",
+                source_reference:"authenticated-options-test-fixture",
+                verified_at:new Date(Date.now()-60_000).toISOString(),
+                source_sha256:"a".repeat(64)
+              },error:null});
+            }
+            return Promise.resolve({data:null,error:null});
           }
-          return Promise.resolve({data:null,error:null});
-        }
-      };
-      return query;
-    },
-    rpc:async(name,args)=>{rpcCalls.push({name,args,key});
-      if(name==="submit_paper_option_limit_order")return {data:{
-        order_id:args.p_order_id,status:"PENDING",reserved_cash_paise:args.p_side==="BUY"?83646:0,
-        reserved_close_quantity:args.p_side==="SELL"?65:0,idempotent_replay:false
-      },error:null};
-      return {data:{
-        order_id:args.p_order_id,status:"CANCELLED",released_cash_paise:0,
-        released_close_quantity:0,idempotent_replay:false
-      },error:null};
-    }}
-  })}
+        };
+        return query;
+      },
+      rpc: async (name,args) => {
+        rpcCalls.push({name,args,key});
+        if(name==="submit_paper_option_limit_order")return {data:{
+          order_id:args.p_order_id,status:"PENDING",
+          reserved_cash_paise:args.p_side==="BUY"?83646:0,
+          reserved_close_quantity:args.p_side==="SELL"?65:0,
+          idempotent_replay:false
+        },error:null};
+        return {data:{
+          order_id:args.p_order_id,status:"CANCELLED",
+          released_cash_paise:0,released_close_quantity:0,
+          idempotent_replay:false
+        },error:null};
+      }
+    })
+  }
 };
 
 const {app,paperOptionLimitWorkerStatus}=require("../supabase-server");
