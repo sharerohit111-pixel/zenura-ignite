@@ -7,9 +7,9 @@ function fail(code) { throw new TypeError(code); }
 function isObject(value) { return value !== null && typeof value === "object" && !Array.isArray(value); }
 function clone(value) { return JSON.parse(JSON.stringify(value)); }
 function deepFreeze(value) {
-  if (value && typeof value === "object" && !Object.isFrozen(value)) {
-    Object.freeze(value);
+  if (value && typeof value === "object") {
     for (const child of Object.values(value)) deepFreeze(child);
+    if (!Object.isFrozen(value)) Object.freeze(value);
   }
   return value;
 }
