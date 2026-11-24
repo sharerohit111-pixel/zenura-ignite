@@ -42,10 +42,11 @@ test("does not count futures or non-NSE option records as NSE options",()=>{
  assert.equal(r.blockedPremiumPaise,0);
 });
 
-test("rejects non-integer paise, broken lot sizes and over-reserved closes",()=>{
+test("rejects non-integer paise, broken lot sizes, over-reserved closes and reservation drift",()=>{
  assert.throws(()=>buildOptionsAccountingSnapshot({...base,account:{...base.account,cash_paise:1.5}}),/safe integer/);
  assert.throws(()=>buildOptionsAccountingSnapshot({...base,positions:[{...base.positions[0],net_quantity:64}]}),/lot-size/);
  assert.throws(()=>buildOptionsAccountingSnapshot({...base,positions:[{...base.positions[0],reserved_quantity:66}]}),/lot-size/);
+ assert.throws(()=>buildOptionsAccountingSnapshot({...base,positions:[{...base.positions[0],reserved_quantity:0}]}),/does not reconcile/);
 });
 
 test("rejects stale future quotes and unsafe arithmetic",()=>{
