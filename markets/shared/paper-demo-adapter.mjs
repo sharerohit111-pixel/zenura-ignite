@@ -96,6 +96,10 @@ export function createPaperDemoViewModel(fixtures, options = {}) {
         !Number.isSafeInteger(level.quantity) || level.quantity < 0) fail("INVALID_SYNTHETIC_DEPTH_LEVEL");
   }
 
+  if (typeof account.accountId !== "string" || !/^mock-[a-z0-9-]+$/.test(account.accountId) ||
+      ["name","email","phone","mobile","address"].some(field => Object.prototype.hasOwnProperty.call(account, field))) {
+    fail("INVALID_MOCK_ACCOUNT_IDENTITY");
+  }
   if (account.currency !== "INR" || account.startingCapitalPaise !== 100000000 ||
       !Number.isSafeInteger(account.cashBalancePaise) || !Number.isSafeInteger(account.blockedFundsPaise) ||
       !Number.isSafeInteger(account.availableFundsPaise) ||
