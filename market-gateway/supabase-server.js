@@ -51,6 +51,7 @@ const {nextUpstoxTokenExpiry}=require("../functions/lib/upstox-token-expiry");
 const {isUsableUpstoxTokenResponse}=require("../functions/lib/upstox-token-response");
 const {isUsableUpstoxOAuthCallback}=require("../functions/lib/upstox-oauth-callback-input");
 const {validateHttpsRedirectUri}=require("./lib/redirect-uri-policy");
+const {assertMarketDataRightsApproved}=require("./lib/market-data-rights-gate");
 
 const PORT=Number(process.env.PORT||8080);
 const SUPABASE_URL=process.env.SUPABASE_URL;
@@ -146,6 +147,9 @@ function connectionUsable(connection){
     &&connection.tokenCiphertext&&typeof connection.tokenCiphertext==="object";
 }
 async function getUpstoxAccessToken(userId){
+  // The deploy-time gate alone is insufficient: enforce the same approval at
+  // runtime for every quote, candle, depth, stream and paper-fill caller.
+  assertMarketDataRightsApproved(process.env);
   const connection=await getConnection(userId);
   if(!connection)throw Object.assign(new Error("Connect your Upstox account before requesting market data."),{status:403});
   if(!connectionUsable(connection))throw Object.assign(new Error("Upstox token expired. Reconnect your account."),{status:403});
