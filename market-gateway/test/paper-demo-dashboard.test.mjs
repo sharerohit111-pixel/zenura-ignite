@@ -81,7 +81,7 @@ test("private Demo watchlists use the canonical MOCK catalog and authenticated p
  assert.match(source,/new Set\(\[\.\.\.next\.map/);
  assert.match(source,/MAX_ITEMS=50/);
  assert.match(source,/currentCatalogItem\(x\.instrument_key\)/);
- assert.match(source,/preservedItems/);
+ assert.match(source,/preservedItems/);\n assert.match(source,/partitionPrivateWatchlistItems/);\n assert.match(source,/isCurrentWatchlistRequest/);\n assert.match(source,/mutatePrivateWatchlist/);
  assert.match(source,/Account changed/);
  assert.match(source,/window\.ZENURA_SUPABASE/);
  assert.match(source,/zenura-market-auth-ready/);
@@ -98,6 +98,6 @@ test("responsive demo assets are included in the Markets PWA shell",async()=>{
  const sw=await readFile(new URL("../../markets/service-worker.js",import.meta.url),"utf8");
  assert.match(css,/@media\(max-width:900px\)/);
  assert.match(css,/@media\(max-width:520px\)/);
- assert.match(sw,/zenura-markets-shell-v6/);
- for(const asset of ["stocks/demo.html","stocks/demo.css","stocks/demo.js","stocks/demo-chart-panel.mjs","stocks/demo-chart-data.mjs","stocks/demo-watchlist-persistence.mjs","shared/paper-demo-adapter.mjs"])assert.ok(sw.includes(asset));
+ assert.match(sw,/zenura-markets-shell-v7/);
+ for(const asset of ["stocks/demo.html","stocks/demo.css","stocks/demo.js","stocks/demo-chart-panel.mjs","stocks/demo-chart-data.mjs","stocks/demo-watchlist-persistence.mjs","stocks/demo-watchlist-state.mjs","shared/paper-demo-adapter.mjs"])assert.ok(sw.includes(asset));
 });
