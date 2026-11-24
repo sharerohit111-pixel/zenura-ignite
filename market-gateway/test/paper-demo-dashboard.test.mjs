@@ -8,10 +8,11 @@ const read=async name=>readFile(new URL(name,root),"utf8");
 const screens=["home","market","watchlists","charts","equity","futures","options","orders","trades","portfolio","positions","holdings","account","profile","settings"];
 
 test("demo route loads the canonical shared adapter and exposes all 15 screens",async()=>{
- const html=await read("demo.html"),js=await read("demo.js");
- assert.match(html,/type="module" src="\.\/demo\.js"/);
+ const html=await read("demo.html"),js=await read("demo.js"),index=await read("index.html");
+ assert.match(html,/type="module" src="\.\/demo.js"/);
  assert.match(js,/from "\.\.\/shared\/paper-demo-adapter\.mjs"/);
  for(const screen of screens)assert.match(html,new RegExp('data-screen="'+screen+'"'));
+ assert.match(index,/href="\.\/demo\.html">OPEN DEMO MODE/);
 });
 test("demo route loads only shared synthetic fixtures with explicit opt-in",async()=>{
  const js=await read("demo.js");
@@ -42,4 +43,12 @@ test("canonical adapter can build the dashboard view model from shared fixtures"
  assert.equal(model.market.instruments.length,2);
  assert.equal(model.orders.length,3);
  assert.equal(model.account.ledgerReconciled,false);
+});
+test("responsive demo assets are included in the Markets PWA shell",async()=>{
+ const css=await read("demo.css");
+ const sw=await readFile(new URL("../../markets/service-worker.js",import.meta.url),"utf8");
+ assert.match(css,/@media\(max-width:900px\)/);
+ assert.match(css,/@media\(max-width:520px\)/);
+ assert.match(sw,/zenura-markets-shell-v3/);
+ for(const asset of ["stocks/demo.html","stocks/demo.css","stocks/demo.js","shared/paper-demo-adapter.mjs"])assert.ok(sw.includes(asset));
 });
