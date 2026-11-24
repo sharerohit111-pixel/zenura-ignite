@@ -96,16 +96,31 @@ const paperIntradayLimitWorkerStatus={enabled:false,intervalMs:null,lastRunAt:nu
 const paperFuturesLimitWorkerStatus={enabled:false,intervalMs:null,lastRunAt:null,lastCycle:null};
 const paperOptionLimitWorkerStatus={enabled:false,intervalMs:null,lastRunAt:null,lastCycle:null};
 const activeUserStreams=new Map();
-function fetchProvider(url,options={},timeoutMs=15000){
-  let isUpstoxApi=false;
-  try{isUpstoxApi=new URL(url).hostname==="api.upstox.com";}catch(_error){}
+async function fetchProvider(url,options={},timeoutMs=15000){
+  let parsed=null;
+  try{parsed=new URL(url);}catch(_error){}
+  const isUpstoxApi=parsed?.hostname==="api.upstox.com";
+  const isMarketDataCall=isUpstoxApi&&(
+    parsed.pathname.startsWith("/v3/market-quote/")
+    ||parsed.pathname.startsWith("/v3/historical-candle/")
+    ||parsed.pathname==="/v2/option/chain"
+    ||parsed.pathname==="/v3/feed/market-data-feed/authorize"
+  );
+  if(isMarketDataCall){
+    const control=await serviceDb.from("s_trade_operational_controls").select("enabled")
+      .eq("control_key","provider_upstox_enabled").maybeSingle();
+    if(control.error)throw Object.assign(new Error("Provider operational control could not be verified."),{status:503});
+    if(control.data&&control.data.enabled===false)
+      throw Object.assign(new Error("Upstox market-data access is temporarily paused by an administrator."),{status:503});
+  }
   const startedAt=Date.now();
   const record=(ok)=>{if(isUpstoxApi)serviceDb.rpc("s_trade_record_provider_health",{
     p_provider:"upstox",p_ok:ok,p_latency_ms:Math.min(120000,Math.max(0,Date.now()-startedAt))
   }).catch(()=>{});};
-  return fetchProviderWithTimeout(fetch,url,options,timeoutMs).then(response=>{
+  try{
+    const response=await fetchProviderWithTimeout(fetch,url,options,timeoutMs);
     record(response.ok);return response;
-  }).catch(error=>{record(false);throw error;});
+  }catch(error){record(false);throw error;}
 }
 function errorStatus(error){
   if(Number.isInteger(error?.status))return error.status;
