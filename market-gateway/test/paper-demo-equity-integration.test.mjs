@@ -67,6 +67,9 @@ test("PWA caches the simulator and synthetic fixtures; production gateway stays 
   assert.match(sw, /stocks\/demo-chart-panel\.mjs/);
   assert.match(sw, /stocks\/demo-chart-data\.mjs/);
   assert.match(sw, /equity-demo-execution-engine\.js/);
+  assert.match(sw, /fixtures\/market\.json/);
+  assert.match(sw, /fixtures\/equity\.json/);
+  assert.match(sw, /fixtures\/derivatives\.json/);
   assert.match(sw, /fixtures\/equity-execution\.json/);
   assert.match(sw, /SHELL\.includes\(url\.toString\(\)\)/);
   assert.match(sw, /if\(shellAsset\|\|/);
