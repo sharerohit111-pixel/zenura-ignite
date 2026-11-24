@@ -25,6 +25,7 @@ on:
       - "market-gateway/test/distributed-provider-rate-limit.test.js"
       - "supabase/migrations/*market_data_distributed_provider_quotas.sql"
       - "market-gateway/PROVIDER-CAPABILITY-MATRIX.md"
+      - "market-gateway/MARKET-DATA-COMPLIANCE.md"
       - "market-gateway/PROVIDER-ROUTING-OPERATIONS.md"
       - ".github/workflows/s-trade-provider-contract-checks.yml"
   pull_request:
