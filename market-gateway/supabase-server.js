@@ -292,11 +292,11 @@ app.get("/market-depth",async(req,res)=>{
     if(instrument.instrument_type==="FUT"){
       if(!futuresDepthAdapter)return res.status(503).json({error:"Futures depth is owned by the dedicated Futures market-data adapter. Merge the Futures instrument foundation before enabling this view."});
       const tickSizePaise=Math.round(Number(instrument.tick_size)*100);
-      const snapshot=futuresDepthAdapter.normalizeDepthSnapshot(payload,{instrumentKey,instrumentKey:instrumentKey,tickSizePaise,nowMs,maxAgeMs:15000});
+      const snapshot=futuresDepthAdapter.normalizeDepthSnapshot(payload,{instrumentKey,tickSizePaise,nowMs,maxAgeMs:15000});
       const quote=Object.values(payload.data||{}).find(item=>item?.instrument_token===instrumentKey);
       const bids=snapshot.bids.map((level,index)=>({...level,orders:Number.isSafeInteger(quote?.depth?.buy?.[index]?.orders)?quote.depth.buy[index].orders:null}));
       const asks=snapshot.asks.map((level,index)=>({...level,orders:Number.isSafeInteger(quote?.depth?.sell?.[index]?.orders)?quote.depth.sell[index].orders:null}));
-      return res.set("Cache-Control","private, no-store").json({provider:"UPSTOX",instrumentKey,timestampMs:snapshot.timestampMs,ageMs:snapshot.ageMs,status:"fresh",bids,asks,ohlc:{},lastPricePaise:pricePaise(quote?.last_price),volume:Number.isSafeInteger(quote?.volume)?quote.volume:null});
+      return res.set("Cache-Control","private, no-store").json({provider:"UPSTOX",instrumentKey,timestampMs:snapshot.timestampMs,ageMs:snapshot.ageMs,status:"fresh",bids,asks,ohlc:{},volume:Number.isSafeInteger(quote?.volume)?quote.volume:null});
     }
     const snapshot=normalizeMarketDepthQuote(payload,instrument,{nowMs,maxAgeMs:15000});
     res.set("Cache-Control","private, no-store").json(snapshot);
