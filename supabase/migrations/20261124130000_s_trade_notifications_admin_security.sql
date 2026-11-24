@@ -1,6 +1,8 @@
 -- S-TRADE notifications, price alerts, admin governance and operational controls.
 -- Draft-only migration. Never apply to production without reviewed staging rehearsal.
 
+-- No application endpoint can grant administrator access. Seed the first administrator
+-- through a separately reviewed, privileged database operation with a documented reason.
 CREATE TABLE IF NOT EXISTS public.s_trade_admins (
   user_id uuid PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   granted_at timestamptz NOT NULL DEFAULT clock_timestamp(),
@@ -179,10 +181,14 @@ CREATE OR REPLACE FUNCTION public.s_trade_evaluate_price_alert(
 ) RETURNS boolean LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
 DECLARE v_alert public.s_trade_price_alerts%ROWTYPE;
 DECLARE v_enabled boolean;
+DECLARE v_alerts_globally_enabled boolean;
 BEGIN
   IF p_alert_id IS NULL OR p_observed_price IS NULL OR p_observed_price<=0 OR p_observed_price>=1000000000000 THEN
     RAISE EXCEPTION 'Invalid price alert observation' USING ERRCODE='22023';
   END IF;
+  SELECT enabled INTO v_alerts_globally_enabled FROM public.s_trade_operational_controls
+   WHERE control_key='price_alerts_enabled';
+  IF FOUND AND NOT v_alerts_globally_enabled THEN RETURN false; END IF;
   SELECT * INTO v_alert FROM public.s_trade_price_alerts
    WHERE alert_id=p_alert_id AND active=true FOR UPDATE;
   IF NOT FOUND THEN RETURN false; END IF;
