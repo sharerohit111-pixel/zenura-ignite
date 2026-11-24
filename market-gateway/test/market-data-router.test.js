@@ -39,7 +39,7 @@ function provider(providerId, getQuote) {
     getHealth: async () => ({ healthy: true }),
   };
 }
-function makeRouter(providers, entitlementResolver = async ({ providerId }) => ({ approved: true, paperTradingAllowed: true, redistributionAllowed: true, reference: "entitlement-" + providerId, rightsApprovalReference: "written-rights-" + providerId })) {
+function makeRouter(providers, entitlementResolver = async ({ providerId }) => ({ approved: true, paperTradingAllowed: true, redistributionAllowed: true, reference: "entitlement-" + providerId, rightsApprovalReference: "written-rights-" + providerId, regulatoryApprovalReference: "regulatory-" + providerId })) {
   return new MarketDataProviderRouter({
     providers: new Map(providers),
     plan,
@@ -132,7 +132,7 @@ test("distributed quota denial skips that provider and never calls its upstream 
   const router = new MarketDataProviderRouter({
     providers: new Map([["upstox", primary], ["angelone", fallback]]),
     plan, rateLimiter,
-    entitlementResolver: async ({ providerId }) => ({ approved: true, paperTradingAllowed: true, redistributionAllowed: true, reference: "entitlement-" + providerId, rightsApprovalReference: "written-rights-" + providerId }),
+    entitlementResolver: async ({ providerId }) => ({ approved: true, paperTradingAllowed: true, redistributionAllowed: true, reference: "entitlement-" + providerId, rightsApprovalReference: "written-rights-" + providerId, regulatoryApprovalReference: "regulatory-" + providerId }),
     clock: () => NOW,
   });
   const result = await router.route("quote", {}, request);
@@ -148,7 +148,7 @@ test("distributed quota service failure fails closed when no other provider is c
     providers: new Map([["upstox", primary]]),
     plan: { ...plan, quote: ["upstox"] },
     rateLimiter: { consume: async () => { throw Object.assign(new Error("quota db down"), { status: 503 }); } },
-    entitlementResolver: async () => ({ approved: true, paperTradingAllowed: true, redistributionAllowed: true, reference: "entitlement-upstox", rightsApprovalReference: "written-rights-upstox" }),
+    entitlementResolver: async () => ({ approved: true, paperTradingAllowed: true, redistributionAllowed: true, reference: "entitlement-upstox", rightsApprovalReference: "written-rights-upstox", regulatoryApprovalReference: "regulatory-upstox" }),
     clock: () => NOW,
   });
   await assert.rejects(router.route("quote", {}, request), { code: "market_data_unavailable", status: 503 });
