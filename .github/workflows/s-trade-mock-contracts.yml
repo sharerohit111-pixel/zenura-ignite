@@ -8,6 +8,8 @@ on:
       - "market-gateway/mock/**"
       - "market-gateway/lib/paper-mock-fixtures.js"
       - "market-gateway/test/paper-mock-fixtures.test.js"
+      - "markets/shared/paper-demo-adapter.mjs"
+      - "market-gateway/test/paper-demo-adapter.test.mjs"
       - ".github/workflows/s-trade-mock-contracts.yml"
   push:
     branches:
@@ -45,6 +47,8 @@ jobs:
           NODE
       - name: Run deterministic fixture tests
         run: node --test market-gateway/test/paper-mock-fixtures.test.js
+      - name: Run shared browser-safe demo adapter tests
+        run: node --test market-gateway/test/paper-demo-adapter.test.mjs
       - name: Ensure fixture loader is not wired into production gateway
         run: |
           if grep -R "paper-mock-fixtures" market-gateway/supabase-server.js market-gateway/server.js; then
