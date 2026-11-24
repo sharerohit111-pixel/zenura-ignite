@@ -60,4 +60,8 @@ Required next ledger phase:
 
 ## Validation status
 
-GitHub Actions has executed the account browser checks on the PR head, but the latest completed run failed only because a regression assertion expected the wrong literal for the production mock-button removal (`else mockButton.remove()`). That assertion has now been corrected on the current PR head; a new exact-head run is pending/not yet reported. Do not claim green CI until that run completes. SMS delivery/provider setup and real browser end-to-end flows remain external release gates.
+- Latest exact-head GitHub Actions run: `45378387994` — **success, 67/67 steps, 0 failures**.
+- The native Auth module syntax checks, email-auth tests, account-settings tests, gateway regression suite, production image boundary checks, disposable PostgreSQL migration suite, account initialization/read isolation and RLS/tenant-isolation checks all completed successfully in that workflow.
+- The earlier failed run was caused by a brittle test assertion that expected a different literal for localhost-only mock-button removal; the assertion was corrected and the exact-head workflow subsequently passed.
+- The current Auth tests are Node-based module/source and account behavior checks; they are not real browser-driven end-to-end tests. Browser-based registration, OAuth callback, SMS OTP, password recovery and two-user UI isolation tests remain release gates.
+- SMS delivery/provider setup and real Supabase Google/SMS provider verification remain external release gates. CI success does not establish that external providers are configured or that real users have completed sign-in.
