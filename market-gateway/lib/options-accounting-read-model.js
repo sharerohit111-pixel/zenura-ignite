@@ -5,6 +5,7 @@
 // to the caller; this module only accepts normalized provider-agnostic snapshots.
 
 const OPEN_ORDER_STATUSES = new Set(["PENDING", "PARTIALLY_FILLED"]);
+const TERMINAL_ORDER_STATUSES = new Set(["FILLED", "CANCELLED", "EXPIRED", "REJECTED"]);
 const OPTION_TYPES = new Set(["CE", "PE"]);
 
 function fail(message) {
@@ -48,12 +49,19 @@ function normalizeLimitOrder(order) {
   const filled = integer(order.filled_quantity ?? 0, "LIMIT filled quantity");
   const remaining = integer(order.remaining_quantity ?? quantity - filled, "LIMIT remaining quantity");
   const lotSize = integer(order.lot_size, "LIMIT lot size", { min: 1 });
-  if (quantity % lotSize !== 0 || filled > quantity || filled + remaining !== quantity) {
-    fail("Options LIMIT order quantity, fills, remaining quantity, or lot size do not reconcile.");
+  if (quantity % lotSize !== 0 || filled > quantity || filled + remaining !== quantity
+      || (!OPEN_ORDER_STATUSES.has(order.status) && !TERMINAL_ORDER_STATUSES.has(order.status))
+      || (order.status === "PENDING" && filled !== 0)
+      || (order.status === "PARTIALLY_FILLED" && (filled < 1 || remaining < 1))
+      || (order.status === "FILLED" && (filled !== quantity || remaining !== 0))) {
+    fail("Options LIMIT order quantity, fills, remaining quantity, status, or lot size do not reconcile.");
   }
   const reservedCash = integer(order.reserved_cash_paise ?? 0, "Order reserved premium");
   const reservedClose = integer(order.reserved_close_quantity ?? 0, "Order reserved close quantity");
   const active = OPEN_ORDER_STATUSES.has(order.status);
+  if (order.reservation_released !== undefined && order.reservation_released !== !active) {
+    fail("Options LIMIT reservation-release flag does not match its lifecycle state.");
+  }
   if (order.side === "BUY") {
     if (reservedClose !== 0 || (active && reservedCash < 1) || (!active && reservedCash !== 0)) {
       fail("Options LIMIT BUY reservation does not match its lifecycle state.");
