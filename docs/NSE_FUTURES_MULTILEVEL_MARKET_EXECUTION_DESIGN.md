@@ -42,6 +42,10 @@ The parser/helper must accept the full provider depth array for the exact instru
 
 Do not mix levels from separate snapshots or combine REST and streaming depth. Retain source timestamp and a deterministic hash of the canonical consumed snapshot/levels for audit and replay comparison. Never trust a client-supplied depth array.
 
+## 3A. Depth helper status (PR #109)
+
+The isolated helper in PR #109 now computes a deterministic SHA-256 `snapshotHash` from the validated instrument key, provider timestamp, and normalized full bid/ask levels. The implementation and regression assertion are on branch `feature/nse-futures-depth-sweep-helper-2026-11-23` (latest test commit `6c8195308ea5c3893483d1a1cdc4e944354b0e94`). This remains a pure simulation helper: it does not fetch provider data, persist an order, or authorize accounting writes. Its PR has no verified CI run for the new commits yet. The hash is audit/replay metadata only; the future atomic RPC must independently validate the supplied fill structure and idempotency payload rather than trusting a client-provided hash.
+
 ## 4. Atomic transaction contract — coordination required
 
 A future implementation must extend or replace the single-price MARKET RPC with one service-only atomic batch contract. Proposed input conceptually includes:
