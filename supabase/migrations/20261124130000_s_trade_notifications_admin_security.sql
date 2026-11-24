@@ -74,7 +74,7 @@ CREATE TABLE IF NOT EXISTS public.s_trade_operational_controls (
 
 CREATE TABLE IF NOT EXISTS public.s_trade_admin_audit_log (
   audit_id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-  actor_user_id uuid REFERENCES auth.users(id) ON DELETE SET NULL,
+  actor_user_id uuid,
   action text NOT NULL CHECK (length(action) BETWEEN 1 AND 100),
   target_type text NOT NULL CHECK (length(target_type) BETWEEN 1 AND 80),
   target_id text,
