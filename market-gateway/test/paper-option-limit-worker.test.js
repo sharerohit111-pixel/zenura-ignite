@@ -125,6 +125,26 @@ test("fills from executable ask, bounds by displayed depth and passes exact quot
  assert.ok(db.calls.some(x=>x.type==="rpc"&&x.name==="release_paper_market_worker_lease"));
 });
 
+test("SELL LIMIT closes only displayed bid depth and sends the bid-side snapshot to SQL",async()=>{
+ const sellOrder={...order,side:"SELL",limit_price_paise:1235,
+  reserved_cash_paise:0,reserved_close_quantity:65};
+ const db=makeDb({orders:[sellOrder]});
+ const result=await createPaperOptionLimitWorker(deps(db))({maxOrders:10});
+ assert.equal(result.scanned,1);
+ assert.equal(result.partial,1);
+ assert.equal(result.filled,0);
+ assert.equal(result.failed,0);
+ const call=db.calls.find(x=>x.type==="rpc"&&x.name==="execute_paper_option_limit_fill");
+ assert.ok(call);
+ assert.equal(call.args.p_fill_quantity,20);
+ assert.equal(call.args.p_execution_price_paise,1235);
+ assert.equal(call.args.p_bid_price_paise,1235);
+ assert.equal(call.args.p_ask_price_paise,1240);
+ assert.equal(call.args.p_bid_quantity,20);
+ assert.equal(call.args.p_ask_quantity,10);
+ assert.equal(call.args.p_now_ms,NOW);
+});
+
 test("fails closed and preserves pending orders when verified session data is missing",async()=>{
  let expireCalls=0,tokenRequested=false;
  const db=makeDb({onRpc:async(name)=>{
