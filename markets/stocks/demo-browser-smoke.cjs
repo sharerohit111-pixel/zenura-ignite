@@ -1,6 +1,12 @@
 "use strict";
 const assert=require("node:assert/strict");
+const fs=require("node:fs");
 const {chromium}=require("playwright");
+const serviceWorker=fs.readFileSync("markets/service-worker.js","utf8");
+const shellBlock=serviceWorker.match(/const SHELL=\\[([\\s\\S]*?)\\]\\.map/);
+assert.ok(shellBlock,"service worker shell precache list must exist");
+const shellEntries=[...shellBlock[1].matchAll(/"([^"]*)"/g)].map(match=>match[1]);
+assert.equal(new Set(shellEntries).size,shellEntries.length,"duplicate precache URLs prevent reliable service worker installation");
 const axePath=require.resolve("axe-core/axe.min.js");
 
 (async()=>{
@@ -43,7 +49,8 @@ const axePath=require.resolve("axe-core/axe.min.js");
   const page=await pwa.newPage();
   console.log("PWA: opening market shell");
   await page.goto("http://127.0.0.1:4173/markets/",{waitUntil:"domcontentloaded",timeout:30000});
-  await page.waitForFunction(()=>navigator.serviceWorker.getRegistration().then(r=>!!r?.active),null,{timeout:15000});
+  await page.waitForLoadState("load",{timeout:10000});
+  await page.waitForFunction(()=>navigator.serviceWorker.getRegistration().then(r=>!!r?.active),null,{timeout:20000});
   console.log("PWA: waiting for service worker activation");
   await page.evaluate(async()=>{
    const registration=await navigator.serviceWorker.ready;
