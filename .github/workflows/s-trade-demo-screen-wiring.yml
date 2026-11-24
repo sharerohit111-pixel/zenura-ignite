@@ -1,0 +1,52 @@
+name: S-TRADE Demo Screen Wiring Tests
+
+on:
+  pull_request:
+    paths:
+      - "markets/shared/paper-demo-adapter.mjs"
+      - "markets/stocks/demo.html"
+      - "markets/stocks/demo.css"
+      - "markets/stocks/demo.js"
+      - "markets/stocks/index.html"
+      - "market-gateway/test/paper-demo-dashboard.test.mjs"
+      - ".github/workflows/s-trade-demo-screen-wiring.yml"
+  push:
+    branches:
+      - feature/s-trade-round2-demo-screen-wiring-2026-11-24
+    paths:
+      - "markets/shared/paper-demo-adapter.mjs"
+      - "markets/stocks/demo.html"
+      - "markets/stocks/demo.css"
+      - "markets/stocks/demo.js"
+      - "markets/stocks/index.html"
+      - "market-gateway/test/paper-demo-dashboard.test.mjs"
+      - ".github/workflows/s-trade-demo-screen-wiring.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  demo-screen-wiring:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Check browser module syntax
+        run: node --check markets/shared/paper-demo-adapter.mjs && node --check markets/stocks/demo.js
+      - name: Validate shared fixtures
+        run: |
+          node - <<'NODE'
+          const fs=require('node:fs');
+          for(const name of ['market','account','equity','derivatives']) JSON.parse(fs.readFileSync('market-gateway/mock/fixtures/'+name+'.json','utf8'));
+          console.log('Parsed all four canonical screen fixtures.');
+          NODE
+      - name: Run adapter and screen integration tests
+        run: node --test market-gateway/test/paper-demo-adapter.test.mjs market-gateway/test/paper-demo-dashboard.test.mjs
+      - name: Guard production gateway isolation
+        run: |
+          if grep -R "paper-demo-adapter" market-gateway/supabase-server.js market-gateway/server.js; then
+            echo "Browser demo adapter must not be imported into production gateway routes."
+            exit 1
+          fi
