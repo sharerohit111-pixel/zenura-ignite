@@ -27,7 +27,8 @@ self.addEventListener("fetch",event=>{
  const request=event.request;
  if(request.method!=="GET"||request.headers.has("authorization"))return;
  const url=new URL(request.url);
- if(url.origin!==BASE.origin||!url.pathname.startsWith(BASE.pathname))return;
+ const shellAsset=SHELL.includes(url.toString());
+ if(url.origin!==BASE.origin||(!url.pathname.startsWith(BASE.pathname)&&!shellAsset))return;
  if(url.searchParams.has("token"))return;
  if(request.mode==="navigate"){
   event.respondWith((async()=>{
@@ -42,7 +43,7 @@ self.addEventListener("fetch",event=>{
   })());
   return;
  }
- if(["style","script","image","font"].includes(request.destination)||url.pathname.endsWith(".webmanifest")){
+ if(shellAsset||["style","script","image","font"].includes(request.destination)||url.pathname.endsWith(".webmanifest")){
   event.respondWith((async()=>{
    const cache=await caches.open(CACHE_NAME),cached=await cache.match(request);
    const network=fetch(request).then(response=>{
