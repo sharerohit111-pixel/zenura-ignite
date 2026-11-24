@@ -28,14 +28,16 @@
   }
   function validateEnvelope(envelope) {
     if (!envelope || envelope.schemaVersion !== "1.0.0" || envelope.mode !== "MOCK" ||
-        envelope.simulated !== true || !envelope.data || !Array.isArray(envelope.data.contracts) ||
+        envelope.simulated !== true || envelope.meta?.source !== "SYNTHETIC_FIXTURE" ||
+        typeof envelope.asOf !== "string" || !Number.isFinite(Date.parse(envelope.asOf)) ||
+        !envelope.data || !Array.isArray(envelope.data.contracts) ||
         !Array.isArray(envelope.data.quotes)) fail("A valid DEMO DATA derivatives fixture is required.");
     return envelope.data;
   }
 
   function createDerivativeMockSimulator(envelope, options) {
     const data = validateEnvelope(envelope);
-    const now = options && Number.isSafeInteger(options.now) ? options.now : Date.now();
+    const now = options && Number.isSafeInteger(options.now) ? options.now : Date.parse(envelope.asOf);
     const contracts = new Map();
     const quotes = new Map();
     const positions = new Map();
