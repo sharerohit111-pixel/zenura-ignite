@@ -17,7 +17,7 @@ INSERT INTO public.paper_derivative_positions(
 DO $expiry_settlement$
 DECLARE
   v_now bigint:=floor(extract(epoch from clock_timestamp())*1000)::bigint;
-  v_settlement_ms bigint:=floor(extract(epoch from ('2026-11-20 10:00:00'::timestamp at time zone 'Asia/Kolkata'))*1000)::bigint;
+  v_settlement_ms bigint:=floor(extract(epoch from ('2026-11-20 16:00:00'::timestamp at time zone 'Asia/Kolkata'))*1000)::bigint;
   v_source text:='NSE official settlement bhavcopy test fixture';
   v_sha text;
   v_result jsonb;
