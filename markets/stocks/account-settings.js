@@ -125,28 +125,31 @@ if (host && !document.getElementById("s-trade-account")) {
   }
 
   $("s-trade-send-otp").addEventListener("click", async () => {
+    const sequence = authSequence;
     const phone = $("s-trade-phone").value.trim();
     if (!/^\+[1-9]\d{7,14}$/.test(phone)) { status.textContent = "Enter a valid international phone number, for example +91XXXXXXXXXX."; return; }
     setBusy(["s-trade-send-otp","s-trade-verify-otp"], true);
     try {
       const { error } = await supabase.auth.signInWithOtp({ phone, options: { shouldCreateUser: true } });
       if (error) throw error;
+      if (sequence !== authSequence) return;
       status.textContent = "OTP sent. Check your SMS and verify the code.";
       $("s-trade-otp").focus();
     } catch (error) {
-      status.textContent = error.message || "OTP could not be sent. Check Supabase Phone provider configuration.";
+      if (sequence === authSequence) status.textContent = error.message || "OTP could not be sent. Check Supabase Phone provider configuration.";
     } finally { setBusy(["s-trade-send-otp","s-trade-verify-otp"], false); }
   });
   $("s-trade-verify-otp").addEventListener("click", async () => {
+    const sequence = authSequence;
     const phone = $("s-trade-phone").value.trim(), token = $("s-trade-otp").value.trim();
     if (!/^\+[1-9]\d{7,14}$/.test(phone) || !/^\d{4,8}$/.test(token)) { status.textContent = "Enter the same mobile number and the SMS OTP."; return; }
     setBusy(["s-trade-send-otp","s-trade-verify-otp"], true);
     try {
       const { data, error } = await supabase.auth.verifyOtp({ phone, token, type: "sms" });
       if (error) throw error;
-      await syncAuth(data.session);
+      if (sequence === authSequence) await syncAuth(data.session);
     } catch (error) {
-      status.textContent = error.message || "OTP verification failed.";
+      if (sequence === authSequence) status.textContent = error.message || "OTP verification failed.";
     } finally { setBusy(["s-trade-send-otp","s-trade-verify-otp"], false); }
   });
   $("s-trade-update-email").addEventListener("click", async () => {
