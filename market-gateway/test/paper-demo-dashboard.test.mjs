@@ -95,19 +95,19 @@ test("responsive demo assets are included in the Markets PWA shell",async()=>{
 
 test("Equity Demo runtime guard defaults to production and never hardcodes development",async()=>{
  const panel=await read("demo-equity-panel.mjs");
- assert.match(panel,/window\\.ZENURA_RUNTIME_ENV/);
- assert.match(panel,/:"production"\\}/);
- assert.doesNotMatch(panel,/env:\\{NODE_ENV:"development"\\}/);
+ assert.match(panel,/window\.ZENURA_RUNTIME_ENV/);
+ assert.match(panel,/:"production"\}/);
+ assert.doesNotMatch(panel,/env:\{NODE_ENV:"development"\}/);
 });
 test("service worker caches only explicitly allowlisted navigation documents",async()=>{
  const sw=await readFile(new URL("../../markets/service-worker.js",import.meta.url),"utf8");
- assert.match(sw,/if\\(request\\.mode==="navigate"\\)\\{[\\s\\S]*?if\\(!shellAsset\\)return;/);
+ assert.match(sw,/if\(request\.mode==="navigate"\)\{[\s\S]*?if\(!shellAsset\)return;/);
  assert.match(sw,/Only explicitly listed static shell documents may be cached/);
 });
 test("Demo entrypoint excludes authenticated, broker and production order modules",async()=>{
  const html=await read("demo.html"),js=await read("demo.js"),equity=await read("demo-equity-panel.mjs"),fo=await read("demo-derivative-panel.mjs");
- assert.doesNotMatch(html,/(?:supabase-client|connect|email-auth|live-quote|order-workspace|stocks\\.js)/i);
- assert.doesNotMatch(js,/fetch\\s*\\([^)]*(?:\\/paper\\/|\\/s-trade\\/|\\/orders)/i);
- assert.doesNotMatch(equity,/fetch\\s*\\([^)]*(?:\\/paper\\/|\\/s-trade\\/|\\/orders)/i);
- assert.doesNotMatch(fo,/fetch\\s*\\([^)]*(?:\\/paper\\/|\\/s-trade\\/|\\/orders)/i);
+ assert.doesNotMatch(html,/(?:supabase-client|connect|email-auth|live-quote|order-workspace|stocks\.js)/i);
+ assert.doesNotMatch(js,/fetch\s*\([^)]*(?:\/paper\/|\/s-trade\/|\/orders)/i);
+ assert.doesNotMatch(equity,/fetch\s*\([^)]*(?:\/paper\/|\/s-trade\/|\/orders)/i);
+ assert.doesNotMatch(fo,/fetch\s*\([^)]*(?:\/paper\/|\/s-trade\/|\/orders)/i);
 });
