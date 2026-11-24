@@ -5,6 +5,19 @@ insert into auth.users(id) values ('abababab-abab-4bab-8bab-abababababab')
 on conflict(id) do nothing;
 select public.initialize_paper_trading_account('abababab-abab-4bab-8bab-abababababab');
 
+insert into public.paper_exchange_sessions(
+  exchange,session_date,is_trading_day,open_minute,close_minute,
+  session_kind,source_reference,verified_at,source_sha256
+) values
+  ('NSE',current_date-1,true,0,1440,'SPECIAL',
+   'https://www.nseindia.com/market-data/holidays',clock_timestamp(),repeat('a',64)),
+  ('NSE',current_date,true,0,1440,'SPECIAL',
+   'https://www.nseindia.com/market-data/holidays',clock_timestamp(),repeat('b',64))
+on conflict(exchange,session_date) do update set
+  is_trading_day=true,open_minute=0,close_minute=1440,session_kind='SPECIAL',
+  source_reference=excluded.source_reference,verified_at=clock_timestamp(),
+  source_sha256=excluded.source_sha256;
+
 do $futures_risk$
 declare
   v_now bigint;
