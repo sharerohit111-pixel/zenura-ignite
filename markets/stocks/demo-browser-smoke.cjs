@@ -101,9 +101,13 @@ const axePath=require.resolve("axe-core/axe.min.js");
    return registrations.some(registration=>registration.active?.state==="activated");
   },null,{timeout:20000});
   console.log("PWA: waiting for service worker activation");
+  // navigator.serviceWorker.ready may resolve while the active worker is
+  // still transitioning through "activating"; wait for the actual state.
+  await page.waitForFunction(async()=>{
+   const registration=await navigator.serviceWorker.ready;
+   return registration.active?.state==="activated";
+  },null,{timeout:20000});
   const workerState=await page.evaluate(async()=>{
-   // Use the platform readiness promise after activation instead of taking a
-   // second snapshot of getRegistrations(), which can race registration updates.
    const registration=await navigator.serviceWorker.ready;
    return {state:registration.active?.state||"missing",scope:registration.scope||null};
   });
