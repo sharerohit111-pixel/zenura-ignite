@@ -132,3 +132,14 @@ test("rejects physical settlement and expiry payout or source tampering",()=>{
  assert.throws(()=>buildOptionsAccountingSnapshot({...base,expirySettlements:[{...expirySettlement,gross_payout_paise:649999}]}),/does not reconcile/);
  assert.throws(()=>buildOptionsAccountingSnapshot({...base,expirySettlements:[{...expirySettlement,settlement_source:"https://attacker.example/settlement"}]}),/does not reconcile/);
 });
+
+
+test("rejects partial or arithmetically inconsistent immutable fill charge breakdowns",()=>{
+ const chargeFill={...base.limitFills[0],brokerage_paise:100,exchange_transaction_paise:0,
+  ipft_paise:0,sebi_paise:0,stamp_duty_paise:0,stt_paise:0,gst_paise:0,
+  charge_schedule_version:"NSE_OPTIONS_SIM_V1_2026_11"};
+ const valid=buildOptionsAccountingSnapshot({...base,limitFills:[chargeFill]});
+ assert.equal(valid.history.some(order=>order.source==="LIMIT"&&order.fills?.[0]?.chargeBreakdownPaise?.brokerage===100),true);
+ assert.throws(()=>buildOptionsAccountingSnapshot({...base,limitFills:[{...chargeFill,gst_paise:1}]}),/do not reconcile/);
+ assert.throws(()=>buildOptionsAccountingSnapshot({...base,limitFills:[{...chargeFill,stt_paise:undefined}]}),/incomplete charge breakdown/);
+});
