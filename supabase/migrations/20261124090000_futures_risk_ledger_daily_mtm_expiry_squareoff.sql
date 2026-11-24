@@ -604,7 +604,9 @@ begin
   if not found then return new; end if;
 
   v_now_ms:=floor(extract(epoch from clock_timestamp())*1000)::bigint;
+  if v_risk.risk_status='CLOSED' then return new; end if;
   if v_risk.risk_status='HEALTHY'
+     and v_risk.source_timestamp_ms is not null
      and v_now_ms-v_risk.source_timestamp_ms<=900000 then
     return new;
   end if;
@@ -1321,10 +1323,14 @@ begin
     snapshot_version,updated_at
   ) values (
     v_user_id,v_instrument_key,v_initial_margin,null,'UNKNOWN',null,null,null,null,1,now()
-  ) on conflict(user_id,instrument_key) do nothing;
+  ) on conflict(user_id,instrument_key) do update set
+    initial_margin_paise=excluded.initial_margin_paise,
+    maintenance_margin_paise=null,risk_status='UNKNOWN',provider=null,
+    source_reference=null,source_sha256=null,source_timestamp_ms=null,
+    snapshot_version=public.paper_futures_risk_state.snapshot_version+1,updated_at=now();
   return new;
 end;
-$$;
+$;
 
 drop trigger if exists paper_futures_seed_unknown_risk_order on public.paper_futures_orders;
 create trigger paper_futures_seed_unknown_risk_order
