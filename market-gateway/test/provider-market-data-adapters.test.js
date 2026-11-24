@@ -50,3 +50,11 @@ test("rejects crossed or malformed depth rather than manufacturing a book",async
  const adapter=createUpstoxMarketDataAdapter({client,resolveInstrument:async()=>upNative,now:()=>NOW});
  await assert.rejects(adapter.getDepth(args),/strictly ordered|crossed/);
 });
+
+test("fails closed when a provider cannot resolve a native instrument for candles or streams",async()=>{
+ const up=createUpstoxMarketDataAdapter({client:clientFor("upstox",upQuote),resolveInstrument:async()=>null,now:()=>NOW});
+ await assert.rejects(up.getCandles(args),/instrument mapping is missing/);
+ await assert.rejects(up.openStream(args),/instrument mapping is missing/);
+ const angel=createAngelOneMarketDataAdapter({client:clientFor("angelone",angelQuote),resolveInstrument:async()=>({symbolToken:"3045",exchangeSegment:"NSE"}),now:()=>NOW});
+ await assert.rejects(angel.getCandles(args),/instrument mapping is missing/);
+});
