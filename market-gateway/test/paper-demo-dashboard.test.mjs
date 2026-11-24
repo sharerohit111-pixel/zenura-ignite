@@ -22,12 +22,12 @@ test("demo route loads only shared synthetic fixtures with explicit opt-in",asyn
  assert.match(js,/No live-data fallback/);
 });
 test("screen rendering is read-only and clearly discloses synthetic and unreconciled data",async()=>{
- const html=await read("demo.html"),js=await read("demo.js");
+ const html=await read("demo.html"),js=await read("demo.js"),panel=await read("demo-derivative-panel.mjs");
  assert.match(html,/DEMO DATA · SYNTHETIC FIXTURES/);
  assert.match(js,/READ ONLY · MOCK/);
  assert.match(js,/ledgerReconciled/);
  assert.match(js,/No MARKET\/LIMIT submission/);
- assert.match(js,/No margin reservation/);
+ assert.match(panel,/No production RPC, cash ledger, margin reservation, charges, broker API or background worker is called/);
  assert.doesNotMatch(js,/fetch\s*\([^)]*(?:\/orders|\/portfolio|\/watchlist)/i);
 });
 test("demo screen does not load production authentication, live quote or order modules",async()=>{
