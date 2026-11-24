@@ -468,3 +468,50 @@ The returned ACLs show table owner `postgres`, with `service_role=Dxtm` on these
 **Deployment gate:** current gateway code uses service-role direct reads for `upstox_connections`, `paper_market_worker_state`, `paper_orders` and `paper_protective_orders`; dedicated workers also directly read Futures/Options tables and update worker cursor state. Under the observed production ACLs, these direct operations are not authorized. Do not deploy/activate these code paths until a reviewed, minimal service_role privilege set is rehearsed and explicitly approved. The grant set must be derived from actual serviceDb callsites and worker methods; keep userDb requests under authenticated RLS and do not grant client access to internal tables. For the Futures worker, add only the necessary SELECT on `paper_futures_orders` if direct reads remain; for `paper_futures_fills`, preserve SELECT/INSERT only and enforce append-only semantics.
 
 This finding is a production-readiness blocker, not authorization to change production. No production ACL, grant, policy or migration was modified.
+
+
+## 16. Consolidated serviceDb access matrix — gateway and workers (2026-11-24)
+
+This matrix is derived from exact direct `serviceDb.from(...)` callsites in PR #99's current backend branch, plus the Futures/Options/Intraday/Protective worker modules. It separates direct table privileges from SECURITY DEFINER RPC execution; it is not itself a migration.
+
+| Table | Direct serviceDb operations observed | Minimum direct ACL candidate | Notes |
+|---|---|---|---|
+| `upstox_connections` | SELECT by `user_id` | SELECT | OAuth token material is sensitive; no broad write ACL needed because writes use dedicated RPCs |
+| `paper_market_worker_state` | SELECT cursor; UPDATE cursor/reset | SELECT, UPDATE | Worker lease acquire/release use SECURITY DEFINER RPCs; cursor updates are lease-token filtered |
+| `paper_orders` | SELECT pending LIMIT/Intraday worker rows | SELECT | User-facing order reads/writes use userDb/RLS or RPCs |
+| `paper_protective_orders` | SELECT and UPDATE worker scan/processing flags | SELECT, UPDATE | Protective fill itself uses a SECURITY DEFINER RPC |
+| `paper_equity_positions` | SELECT for protective worker evaluation | SELECT | Do not grant write access; fill RPC owns accounting |
+| `paper_futures_orders` | SELECT pending Futures LIMIT rows | SELECT | Worker currently reads directly; missing from both PR #83/#91 shared grant lists |
+| `paper_futures_fills` | SELECT prior executions for idempotency/sequence/charge calculation | SELECT | The current worker does not directly insert/update/delete; atomic fill RPC writes. PR #87's table-wide UPDATE/DELETE grant is unjustified by this worker code |
+| `paper_option_limit_orders` | SELECT pending Options LIMIT rows | SELECT | User-owned list and order creation use userDb/RLS and RPCs |
+| `paper_option_limit_fills` | SELECT prior executions | SELECT | Atomic fill RPC owns inserts; schema already grants service_role SELECT, INSERT; worker only needs SELECT |
+
+### RPC EXECUTE boundary
+
+Production read-only catalog verification confirms `service_role` currently has EXECUTE on the existing SECURITY DEFINER functions for Upstox OAuth lifecycle, margin preview rate limiting, stream lease lifecycle, legacy equity LIMIT fill, and shared worker lease acquire/release. These functions have explicit `search_path=''` in the inspected production catalog. The production catalog does **not** currently contain the newer Futures/Options LIMIT fill/expiry RPCs queried in this pass, so the draft worker modules depend on migrations not yet deployed. Keep worker feature flags disabled until the complete RPC and direct ACL contract is present in an approved environment.
+
+### Exact grant design to test (not yet approved/applied)
+
+- `upstox_connections`: SELECT
+- `paper_market_worker_state`: SELECT, UPDATE
+- `paper_orders`: SELECT
+- `paper_protective_orders`: SELECT, UPDATE
+- `paper_equity_positions`: SELECT
+- `paper_futures_orders`: SELECT
+- `paper_futures_fills`: SELECT only for worker; INSERT should remain exclusive to the atomic SECURITY DEFINER fill path if that function's owner/ACL design supports it
+- `paper_option_limit_orders`: SELECT
+- `paper_option_limit_fills`: SELECT only for worker; insert remains via atomic SECURITY DEFINER fill RPC
+
+No direct service-role grants should be added to `paper_accounts`, `paper_futures_positions`, `paper_derivative_orders`, or `paper_derivative_positions` solely on the basis of this worker scan: the relevant user-facing gateway routes use `userDb` authenticated RLS for those tables. Reconfirm any future new serviceDb callsite before adding ACL.
+
+### Required disposable PostgreSQL ACL tests
+
+1. Assert each direct operation above succeeds under service_role and no operation beyond the candidate matrix succeeds.
+2. Assert anon/authenticated cannot access internal tables except explicitly intended userDb/RLS-owned rows.
+3. Assert `paper_futures_fills` and `paper_option_limit_fills` reject UPDATE and DELETE, including service_role attempts; enforce with database-level immutable-ledger triggers or equivalent owner-only write architecture.
+4. Assert fill inserts can occur only through the atomic RPC, not arbitrary service_role table INSERT if RPC is the chosen trusted write path.
+5. Assert worker cursor UPDATE affects zero rows with a stale/foreign lease token; stale owner cannot release another token's lease.
+6. Assert all SECURITY DEFINER RPC EXECUTE grants are exact-signature, service_role-only where intended, and bodies use qualified objects with hardened search_path.
+7. Run the full worker smoke suite using the same role and queries as production worker code, not a superuser-only test harness.
+
+This is a reviewed candidate privilege matrix, not an approved production grant. Production ACL snapshot from Section 15 remains unchanged. No grants, policies, functions or migrations were modified or applied.
