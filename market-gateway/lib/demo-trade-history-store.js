@@ -125,7 +125,7 @@ function createDemoTradeHistoryStore(options = {}) {
         p.quantity = oldQuantity + signedFill;
         if (p.quantity === 0) p.averagePricePaise = 0;
         else if (Math.sign(p.quantity) !== Math.sign(oldQuantity)) {
-          p.costBasisPaise = trade.grossValuePaise - allocated;
+          p.costBasisPaise = Math.abs(p.quantity) * trade.pricePaise;
           p.averagePricePaise = trade.pricePaise;
         }
       }
