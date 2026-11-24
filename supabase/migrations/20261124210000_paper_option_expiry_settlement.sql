@@ -162,8 +162,16 @@ begin
    where user_id=p_user_id and instrument_key=p_instrument_key and expiry=p_expiry;
   if found then
     if v_existing.settlement_id<>p_settlement_id
+       or v_existing.trading_symbol<>p_trading_symbol
+       or v_existing.instrument_type<>p_instrument_type
+       or v_existing.underlying_type<>p_underlying_type
+       or v_existing.settlement_type<>p_settlement_type
+       or v_existing.strike_price_paise<>p_strike_price_paise
+       or v_existing.settlement_source<>p_settlement_source
        or v_existing.settlement_source_sha256<>p_settlement_source_sha256
-       or v_existing.settlement_price_paise<>p_settlement_price_paise then
+       or v_existing.settlement_price_paise<>p_settlement_price_paise
+       or v_existing.settlement_timestamp_ms<>p_settlement_timestamp_ms
+       or v_existing.verified_at_ms<>p_verified_at_ms then
       raise exception 'Expiry settlement replay changed its immutable settlement identity.'
         using errcode='23505';
     end if;
