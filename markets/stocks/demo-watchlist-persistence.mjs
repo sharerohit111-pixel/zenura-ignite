@@ -18,7 +18,8 @@ export function mountPrivateWatchlists(host,{model,fetchImpl=fetch,supabaseClien
  controls.append(listField,instrumentField,add);panel.append(title,disclosure,controls,status,rowsHost);host.append(panel);
  let userId=null,items=[],preservedItems=[],requestSeq=0,editSeq=0,authSubscription=null,disposed=false;
  const currentName=()=>listSelect.value;
- const getClient=()=>supabaseClient||window.ZENURA_SUPABASE||null;\n const session=async()=>{const client=getClient();if(!client?.auth?.getSession)throw new Error("Account sign-in integration is not loaded on this Demo route yet.");const {data,error}=await client.auth.getSession();if(error)throw error;return data.session||null;};
+ const getClient=()=>supabaseClient||window.ZENURA_SUPABASE||null;\n const getClient=()=>supabaseClient||window.ZENURA_SUPABASE||null;
+ const session=async()=>{const client=getClient();if(!client?.auth?.getSession)throw new Error("Account sign-in integration is not loaded on this Demo route yet.");const {data,error}=await client.auth.getSession();if(error)throw error;return data.session||null;};
  const currentUser=async()=>{const s=await session();return s?.user?.id?{id:s.user.id,token:s.access_token}:null;};
  const currentCatalogItem=key=>catalog.find(x=>x.instrumentKey===key);
  function render(){
@@ -79,11 +80,19 @@ export function mountPrivateWatchlists(host,{model,fetchImpl=fetch,supabaseClien
   mutate(next=>next.push({instrument_key:key,trading_symbol:item.symbol,name:item.symbol,exchange:item.exchange,instrument_type:item.assetClass}));
  });
  listSelect.addEventListener("change",()=>{requestSeq++;editSeq++;items=[];render();load();});
- const authResult=supabaseClient.auth.onAuthStateChange((_event,newSession)=>{
+ const handleAuth=(_event,newSession)=>{
   const nextId=newSession?.user?.id||null;
   if(nextId!==userId){requestSeq++;editSeq++;userId=nextId;items=[];preservedItems=[];status.textContent=nextId?"Account changed · restoring its private watchlist…":"Signed out · private watchlist hidden.";render();queueMicrotask(load);}
- });
- authSubscription=authResult?.data?.subscription||null;
+ };
+ const attachAuth=()=>{
+  const client=getClient();
+  if(authSubscription||!client?.auth?.onAuthStateChange)return;
+  const result=client.auth.onAuthStateChange(handleAuth);
+  authSubscription=result?.data?.subscription||null;
+ };
+ const authReady=()=>{attachAuth();load().catch(error=>{status.textContent=error.message||"Private watchlist unavailable.";});};
+ window.addEventListener("zenura-market-auth-ready",authReady);
+ attachAuth();
  load().catch(error=>{status.textContent=error.message||"Private watchlist unavailable.";});
- return Object.freeze({refresh:load,dispose(){disposed=true;requestSeq++;authSubscription?.unsubscribe?.();}});
+ return Object.freeze({refresh:load,dispose(){disposed=true;requestSeq++;window.removeEventListener("zenura-market-auth-ready",authReady);authSubscription?.unsubscribe?.();}});
 }
