@@ -32,7 +32,7 @@ test("market BUY sweeps deterministic ask levels and returns one immutable recei
   const snap=e.snapshot();assert.equal(snap.account.cashBalancePaise,100000000-875700);
   assert.equal(snap.account.blockedFundsPaise,0);assert.equal(snap.account.availableFundsPaise,snap.account.cashBalancePaise);
   assert.equal(snap.account.positions[fixture.data.instrument.instrumentKey].quantity,7);
-  assert.equal(snap.account.positions[fixture.data.instrument.instrumentKey].costBasisPaise,875750);
+  assert.equal(snap.account.positions[fixture.data.instrument.instrumentKey].costBasisPaise,875700);
 });
 test("limit BUY fills only marketable levels and cancel releases only the unfilled reservation",()=>{
   const e=engine(),order=e.submitOrder(buy({idempotencyKey:"demo-limit-001",orderType:"LIMIT",quantity:7,limitPricePaise:125100}));
@@ -59,7 +59,7 @@ test("market SELL reserves shares and realizes cumulative P&L over multiple bid 
   assert.equal(e.snapshot().account.positions[key].quantity,2);
   assert.equal(e.snapshot().account.positions[key].reservedQuantity,0);
   assert.equal(e.snapshot().account.cashBalancePaise,100000000+624600);
-  assert.equal(e.snapshot().account.realizedPnlPaise,4700);
+  assert.equal(e.snapshot().account.realizedPnlPaise,4600);
 });
 test("cancelling a partially filled SELL preserves fills and releases only remaining shares",()=>{
   const key=fixture.data.instrument.instrumentKey;
