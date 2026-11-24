@@ -3,6 +3,7 @@
 const test=require("node:test");
 const assert=require("node:assert/strict");
 const http=require("node:http");
+const {makeOrderFingerprint}=require("../lib/order-idempotency");
 
 process.env.SUPABASE_URL="https://example.supabase.co";
 process.env.SUPABASE_PUBLISHABLE_KEY="test-publishable-key";
@@ -259,6 +260,7 @@ test("authenticated NSE Options LIMIT BUY and SELL submit through verified sessi
       assert.ok(buyRpc);
       assert.equal(buyRpc.args.p_user_id,TEST_USER_ID);
       assert.equal(buyRpc.args.p_quantity,65);
+      assert.equal(buyRpc.args.p_request_fingerprint,makeOrderFingerprint({instrumentKey:TEST_INSTRUMENT_KEY,side:"BUY",quantity:65,orderType:"LIMIT",limitPricePaise:1250}));
       assert.equal(buyRpc.args.p_limit_price_paise,1250);
       assert.equal(buyRpc.key,"test-service-role-key");
 
@@ -275,6 +277,7 @@ test("authenticated NSE Options LIMIT BUY and SELL submit through verified sessi
       assert.ok(sellRpc);
       assert.equal(sellRpc.args.p_user_id,TEST_USER_ID);
       assert.equal(sellRpc.args.p_quantity,65);
+      assert.equal(sellRpc.args.p_request_fingerprint,makeOrderFingerprint({instrumentKey:TEST_INSTRUMENT_KEY,side:"SELL",quantity:65,orderType:"LIMIT",limitPricePaise:1235}));
       assert.equal(sellRpc.args.p_limit_price_paise,1235);
       assert.equal(sellRpc.key,"test-service-role-key");
       assert.ok(userQueries.some(q=>q.table==="paper_accounts"&&q.key==="test-publishable-key"));
