@@ -189,73 +189,38 @@
     if(!body||!status||!gateway||!connector?.getIdToken||!uid)return;
     const metric=id=>document.getElementById(id);
     const setMetric=(id,value)=>{const node=metric(id);if(node)node.textContent=value;};
-    const safeSum=(items,read,label)=>items.reduce((sum,item)=>{
-      const value=read(item)??0;
-      if(!Number.isSafeInteger(value))throw new Error(label+' contains a non-integer paise value.');
-      const next=sum+value;
-      if(!Number.isSafeInteger(next))throw new Error(label+' exceeds safe integer limits.');
-      return next;
-    },0);
-    status.textContent='Refreshing verified NSE Options accounting…';
+    status.textContent='Reconciling complete NSE Options accounting…';
     try{
       const token=await connector.getIdToken();
       if(request!==derivativePortfolioRequest||connector.getUserId()!==uid)return;
-      const headers={Authorization:'Bearer '+token,Accept:'application/json'};
-      const [portfolioResponse,marketHistoryResponse,limitHistoryResponse,accountResponse]=await Promise.all([
-        fetch(gateway+'/paper/derivatives/portfolio',{headers}),
-        fetch(gateway+'/paper/derivative/orders?limit=100',{headers}),
-        fetch(gateway+'/paper/derivative/limit-orders?limit=100',{headers}),
-        fetch(gateway+'/paper/account',{headers})
-      ]);
-      const [data,marketHistory,limitHistory,account]=await Promise.all([
-        portfolioResponse.json(),marketHistoryResponse.json(),limitHistoryResponse.json(),accountResponse.json()
-      ]);
-      if(request!==derivativePortfolioRequest||connector.getUserId()!==uid)return;
-      if(!portfolioResponse.ok)throw new Error(data.error||'Options portfolio unavailable');
-      if(!marketHistoryResponse.ok)throw new Error(marketHistory.error||'Options MARKET history unavailable');
-      if(!limitHistoryResponse.ok)throw new Error(limitHistory.error||'Options LIMIT history unavailable');
-      if(!accountResponse.ok)throw new Error(account.error||'Paper account balance unavailable');
-
-      const limitOrders=Array.isArray(limitHistory.orders)?limitHistory.orders:[];
-      const limitFills=Array.isArray(limitHistory.fills)?limitHistory.fills:[];
-      const marketOrders=(marketHistory.orders||[]).filter(order=>['CE','PE'].includes(order.instrumentType));
-      const openOrders=limitOrders.filter(order=>['PENDING','PARTIALLY_FILLED'].includes(order.status));
-      const blockedPremiumPaise=safeSum(openOrders.filter(order=>order.side==='BUY'),order=>order.reservedCashPaise,'Blocked premium');
-      const reservedByInstrument=new Map();
-      openOrders.filter(order=>order.side==='SELL').forEach(order=>{
-        const prior=reservedByInstrument.get(order.instrumentKey)||0;
-        const next=prior+(order.reservedCloseQuantity||0);
-        if(!Number.isSafeInteger(next))throw new Error('Reserved Options exit quantity exceeds safe limits.');
-        reservedByInstrument.set(order.instrumentKey,next);
+      const response=await fetch(gateway+'/paper/options/accounting',{
+        headers:{Authorization:'Bearer '+token,Accept:'application/json'}
       });
-      const availableCashPaise=account.cashPaise-account.reservedCashPaise-account.reservedMarginPaise;
-      if(!Number.isSafeInteger(availableCashPaise)||availableCashPaise<0)throw new Error('Available paper balance does not reconcile with account reservations.');
-      const premiumInvestedPaise=safeSum(data.positions||[],position=>position.costBasisPaise,'Premium invested');
-      const marketRealized=safeSum(marketOrders,order=>order.realizedPnlPaise,'MARKET realized P&L');
-      const limitRealized=safeSum(limitFills,fill=>fill.realizedPnlPaise,'LIMIT realized P&L');
-      const realizedPnlPaise=marketRealized+limitRealized;
-      if(!Number.isSafeInteger(realizedPnlPaise))throw new Error('Options realized P&L exceeds safe integer limits.');
-      const chargesPaidPaise=safeSum(marketOrders,order=>order.chargesPaise,'MARKET charges')
-        +safeSum(limitFills,fill=>fill.chargesPaise,'LIMIT charges');
-      if(!Number.isSafeInteger(chargesPaidPaise))throw new Error('Options charges exceed safe integer limits.');
-
-      setMetric('options-available-balance',inrPaise(availableCashPaise));
-      setMetric('options-blocked-premium',inrPaise(blockedPremiumPaise));
-      setMetric('options-premium-invested',inrPaise(premiumInvestedPaise));
-      setMetric('options-realized-pnl',signedMoney(realizedPnlPaise));
+      const data=await response.json();
+      if(request!==derivativePortfolioRequest||connector.getUserId()!==uid)return;
+      if(!response.ok)throw new Error(data.error||'NSE Options accounting unavailable');
+      const paiseFields=['cashPaise','accountReservedCashPaise','reservedMarginPaise','availableCashPaise',
+        'blockedPremiumPaise','premiumInvestedPaise','chargesPaidPaise'];
+      paiseFields.forEach(key=>{if(!Number.isSafeInteger(data[key])||data[key]<0)throw new Error('Options accounting returned an invalid '+key+'.');});
+      if(!Number.isSafeInteger(data.realizedPnlPaise))throw new Error('Options realized P&L is invalid.');
+      if(data.unrealizedPnlPaise!==null&&!Number.isSafeInteger(data.unrealizedPnlPaise))throw new Error('Options unrealized P&L is invalid.');
+      setMetric('options-available-balance',inrPaise(data.availableCashPaise));
+      setMetric('options-blocked-premium',inrPaise(data.blockedPremiumPaise));
+      setMetric('options-premium-invested',inrPaise(data.premiumInvestedPaise));
+      setMetric('options-realized-pnl',signedMoney(data.realizedPnlPaise));
       setMetric('options-unrealized-pnl',data.unrealizedPnlPaise===null?'STALE':signedMoney(data.unrealizedPnlPaise));
-      setMetric('options-charges-paid',inrPaise(chargesPaidPaise));
+      setMetric('options-charges-paid',inrPaise(data.chargesPaidPaise));
 
       body.textContent='';
-      if(!data.positions?.length)tableMessage(body,8,'No open NSE Options positions.');
+      if(!Array.isArray(data.positions)||!data.positions.length)tableMessage(body,8,'No open NSE Options positions.');
       else data.positions.forEach(position=>{
-        const reserved=reservedByInstrument.get(position.instrumentKey)||0;
-        const available=position.netQuantity-reserved;
-        if(!Number.isSafeInteger(available)||available<0)throw new Error('Options exit reservation exceeds the open position quantity.');
+        const reserved=position.reservedCloseQuantity,available=position.availableCloseQuantity;
+        if(!Number.isSafeInteger(reserved)||!Number.isSafeInteger(available)||reserved<0||available<0
+          ||reserved+available!==position.quantity)throw new Error('Options close reservation does not reconcile.');
         const tr=document.createElement('tr');
         [
-          position.tradingSymbol||position.instrumentKey,position.netQuantity,
-          inrPaise(position.averagePricePaise),
+          position.tradingSymbol||position.instrumentKey,position.quantity,
+          inrPaise(position.averagePremiumPaise),
           position.marketPricePaise===null?'STALE':inrPaise(position.marketPricePaise),
           position.marketValuePaise===null?'—':inrPaise(position.marketValuePaise),
           position.unrealizedPnlPaise===null?'—':signedMoney(position.unrealizedPnlPaise),
@@ -264,44 +229,35 @@
         body.append(tr);
       });
       status.textContent=data.valuationStatus==='fresh'
-        ?'NSE long CE/PE · Fresh provider quotes · Fee-inclusive entry basis · Estimated exit charges excluded'
+        ?'NSE long CE/PE · Complete server-side ledger reconciliation · Fresh quotes · Estimated exit charges excluded'
         :data.valuationStatus==='no_open_positions'
-          ?'No open NSE Options positions · Account and order reservations reconciled'
+          ?'No open NSE Options positions · Complete account/order reconciliation'
           :'Some option quotes are stale or unavailable; aggregate unrealized P&L is withheld.';
 
-      const realizedByLimitOrder=new Map();
-      limitFills.forEach(fill=>{
-        const key=fill.orderId,prior=realizedByLimitOrder.get(key)||0,next=prior+(fill.realizedPnlPaise||0);
-        if(!Number.isSafeInteger(next))throw new Error('LIMIT order realized P&L exceeds safe integer limits.');
-        realizedByLimitOrder.set(key,next);
-      });
-      const rows=[
-        ...marketOrders.map(order=>({
-          date:order.createdAt,symbol:order.tradingSymbol,side:order.side,type:'MARKET',
-          quantity:String(order.quantity)+' / '+String(order.quantity),
-          average:order.executionPricePaise,gross:order.grossPaise,charges:order.chargesPaise,
-          realized:order.realizedPnlPaise,status:order.status
-        })),
-        ...limitOrders.map(order=>({
-          date:order.createdAt,symbol:order.tradingSymbol,side:order.side,type:'LIMIT',
-          quantity:String(order.quantity)+' / '+String(order.filledQuantity),
-          average:order.averageFillPricePaise,gross:order.cumulativeGrossPaise,
-          charges:order.cumulativeChargesPaise,
-          realized:realizedByLimitOrder.get(order.id)||0,status:order.status
-        }))
-      ].sort((a,b)=>new Date(b.date||0)-new Date(a.date||0));
       const historyBody=document.getElementById('derivative-history');
       if(historyBody){
+        const rows=Array.isArray(data.history)?data.history:[];
         historyBody.textContent='';
         if(!rows.length)tableMessage(historyBody,10,'No Options orders or exits recorded.');
         else rows.forEach(order=>{
-          const tr=document.createElement('tr'),date=order.date?new Date(order.date).toLocaleString('en-IN'):'—';
+          const date=order.createdAt?new Date(order.createdAt).toLocaleString('en-IN'):'—';
+          const filled=order.filledQuantity??order.quantity;
+          const average=order.source==='EXPIRY'?order.settlementPricePaise:(filled>0?Math.round(order.grossPaise/filled):null);
+          const quantity=order.source==='LIMIT'?String(order.quantity)+' / '+String(filled):String(order.quantity)+' / '+String(filled);
           [
-            date,order.symbol,order.side,order.type,order.quantity,
-            order.average?inrPaise(order.average):'—',inrPaise(order.gross||0),
-            inrPaise(order.charges||0),signedMoney(order.realized||0),order.status+' · SIM'
-          ].forEach(value=>{const td=document.createElement('td');td.textContent=String(value);tr.append(td);});
-          historyBody.append(tr);
+            date,order.tradingSymbol||order.id||'—',order.side,order.source,quantity,
+            average?inrPaise(average):'—',inrPaise(order.grossPaise||0),
+            inrPaise(order.chargesPaise||0),signedMoney(order.realizedPnlPaise||0),order.status+' · SIM'
+          ].forEach((value,index)=>{
+            const td=document.createElement('td');
+            td.textContent=String(value);
+            if(index===1&&order.source==='LIMIT'&&Array.isArray(order.fills)&&order.fills.length){
+              td.title=order.fills.length+' immutable execution fill(s)';
+            }
+            const tr=historyBody.lastElementChild;
+            if(index===0){const row=document.createElement('tr');row.append(td);historyBody.append(row);}
+            else if(tr)tr.append(td);
+          });
         });
       }
     }catch(error){

@@ -5,8 +5,8 @@
 // to the caller; this module only accepts normalized provider-agnostic snapshots.
 
 const OPEN_ORDER_STATUSES = new Set(["PENDING", "PARTIALLY_FILLED"]);
+const TERMINAL_ORDER_STATUSES = new Set(["FILLED", "CANCELLED", "EXPIRED", "REJECTED"]);
 const OPTION_TYPES = new Set(["CE", "PE"]);
-const MAX_SAFE = Number.MAX_SAFE_INTEGER;
 
 function fail(message) {
   throw Object.assign(new Error(message), { status: 422 });
@@ -36,6 +36,42 @@ function multiplySafe(a, b, label) {
 
 function isNseOption(row) {
   return row && row.exchange === "NSE" && row.segment === "NSE_FO" && OPTION_TYPES.has(row.instrument_type ?? row.instrumentType);
+}
+
+function normalizeLimitOrder(order) {
+  if (!order || typeof order.order_id !== "string" || !order.order_id
+      || typeof order.instrument_key !== "string" || !order.instrument_key
+      || !isNseOption(order) || !["BUY", "SELL"].includes(order.side)
+      || typeof order.status !== "string") {
+    fail("Options LIMIT order identity, contract, side, or status is invalid.");
+  }
+  const quantity = integer(order.quantity, "LIMIT order quantity", { min: 1 });
+  const filled = integer(order.filled_quantity ?? 0, "LIMIT filled quantity");
+  const remaining = integer(order.remaining_quantity ?? quantity - filled, "LIMIT remaining quantity");
+  const lotSize = integer(order.lot_size, "LIMIT lot size", { min: 1 });
+  if (quantity % lotSize !== 0 || filled > quantity || filled + remaining !== quantity
+      || (!OPEN_ORDER_STATUSES.has(order.status) && !TERMINAL_ORDER_STATUSES.has(order.status))
+      || (order.status === "PENDING" && filled !== 0)
+      || (order.status === "PARTIALLY_FILLED" && (filled < 1 || remaining < 1))
+      || (order.status === "FILLED" && (filled !== quantity || remaining !== 0))) {
+    fail("Options LIMIT order quantity, fills, remaining quantity, status, or lot size do not reconcile.");
+  }
+  const reservedCash = integer(order.reserved_cash_paise ?? 0, "Order reserved premium");
+  const reservedClose = integer(order.reserved_close_quantity ?? 0, "Order reserved close quantity");
+  const active = OPEN_ORDER_STATUSES.has(order.status);
+  if (order.reservation_released !== undefined && order.reservation_released !== !active) {
+    fail("Options LIMIT reservation-release flag does not match its lifecycle state.");
+  }
+  if (order.side === "BUY") {
+    if (reservedClose !== 0 || (active && reservedCash < 1) || (!active && reservedCash !== 0)) {
+      fail("Options LIMIT BUY reservation does not match its lifecycle state.");
+    }
+  } else if (reservedCash !== 0
+      || (active && reservedClose !== remaining)
+      || (!active && reservedClose !== 0)) {
+    fail("Options LIMIT SELL reservation does not match its remaining close quantity.");
+  }
+  return { quantity, filled, remaining, lotSize, reservedCash, reservedClose, active };
 }
 
 function normalizePosition(row) {
@@ -73,6 +109,7 @@ function buildOptionsAccountingSnapshot({
   limitOrders = [],
   limitFills = [],
   marketOrders = [],
+  expirySettlements = [],
   quotes = [],
   now = Date.now(),
   maxQuoteAgeMs = 15_000
@@ -84,12 +121,19 @@ function buildOptionsAccountingSnapshot({
   const accountReservedCashPaise = integer(account.reserved_cash_paise ?? 0, "Account reserved cash");
   const reservedMarginPaise = integer(account.reserved_margin_paise ?? 0, "Reserved margin");
   const realizedAccountPnlPaise = signedInteger(account.realized_pnl_paise ?? 0, "Account realized P&L");
-  if (accountReservedCashPaise + reservedMarginPaise > cashPaise) {
-    fail("Account reservations exceed cash balance.");
-  }
-  const availableCashPaise = cashPaise - accountReservedCashPaise - reservedMarginPaise;
+  const totalReservations = addSafe(accountReservedCashPaise, reservedMarginPaise, "Account reservations");
+  if (totalReservations > cashPaise) fail("Account reservations exceed cash balance.");
+  const availableCashPaise = cashPaise - totalReservations;
 
   const normalizedPositions = positions.map(normalizePosition).filter(Boolean);
+  const positionKeys = new Set();
+  for (const position of normalizedPositions) {
+    if (typeof position.instrumentKey !== "string" || !position.instrumentKey
+        || positionKeys.has(position.instrumentKey)) {
+      fail("Options position snapshot contains a missing or duplicate instrument key.");
+    }
+    positionKeys.add(position.instrumentKey);
+  }
   const quoteMap = new Map();
   for (const quote of quotes) {
     if (!quote || typeof quote.instrumentKey !== "string" || quoteMap.has(quote.instrumentKey)) {
@@ -124,19 +168,20 @@ function buildOptionsAccountingSnapshot({
   let reservedCloseQuantity = 0;
   const reservedCloseByInstrument = new Map();
   const activeLimitOrders = [];
+  const limitOrderById = new Map();
   for (const order of limitOrders) {
-    if (!isNseOption(order) || !OPEN_ORDER_STATUSES.has(order.status)) continue;
-    const reservedCash = integer(order.reserved_cash_paise ?? 0, "Order reserved premium");
-    const reservedClose = integer(order.reserved_close_quantity ?? 0, "Order reserved close quantity");
+    if (!isNseOption(order)) continue;
+    const normalized = normalizeLimitOrder(order);
+    if (limitOrderById.has(order.order_id)) fail("Options LIMIT order history contains a duplicate order ID.");
+    limitOrderById.set(order.order_id, order);
+    if (!normalized.active) continue;
     if (order.side === "BUY") {
-      if (reservedClose !== 0) fail("BUY order cannot reserve close quantity.");
-      blockedPremiumPaise = addSafe(blockedPremiumPaise, reservedCash, "Blocked premium");
-    } else if (order.side === "SELL") {
-      if (reservedCash !== 0) fail("SELL order cannot reserve premium.");
-      reservedCloseQuantity = addSafe(reservedCloseQuantity, reservedClose, "Reserved close quantity");
+      blockedPremiumPaise = addSafe(blockedPremiumPaise, normalized.reservedCash, "Blocked premium");
+    } else {
+      reservedCloseQuantity = addSafe(reservedCloseQuantity, normalized.reservedClose, "Reserved close quantity");
       reservedCloseByInstrument.set(order.instrument_key,
-        addSafe(reservedCloseByInstrument.get(order.instrument_key) ?? 0, reservedClose, "Per-contract close reservation"));
-    } else fail("Options order side is invalid.");
+        addSafe(reservedCloseByInstrument.get(order.instrument_key) ?? 0, normalized.reservedClose, "Per-contract close reservation"));
+    }
     activeLimitOrders.push(order);
   }
   for (const position of normalizedPositions) {
@@ -156,11 +201,51 @@ function buildOptionsAccountingSnapshot({
   let realizedPnlPaise = 0;
   let chargesPaidPaise = 0;
   const history = [];
+  const marketOrderIds = new Set();
   for (const order of marketOrders) {
     if (!isNseOption(order) || order.status !== "FILLED") continue;
-    realizedPnlPaise = addSafe(realizedPnlPaise, signedInteger(order.realized_pnl_paise ?? 0, "Market order realized P&L"), "Options realized P&L");
-    chargesPaidPaise = addSafe(chargesPaidPaise, integer(order.charges_paise ?? 0, "Market order charges"), "Options charges");
-    history.push({ source: "MARKET", id: order.order_id, side: order.side, quantity: order.quantity, grossPaise: order.gross_paise, chargesPaise: order.charges_paise ?? 0, realizedPnlPaise: order.realized_pnl_paise ?? 0, status: order.status, createdAt: order.created_at });
+    if (typeof order.order_id !== "string" || !order.order_id || marketOrderIds.has(order.order_id)
+        || !["BUY", "SELL"].includes(order.side)) {
+      fail("Options MARKET order history contains an invalid or duplicate order.");
+    }
+    marketOrderIds.add(order.order_id);
+    const quantity = integer(order.quantity, "MARKET order quantity", { min: 1 });
+    const executionPrice = integer(order.execution_price_paise, "MARKET execution price", { min: 1 });
+    const gross = integer(order.gross_paise, "MARKET order gross", { min: 1 });
+    const charges = integer(order.charges_paise ?? 0, "MARKET order charges");
+    if (multiplySafe(executionPrice, quantity, "MARKET order notional") !== gross) {
+      fail("Options MARKET order gross does not equal execution price multiplied by quantity.");
+    }
+    let chargeBreakdownPaise = null;
+    let chargeScheduleVersion = null;
+    const rawBreakdown = order.charges_breakdown;
+    if (rawBreakdown && typeof rawBreakdown === "object" && !Array.isArray(rawBreakdown)
+        && Object.keys(rawBreakdown).length > 0) {
+      const fields = ["brokeragePaise","exchangeTransactionPaise","ipftPaise","sebiPaise","stampDutyPaise","gstPaise","sttPaise"];
+      const components = fields.map(field => integer(rawBreakdown[field], `MARKET charge ${field}`));
+      const componentTotal = components.reduce((sum,value) => addSafe(sum,value,"MARKET charge components"),0);
+      if (componentTotal !== charges || integer(rawBreakdown.totalChargesPaise,"MARKET total charge breakdown") !== charges
+          || integer(rawBreakdown.grossPaise,"MARKET breakdown gross",{min:1}) !== gross
+          || rawBreakdown.exchange !== order.exchange || rawBreakdown.side !== order.side
+          || rawBreakdown.indicative !== true || rawBreakdown.simulationOnly !== true) {
+        fail("Options MARKET charge breakdown does not reconcile to its immutable receipt.");
+      }
+      chargeBreakdownPaise = {
+        brokerage: components[0], exchangeTransaction: components[1], ipft: components[2],
+        sebi: components[3], stampDuty: components[4], gst: components[5], stt: components[6]
+      };
+      chargeScheduleVersion = typeof rawBreakdown.chargeScheduleVersion === "string"
+        ? rawBreakdown.chargeScheduleVersion : null;
+    } else if (rawBreakdown && (typeof rawBreakdown !== "object" || Array.isArray(rawBreakdown))) {
+      fail("Options MARKET charge breakdown has an invalid shape.");
+    }
+    signedInteger(order.realized_pnl_paise ?? 0, "Market order realized P&L");
+    if (order.side === "BUY" && (order.realized_pnl_paise ?? 0) !== 0) {
+      fail("A long Options MARKET BUY cannot realize P&L.");
+    }
+    realizedPnlPaise = addSafe(realizedPnlPaise, order.realized_pnl_paise ?? 0, "Options realized P&L");
+    chargesPaidPaise = addSafe(chargesPaidPaise, charges, "Options charges");
+    history.push({ source: "MARKET", id: order.order_id, tradingSymbol: order.trading_symbol ?? order.instrument_key, instrumentKey: order.instrument_key, side: order.side, quantity, filledQuantity: quantity, grossPaise: gross, chargesPaise: charges, chargeBreakdownPaise, chargeScheduleVersion, realizedPnlPaise: order.realized_pnl_paise ?? 0, status: order.status, createdAt: order.created_at });
   }
   const fillsByOrder = new Map();
   const seenExecutions = new Set();
@@ -192,19 +277,101 @@ function buildOptionsAccountingSnapshot({
       if (integer(fill.fill_sequence, "LIMIT fill sequence", { min: 1 }) !== index + 1) {
         fail("Options fill sequence is not contiguous.");
       }
-      fillQuantity = addSafe(fillQuantity, integer(fill.fill_quantity, "LIMIT fill quantity", { min: 1 }), "LIMIT filled quantity");
-      fillGross = addSafe(fillGross, integer(fill.gross_paise, "LIMIT fill gross", { min: 1 }), "LIMIT fill gross");
+      const fillQty = integer(fill.fill_quantity, "LIMIT fill quantity", { min: 1 });
+      const fillPrice = integer(fill.execution_price_paise, "LIMIT execution price", { min: 1 });
+      const gross = integer(fill.gross_paise, "LIMIT fill gross", { min: 1 });
+      if (multiplySafe(fillPrice, fillQty, "LIMIT fill notional") !== gross) {
+        fail("Options LIMIT fill gross does not equal execution price multiplied by quantity.");
+      }
+      fillQuantity = addSafe(fillQuantity, fillQty, "LIMIT filled quantity");
+      fillGross = addSafe(fillGross, gross, "LIMIT fill gross");
+      const chargeFields = ["brokerage_paise","exchange_transaction_paise","ipft_paise","sebi_paise","stamp_duty_paise","stt_paise","gst_paise"];
+      const suppliedChargeFields = chargeFields.filter(field => fill[field] !== undefined && fill[field] !== null);
+      if (suppliedChargeFields.length !== 0 && suppliedChargeFields.length !== chargeFields.length) {
+        fail("Options LIMIT fill contains an incomplete charge breakdown.");
+      }
+      if (suppliedChargeFields.length === chargeFields.length) {
+        const componentTotal = chargeFields.reduce((sum,field) =>
+          addSafe(sum,integer(fill[field],field), "Options fill charge components"),0);
+        if (componentTotal !== integer(fill.incremental_charges_paise ?? 0, "LIMIT fill charges")) {
+          fail("Options LIMIT fill charge components do not reconcile to booked charges.");
+        }
+        if (typeof fill.charge_schedule_version !== "string" || !fill.charge_schedule_version) {
+          fail("Options LIMIT fill charge schedule version is missing.");
+        }
+      }
       orderRealized = addSafe(orderRealized, signedInteger(fill.realized_pnl_paise ?? 0, "LIMIT fill realized P&L"), "LIMIT order realized P&L");
       orderCharges = addSafe(orderCharges, integer(fill.incremental_charges_paise ?? 0, "LIMIT fill charges"), "LIMIT order charges");
     }
-    if (fillQuantity !== integer(order.filled_quantity ?? 0, "LIMIT order filled quantity")
+    const orderState = normalizeLimitOrder(order);
+    if (fillQuantity !== orderState.filled || fillQuantity > orderState.quantity
         || fillGross !== integer(order.cumulative_gross_paise ?? 0, "LIMIT cumulative gross")
         || orderCharges !== integer(order.cumulative_charges_paise ?? 0, "LIMIT cumulative charges")) {
       fail("Options LIMIT order totals do not reconcile to its immutable fills.");
     }
     realizedPnlPaise = addSafe(realizedPnlPaise, orderRealized, "Options realized P&L");
     chargesPaidPaise = addSafe(chargesPaidPaise, orderCharges, "Options charges");
-    history.push({ source: "LIMIT", id: order.order_id, side: order.side, quantity: order.quantity, filledQuantity: order.filled_quantity, grossPaise: order.cumulative_gross_paise, chargesPaise: order.cumulative_charges_paise, realizedPnlPaise: orderRealized, status: order.status, createdAt: order.created_at, fills: fills.map(fill => ({ executionId: fill.execution_id, sequence: fill.fill_sequence, quantity: fill.fill_quantity, pricePaise: fill.execution_price_paise, grossPaise: fill.gross_paise, chargesPaise: fill.incremental_charges_paise, realizedPnlPaise: fill.realized_pnl_paise })) });
+    history.push({ source: "LIMIT", id: order.order_id, tradingSymbol: order.trading_symbol ?? order.instrument_key, instrumentKey: order.instrument_key, side: order.side, quantity: order.quantity, filledQuantity: order.filled_quantity, grossPaise: order.cumulative_gross_paise, chargesPaise: order.cumulative_charges_paise, realizedPnlPaise: orderRealized, status: order.status, createdAt: order.created_at, fills: fills.map(fill => ({ executionId: fill.execution_id, sequence: fill.fill_sequence, quantity: fill.fill_quantity, pricePaise: fill.execution_price_paise, grossPaise: fill.gross_paise, chargesPaise: fill.incremental_charges_paise, chargeBreakdownPaise: { brokerage: fill.brokerage_paise ?? null, exchangeTransaction: fill.exchange_transaction_paise ?? null, ipft: fill.ipft_paise ?? null, sebi: fill.sebi_paise ?? null, stampDuty: fill.stamp_duty_paise ?? null, stt: fill.stt_paise ?? null, gst: fill.gst_paise ?? null }, chargeScheduleVersion: fill.charge_schedule_version ?? null, realizedPnlPaise: fill.realized_pnl_paise })) });
+  }
+  const settlementIds = new Set();
+  const settledContracts = new Set();
+  for (const settlement of expirySettlements) {
+    if (!settlement || typeof settlement.settlement_id !== "string"
+        || settlement.settlement_id.length !== 64 || !/^[a-f0-9]{64}$/.test(settlement.settlement_id)
+        || settlement.exchange !== "NSE" || settlement.segment !== "NSE_FO"
+        || !OPTION_TYPES.has(settlement.instrument_type)
+        || settlement.underlying_type !== "INDEX" || settlement.settlement_type !== "CASH_SETTLED"
+        || typeof settlement.instrument_key !== "string" || !settlement.instrument_key
+        || settlementIds.has(settlement.settlement_id)) {
+      fail("Options expiry settlement identity or contract classification is invalid.");
+    }
+    const contractIdentity = settlement.instrument_key + ":" + settlement.expiry;
+    if (settledContracts.has(contractIdentity)) fail("Duplicate Options expiry settlement exists for one contract.");
+    settlementIds.add(settlement.settlement_id);
+    settledContracts.add(contractIdentity);
+    const quantity = integer(settlement.settled_quantity, "Expiry settled quantity", { min: 1 });
+    const strike = integer(settlement.strike_price_paise, "Expiry strike", { min: 1 });
+    const settlementPrice = integer(settlement.settlement_price_paise, "Expiry settlement price");
+    const intrinsic = integer(settlement.intrinsic_value_paise, "Expiry intrinsic value");
+    const gross = integer(settlement.gross_payout_paise, "Expiry gross payout");
+    const exerciseStt = integer(settlement.exercise_stt_paise, "Expiry exercise STT");
+    const net = integer(settlement.net_payout_paise, "Expiry net payout");
+    const basis = integer(settlement.entry_cost_basis_paise, "Expiry entry cost basis", { min: 1 });
+    const realized = signedInteger(settlement.realized_pnl_paise, "Expiry realized P&L");
+    const expectedIntrinsic = settlement.instrument_type === "CE"
+      ? Math.max(settlementPrice - strike, 0) : Math.max(strike - settlementPrice, 0);
+    const expectedExerciseStt = Number(((BigInt(gross) * 15n + 500_000n) / 1_000_000n) * 100n);
+    const settlementTimestamp = integer(settlement.settlement_timestamp_ms, "Expiry settlement timestamp", { min: 1 });
+    const verifiedTimestamp = integer(settlement.verified_at_ms, "Expiry verification timestamp", { min: 1 });
+    const expiryDate = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit"
+    }).format(new Date(settlementTimestamp));
+    const expiryCutoff = new Date(`${settlement.expiry}T15:30:00+05:30`).getTime();
+    if (!Number.isSafeInteger(expiryCutoff) || settlementTimestamp < expiryCutoff
+        || intrinsic !== expectedIntrinsic || multiplySafe(intrinsic, quantity, "Expiry payout") !== gross
+        || exerciseStt !== expectedExerciseStt || gross - exerciseStt !== net || net - basis !== realized
+        || verifiedTimestamp < settlementTimestamp || verifiedTimestamp > now
+        || expiryDate !== settlement.expiry
+        || typeof settlement.settlement_source_sha256 !== "string"
+        || !/^[a-f0-9]{64}$/.test(settlement.settlement_source_sha256)
+        || typeof settlement.settlement_source !== "string"
+        || !/^https:\/\/(?:[a-z0-9-]+\.)*nseindia\.com\//i.test(settlement.settlement_source)
+        || settlement.charge_schedule_version !== "NSE_EXERCISE_STT_2026_04_V1") {
+      fail("Options expiry settlement payout, STT, P&L, or official source does not reconcile.");
+    }
+    realizedPnlPaise = addSafe(realizedPnlPaise, realized, "Options realized P&L");
+    chargesPaidPaise = addSafe(chargesPaidPaise, exerciseStt, "Options charges");
+    history.push({
+      source: "EXPIRY", id: settlement.settlement_id,
+      tradingSymbol: settlement.trading_symbol, instrumentKey: settlement.instrument_key,
+      side: "SETTLEMENT", quantity, filledQuantity: quantity,
+      grossPaise: gross, chargesPaise: exerciseStt,
+      chargeBreakdownPaise: { exerciseStt: exerciseStt },
+      realizedPnlPaise: realized, status: "SETTLED",
+      createdAt: settlement.created_at, expiry: settlement.expiry,
+      settlementPricePaise: settlementPrice, intrinsicValuePaise: intrinsic,
+      chargeScheduleVersion: settlement.charge_schedule_version
+    });
   }
   history.sort((a, b) => Date.parse(b.createdAt ?? 0) - Date.parse(a.createdAt ?? 0));
 

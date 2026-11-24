@@ -211,6 +211,8 @@ jobs:
         run: bash supabase/tests/options_limit_fill_cancel_race.sh
       - name: Verify NSE Options LIMIT expiry preserves reservations without a verified session
         run: psql -v ON_ERROR_STOP=1 -f supabase/tests/options_limit_expiry_calendar_guard.sql
+      - name: Exercise atomic cash-settled NSE index Options expiry and immutable ledger
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/options_expiry_settlement.sql
       - name: Exercise concurrent NSE Options cash and close reservations
         run: bash supabase/tests/options_limit_concurrent_reservation_race.sh
       - name: Verify F&O LIMIT schema remains fail-closed until lifecycle release
