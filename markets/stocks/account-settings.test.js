@@ -57,3 +57,54 @@ test("local UI cannot create a mock identity and private profile writes are guar
   assert.match(source, /let authEventSeen = false/);
   assert.match(source, /if \(authEventSeen\) return/);
 });
+
+function createAccountSessionHarness() {
+ const elements=new Map();
+ class Element {
+  constructor(id=""){this.id=id;this.listeners={};this.hidden=false;this.disabled=false;this.value="";this.textContent="";this.children=[];}
+  addEventListener(name,fn){(this.listeners[name] ||= []).push(fn);}
+  append(...nodes){this.children.push(...nodes);}
+  focus(){}
+  set innerHTML(markup){for(const m of markup.matchAll(/id="([^"]+)"/g))elements.set(m[1],new Element(m[1]));}
+  querySelector(sel){return elements.get(sel.replace(/^#/,""));}
+ }
+ const host=new Element("connection");elements.set("connection",host);
+ let listener,currentSession=null,firstResolve,firstStartedResolve;
+ const firstStarted=new Promise(r=>firstStartedResolve=r);
+ const firstUser=new Promise(r=>firstResolve=r);
+ let userCalls=0;
+ const auth={
+  onAuthStateChange(fn){listener=fn;},
+  async getSession(){return {data:{session:currentSession},error:null};},
+  getUser(){userCalls++;if(userCalls===1){firstStartedResolve();return firstUser;}return Promise.resolve({data:{user:{id:"user-2",email:"two@example.test",user_metadata:{display_name:"Second User"}}},error:null});}
+ };
+ const supabase={auth};
+ const document={
+  head:new Element("head"),
+  getElementById(id){return elements.get(id)||null;},
+  createElement(){return new Element();},
+  querySelector(){return {content:"https://gateway.example"};}
+ };
+ const fetch=async(_url,opts)=>({ok:true,json:async()=>({startingCashPaise:100000000,cashPaise:20000,reservedCashPaise:1000,reservedMarginPaise:0,availableCashPaise:19000,ledgerReconciled:false,tokenUsed:opts.headers.Authorization})});
+ const vm=require("node:vm");
+ vm.runInNewContext(source.replace('import { supabase } from "./supabase-client.js";',"const {supabase}=globalThis.__test;"),{
+  document,fetch,queueMicrotask,AbortSignal:{timeout:()=>({})},Intl,globalThis:{__test:{supabase}},console
+ });
+ return {elements,firstStarted,resolveFirst:()=>firstResolve({data:{user:{id:"user-1",email:"one@example.test",user_metadata:{display_name:"First User"}}},error:null}),switchUser:()=>{currentSession={user:{id:"user-2"},access_token:"token-user-2"};listener("SIGNED_IN",currentSession);},switchOut:()=>{currentSession=null;listener("SIGNED_OUT",null);}};
+}
+test("a delayed previous-user profile response cannot overwrite the newly active account", async()=>{
+ const h=createAccountSessionHarness();
+ await new Promise(r=>setTimeout(r,0));
+ h.switchUser();
+ await h.firstStarted;
+ await new Promise(r=>setTimeout(r,0));
+ h.resolveFirst();
+ await new Promise(r=>setTimeout(r,10));
+ assert.equal(h.elements.get("s-trade-display-name").value,"Second User");
+ assert.equal(h.elements.get("s-trade-wallet-cash").textContent,"₹200.00");
+ assert.equal(h.elements.get("s-trade-session-info").textContent,"Signed in as two@example.test");
+ h.switchOut();
+ await new Promise(r=>setTimeout(r,0));
+ assert.equal(h.elements.get("s-trade-account-private").hidden,true);
+ assert.equal(h.elements.get("s-trade-wallet-cash").textContent,"—");
+});
