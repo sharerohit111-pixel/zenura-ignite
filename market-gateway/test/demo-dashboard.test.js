@@ -7,6 +7,7 @@ const root = path.resolve(__dirname, "../../markets/stocks");
 const html = fs.readFileSync(path.join(root, "demo.html"), "utf8");
 const js = fs.readFileSync(path.join(root, "demo.js"), "utf8");
 const adapter = fs.readFileSync(path.join(root, "mock-demo-adapter.js"), "utf8");
+const serviceWorker = fs.readFileSync(path.resolve(root, "../service-worker.js"), "utf8");
 const screens = ["home","market","watchlists","charts","equity","futures","options","orders","trades","portfolio","positions","holdings","account","profile","settings"];
 
 test("demo entry page loads only the isolated dashboard scripts", () => {
@@ -35,4 +36,12 @@ test("dashboard requires explicit mock opt-in and shows read-only safeguards", (
 test("demo dashboard does not call production order or account mutation endpoints", () => {
   assert.doesNotMatch(js, /fetch\s*\(/);
   assert.doesNotMatch(js, /\/orders|\/watchlist|\/portfolio\/|submitOrder/i);
+});
+
+test("PWA shell caches the demo route and its scripts, and allowlists shared fixture JSON", () => {
+  for (const asset of ["stocks/demo.html", "stocks/demo.css", "stocks/demo.js", "stocks/mock-demo-adapter.js"]) {
+    assert.ok(serviceWorker.includes('"' + asset + '"'), "missing PWA shell asset: " + asset);
+  }
+  assert.match(serviceWorker, /market\\|account\\|equity\\|derivatives\\|error/);
+  assert.match(serviceWorker, /market-gateway\\/mock\\/fixtures/);
 });
