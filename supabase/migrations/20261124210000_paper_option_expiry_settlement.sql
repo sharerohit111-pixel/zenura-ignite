@@ -144,8 +144,9 @@ begin
   v_source_date:=(to_timestamp(p_settlement_timestamp_ms/1000.0)
     at time zone 'Asia/Kolkata')::date;
   if v_source_date<>p_expiry
-     or p_expiry>=(v_now at time zone 'Asia/Kolkata')::date
-     or v_now<((p_expiry+time '15:30') at time zone 'Asia/Kolkata') then
+     or p_expiry>(v_now at time zone 'Asia/Kolkata')::date
+     or v_now<((p_expiry+time '15:30') at time zone 'Asia/Kolkata')
+     or to_timestamp(p_settlement_timestamp_ms/1000.0)<((p_expiry+time '15:30') at time zone 'Asia/Kolkata') then
     raise exception 'Only a past, completed NSE contract expiry can be settled.'
       using errcode='22023';
   end if;
