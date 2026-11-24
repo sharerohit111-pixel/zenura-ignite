@@ -3,7 +3,7 @@
   "use strict";
   const gateway=(document.querySelector('meta[name="market-gateway-url"]')?.content||"").trim().replace(/\/+$/,"");
   const connector=()=>window.ZENURA_MARKET_CONNECTOR;
-  const state={instrument:null,depthTimer:null,statusTimer:null,depthRequest:0,statusRequest:0,depthInFlight:false};
+  const state={instrument:null,depthTimer:null,statusTimer:null,depthRequest:0,statusRequest:0,depthInFlight:false,depthQueued:false};
   const statusStrip=document.createElement("section");
   statusStrip.className="exchange-status-strip";
   statusStrip.setAttribute("aria-label","NSE and BSE market status");
@@ -34,7 +34,7 @@
     levels.forEach(level=>{
       const row=document.createElement("div");row.className="depth-row "+kind;
       const p=document.createElement("span"),q=document.createElement("span"),o=document.createElement("span");
-      p.textContent=formatPrice(level.pricePaise);q.textContent=Number(level.quantity).toLocaleString("en-IN");o.textContent=Number(level.orders).toLocaleString("en-IN")+" ord";
+      p.textContent=formatPrice(level.pricePaise);q.textContent=Number(level.quantity).toLocaleString("en-IN");o.textContent=(Number.isSafeInteger(level.orders)?Number(level.orders).toLocaleString("en-IN"):"—")+" ord";
       row.append(p,q,o);target.append(row);
     });
   }
@@ -51,7 +51,7 @@
   }
   async function refreshDepth(){
     const item=state.instrument;
-    if(state.depthInFlight||!item)return;
+    if(!item)return;\n    if(state.depthInFlight){state.depthQueued=true;return;}
     state.depthInFlight=true;
     const requestId=++state.depthRequest;
     if(!item){showDepthMessage("No instrument selected");return;}
@@ -64,7 +64,7 @@
       stamp.classList.toggle("depth-stale",data.status!=="fresh");
       if(data.status!=="fresh")stamp.textContent+=" · DO NOT USE AS LIVE";
     }catch(error){if(requestId===state.depthRequest){showDepthMessage(error.message||"Depth unavailable");stamp.textContent="Unavailable";stamp.classList.add("depth-stale");}}
-    finally{state.depthInFlight=false;}
+    finally{state.depthInFlight=false;if(state.depthQueued){state.depthQueued=false;refreshDepth();}}
   }
   function statusLabel(value){
     return ({NORMAL_OPEN:"OPEN",NORMAL_CLOSE:"CLOSED",PRE_OPEN_START:"PRE-OPEN",PRE_OPEN_END:"PRE-OPEN ENDED",PRE_OPEN_M_END:"PRE-OPEN MATCHING",CLOSING_START:"CLOSING",CLOSING_END:"CLOSING ENDED",CTS_CLOSE:"CONTINUOUS TRADING CLOSED",CAS_LM_START:"CLOSING AUCTION",CAS_M_STOP:"CAS MARKET ORDERS STOPPED",CAS_STOP:"CAS CLOSED"})[value]||value||"UNKNOWN";
@@ -76,9 +76,9 @@
       try{
         const data=await request("/market-status?exchange="+exchange);
         if(requestId!==state.statusRequest)return;
-        value.textContent=statusLabel(data.status)+(data.casStatus?" · "+statusLabel(data.casStatus):"");
+        value.textContent=statusLabel(data.status)+(data.casStatus?" · CAS "+statusLabel(data.casStatus)+(data.casFreshness==="stale"?" (STALE)":""):"");
         value.classList.toggle("closed",data.status!=="NORMAL_OPEN");
-        value.classList.toggle("stale",data.freshness!=="fresh");
+        value.classList.toggle("stale",data.freshness!=="fresh"||data.casFreshness==="stale");
         meta.textContent=(data.freshness==="fresh"?"Verified":"STALE")+" · Updated "+new Date(data.lastUpdatedMs).toLocaleTimeString("en-IN",{timeZone:"Asia/Kolkata"})+" IST";
       }catch(error){if(requestId===state.statusRequest){value.textContent="UNAVAILABLE";value.classList.add("stale");meta.textContent=error.message||"Exchange status unavailable";}}
     }));
@@ -91,7 +91,7 @@
   async function populateExpiries(item){
     const select=document.getElementById("option-expiry");
     if(!select||!["NSE_INDEX","BSE_INDEX","NSE_EQ","BSE_EQ"].includes(item.segment))return;
-    const previous=select.value,underlying=item.underlying_symbol||String(item.trading_symbol||item.name||"").split(/\\s+/)[0];
+    const previous=select.value,underlying=item.underlying_symbol||String(item.trading_symbol||item.name||"").split(" ")[0];
     try{
       const data=await request("/instruments?"+new URLSearchParams({kind:"options",q:underlying,limit:"100"}));
       if(state.instrument?.instrument_key!==item.instrument_key)return;
