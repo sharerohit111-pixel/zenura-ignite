@@ -39,6 +39,7 @@ function buildPaperPortfolioAccounting({account,assetSnapshots,mode="PERSISTED",
   for(const o of s.orders){if(!o||o.asset!==s.asset)fail("Order asset does not match adapter.");const orderId=id(o.orderId,"Order ID");if(orderIds.has(orderId))fail("Duplicate order ID across assets.");orderIds.add(orderId);money(o.remainingQuantity??0,"Remaining order quantity");if(typeof o.status!=="string")fail("Order status missing.");orders.push({...o,orderId});}
   for(const t of s.trades){if(!t||t.asset!==s.asset)fail("Trade asset does not match adapter.");const tradeId=id(t.tradeId,"Trade ID");if(tradeIds.has(tradeId))fail("Duplicate trade ID across assets.");tradeIds.add(tradeId);const c=money(t.chargesPaise??0,"Trade charges"),r=money(t.realizedPnlPaise??0,"Realized P&L",true);charges=add(charges,c,"Charges");realized=add(realized,r,"Realized P&L");trades.push({...t,tradeId,chargesPaise:c,realizedPnlPaise:r});}
  }
+ if(assets.size!==ASSETS.size)fail("Equity, Futures and Options snapshots are all required; use empty snapshots for unused assets.");
  positions.sort((a,b)=>a.asset.localeCompare(b.asset)||String(a.symbol||"").localeCompare(String(b.symbol||"")));
  orders.sort((a,b)=>String(b.createdAt||"").localeCompare(String(a.createdAt||""))||a.orderId.localeCompare(b.orderId));
  trades.sort((a,b)=>String(b.executedAt||"").localeCompare(String(a.executedAt||""))||a.tradeId.localeCompare(b.tradeId));
