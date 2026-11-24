@@ -435,3 +435,14 @@ The Futures and Options work must be reviewed at its own PR head and reconciled 
 4. Add real PostgreSQL tests for expiry takeover, two concurrent claimants, renew-after-expiry rejection, stale owner fill rejection, cursor update with zero affected rows, and crash/restart recovery.
 
 No worker runtime, SQL, migration, scheduler, feature flag or production configuration was changed by this matrix update.
+
+
+## 22. Backward-compatible public API error codes (2026-11-24)
+
+Added a small, database-independent public error taxonomy in `market-gateway/lib/api-error-contract.js` and wired it into the Supabase gateway's shared `sendError` response path.
+
+- Error responses retain the existing `error` and `requestId` fields and HTTP status; an additive `code` field now provides a stable status-derived identifier.
+- Known codes cover invalid request, unauthenticated, forbidden, not found, request timeout, conflict, payload too large, validation failed, rate limited, upstream error, service unavailable and upstream timeout. Unknown 5xx statuses map to `INTERNAL_ERROR`; unknown non-5xx statuses map to `REQUEST_FAILED`.
+- Raw PostgreSQL/PostgREST/provider error codes are deliberately not surfaced. Existing generic error text/fallback behavior and safe structured logging remain unchanged.
+- Added isolated mapping unit tests, gateway response-contract assertions and a syntax-check entry. No route-specific response body outside the shared error path was changed.
+- Exact-head full CI has not yet run for these commits. Keep this additive contract in Draft until the full gateway regression and disposable PostgreSQL workflow passes.
