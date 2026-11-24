@@ -19,7 +19,7 @@
     $("demo-exec-available").textContent=money(account.availableFundsPaise);
     $("demo-exec-pnl").textContent=money(account.realizedPnlPaise);
     const delivery=account.positions[instrumentKey],intraday=account.intradayPositions[instrumentKey];
-    const describe=p=>p?String(p.quantity)+" shares · avg "+money(p.averagePricePaise):"0 shares";
+    const describe=p?p.quantity+" shares · reserved "+(p.reservedQuantity||0)+" · avg "+money(p.averagePricePaise):"0 shares · reserved 0";
     $("demo-exec-positions").textContent="Delivery: "+describe(delivery)+" · Intraday: "+describe(intraday);
     const selector=$("demo-exec-order-select"),previous=selector.value||selectedOrderId;
     selector.innerHTML=orders.length?orders.map(o=>'<option value="'+escape(o.orderId)+'">'+escape(o.side+" "+o.quantity+" "+o.symbol+" · "+o.status+" · "+o.orderId)+'</option>').join(""):'<option value="">No orders yet</option>';
