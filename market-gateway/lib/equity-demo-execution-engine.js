@@ -94,7 +94,7 @@ function createEquityDemoExecutionEngine({fixture,account,env=process.env}={}){
     const order={orderId,idempotencyKey:key,instrumentKey:request.instrumentKey,symbol:instrument.symbol,
       side:request.side,orderType:request.orderType,product:request.product,quantity:request.quantity,
       filledQuantity:0,remainingQuantity:request.quantity,averagePricePaise:0,grossValuePaise:0,
-      realizedPnlPaise:0,status:"PENDING",reservedCashPaise,reservedShareQuantity:request.side==="SELL"?request.quantity:0,
+      realizedPnlPaise:0,status:"PENDING",reservedCashPaise:reserveCashPaise,reservedShareQuantity:request.side==="SELL"?request.quantity:0,
       limitPricePaise:request.limitPricePaise??null,simulationOnly:true,source:"SYNTHETIC_FIXTURE",createdAt:fixture.asOf,
       updatedAt:fixture.asOf};
     state.orders.set(orderId,order);state.idempotency.set(key,{fingerprint:hash,orderId});
