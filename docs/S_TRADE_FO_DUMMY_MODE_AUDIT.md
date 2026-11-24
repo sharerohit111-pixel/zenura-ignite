@@ -36,7 +36,7 @@ These PRs are separate Draft/stacked branches, not a single merged production re
 - Use the existing applyDerivativeFill position helper for position transitions; do not reimplement its average-price or realized-P&L arithmetic.
 - Add a small browser export to the existing helper so the isolated static workspace can reuse it; CommonJS consumers and tests retain the same export.
 - Add a deterministic simulator harness with whole-lot partial fills, side-correct bid/ask matching, terminal cancellation and close-quantity reservation for long Options SELL orders.
-- Fix the shared fixture loader's fixture-directory resolution and its test import path. The loader remains test-only and is not imported by production gateway routes.
+- Reuse PR #137's corrected shared fixture loader path and test import; extend its existing fixture tests with derivative-specific assertions. The loader remains test-only and is not imported by production gateway routes.
 - Add focused Node tests for contracts, expiry/strike coverage, Futures long/short positions, CE/PE long-only entry/exit, MARKET rejection on insufficient depth, LIMIT partial/full fills, cancellation and reservation release.
 
 ## Non-duplication and safety
