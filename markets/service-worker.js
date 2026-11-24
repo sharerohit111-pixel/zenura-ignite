@@ -1,8 +1,10 @@
 "use strict";
 const BASE=new URL("./",self.registration.scope);
-const CACHE_NAME="zenura-markets-shell-v2";
+const CACHE_NAME="zenura-markets-shell-v3";
 const SHELL=[
- "", "index.html","portal.css","pwa-register.js","language-toggle.js","language-toggle.js",
+ "", "index.html","portal.css","pwa-register.js","language-toggle.js",
+ "dashboard/","dashboard/index.html","dashboard/dashboard.css","dashboard/dashboard.js",
+ "dashboard/dashboard-model.js","dashboard/mock-data.json",
  "stocks/","stocks/index.html","stocks/stocks.css","stocks/order-workspace.css","stocks/chart-theme.css",
  "stocks/sse-parser.js","stocks/live-quote.js","stocks/reconnect-policy.js","stocks/paper-order-retry-policy.js",
  "stocks/chart-indicators.js","stocks/chart-engine.js","stocks/stocks.js","stocks/order-workspace.js","stocks/chart-theme.js",
@@ -42,7 +44,7 @@ self.addEventListener("fetch",event=>{
   })());
   return;
  }
- if(["style","script","image","font"].includes(request.destination)||url.pathname.endsWith(".webmanifest")){
+ if(["style","script","image","font"].includes(request.destination)||url.pathname.endsWith(".webmanifest")||url.pathname.endsWith(".json")){
   event.respondWith((async()=>{
    const cache=await caches.open(CACHE_NAME),cached=await cache.match(request);
    const network=fetch(request).then(response=>{
