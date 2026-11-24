@@ -104,6 +104,9 @@ GRANT SELECT,INSERT,UPDATE ON public.s_trade_provider_health,
 GRANT SELECT ON public.s_trade_admins TO service_role;
 GRANT SELECT,INSERT ON public.s_trade_admin_audit_log TO service_role;
 GRANT USAGE,SELECT ON SEQUENCE public.s_trade_admin_audit_log_audit_id_seq TO service_role;
+GRANT SELECT,INSERT,UPDATE ON public.s_trade_notification_preferences TO authenticated;
+GRANT SELECT,UPDATE(read_at) ON public.s_trade_notifications TO authenticated;
+GRANT SELECT,INSERT,UPDATE,DELETE ON public.s_trade_price_alerts TO authenticated;
 
 CREATE POLICY s_trade_preferences_select_own ON public.s_trade_notification_preferences
   FOR SELECT TO authenticated USING ((SELECT auth.uid())=user_id);
@@ -113,6 +116,9 @@ CREATE POLICY s_trade_preferences_update_own ON public.s_trade_notification_pref
   FOR UPDATE TO authenticated USING ((SELECT auth.uid())=user_id) WITH CHECK ((SELECT auth.uid())=user_id);
 CREATE POLICY s_trade_notifications_select_own ON public.s_trade_notifications
   FOR SELECT TO authenticated USING ((SELECT auth.uid())=user_id);
+CREATE POLICY s_trade_notifications_mark_read_own ON public.s_trade_notifications
+  FOR UPDATE TO authenticated USING ((SELECT auth.uid())=user_id)
+  WITH CHECK ((SELECT auth.uid())=user_id);
 CREATE POLICY s_trade_price_alerts_select_own ON public.s_trade_price_alerts
   FOR SELECT TO authenticated USING ((SELECT auth.uid())=user_id);
 CREATE POLICY s_trade_price_alerts_insert_own ON public.s_trade_price_alerts
@@ -250,3 +256,11 @@ END;
 $$;
 REVOKE ALL ON FUNCTION public.s_trade_record_provider_health(text,boolean,integer) FROM PUBLIC,anon,authenticated;
 GRANT EXECUTE ON FUNCTION public.s_trade_record_provider_health(text,boolean,integer) TO service_role;
+
+-- Extend event-driven confirmations to the existing Futures and Options LIMIT order lifecycles.
+DROP TRIGGER IF EXISTS s_trade_futures_order_notification ON public.paper_futures_orders;
+CREATE TRIGGER s_trade_futures_order_notification AFTER INSERT OR UPDATE ON public.paper_futures_orders
+  FOR EACH ROW EXECUTE FUNCTION public.s_trade_notify_order_event();
+DROP TRIGGER IF EXISTS s_trade_option_limit_order_notification ON public.paper_option_limit_orders;
+CREATE TRIGGER s_trade_option_limit_order_notification AFTER INSERT OR UPDATE ON public.paper_option_limit_orders
+  FOR EACH ROW EXECUTE FUNCTION public.s_trade_notify_order_event();
