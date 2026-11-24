@@ -18,7 +18,7 @@ function validateFixture(fixture){
     fixture.meta?.provider!=="MOCK"||fixture.meta?.fees!=="NOT_MODELED"||
     typeof fixture.asOf!=="string"||!Number.isFinite(Date.parse(fixture.asOf)))fail("INVALID_EQUITY_DEMO_FIXTURE",500);
   const instrument=fixture.data?.instrument,book=fixture.data?.orderBook;
-  if(!instrument||typeof instrument.instrumentKey!=="string"||!instrument.instrumentKey.startsWith("MOCK|SIM|EQ|")||
+  if(!instrument||typeof instrument.instrumentKey!=="string"||!instrument.instrumentKey.startsWith("MOCK|NSE|EQ|")||
     typeof instrument.symbol!=="string"||!instrument.symbol.startsWith("MOCK")||
     !Number.isSafeInteger(instrument.tickSizePaise)||instrument.tickSizePaise<1||
     !Number.isSafeInteger(instrument.markPricePaise)||instrument.markPricePaise<1||instrument.markPricePaise%instrument.tickSizePaise!==0||
