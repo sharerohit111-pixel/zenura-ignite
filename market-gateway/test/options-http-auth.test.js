@@ -157,6 +157,23 @@ test("authenticated NSE Options MARKET BUY submits with fresh ask and verified u
   }
 });
 
+test("authenticated NSE Options LIMIT route rejects malformed inputs before account or provider reads",async()=>{
+  const cases=[
+    [{idempotency_key:"not-a-uuid"},"A valid UUID idempotency_key is required."],
+    [{instrument_key:"bad\\ninstrument"},"A valid NSE option instrument_key is required."],
+    [{side:"SHORT"},"Options LIMIT side must be BUY or SELL."],
+    [{lots:1.5},"Lots must be a whole number between 1 and 10,000."],
+    [{limit_price_paise:0},"LIMIT price must be a positive integer number of paise."]
+  ];
+  for(const [bodyOverrides,message] of cases){
+    const result=await submitAuthenticatedOptionsLimit("BUY","00000000-0000-4000-8000-000000000031",{bodyOverrides});
+    assert.equal(result.status,400,JSON.stringify(result.body));
+    assert.equal(result.body.error,message);
+    assert.equal(rpcCalls.length,0,"invalid requests must not invoke accounting RPCs");
+    assert.equal(userQueries.length,0,"invalid requests must not read account, positions, tokens or sessions");
+  }
+});
+
 test("authenticated Options history and cancellation APIs use verified user scope",async()=>{
   authenticated=true;
   rpcCalls.length=0;userQueries.length=0;
@@ -280,6 +297,9 @@ test("authenticated NSE Options LIMIT BUY validates account, quote and session b
   assert.equal(rpcCalls[0].args.p_user_id,TEST_USER_ID);
   assert.equal(rpcCalls[0].args.p_side,"BUY");
   assert.equal(rpcCalls[0].args.p_quantity,65);
+  assert.equal(rpcCalls[0].args.p_request_fingerprint,makeOrderFingerprint({
+    instrumentKey:TEST_INSTRUMENT_KEY,side:"BUY",quantity:65,orderType:"LIMIT",limitPricePaise:1240
+  }));
   assert.equal(rpcCalls[0].args.p_limit_price_paise,1240);
   assert.equal(rpcCalls[0].key,"test-service-role-key");
   assert.ok(userQueries.some(q=>q.table==="paper_option_limit_orders"&&q.key==="test-publishable-key"));
@@ -298,6 +318,9 @@ test("authenticated NSE Options LIMIT SELL reserves only existing unreserved lon
   assert.equal(rpcCalls[0].args.p_user_id,TEST_USER_ID);
   assert.equal(rpcCalls[0].args.p_side,"SELL");
   assert.equal(rpcCalls[0].args.p_quantity,65);
+  assert.equal(rpcCalls[0].args.p_request_fingerprint,makeOrderFingerprint({
+    instrumentKey:TEST_INSTRUMENT_KEY,side:"SELL",quantity:65,orderType:"LIMIT",limitPricePaise:1240
+  }));
   assert.equal(rpcCalls[0].key,"test-service-role-key");
   assert.ok(userQueries.some(q=>q.table==="paper_derivative_positions"&&q.key==="test-publishable-key"));
 });
@@ -307,7 +330,7 @@ function priorOptionsLimitOrder({idempotencyKey,side="BUY",limitPricePaise=1240,
     order_id:require("../lib/order-idempotency").makeOrderId(TEST_USER_ID,idempotencyKey),
     idempotency_key:idempotencyKey,
     request_fingerprint:makeOrderFingerprint({
-      instrumentKey:TEST_INSTRUMENT_KEY,side,quantity:lots,orderType:"LIMIT",limitPricePaise
+      instrumentKey:TEST_INSTRUMENT_KEY,side,quantity:lots*TEST_INSTRUMENT.lot_size,orderType:"LIMIT",limitPricePaise
     }),
     trading_symbol:"NIFTY26NOV25000CE",instrument_key:TEST_INSTRUMENT_KEY,
     side,quantity:65,filled_quantity:0,remaining_quantity:65,
