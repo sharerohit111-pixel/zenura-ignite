@@ -31,6 +31,9 @@ self.addEventListener("fetch",event=>{
  if(url.origin!==BASE.origin||(!url.pathname.startsWith(BASE.pathname)&&!shellAsset))return;
  if(url.searchParams.has("token"))return;
  if(request.mode==="navigate"){
+  // Only explicitly listed static shell documents may be cached. Never cache
+  // arbitrary same-origin navigation responses that could become user-specific.
+  if(!shellAsset)return;
   event.respondWith((async()=>{
    try{
     const response=await fetch(request);
