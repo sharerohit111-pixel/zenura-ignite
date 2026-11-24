@@ -30,4 +30,12 @@ test("normalizes NSE/BSE market status and rejects stale/future or mismatched st
  assert.equal(result.freshness,"fresh");assert.equal(result.casStatus,"CTS_CLOSE");
  assert.throws(()=>normalizeMarketStatus(payload,"BSE",{nowMs:now}),/invalid exchange/);
  assert.throws(()=>normalizeMarketStatus({...payload,data:{...payload.data,last_updated:now+1}},"NSE",{nowMs:now}),/future/);
+ assert.throws(()=>normalizeMarketStatus({...payload,data:{...payload.data,last_updated:now-300001}},"NSE",{nowMs:now}),/invalid exchange/);
+ assert.throws(()=>normalizeMarketStatus({...payload,data:{...payload.data,status:"UNKNOWN"}},"NSE",{nowMs:now}),/invalid exchange/);
+});
+test("rejects unsorted depth and more than five levels",()=>{
+ const unsorted=quote({depth:{buy:[{price:99.95,quantity:1,orders:1},{price:100,quantity:1,orders:1}],sell:[]}});
+ assert.throws(()=>normalizeMarketDepthQuote(unsorted,instrument,{nowMs:now}),/not ordered/);
+ const tooMany=Array.from({length:6},(_,i)=>({price:100-i*.05,quantity:1,orders:1}));
+ assert.throws(()=>normalizeMarketDepthQuote(quote({depth:{buy:tooMany,sell:[]}}),instrument,{nowMs:now}),/at most five/);
 });
