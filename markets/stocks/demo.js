@@ -7,7 +7,7 @@ let client=null,fixtures={};
 const titles={home:"Home Overview",market:"Market Snapshot",watchlists:"Watchlists",charts:"Charts & Depth",equity:"Equity Paper Trading",futures:"Futures Paper Trading",options:"Options Paper Trading",orders:"Orders",trades:"Trade History",portfolio:"Portfolio",positions:"Positions",holdings:"Holdings",account:"Virtual Wallet",profile:"Profile",settings:"Settings"};
 function el(tag,cls,txt){const n=document.createElement(tag);if(cls)n.className=cls;if(txt!==undefined)n.textContent=String(txt);return n}
 function money(paise){return "₹"+(Number(paise||0)/100).toLocaleString("en-IN",{minimumFractionDigits:2,maximumFractionDigits:2})}
-function card(label,value,detail){const c=el("article","card");c.append(el("h3","",label),el("div","metric",value),el("div","sub","",detail));return c}
+function card(label,value,detail){const c=el("article","card");c.append(el("h3","",label),el("div","metric",value),el("div","sub",detail||""));return c}
 function sectionTitle(name,description){const row=el("div","screen-title");const left=el("div");left.append(el("h2","",titles[name]||name),el("p","",description));row.append(left,el("span","read-only","READ ONLY · MOCK"));return row}
 function table(headers,rows){const wrap=el("div","table-wrap"),t=el("table"),head=el("thead"),hr=el("tr");headers.forEach(h=>hr.append(el("th","",h)));head.append(hr);const body=el("tbody");rows.forEach(row=>{const tr=el("tr");row.forEach(v=>tr.append(el("td","",v)));body.append(tr)});t.append(head,body);wrap.append(t);return wrap}
 function grid(...items){const g=el("div","grid");items.forEach(x=>g.append(x));return g}
@@ -22,9 +22,19 @@ function render(name){
   if(name==="charts"){const depth=market.depth||{};content.append(el("h3","","Synthetic bid / ask depth"),table(["SIDE","PRICE","QUANTITY"],[...(depth.bids||[]).map(x=>["BID",money(x.pricePaise),x.quantity]),...(depth.asks||[]).map(x=>["ASK",money(x.pricePaise),x.quantity])]));}
   return;
  }
- if(name==="account"||name==="profile"||name==="settings"){
+ if(name==="account"){
   content.append(grid(card("Virtual starting capital",money(account.startingCapitalPaise),"₹10,00,000 demo account"),card("Cash balance",money(account.cashBalancePaise),"Fixture snapshot"),card("Blocked funds",money(account.blockedFundsPaise),"No real funds"),card("Available funds",money(account.availableFundsPaise),"Not reconciled across asset ledgers")));
   content.append(el("div","notice","Ledger reconciliation: "+String(account.ledgerReconciled)+" · This wallet fixture is illustrative only and must not be treated as a unified reconciled balance."));
+  return;
+ }
+ if(name==="profile"){
+  content.append(grid(card("Demo account ID",account.accountId||"—","Synthetic fixture identifier"),card("Currency",account.currency||"—","Account fixture field"),card("Account mode","MOCK","No real brokerage account"),card("Authentication","Not connected","This isolated preview does not sign in or bypass production authentication")));
+  content.append(el("div","notice","The shared account fixture does not contain a personal name, email, phone number or editable profile fields."));
+  return;
+ }
+ if(name==="settings"){
+  content.append(grid(card("Data source","Synthetic JSON","No live market feed"),card("Order submission","Disabled","Read-only preview"),card("Environment","Demo only","No production session"),card("Crypto","Separate","Not included in this Indian-market demo")));
+  content.append(el("div","notice","These are fixed demo safeguards. This preview does not change production settings, authentication or account preferences."));
   return;
  }
  if(name==="futures"||name==="options"){
