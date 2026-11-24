@@ -70,22 +70,30 @@ SET LOCAL ROLE service_role;
 DO $worker_lease_fencing$
 DECLARE
   v_state_key constant text := 'paper_futures_limit_orders';
-  v_token constant uuid := '8a9a5f3c-93a1-4a45-9c0a-41d80f4c0f01';
-  v_stale_token constant uuid := 'b5f62a28-7f61-4a5a-bad5-2d52e6a2ac02';
+  v_token uuid := gen_random_uuid();
+  v_stale_token uuid := gen_random_uuid();
+  v_now_ms bigint;
   v_acquired boolean;
   v_released boolean;
   v_rows integer;
   v_current_token uuid;
 BEGIN
+  SELECT greatest(
+    floor(extract(epoch from clock_timestamp())*1000)::bigint,
+    coalesce(max((extract(epoch from lease_expires_at)*1000)::bigint+1),0)
+  ) INTO v_now_ms
+    FROM public.paper_market_worker_state
+   WHERE state_key=v_state_key;
+
   SELECT public.acquire_paper_market_worker_lease(
-    v_state_key,v_token,2000000000000,30000
+    v_state_key,v_token,v_now_ms,30000
   ) INTO v_acquired;
   IF NOT v_acquired THEN
     RAISE EXCEPTION 'Could not acquire disposable Futures worker lease fixture';
   END IF;
 
   SELECT public.release_paper_market_worker_lease(
-    v_state_key,v_stale_token,2000000000001
+    v_state_key,v_stale_token,v_now_ms+1
   ) INTO v_released;
   IF v_released THEN
     RAISE EXCEPTION 'Stale worker token unexpectedly released the active lease';
@@ -107,7 +115,7 @@ BEGIN
   END IF;
 
   SELECT public.release_paper_market_worker_lease(
-    v_state_key,v_token,2000000000002
+    v_state_key,v_token,v_now_ms+2
   ) INTO v_released;
   IF NOT v_released THEN
     RAISE EXCEPTION 'Current lease owner could not release its own lease';
