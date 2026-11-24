@@ -112,7 +112,7 @@ function getCandles(instrumentKey,{timeframe="5m",count=24}={}){
   const tick=Math.max(1,Math.round(BY_KEY.get(instrumentKey).tick_size*100));
   const step={ "1m":1,"5m":2,"15m":3,"1h":5,"1D":8,"1W":13 }[timeframe];
   return Array.from({length:count},(_,i)=>{
-    const base=quote.lastPricePaise+(i-count+1)*tick*step;
+    const base=Math.max(tick*10,quote.lastPricePaise+(i-count+1)*tick*step);
     const open=base+(i%3-1)*tick*2,close=base+((i%4)-1)*tick;
     return Object.freeze({index:i,openPaise:open,highPaise:Math.max(open,close)+tick*3,lowPaise:Math.min(open,close)-tick*3,closePaise:close,volume:10000+i*375});
   });
