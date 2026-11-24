@@ -41,6 +41,28 @@ BEGIN
     RAISE EXCEPTION 'Expired OAuth state should not be marked consumed';
   END IF;
 
+  -- Each authorization start prunes at most 500 states older than the
+  -- one-day retention window, while preserving newer expired rows.
+  INSERT INTO public.upstox_oauth_states(
+    state_hash,user_id,connection_generation,used,expires_at
+  )
+  SELECT lpad(to_hex(n),64,'0'),v_user,0,true,
+         clock_timestamp()-interval '2 days'
+    FROM generate_series(1,501) AS n;
+  PERFORM public.begin_upstox_oauth(v_user,repeat('d',64),
+    clock_timestamp()+interval '5 minutes',
+    floor(extract(epoch from clock_timestamp())*1000)::bigint);
+  IF (SELECT count(*) FROM public.upstox_oauth_states
+       WHERE expires_at<clock_timestamp()-interval '1 day')<>1 THEN
+    RAISE EXCEPTION 'OAuth state cleanup did not prune exactly 500 old rows';
+  END IF;
+  IF NOT EXISTS(SELECT 1 FROM public.upstox_oauth_states WHERE state_hash=repeat('d',64)) THEN
+    RAISE EXCEPTION 'OAuth state cleanup removed the newly created state';
+  END IF;
+  IF to_regclass('public.upstox_oauth_states_expires_at_idx') IS NULL THEN
+    RAISE EXCEPTION 'OAuth state expiry index is missing';
+  END IF;
+
   -- Disconnect increments generation; a callback captured before disconnect
   -- must not be able to recreate the connection afterward.
   v_generation := public.disconnect_upstox_connection(v_user,
