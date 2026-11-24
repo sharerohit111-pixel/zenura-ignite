@@ -295,7 +295,7 @@ test("authenticated NSE Options LIMIT route rejects malformed inputs before acco
         limit_price_paise:1250,idempotency_key:"00000000-0000-4000-8000-000000000030"};
       const cases=[
         [{...valid,idempotency_key:"not-a-uuid"},"A valid UUID idempotency_key is required."],
-        [{...valid,instrument_key:"bad\\ninstrument"},"A valid NSE option instrument_key is required."],
+        [{...valid,instrument_key:"bad\ninstrument"},"A valid NSE option instrument_key is required."],
         [{...valid,side:"SHORT"},"Options LIMIT side must be BUY or SELL."],
         [{...valid,lots:1.5},"Lots must be a whole number between 1 and 10,000."],
         [{...valid,limit_price_paise:0},"LIMIT price must be a positive integer number of paise."]
