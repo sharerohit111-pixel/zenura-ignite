@@ -82,3 +82,37 @@ export async function mountDerivativeDemo(container,screen){
   const c=selected();status.textContent=c?"MOCK quote selected · "+c.symbol+" · "+c.expiry:"Synthetic contracts loaded.";paint();
  }catch(e){status.textContent="Demo unavailable · "+(e.message||"fixture validation failed")+". No live fallback.";buy.disabled=true;sell.disabled=true;match.disabled=true;refresh.disabled=true;}
 }
+
+export async function appendDerivativeSummary(container, screen) {
+  const section = el("section", "demo-fo-summary");
+  section.append(el("h3", "demo-fo-subhead",
+    screen === "positions" || screen === "portfolio" ? "LOCAL FUTURES & OPTIONS POSITIONS" :
+    screen === "trades" ? "LOCAL FUTURES & OPTIONS FILLS" : "LOCAL FUTURES & OPTIONS ORDERS"));
+  section.append(el("p", "demo-fo-disclaimer",
+    "Browser-memory DEMO DATA only. These records are not part of the account fixture, cash ledger or production portfolio."));
+  const host = el("div");
+  section.append(host);
+  container.append(section);
+  try {
+    const engine = await getSimulator();
+    const snapshot = engine.snapshot();
+    if (screen === "positions" || screen === "portfolio") {
+      renderTable(host,
+        ["CONTRACT","ASSET","EXPIRY","NET QTY","AVG PRICE","RESERVED CLOSE","AVAILABLE CLOSE"],
+        snapshot.positions.map(x => [x.symbol,x.assetClass === "OPTION" ? x.optionType : "FUT",x.expiry,x.netQuantity,money(x.averagePricePaise),x.reservedCloseQuantity,x.availableCloseQuantity]),
+        "No local Futures/Options demo positions.");
+    } else if (screen === "trades") {
+      const rows = snapshot.orders.flatMap(order => order.fills.map(fill => [
+        fill.fillId,order.symbol,order.side,order.orderType,fill.quantity,money(fill.pricePaise),money(fill.grossPaise),fill.executedAt
+      ]));
+      renderTable(host,["FILL ID","CONTRACT","SIDE","ORDER TYPE","QTY","FILL PRICE","GROSS VALUE","EXECUTED AT"],rows,"No local Futures/Options demo fills.");
+    } else {
+      renderTable(host,
+        ["ORDER ID","CONTRACT","SIDE","TYPE","QTY","FILLED / REMAINING","AVG FILL","STATUS"],
+        snapshot.orders.map(x => [x.orderId,x.symbol,x.side,x.orderType,x.quantity,x.filledQuantity+" / "+x.remainingQuantity,x.averageFillPricePaise?money(x.averageFillPricePaise):"—",x.status]),
+        "No local Futures/Options demo orders.");
+    }
+  } catch (error) {
+    host.append(el("p","demo-fo-status","Local derivative Demo records unavailable · "+(error.message || "fixture error")));
+  }
+}
