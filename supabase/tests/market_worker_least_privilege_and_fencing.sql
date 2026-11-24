@@ -65,6 +65,8 @@ $worker_acl_contract$;
 
 -- Exercise the actual SECURITY DEFINER lease RPC under service_role. A stale token
 -- must neither release the current lease nor write the worker cursor.
+SET LOCAL ROLE service_role;
+
 DO $worker_lease_fencing$
 DECLARE
   v_state_key constant text := 'paper_futures_limit_orders';
@@ -75,8 +77,6 @@ DECLARE
   v_rows integer;
   v_current_token uuid;
 BEGIN
-  SET LOCAL ROLE service_role;
-
   SELECT public.acquire_paper_market_worker_lease(
     v_state_key,v_token,2000000000000,30000
   ) INTO v_acquired;
@@ -112,6 +112,7 @@ BEGIN
   IF NOT v_released THEN
     RAISE EXCEPTION 'Current lease owner could not release its own lease';
   END IF;
-  RESET ROLE;
 END
 $worker_lease_fencing$;
+
+RESET ROLE;
