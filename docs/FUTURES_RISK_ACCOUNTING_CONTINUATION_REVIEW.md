@@ -105,3 +105,69 @@ The helper accepts positive integer quantities and configured basis-point rates 
 - **Chat 4:** owns Futures-specific settlement source verification, risk ledger design, MTM/expiry semantics and Futures-only tests.
 
 Until these approvals and the migration-chain reconciliation are complete, keep this work at documentation, pure-domain tests and disposable-CI level. No production/staging migration, hosted database write, deployment, feature activation or broker order routing is authorized.
+
+
+## 7. PR #110 design cross-review — conflicts to resolve
+
+PR #110 is also open and Draft. It changes only `docs/NSE_FUTURES_DAILY_MTM_EXPIRY_SETTLEMENT_DESIGN.md`; it is design, not a settlement implementation.
+
+### D1 — Lock order is inconsistent across the design chain
+
+- PR #110 says account → position → settlement identity.
+- PR #112 ledger design says account → event/idempotency identity → position → settlement basis.
+- PR #112 implementation plan separately records the observed PR #89 LIMIT-fill sequence as account → order → execution replay check → position.
+
+These are not interchangeable descriptions. Before any RPC/schema work, Chat 3 and Chat 7 must approve one global, deterministic lock hierarchy that includes account, order (where applicable), idempotency/event identity, position, and settlement-basis rows. Do not select a new sequence in Chat 4 or assume the LIMIT-fill order automatically governs every MARKET/cancel/worker path.
+
+### D2 — Blanket off-tick rejection for official settlement values is not justified
+
+PR #110's trusted-input list says reject off-tick settlement prices. PR #112's implementation plan correctly distinguishes order-entry tick validation from an exchange-computed settlement price and says not to snap an official settlement value to the tradable tick unless the applicable official settlement rule requires it.
+
+**Resolution required:** validate source precision, contract identity, official report value and the settlement methodology's own rounding rule. Do not reject or alter a published settlement price solely because it is not a valid order-entry tick. Confirm the exact applicable NSE/NCL rule for the supported contract type before adding a tick constraint.
+
+### D3 — Arithmetic type should be BigInt, not Number
+
+PR #110 asks for numeric intermediate arithmetic and bigint bounds. PR #108's helper and PR #112 plan use checked BigInt intermediates. The implementation contract should consistently use BigInt for multiplication/subtraction and enforce the target database integer range before writing; JavaScript Number must not be the money arithmetic intermediate.
+
+### D4 — Opening-day basis is intentionally unresolved
+
+PR #110 says use weighted-average execution price for a position opened after the previous settlement, but also says the opening-day variation must follow an approved exchange convention. PR #112 correctly keeps this as an explicit approval gate.
+
+**Resolution required:** do not silently assume the weighted-average trade price is the daily settlement basis for every new/partially increased position. Approve and test the precise day-one basis treatment for same-day open, add-on, partial close, reversal and position netting before enabling any cash posting.
+
+### D5 — Pending order expiry is not contract expiry settlement
+
+PR #110 explicitly distinguishes the existing LIMIT order expiry worker (pending order reservation release) from terminal settlement of an open Futures position. Preserve this distinction in UI, worker names, metrics, event types and audit logs. A pending-order expiry success must never be reported as Futures contract settlement.
+
+## 8. Official NSE source review performed on 2026-11-24
+
+The official NSE All Reports – Derivatives page currently lists, separately:
+- F&O – SPAN Risk Parameter Files (Begin of Day, multiple intra-day snapshots and End of Day);
+- F&O – Daily Settlement Prices;
+- F&O – UDiFF Common Bhavcopy Final;
+- NSE F&O exclusive contract files and related contract/position reports.
+
+Source: https://betanseapi.nseindia.com/all-reports-derivatives
+
+This supports a source-adapter design that treats margin parameter snapshots, daily settlement prices, final bhavcopy and contract master as distinct source artifacts. It does not by itself prove the exact CSV column schema, final-settlement flag semantics, correction process, or that one file contains every field needed for settlement. The official sample file still must be downloaded and schema-inspected before importer code.
+
+NSE's published CAS 2.0 FAQ identifies the revised final settlement price method for expiring equity derivatives:
+- Index derivatives: underlying index value based on constituent securities' VWAP during the last 30 minutes of the Continuous Trading Session in the equity cash segment.
+- Stock derivatives: underlying stock VWAP during the last 30 minutes of CTS in the cash segment across all stock exchanges.
+
+Source: https://nsearchives.nseindia.com/web/mediaattachment/2026-11/FAQs_for_CM_and_FO_FOR_CAS_2.0_20261109152618.pdf
+
+The official NSE page identifies the CAS 2.0 changes as applicable from 2026-12-07:
+https://betanseapi.nseindia.com/static/trade/continuous-markets-FAQs
+
+Treat 2026-12-07 as a versioned effective-date boundary for the applicable revised rule, not as permission to apply it early. The importer should consume the clearing corporation's published settlement result; S-TRADE must not reconstruct the final price from broker quotes or constituent data.
+
+The current official report page also lists multiple SPAN parameter snapshots. A single hard-coded margin percentage cannot be represented as the NSE initial margin calculation. Any future margin-source adapter needs an explicit contract-set snapshot, source file hash, parameter-file time/version, effective trading date and a fail-closed policy for stale/missing inputs.
+
+## 9. Next safe work gate
+
+1. Ask Chat 3/7 to resolve D1 and approve the exact cross-path lock hierarchy.
+2. Ask Chat 2/7 to approve shared account margin aggregation and opening-day basis accounting treatment with Chat 3.
+3. Obtain and inspect an official NSE F&O Daily Settlement Prices sample plus the applicable current contract-master and SPAN files; record actual headers and row identity without guessing.
+4. Reconcile the official sample's daily/final settlement semantics and correction/revision behavior against the applicable effective-dated NSE/NCL circular/SOP.
+5. Only then draft a Futures-only schema/RPC proposal and executable disposable-PostgreSQL test plan. No hosted migration, staging/production write, deployment or feature activation is authorized.
