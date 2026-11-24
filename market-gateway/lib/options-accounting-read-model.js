@@ -327,6 +327,7 @@ function buildOptionsAccountingSnapshot({
     history.push({
       source: "EXPIRY", id: settlement.settlement_id, side: "SETTLEMENT",
       quantity, grossPaise: gross, chargesPaise: exerciseStt,
+      chargeBreakdownPaise: { exerciseStt: exerciseStt },
       realizedPnlPaise: realized, status: "SETTLED",
       createdAt: settlement.created_at, expiry: settlement.expiry,
       settlementPricePaise: settlementPrice, intrinsicValuePaise: intrinsic,
