@@ -400,3 +400,17 @@ The following are GitHub Git blob SHA-1 values (not SHA-256). Each identifies th
 - The 20261123160000, 20261123170000 and three-way 20261123180000 collisions remain unresolved. Prepare forward-only uniquely versioned canonical copies only after dependency review; do not rewrite production-applied history.
 - Rollback classification remains pending per migration. Treat ledger writes and financial history as forward-repair-only unless a data-safe rollback is demonstrated in disposable PostgreSQL.
 - No production or staging SQL was applied.
+
+
+## 12. Futures LIMIT ledger privilege mismatch — PR #87 (2026-11-24)
+
+Exact current source file fetched from PR #87 head `91ffb206693f4af3605d6734cc07b8029a5b0dbd`:
+
+- `supabase/migrations/20261123140000_futures_limit_ledger_foundation.sql`
+- Git blob SHA: `f9f0979e960ad0966ff2b00f3b05634c8428d1c5`
+
+**Release blocker:** `paper_futures_fills` is described in the migration comment as a private append-only-by-contract simulation fill ledger, but the same migration explicitly grants `SELECT, INSERT, UPDATE, DELETE` to `service_role`. This does not enforce append-only semantics. Before canonical acceptance, restrict the write contract to INSERT-only for the intended trusted execution path, add database-level UPDATE/DELETE rejection (or an equally strong immutable ledger design), and add disposable PostgreSQL assertions that service_role cannot mutate/delete historical fills. Do not weaken RLS or expose the ledger to client roles. Coordinate this correction with Futures accounting owner; do not edit PR #87 in place until the complete Futures lifecycle and migration chain are reviewed.
+
+The migration also adds `auth.users(id)` ownership FK with `ON DELETE CASCADE` for fills. This remains subject to the unresolved Firebase/Supabase identity architecture and financial-history retention decision: user deletion must not cascade-delete immutable financial history. Prefer restrictive ownership linkage and a separate anonymization/retention process after legal/product policy is decided.
+
+This is a draft-only finding. No SQL was changed or applied; no production/staging permissions were changed.
