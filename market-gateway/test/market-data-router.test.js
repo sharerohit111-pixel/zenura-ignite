@@ -7,11 +7,11 @@ const { ProviderRateLimitPolicy } = require("../lib/provider-rate-limit");
 
 const NOW = 1_800_000_000_000;
 const plan = {
-  quote: ["upstox", "dhan"],
+  quote: ["upstox", "angelone"],
   candles: ["upstox"],
-  depth: ["upstox", "dhan"],
+  depth: ["upstox", "angelone"],
   instrumentMaster: ["upstox"],
-  stream: ["upstox", "dhan"],
+  stream: ["upstox", "angelone"],
 };
 function quote(providerId, overrides = {}) {
   return {
@@ -39,7 +39,7 @@ function provider(providerId, getQuote) {
     getHealth: async () => ({ healthy: true }),
   };
 }
-function makeRouter(providers, entitlementResolver = async ({ providerId }) => ({ approved: true, reference: "rights-" + providerId })) {
+function makeRouter(providers, entitlementResolver = async ({ providerId }) => ({ approved: true, paperTradingAllowed: true, redistributionAllowed: true, reference: "entitlement-" + providerId, rightsApprovalReference: "written-rights-" + providerId })) {
   return new MarketDataProviderRouter({
     providers: new Map(providers),
     plan,
@@ -50,7 +50,7 @@ function makeRouter(providers, entitlementResolver = async ({ providerId }) => (
 const request = { userId: "user-1", instrumentId: "NSE_EQ|INE002A01018", exchange: "NSE" };
 
 test("provider plan requires ordered, non-empty, unique provider ids", () => {
-  assert.deepEqual(validateProviderPlan(plan).quote, ["upstox", "dhan"]);
+  assert.deepEqual(validateProviderPlan(plan).quote, ["upstox", "angelone"]);
   assert.throws(() => validateProviderPlan({ ...plan, quote: [] }));
   assert.throws(() => validateProviderPlan({ ...plan, quote: ["upstox", "upstox"] }));
 });
@@ -58,7 +58,7 @@ test("provider plan requires ordered, non-empty, unique provider ids", () => {
 test("routes to first authorized and healthy provider with attribution", async () => {
   const router = makeRouter([
     ["upstox", provider("upstox", async () => quote("upstox"))],
-    ["dhan", provider("dhan", async () => quote("dhan"))],
+    ["angelone", provider("angelone", async () => quote("angelone"))],
   ]);
   const result = await router.route("quote", {}, request);
   assert.equal(result.providerId, "upstox");
@@ -67,10 +67,10 @@ test("routes to first authorized and healthy provider with attribution", async (
 
 test("fails over after upstream outage to independently entitled provider", async () => {
   const first = provider("upstox", async () => { throw Object.assign(new Error("timeout"), { status: 503 }); });
-  const second = provider("dhan", async () => quote("dhan"));
-  const router = makeRouter([["upstox", first], ["dhan", second]]);
+  const second = provider("angelone", async () => quote("angelone"));
+  const router = makeRouter([["upstox", first], ["angelone", second]]);
   const result = await router.route("quote", {}, request);
-  assert.equal(result.providerId, "dhan");
+  assert.equal(result.providerId, "angelone");
 });
 
 test("does not use a provider without explicit per-user entitlement", async () => {
@@ -83,17 +83,17 @@ test("does not use a provider without explicit per-user entitlement", async () =
 
 test("stale first provider is rejected and only fresh authorized fallback can serve", async () => {
   const stale = provider("upstox", async () => quote("upstox", { exchangeTimestampMs: NOW - 16000 }));
-  const fresh = provider("dhan", async () => quote("dhan"));
-  const router = makeRouter([["upstox", stale], ["dhan", fresh]]);
+  const fresh = provider("angelone", async () => quote("angelone"));
+  const router = makeRouter([["upstox", stale], ["angelone", fresh]]);
   const result = await router.route("quote", {}, request);
-  assert.equal(result.providerId, "dhan");
+  assert.equal(result.providerId, "angelone");
 });
 
 test("fails closed when all sources are stale or unhealthy", async () => {
   const stale = provider("upstox", async () => quote("upstox", { receivedAtMs: NOW - 20000 }));
-  const down = provider("dhan", async () => quote("dhan"));
+  const down = provider("angelone", async () => quote("angelone"));
   down.getHealth = async () => ({ healthy: false });
-  const router = makeRouter([["upstox", stale], ["dhan", down]]);
+  const router = makeRouter([["upstox", stale], ["angelone", down]]);
   await assert.rejects(router.route("quote", {}, request), { code: "market_data_unavailable", status: 503 });
 });
 
@@ -122,7 +122,7 @@ test("distributed quota denial skips that provider and never calls its upstream 
   let primaryCalls = 0;
   let fallbackCalls = 0;
   const primary = provider("upstox", async () => { primaryCalls += 1; return quote("upstox"); });
-  const fallback = provider("dhan", async () => { fallbackCalls += 1; return quote("dhan"); });
+  const fallback = provider("angelone", async () => { fallbackCalls += 1; return quote("angelone"); });
   const rateLimiter = {
     consume: async (providerId) => {
       if (providerId === "upstox") throw Object.assign(new Error("quota"), { status: 429 });
@@ -130,13 +130,13 @@ test("distributed quota denial skips that provider and never calls its upstream 
     },
   };
   const router = new MarketDataProviderRouter({
-    providers: new Map([["upstox", primary], ["dhan", fallback]]),
+    providers: new Map([["upstox", primary], ["angelone", fallback]]),
     plan, rateLimiter,
-    entitlementResolver: async ({ providerId }) => ({ approved: true, reference: "rights-" + providerId }),
+    entitlementResolver: async ({ providerId }) => ({ approved: true, paperTradingAllowed: true, redistributionAllowed: true, reference: "entitlement-" + providerId, rightsApprovalReference: "written-rights-" + providerId }),
     clock: () => NOW,
   });
   const result = await router.route("quote", {}, request);
-  assert.equal(result.providerId, "dhan");
+  assert.equal(result.providerId, "angelone");
   assert.equal(primaryCalls, 0);
   assert.equal(fallbackCalls, 1);
 });
@@ -148,7 +148,7 @@ test("distributed quota service failure fails closed when no other provider is c
     providers: new Map([["upstox", primary]]),
     plan: { ...plan, quote: ["upstox"] },
     rateLimiter: { consume: async () => { throw Object.assign(new Error("quota db down"), { status: 503 }); } },
-    entitlementResolver: async () => ({ approved: true, reference: "rights-upstox" }),
+    entitlementResolver: async () => ({ approved: true, paperTradingAllowed: true, redistributionAllowed: true, reference: "entitlement-upstox", rightsApprovalReference: "written-rights-upstox" }),
     clock: () => NOW,
   });
   await assert.rejects(router.route("quote", {}, request), { code: "market_data_unavailable", status: 503 });
