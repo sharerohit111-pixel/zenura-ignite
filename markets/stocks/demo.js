@@ -15,7 +15,7 @@ const card=(label,value,detail)=>{const c=el("article","card");c.append(el("h3",
 const grid=(...items)=>{const g=el("div","grid");items.forEach(x=>g.append(x));return g;};
 const table=(headers,rows)=>{const wrap=el("div","table-wrap"),t=el("table"),head=el("thead"),hr=el("tr"),body=el("tbody");headers.forEach(h=>hr.append(el("th","",h)));head.append(hr);rows.forEach(row=>{const tr=el("tr");row.forEach(v=>tr.append(el("td","",v??"—")));body.append(tr);});if(!rows.length){const tr=el("tr"),td=el("td","empty","No record exists in the current canonical fixture.");td.colSpan=headers.length;tr.append(td);body.append(tr);}t.append(head,body);wrap.append(t);return wrap;};
 const notice=text=>el("div","notice",text);
-function header(name,description){const row=el("div","screen-title"),left=el("div");left.append(el("h2","",titles[name]||name),el("p","",description));row.append(left,el("span","read-only","READ ONLY · MOCK"));return row;}
+function header(name,description){const row=el("div","screen-title"),left=el("div");left.append(el("h2","",titles[name]||name),el("p","",description));row.append(left,el("span","read-only","MOCK · LOCAL DEMO"));return row;}
 function quoteRows(){return model.market.instruments.map(x=>[x.symbol,x.exchange,x.assetClass,money(x.lastPricePaise),(x.changePaise>=0?"+":"")+money(x.changePaise),x.volume,x.timestamp]);}
 function orderRows(orders){return orders.map(o=>[o.orderId,o.assetClass,o.instrumentKey,o.side,o.orderType,o.quantity??o.lots,o.status,money(o.averagePricePaise??o.limitPricePaise??0),money(o.chargesPaise??0)]);}
 function render(name){
@@ -79,7 +79,7 @@ function render(name){
   return;
  }
  if(name==="settings"){
-  content.append(grid(card("Data provider",model.meta.provider,"Explicit demo route"),card("Environment",model.meta.mode,"Production mode rejected by adapter"),card("Order submission","Disabled","Read-only preview"),card("Crypto","Separate","Excluded from Indian-market fixtures")));
+  content.append(grid(card("Data provider",model.meta.provider,"Explicit demo route"),card("Environment",model.meta.mode,"Production mode rejected by adapter"),card("Order execution","Local simulation only","No broker or production RPC"),card("Crypto","Separate","Excluded from Indian-market fixtures")));
   content.append(notice(model.meta.disclaimer));
  }
 }
@@ -94,7 +94,7 @@ async function start(){
  try{
   const [market,account,equity,derivatives]=await Promise.all(["market","account","equity","derivatives"].map(loadFixture));
   model=createPaperDemoViewModel({market,account,equity,derivatives},{enabled:true,production:false});
-  status.textContent="4 canonical fixtures validated · DUMMY_JSON · order actions disabled";
+  status.textContent="4 canonical fixtures validated · DUMMY_JSON · local Equity/F&O simulation only";
   render("home");
  }catch(error){
   status.textContent="Demo unavailable: "+(error.message||"fixture validation failed");
