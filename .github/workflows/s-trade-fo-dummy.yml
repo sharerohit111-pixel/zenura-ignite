@@ -1,0 +1,64 @@
+name: S-TRADE Futures and Options Dummy Mode
+
+on:
+  pull_request:
+    branches:
+      - feature/s-trade-mock-contract-architecture-2026-11-24
+    paths:
+      - "market-gateway/mock/**"
+      - "market-gateway/lib/derivative-position.js"
+      - "market-gateway/lib/paper-mock-fixtures.js"
+      - "market-gateway/test/**"
+      - "markets/stocks/derivative-mock-*"
+      - "markets/stocks/index.html"
+      - "market-gateway/package.json"
+      - ".github/workflows/s-trade-fo-dummy.yml"
+  push:
+    branches:
+      - feature/s-trade-fo-dummy-mode-2026-11-24
+    paths:
+      - "market-gateway/mock/**"
+      - "market-gateway/lib/derivative-position.js"
+      - "market-gateway/lib/paper-mock-fixtures.js"
+      - "market-gateway/test/**"
+      - "markets/stocks/derivative-mock-*"
+      - "markets/stocks/index.html"
+      - "market-gateway/package.json"
+      - ".github/workflows/s-trade-fo-dummy.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  dummy-mode:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Parse shared schemas and deterministic fixtures
+        run: |
+          node - <<'NODE'
+          const fs = require("node:fs");
+          const files = [
+            "market-gateway/mock/contracts/paper-trading-envelope.schema.json",
+            "market-gateway/mock/contracts/paper-trading-domain.schema.json",
+            ...fs.readdirSync("market-gateway/mock/fixtures").filter(name => name.endsWith(".json"))
+              .map(name => "market-gateway/mock/fixtures/" + name)
+          ];
+          for (const file of files) JSON.parse(fs.readFileSync(file, "utf8"));
+          console.log("Parsed " + files.length + " JSON schemas/fixtures.");
+          NODE
+      - name: Install gateway dependencies
+        run: npm install --prefix market-gateway --no-audit --no-fund --package-lock=false
+      - name: Run full gateway and mock simulator tests
+        run: npm test --prefix market-gateway
+      - name: Check gateway and browser module syntax
+        run: npm run check --prefix market-gateway
+      - name: Keep mock fixture loader out of production routes
+        run: |
+          if grep -R "paper-mock-fixtures" market-gateway/supabase-server.js market-gateway/server.js; then
+            echo "Mock fixtures must not be imported by production gateway routes."
+            exit 1
+          fi
