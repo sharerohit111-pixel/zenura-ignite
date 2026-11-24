@@ -48,7 +48,8 @@ function normalizePosition(row) {
   if (quantity > 1_000_000 || quantity % lotSize !== 0 || reservedQuantity > quantity) {
     fail("Position quantity, lot-size multiple, or close reservation is inconsistent.");
   }
-  if (Math.floor(costBasisPaise / quantity + 0.5) !== averagePremiumPaise) {
+  const roundedAverage = Number((2n * BigInt(costBasisPaise) + BigInt(quantity)) / (2n * BigInt(quantity)));
+  if (roundedAverage !== averagePremiumPaise) {
     fail("Position average premium does not reconcile to its fee-inclusive cost basis.");
   }
   return {
