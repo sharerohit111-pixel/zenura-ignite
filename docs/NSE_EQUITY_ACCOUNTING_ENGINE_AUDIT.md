@@ -112,3 +112,20 @@ This audit created a new branch from the PR #92 head. It did not modify PR #92, 
 - First branch-push smoke run exposed that PR #92's _execute_paper_market_order_legacy helper is absent when the accounting branch is tested standalone (push workflow checks out the head branch without merging the PR base).
 - The MARKET migration now normalizes both migration-chain shapes: it renames the pre-audit core directly in standalone branch CI, or extracts the pre-audit core from PR #92's audit wrapper when the base branch is present. Both paths use _execute_paper_market_order_core.
 - The corrected migration is being revalidated by a new branch-push workflow. No pass is claimed until that exact run completes.
+
+
+## Portfolio reconciliation regression — 2026-11-24
+
+Added `supabase/tests/equity_portfolio_reconciliation.sql` and wired it into the disposable PostgreSQL migration workflow. The isolated test user exercises Delivery BUY/SELL, an Intraday BUY, and Delivery LIMIT reservation creation/cancellation, then verifies:
+
+- Account cash equals the initial virtual capital plus immutable cash-ledger deltas.
+- Account blocked cash equals the sum of immutable reservation deltas.
+- Equity-only activity does not mutate shared Futures reserved margin.
+- Account realized P&L equals the sum of immutable Equity fill realized P&L.
+- Every fill has exactly one matching trade cash-ledger event with the same user, order, fill, side-derived event type and cash delta.
+- Trade event count equals fill count.
+- Per-product/instrument position quantities equal signed BUY/SELL fill quantities, detecting Delivery/Intraday cross-contamination.
+
+The test rolls back its disposable fixture. It does not claim unrealized P&L reconciliation: unrealized P&L is quote/mark-dependent and must be derived from a trusted current mark, with stale/missing mark behavior tested separately. It also does not implement partial fills, T+1 settlement, reversal/refund RPCs, or Intraday square-off.
+
+**CI status:** no workflow run or combined status has been reported for the latest exact head yet. The migration version collision at `20261123180000` remains unresolved by the cross-chat canonical migration plan and continues to block mergeability. No merge, migration apply, deployment, Crypto, Futures or Options changes were made.
