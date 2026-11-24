@@ -130,6 +130,7 @@ test("includes immutable cash-settled index expiry receipts in realized P&L and 
 test("rejects physical settlement and expiry payout or source tampering",()=>{
  assert.throws(()=>buildOptionsAccountingSnapshot({...base,expirySettlements:[{...expirySettlement,settlement_type:"PHYSICAL"}]}),/classification/);
  assert.throws(()=>buildOptionsAccountingSnapshot({...base,expirySettlements:[{...expirySettlement,gross_payout_paise:649999}]}),/does not reconcile/);
+ assert.throws(()=>buildOptionsAccountingSnapshot({...base,expirySettlements:[{...expirySettlement,exercise_stt_paise:900}]}),/does not reconcile/);
  assert.throws(()=>buildOptionsAccountingSnapshot({...base,expirySettlements:[{...expirySettlement,settlement_source:"https://attacker.example/settlement"}]}),/does not reconcile/);
 });
 
