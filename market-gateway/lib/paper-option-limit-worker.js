@@ -1,6 +1,7 @@
 "use strict";
 
 const crypto=require("node:crypto");
+const {createLeaseHeartbeat}=require("./lease-heartbeat");
 const {normalizeWorkerCursor,groupOrdersByUser}=require("./paper-limit-worker");
 const {loadVerifiedExchangeSession,marketDateString}=require("./exchange-session-calendar");
 const {marketClockParts}=require("./intraday-limit-policy");
@@ -63,7 +64,8 @@ function isValidNseOptionLimitOrder(order,instrument){
 
 function createPaperOptionLimitWorker({
   serviceDb,ensureInstrumentCache,getUpstoxAccessToken,fetchProvider,
-  readProviderJson,loadSession=loadVerifiedExchangeSession,now=Date.now
+  readProviderJson,loadSession=loadVerifiedExchangeSession,now=Date.now,
+  scheduleHeartbeat=setInterval,cancelHeartbeat=clearInterval
 }){
   if(!serviceDb||typeof serviceDb.rpc!=="function"||typeof serviceDb.from!=="function"
      ||typeof ensureInstrumentCache!=="function"||typeof getUpstoxAccessToken!=="function"
@@ -84,18 +86,33 @@ function createPaperOptionLimitWorker({
     if(lease?.data!==true)
       return {locked:true,scanned:0,filled:0,partial:0,notEligible:0,failed:0,expired:0};
 
-    const summary={locked:false,scanned:0,filled:0,partial:0,notEligible:0,failed:0,expired:0};
+    const summary={locked:false,scanned:0,filled:0,partial:0,notEligible:0,failed:0,expired:0,leaseLost:false};
+    const heartbeat=createLeaseHeartbeat({
+      renew:async()=>{
+        const result=await serviceDb.rpc("renew_paper_market_worker_lease",{
+          p_state_key:"paper_option_limit_orders",p_lease_token:leaseToken,
+          p_now_ms:now(),p_ttl_ms:240000
+        });
+        if(result?.error)throw new Error("Options LIMIT worker lease renewal failed.");
+        return result?.data===true;
+      },
+      onLost:()=>{summary.leaseLost=true;},
+      onError:()=>{summary.leaseLost=true;},
+      intervalMs:60000,schedule:scheduleHeartbeat,cancel:cancelHeartbeat
+    });
     const failedOrderIds=new Set();
     const markFailed=order=>{summary.failed++;if(order?.order_id)failedOrderIds.add(order.order_id);};
     try{
       const instruments=await ensureInstrumentCache();
       if(!Array.isArray(instruments)||!instruments.length)
         throw new Error("Official Upstox instrument master is unavailable for Options LIMIT worker.");
+      if(summary.leaseLost)return summary;
 
       const stateResult=await serviceDb.from("paper_market_worker_state")
         .select("cursor_created_at,cursor_order_id")
         .eq("state_key","paper_option_limit_orders").maybeSingle();
       if(stateResult.error)throw new Error("Options LIMIT worker cursor could not be read.");
+      if(summary.leaseLost)return summary;
       let cursor=normalizeWorkerCursor(stateResult.data);
       const loadBatch=position=>{
         let query=serviceDb.from("paper_option_limit_orders")
@@ -110,10 +127,13 @@ function createPaperOptionLimitWorker({
       let batch=await loadBatch(cursor);
       if(batch.error)throw new Error("Pending Options LIMIT orders could not be scanned.");
       if(!(batch.data||[]).length&&(cursor.createdAt||cursor.orderId)){
+        if(summary.leaseLost)return summary;
         cursor={createdAt:null,orderId:null};
         const reset=await serviceDb.from("paper_market_worker_state")
           .update({cursor_created_at:null,cursor_order_id:null,updated_at:new Date(now()).toISOString()})
-          .eq("state_key","paper_option_limit_orders").eq("lease_token",leaseToken);
+          .eq("state_key","paper_option_limit_orders").eq("lease_token",leaseToken)
+          // An expired owner must not checkpoint/reset even before another worker reacquires.
+          .gt("lease_expires_at",new Date(now()).toISOString());
         if(reset.error)throw new Error("Options LIMIT worker cursor could not be reset.");
         batch=await loadBatch(cursor);
         if(batch.error)throw new Error("Pending Options LIMIT orders could not be rescanned.");
@@ -132,9 +152,11 @@ function createPaperOptionLimitWorker({
       const processUserOrders=async([userId,userOrders])=>{
         try{
           const currentNow=now(),session=await getSession(currentNow);
+          if(summary.leaseLost)return;
           const sessionState=optionSessionState(currentNow,session);
           const eligible=[];
           for(const order of userOrders){
+            if(summary.leaseLost){summary.notEligible++;continue;}
             if(Date.parse(order.expires_at)<=currentNow||isContractExpired(order,currentNow)
                ||sessionState==="CLOSED"){
               const expired=await serviceDb.rpc("expire_paper_option_limit_order",{p_order_id:order.order_id});
@@ -158,6 +180,7 @@ function createPaperOptionLimitWorker({
           }
           if(!eligible.length)return;
 
+          if(summary.leaseLost)return;
           const {token}=await getUpstoxAccessToken(userId);
           const keys=[...new Set(eligible.map(x=>x.order.instrument_key))];
           const response=await fetchProvider(
@@ -166,8 +189,10 @@ function createPaperOptionLimitWorker({
           );
           const payload=await readProviderJson(response);
           if(!response.ok)throw new Error("Upstox V3 NSE Options quote request failed.");
+          if(summary.leaseLost)return;
 
           for(const {order,instrument} of eligible){
+            if(summary.leaseLost){summary.notEligible++;continue;}
             const nowMs=now();
             let decision;
             try{
@@ -188,6 +213,7 @@ function createPaperOptionLimitWorker({
               .eq("order_id",order.order_id)
               .order("fill_sequence",{ascending:true});
             if(fillsResult.error)throw new Error("Options LIMIT execution ledger could not be read.");
+            if(summary.leaseLost){summary.notEligible++;continue;}
             const fills=fillsResult.data||[];
             const executionId=crypto.createHash("sha256")
               .update([order.order_id,decision.timestampMs,decision.pricePaise,decision.fillQuantity,
@@ -198,6 +224,7 @@ function createPaperOptionLimitWorker({
               continue;
             }
             const fillSequence=fills.reduce((max,fill)=>Math.max(max,Number(fill.fill_sequence)||0),0)+1;
+            if(summary.leaseLost){summary.notEligible++;continue;}
             const result=await serviceDb.rpc("execute_paper_option_limit_fill",{
               p_order_id:order.order_id,p_execution_id:executionId,
               p_fill_sequence:fillSequence,p_fill_quantity:decision.fillQuantity,
@@ -223,6 +250,7 @@ function createPaperOptionLimitWorker({
       for(let offset=0;offset<groups.length;offset+=5)
         await Promise.all(groups.slice(offset,offset+5).map(processUserOrders));
 
+      if(summary.leaseLost)return summary;
       if(orders.length){
         const firstFailedIndex=orders.findIndex(order=>failedOrderIds.has(order.order_id));
         // Never move the cursor past a transiently failed order. If earlier orders
@@ -233,17 +261,22 @@ function createPaperOptionLimitWorker({
           const nextCursor=orders[cursorIndex];
           const saved=await serviceDb.from("paper_market_worker_state")
             .update({cursor_created_at:nextCursor.created_at,cursor_order_id:nextCursor.order_id,updated_at:new Date(now()).toISOString()})
-            .eq("state_key","paper_option_limit_orders").eq("lease_token",leaseToken);
+            .eq("state_key","paper_option_limit_orders").eq("lease_token",leaseToken)
+          // An expired owner must not checkpoint/reset even before another worker reacquires.
+          .gt("lease_expires_at",new Date(now()).toISOString());
           if(saved.error)throw new Error("Options LIMIT worker cursor could not be saved.");
         }
       }else{
         const saved=await serviceDb.from("paper_market_worker_state")
           .update({cursor_created_at:null,cursor_order_id:null,updated_at:new Date(now()).toISOString()})
-          .eq("state_key","paper_option_limit_orders").eq("lease_token",leaseToken);
+          .eq("state_key","paper_option_limit_orders").eq("lease_token",leaseToken)
+          // An expired owner must not checkpoint/reset even before another worker reacquires.
+          .gt("lease_expires_at",new Date(now()).toISOString());
         if(saved.error)throw new Error("Options LIMIT worker cursor could not be reset.");
       }
       return summary;
     }finally{
+      heartbeat.stop();
       const released=await serviceDb.rpc("release_paper_market_worker_lease",{
         p_state_key:"paper_option_limit_orders",p_lease_token:leaseToken,p_now_ms:now()
       });
