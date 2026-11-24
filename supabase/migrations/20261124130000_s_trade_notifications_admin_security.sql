@@ -152,6 +152,32 @@ DROP TRIGGER IF EXISTS s_trade_audit_append_only ON public.s_trade_admin_audit_l
 CREATE TRIGGER s_trade_audit_append_only BEFORE UPDATE OR DELETE ON public.s_trade_admin_audit_log
   FOR EACH ROW EXECUTE FUNCTION public.s_trade_reject_audit_mutation();
 
+CREATE OR REPLACE FUNCTION public.s_trade_audit_admin_registry_change()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $
+DECLARE v_actor uuid;
+DECLARE v_target uuid;
+DECLARE v_reason text;
+DECLARE v_action text;
+BEGIN
+  IF TG_OP='INSERT' THEN
+    v_actor:=NEW.granted_by;v_target:=NEW.user_id;v_reason:=NEW.reason;v_action:='admin_grant';
+  ELSE
+    v_actor:=OLD.granted_by;v_target:=OLD.user_id;v_reason:=OLD.reason;v_action:='admin_revoke';
+  END IF;
+  INSERT INTO public.s_trade_admin_audit_log(
+    actor_user_id,action,target_type,target_id,reason,outcome,metadata
+  ) VALUES (
+    v_actor,v_action,'admin',v_target::text,v_reason,'succeeded',
+    jsonb_build_object('source','privileged_database_operation')
+  );
+  IF TG_OP='DELETE' THEN RETURN OLD; END IF;
+  RETURN NEW;
+END;
+$;
+DROP TRIGGER IF EXISTS s_trade_admin_registry_audit ON public.s_trade_admins;
+CREATE TRIGGER s_trade_admin_registry_audit AFTER INSERT OR DELETE ON public.s_trade_admins
+  FOR EACH ROW EXECUTE FUNCTION public.s_trade_audit_admin_registry_change();
+
 CREATE OR REPLACE FUNCTION public.s_trade_notify_order_event()
 RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
 DECLARE
@@ -235,6 +261,7 @@ END;
 $$;
 
 REVOKE ALL ON FUNCTION public.s_trade_reject_audit_mutation() FROM PUBLIC,anon,authenticated,service_role;
+REVOKE ALL ON FUNCTION public.s_trade_audit_admin_registry_change() FROM PUBLIC,anon,authenticated,service_role;
 REVOKE ALL ON FUNCTION public.s_trade_notify_order_event() FROM PUBLIC,anon,authenticated,service_role;
 REVOKE ALL ON FUNCTION public.s_trade_evaluate_price_alert(uuid,numeric) FROM PUBLIC,anon,authenticated;
 GRANT EXECUTE ON FUNCTION public.s_trade_evaluate_price_alert(uuid,numeric) TO service_role;
