@@ -200,8 +200,9 @@
       if(request!==derivativePortfolioRequest||connector.getUserId()!==uid)return;
       if(!response.ok)throw new Error(data.error||'NSE Options accounting unavailable');
       const paiseFields=['cashPaise','accountReservedCashPaise','reservedMarginPaise','availableCashPaise',
-        'blockedPremiumPaise','premiumInvestedPaise','realizedPnlPaise','chargesPaidPaise'];
+        'blockedPremiumPaise','premiumInvestedPaise','chargesPaidPaise'];
       paiseFields.forEach(key=>{if(!Number.isSafeInteger(data[key])||data[key]<0)throw new Error('Options accounting returned an invalid '+key+'.');});
+      if(!Number.isSafeInteger(data.realizedPnlPaise))throw new Error('Options realized P&L is invalid.');
       if(data.unrealizedPnlPaise!==null&&!Number.isSafeInteger(data.unrealizedPnlPaise))throw new Error('Options unrealized P&L is invalid.');
       setMetric('options-available-balance',inrPaise(data.availableCashPaise));
       setMetric('options-blocked-premium',inrPaise(data.blockedPremiumPaise));
@@ -241,7 +242,7 @@
         else rows.forEach(order=>{
           const date=order.createdAt?new Date(order.createdAt).toLocaleString('en-IN'):'—';
           const filled=order.filledQuantity??order.quantity;
-          const average=filled>0?Math.round(order.grossPaise/filled):null;
+          const average=order.source==='EXPIRY'?order.settlementPricePaise:(filled>0?Math.round(order.grossPaise/filled):null);
           const quantity=order.source==='LIMIT'?String(order.quantity)+' / '+String(filled):String(order.quantity)+' / '+String(filled);
           [
             date,order.tradingSymbol||order.id||'—',order.side,order.source,quantity,
