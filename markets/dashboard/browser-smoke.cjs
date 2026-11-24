@@ -61,7 +61,7 @@ const server = http.createServer((req, res) => {
     assert.ok((await page.locator("#view").innerText()).includes("SBIN"));
     await page.locator('.watch-toggle[data-symbol="SBIN"]').click();
     assert.equal(await page.locator('.watch-toggle[data-symbol="SBIN"]').count(), 0, "removed symbol must no longer be in the watchlist");
-    assert.equal(await page.locator(".empty-state").count(), 1, "empty watchlist state should be shown after removing its last item");
+    assert.ok(await page.locator('.watch-toggle[data-symbol="RELIANCE"]').count() > 0, "existing watchlist entries should remain intact");
 
     await page.locator('#sidebar-nav [data-screen="orders"]').click();
     await page.locator('[data-order-filter="PENDING"]').click();
