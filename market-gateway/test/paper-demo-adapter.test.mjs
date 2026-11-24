@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {readFile} from "node:fs/promises";
-import {createPaperDemoViewModel,isPaperDemoViewModel} from "../../markets/shared/paper-demo-adapter.mjs";
+import {createPaperDemoViewModel,isPaperDemoViewModel,searchPaperDemoInstruments,getPaperDemoExpiries,getPaperDemoOptionChain} from "../../markets/shared/paper-demo-adapter.mjs";
 
 const root = new URL("../mock/fixtures/", import.meta.url);
 async function fixture(name) { return JSON.parse(await readFile(new URL(name + ".json", root), "utf8")); }
@@ -16,7 +16,7 @@ test("explicit demo selection maps canonical fixtures into one shared screen mod
   assert.equal(model.meta.provider, "DUMMY_JSON");
   assert.equal(model.meta.simulated, true);
   assert.equal(model.account.startingCapitalPaise, 100000000);
-  assert.equal(model.market.instruments.length, 2);
+  assert.equal(model.market.instruments.length, 20);
   assert.deepEqual(model.orders.map(x => x.assetClass), ["EQUITY","FUTURE","OPTION"]);
   assert.ok(model.meta.disclaimer.includes("not live NSE/BSE"));
 });
@@ -57,4 +57,38 @@ test("adapter rejects envelopes outside the canonical synthetic source contract"
   negative.account.data.availableFundsPaise = -1;
   negative.account.data.blockedFundsPaise = 100000001;
   assert.throws(() => createPaperDemoViewModel(negative,{enabled:true}), /INVALID_MOCK_ACCOUNT_SNAPSHOT/);
+});
+
+test("canonical catalog includes NSE/BSE equity, indices, Futures and CE/PE Options", async () => {
+ const model=createPaperDemoViewModel(await allFixtures(),{enabled:true});
+ const counts=Object.fromEntries(["EQUITY","INDEX","FUTURE","OPTION"].map(kind=>[kind,model.market.instruments.filter(x=>x.assetClass===kind).length]));
+ assert.deepEqual(counts,{EQUITY:2,INDEX:2,FUTURE:4,OPTION:12});
+ assert.ok(model.market.instruments.every(x=>x.instrumentKey.startsWith("MOCK|")&&x.symbol.startsWith("MOCK")));
+ assert.equal(new Set(model.market.instruments.map(x=>x.instrumentKey)).size,model.market.instruments.length);
+});
+test("instrument search ranks exact symbol and filters by exchange, asset class and underlying", async () => {
+ const model=createPaperDemoViewModel(await allFixtures(),{enabled:true});
+ assert.equal(searchPaperDemoInstruments(model,{query:"MOCKSENSEX",assetClass:"INDEX",exchange:"BSE"})[0].symbol,"MOCKSENSEX");
+ assert.ok(searchPaperDemoInstruments(model,{assetClass:"FUTURE",underlying:"MOCKNIFTY"}).every(x=>x.exchange==="NSE"));
+ assert.equal(searchPaperDemoInstruments(model,{assetClass:"OPTION",exchange:"BSE"}).length,4);
+});
+test("expiry discovery is sorted and supports both Futures and Options", async () => {
+ const model=createPaperDemoViewModel(await allFixtures(),{enabled:true});
+ assert.deepEqual(getPaperDemoExpiries(model,{underlying:"MOCKNIFTY",assetClass:"OPTION"}),["2026-11-26","2026-12-31"]);
+ assert.deepEqual(getPaperDemoExpiries(model,{underlying:"MOCKSENSEX",assetClass:"FUTURE",exchange:"BSE"}),["2026-12-29"]);
+});
+test("option chain groups CE/PE by strike and supports exact strike and side filters", async () => {
+ const model=createPaperDemoViewModel(await allFixtures(),{enabled:true});
+ const chain=getPaperDemoOptionChain(model,{underlying:"MOCKNIFTY",expiry:"2026-11-26"});
+ assert.equal(chain.length,2);
+ assert.ok(chain.every(row=>row.CE&&row.PE));
+ const selected=getPaperDemoOptionChain(model,{underlying:"MOCKSENSEX",expiry:"2026-12-29",exchange:"BSE",strikePaise:8200000,optionType:"CE"});
+ assert.equal(selected.length,1);assert.ok(selected[0].CE);assert.equal(selected[0].PE,null);
+});
+test("catalog rejects duplicate derivative identities and missing derivative quotes", async () => {
+ const fixtures=await allFixtures();
+ fixtures.derivatives.data.contracts.push({...fixtures.derivatives.data.contracts[0]});
+ assert.throws(()=>createPaperDemoViewModel(fixtures,{enabled:true}),/DUPLICATE_MOCK_INSTRUMENT_KEY/);
+ const missing=await allFixtures();missing.derivatives.data.quotes.pop();
+ assert.throws(()=>createPaperDemoViewModel(missing,{enabled:true}),/MOCK_DERIVATIVE_CATALOG_REQUIRED/);
 });
