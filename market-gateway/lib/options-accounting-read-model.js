@@ -116,6 +116,7 @@ function buildOptionsAccountingSnapshot({
 
   let blockedPremiumPaise = 0;
   let reservedCloseQuantity = 0;
+  const reservedCloseByInstrument = new Map();
   const activeLimitOrders = [];
   for (const order of limitOrders) {
     if (!isNseOption(order) || !OPEN_ORDER_STATUSES.has(order.status)) continue;
@@ -127,8 +128,20 @@ function buildOptionsAccountingSnapshot({
     } else if (order.side === "SELL") {
       if (reservedCash !== 0) fail("SELL order cannot reserve premium.");
       reservedCloseQuantity = addSafe(reservedCloseQuantity, reservedClose, "Reserved close quantity");
+      reservedCloseByInstrument.set(order.instrument_key,
+        addSafe(reservedCloseByInstrument.get(order.instrument_key) ?? 0, reservedClose, "Per-contract close reservation"));
     } else fail("Options order side is invalid.");
     activeLimitOrders.push(order);
+  }
+  for (const position of normalizedPositions) {
+    if ((reservedCloseByInstrument.get(position.instrumentKey) ?? 0) !== position.reservedCloseQuantity) {
+      fail("Position close reservation does not reconcile to its active Options LIMIT SELL orders.");
+    }
+  }
+  for (const [instrumentKey, reserved] of reservedCloseByInstrument) {
+    if (!normalizedPositions.some(position => position.instrumentKey === instrumentKey) && reserved > 0) {
+      fail("An active Options LIMIT SELL reservation has no matching long position.");
+    }
   }
 
   let realizedPnlPaise = 0;
