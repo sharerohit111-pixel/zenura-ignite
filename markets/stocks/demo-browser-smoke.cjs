@@ -11,7 +11,7 @@ const axePath=require.resolve("axe-core/axe.min.js");
    const page=await context.newPage();
    const pageErrors=[];
    page.on("pageerror",error=>pageErrors.push(error.message));
-   await page.goto("http://127.0.0.1:4173/markets/stocks/demo.html",{waitUntil:"networkidle"});
+   await page.goto("http://127.0.0.1:4173/markets/stocks/demo.html",{waitUntil:"networkidle",timeout:30000});
    await page.waitForFunction(()=>document.querySelector("#demo-status")?.textContent.includes("4 canonical fixtures validated"),null,{timeout:10000});
    assert.equal(await page.locator("#screen-nav button[data-screen]").count(),15,viewport.name+" screen count");
    for(const name of ["home","market","watchlists","charts","equity","futures","options","orders","trades","portfolio","positions","holdings","account","profile","settings"]){
@@ -21,7 +21,7 @@ const axePath=require.resolve("axe-core/axe.min.js");
     const overflow=await page.evaluate(()=>document.documentElement.scrollWidth>window.innerWidth+1);
     assert.equal(overflow,false,viewport.name+" horizontal document overflow on "+name);
    }
-   await page.goto("http://127.0.0.1:4173/markets/stocks/demo.html",{waitUntil:"networkidle"});
+   await page.goto("http://127.0.0.1:4173/markets/stocks/demo.html",{waitUntil:"networkidle",timeout:30000});
    await page.addScriptTag({path:axePath});
    const axe=await page.evaluate(async()=>window.axe.run(document,{runOnly:{type:"tag",values:["wcag2a","wcag2aa","wcag21a","wcag21aa"]}}));
    const serious=axe.violations.filter(v=>v.impact==="critical"||v.impact==="serious");
@@ -41,7 +41,7 @@ const axePath=require.resolve("axe-core/axe.min.js");
 
   const pwa=await browser.newContext({viewport:{width:390,height:844},serviceWorkers:"allow"});
   const page=await pwa.newPage();
-  await page.goto("http://127.0.0.1:4173/markets/",{waitUntil:"networkidle"});
+  await page.goto("http://127.0.0.1:4173/markets/",{waitUntil:"networkidle",timeout:30000});
   await page.waitForFunction(()=>navigator.serviceWorker.getRegistration().then(r=>!!r?.active),null,{timeout:15000});
   await page.evaluate(async()=>{
    const registration=await navigator.serviceWorker.ready;
@@ -50,10 +50,10 @@ const axePath=require.resolve("axe-core/axe.min.js");
   // The first navigation installs the worker but is not guaranteed to be controlled
   // until the activation/claim lifecycle completes. Reload only after ready so the
   // next navigation is deterministically within the active worker's scope.
-  await page.reload({waitUntil:"networkidle"});
+  await page.reload({waitUntil:"networkidle",timeout:30000});
   await page.waitForFunction(()=>!!navigator.serviceWorker.controller,null,{timeout:15000});
   const controlledPage=await pwa.newPage();
-  await controlledPage.goto("http://127.0.0.1:4173/markets/stocks/demo.html",{waitUntil:"networkidle"});
+  await controlledPage.goto("http://127.0.0.1:4173/markets/stocks/demo.html",{waitUntil:"networkidle",timeout:30000});
   await controlledPage.waitForFunction(()=>!!navigator.serviceWorker.controller,null,{timeout:15000});
   await page.close();
   const demoPage=controlledPage;
@@ -67,7 +67,7 @@ const axePath=require.resolve("axe-core/axe.min.js");
   });
   assert.ok(cached.every(x=>x.found),"all four canonical fixture JSON files must be precached");
   await pwa.setOffline(true);
-  await demoPage.reload({waitUntil:"networkidle"});
+  await demoPage.reload({waitUntil:"domcontentloaded",timeout:15000});
   await demoPage.waitForFunction(()=>document.querySelector("#demo-status")?.textContent.includes("4 canonical fixtures validated"),null,{timeout:10000});
   console.log(JSON.stringify({pwa:"offline demo fixture load PASS",cachedFixtures:cached.length}));
   await pwa.close();
