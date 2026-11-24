@@ -69,7 +69,7 @@ test("rejects unknown exchange, truncated/oversized frames and malformed tokens"
 
 test("rejects malformed depth and crossed best bid/ask", () => {
   const bad=packet(3);
-  bad.writeBigInt64LE(56900n,177);
+  bad.writeBigInt64LE(56700n,177);
   assert.throws(()=>decodeAngelOneBinaryFeedPacket(bad),{code:"invalid_market_data"});
   const badFlag=packet(3); badFlag.writeUInt16LE(9,147);
   assert.throws(()=>decodeAngelOneBinaryFeedPacket(badFlag),{code:"invalid_market_data"});
