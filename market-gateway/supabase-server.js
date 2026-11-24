@@ -52,6 +52,7 @@ const {isUsableUpstoxTokenResponse}=require("../functions/lib/upstox-token-respo
 const {isUsableUpstoxOAuthCallback}=require("../functions/lib/upstox-oauth-callback-input");
 const {validateHttpsRedirectUri}=require("./lib/redirect-uri-policy");
 const {apiRateLimitBucket,consumeApiRateLimit}=require("./lib/api-rate-limit");
+const {createSTradeRouter}=require("./lib/s-trade-notifications-admin-router");
 
 const PORT=Number(process.env.PORT||8080);
 const SUPABASE_URL=process.env.SUPABASE_URL;
@@ -123,6 +124,7 @@ async function auth(req){
   }
   return {user,accessToken,userDb:runtime.createUserClient(accessToken)};
 }
+app.use("/s-trade",createSTradeRouter({express,serviceDb,authenticate:auth}));
 function localNowMs(){return Date.now();}
 function validDate(value){
   if(typeof value!=="string"||!/^\d{4}-\d{2}-\d{2}$/.test(value))return false;
