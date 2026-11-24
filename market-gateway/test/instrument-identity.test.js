@@ -3,7 +3,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const { normalizeInstrumentRecord, buildInstrumentMaster, buildProviderSymbolMap } = require("../lib/instrument-identity");
 
-const NOW = 1_800_000_000_000;
+const NOW = 1_795_478_400_000;
 const META = {
   providerId: "upstox", exchange: "NSE", generatedAtMs: NOW - 1000,
   sourceDate: "2026-11-24", sourceReference: "official-provider-master",
@@ -50,6 +50,8 @@ test("builds a provenance-bound master and rejects stale, future or duplicate id
   assert.equal(master.instrumentCount, 1);
   assert.equal(master.instruments[0].instrumentId, "EQ:NSE:INE123456789");
   assert.throws(() => buildInstrumentMaster({ ...META, generatedAtMs: NOW + 1, records: [equity()] }));
+  assert.throws(() => buildInstrumentMaster({ ...META, sourceDate: "2026-11-25", records: [equity()] }));
+  assert.throws(() => buildInstrumentMaster({ ...META, sourceDate: "2026-11-01", records: [equity()] }));
   assert.throws(() => buildInstrumentMaster({ ...META, records: [equity(), equity({ providerInstrumentKey: "another-key" })] }));
 });
 test("maps provider-specific symbols to the same canonical identity", () => {
