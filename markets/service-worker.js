@@ -29,7 +29,8 @@ self.addEventListener("fetch",event=>{
  const url=new URL(request.url);
  if(url.origin!==BASE.origin)return;
  const fixturePath="/market-gateway/mock/fixtures/";
- if(url.pathname.startsWith(fixturePath)&&/^\\/market-gateway\\/mock\\/fixtures\\/(market|account|equity|derivatives|error)\\.json$/.test(url.pathname)){
+ const allowedFixtures=new Set(["market","account","equity","derivatives","error"].map(name=>fixturePath+name+".json"));
+ if(allowedFixtures.has(url.pathname)){
   event.respondWith((async()=>{
    const cache=await caches.open(CACHE_NAME),cached=await cache.match(request);
    const network=fetch(request).then(response=>{if(response.ok)cache.put(request,response.clone()).catch(()=>{});return response;}).catch(()=>null);
