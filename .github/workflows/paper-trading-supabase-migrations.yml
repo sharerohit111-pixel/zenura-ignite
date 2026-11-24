@@ -189,6 +189,14 @@ jobs:
           done
       - name: Verify least-privilege Supabase market gateway service-role grants
         run: psql -v ON_ERROR_STOP=1 -f supabase/tests/market_gateway_service_role_grants.sql
+      - name: Verify distributed per-user API rate-limit budgets and RPC isolation
+        run: |
+          node --check market-gateway/lib/api-rate-limit.js
+          node --check market-gateway/test/api-rate-limit.test.js
+          node --test market-gateway/test/api-rate-limit.test.js
+          psql -v ON_ERROR_STOP=1 -f supabase/tests/paper_api_rate_limits.sql
+      - name: Exercise concurrent distributed API rate-limit requests
+        run: bash supabase/tests/paper_api_rate_limit_concurrency.sh
       - name: Reconcile Indian-market Futures ledger cash, charges, realized P&L and margin
         run: psql -v ON_ERROR_STOP=1 -f supabase/tests/futures_market_order_accounting.sql
       - name: Exercise atomic Futures LIMIT submit, reservation, cancel and expiry
