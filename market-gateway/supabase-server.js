@@ -167,7 +167,7 @@ const ORDER_SUBMISSION_PATHS=new Set([
   "/paper/orders","/paper/protective-orders","/paper/derivative/orders","/paper/derivative/limit-orders","/paper/futures/orders"
 ]);
 app.use(async(req,res,next)=>{
-  const orderRoute=String(req.path||"").replace(/\\/+$/,"").toLowerCase();
+  const orderRoute=String(req.path||"").replace(/\/+$/,"").toLowerCase();
   if(req.method!=="POST"||!ORDER_SUBMISSION_PATHS.has(orderRoute))return next();
   try{
     await auth(req);
