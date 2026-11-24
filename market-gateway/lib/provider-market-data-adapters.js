@@ -108,7 +108,8 @@ function makeBase(providerId, client, resolveInstrument, now) {
         generatedAtMs:now(), sourceReference:providerId+"-instrument-master", instruments };
     },
     async openStream(args) {
-      const nativeInstrument=requireNativeInstrument(await resolveInstrument(args),providerId);\n      const stream=await client.openStream({ ...args, nativeInstrument });
+      const nativeInstrument=requireNativeInstrument(await resolveInstrument(args),providerId);
+      const stream=await client.openStream({ ...args, nativeInstrument });
       if (!stream || typeof stream.close !== "function" ||
           (typeof stream.subscribe !== "function" && typeof stream[Symbol.asyncIterator] !== "function")) {
         fail("Provider stream transport did not return a closable stream.");
