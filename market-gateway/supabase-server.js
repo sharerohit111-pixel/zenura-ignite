@@ -18,7 +18,7 @@ const {loadVerifiedExchangeSession}=require("./lib/exchange-session-calendar");
 const {isIntradaySessionOpen}=require("./lib/intraday-limit-policy");
 const {normalizeEquityTickSizePaise,isEquityExecutionPriceOnTick}=require("./lib/equity-order-validation");
 const {encodeOrderHistoryCursor,decodeOrderHistoryCursor,buildOrderHistoryCursorFilter}=require("./lib/order-history-pagination");
-const {rankInstrumentSearchResults}=require("./lib/instrument-search");
+const {filterAndRankInstrumentCatalog}=require("./lib/instrument-catalog");
 const mockMarketData=require("./lib/mock-market-data");
 const {normalizeMarketDepthQuote,normalizeMarketStatus}=require("./lib/market-snapshot");
 let futuresDepthAdapter=null;
@@ -260,19 +260,14 @@ app.get("/demo/candles",(req,res)=>sendDemoResponse(res,()=>{
 app.get("/instruments",async(req,res)=>{
   try{
     if(!instrumentCache.length||Date.now()-instrumentCacheUpdatedAt>6*60*60*1000)await refreshInstrumentCache();
-    const kind=String(req.query.kind||"all").toLowerCase(),exchange=String(req.query.exchange||"").toUpperCase();
-    const q=String(req.query.q||"").trim().toLowerCase().slice(0,60);
-    const limit=Math.min(Math.max(Number.parseInt(req.query.limit||"50",10)||50,1),100);
-    const filtered=instrumentCache.filter(item=>{
-      if(exchange&&item.exchange!==exchange)return false;
-      if(kind==="equities"&&!(item.instrument_type==="EQ"&&["NSE_EQ","BSE_EQ"].includes(item.segment)))return false;
-      if(kind==="indices"&&!(item.instrument_type==="INDEX"&&["NSE_INDEX","BSE_INDEX"].includes(item.segment)))return false;
-      if(kind==="futures"&&!(item.instrument_type==="FUT"&&["NSE_FO","BSE_FO"].includes(item.segment)))return false;
-      if(kind==="options"&&!((["CE","PE"].includes(item.instrument_type))&&["NSE_FO","BSE_FO"].includes(item.segment)))return false;
-      if(q&&!String(item.trading_symbol||"").toLowerCase().includes(q)&&!String(item.name||"").toLowerCase().includes(q)&&!String(item.underlying_symbol||"").toLowerCase().includes(q))return false;
-      return true;
-    });
-    const matches=rankInstrumentSearchResults(filtered,q,limit).map(item=>({
+    const matches=filterAndRankInstrumentCatalog(instrumentCache,{
+      kind:req.query.kind,exchange:req.query.exchange,q:req.query.q,underlying:req.query.underlying,
+      expiry:req.query.expiry,optionType:req.query.option_type,
+      strike:req.query.strike===undefined?undefined:Number(req.query.strike),
+      minStrike:req.query.min_strike===undefined?undefined:Number(req.query.min_strike),
+      maxStrike:req.query.max_strike===undefined?undefined:Number(req.query.max_strike),
+      limit:req.query.limit===undefined?50:Number(req.query.limit)
+    }).map(item=>({
       instrument_key:item.instrument_key,segment:item.segment,exchange:item.exchange,
       name:item.name,trading_symbol:item.trading_symbol,instrument_type:item.instrument_type,
       expiry:item.expiry??null,strike_price:item.strike_price??null,
