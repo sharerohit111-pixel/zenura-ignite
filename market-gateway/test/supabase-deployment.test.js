@@ -199,12 +199,12 @@ test("Request correlation IDs are attached before JSON parsing and exposed to br
  const jsonParser=server.indexOf('app.use(express.json({limit:"32kb"}))');
  assert.ok(requestIdMiddleware>=0&&jsonParser>requestIdMiddleware,
   "request ID middleware must run before body parsing can reject malformed JSON");
- assert.match(server,/Access-Control-Expose-Headers","Retry-After, X-Request-Id"/);
+ assert.match(server,/Access-Control-Expose-Headers","Retry-After, X-Request-Id, X-Trace-Id"/);
 });
 
 test("JSON parser failures preserve request IDs, CORS headers and safe JSON errors",()=>{
  const requestId=server.indexOf('const requestId=crypto.randomUUID()');
- const cors=server.indexOf('Access-Control-Expose-Headers","Retry-After, X-Request-Id"');
+ const cors=server.indexOf('Access-Control-Expose-Headers","Retry-After, X-Request-Id, X-Trace-Id"');
  const parser=server.indexOf('app.use(express.json({limit:"32kb"}))');
  const parserError=server.indexOf('error?.type==="entity.too.large"');
  const firstRoute=server.indexOf('app.get("/health"');
