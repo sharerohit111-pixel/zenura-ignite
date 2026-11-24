@@ -45,7 +45,7 @@ test("account settings layout is responsive and does not expose controls while s
 
 test("development mock login is localhost-only and never creates a backend auth session", () => {
   assert.ok(source.includes('["localhost", "127.0.0.1", "[::1]"]'));
-  assert.match(source, /if \(!isLocalDevelopment\) mockButton\.remove\(\)/);
+  assert.ok(source.includes("if (!isLocalDevelopment) mockButton.remove()"));
   assert.match(source, /DEVELOPMENT MOCK SESSION — local UI preview only/);
   assert.match(source, /No API access, orders, database writes or real authentication/);
   assert.match(source, /devMockActive = true/);
