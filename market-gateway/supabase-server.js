@@ -361,7 +361,7 @@ function publicInstrument(item){return {instrument_key:item.instrument_key,segme
 app.get("/watchlists",async(req,res)=>{
   try{
     const {user,userDb}=await auth(req),watchlists=await readWatchlists(userDb,user.id);
-    if(!instrumentCache.length||Date.now()-instrumentCacheUpdatedAt>6*60*60*1000)await refreshInstrumentCache();
+    await ensureWatchlistInstrumentCache(Object.values(watchlists).flat());
     const mapped={};for(const name of WATCHLIST_NAMES)mapped[name]=watchlists[name].map(key=>resolveWatchlistInstrument(key,instrumentCache,mockWatchlistCatalog)).filter(Boolean).map(publicInstrument);
     res.set("Cache-Control","private, no-store").json({watchlists:mapped,names:WATCHLIST_NAMES,maxItemsPerList:50});
   }catch(error){sendError(res,error,"Watchlists could not be loaded.");}
@@ -369,7 +369,7 @@ app.get("/watchlists",async(req,res)=>{
 app.get("/watchlist",async(req,res)=>{
   try{
     const {user,userDb}=await auth(req),name=watchlistName(req),watchlists=await readWatchlists(userDb,user.id);
-    if(!instrumentCache.length||Date.now()-instrumentCacheUpdatedAt>6*60*60*1000)await refreshInstrumentCache();
+    await ensureWatchlistInstrumentCache(watchlists[name]);
     const items=watchlists[name].map(key=>resolveWatchlistInstrument(key,instrumentCache,mockWatchlistCatalog)).filter(Boolean).map(publicInstrument);
     res.set("Cache-Control","private, no-store").json({name,items,maxItems:50});
   }catch(error){sendError(res,error,"Watchlist could not be loaded.");}
@@ -379,7 +379,7 @@ app.put("/watchlist",async(req,res)=>{
     const {user,userDb}=await auth(req),name=watchlistName(req),raw=req.body?.instrumentKeys;
     if(!Array.isArray(raw)||raw.length>50||raw.some(x=>typeof x!=="string"||!x||x.length>100))return res.status(400).json({error:"Watchlist must contain up to 50 valid instrument keys."});
     const keys=[...new Set(raw)];
-    if(!instrumentCache.length||Date.now()-instrumentCacheUpdatedAt>6*60*60*1000)await refreshInstrumentCache();
+    await ensureWatchlistInstrumentCache(keys);
     const valid=new Set([...instrumentCache.map(x=>x.instrument_key),...mockWatchlistCatalog.keys()]);
     if(keys.some(key=>!valid.has(key)))return res.status(400).json({error:"Watchlist contains an instrument not present in a supported instrument catalog."});
     const {error}=await userDb.from("paper_watchlists").upsert({user_id:user.id,name,instrument_keys:keys,updated_at:new Date().toISOString()},{onConflict:"user_id,name"});
