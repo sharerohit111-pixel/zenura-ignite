@@ -1216,7 +1216,9 @@ begin
   if not found then return new; end if;
 
   v_now_ms:=floor(extract(epoch from clock_timestamp())*1000)::bigint;
+  if v_risk.risk_status='CLOSED' then return new; end if;
   if v_risk.risk_status='HEALTHY'
+     and v_risk.source_timestamp_ms is not null
      and v_now_ms-v_risk.source_timestamp_ms<=900000 then
     return new;
   end if;
@@ -1230,6 +1232,9 @@ begin
   if not v_has_position then
     if tg_table_name='paper_futures_orders' and new.order_type='MARKET' then
       return new;
+    end if;
+    if tg_table_name='paper_futures_fills' then
+      return new; -- full close removed the position before the fill ledger insert
     end if;
     raise exception 'Futures risk snapshot is UNKNOWN, stale or in margin call; opening exposure is blocked.'
       using errcode='55000';
@@ -1299,7 +1304,10 @@ begin
         risk_status,provider,source_reference,source_sha256,source_timestamp_ms,
         snapshot_version,updated_at
       ) values (v_user_id,v_instrument_key,0,null,'CLOSED',null,null,null,null,1,now())
-      on conflict(user_id,instrument_key) do nothing;
+      on conflict(user_id,instrument_key) do update set
+        initial_margin_paise=0,maintenance_margin_paise=null,risk_status='CLOSED',
+        provider=null,source_reference=null,source_sha256=null,source_timestamp_ms=null,
+        snapshot_version=public.paper_futures_risk_state.snapshot_version+1,updated_at=now();
       return new;
     end if;
   else
