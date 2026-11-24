@@ -199,7 +199,7 @@ BEGIN
   v_status := upper(coalesce(to_jsonb(NEW)->>'status',''));
   v_old_status := CASE WHEN TG_OP='INSERT' THEN NULL ELSE upper(coalesce(to_jsonb(OLD)->>'status','')) END;
   v_order_id := coalesce(to_jsonb(NEW)->>'order_id',to_jsonb(NEW)->>'id');
-  IF v_user_id IS NULL OR v_status=v_old_status OR v_status NOT IN ('FILLED','PARTIALLY_FILLED','CANCELLED','REJECTED','EXPIRED') THEN
+  IF v_user_id IS NULL OR v_status=v_old_status OR v_status NOT IN ('FILLED','PARTIALLY_FILLED','CANCELLED','REJECTED','EXPIRED','TRIGGERED') THEN
     RETURN NEW;
   END IF;
   SELECT coalesce(order_alerts,true),coalesce(trade_confirmations,true)
@@ -210,7 +210,7 @@ BEGIN
   v_event := CASE WHEN v_status='FILLED' THEN 'trade_confirmation' ELSE 'order_alert' END;
   v_title := CASE v_status WHEN 'FILLED' THEN 'Trade confirmed'
     WHEN 'PARTIALLY_FILLED' THEN 'Order partially filled'
-    WHEN 'CANCELLED' THEN 'Order cancelled' WHEN 'EXPIRED' THEN 'Order expired' ELSE 'Order rejected' END;
+    WHEN 'CANCELLED' THEN 'Order cancelled' WHEN 'EXPIRED' THEN 'Order expired' WHEN 'TRIGGERED' THEN 'Protective order triggered' ELSE 'Order rejected' END;
   v_body := 'Your simulated order status is now '||lower(replace(v_status,'_',' '))||'.';
   INSERT INTO public.s_trade_notifications(user_id,event_type,title,body,data,source_table,source_id)
   VALUES(v_user_id,v_event,v_title,v_body,jsonb_build_object('orderId',v_order_id,'status',v_status),TG_TABLE_NAME,v_order_id)
@@ -308,4 +308,8 @@ CREATE TRIGGER s_trade_futures_order_notification AFTER INSERT OR UPDATE ON publ
   FOR EACH ROW EXECUTE FUNCTION public.s_trade_notify_order_event();
 DROP TRIGGER IF EXISTS s_trade_option_limit_order_notification ON public.paper_option_limit_orders;
 CREATE TRIGGER s_trade_option_limit_order_notification AFTER INSERT OR UPDATE ON public.paper_option_limit_orders
+  FOR EACH ROW EXECUTE FUNCTION public.s_trade_notify_order_event();
+
+DROP TRIGGER IF EXISTS s_trade_protective_order_notification ON public.paper_protective_orders;
+CREATE TRIGGER s_trade_protective_order_notification AFTER INSERT OR UPDATE ON public.paper_protective_orders
   FOR EACH ROW EXECUTE FUNCTION public.s_trade_notify_order_event();
