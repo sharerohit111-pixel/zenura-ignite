@@ -19,11 +19,14 @@ function buildPaperPortfolioAccounting({account,assetSnapshots,mode="PERSISTED",
  const minimumCashDeficitPaise=Math.max(0,-availableCashPaise);
  const marginDeficitPaise=money(account.margin_deficit_paise??minimumCashDeficitPaise,"Margin deficit");
  if(marginDeficitPaise<minimumCashDeficitPaise)fail("Margin deficit cannot be lower than the negative available-cash deficit.");
- const assets=new Set(),positions=[],orders=[],trades=[],positionIds=new Set(),orderIds=new Set(),tradeIds=new Set();
+ const assets=new Set(),positions=[],orders=[],trades=[],positionIds=new Set(),orderIds=new Set(),tradeIds=new Set(),historyEvidence=[];
  let historyComplete=true,stale=0,marketValue=0,unrealized=0,observedRealized=0,observedCharges=0,unpriced=false;
  for(const s of assetSnapshots){
-  if(!s||!ASSETS.has(s.asset)||assets.has(s.asset)||!Array.isArray(s.positions)||!Array.isArray(s.orders)||!Array.isArray(s.trades)||typeof s.complete!=="boolean")fail("Invalid or duplicate asset adapter snapshot.");
-  assets.add(s.asset);historyComplete=historyComplete&&s.complete;
+  if(!s||!ASSETS.has(s.asset)||assets.has(s.asset)||!Array.isArray(s.positions)||!Array.isArray(s.orders)||!Array.isArray(s.trades)||!s.history||typeof s.history.complete!=="boolean"||!["LIFETIME","PARTIAL","UNKNOWN"].includes(s.history.scope))fail("Invalid or duplicate asset adapter snapshot.");
+  const evidenceRef=id(s.history.evidenceRef,"History evidence reference");
+  if(s.history.complete&&s.history.scope!=="LIFETIME")fail("Complete history must explicitly cover the lifetime scope.");
+  if(!s.history.complete&&s.history.scope==="LIFETIME")fail("Incomplete history cannot claim lifetime coverage.");
+  assets.add(s.asset);historyComplete=historyComplete&&(s.history.complete&&s.history.scope==="LIFETIME");historyEvidence.push({asset:s.asset,complete:s.history.complete,scope:s.history.scope,evidenceRef});
   for(const p of s.positions){
    if(!p||p.asset!==s.asset)fail("Position asset does not match adapter.");
    const positionId=id(p.positionId,"Position ID"),quantity=money(p.quantity,"Position quantity"),costBasisPaise=money(p.costBasisPaise,"Position cost basis");
@@ -67,7 +70,7 @@ function buildPaperPortfolioAccounting({account,assetSnapshots,mode="PERSISTED",
   historyComplete,historyStatus:historyComplete?"lifetime_complete":"partial_history",
   stalePositions:stale,valuationStatus:!positions.length?"empty":unpriced?"partial_or_stale":"fresh",
   ledgerReconciled:false,reconciliationStatus:"not_reconciled",snapshotConsistency:"unverified",
-  reconciliationBlockers,sourceAssets:[...assets].sort()
+  reconciliationBlockers,historyEvidence:historyEvidence.sort((a,b)=>a.asset.localeCompare(b.asset)),sourceAssets:[...assets].sort()
  });
 }
 module.exports={buildPaperPortfolioAccounting};
