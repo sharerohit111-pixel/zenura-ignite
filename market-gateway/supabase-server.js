@@ -96,7 +96,17 @@ const paperIntradayLimitWorkerStatus={enabled:false,intervalMs:null,lastRunAt:nu
 const paperFuturesLimitWorkerStatus={enabled:false,intervalMs:null,lastRunAt:null,lastCycle:null};
 const paperOptionLimitWorkerStatus={enabled:false,intervalMs:null,lastRunAt:null,lastCycle:null};
 const activeUserStreams=new Map();
-function fetchProvider(url,options={},timeoutMs=15000){return fetchProviderWithTimeout(fetch,url,options,timeoutMs);}
+function fetchProvider(url,options={},timeoutMs=15000){
+  let isUpstoxApi=false;
+  try{isUpstoxApi=new URL(url).hostname==="api.upstox.com";}catch(_error){}
+  const startedAt=Date.now();
+  const record=(ok)=>{if(isUpstoxApi)serviceDb.rpc("s_trade_record_provider_health",{
+    p_provider:"upstox",p_ok:ok,p_latency_ms:Math.min(120000,Math.max(0,Date.now()-startedAt))
+  }).catch(()=>{});};
+  return fetchProviderWithTimeout(fetch,url,options,timeoutMs).then(response=>{
+    record(response.ok);return response;
+  }).catch(error=>{record(false);throw error;});
+}
 function errorStatus(error){
   if(Number.isInteger(error?.status))return error.status;
   if(error?.name==="TimeoutError"||error?.name==="AbortError")return 504;
@@ -125,6 +135,19 @@ async function auth(req){
   return {user,accessToken,userDb:runtime.createUserClient(accessToken)};
 }
 app.use("/s-trade",createSTradeRouter({express,serviceDb,authenticate:auth}));
+const ORDER_SUBMISSION_PATHS=new Set([
+  "/paper/orders","/paper/derivative/orders","/paper/derivative/limit-orders","/paper/futures/orders"
+]);
+app.use(async(req,res,next)=>{
+  if(req.method!=="POST"||!ORDER_SUBMISSION_PATHS.has(req.path))return next();
+  try{
+    const result=await serviceDb.from("s_trade_operational_controls")
+      .select("enabled").eq("control_key","new_orders_enabled").maybeSingle();
+    if(result.error)return res.status(503).json({error:"Trading operational control could not be verified."});
+    if(result.data&&result.data.enabled===false)return res.status(503).json({error:"New simulated orders are temporarily paused by an administrator."});
+    return next();
+  }catch(_error){return res.status(503).json({error:"Trading operational control could not be verified."});}
+});
 function localNowMs(){return Date.now();}
 function validDate(value){
   if(typeof value!=="string"||!/^\d{4}-\d{2}-\d{2}$/.test(value))return false;
