@@ -171,3 +171,21 @@ The current official report page also lists multiple SPAN parameter snapshots. A
 3. Obtain and inspect an official NSE F&O Daily Settlement Prices sample plus the applicable current contract-master and SPAN files; record actual headers and row identity without guessing.
 4. Reconcile the official sample's daily/final settlement semantics and correction/revision behavior against the applicable effective-dated NSE/NCL circular/SOP.
 5. Only then draft a Futures-only schema/RPC proposal and executable disposable-PostgreSQL test plan. No hosted migration, staging/production write, deployment or feature activation is authorized.
+
+
+## 10. Additional official CAS 2.0 final-settlement clarification (verified 2026-11-24)
+
+The NSE FAQ titled "Closing Auction Session (CAS) 2.0 in the Equity segment and changes in Equity Derivatives Segment", Version 1, updated 2026-11-06, explicitly states:
+- The changes are applicable from 2026-12-07; the special changes for unexecuted CTS limit and disclosed-quantity orders are effective 2027-02-08.
+- For expiring index derivatives, final settlement price is based on the underlying index value calculated using constituent securities' VWAP during the last 30 minutes of the Continuous Trading Session (CTS) in the equity cash segment.
+- For expiring stock derivatives, the Clearing Corporations determine final settlement price based on underlying-stock VWAP during the last 30 minutes of CTS in the cash segment across all Stock Exchanges.
+- The FAQ separately says the daily closing price of derivatives contracts continues under the existing methodology and defines its last half-hour calculation period as 15:15–15:45 under the revised timings. Do not confuse that daily derivative close with the final expiry settlement price.
+- It also states that clearing-corporation communications govern cross-exchange closing-price differences for settlement calculations.
+
+Official source: https://nsearchives.nseindia.com/web/mediaattachment/2026-11/FAQs_for_CM_and_FO_FOR_CAS_2.0_20261109152618.pdf (see questions 2, 42–43, 72–73 and 105).
+
+**Implementation consequence:** store settlement kind and methodology version explicitly. Daily settlement-price ingestion and final-expiry settlement ingestion must not share an inferred price rule. For final expiry, consume the official Clearing Corporation settlement result for the exact contract and expiry date; do not calculate it from a daily closing price, a single-exchange cash close, LTP, or broker feed. Apply the new effective-dated methodology only from 2026-12-07. The FAQ is a summary; retain the detailed circular/SOP and Clearing Corporation publication as the implementation authority before coding.
+
+## 11. CI observation for this documentation-only update
+
+Commit `ac8bba2dcda43c15aca7d559afacab3e006feedd` has no pull-request workflow run returned by the commit workflow-runs endpoint at the time of this check. This is not a passing CI result. The prior PR #108 commit's successful disposable SQL smoke run remains scoped only to that earlier commit and its code/tests.
