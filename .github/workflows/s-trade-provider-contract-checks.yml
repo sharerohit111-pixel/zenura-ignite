@@ -40,6 +40,10 @@ on:
       - feature/s-trade-upstox-oauth-market-data-security-2026-11-23
     paths:
       - "market-gateway/lib/*provider-contract.js"
+      - "market-gateway/lib/provider-market-data-adapters.js"
+      - "market-gateway/lib/upstox-stream-normalizer.js"
+      - "market-gateway/test/provider-market-data-adapters.test.js"
+      - "market-gateway/test/upstox-stream-normalizer.test.js"
       - "market-gateway/lib/market-data-provider-router.js"
       - "market-gateway/lib/provider-rate-limit.js"
       - "market-gateway/lib/provider-health-registry.js"
