@@ -41,5 +41,5 @@ async function refresh(){
 }
 $("refresh").addEventListener("click",refresh);
 $("more-users").addEventListener("click",async()=>{try{page++;await loadUsers(false);}catch(e){setStatus(e.message,true);}});
-supabase.auth.onAuthStateChange(()=>refresh());
+supabase.auth.onAuthStateChange(()=>setTimeout(()=>refresh(),0));
 refresh();
