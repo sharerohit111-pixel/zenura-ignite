@@ -1,0 +1,19 @@
+{
+  "schemaVersion": "1.0.0",
+  "mode": "MOCK",
+  "simulated": true,
+  "requestId": "mock-account-0001",
+  "asOf": "2026-11-24T09:30:00+05:30",
+  "meta": { "source": "SYNTHETIC_FIXTURE", "stale": false, "cursor": null },
+  "data": {
+    "accountId": "mock-account-user-a",
+    "currency": "INR",
+    "startingCapitalPaise": 100000000,
+    "cashBalancePaise": 100000000,
+    "blockedFundsPaise": 0,
+    "availableFundsPaise": 100000000,
+    "realizedPnlPaise": 0,
+    "unrealizedPnlPaise": 0,
+    "ledgerReconciled": false
+  }
+}

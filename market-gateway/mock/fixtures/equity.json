@@ -1,0 +1,15 @@
+{
+  "schemaVersion": "1.0.0",
+  "mode": "MOCK",
+  "simulated": true,
+  "requestId": "mock-equity-0001",
+  "asOf": "2026-11-24T09:30:00+05:30",
+  "meta": { "source": "SYNTHETIC_FIXTURE", "stale": false, "cursor": null },
+  "data": {
+    "product": "DELIVERY",
+    "instrumentKey": "MOCK|NSE|EQ|0001",
+    "symbol": "MOCKALPHA",
+    "order": { "orderId": "mock-order-equity-001", "side": "BUY", "orderType": "MARKET", "quantity": 2, "status": "FILLED", "averagePricePaise": 125050, "chargesPaise": 0 },
+    "position": { "quantity": 2, "averagePricePaise": 125050, "investedValuePaise": 250100, "realizedPnlPaise": 0, "unrealizedPnlPaise": 0 }
+  }
+}

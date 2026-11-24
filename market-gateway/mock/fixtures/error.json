@@ -1,0 +1,10 @@
+{
+  "schemaVersion": "1.0.0",
+  "mode": "MOCK",
+  "simulated": true,
+  "requestId": "mock-error-0001",
+  "asOf": "2026-11-24T09:30:00+05:30",
+  "data": {
+    "error": { "code": "MOCK_INSUFFICIENT_FUNDS", "message": "Synthetic fixture: available virtual funds are insufficient.", "retryable": false }
+  }
+}
