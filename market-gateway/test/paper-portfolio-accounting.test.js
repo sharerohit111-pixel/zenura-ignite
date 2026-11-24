@@ -18,3 +18,5 @@ test("rejects duplicate adapters, IDs and valuation drift",()=>{assert.throws(()
 test("rejects unsafe paise and unsupported asset adapters",()=>{assert.throws(()=>buildPaperPortfolioAccounting({account:{...account,cash_paise:Number.MAX_SAFE_INTEGER+1},assetSnapshots:snapshots,mode:"DUMMY",now}),/safe integer/);assert.throws(()=>buildPaperPortfolioAccounting({account,assetSnapshots:[{asset:"CRYPTO",complete:true,positions:[],orders:[],trades:[]}],mode:"DUMMY",now}),/Invalid or duplicate/);});
 
 test("persisted snapshots are not mislabeled as simulation",()=>{const r=buildPaperPortfolioAccounting({account,assetSnapshots:snapshots,mode:"PERSISTED",now});assert.equal(r.simulationOnly,false);assert.equal(r.mode,"PERSISTED");});
+
+test("rejects omitted asset adapters instead of reporting a complete partial portfolio",()=>{assert.throws(()=>buildPaperPortfolioAccounting({account,assetSnapshots:snapshots.slice(0,2),mode:"DUMMY",now}),/all required/);});
