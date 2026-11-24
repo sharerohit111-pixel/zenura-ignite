@@ -90,6 +90,24 @@ begin
     raise exception 'Daily MTM did not update account cash and realized P&L exactly once';
   end if;
 
+  -- Seed a pending LIMIT order while the position is not yet risk-refreshed.
+  -- Its fill is tested below after the provider maintenance snapshot becomes a call.
+  v_now:=floor(extract(epoch from clock_timestamp())*1000)::bigint;
+  insert into public.paper_futures_orders(
+    order_id,user_id,idempotency_key,request_fingerprint,instrument_key,
+    trading_symbol,exchange,segment,expiry,lot_size,side,product,order_type,
+    status,quantity,limit_price_paise,tick_size_paise,margin_reserved_paise,
+    charges_paise,realized_pnl_paise,quote_timestamp_ms,quote_age_ms,
+    reservation_released,simulation_only,filled_quantity,remaining_quantity,
+    average_fill_price_paise,reserved_open_margin_paise,reserved_close_quantity,expires_at
+  ) values (
+    repeat('8',64),'abababab-abab-4bab-8bab-abababababab',
+    'abababab-0000-4000-8000-000000000098',repeat('8',64),
+    'NSE_FO|RISK_TEST','RISK_TEST','NSE','NSE_FO',current_date+10,25,
+    'BUY','DELIVERY','LIMIT','PENDING',25,11000,5,0,0,0,v_now,0,
+    false,true,0,25,null,0,0,clock_timestamp()+interval '5 minutes'
+  );
+
   -- Provider maintenance requirement is explicit and versioned. No guessed rate.
   v_now:=floor(extract(epoch from clock_timestamp())*1000)::bigint;
   v_result:=public.refresh_paper_futures_margin(
@@ -104,6 +122,28 @@ begin
   select reserved_margin_paise into v_margin from public.paper_accounts
    where user_id='abababab-abab-4bab-8bab-abababababab';
   if v_margin<>120000 then raise exception 'Provider initial margin was not reconciled to account reservation'; end if;
+
+  -- A fresh MARGIN_CALL snapshot blocks new risk-increasing orders and fills.
+  v_rejected:=false;
+  v_now:=floor(extract(epoch from clock_timestamp())*1000)::bigint;
+  begin
+    insert into public.paper_futures_orders(
+      order_id,user_id,idempotency_key,request_fingerprint,instrument_key,
+      trading_symbol,exchange,segment,expiry,lot_size,side,product,order_type,
+      status,quantity,limit_price_paise,tick_size_paise,margin_reserved_paise,
+      charges_paise,realized_pnl_paise,quote_timestamp_ms,quote_age_ms,
+      reservation_released,simulation_only,filled_quantity,remaining_quantity,
+      average_fill_price_paise,reserved_open_margin_paise,reserved_close_quantity,expires_at
+    ) values (
+      repeat('7',64),'abababab-abab-4bab-8bab-abababababab',
+      'abababab-0000-4000-8000-000000000097',repeat('7',64),
+      'NSE_FO|RISK_TEST','RISK_TEST','NSE','NSE_FO',current_date+10,25,
+      'BUY','DELIVERY','LIMIT','PENDING',25,11000,5,0,0,0,v_now,0,
+      false,true,0,25,null,0,0,clock_timestamp()+interval '5 minutes'
+    );
+  exception when sqlstate '55000' then v_rejected:=true;
+  end;
+  if not v_rejected then raise exception 'Risk-increasing Futures order passed during MARGIN_CALL'; end if;
 
   -- A simulated square-off closes at an explicit fresh provider quote, books
   -- P&L from the latest MTM basis, charges, and releases the entire margin.
