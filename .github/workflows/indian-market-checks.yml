@@ -2,9 +2,14 @@ name: Validate Indian Market Code
 
 on:
   pull_request:
-    branches: ["main"]
+    branches: ["main", "feature/nse-options-accounting-complete-chat6-2026-11-24"]
     paths:
       - "markets/stocks/**"
+      - "markets/dashboard/**"
+      - "markets/index.html"
+      - "markets/service-worker.js"
+      - "markets/dashboard/**"
+      - "markets/index.html"
       - "crypto/index.html"
       - "index.html"
       - "admin.html"
@@ -35,7 +40,7 @@ on:
       - ".github/workflows/indian-market-checks.yml"
       - ".github/workflows/deploy-firebase-rules.yml"
   push:
-    branches: ["feature/indian-stock-market", "reconcile/indian-stock-market-main-sync"]
+    branches: ["feature/indian-stock-market", "reconcile/indian-stock-market-main-sync", "feature/s-trade-core-ui-navigation-dummy-v2-2026-11-24"]
     paths:
       - "markets/stocks/**"
       - "crypto/index.html"
@@ -75,7 +80,7 @@ permissions:
 jobs:
   syntax-and-unit-tests:
     name: Syntax and gateway unit tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -111,6 +116,17 @@ jobs:
           NODE
       - name: Check browser module syntax
         run: node --check markets/stocks/stocks.js
+      - name: Check and test S-TRADE dummy dashboard
+        run: |
+          node --input-type=module --check < markets/dashboard/dashboard.js
+          node --input-type=module --check < markets/dashboard/dashboard-model.js
+          node --test markets/stocks/dashboard-contract.test.js markets/dashboard/dashboard-model.test.js
+      - name: Install Playwright Chromium for dashboard browser QA
+        run: |
+          npm install --prefix "$RUNNER_TEMP/zenura-playwright" --no-save --no-package-lock --no-audit --no-fund playwright@1.56.1
+          "$RUNNER_TEMP/zenura-playwright/node_modules/.bin/playwright" install --with-deps chromium
+      - name: Run S-TRADE desktop and mobile viewport browser smoke tests
+        run: NODE_PATH="$RUNNER_TEMP/zenura-playwright/node_modules" node markets/dashboard/browser-smoke.cjs
       - name: Check chart theme module syntax
         run: node --check markets/stocks/chart-theme.js
       - name: Check SSE parser syntax

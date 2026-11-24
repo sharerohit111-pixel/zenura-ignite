@@ -14,6 +14,6 @@
   "categories": ["finance", "education", "utilities"],
   "icons": [{"src":"../crypto/icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any"}],
   "shortcuts": [
-    {"name":"Paper Trading","short_name":"Trading","url":"/markets/stocks/"},
+    {"name":"Paper Trading","short_name":"Trading","url":"/markets/stocks/"}
   ]
 }
