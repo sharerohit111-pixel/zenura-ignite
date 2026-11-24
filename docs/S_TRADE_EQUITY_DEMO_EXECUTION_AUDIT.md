@@ -29,3 +29,13 @@ Scope: isolated deterministic Mock/Dummy cash-equity execution only.
 ## Validation
 
 Focused tests cover fixture provenance, production fail-closed behavior, deterministic depth sweeps, partial/full fills, LIMIT marketability, BUY cash reservation, SELL share reservation, cumulative P&L, cancellation of only the unfilled quantity, idempotent replay, insufficient resources, separate product books, detached receipts and fixed timestamps.
+
+## Overlap audit: PR #146 vs PR #148 (2026-11-24)
+
+- PR #146 adds a second standalone browser engine at `markets/stocks/equity-dummy-engine.js`, its own fixture contract, tests and a separate `equity-demo.html` page. It duplicates the same Equity Demo lifecycle and must not be merged alongside PR #148.
+- PR #148 is the canonical implementation because it uses the shared `MOCK` JSON fixture contract, the reusable gateway-side simulator, the existing Market Dashboard Demo workspace and a dedicated Mock Contract CI workflow.
+- PR #146 is superseded for implementation/UI purposes. Preserve its useful regression intent in the canonical engine tests; do not import its engine, fixtures or standalone page into the shared Market Dashboard.
+- The canonical engine remains in-memory and demo-only. It is not wired into authenticated production routes or the private order ledger. Production Equity SQL/RPC, workers, reservations, fee master and accounting remain untouched.
+- The canonical simulator now supports optional stable execution IDs for `matchNext`: replaying the same ID returns the original detached result without applying a second fill; reusing it for another order is rejected. Callers that do not provide an execution ID retain the existing one-book-level-per-call behavior.
+- Regression coverage also checks that repeated partial SELL fills allocate the exact residual cost basis when the position is fully closed.
+- PR #148 remains Draft pending CI on the latest head and review; PR #146 should remain explicitly marked superseded and unmerged.
