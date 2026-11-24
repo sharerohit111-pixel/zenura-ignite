@@ -15,7 +15,7 @@ function createLeaseHeartbeat({renew,onRenewed=()=>{},onLost=()=>{},onError=()=>
   }catch(error){if(!stopped){stop();onError(error);}}
   finally{inFlight=false;}
  };
- timer=schedule(()=>{void tick();},intervalMs);
+ timer=schedule(()=>tick(),intervalMs);
  return {stop,tick};
 }
 module.exports={createLeaseHeartbeat};
