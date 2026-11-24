@@ -53,6 +53,7 @@ const {isUsableUpstoxOAuthCallback}=require("../functions/lib/upstox-oauth-callb
 const {validateHttpsRedirectUri}=require("./lib/redirect-uri-policy");
 const {apiRateLimitBucket,consumeApiRateLimit}=require("./lib/api-rate-limit");
 const {createSTradeRouter}=require("./lib/s-trade-notifications-admin-router");
+const {createPriceAlertWorker}=require("./lib/price-alert-worker");
 
 const PORT=Number(process.env.PORT||8080);
 const SUPABASE_URL=process.env.SUPABASE_URL;
@@ -95,6 +96,7 @@ const paperProtectiveWorkerStatus={enabled:false,intervalMs:null,lastRunAt:null,
 const paperIntradayLimitWorkerStatus={enabled:false,intervalMs:null,lastRunAt:null,lastCycle:null};
 const paperFuturesLimitWorkerStatus={enabled:false,intervalMs:null,lastRunAt:null,lastCycle:null};
 const paperOptionLimitWorkerStatus={enabled:false,intervalMs:null,lastRunAt:null,lastCycle:null};
+const priceAlertWorkerStatus={enabled:false,intervalMs:null,lastRunAt:null,lastCycle:null};
 const activeUserStreams=new Map();
 async function fetchProvider(url,options={},timeoutMs=15000){
   let parsed=null;
@@ -210,11 +212,14 @@ async function getQuote(accessToken,instrumentKey){
   const quote=Object.values(payload?.data||{}).find(x=>x&&x.instrument_token===instrumentKey);
   return {quote,payload};
 }
+const processPriceAlerts=createPriceAlertWorker({
+  serviceDb,getUpstoxAccessToken,fetchProvider,readProviderJson,normalizeProviderQuote
+});
 app.get("/health",(_req,res)=>res.json({
   ok:true,service:"zenura-supabase-market-gateway",authProvider:"supabase",
   feedProtocol:"upstox-v3",instrumentMasterLoaded:instrumentCache.length>0,
   instrumentMasterUpdatedAt:instrumentCacheUpdatedAt||null,
-  limitWorker:{...paperLimitWorkerStatus},intradayLimitWorker:{...paperIntradayLimitWorkerStatus},futuresLimitSubmissionEnabled:process.env.PAPER_FUTURES_LIMIT_ENABLED==="true",futuresLimitWorker:{...paperFuturesLimitWorkerStatus},optionsLimitSubmissionEnabled:process.env.PAPER_OPTIONS_LIMIT_ENABLED==="true",optionsLimitWorker:{...paperOptionLimitWorkerStatus},protectiveWorker:{...paperProtectiveWorkerStatus}
+  limitWorker:{...paperLimitWorkerStatus},intradayLimitWorker:{...paperIntradayLimitWorkerStatus},futuresLimitSubmissionEnabled:process.env.PAPER_FUTURES_LIMIT_ENABLED==="true",futuresLimitWorker:{...paperFuturesLimitWorkerStatus},optionsLimitSubmissionEnabled:process.env.PAPER_OPTIONS_LIMIT_ENABLED==="true",optionsLimitWorker:{...paperOptionLimitWorkerStatus},protectiveWorker:{...paperProtectiveWorkerStatus},priceAlertWorker:{...priceAlertWorkerStatus}
 }));
 
 app.get("/upstox/connection",async(req,res)=>{
@@ -1510,6 +1515,28 @@ async function start(){
     const workerTimer=setInterval(runWorker,intervalMs);
     workerTimer.unref?.();
     console.log("Paper NSE Options LIMIT worker enabled; interval",intervalMs,"ms");
+  }
+  if(process.env.S_TRADE_PRICE_ALERT_WORKER_ENABLED==="true"){
+    const intervalMs=Math.max(5000,Math.min(60000,Number(process.env.S_TRADE_PRICE_ALERT_WORKER_INTERVAL_MS)||15000));
+    priceAlertWorkerStatus.enabled=true;priceAlertWorkerStatus.intervalMs=intervalMs;
+    let busy=false,nextRunAt=0,backoffMs=intervalMs;
+    const runWorker=async()=>{
+      if(busy||Date.now()<nextRunAt)return;
+      busy=true;
+      try{
+        const result=await processPriceAlerts.run({maxAlerts:500,maxUsersPerCycle:50});
+        priceAlertWorkerStatus.lastRunAt=Date.now();priceAlertWorkerStatus.lastCycle={...result,cycleError:false};
+        backoffMs=intervalMs;nextRunAt=Date.now()+intervalMs;
+        if(result.triggered||result.failed)console.log("S-TRADE price alert worker cycle",JSON.stringify(result));
+      }catch(error){
+        priceAlertWorkerStatus.lastRunAt=Date.now();
+        priceAlertWorkerStatus.lastCycle={scanned:0,users:0,observed:0,triggered:0,stale:0,failed:1,cycleError:true};
+        nextRunAt=Date.now()+backoffMs;backoffMs=Math.min(120000,backoffMs*2);
+        console.error("S-TRADE price alert worker cycle failed:",error.message);
+      }finally{busy=false;}
+    };
+    runWorker().catch(()=>{});const timer=setInterval(runWorker,intervalMs);timer.unref?.();
+    console.log("S-TRADE price alert worker enabled; interval",intervalMs,"ms");
   }
   if(process.env.PAPER_LIMIT_WORKER_ENABLED==="true"){
     const intervalMs=Math.max(1000,Math.min(10000,Number(process.env.PAPER_LIMIT_WORKER_INTERVAL_MS)||2000));
