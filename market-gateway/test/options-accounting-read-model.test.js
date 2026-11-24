@@ -105,3 +105,30 @@ test("includes contract identity in the reconciled MARKET and LIMIT history read
  assert.equal(limit.tradingSymbol,base.limitOrders[0].trading_symbol);
  assert.equal(limit.instrumentKey,base.limitOrders[0].instrument_key);
 });
+
+
+const expirySettlement={
+ settlement_id:"a".repeat(64),instrument_key:"NSE_FO|NIFTY_CE",trading_symbol:"NIFTY CE",
+ exchange:"NSE",segment:"NSE_FO",instrument_type:"CE",underlying_type:"INDEX",
+ settlement_type:"CASH_SETTLED",expiry:"2026-11-20",strike_price_paise:250000,
+ settlement_price_paise:260000,settled_quantity:65,entry_cost_basis_paise:500000,
+ intrinsic_value_paise:10000,gross_payout_paise:650000,exercise_stt_paise:1000,
+ net_payout_paise:649000,realized_pnl_paise:149000,
+ settlement_source:"https://www.nseindia.com/reports/settlement-price",
+ settlement_source_sha256:"b".repeat(64),settlement_timestamp_ms:1795150000000,
+ verified_at_ms:1795150100000,charge_schedule_version:"NSE_EXERCISE_STT_2026_04_V1",
+ created_at:"2026-11-20T12:00:00Z"
+};
+
+test("includes immutable cash-settled index expiry receipts in realized P&L and charges",()=>{
+ const r=buildOptionsAccountingSnapshot({...base,expirySettlements:[expirySettlement]});
+ assert.equal(r.realizedPnlPaise,163129);
+ assert.equal(r.chargesPaidPaise,1200);
+ assert.equal(r.history.some(x=>x.source==="EXPIRY"&&x.id===expirySettlement.settlement_id&&x.status==="SETTLED"),true);
+});
+
+test("rejects physical settlement and expiry payout or source tampering",()=>{
+ assert.throws(()=>buildOptionsAccountingSnapshot({...base,expirySettlements:[{...expirySettlement,settlement_type:"PHYSICAL"}]}),/classification/);
+ assert.throws(()=>buildOptionsAccountingSnapshot({...base,expirySettlements:[{...expirySettlement,gross_payout_paise:649999}]}),/does not reconcile/);
+ assert.throws(()=>buildOptionsAccountingSnapshot({...base,expirySettlements:[{...expirySettlement,settlement_source:"https://attacker.example/settlement"}]}),/does not reconcile/);
+});
