@@ -30,6 +30,8 @@ on:
       - "market-gateway/lib/provider-rate-limit.js"
       - "market-gateway/lib/provider-health-registry.js"
       - "market-gateway/lib/distributed-provider-rate-limit.js"
+      - "market-gateway/lib/instrument-identity.js"
+      - "market-gateway/test/instrument-identity.test.js"
       - "market-gateway/test/provider-contract.test.js"
       - "market-gateway/test/market-data-router.test.js"
       - "market-gateway/test/market-data-shapes.test.js"
