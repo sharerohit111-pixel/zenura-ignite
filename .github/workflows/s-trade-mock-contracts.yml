@@ -16,10 +16,13 @@ on:
   push:
     branches:
       - feature/s-trade-mock-contract-architecture-2026-11-24
+      - feature/s-trade-shared-demo-consumer-adapter-2026-11-24
     paths:
       - "market-gateway/mock/**"
       - "market-gateway/lib/paper-mock-fixtures.js"
       - "market-gateway/test/paper-mock-fixtures.test.js"
+      - "markets/shared/paper-demo-adapter.mjs"
+      - "market-gateway/test/paper-demo-adapter.test.mjs"
       - ".github/workflows/s-trade-mock-contracts.yml"
 
 permissions:
