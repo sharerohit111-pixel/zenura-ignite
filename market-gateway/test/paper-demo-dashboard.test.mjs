@@ -62,6 +62,11 @@ test("canonical adapter can build the dashboard view model from shared fixtures"
  assert.equal(model.orders.length,3);
  assert.equal(model.account.ledgerReconciled,false);
 });
+test("chart fixture requests omit account credentials",async()=>{
+ const chart=await read("demo-chart-panel.mjs");
+ assert.match(chart,/credentials: "omit"/);
+ assert.match(chart,/No synthetic chart data is displayed/);
+});
 test("responsive demo assets are included in the Markets PWA shell",async()=>{
  const css=await read("demo.css");
  const sw=await readFile(new URL("../../markets/service-worker.js",import.meta.url),"utf8");
