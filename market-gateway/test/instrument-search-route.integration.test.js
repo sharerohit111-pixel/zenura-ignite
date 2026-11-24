@@ -10,7 +10,13 @@ process.env.SUPABASE_SERVICE_ROLE_KEY = "server-only-instrument-search-test";
 
 const originalLoad = Module._load;
 Module._load = function(request, parent, isMain) {
-  if (request === "@supabase/supabase-js") return { createClient() { return {}; } };
+  if (request === "@supabase/supabase-js") return { createClient() {
+    return {
+      auth: { async getUser() { return { data: { user: null }, error: { message: "not used by public instrument route" } }; } },
+      async rpc() { return { data: null, error: null }; },
+      from() { return { select() { return this; }, eq() { return this; }, maybeSingle: async () => ({ data: null, error: null }) }; }
+    };
+  } };
   return originalLoad.call(this, request, parent, isMain);
 };
 const { app, configureRouteTestState } = require("../supabase-server");
