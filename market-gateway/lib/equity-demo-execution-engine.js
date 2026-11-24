@@ -61,7 +61,7 @@ function createEquityDemoExecutionEngine({fixture,account,env=(typeof process!==
   if(env?.NODE_ENV==="production")fail("EQUITY_DEMO_EXECUTION_DISABLED_IN_PRODUCTION",403);
   validateFixture(fixture);
   const instrument=fixture.data.instrument;
-  const state={account:normalizeAccount(account),orders:new Map(),idempotency:new Map(),fills:[],
+  const state={account:normalizeAccount(account),orders:new Map(),idempotency:new Map(),fills:[],executions:new Map(),
     book:{asks:clone(fixture.data.orderBook.asks),bids:clone(fixture.data.orderBook.bids),askIndex:0,bidIndex:0}};
   function positionMap(product){return product==="INTRADAY"?state.account.intradayPositions:state.account.positions;}
   function updateAvailable(){state.account.availableFundsPaise=state.account.cashBalancePaise-state.account.blockedFundsPaise;}
@@ -101,8 +101,15 @@ function createEquityDemoExecutionEngine({fixture,account,env=(typeof process!==
     state.account.blockedFundsPaise+=reserveCashPaise;updateAvailable();
     return orderView(order);
   }
-  function matchNext(orderId){
+  function matchNext(orderId,options={}){
     const order=state.orders.get(orderId);if(!order)fail("DEMO_ORDER_NOT_FOUND",404);
+    if(!options||typeof options!=="object"||Array.isArray(options))fail("INVALID_DEMO_EXECUTION_OPTIONS");
+    const executionId=options.executionId;
+    if(executionId!==undefined){
+      if(typeof executionId!=="string"||!/^[A-Za-z0-9_-]{8,80}$/.test(executionId))fail("INVALID_DEMO_EXECUTION_ID");
+      const prior=state.executions.get(executionId);
+      if(prior){if(prior.orderId!==orderId)fail("DEMO_EXECUTION_ID_REUSED",409);return clone(prior.result);}
+    }
     if(order.status==="FILLED"||order.status==="CANCELLED")return {matched:false,reason:"ORDER_NOT_OPEN",order:orderView(order),fill:null};
     const sideBook=order.side==="BUY"?state.book.asks:state.book.bids;
     const indexKey=order.side==="BUY"?"askIndex":"bidIndex";
@@ -144,7 +151,9 @@ function createEquityDemoExecutionEngine({fixture,account,env=(typeof process!==
       filledAt:timestamp,sequence:fillSequence,simulationOnly:true,source:"SYNTHETIC_FIXTURE"};
     delete order._lastFillRealizedPnlPaise;
     state.fills.push(fill);updateAvailable();
-    return {matched:true,reason:null,order:orderView(order),fill:clone(fill)};
+    const result={matched:true,reason:null,order:orderView(order),fill:clone(fill)};
+    if(executionId)state.executions.set(executionId,{orderId,result:clone(result)});
+    return result;
   }
   function cancelOrder(orderId){
     const order=state.orders.get(orderId);if(!order)fail("DEMO_ORDER_NOT_FOUND",404);
