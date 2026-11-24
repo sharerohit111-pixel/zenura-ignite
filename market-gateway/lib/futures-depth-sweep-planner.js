@@ -4,18 +4,26 @@ function fail(message) {
   throw Object.assign(new Error(message), { status: 409 });
 }
 
-/**
- * Pure paper-execution planner. Produces individual depth-level fill legs but
- * does not reserve funds, persist fills, charge fees, or settle accounting.
- * Insufficient aggregate displayed depth rejects the entire plan.
- */
-function planFuturesDepthSweep({ snapshot, side, quantity, tickSizePaise } = {}) {
+function planFuturesDepthSweep({
+  snapshot, side, quantity, lotSize, tickSizePaise,
+  nowMs = Date.now(), maxAgeMs = 15000
+} = {}) {
   if (!snapshot || typeof snapshot !== "object" || Array.isArray(snapshot)
       || !["BUY", "SELL"].includes(side)
       || !Number.isSafeInteger(quantity) || quantity < 1
+      || !Number.isSafeInteger(lotSize) || lotSize < 1 || quantity % lotSize !== 0
       || !Number.isSafeInteger(tickSizePaise) || tickSizePaise < 1
+      || !Number.isSafeInteger(nowMs) || nowMs < 1
+      || !Number.isSafeInteger(maxAgeMs) || maxAgeMs < 1
       || !Array.isArray(snapshot.bids) || !Array.isArray(snapshot.asks)) {
-    fail("Invalid Futures depth-sweep planning request.");
+    fail("Invalid Futures depth-sweep request or quantity is not a valid lot multiple.");
+  }
+
+  const timestampMs = snapshot.timestampMs;
+  const ageMs = nowMs - timestampMs;
+  if (!Number.isSafeInteger(timestampMs) || timestampMs < 1
+      || ageMs < 0 || ageMs > maxAgeMs) {
+    fail("A fresh, non-future Futures depth snapshot is required for the sweep.");
   }
 
   const levels = side === "BUY" ? snapshot.asks : snapshot.bids;
@@ -46,23 +54,20 @@ function planFuturesDepthSweep({ snapshot, side, quantity, tickSizePaise } = {})
         || !Number.isSafeInteger(grossPaise + fillGrossPaise)) {
       fail("Futures depth-sweep turnover exceeds supported calculation limits.");
     }
-    fills.push(Object.freeze({
-      pricePaise: level.pricePaise,
-      quantity: fillQuantity,
-      grossPaise: fillGrossPaise
-    }));
+    fills.push(Object.freeze({ pricePaise: level.pricePaise, quantity: fillQuantity, grossPaise: fillGrossPaise }));
     grossPaise += fillGrossPaise;
     remaining -= fillQuantity;
   }
 
-  if (remaining > 0) {
-    fail("Insufficient displayed Futures depth; the full paper MARKET order was rejected.");
-  }
+  if (remaining > 0) fail("Insufficient displayed Futures depth; the full paper MARKET order was rejected.");
 
   return Object.freeze({
     providerId: snapshot.providerId || null,
     instrumentKey: snapshot.instrumentKey || null,
+    quoteTimestampMs: timestampMs,
+    quoteAgeMs: ageMs,
     side,
+    lotSize,
     requestedQuantity: quantity,
     filledQuantity: quantity,
     grossPaise,
