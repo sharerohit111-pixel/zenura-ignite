@@ -26,7 +26,7 @@ test("market BUY sweeps deterministic ask levels and returns one immutable recei
   assert.deepEqual([a.fill.quantity,b.fill.quantity,c.fill.quantity],[2,3,2]);
   assert.deepEqual([a.fill.pricePaise,b.fill.pricePaise,c.fill.pricePaise],[125050,125100,125150]);
   assert.equal(c.order.status,"FILLED");assert.equal(c.order.filledQuantity,7);assert.equal(c.order.remainingQuantity,0);
-  assert.equal(c.order.grossValuePaise,875750);assert.equal(c.order.averagePricePaise,125107);
+  assert.equal(c.order.grossValuePaise,875700);assert.equal(c.order.averagePricePaise,125100);
   assert.equal(e.getFillReceipts(order.orderId).length,3);
   assert.deepEqual(e.getFillReceipts(order.orderId).map(x=>x.fillId),["DEMO-EQ-demo-buy-0001-F0001","DEMO-EQ-demo-buy-0001-F0002","DEMO-EQ-demo-buy-0001-F0003"]);
   const snap=e.snapshot();assert.equal(snap.account.cashBalancePaise,100000000-875750);
@@ -55,22 +55,22 @@ test("market SELL reserves shares and realizes cumulative P&L over multiple bid 
   assert.equal(e.snapshot().account.positions[key].reservedQuantity,5);
   const a=e.matchNext(order.orderId),b=e.matchNext(order.orderId),c=e.matchNext(order.orderId);
   assert.deepEqual([a.fill.quantity,b.fill.quantity],[2,3]);
-  assert.equal(c.order.status,"FILLED");assert.equal(c.order.realizedPnlPaise,4700);
+  assert.equal(c.order.status,"FILLED");assert.equal(c.order.realizedPnlPaise,4600);
   assert.equal(e.snapshot().account.positions[key].quantity,2);
   assert.equal(e.snapshot().account.positions[key].reservedQuantity,0);
-  assert.equal(e.snapshot().account.cashBalancePaise,100000000+624700);
+  assert.equal(e.snapshot().account.cashBalancePaise,100000000+624600);
   assert.equal(e.snapshot().account.realizedPnlPaise,4700);
 });
 test("cancelling a partially filled SELL preserves fills and releases only remaining shares",()=>{
   const key=fixture.data.instrument.instrumentKey;
-  const e=engine({account:{positions:{[key]:{quantity:8,costBasisPaise:8*120000,averagePricePaise:120000,reservedQuantity:0}}}});
+  const e=engine({account:{positions:{[key]:{quantity:8,costBasisPaise:8*120000,averagePricePaise:120000,reservedQuantity:0}},intradayPositions:{[key]:{quantity:8,costBasisPaise:8*120000,averagePricePaise:120000,reservedQuantity:0}}}});
   const order=e.submitOrder({idempotencyKey:"demo-sell-cancel-1",instrumentKey:key,side:"SELL",orderType:"LIMIT",limitPricePaise:124900,product:"INTRADAY",quantity:7});
   const fill=e.matchNext(order.orderId);assert.equal(fill.fill.quantity,2);
   const cancelled=e.cancelOrder(order.orderId);
   assert.equal(cancelled.order.filledQuantity,2);assert.equal(cancelled.order.remainingQuantity,5);
   assert.equal(cancelled.releasedShareQuantity,5);
   const p=e.snapshot().account.intradayPositions[key];
-  assert.equal(p.quantity,8); // product-specific position is isolated; no Delivery shares were consumed.
+  assert.equal(p.quantity,8); // cancellation releases the unfilled Intraday shares.
   assert.equal(e.snapshot().account.positions[key].quantity,8);
 });
 test("idempotency returns same order for same payload and rejects changed payload",()=>{
