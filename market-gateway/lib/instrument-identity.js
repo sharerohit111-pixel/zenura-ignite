@@ -1,7 +1,5 @@
 "use strict";
 
-const crypto = require("node:crypto");
-
 const ISIN_RE = /^[A-Z]{2}[A-Z0-9]{10}$/;
 const PROVIDER_RE = /^[a-z][a-z0-9_-]{1,39}$/;
 const DATE_RE = /^\\d{4}-\\d{2}-\\d{2}$/;
