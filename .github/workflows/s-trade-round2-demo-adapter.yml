@@ -1,0 +1,26 @@
+name: S-TRADE Round 2 Demo Adapter Tests
+
+on:
+  pull_request:
+    paths:
+      - "markets/stocks/mock-demo-adapter.js"
+      - "market-gateway/test/mock-demo-adapter.test.js"
+      - "market-gateway/mock/fixtures/**"
+      - ".github/workflows/s-trade-round2-demo-adapter.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  demo-adapter:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Check adapter syntax
+        run: node --check markets/stocks/mock-demo-adapter.js
+      - name: Run adapter and shared fixture tests
+        working-directory: market-gateway
+        run: node --test test/mock-demo-adapter.test.js test/paper-mock-fixtures.test.js
