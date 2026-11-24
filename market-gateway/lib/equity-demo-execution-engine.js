@@ -128,33 +128,44 @@ function createEquityDemoExecutionEngine({fixture,account,env=(typeof process!==
     const marketable=order.orderType==="MARKET"||(order.side==="BUY"?level.pricePaise<=order.limitPricePaise:level.pricePaise>=order.limitPricePaise);
     if(!marketable)return {matched:false,reason:"LIMIT_NOT_MARKETABLE",order:orderView(order),fill:null};
     const quantity=Math.min(order.remainingQuantity,level.quantity),gross=safeProduct(level.pricePaise,quantity);
+    const nextFilledQuantity=safeSum(order.filledQuantity,quantity);
+    const nextGrossValuePaise=safeSum(order.grossValuePaise,gross);
+    const nextAveragePricePaise=Math.round(nextGrossValuePaise/nextFilledQuantity);
     const fillSequence=state.fills.length+1,fillId=order.orderId+"-F"+String(fillSequence).padStart(4,"0");
     const timestamp=new Date(Date.parse(fixture.asOf)+fillSequence*1000).toISOString();
     if(order.side==="BUY"){
-      state.account.cashBalancePaise-=gross;
-      state.account.blockedFundsPaise-=safeProduct(order.orderType==="LIMIT"?order.limitPricePaise:state.book.asks.at(-1).pricePaise,quantity);
+      const reservePerShare=order.orderType==="LIMIT"?order.limitPricePaise:state.book.asks.at(-1).pricePaise;
+      const releaseCash=safeProduct(reservePerShare,quantity);
+      const nextCash=state.account.cashBalancePaise-gross,nextBlocked=state.account.blockedFundsPaise-releaseCash;
+      if(!Number.isSafeInteger(nextCash)||nextCash<0||nextBlocked<0)fail("DEMO_RESERVATION_INVARIANT_BROKEN",500);
       const map=positionMap(order.product),old=map[order.instrumentKey]||{quantity:0,costBasisPaise:0,averagePricePaise:0,reservedQuantity:0};
       const nextQuantity=safeSum(old.quantity,quantity);
       if(nextQuantity>MAX_QUANTITY)fail("DEMO_POSITION_QUANTITY_LIMIT",409);
-      old.quantity=nextQuantity;old.costBasisPaise=safeSum(old.costBasisPaise,gross);old.averagePricePaise=Math.round(old.costBasisPaise/old.quantity);old.investedValuePaise=old.costBasisPaise;
-      map[order.instrumentKey]=old;
+      const nextCostBasis=safeSum(old.costBasisPaise,gross);
+      state.account.cashBalancePaise=nextCash;state.account.blockedFundsPaise=nextBlocked;
+      map[order.instrumentKey]={...old,quantity:nextQuantity,costBasisPaise:nextCostBasis,
+        averagePricePaise:Math.round(nextCostBasis/nextQuantity),investedValuePaise:nextCostBasis};
     }else{
-      const nextCash=state.account.cashBalancePaise+gross;
-      if(!Number.isSafeInteger(nextCash))fail("DEMO_AMOUNT_OUT_OF_RANGE",409);
-      state.account.cashBalancePaise=nextCash;
+      const nextCash=safeSum(state.account.cashBalancePaise,gross);
       const map=positionMap(order.product),p=map[order.instrumentKey];
+      if(!p||p.quantity<quantity||p.reservedQuantity<quantity)fail("DEMO_RESERVATION_INVARIANT_BROKEN",500);
       const allocatedCost=allocateCostPaise(p.costBasisPaise,quantity,p.quantity);
-      const oldQuantity=p.quantity;p.quantity-=quantity;p.costBasisPaise-=allocatedCost;p.averagePricePaise=p.quantity?Math.round(p.costBasisPaise/p.quantity):0;
-      p.investedValuePaise=p.costBasisPaise;p.reservedQuantity-=quantity;
+      const remainingQuantity=p.quantity-quantity,remainingCost=p.costBasisPaise-allocatedCost;
       const realized=gross-allocatedCost;
-      order.realizedPnlPaise=safeSum(order.realizedPnlPaise,realized);
-      state.account.realizedPnlPaise=safeSum(state.account.realizedPnlPaise,realized);
-      if(p.quantity===0)delete map[order.instrumentKey];
+      const nextOrderRealized=safeSum(order.realizedPnlPaise,realized);
+      const nextAccountRealized=safeSum(state.account.realizedPnlPaise,realized);
+      state.account.cashBalancePaise=nextCash;
+      if(remainingQuantity===0)delete map[order.instrumentKey];
+      else map[order.instrumentKey]={...p,quantity:remainingQuantity,costBasisPaise:remainingCost,
+        averagePricePaise:Math.round(remainingCost/remainingQuantity),investedValuePaise:remainingCost,
+        reservedQuantity:p.reservedQuantity-quantity};
+      order.realizedPnlPaise=nextOrderRealized;
+      state.account.realizedPnlPaise=nextAccountRealized;
       order._lastFillRealizedPnlPaise=realized;
     }
     level.quantity-=quantity;
-    order.filledQuantity+=quantity;order.remainingQuantity-=quantity;order.grossValuePaise+=gross;
-    order.averagePricePaise=Math.round(order.grossValuePaise/order.filledQuantity);
+    order.filledQuantity=nextFilledQuantity;order.remainingQuantity-=quantity;order.grossValuePaise=nextGrossValuePaise;
+    order.averagePricePaise=nextAveragePricePaise;
     order.reservedCashPaise-=order.side==="BUY"?safeProduct(order.orderType==="LIMIT"?order.limitPricePaise:state.book.asks.at(-1).pricePaise,quantity):0;
     order.reservedShareQuantity-=order.side==="SELL"?quantity:0;
     order.status=order.remainingQuantity===0?"FILLED":"PARTIALLY_FILLED";order.updatedAt=timestamp;
