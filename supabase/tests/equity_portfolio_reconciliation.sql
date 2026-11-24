@@ -94,6 +94,28 @@ BEGIN
     RAISE EXCEPTION 'Trade ledger event count does not equal immutable fill count';
   END IF;
 
+  -- Position cost basis must reconcile to fee-inclusive BUY debits less the
+  -- cost basis released by SELL fills. For each SELL, net proceeds minus the
+  -- immutable realized P&L is the allocated cost basis.
+  IF EXISTS (
+    WITH fill_basis AS (
+      SELECT instrument_key,product,
+        sum(CASE WHEN side='BUY' THEN -cash_delta_paise ELSE 0 END)
+        - sum(CASE WHEN side='SELL' THEN cash_delta_paise-realized_pnl_paise ELSE 0 END)
+          AS expected_cost_basis_paise
+      FROM public.paper_equity_fills WHERE user_id=v_user
+      GROUP BY instrument_key,product
+    ), position_basis AS (
+      SELECT instrument_key,product,cost_basis_paise
+      FROM public.paper_equity_positions WHERE user_id=v_user
+    )
+    SELECT 1 FROM fill_basis f
+    FULL JOIN position_basis p USING (instrument_key,product)
+    WHERE coalesce(f.expected_cost_basis_paise,0)<>coalesce(p.cost_basis_paise,0)
+  ) THEN
+    RAISE EXCEPTION 'Equity position cost basis does not reconcile to fee-inclusive fill history';
+  END IF;
+
   -- Current position quantity must equal signed immutable fill quantity, per product
   -- and instrument; this also detects accidental DELIVERY/INTRADAY cross-contamination.
   IF EXISTS (
