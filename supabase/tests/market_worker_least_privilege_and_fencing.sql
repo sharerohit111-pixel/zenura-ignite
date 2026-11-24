@@ -124,3 +124,32 @@ END
 $worker_lease_fencing$;
 
 RESET ROLE;
+
+DO $worker_rpc_acl$
+DECLARE
+  v_signature text;
+  v_signatures text[] := ARRAY[
+    'public.acquire_paper_market_worker_lease(text,uuid,bigint,bigint)',
+    'public.release_paper_market_worker_lease(text,uuid,bigint)',
+    'public.execute_paper_futures_limit_fill(text,text,integer,integer,bigint,bigint,bigint,integer,integer,bigint,bigint,bigint)',
+    'public.expire_paper_futures_limit_order(text)',
+    'public.submit_paper_option_limit_order(uuid,text,uuid,text,text,text,text,text,text,date,numeric,integer,integer,text,integer,bigint,bigint,timestamptz)',
+    'public.cancel_paper_option_limit_order(uuid,text)',
+    'public.expire_paper_option_limit_order(text)',
+    'public.execute_paper_option_limit_fill(text,text,integer,integer,bigint,bigint,bigint,integer,integer,bigint,bigint)'
+  ];
+BEGIN
+  FOREACH v_signature IN ARRAY v_signatures LOOP
+    IF to_regprocedure(v_signature) IS NULL THEN
+      RAISE EXCEPTION 'Required worker lifecycle RPC is missing: %',v_signature;
+    END IF;
+    IF NOT has_function_privilege('service_role',to_regprocedure(v_signature),'EXECUTE') THEN
+      RAISE EXCEPTION 'service_role is missing EXECUTE on %',v_signature;
+    END IF;
+    IF has_function_privilege('anon',to_regprocedure(v_signature),'EXECUTE')
+       OR has_function_privilege('authenticated',to_regprocedure(v_signature),'EXECUTE') THEN
+      RAISE EXCEPTION 'Client role unexpectedly has EXECUTE on server lifecycle RPC %',v_signature;
+    END IF;
+  END LOOP;
+END
+$worker_rpc_acl$;
