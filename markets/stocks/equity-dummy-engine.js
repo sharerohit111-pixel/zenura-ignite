@@ -102,11 +102,6 @@
       }
     }
     function fill(order, quantity, pricePaise, executionId) {
-      assert(!TERMINAL.has(order.status), 'Terminal orders cannot be filled.');
-      assert(safeInt(quantity) && quantity > 0 && quantity <= order.remainingQuantity, 'Fill quantity exceeds the remaining order quantity.');
-      assert(safeInt(pricePaise) && pricePaise > 0, 'Execution price must be positive integer paise.');
-      const instrument = instruments.get(order.instrumentKey);
-      assert(pricePaise % instrument.tickSizePaise === 0, 'Execution price does not match the instrument tick size.');
       if (executionId) {
         const priorFill = state.fills.find(row => row.executionId === executionId);
         if (priorFill) {
@@ -115,6 +110,11 @@
           return clone(priorFill);
         }
       }
+      assert(!TERMINAL.has(order.status), 'Terminal orders cannot be filled.');
+      assert(safeInt(quantity) && quantity > 0 && quantity <= order.remainingQuantity, 'Fill quantity exceeds the remaining order quantity.');
+      assert(safeInt(pricePaise) && pricePaise > 0, 'Execution price must be positive integer paise.');
+      const instrument = instruments.get(order.instrumentKey);
+      assert(pricePaise % instrument.tickSizePaise === 0, 'Execution price does not match the instrument tick size.');
       if (order.orderType === 'LIMIT') {
         if (order.side === 'BUY') assert(pricePaise <= order.limitPricePaise, 'BUY limit price condition is not met.');
         else assert(pricePaise >= order.limitPricePaise, 'SELL limit price condition is not met.');
