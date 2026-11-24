@@ -83,6 +83,9 @@ jobs:
       PGDATABASE: paper_trading_test
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
       - name: Check native Supabase Auth browser modules
         run: |
           node --input-type=module --check < markets/stocks/supabase-client.js
