@@ -67,6 +67,10 @@ test("canonical adapter can build the dashboard view model from shared fixtures"
  const model=createPaperDemoViewModel({market,account,equity,derivatives},{enabled:true,production:false});
  assert.equal(model.meta.provider,"DUMMY_JSON");
  assert.equal(model.market.instruments.length,20);
+ assert.equal(model.market.instruments.filter(item=>item.assetClass==="INDEX").length,2);
+ assert.equal(model.market.instruments.filter(item=>item.assetClass==="EQUITY").length,2);
+ assert.equal(model.market.instruments.filter(item=>item.assetClass==="FUTURE").length,4);
+ assert.equal(model.market.instruments.filter(item=>item.assetClass==="OPTION").length,12);
  assert.equal(model.orders.length,3);
  assert.equal(model.account.ledgerReconciled,false);
 });
@@ -74,6 +78,10 @@ test("chart fixture requests omit account credentials",async()=>{
  const chart=await read("demo-chart-panel.mjs");
  assert.match(chart,/credentials: "omit"/);
  assert.match(chart,/No synthetic chart data is displayed/);
+});
+test("dashboard does not infer BSE market status from the NSE-only market fixture",async()=>{
+ const js=await read("demo.js");
+ assert.match(js,/model\.market\.exchange===exchange\?model\.market\.marketStatus:"NOT SUPPLIED"/);
 });
 test("responsive demo assets are included in the Markets PWA shell",async()=>{
  const css=await read("demo.css");
