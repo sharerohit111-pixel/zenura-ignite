@@ -49,7 +49,7 @@ test("responsive demo assets are included in the Markets PWA shell",async()=>{
  const sw=await readFile(new URL("../../markets/service-worker.js",import.meta.url),"utf8");
  assert.match(css,/@media\(max-width:900px\)/);
  assert.match(css,/@media\(max-width:520px\)/);
- assert.match(sw,/zenura-markets-shell-v3/);
+ assert.match(sw,/zenura-markets-shell-v4/);
  for(const asset of ["stocks/demo.html","stocks/demo.css","stocks/demo.js","shared/paper-demo-adapter.mjs"])assert.ok(sw.includes(asset));
 });
 
@@ -62,9 +62,8 @@ test("Demo route exposes account return navigation and shared Hindi/English togg
  assert.doesNotMatch(html, /account-settings\.js|supabase-client\.js|email-auth\.js/);
 });
 
-test("shared language toggle includes Hindi strings for Demo and authenticated account UI", () => {
- const fs = require("node:fs");
- const language = fs.readFileSync(new URL("../../markets/language-toggle.js", import.meta.url), "utf8");
+test("shared language toggle includes Hindi strings for Demo and authenticated account UI", async () => {
+ const language = await readFile(new URL("../../markets/language-toggle.js", import.meta.url), "utf8");
  assert.match(language, /"USER ACCOUNT & WALLET":"यूज़र खाता और वॉलेट"/);
  assert.match(language, /"Home Overview":"होम ओवरव्यू"/);
  assert.match(language, /"VERIFY & SIGN IN":"सत्यापित करें और साइन इन करें"/);
