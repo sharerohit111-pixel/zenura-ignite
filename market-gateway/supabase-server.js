@@ -760,11 +760,12 @@ app.post("/paper/derivative/orders",async(req,res)=>{
   }catch(error){sendError(res,error,"Derivative paper order could not be completed.");}
 });
 
-async function loadAllOptionsRows(userDb,table,userId,orderColumn="created_at"){
+async function loadAllOptionsRows(userDb,table,userId,orderColumn="created_at",tieBreakColumn="order_id"){
   const rows=[],pageSize=500;
   for(let offset=0;offset<100000;offset+=pageSize){
     const {data,error}=await userDb.from(table).select("*").eq("user_id",userId)
-      .order(orderColumn,{ascending:true}).range(offset,offset+pageSize-1);
+      .order(orderColumn,{ascending:true}).order(tieBreakColumn,{ascending:true})
+      .range(offset,offset+pageSize-1);
     if(error)throw Object.assign(new Error("Options accounting history could not be loaded."),{status:503});
     const page=data||[];rows.push(...page);
     if(page.length<pageSize)return rows;
@@ -782,7 +783,7 @@ app.get("/paper/options/accounting",async(req,res)=>{
       userDb.from("paper_derivative_positions").select("*").eq("user_id",user.id),
       loadAllOptionsRows(userDb,"paper_derivative_orders",user.id),
       loadAllOptionsRows(userDb,"paper_option_limit_orders",user.id),
-      loadAllOptionsRows(userDb,"paper_option_expiry_settlements",user.id)
+      loadAllOptionsRows(userDb,"paper_option_expiry_settlements",user.id,"created_at","settlement_id")
     ]);
     if(accountError||!account)return res.status(404).json({error:"Indian paper account has not been initialized."});
     if(positionError)throw Object.assign(new Error("Options positions could not be loaded."),{status:503});
@@ -794,7 +795,7 @@ app.get("/paper/options/accounting",async(req,res)=>{
       const ids=orderIds.slice(orderOffset,orderOffset+500);
       for(let fillOffset=0;fillOffset<100000;fillOffset+=500){
         const {data,error}=await userDb.from("paper_option_limit_fills").select("*")
-          .in("order_id",ids).order("fill_id",{ascending:true})
+          .in("order_id",ids).order("fill_sequence",{ascending:true}).order("fill_id",{ascending:true})
           .range(fillOffset,fillOffset+499);
         if(error)throw Object.assign(new Error("Options immutable fill history could not be loaded."),{status:503});
         const page=data||[];limitFills.push(...page);
