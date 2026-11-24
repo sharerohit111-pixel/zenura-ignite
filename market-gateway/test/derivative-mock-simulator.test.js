@@ -206,3 +206,28 @@ test("simulator rejects a non-synthetic Options underlying", () => {
   target.underlying = "NIFTY";
   assert.throws(() => createDerivativeMockSimulator(invalid, { now }), /invalid CE\/PE strike contract/);
 });
+
+
+test("F&O lot boundaries reject zero, fractional and over-cap lots without creating orders",()=>{
+  const simulator=create();
+  const instrument=future();
+  for(const lots of [0,1.5,10001]){
+    assert.throws(()=>simulator.submit({
+      instrumentKey:instrument.instrumentKey,side:"BUY",orderType:"LIMIT",lots,limitPricePaise:2500050
+    }),/Lots (is invalid|exceed the demo limit)/);
+  }
+  assert.equal(simulator.snapshot().orders.length,0);
+  assert.equal(simulator.snapshot().positions.length,0);
+});
+
+test("F&O derivative position arithmetic rejects unsafe fill value without returning a position",()=>{
+  const simulator=create();
+  const instrument=future();
+  const altered=structuredClone(fixture);
+  const quote=altered.data.quotes.find(item=>item.instrumentKey===instrument.instrumentKey);
+  quote.askPricePaise=Number.MAX_SAFE_INTEGER;
+  quote.askQuantity=instrument.lotSize;
+  assert.throws(()=>createDerivativeMockSimulator(altered,{now}).submit({
+    instrumentKey:instrument.instrumentKey,side:"BUY",orderType:"MARKET",lots:1
+  }),/safe calculation limits|safe integer limits/);
+});
