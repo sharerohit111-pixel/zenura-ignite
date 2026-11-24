@@ -9,6 +9,7 @@ if (host && !document.getElementById("s-trade-account")) {
   root.innerHTML = `
     <h3>USER ACCOUNT & WALLET</h3>
     <p id="s-trade-account-status" class="account-status" role="status">Sign in to view your account.</p>
+    <button type="button" id="s-trade-dev-mock-login" hidden>DEVELOPMENT MOCK LOGIN · LOCAL ONLY</button>
     <div id="s-trade-phone-auth">
       <label>Mobile number (with country code)
         <input id="s-trade-phone" type="tel" inputmode="tel" autocomplete="tel" maxlength="16" placeholder="+91XXXXXXXXXX">
@@ -47,6 +48,11 @@ if (host && !document.getElementById("s-trade-account")) {
   const status = $("s-trade-account-status");
   const privatePanel = $("s-trade-account-private");
   const phonePanel = $("s-trade-phone-auth");
+  const mockButton = $("s-trade-dev-mock-login");
+  const isLocalDevelopment = ["localhost", "127.0.0.1", "[::1]"].includes(location.hostname);
+  let devMockActive = false;
+  if (isLocalDevelopment) mockButton.hidden = false;
+  else mockButton.remove();
   const gateway = (document.querySelector('meta[name="market-gateway-url"]')?.content || "").trim().replace(/\/+$/, "");
   let currentUserId = null;
   let authSequence = 0;
@@ -85,6 +91,7 @@ if (host && !document.getElementById("s-trade-account")) {
     $("s-trade-wallet-available").textContent = money(payload.availableCashPaise);
   }
   async function syncAuth(session) {
+    if (devMockActive) return;
     const sequence = ++authSequence;
     const user = session?.user || null;
     currentUserId = user?.id || null;
@@ -106,6 +113,24 @@ if (host && !document.getElementById("s-trade-account")) {
       if (sequence === authSequence && currentUserId === user.id) status.textContent = error.message || "Account could not be loaded.";
     }
   }
+
+  mockButton.addEventListener("click", () => {
+    if (!isLocalDevelopment) return;
+    devMockActive = true;
+    authSequence++;
+    currentUserId = "development-mock-user";
+    phonePanel.hidden = true;
+    privatePanel.hidden = false;
+    clearWallet();
+    $("s-trade-display-name").value = "Development Demo";
+    $("s-trade-session-info").textContent = "Local demo only · no authenticated Supabase session";
+    $("s-trade-wallet-start").textContent = "₹10,00,000.00";
+    $("s-trade-wallet-cash").textContent = "₹10,00,000.00";
+    $("s-trade-wallet-blocked").textContent = "₹0.00";
+    $("s-trade-wallet-available").textContent = "₹10,00,000.00";
+    status.textContent = "DEVELOPMENT MOCK SESSION — local UI preview only. No API access, orders, database writes or real authentication.";
+    mockButton.hidden = true;
+  });
 
   $("s-trade-send-otp").addEventListener("click", async () => {
     const phone = $("s-trade-phone").value.trim();
@@ -160,6 +185,17 @@ if (host && !document.getElementById("s-trade-account")) {
     catch (error) { status.textContent = error.message || "Wallet refresh failed."; }
   });
   $("s-trade-sign-out").addEventListener("click", async () => {
+    if (devMockActive) {
+      devMockActive = false;
+      currentUserId = null;
+      authSequence++;
+      clearWallet();
+      privatePanel.hidden = true;
+      phonePanel.hidden = false;
+      if (isLocalDevelopment) mockButton.hidden = false;
+      status.textContent = "Development mock session ended. Sign in with Supabase for authenticated access.";
+      return;
+    }
     $("s-trade-sign-out").disabled = true;
     try {
       const { error } = await supabase.auth.signOut();
