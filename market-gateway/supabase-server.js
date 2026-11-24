@@ -18,6 +18,7 @@ const {loadVerifiedExchangeSession}=require("./lib/exchange-session-calendar");
 const {isIntradaySessionOpen}=require("./lib/intraday-limit-policy");
 const {normalizeEquityTickSizePaise,isEquityExecutionPriceOnTick}=require("./lib/equity-order-validation");
 const {encodeOrderHistoryCursor,decodeOrderHistoryCursor,buildOrderHistoryCursorFilter}=require("./lib/order-history-pagination");
+const {rankInstrumentSearchResults}=require("./lib/instrument-search");
 const {isEligiblePaperLimitOrder,normalizeWorkerCursor,groupOrdersByUser}=require("./lib/paper-limit-worker");
 const {createPaperProtectiveWorker}=require("./lib/paper-protective-worker");
 const {createPaperIntradayLimitWorker}=require("./lib/paper-intraday-limit-worker");
@@ -220,7 +221,7 @@ app.get("/instruments",async(req,res)=>{
     const kind=String(req.query.kind||"all").toLowerCase(),exchange=String(req.query.exchange||"").toUpperCase();
     const q=String(req.query.q||"").trim().toLowerCase().slice(0,60);
     const limit=Math.min(Math.max(Number.parseInt(req.query.limit||"50",10)||50,1),100);
-    const matches=instrumentCache.filter(item=>{
+    const filtered=instrumentCache.filter(item=>{
       if(exchange&&item.exchange!==exchange)return false;
       if(kind==="equities"&&!(item.instrument_type==="EQ"&&["NSE_EQ","BSE_EQ"].includes(item.segment)))return false;
       if(kind==="indices"&&!(item.instrument_type==="INDEX"&&["NSE_INDEX","BSE_INDEX"].includes(item.segment)))return false;
@@ -228,7 +229,8 @@ app.get("/instruments",async(req,res)=>{
       if(kind==="options"&&!((["CE","PE"].includes(item.instrument_type))&&["NSE_FO","BSE_FO"].includes(item.segment)))return false;
       if(q&&!String(item.trading_symbol||"").toLowerCase().includes(q)&&!String(item.name||"").toLowerCase().includes(q)&&!String(item.underlying_symbol||"").toLowerCase().includes(q))return false;
       return true;
-    }).slice(0,limit).map(item=>({
+    });
+    const matches=rankInstrumentSearchResults(filtered,q,limit).map(item=>({
       instrument_key:item.instrument_key,segment:item.segment,exchange:item.exchange,
       name:item.name,trading_symbol:item.trading_symbol,instrument_type:item.instrument_type,
       expiry:item.expiry??null,strike_price:item.strike_price??null,
