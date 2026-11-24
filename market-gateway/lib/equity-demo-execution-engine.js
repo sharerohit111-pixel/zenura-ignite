@@ -121,6 +121,9 @@ function createEquityDemoExecutionEngine({fixture,account,env=process.env}={}){
       old.quantity+=quantity;old.costBasisPaise+=gross;old.averagePricePaise=Math.round(old.costBasisPaise/old.quantity);old.investedValuePaise=old.costBasisPaise;
       map[order.instrumentKey]=old;
     }else{
+      const nextCash=state.account.cashBalancePaise+gross;
+      if(!Number.isSafeInteger(nextCash))fail("DEMO_AMOUNT_OUT_OF_RANGE",409);
+      state.account.cashBalancePaise=nextCash;
       const map=positionMap(order.product),p=map[order.instrumentKey];
       const allocatedCost=quantity===p.quantity?p.costBasisPaise:Math.round(p.costBasisPaise*quantity/p.quantity);
       const oldQuantity=p.quantity;p.quantity-=quantity;p.costBasisPaise-=allocatedCost;p.averagePricePaise=p.quantity?Math.round(p.costBasisPaise/p.quantity):0;
