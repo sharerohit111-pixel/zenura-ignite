@@ -302,3 +302,14 @@ test("uses a separate connected Upstox token for each Futures LIMIT account",asy
     "Bearer token-for-"+USER,"Bearer token-for-"+secondUser
   ]));
 });
+
+
+test("rejects Futures LIMIT orders with invalid quantity conservation or lot multiples",()=>{
+  assert.equal(isValidNseFuture({...order,quantity:26},instrument),false);
+  assert.equal(isValidNseFuture({...order,filled_quantity:1,remaining_quantity:24},instrument),false);
+  assert.equal(isValidNseFuture({...order,filled_quantity:25,remaining_quantity:25},instrument),false);
+  assert.equal(isValidNseFuture({...order,remaining_quantity:0},instrument),false);
+  assert.equal(isValidNseFuture({...order,filled_quantity:-1},instrument),false);
+  assert.equal(isValidNseFuture({...order,remaining_quantity:24},instrument),false);
+  assert.equal(isValidNseFuture({...order,quantity:50,filled_quantity:25,remaining_quantity:25},instrument),true);
+});
