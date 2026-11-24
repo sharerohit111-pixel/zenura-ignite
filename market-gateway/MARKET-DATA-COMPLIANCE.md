@@ -37,3 +37,46 @@ These safeguards reduce accidental cross-user sharing but do **not** replace wri
 5. Record the written approval reference in GitHub Actions variable `MARKET_DATA_RIGHTS_REFERENCE` and set `MARKET_DATA_RIGHTS_APPROVED=true` only after approval is actually received.
 
 The production deployment workflow fails closed unless both GitHub variables are present and approved. Do not bypass this gate to make the app appear live.
+
+## Additional provider-specific restrictions (reviewed 2026-11-24)
+
+The runtime policy in `market-gateway/lib/provider-paper-trading-policy.js` now distinguishes generic API access from permission to supply market data to this app's paper-trading simulator:
+
+- Kite Connect terms expressly prohibit use of live market data for virtual/mock trading apps. It is not an eligible fallback.
+- Dhan's own support guidance says paper trading with virtual funds and live market data is not supported. Its sandbox is not a live-market simulator.
+- FYERS API terms expressly prohibit using exchange data to develop paper-trading, gaming, and virtual-trading tools; they also require written consent for certain third-party copying, caching, public display and redistribution.
+- Upstox and Angel One remain approval-required, not approved. API docs establish technical endpoints only.
+- Any authorized vendor must provide a signed agreement expressly covering S-TRADE's simulator use, live/delayed data, display, redistribution, derived data, storage/cache, user limits, attribution, and term.
+
+Official sources:
+- Kite Connect terms: https://www.kite.trade/terms/
+- Dhan support on live data + virtual funds: https://dhan.co/support/platforms/dhanhq-api/can-i-test-my-trading-strategy-with-virtual-money-before-going-live/
+- Dhan sandbox clarification: https://blog.dhan.co/support/platforms/dhanhq-api/can-i-use-dhanhq-sandbox-for-paper-trading-with-virtual-money-and-live-market-data/
+- FYERS API terms: https://fyers.in/terms-and-conditions-api
+
+## Runtime enforcement
+
+A route is denied unless the provider policy allows conditional approval and the authenticated entitlement resolver returns all of:
+- `approved: true`
+- `paperTradingAllowed: true`
+- `redistributionAllowed: true`
+- a non-empty account entitlement `reference`
+- a separate non-empty written `rightsApprovalReference`
+
+The Kite, Dhan and FYERS policy entries are hard-denied. Unknown providers are unreviewed and fail closed. A fallback provider must pass the same policy independently; failure of one provider never authorizes another.
+
+## SEBI advisory on unauthorized virtual trading / gaming platforms
+
+SEBI Press Release PR No. 27/2024 dated 4 November 2024 is titled **"Advisory on unauthorized virtual trading / gaming platforms"**. It specifically refers to apps and web applications offering virtual trading, paper trading, or fantasy games to the public based on listed-company stock-price data, warns that such activities may violate the Securities Contracts (Regulation) Act, 1956 and SEBI Act, 1992, and reiterates that public investing/trading activities must be through/with registered intermediaries. It also warns that SEBI/exchange investor-protection and grievance mechanisms are unavailable for unauthorized platforms.
+
+Official SEBI press release: https://www.sebi.gov.in/sebi_data/attachdocs/may-2025/1746683724445.pdf
+
+This is a material product-level legal blocker, not merely a feed-licensing issue. Do not infer that a no-cash virtual simulator, a disclaimer, per-user broker OAuth, a delayed feed, or a provider API agreement alone resolves the advisory. Qualified Indian securities counsel must determine the product's legal status, whether any registration/association/approval is required, and whether the proposed features and distribution model are permissible. Obtain written advice and any required regulator/exchange/provider permissions before any public simulator launch.
+
+## Separate runtime release approvals
+
+The active gateway now requires two distinct deployment approvals:
+1. `MARKET_DATA_RIGHTS_APPROVED=true` plus `MARKET_DATA_RIGHTS_REFERENCE`: written provider/exchange rights for this exact product and data use.
+2. `MARKET_DATA_REGULATORY_APPROVED=true` plus `MARKET_DATA_REGULATORY_REFERENCE`: separate documented securities-law/regulatory clearance for the public paper-trading product.
+
+Both references are passed into the Cloud Run runtime and checked on the shared Upstox market-data token accessor. Missing either approval fails closed. This runtime gate is not a legal opinion and must not be populated with placeholder references.

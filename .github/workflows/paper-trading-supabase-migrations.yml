@@ -187,6 +187,12 @@ jobs:
             echo "Applying $migration"
             psql -v ON_ERROR_STOP=1 -f "$migration"
           done
+      - name: Exercise provider-account and per-user distributed quota boundaries
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/market_data_provider_quotas.sql
+      - name: Verify bounded distributed quota bucket retention and active-window safety
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/market_data_provider_quota_retention.sql
+      - name: Exercise concurrent provider quota requests across independent database sessions
+        run: bash supabase/tests/market_data_provider_quota_race.sh
       - name: Verify least-privilege Supabase market gateway service-role grants
         run: psql -v ON_ERROR_STOP=1 -f supabase/tests/market_gateway_service_role_grants.sql
       - name: Reconcile Indian-market Futures ledger cash, charges, realized P&L and margin
