@@ -38,7 +38,8 @@ Date: 2026-11-24
 - The dedicated Mock Contract workflow syntax-checks both chart modules and runs the chart integration tests.
 - On exact PR head `f7379f24258673bd844197febbf47d9f7325e0de`, the dedicated Mock Contract workflow completed successfully: shared JSON schemas/fixtures, adapter tests, chart module syntax, all five chart integration tests, and production fixture isolation passed.
 - On the same exact PR head, the Supabase/PostgreSQL migration smoke and full market-gateway regression workflow completed successfully (71 workflow steps successful; no failed steps).
-- Browser/mobile E2E remains a separate release gate and has not been run/verified in this audit.
+- Chromium browser E2E passed on the exact PR head `51e83eda2bec3aa8ba1d88b67b1e67f4d925fe12`: 1440px desktop and 390px mobile viewport; shared fixture rendering, MOCK badge, 4 instrument identities, deterministic timeframe replay, Candlestick/Line mode, 64 volume bars, five bid/ask levels, and no horizontal overflow.
+- The browser E2E job is part of the Mock Contract workflow and uses the pinned Ubuntu 24.04 runner for supported Playwright/Chromium installation.
 
 ## Supersession
 
