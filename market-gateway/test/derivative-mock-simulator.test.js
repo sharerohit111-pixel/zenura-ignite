@@ -227,7 +227,12 @@ test("F&O derivative position arithmetic rejects unsafe fill value without retur
   const quote=altered.data.quotes.find(item=>item.instrumentKey===instrument.instrumentKey);
   quote.askPricePaise=Number.MAX_SAFE_INTEGER;
   quote.askQuantity=instrument.lotSize;
-  assert.throws(()=>createDerivativeMockSimulator(altered,{now}).submit({
+  const bounded=createDerivativeMockSimulator(altered,{now});
+  const rejected=bounded.submit({
     instrumentKey:instrument.instrumentKey,side:"BUY",orderType:"MARKET",lots:1
-  }),/safe calculation limits|safe integer limits/);
+  });
+  assert.equal(rejected.status,"REJECTED");
+  assert.match(rejected.rejectionReason,/safe calculation limits|safe integer limits/);
+  assert.equal(bounded.snapshot().positions.length,0);
+  assert.equal(bounded.snapshot().orders.length,1);
 });
