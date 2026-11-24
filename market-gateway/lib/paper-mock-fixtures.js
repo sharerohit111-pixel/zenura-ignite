@@ -17,7 +17,8 @@ function createMockFixtureStore(options = {}) {
     throw new Error("MOCK_FIXTURES_DISABLED_IN_PRODUCTION");
   }
 
-  const root = options.root || path.join(__dirname, "fixtures");
+  // The shared loader lives in lib/, while fixture JSON is kept in mock/fixtures/.
+  const root = options.root || path.join(__dirname, "..", "mock", "fixtures");
   function read(name) {
     const filename = FIXTURES[name];
     if (!filename) throw new Error("UNKNOWN_MOCK_FIXTURE");
