@@ -6,6 +6,7 @@ const protobuf=require("protobufjs");
 const crypto=require("node:crypto");
 const path=require("node:path");
 const {createClient}=require("@supabase/supabase-js");
+const {createHttpTelemetry}=require("./lib/http-telemetry");
 const {createSupabaseRuntime,readBearerToken}=require("./lib/supabase-runtime");
 const {downloadInstrumentMaster}=require("./lib/instrument-master-download");
 const {validateUpstoxFeedUrl}=require("./lib/upstox-feed-url");
@@ -70,12 +71,17 @@ app.use((req,res,next)=>{
   res.set("X-Request-Id",requestId);
   next();
 });
+const httpTelemetry=createHttpTelemetry({
+  logger:entry=>console.log(JSON.stringify(entry)),
+  projectId:process.env.GOOGLE_CLOUD_PROJECT||process.env.GCLOUD_PROJECT||null
+});
+app.use(httpTelemetry.middleware);
 app.use((req,res,next)=>{
   const origin=req.get("origin");
   if(origin&&ALLOWED_ORIGINS.includes(origin)){
     res.set("Access-Control-Allow-Origin",origin);res.set("Vary","Origin");
-    res.set("Access-Control-Allow-Headers","Authorization, Content-Type, Accept");
-    res.set("Access-Control-Expose-Headers","Retry-After, X-Request-Id");
+    res.set("Access-Control-Allow-Headers","Authorization, Content-Type, Accept, traceparent");
+    res.set("Access-Control-Expose-Headers","Retry-After, X-Request-Id, X-Trace-Id");
     res.set("Access-Control-Allow-Methods","GET, POST, PUT, DELETE, OPTIONS");
   }
   if(req.method==="OPTIONS")return res.sendStatus(origin&&ALLOWED_ORIGINS.includes(origin)?204:403);
