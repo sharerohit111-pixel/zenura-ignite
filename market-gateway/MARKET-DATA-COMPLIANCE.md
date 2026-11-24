@@ -64,3 +64,19 @@ A route is denied unless the provider policy allows conditional approval and the
 - a separate non-empty written `rightsApprovalReference`
 
 The Kite, Dhan and FYERS policy entries are hard-denied. Unknown providers are unreviewed and fail closed. A fallback provider must pass the same policy independently; failure of one provider never authorizes another.
+
+## SEBI advisory on unauthorized virtual trading / gaming platforms
+
+SEBI Press Release PR No. 27/2024 dated 4 November 2024 is titled **"Advisory on unauthorized virtual trading / gaming platforms"**. It specifically refers to apps and web applications offering virtual trading, paper trading, or fantasy games to the public based on listed-company stock-price data, warns that such activities may violate the Securities Contracts (Regulation) Act, 1956 and SEBI Act, 1992, and reiterates that public investing/trading activities must be through/with registered intermediaries. It also warns that SEBI/exchange investor-protection and grievance mechanisms are unavailable for unauthorized platforms.
+
+Official SEBI press release: https://www.sebi.gov.in/sebi_data/attachdocs/may-2025/1746683724445.pdf
+
+This is a material product-level legal blocker, not merely a feed-licensing issue. Do not infer that a no-cash virtual simulator, a disclaimer, per-user broker OAuth, a delayed feed, or a provider API agreement alone resolves the advisory. Qualified Indian securities counsel must determine the product's legal status, whether any registration/association/approval is required, and whether the proposed features and distribution model are permissible. Obtain written advice and any required regulator/exchange/provider permissions before any public simulator launch.
+
+## Separate runtime release approvals
+
+The active gateway now requires two distinct deployment approvals:
+1. `MARKET_DATA_RIGHTS_APPROVED=true` plus `MARKET_DATA_RIGHTS_REFERENCE`: written provider/exchange rights for this exact product and data use.
+2. `MARKET_DATA_REGULATORY_APPROVED=true` plus `MARKET_DATA_REGULATORY_REFERENCE`: separate documented securities-law/regulatory clearance for the public paper-trading product.
+
+Both references are passed into the Cloud Run runtime and checked on the shared Upstox market-data token accessor. Missing either approval fails closed. This runtime gate is not a legal opinion and must not be populated with placeholder references.
