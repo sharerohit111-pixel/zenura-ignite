@@ -91,11 +91,11 @@ app.use((req,res,next)=>{
 app.use(express.json({limit:"32kb"}));
 app.use((error,req,res,next)=>{
   if(error?.type==="entity.too.large"){
-    return res.status(413).json({error:"Request body exceeds the 32 KB limit.",requestId:req.requestId||null});
+    return res.status(413).json({error:"Request body exceeds the 32 KB limit.",code:publicErrorCode(413),requestId:req.requestId||null});
   }
   if(error instanceof SyntaxError&&error.status===400&&Object.prototype.hasOwnProperty.call(error,"body")){
     console.error(JSON.stringify({event:"api_request_failed",requestId:req.requestId||null,status:400,method:req.method||null,path:req.path||null,errorName:"SyntaxError"}));
-    return res.status(400).json({error:"Request body must contain valid JSON.",requestId:req.requestId||null});
+    return res.status(400).json({error:"Request body must contain valid JSON.",code:publicErrorCode(400),requestId:req.requestId||null});
   }
   return next(error);
 });
