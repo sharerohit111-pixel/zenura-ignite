@@ -1,6 +1,7 @@
 "use strict";
 
 const crypto=require("node:crypto");
+const {createLeaseHeartbeat}=require("./lease-heartbeat");
 const {normalizeWorkerCursor,groupOrdersByUser}=require("./paper-limit-worker");
 const {loadVerifiedExchangeSession,marketDateString}=require("./exchange-session-calendar");
 const {marketClockParts}=require("./intraday-limit-policy");
@@ -8,16 +9,22 @@ const {normalizeTickSizePaise,normalizeExpiryDate}=require("./derivative-contrac
 const {calculateFuturesTradeCharges}=require("./trading-charges");
 const {evaluateUpstoxRestDerivativeLimit}=require("./upstox-rest-executable-quote");
 
-function isVerifiedSessionOpen(nowMs,session){
-  if(!Number.isSafeInteger(nowMs)||nowMs<1||!session||session.isTradingDay!==true
-     ||!["NSE","BSE"].includes(session.exchange)
-     ||!Number.isInteger(session.openMinute)||!Number.isInteger(session.closeMinute)
-     ||session.openMinute<0||session.closeMinute>1440
-     ||session.openMinute>=session.closeMinute)return false;
+function futuresSessionState(nowMs,session){
+  if(!Number.isSafeInteger(nowMs)||nowMs<1||!session
+     ||session.exchange!=="NSE"||!Number.isInteger(session.openMinute)
+     ||!Number.isInteger(session.closeMinute)||session.openMinute<0
+     ||session.closeMinute>1440||session.openMinute>=session.closeMinute)return "MISSING";
   const clock=marketClockParts(nowMs);
   const date=clock.year+"-"+String(clock.month).padStart(2,"0")+"-"+String(clock.day).padStart(2,"0");
+  if(session.sessionDate!==date)return "MISSING";
+  if(session.isTradingDay!==true)return "NOT_TRADING_DAY";
   const minute=clock.hour*60+clock.minute;
-  return session.sessionDate===date&&minute>=session.openMinute&&minute<session.closeMinute;
+  if(minute<session.openMinute)return "BEFORE_OPEN";
+  if(minute>=session.closeMinute)return "CLOSED";
+  return "OPEN";
+}
+function isVerifiedSessionOpen(nowMs,session){
+  return futuresSessionState(nowMs,session)==="OPEN";
 }
 function isContractExpired(order,nowMs){
   const expiry=normalizeExpiryDate(order?.expiry);
@@ -71,7 +78,8 @@ function cumulativeFillCharges({fills,grossPaise,exchange,side}){
 
 function createPaperFuturesLimitWorker({
   serviceDb,ensureInstrumentCache,getUpstoxAccessToken,fetchProvider,
-  readProviderJson,loadSession=loadVerifiedExchangeSession,now=Date.now
+  readProviderJson,loadSession=loadVerifiedExchangeSession,now=Date.now,
+  scheduleHeartbeat=setInterval,cancelHeartbeat=clearInterval
 }){
   if(!serviceDb||typeof serviceDb.rpc!=="function"||typeof serviceDb.from!=="function"
      ||typeof ensureInstrumentCache!=="function"||typeof getUpstoxAccessToken!=="function"
@@ -92,16 +100,31 @@ function createPaperFuturesLimitWorker({
     if(lease?.data!==true)
       return {locked:true,scanned:0,filled:0,partial:0,notEligible:0,failed:0,expired:0};
 
-    const summary={locked:false,scanned:0,filled:0,partial:0,notEligible:0,failed:0,expired:0};
+    const summary={locked:false,scanned:0,filled:0,partial:0,notEligible:0,failed:0,expired:0,leaseLost:false};
+    const heartbeat=createLeaseHeartbeat({
+      renew:async()=>{
+        const result=await serviceDb.rpc("renew_paper_market_worker_lease",{
+          p_state_key:"paper_futures_limit_orders",p_lease_token:leaseToken,
+          p_now_ms:now(),p_ttl_ms:240000
+        });
+        if(result?.error)throw new Error("Futures LIMIT worker lease renewal failed.");
+        return result?.data===true;
+      },
+      onLost:()=>{summary.leaseLost=true;},
+      onError:()=>{summary.leaseLost=true;},
+      intervalMs:60000,schedule:scheduleHeartbeat,cancel:cancelHeartbeat
+    });
     try{
       const instruments=await ensureInstrumentCache();
       if(!Array.isArray(instruments)||!instruments.length)
         throw new Error("Official Upstox instrument master is unavailable for Futures LIMIT worker.");
+      if(summary.leaseLost)return summary;
 
       const stateResult=await serviceDb.from("paper_market_worker_state")
         .select("cursor_created_at,cursor_order_id")
         .eq("state_key","paper_futures_limit_orders").maybeSingle();
       if(stateResult.error)throw new Error("Futures LIMIT worker cursor could not be read.");
+      if(summary.leaseLost)return summary;
       let cursor=normalizeWorkerCursor(stateResult.data);
       const loadBatch=position=>{
         let query=serviceDb.from("paper_futures_orders")
@@ -116,6 +139,7 @@ function createPaperFuturesLimitWorker({
       let batch=await loadBatch(cursor);
       if(batch.error)throw new Error("Pending Futures LIMIT orders could not be scanned.");
       if(!(batch.data||[]).length&&(cursor.createdAt||cursor.orderId)){
+        if(summary.leaseLost)return summary;
         cursor={createdAt:null,orderId:null};
         const reset=await serviceDb.from("paper_market_worker_state")
           .update({cursor_created_at:null,cursor_order_id:null,updated_at:new Date(now()).toISOString()})
@@ -141,15 +165,20 @@ function createPaperFuturesLimitWorker({
           const eligible=[];
           for(const order of userOrders){
             const session=await getSession(order.exchange,currentNow);
-            const sessionOpen=isVerifiedSessionOpen(currentNow,session);
+            if(summary.leaseLost){summary.notEligible++;continue;}
+            const sessionState=futuresSessionState(currentNow,session);
             const expiredByTime=Date.parse(order.expires_at)<=currentNow;
-            if(expiredByTime||isContractExpired(order,currentNow)||!sessionOpen){
+            if(expiredByTime||isContractExpired(order,currentNow)||sessionState==="CLOSED"){
               const expired=await serviceDb.rpc("expire_paper_futures_limit_order",{p_order_id:order.order_id});
               if(expired?.error){
                 if(["22023","23514","P0002"].includes(expired.error.code))summary.notEligible++;
                 else{summary.failed++;console.warn("Futures LIMIT expiry RPC failed",{orderId:order.order_id,code:expired.error.code||"unknown"});}
               }else if(expired.data?.status==="EXPIRED"&&!expired.data.idempotent_replay)summary.expired++;
               else summary.notEligible++;
+              continue;
+            }
+            if(sessionState!=="OPEN"){
+              summary.notEligible++;
               continue;
             }
             const instrument=instruments.find(item=>item?.instrument_key===order.instrument_key);
@@ -170,6 +199,10 @@ function createPaperFuturesLimitWorker({
           const payload=await readProviderJson(response);
           if(!response.ok)throw new Error("Upstox V3 Futures quote request failed.");
           for(const {order} of eligible){
+            if(summary.leaseLost){
+              summary.notEligible++;
+              continue;
+            }
             const nowMs=now();
             let decision;
             try{
@@ -207,6 +240,10 @@ function createPaperFuturesLimitWorker({
             const chargesPaise=cumulativeFillCharges({
               fills,grossPaise,exchange:order.exchange,side:order.side
             });
+            if(summary.leaseLost){
+              summary.notEligible++;
+              continue;
+            }
             const result=await serviceDb.rpc("execute_paper_futures_limit_fill",{
               p_order_id:order.order_id,p_execution_id:executionId,
               p_fill_sequence:fillSequence,p_fill_quantity:decision.fillQuantity,
@@ -232,6 +269,7 @@ function createPaperFuturesLimitWorker({
       for(let offset=0;offset<groups.length;offset+=5)
         await Promise.all(groups.slice(offset,offset+5).map(processUserOrders));
 
+      if(summary.leaseLost||summary.failed>0)return summary;
       if(orders.length){
         const last=orders[orders.length-1];
         const saved=await serviceDb.from("paper_market_worker_state")
@@ -246,6 +284,7 @@ function createPaperFuturesLimitWorker({
       }
       return summary;
     }finally{
+      heartbeat.stop();
       const released=await serviceDb.rpc("release_paper_market_worker_lease",{
         p_state_key:"paper_futures_limit_orders",p_lease_token:leaseToken,p_now_ms:now()
       });
@@ -255,5 +294,5 @@ function createPaperFuturesLimitWorker({
 }
 
 module.exports={
-  createPaperFuturesLimitWorker,isContractExpired,isValidNseFuture,cumulativeFillCharges,isVerifiedSessionOpen
+  createPaperFuturesLimitWorker,isContractExpired,isValidNseFuture,cumulativeFillCharges,isVerifiedSessionOpen,futuresSessionState
 };

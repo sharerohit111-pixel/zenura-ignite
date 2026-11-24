@@ -193,6 +193,12 @@ jobs:
         run: psql -v ON_ERROR_STOP=1 -f supabase/tests/futures_limit_atomic_fill.sql
       - name: Exercise concurrent Futures LIMIT fill, cancel and duplicate execution races
         run: bash supabase/tests/futures_limit_fill_cancel_race.sh
+      - name: Verify isolated Futures LIMIT worker lease ownership and grants
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/futures_limit_worker_lease.sql
+      - name: Verify owner-bound paper market worker lease renewal and expiry
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/paper_market_worker_lease_renewal.sql
+      - name: Exercise two-connection paper worker lease renewal and reacquisition races
+        run: bash supabase/tests/paper_market_worker_lease_renewal_race.sh
       - name: Reconcile Indian-market long Options ledger cash, charges and realized P&L
         run: psql -v ON_ERROR_STOP=1 -f supabase/tests/long_option_ledger_reconciliation.sql
       - name: Verify F&O LIMIT schema remains fail-closed until lifecycle release
