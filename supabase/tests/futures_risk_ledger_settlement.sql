@@ -46,10 +46,10 @@ begin
     into v_cash,v_margin,v_realized from public.paper_accounts
    where user_id='abababab-abab-4bab-8bab-abababababab';
   select average_price_paise,net_quantity,realized_pnl_paise
-    into v_avg,v_qty,v_margin from public.paper_futures_positions
+    into v_avg,v_qty,v_realized from public.paper_futures_positions
    where user_id='abababab-abab-4bab-8bab-abababababab'
      and instrument_key='NSE_FO|RISK_TEST';
-  if v_cash<>100025000 or v_margin<>25 or v_avg<>11000 or v_qty<>25 then
+  if v_cash<>100025000 or v_realized<>25000 or v_avg<>11000 or v_qty<>25 then
     raise exception 'Daily MTM cash/basis/quantity reconciliation failed';
   end if;
 
