@@ -185,7 +185,7 @@ test("partially filled Options SELL LIMIT retains only its remaining close reser
   simulator.submit({ instrumentKey: instrument.instrumentKey, side: "BUY", orderType: "MARKET", lots: 2 });
   const sell = simulator.submit({
     instrumentKey: instrument.instrumentKey, side: "SELL", orderType: "LIMIT",
-    lots: 2, limitPricePaise: 15000
+    lots: 2, limitPricePaise: 9000
   });
   const result = simulator.processLimitFills();
   assert.equal(result.partial, 1);
