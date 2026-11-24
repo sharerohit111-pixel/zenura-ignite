@@ -49,6 +49,15 @@ test("adapter returns detached deeply frozen view data and preserves unreconcile
   assert.equal(model.account.ledgerReconciled, false);
 });
 
+test("adapter rejects non-synthetic account IDs and personal profile fields", async () => {
+  const invalidId = await allFixtures();
+  invalidId.account.data.accountId = "customer-123";
+  assert.throws(() => createPaperDemoViewModel(invalidId,{enabled:true}),/INVALID_MOCK_ACCOUNT_IDENTITY/);
+  const personal = await allFixtures();
+  personal.account.data.email = "private@example.invalid";
+  assert.throws(() => createPaperDemoViewModel(personal,{enabled:true}),/INVALID_MOCK_ACCOUNT_IDENTITY/);
+});
+
 test("adapter rejects envelopes outside the canonical synthetic source contract", async () => {
   const fixtures = await allFixtures();
   delete fixtures.market.meta.source;
