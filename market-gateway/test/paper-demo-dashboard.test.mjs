@@ -24,7 +24,10 @@ test("demo route loads only shared synthetic fixtures with explicit opt-in",asyn
 test("Demo screens disclose synthetic data and isolate local Equity execution from Wallet",async()=>{
  const html=await read("demo.html"),js=await read("demo.js"),panel=await read("demo-derivative-panel.mjs");
  assert.match(html,/DEMO DATA · SYNTHETIC FIXTURES/);
- assert.match(js,/READ ONLY · MOCK/);
+ assert.match(js,/MOCK · LOCAL DEMO/);
+ assert.match(js,/local Equity\/F&O simulation only/);
+ assert.match(js,/Order execution","Local simulation only/);
+ assert.doesNotMatch(js,/order actions disabled/);
  assert.match(js,/ledgerReconciled/);
  assert.match(js,/mountEquityDemo\(content\)/);
  const equityPanel=await read("demo-equity-panel.mjs");
