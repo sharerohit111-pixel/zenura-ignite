@@ -104,7 +104,9 @@ declare
   v_net bigint;
   v_realized bigint;
   v_cash bigint;
+  v_cash_numeric numeric;
   v_account_realized bigint;
+  v_account_realized_numeric numeric;
 begin
   if p_user_id is null
      or p_settlement_id is null or p_settlement_id !~ '^[a-f0-9]{64}$'
@@ -114,8 +116,8 @@ begin
      or p_underlying_type is distinct from 'INDEX'
      or p_settlement_type is distinct from 'CASH_SETTLED'
      or p_expiry is null
-     or p_strike_price_paise is null or p_strike_price_paise<=0
-     or p_settlement_price_paise is null or p_settlement_price_paise<0
+     or p_strike_price_paise is null or p_strike_price_paise<=0 or p_strike_price_paise>9007199254740991
+     or p_settlement_price_paise is null or p_settlement_price_paise<0 or p_settlement_price_paise>9007199254740991
      or p_settlement_source is null
      or lower(p_settlement_source) !~ '^https://([a-z0-9-]+[.])*nseindia[.]com/'
      or p_settlement_source_content is null
@@ -184,7 +186,7 @@ begin
      or v_position.trading_symbol is distinct from p_trading_symbol
      or v_position.net_quantity<=0
      or v_position.reserved_quantity<>0
-     or v_position.cost_basis_paise<=0 then
+     or v_position.cost_basis_paise<=0 or v_position.cost_basis_paise>9007199254740991 then
     raise exception 'Expiry position metadata or unreserved long quantity does not match.'
       using errcode='23514';
   end if;
@@ -217,13 +219,17 @@ begin
     raise exception 'Expiry STT exceeds the gross intrinsic payout.' using errcode='23514';
   end if;
   v_realized:=v_net-v_position.cost_basis_paise;
-  v_cash:=v_account.cash_paise+v_net;
-  v_account_realized:=v_account.realized_pnl_paise+v_realized;
-  if abs(v_cash::numeric)>9007199254740991
-     or abs(v_account_realized::numeric)>9007199254740991
-     or v_account.reserved_cash_paise+v_account.reserved_margin_paise>v_cash then
-    raise exception 'Expiry settlement would violate account cash or reservation invariants.'
+  v_cash_numeric:=v_account.cash_paise::numeric+v_net::numeric;
+  v_account_realized_numeric:=v_account.realized_pnl_paise::numeric+v_realized::numeric;
+  if abs(v_cash_numeric)>9007199254740991
+     or abs(v_account_realized_numeric)>9007199254740991 then
+    raise exception 'Expiry settlement would exceed safe account cash or realized-P&L limits.'
       using errcode='23514';
+  end if;
+  v_cash:=v_cash_numeric::bigint;
+  v_account_realized:=v_account_realized_numeric::bigint;
+  if v_account.reserved_cash_paise::numeric+v_account.reserved_margin_paise::numeric>v_cash_numeric then
+    raise exception 'Expiry settlement would violate account reservation invariants.' using errcode='23514';
   end if;
 
   insert into public.paper_option_expiry_settlements(
