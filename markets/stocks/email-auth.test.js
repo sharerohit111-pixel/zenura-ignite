@@ -23,6 +23,13 @@ test("password recovery uses Supabase and avoids account enumeration in the succ
   assert.match(source, /If this email belongs to an account, a password reset link has been sent\./);
 });
 
+test("password recovery completes only after a PASSWORD_RECOVERY event and updates the Supabase password", () => {
+  assert.match(source, /event === "PASSWORD_RECOVERY" && session\?\.user/);
+  assert.match(source, /supabase\.auth\.updateUser\(\{ password: nextPassword \}\)/);
+  assert.match(source, /Choose a new password between 8 and 128 characters\./);
+  assert.match(source, /saveNewPasswordButton\.hidden = false/);
+});
+
 test("logout and auth-state UI are driven by Supabase session state", () => {
   assert.match(source, /supabase\.auth\.signOut\(\)/);
   assert.match(source, /supabase\.auth\.onAuthStateChange/);
