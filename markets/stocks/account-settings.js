@@ -67,6 +67,7 @@ if (host && !document.getElementById("s-trade-account")) {
     return new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 2 }).format(value / 100);
   }
   function setBusy(ids, busy) { for (const id of ids) $(id).disabled = busy; }
+  function isCurrent(userId, sequence) { return currentUserId === userId && authSequence === sequence; }
   function clearWallet() {
     for (const id of ["s-trade-wallet-start","s-trade-wallet-cash","s-trade-wallet-blocked","s-trade-wallet-available"]) $(id).textContent = "—";
   }
@@ -150,59 +151,68 @@ if (host && !document.getElementById("s-trade-account")) {
   });
   $("s-trade-update-email").addEventListener("click", async () => {
     if (!currentUserId) return;
+    const userId = currentUserId, sequence = authSequence;
     const email = $("s-trade-new-email").value.trim();
     if (!email || !$("s-trade-new-email").checkValidity()) { status.textContent = "Enter a valid new email address."; return; }
     $("s-trade-update-email").disabled = true;
     try {
       const { data, error } = await supabase.auth.updateUser({ email });
       if (error) throw error;
-      if (data.user?.id !== currentUserId) throw new Error("Account changed. Please sign in again.");
+      if (!isCurrent(userId, sequence)) return;
+      if (data.user?.id !== userId) throw new Error("Account changed. Please sign in again.");
       $("s-trade-new-email").value = "";
       status.textContent = "Email change requested. Complete the confirmation steps sent by Supabase before the new address becomes active.";
-    } catch (error) { status.textContent = error.message || "Email change could not be requested."; }
-    finally { $("s-trade-update-email").disabled = false; }
+    } catch (error) { if (isCurrent(userId, sequence)) status.textContent = error.message || "Email change could not be requested."; }
+    finally { if (isCurrent(userId, sequence)) $("s-trade-update-email").disabled = false; }
   });
   $("s-trade-change-password").addEventListener("click", async () => {
     if (!currentUserId) return;
+    const userId = currentUserId, sequence = authSequence;
     const password = $("s-trade-new-password").value;
     if (password.length < 8 || password.length > 128) { status.textContent = "Choose a password between 8 and 128 characters."; return; }
     $("s-trade-change-password").disabled = true;
     try {
       const { data, error } = await supabase.auth.updateUser({ password });
       if (error) throw error;
-      if (data.user?.id !== currentUserId) throw new Error("Account changed. Please sign in again.");
+      if (!isCurrent(userId, sequence)) return;
+      if (data.user?.id !== userId) throw new Error("Account changed. Please sign in again.");
       $("s-trade-new-password").value = "";
       status.textContent = "Password updated successfully.";
-    } catch (error) { status.textContent = error.message || "Password could not be updated."; }
-    finally { $("s-trade-change-password").disabled = false; }
+    } catch (error) { if (isCurrent(userId, sequence)) status.textContent = error.message || "Password could not be updated."; }
+    finally { if (isCurrent(userId, sequence)) $("s-trade-change-password").disabled = false; }
   });
 
   $("s-trade-save-profile").addEventListener("click", async () => {
     if (!currentUserId) return;
+    const userId = currentUserId, sequence = authSequence;
     const displayName = $("s-trade-display-name").value.trim();
     if (displayName.length > 80) { status.textContent = "Display name must be 80 characters or fewer."; return; }
     $("s-trade-save-profile").disabled = true;
     try {
       const { data, error } = await supabase.auth.updateUser({ data: { display_name: displayName } });
       if (error) throw error;
-      if (data.user?.id !== currentUserId) throw new Error("Account changed. Please sign in again.");
+      if (!isCurrent(userId, sequence)) return;
+      if (data.user?.id !== userId) throw new Error("Account changed. Please sign in again.");
       status.textContent = "Profile saved.";
-    } catch (error) { status.textContent = error.message || "Profile could not be saved."; }
-    finally { $("s-trade-save-profile").disabled = false; }
+    } catch (error) { if (isCurrent(userId, sequence)) status.textContent = error.message || "Profile could not be saved."; }
+    finally { if (isCurrent(userId, sequence)) $("s-trade-save-profile").disabled = false; }
   });
   $("s-trade-refresh-session").addEventListener("click", async () => {
+    const userId = currentUserId, sequence = authSequence;
+    if (!userId) return;
     $("s-trade-refresh-session").disabled = true;
     try {
       const { data, error } = await supabase.auth.refreshSession();
       if (error) throw error;
-      await syncAuth(data.session);
-    } catch (error) { status.textContent = error.message || "Session refresh failed."; }
-    finally { $("s-trade-refresh-session").disabled = false; }
+      if (isCurrent(userId, sequence)) await syncAuth(data.session);
+    } catch (error) { if (isCurrent(userId, sequence)) status.textContent = error.message || "Session refresh failed."; }
+    finally { if (isCurrent(userId, sequence)) $("s-trade-refresh-session").disabled = false; }
   });
   $("s-trade-refresh-wallet").addEventListener("click", async () => {
     if (!currentUserId) return;
-    try { await loadWallet(currentUserId); status.textContent = "Wallet refreshed."; }
-    catch (error) { status.textContent = error.message || "Wallet refresh failed."; }
+    const userId = currentUserId, sequence = authSequence;
+    try { await loadWallet(userId, sequence); if (isCurrent(userId, sequence)) status.textContent = "Wallet refreshed."; }
+    catch (error) { if (isCurrent(userId, sequence)) status.textContent = error.message || "Wallet refresh failed."; }
   });
   $("s-trade-sign-out").addEventListener("click", async () => {
     $("s-trade-sign-out").disabled = true;
