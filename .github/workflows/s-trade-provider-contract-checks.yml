@@ -10,6 +10,8 @@ on:
       - "market-gateway/lib/provider-rate-limit.js"
       - "market-gateway/lib/provider-health-registry.js"
       - "market-gateway/lib/distributed-provider-rate-limit.js"
+      - "market-gateway/lib/instrument-identity.js"
+      - "market-gateway/test/instrument-identity.test.js"
       - "market-gateway/test/provider-contract.test.js"
       - "market-gateway/test/market-data-router.test.js"
       - "market-gateway/test/market-data-shapes.test.js"
@@ -58,5 +60,6 @@ jobs:
           node --check market-gateway/lib/provider-rate-limit.js
           node --check market-gateway/lib/provider-health-registry.js
           node --check market-gateway/lib/distributed-provider-rate-limit.js
+          node --check market-gateway/lib/instrument-identity.js
       - name: Run provider contract, routing, outage, health and distributed quota tests
-        run: node --test market-gateway/test/provider-contract.test.js market-gateway/test/market-data-router.test.js market-gateway/test/market-data-shapes.test.js market-gateway/test/provider-health-registry.test.js market-gateway/test/distributed-provider-rate-limit.test.js
+        run: node --test market-gateway/test/provider-contract.test.js market-gateway/test/market-data-router.test.js market-gateway/test/market-data-shapes.test.js market-gateway/test/provider-health-registry.test.js market-gateway/test/distributed-provider-rate-limit.test.js market-gateway/test/instrument-identity.test.js
