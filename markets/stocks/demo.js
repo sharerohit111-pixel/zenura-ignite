@@ -15,7 +15,7 @@ const el=(tag,cls,text)=>{const n=document.createElement(tag);if(cls)n.className
 const money=paise=>"₹"+(Number(paise||0)/100).toLocaleString("en-IN",{minimumFractionDigits:2,maximumFractionDigits:2});
 const card=(label,value,detail)=>{const c=el("article","card");c.append(el("h3","",label),el("div","metric",value),el("div","sub",detail||""));return c;};
 const grid=(...items)=>{const g=el("div","grid");items.forEach(x=>g.append(x));return g;};
-const table=(headers,rows)=>{const wrap=el("div","table-wrap"),t=el("table"),head=el("thead"),hr=el("tr"),body=el("tbody");wrap.tabIndex=0;wrap.setAttribute("role","region");wrap.setAttribute("aria-label","Scrollable data table");headers.forEach(h=>hr.append(el("th","",h)));head.append(hr);rows.forEach(row=>{const tr=el("tr");row.forEach(v=>tr.append(el("td","",v??"—")));body.append(tr);});if(!rows.length){const tr=el("tr"),td=el("td","empty","No record exists in the current canonical fixture.");td.colSpan=headers.length;tr.append(td);body.append(tr);}t.append(head,body);wrap.append(t);return wrap;};
+const table=(headers,rows)=>{const wrap=el("div","table-wrap"),t=el("table"),head=el("thead"),hr=el("tr"),body=el("tbody");wrap.tabIndex=0;wrap.setAttribute("role","region");wrap.setAttribute("aria-label","Scrollable data table");headers.forEach(h=>{const th=el("th","",h);th.scope="col";hr.append(th);});head.append(hr);rows.forEach(row=>{const tr=el("tr");row.forEach(v=>tr.append(el("td","",v??"—")));body.append(tr);});if(!rows.length){const tr=el("tr"),td=el("td","empty","No record exists in the current canonical fixture.");td.colSpan=headers.length;tr.append(td);body.append(tr);}t.append(head,body);wrap.append(t);return wrap;};
 const notice=text=>el("div","notice",text);
 function header(name,description){const row=el("div","screen-title"),left=el("div");left.append(el("h2","",titles[name]||name),el("p","",description));row.append(left,el("span","read-only","MOCK · LOCAL DEMO"));return row;}
 function quoteRows(){return model.market.instruments.map(x=>[x.symbol,x.exchange,x.assetClass,money(x.lastPricePaise),(x.changePaise>=0?"+":"")+money(x.changePaise),x.volume,x.timestamp]);}
@@ -227,7 +227,49 @@ function render(name){
   content.append(notice(model.meta.disclaimer));
  }
 }
-nav.addEventListener("click",event=>{const button=event.target.closest("button[data-screen]");if(!button||!model)return;nav.querySelectorAll("button").forEach(x=>x.classList.toggle("active",x===button));render(button.dataset.screen);});
+nav.addEventListener("click",event=>{const button=event.target.closest("button[data-screen]");if(!button||!model)return;nav.querySelectorAll("button[data-screen]").forEach(x=>{const active=x===button;x.classList.toggle("active",active);if(active)x.setAttribute("aria-current","page");else x.removeAttribute("aria-current");});render(button.dataset.screen);content.setAttribute("aria-busy","false");});
+const translations={
+ "Home":"होम","Market":"बाज़ार","Watchlist":"वॉचलिस्ट","Charts / Depth":"चार्ट / डेप्थ","Equity":"इक्विटी","Futures":"फ्यूचर्स","Options":"ऑप्शंस","Orders":"ऑर्डर","Trade History":"ट्रेड इतिहास","Portfolio":"पोर्टफोलियो","Positions":"पोज़िशन","Holdings":"होल्डिंग्स","Wallet":"वर्चुअल वॉलेट","Profile":"प्रोफ़ाइल","Settings":"सेटिंग्स",
+ "Home Overview":"होम अवलोकन","Market Snapshot":"बाज़ार स्नैपशॉट","Watchlists":"वॉचलिस्ट","Charts & Depth":"चार्ट और डेप्थ","Equity Paper Trading":"इक्विटी पेपर ट्रेडिंग","Futures Paper Trading":"फ्यूचर्स पेपर ट्रेडिंग","Options Paper Trading":"ऑप्शंस पेपर ट्रेडिंग","Virtual Wallet":"वर्चुअल वॉलेट","Demo Profile":"डेमो प्रोफ़ाइल",
+ "Search":"खोजें","Exchange":"एक्सचेंज","Asset class":"एसेट श्रेणी","Underlying":"अंडरलाइंग","Expiry":"एक्सपायरी","Strike":"स्ट्राइक","Option side":"ऑप्शन साइड","All exchanges":"सभी एक्सचेंज","All underlyings":"सभी अंडरलाइंग","All strikes":"सभी स्ट्राइक","Search MOCK symbol or underlying":"मॉक सिंबल या अंडरलाइंग खोजें","Search Futures contract":"फ्यूचर्स कॉन्ट्रैक्ट खोजें","Search option symbol":"ऑप्शन सिंबल खोजें","DEMO INSTRUMENT":"डेमो इंस्ट्रूमेंट","TIMEFRAME":"समयावधि","STYLE":"शैली","CANDLESTICK":"कैंडलस्टिक","LINE":"लाइन","Fixture Bid / Ask Depth":"फ़िक्स्चर बिड / आस्क डेप्थ","BIDS":"बिड","ASKS":"आस्क","QTY":"मात्रा","All instruments":"सभी इंस्ट्रूमेंट","All expiries":"सभी एक्सपायरी","CE + PE":"CE + PE","CE only":"केवल CE","PE only":"केवल PE",
+ "Side":"साइड","Order type":"ऑर्डर प्रकार","Product":"प्रोडक्ट","Quantity (shares)":"मात्रा (शेयर)","LIMIT price (₹)":"लिमिट मूल्य (₹)","Pending order to manage":"मैनेज करने के लिए पेंडिंग ऑर्डर","PLACE DEMO ORDER":"डेमो ऑर्डर दें","SIMULATE NEXT FILL":"अगला डेमो फिल","MATCH MARKETABLE DEPTH":"मार्केटेबल डेप्थ मैच करें","CANCEL REMAINDER":"बाकी ऑर्डर रद्द करें",
+ "DEMO DATA · SYNTHETIC FIXTURES":"डेमो डेटा · सिंथेटिक फ़िक्स्चर","DEMO · LOCAL DEMO":"डेमो · लोकल डेमो","MOCK · LOCAL DEMO":"मॉक · लोकल डेमो","DEMO DATA · MOCK · SYNTHETIC ONLY":"डेमो डेटा · मॉक · केवल सिंथेटिक","No record exists in the current canonical fixture.":"मौजूदा कैनोनिकल फ़िक्स्चर में कोई रिकॉर्ड नहीं है।","This demo watchlist is empty.":"यह डेमो वॉचलिस्ट खाली है।",
+ "Starting capital":"प्रारंभिक पूंजी","Available funds":"उपलब्ध राशि","Blocked funds":"ब्लॉक राशि","Cash balance":"नकद शेष","Realized P&L":"रियलाइज़्ड P&L","Unrealized P&L":"अनरियलाइज़्ड P&L","Records":"रिकॉर्ड","Filled":"भरे गए","Pending":"पेंडिंग","Cancelled":"रद्द",
+ "SYMBOL":"सिंबल","EXCHANGE":"एक्सचेंज","TYPE":"प्रकार","MOCK PRICE":"मॉक मूल्य","UP":"ऊपर","DOWN":"नीचे","REMOVE":"हटाएँ","CONTRACT":"कॉन्ट्रैक्ट","LOT SIZE":"लॉट साइज","BID":"बिड","ASK":"आस्क","STRIKE":"स्ट्राइक","INSTRUMENT":"इंस्ट्रूमेंट","QUANTITY":"मात्रा","AVERAGE PRICE":"औसत मूल्य","INVESTED VALUE":"निवेश राशि","STATUS":"स्थिति",
+ "Switch interface language to Hindi":"इंटरफ़ेस की भाषा अंग्रेज़ी करें","Switch interface language to English":"इंटरफ़ेस की भाषा हिंदी करें"
+};
+const languageToggle=document.getElementById("language-toggle");
+let currentLanguage="en";
+const originalText=new WeakMap();
+function translateTextNode(node){
+ if(node.nodeType!==Node.TEXT_NODE||!node.parentElement)return;
+ if(!originalText.has(node))originalText.set(node,node.nodeValue);
+ else {
+  const previous=originalText.get(node).trim(), current=node.nodeValue.trim(), previousHindi=translations[previous];
+  if(current!==previous && !(current===previousHindi && currentLanguage==="hi"))originalText.set(node,node.nodeValue);
+ }
+ const source=originalText.get(node).trim();
+ if(!source)return;
+ const translated=currentLanguage==="hi"?(translations[source]||source):source;
+ if(node.nodeValue!==translated)node.nodeValue=translated;
+}
+function applyLanguage(){
+ document.documentElement.lang=currentLanguage==="hi"?"hi":"en";
+ languageToggle.textContent=currentLanguage==="hi"?"English":"हिन्दी";
+ languageToggle.setAttribute("aria-pressed",String(currentLanguage==="hi"));
+ languageToggle.setAttribute("aria-label",currentLanguage==="hi"?"Switch interface language to English":"Switch interface language to Hindi");
+ const walker=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT);
+ while(walker.nextNode())translateTextNode(walker.currentNode);
+}
+languageToggle.addEventListener("click",()=>{currentLanguage=currentLanguage==="en"?"hi":"en";applyLanguage();});
+const languageObserver=new MutationObserver(records=>records.forEach(record=>{
+ if(record.type==="characterData")translateTextNode(record.target);
+ record.addedNodes?.forEach(node=>{
+  if(node.nodeType===Node.TEXT_NODE)translateTextNode(node);
+  else if(node.nodeType===Node.ELEMENT_NODE){const walker=document.createTreeWalker(node,NodeFilter.SHOW_TEXT);while(walker.nextNode())translateTextNode(walker.currentNode);}
+ });
+}));
+languageObserver.observe(document.body,{subtree:true,childList:true,characterData:true});
 async function loadFixture(name){
  const url=new URL("../../market-gateway/mock/fixtures/"+name+".json",import.meta.url);
  const response=await fetch(url,{method:"GET",credentials:"omit",cache:"no-store",headers:{Accept:"application/json"}});
@@ -239,10 +281,10 @@ async function start(){
   const [market,account,equity,derivatives]=await Promise.all(["market","account","equity","derivatives"].map(loadFixture));
   model=createPaperDemoViewModel({market,account,equity,derivatives},{enabled:true,production:false});
   status.textContent="4 canonical fixtures validated · DUMMY_JSON · local Equity/F&O simulation only";
-  render("home");
+  render("home");content.setAttribute("aria-busy","false");applyLanguage();
  }catch(error){
   status.textContent="Demo unavailable: "+(error.message||"fixture validation failed");
-  content.replaceChildren(notice("The shared Mock JSON fixture set could not be loaded or validated. No live-data fallback is attempted."));
+  content.replaceChildren(notice("The shared Mock JSON fixture set could not be loaded or validated. No live-data fallback is attempted."));content.setAttribute("aria-busy","false");applyLanguage();
  }
 }
 start();
