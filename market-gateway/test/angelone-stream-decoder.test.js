@@ -7,7 +7,7 @@ function packet(mode = 3, exchangeType = 1) {
   const size = ({1:51,2:123,3:379})[mode];
   const b = Buffer.alloc(size);
   b.writeUInt8(mode,0); b.writeUInt8(exchangeType,1);
-  b.write("3045","utf8",2);
+  b.write("3045",2,"utf8");
   b.writeBigInt64LE(123456n,27);
   b.writeBigInt64LE(1795500000000n,35);
   b.writeBigInt64LE(56820n,43);
