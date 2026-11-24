@@ -17,6 +17,10 @@ function createPriceAlertWorker({serviceDb,getUpstoxAccessToken,fetchProvider,re
   if(!Number.isInteger(maxAlerts)||maxAlerts<1||maxAlerts>1000||!Number.isInteger(maxUsersPerCycle)||maxUsersPerCycle<1||maxUsersPerCycle>50)
    throw new TypeError("Price alert worker bounds are invalid");
   const result={scanned:0,users:0,observed:0,triggered:0,stale:0,failed:0};
+  const control=await serviceDb.from("s_trade_operational_controls").select("enabled")
+   .eq("control_key","price_alerts_enabled").maybeSingle();
+  if(control.error)throw new Error("Price alert operational control could not be verified");
+  if(control.data&&control.data.enabled===false)return result;
   const loaded=await serviceDb.from("s_trade_price_alerts")
    .select("alert_id,user_id,instrument_key,display_symbol,condition,target_price")
    .eq("active",true).order("updated_at",{ascending:true}).limit(maxAlerts);
