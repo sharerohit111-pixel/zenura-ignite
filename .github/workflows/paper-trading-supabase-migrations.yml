@@ -42,6 +42,8 @@ on:
       - "market-gateway/test/derivative-limit-quote-policy.test.js"
       - "market-gateway/lib/upstox-executable-quote.js"
       - "market-gateway/test/upstox-executable-quote.test.js"
+      - "market-gateway/lib/futures-depth-sweep.js"
+      - "market-gateway/test/futures-depth-sweep.test.js"
       - "supabase/tests/**"
       - "supabase/tests/protective_order_cancel.sql"
   push:
@@ -139,6 +141,10 @@ jobs:
         run: node --test market-gateway/test/derivative-order-transaction.test.js
       - name: Run Existing transaction reference derivative contract validation tests
         run: node --test market-gateway/test/derivative-contract.test.js
+      - name: Verify isolated NSE Futures depth-sweep helper
+        run: |
+          node --check market-gateway/lib/futures-depth-sweep.js
+          node --test market-gateway/test/futures-depth-sweep.test.js
       - name: Run complete market-gateway regression suite
         run: |
           npm install --prefix market-gateway --no-audit --no-fund --package-lock=false
