@@ -19,6 +19,7 @@ const {isIntradaySessionOpen}=require("./lib/intraday-limit-policy");
 const {normalizeEquityTickSizePaise,isEquityExecutionPriceOnTick}=require("./lib/equity-order-validation");
 const {encodeOrderHistoryCursor,decodeOrderHistoryCursor,buildOrderHistoryCursorFilter}=require("./lib/order-history-pagination");
 const {rankInstrumentSearchResults}=require("./lib/instrument-search");
+const {normalizeMarketDepthQuote,normalizeMarketStatus}=require("./lib/market-snapshot");
 const {isEligiblePaperLimitOrder,normalizeWorkerCursor,groupOrdersByUser}=require("./lib/paper-limit-worker");
 const {createPaperProtectiveWorker}=require("./lib/paper-protective-worker");
 const {createPaperIntradayLimitWorker}=require("./lib/paper-intraday-limit-worker");
@@ -266,6 +267,35 @@ app.get("/candles",async(req,res)=>{
     if(!upstream.ok)return res.status(upstream.status===401?403:502).json({error:"Upstox historical candle request failed.",providerStatus:upstream.status});
     res.set("Cache-Control","private, no-store").json(payload);
   }catch(error){sendError(res,error,"Historical candles could not be loaded.");}
+});
+app.get("/market-depth",async(req,res)=>{
+  try{
+    const {user}=await auth(req),instrumentKey=String(req.query.instrument_key||"");
+    if(!instrumentKey||instrumentKey.length>100||/[\\r\\n]/.test(instrumentKey))return res.status(400).json({error:"A valid instrument_key is required."});
+    if(!instrumentCache.length||Date.now()-instrumentCacheUpdatedAt>6*60*60*1000)await refreshInstrumentCache();
+    const instrument=instrumentCache.find(item=>item.instrument_key===instrumentKey);
+    if(!instrument||!["NSE_EQ","BSE_EQ","NSE_INDEX","BSE_INDEX","NSE_FO","BSE_FO"].includes(instrument.segment))
+      return res.status(400).json({error:"Instrument is not present in the supported NSE/BSE master."});
+    const {token}=await getUpstoxAccessToken(user.id);
+    const url="https://api.upstox.com/v3/market-quote/quotes?"+new URLSearchParams({instrument_key:instrumentKey});
+    const upstream=await fetchProvider(url,{headers:{Authorization:"Bearer "+token,Accept:"application/json"}});
+    const payload=await readProviderJson(upstream);
+    if(!upstream.ok)return res.status(upstream.status===401?403:502).json({error:"Upstox market depth request failed.",providerStatus:upstream.status});
+    const snapshot=normalizeMarketDepthQuote(payload,instrument,{nowMs:Date.now(),maxAgeMs:15000});
+    res.set("Cache-Control","private, no-store").json(snapshot);
+  }catch(error){sendError(res,error,"Market depth could not be loaded.");}
+});
+app.get("/market-status",async(req,res)=>{
+  try{
+    const {user}=await auth(req),exchange=String(req.query.exchange||"").toUpperCase();
+    if(!["NSE","BSE"].includes(exchange))return res.status(400).json({error:"Exchange must be NSE or BSE."});
+    const {token}=await getUpstoxAccessToken(user.id);
+    const upstream=await fetchProvider("https://api.upstox.com/v2/market/status/"+exchange,{headers:{Authorization:"Bearer "+token,Accept:"application/json"}});
+    const payload=await readProviderJson(upstream);
+    if(!upstream.ok)return res.status(upstream.status===401?403:502).json({error:"Upstox market status request failed.",providerStatus:upstream.status});
+    const status=normalizeMarketStatus(payload,exchange,{nowMs:Date.now(),maxAgeMs:300000});
+    res.set("Cache-Control","private, no-store").json(status);
+  }catch(error){sendError(res,error,"Exchange market status could not be loaded.");}
 });
 app.get("/option-chain",async(req,res)=>{
   try{
