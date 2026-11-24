@@ -1,7 +1,7 @@
 "use strict";
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { decodeAngelOneBinaryFeedPacket } = require("../lib/angelone-stream-decoder");
+const { decodeAngelOneBinaryFeedPacket, decodeAndNormalizeAngelOneBinaryFeedPacket } = require("../lib/angelone-stream-decoder");
 
 function packet(mode = 3, exchangeType = 1) {
   const size = ({1:51,2:123,3:379})[mode];
@@ -73,4 +73,31 @@ test("rejects malformed depth and crossed best bid/ask", () => {
   assert.throws(()=>decodeAngelOneBinaryFeedPacket(bad),{code:"invalid_market_data"});
   const badFlag=packet(3); badFlag.writeUInt16LE(9,147);
   assert.throws(()=>decodeAngelOneBinaryFeedPacket(badFlag),{code:"invalid_market_data"});
+});
+
+test("normalizes only fresh Snap Quote packets with exact entitlement-bound native mapping", () => {
+  const now=1795500000000;
+  const key="1:3045";
+  const mapping={nativeSymbolToken:"3045",exchangeType:1,instrumentId:"NSE_EQ|INE002A01018",exchange:"NSE",entitlementReference:"approved-rights-ref"};
+  const result=decodeAndNormalizeAngelOneBinaryFeedPacket(packet(3),{
+    now,maxAgeMs:15000,instrumentMap:{[key]:mapping}
+  });
+  assert.equal(result.lastPricePaise,56820);
+  assert.equal(result.instrumentId,"NSE_EQ|INE002A01018");
+  assert.equal(result.entitlementReference,"approved-rights-ref");
+  assert.equal(result.attribution.displayName,"Angel One SmartAPI");
+});
+
+test("does not invent trade time for LTP/Quote or accept stale and mismatched mappings", () => {
+  const now=1795500000000;
+  assert.equal(decodeAndNormalizeAngelOneBinaryFeedPacket(packet(1),{now,instrumentMap:{}}),null);
+  assert.equal(decodeAndNormalizeAngelOneBinaryFeedPacket(packet(2),{now,instrumentMap:{}}),null);
+  assert.equal(decodeAndNormalizeAngelOneBinaryFeedPacket(packet(3),{
+    now:1795500000000+30000,maxAgeMs:15000,
+    instrumentMap:{"1:3045":{nativeSymbolToken:"3045",exchangeType:1,instrumentId:"NSE_EQ|INE002A01018",exchange:"NSE",entitlementReference:"rights"}}
+  }),null);
+  assert.equal(decodeAndNormalizeAngelOneBinaryFeedPacket(packet(3),{
+    now,maxAgeMs:15000,
+    instrumentMap:{"1:3045":{nativeSymbolToken:"9999",exchangeType:1,instrumentId:"NSE_EQ|INE002A01018",exchange:"NSE",entitlementReference:"rights"}}
+  }),null);
 });
