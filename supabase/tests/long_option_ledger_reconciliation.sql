@@ -23,6 +23,7 @@ DECLARE
   v_expected_cash bigint;
   v_buy_basis bigint;
   v_closed_basis bigint;
+  v_invalid_breakdowns integer;
 BEGIN
   -- Buy one long CE lot; premium and buy-side charges enter fee-inclusive cost basis.
   v_now:=floor(extract(epoch from clock_timestamp())*1000)::bigint;
@@ -140,12 +141,27 @@ BEGIN
    WHERE user_id='cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd'
      AND instrument_key='NSE_FO|OPTION_PARTIAL_CLOSE'
      AND status='FILLED' AND simulation_only IS TRUE;
-  IF v_buy_basis<=0 OR v_closed_basis<>v_buy_basis
+  SELECT count(*) INTO v_invalid_breakdowns
+    FROM public.paper_derivative_orders
+   WHERE user_id='cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd'
+     AND status='FILLED' AND simulation_only IS TRUE
+     AND (
+       charges_breakdown->>'chargeScheduleVersion' IS DISTINCT FROM 'NSE_OPTIONS_MARKET_SIM_V1_2026_11'
+       OR coalesce((charges_breakdown->>'brokeragePaise')::bigint,-1)
+        +coalesce((charges_breakdown->>'exchangeTransactionPaise')::bigint,-1)
+        +coalesce((charges_breakdown->>'ipftPaise')::bigint,-1)
+        +coalesce((charges_breakdown->>'sebiPaise')::bigint,-1)
+        +coalesce((charges_breakdown->>'stampDutyPaise')::bigint,-1)
+        +coalesce((charges_breakdown->>'gstPaise')::bigint,-1)
+        +coalesce((charges_breakdown->>'sttPaise')::bigint,-1)<>charges_paise
+       OR coalesce((charges_breakdown->>'totalChargesPaise')::bigint,-1)<>charges_paise
+     );
+  IF v_buy_basis<=0 OR v_closed_basis<>v_buy_basis OR v_invalid_breakdowns<>0
      OR EXISTS(SELECT 1 FROM public.paper_derivative_positions
        WHERE user_id='cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd'
          AND instrument_key='NSE_FO|OPTION_PARTIAL_CLOSE') THEN
-    RAISE EXCEPTION 'Repeated partial option closes did not conserve the exact fee-inclusive entry basis: bought %, released %',
-      v_buy_basis,v_closed_basis;
+    RAISE EXCEPTION 'Repeated partial option closes or MARKET charge breakdown did not reconcile: bought %, released %, invalid breakdowns %',
+      v_buy_basis,v_closed_basis,v_invalid_breakdowns;
   END IF;
 
 END
