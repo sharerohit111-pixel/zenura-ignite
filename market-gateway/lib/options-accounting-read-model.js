@@ -362,8 +362,10 @@ function buildOptionsAccountingSnapshot({
     realizedPnlPaise = addSafe(realizedPnlPaise, realized, "Options realized P&L");
     chargesPaidPaise = addSafe(chargesPaidPaise, exerciseStt, "Options charges");
     history.push({
-      source: "EXPIRY", id: settlement.settlement_id, side: "SETTLEMENT",
-      quantity, grossPaise: gross, chargesPaise: exerciseStt,
+      source: "EXPIRY", id: settlement.settlement_id,
+      tradingSymbol: settlement.trading_symbol, instrumentKey: settlement.instrument_key,
+      side: "SETTLEMENT", quantity, filledQuantity: quantity,
+      grossPaise: gross, chargesPaise: exerciseStt,
       chargeBreakdownPaise: { exerciseStt: exerciseStt },
       realizedPnlPaise: realized, status: "SETTLED",
       createdAt: settlement.created_at, expiry: settlement.expiry,
