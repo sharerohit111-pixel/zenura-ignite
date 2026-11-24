@@ -33,7 +33,10 @@ function istTimestamp(value) {
   const match = /^(\d{2})-(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)-(\d{4}) (\d{2}):(\d{2}):(\d{2})$/.exec(value);
   if (!match) return timestamp(value);
   const months = { Jan:0, Feb:1, Mar:2, Apr:3, May:4, Jun:5, Jul:6, Aug:7, Sep:8, Oct:9, Nov:10, Dec:11 };
-  return Date.UTC(Number(match[3]), months[match[2]], Number(match[1]), Number(match[4])-5, Number(match[5])-30, Number(match[6]));
+  const year=Number(match[3]), month=months[match[2]], day=Number(match[1]), hour=Number(match[4]), minute=Number(match[5]), second=Number(match[6]);
+  const calendarCheck=new Date(Date.UTC(year,month,day));
+  if (calendarCheck.getUTCFullYear()!==year || calendarCheck.getUTCMonth()!==month || calendarCheck.getUTCDate()!==day || hour>23 || minute>59 || second>59) return null;
+  return Date.UTC(year, month, day, hour-5, minute-30, second);
 }
 function assertDependencies(client, resolveInstrument, now) {
   if (!client || typeof client !== "object" || typeof resolveInstrument !== "function" ||
@@ -135,6 +138,7 @@ function createUpstoxMarketDataAdapter({ client, resolveInstrument, now=()=>Date
       const entry=payload?.data && Object.values(payload.data).find(x=>x?.instrument_token===native.instrumentKey);
       if (!entry?.depth) fail("Upstox depth is unavailable.");
       const bids=normalizeDepth(entry.depth.buy,"bid"), asks=normalizeDepth(entry.depth.sell,"ask");
+      if (bids[0].pricePaise >= asks[0].pricePaise) fail("Upstox returned a crossed bid/ask book.");
       const timestampMs=timestamp(entry.timestamp);
       return { providerId:"upstox", instrumentId:args.instrumentId, exchange:args.exchange,
         entitlementReference:args.entitlementReference, attribution:{displayName:"Upstox"},
@@ -180,6 +184,7 @@ function createAngelOneMarketDataAdapter({ client, resolveInstrument, now=()=>Da
     async getDepth(args) {
       const {entry}=await read(args,"FULL");
       const bids=normalizeDepth(entry.depth?.buy,"bid"), asks=normalizeDepth(entry.depth?.sell,"ask");
+      if (bids[0].pricePaise >= asks[0].pricePaise) fail("Angel One returned a crossed bid/ask book.");
       const timestampMs=istTimestamp(entry.exchFeedTime);
       return { providerId:"angelone", instrumentId:args.instrumentId, exchange:args.exchange,
         entitlementReference:args.entitlementReference, attribution:{displayName:"Angel One SmartAPI"},
