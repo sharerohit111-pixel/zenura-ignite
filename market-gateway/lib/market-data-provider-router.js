@@ -112,10 +112,11 @@ function validateStreamResult(result) {
 }
 
 class MarketDataProviderRouter {
-  constructor({ providers, plan, entitlementResolver, healthRegistry = null, clock = () => Date.now(), maxQuoteAgeMs = 15000 }) {
+  constructor({ providers, plan, entitlementResolver, healthRegistry = null, rateLimiter = null, clock = () => Date.now(), maxQuoteAgeMs = 15000 }) {
     if (!(providers instanceof Map) || typeof entitlementResolver !== "function" ||
         (healthRegistry !== null && (typeof healthRegistry.isAvailable !== "function" ||
           typeof healthRegistry.recordSuccess !== "function" || typeof healthRegistry.recordFailure !== "function")) ||
+        (rateLimiter !== null && typeof rateLimiter.consume !== "function") ||
         typeof clock !== "function" || !Number.isSafeInteger(maxQuoteAgeMs) || maxQuoteAgeMs <= 0) {
       throw new TypeError("Market-data router dependencies are invalid.");
     }
@@ -127,6 +128,7 @@ class MarketDataProviderRouter {
     this.plan = validateProviderPlan(plan);
     this.entitlementResolver = entitlementResolver;
     this.healthRegistry = healthRegistry;
+    this.rateLimiter = rateLimiter;
     this.clock = clock;
     this.maxQuoteAgeMs = maxQuoteAgeMs;
   }
@@ -158,6 +160,16 @@ class MarketDataProviderRouter {
       }
       if (!entitlement || entitlement.approved !== true ||
           typeof entitlement.reference !== "string" || !entitlement.reference.trim()) continue;
+
+      // Shared PostgreSQL quota is consumed before any upstream call. A missing
+      // policy or unavailable quota service never falls back to an in-memory limit.
+      if (this.rateLimiter) {
+        try {
+          await this.rateLimiter.consume(providerId, capability, { userId });
+        } catch {
+          continue;
+        }
+      }
 
       if (this.healthRegistry && !this.healthRegistry.isAvailable(providerId)) continue;
 
