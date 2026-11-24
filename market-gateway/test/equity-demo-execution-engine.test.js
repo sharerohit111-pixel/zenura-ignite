@@ -151,22 +151,21 @@ test("browser build exposes the same engine without Node globals and can execute
   assert.equal(first.order.status,"PARTIALLY_FILLED");
   assert.equal(browserEngine.snapshot().account.positions[fixture.data.instrument.instrumentKey].quantity,2);
 });
-test("market page wires a separate, clearly labelled demo order sandbox and responsive styles",()=>{
-  const html=fs.readFileSync(path.join(__dirname,"../../markets/stocks/index.html"),"utf8");
-  const js=fs.readFileSync(path.join(__dirname,"../../markets/stocks/demo-equity-execution-workspace.js"),"utf8");
-  const css=fs.readFileSync(path.join(__dirname,"../../markets/stocks/demo-equity-execution-workspace.css"),"utf8");
-  assert.match(html,/id="demo-execution-lab"/);
-  assert.match(html,/SYNTHETIC · NOT A REAL ORDER/);
+test("canonical 15-screen Demo mounts the shared Equity engine and responsive panel",()=>{
+  const html=fs.readFileSync(path.join(__dirname,"../../markets/stocks/demo.html"),"utf8");
+  const js=fs.readFileSync(path.join(__dirname,"../../markets/stocks/demo.js"),"utf8");
+  const panel=fs.readFileSync(path.join(__dirname,"../../markets/stocks/demo-equity-panel.mjs"),"utf8");
+  const css=fs.readFileSync(path.join(__dirname,"../../markets/stocks/demo.css"),"utf8");
   assert.match(html,/equity-demo-execution-engine\.js/);
-  assert.match(html,/demo-equity-execution-workspace\.js/);
-  assert.match(html,/demo-equity-execution-workspace\.css/);
-  assert.ok(js.includes("../../market-gateway/mock/fixtures/equity-execution.json"));
-  assert.ok(js.includes("../../market-gateway/mock/fixtures/account.json"));
-  assert.match(js,/reserved \"\+\(p\.reservedQuantity\|\|0\)/);
-  assert.match(js,/const describe=p=>p\?/);
-  assert.match(js,/demo-exec-unrealized/);
-  assert.match(js,/demo-exec-total-pnl/);
-  assert.match(html,/No broker or exchange order is submitted/);
-  assert.match(css,/@media\(max-width:760px\)/);
-  assert.match(css,/@media\(max-width:420px\)/);
+  assert.match(html,/DEMO DATA · SYNTHETIC FIXTURES/);
+  assert.match(js,/mountEquityDemo\(content\)/);
+  assert.match(js,/appendEquitySummary\(content,name\)/);
+  assert.ok(panel.includes("../../market-gateway/mock/fixtures/equity-execution.json"));
+  assert.ok(panel.includes("../../market-gateway/mock/fixtures/account.json"));
+  assert.match(panel,/submitOrder/);
+  assert.match(panel,/matchNext/);
+  assert.match(panel,/cancelOrder/);
+  assert.match(panel,/not reconciled with the Wallet/);
+  assert.match(css,/@media\(max-width:900px\)/);
+  assert.match(css,/@media\(max-width:520px\)/);
 });
