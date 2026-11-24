@@ -16,7 +16,7 @@ on:
       - "market-gateway/lib/watchlist-instrument-resolver.js"
       - "market-gateway/test/watchlist-instrument-resolver.test.js"
       - "market-gateway/supabase-server.js"
-      - "market-gateway/test/demo-chart-data.test.mjs market-gateway/test/watchlist-instrument-resolver.test.js"
+      - "market-gateway/test/demo-chart-data.test.mjs"
       - ".github/workflows/s-trade-demo-screen-wiring.yml"
   push:
     branches:
@@ -53,7 +53,7 @@ jobs:
           console.log('Parsed all four canonical screen fixtures.');
           NODE
       - name: Run adapter and screen integration tests
-        run: node --test market-gateway/test/paper-demo-adapter.test.mjs market-gateway/test/paper-demo-dashboard.test.mjs market-gateway/test/demo-chart-data.test.mjs
+        run: node --test market-gateway/test/paper-demo-adapter.test.mjs market-gateway/test/paper-demo-dashboard.test.mjs market-gateway/test/demo-chart-data.test.mjs market-gateway/test/watchlist-instrument-resolver.test.js
       # Chart model, panel, and regression tests are included in this exact-head gate.
       - name: Install Chromium browser QA dependencies
         run: |
