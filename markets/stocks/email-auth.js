@@ -27,6 +27,7 @@ if (card && connectButton) {
       <button type="button" id="email-create">CREATE ACCOUNT</button>
       <button type="button" id="email-google">CONTINUE WITH GOOGLE</button>
       <button type="button" id="email-reset">RESET PASSWORD</button>
+      <button type="button" id="email-save-new-password" hidden>SAVE NEW PASSWORD</button>
       <button type="button" id="email-sign-out" hidden>SIGN OUT</button>
     </div>`;
   card.append(form);
@@ -38,6 +39,7 @@ if (card && connectButton) {
   const signOutButton = form.querySelector("#email-sign-out");
   const googleButton = form.querySelector("#email-google");
   const resetButton = form.querySelector("#email-reset");
+  const saveNewPasswordButton = form.querySelector("#email-save-new-password");
   let creating = false;
   create.addEventListener("click", () => {
     creating = !creating;
@@ -120,13 +122,48 @@ if (card && connectButton) {
       message.textContent = error?.message || "Password reset could not be requested.";
     } finally { resetButton.disabled = false; }
   });
+  saveNewPasswordButton.addEventListener("click", async () => {
+    const nextPassword = password.value;
+    if (nextPassword.length < 8 || nextPassword.length > 128) {
+      message.textContent = "Choose a new password between 8 and 128 characters.";
+      password.focus();
+      return;
+    }
+    saveNewPasswordButton.disabled = true;
+    try {
+      const { error } = await supabase.auth.updateUser({ password: nextPassword });
+      if (error) throw error;
+      password.value = "";
+      message.textContent = "Password updated securely. Your account is ready.";
+      saveNewPasswordButton.hidden = true;
+      signOutButton.hidden = false;
+    } catch (error) {
+      message.textContent = error?.message || "Password could not be updated. Request a fresh reset link.";
+    } finally { saveNewPasswordButton.disabled = false; }
+  });
   signOutButton.addEventListener("click", async () => {
     signOutButton.disabled = true;
     const { error } = await supabase.auth.signOut();
     message.textContent = error?.message || "Signed out.";
     signOutButton.disabled = false;
   });
-  supabase.auth.onAuthStateChange((_event, session) => {
+  supabase.auth.onAuthStateChange((event, session) => {
+    if (event === "PASSWORD_RECOVERY" && session?.user) {
+      message.textContent = "Choose a new password to finish account recovery.";
+      email.hidden = true;
+      password.hidden = false;
+      password.value = "";
+      password.autocomplete = "new-password";
+      password.minLength = 8;
+      password.placeholder = "New password (8–128 characters)";
+      signIn.hidden = true;
+      create.hidden = true;
+      googleButton.hidden = true;
+      resetButton.hidden = true;
+      saveNewPasswordButton.hidden = false;
+      signOutButton.hidden = true;
+      return;
+    }
     if (session?.user) {
       message.textContent = "Signed in as " + (session.user.email || "your account") + " using Supabase Auth.";
       email.hidden = true;
@@ -135,6 +172,7 @@ if (card && connectButton) {
       create.hidden = true;
       googleButton.hidden = true;
       resetButton.hidden = true;
+      saveNewPasswordButton.hidden = true;
       signOutButton.hidden = false;
     } else {
       email.hidden = false;
@@ -143,6 +181,7 @@ if (card && connectButton) {
       create.hidden = false;
       googleButton.hidden = false;
       resetButton.hidden = false;
+      saveNewPasswordButton.hidden = true;
       signOutButton.hidden = true;
     }
   });
