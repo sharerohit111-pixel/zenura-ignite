@@ -246,7 +246,7 @@ function translateTextNode(node){
  if(!originalText.has(node))originalText.set(node,node.nodeValue);
  else {
   const previous=originalText.get(node).trim(), current=node.nodeValue.trim(), previousHindi=translations[previous];
-  if(current!==previous && !(current===previousHindi && currentLanguage==="hi"))originalText.set(node,node.nodeValue);
+  if(current!==previous && current!==previousHindi)originalText.set(node,node.nodeValue);
  }
  const source=originalText.get(node).trim();
  if(!source)return;
