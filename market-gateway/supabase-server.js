@@ -23,6 +23,7 @@ const {validateDerivativeContract,normalizeTickSizePaise}=require("./lib/derivat
 const {parseMarginPreviewInput}=require("./lib/margin-preview-input");
 const {normalizeUpstoxMarginResponse}=require("./lib/upstox-margin");
 const {availablePaperCash}=require("./lib/available-paper-cash");
+const {buildPaperWalletSnapshot}=require("./lib/paper-wallet");
 const {formatSseEvent,formatSseComment}=require("./lib/sse");
 const {fetchProviderWithTimeout}=require("./lib/provider-fetch");
 const {createSingleFlight}=require("./lib/single-flight");
@@ -284,10 +285,10 @@ app.get("/paper/account",async(req,res)=>{
     const initialized=await runtime.callUserRpc(user,"initialize_paper_trading_account",{});
     const {data,error}=await userDb.from("paper_accounts").select("*").eq("user_id",user.id).maybeSingle();
     if(error||!data)return res.status(409).json({error:"Paper Trading account could not be initialized or read."});
+    const wallet=buildPaperWalletSnapshot(data);
     res.set("Cache-Control","private, no-store").json({
-      cashPaise:data.cash_paise,reservedCashPaise:data.reserved_cash_paise||0,
-      reservedMarginPaise:data.reserved_margin_paise||0,realizedPnlPaise:data.realized_pnl_paise||0,
-      version:data.version,created:initialized?.created===true,simulationOnly:true
+      ...wallet,realizedPnlPaise:data.realized_pnl_paise||0,
+      version:data.version,created:initialized?.created===true
     });
   }catch(error){sendError(res,error,"Paper account could not be loaded.");}
 });
