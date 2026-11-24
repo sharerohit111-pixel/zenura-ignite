@@ -19,6 +19,7 @@ const {isIntradaySessionOpen}=require("./lib/intraday-limit-policy");
 const {normalizeEquityTickSizePaise,isEquityExecutionPriceOnTick}=require("./lib/equity-order-validation");
 const {encodeOrderHistoryCursor,decodeOrderHistoryCursor,buildOrderHistoryCursorFilter}=require("./lib/order-history-pagination");
 const {rankInstrumentSearchResults}=require("./lib/instrument-search");
+const mockMarketData=require("./lib/mock-market-data");
 const {normalizeMarketDepthQuote,normalizeMarketStatus}=require("./lib/market-snapshot");
 let futuresDepthAdapter=null;
 try{
@@ -222,6 +223,39 @@ app.delete("/upstox/connection",async(req,res)=>{
     res.set("Cache-Control","no-store").json({disconnected:true,generation:data,feedReady:false});
   }catch(error){sendError(res,error,"Upstox disconnect failed.");}
 });
+
+function sendDemoResponse(res,handler){
+  try{
+    const payload=handler();
+    res.set("Cache-Control","public, max-age=60").json(payload);
+  }catch(error){
+    res.status(Number.isInteger(error?.status)?error.status:400).json({error:error?.message||"Invalid synthetic demo request."});
+  }
+}
+app.get("/demo/instruments",(req,res)=>sendDemoResponse(res,()=>{
+  const results=mockMarketData.listInstruments({
+    kind:req.query.kind,exchange:req.query.exchange,q:req.query.q,underlying:req.query.underlying,
+    expiry:req.query.expiry,strike:req.query.strike===undefined?undefined:Number(req.query.strike),
+    minStrike:req.query.min_strike===undefined?undefined:Number(req.query.min_strike),
+    maxStrike:req.query.max_strike===undefined?undefined:Number(req.query.max_strike),
+    optionType:req.query.option_type,asOf:req.query.as_of,limit:req.query.limit===undefined?100:Number(req.query.limit)
+  });
+  return {...mockMarketData.getDemoMetadata(),count:results.length,results};
+}));
+app.get("/demo/expiries",(req,res)=>sendDemoResponse(res,()=>({
+  ...mockMarketData.getDemoMetadata(),
+  expiries:mockMarketData.listExpiries({underlying:req.query.underlying,exchange:req.query.exchange,kind:req.query.kind||"options",asOf:req.query.as_of})
+})));
+app.get("/demo/options-chain",(req,res)=>sendDemoResponse(res,()=>mockMarketData.getOptionChain({
+  underlying:req.query.underlying,exchange:req.query.exchange,expiry:req.query.expiry,
+  strike:req.query.strike===undefined?undefined:Number(req.query.strike),
+  optionType:req.query.option_type,asOf:req.query.as_of
+})));
+app.get("/demo/quotes",(req,res)=>sendDemoResponse(res,()=>mockMarketData.getQuote(req.query.instrument_key)));
+app.get("/demo/candles",(req,res)=>sendDemoResponse(res,()=>{
+  const candles=mockMarketData.getCandles(req.query.instrument_key,{timeframe:req.query.timeframe||"5m",count:req.query.count===undefined?24:Number(req.query.count)});
+  return {...mockMarketData.getDemoMetadata(),instrumentKey:req.query.instrument_key,timeframe:req.query.timeframe||"5m",candles};
+}));
 
 app.get("/instruments",async(req,res)=>{
   try{
