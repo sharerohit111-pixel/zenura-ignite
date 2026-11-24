@@ -776,12 +776,13 @@ app.get("/paper/options/accounting",async(req,res)=>{
   try{
     const {user,userDb}=await auth(req);
     const [{data:account,error:accountError},{data:positions,error:positionError},
-      marketOrders,limitOrders]=await Promise.all([
+      marketOrders,limitOrders,expirySettlements]=await Promise.all([
       userDb.from("paper_accounts").select("cash_paise,reserved_cash_paise,reserved_margin_paise,realized_pnl_paise")
         .eq("user_id",user.id).maybeSingle(),
       userDb.from("paper_derivative_positions").select("*").eq("user_id",user.id),
       loadAllOptionsRows(userDb,"paper_derivative_orders",user.id),
-      loadAllOptionsRows(userDb,"paper_option_limit_orders",user.id)
+      loadAllOptionsRows(userDb,"paper_option_limit_orders",user.id),
+      loadAllOptionsRows(userDb,"paper_option_expiry_settlements",user.id)
     ]);
     if(accountError||!account)return res.status(404).json({error:"Indian paper account has not been initialized."});
     if(positionError)throw Object.assign(new Error("Options positions could not be loaded."),{status:503});
@@ -813,7 +814,8 @@ app.get("/paper/options/accounting",async(req,res)=>{
     }
     const snapshot=buildOptionsAccountingSnapshot({
       account,positions:optionPositions,marketOrders:optionOrders,
-      limitOrders:optionLimitOrders,limitFills,quotes,now:Date.now()
+      limitOrders:optionLimitOrders,limitFills,
+      expirySettlements:expirySettlements||[],quotes,now:Date.now()
     });
     res.set("Cache-Control","private, no-store").json(snapshot);
   }catch(error){sendError(res,error,"NSE Options accounting snapshot could not be reconciled.");}
