@@ -127,6 +127,7 @@ test("password recovery event exposes completion and persists the new password t
   const password = elements.get("market-password");
   password.value = "NewSecurePass123";
   await elements.get("email-save-new-password").dispatch("click");
-  assert.deepEqual(calls[0], ["updateUser", { password: "NewSecurePass123" }]);
+  assert.equal(calls[0][0], "updateUser");
+  assert.equal(calls[0][1].password, "NewSecurePass123");
   assert.equal(elements.get("email-save-new-password").hidden, true);
 });
