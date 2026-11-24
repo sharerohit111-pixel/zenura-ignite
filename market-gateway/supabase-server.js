@@ -345,7 +345,11 @@ app.get("/paper/account",async(req,res)=>{
   }catch(error){sendError(res,error,"Paper account could not be loaded.");}
 });
 
-async function ensureWatchlistInstrumentCache(keys){\n  const needsOfficial=(keys||[]).some(key=>!mockWatchlistCatalog.has(key));\n  if(needsOfficial&&(!instrumentCache.length||Date.now()-instrumentCacheUpdatedAt>6*60*60*1000))await refreshInstrumentCache();\n}\nfunction watchlistName(req){
+async async function ensureWatchlistInstrumentCache(keys){
+  const needsOfficial=(keys||[]).some(key=>!mockWatchlistCatalog.has(key));
+  if(needsOfficial&&(!instrumentCache.length||Date.now()-instrumentCacheUpdatedAt>6*60*60*1000))await refreshInstrumentCache();
+}
+function watchlistName(req){
   const name=String(req.query?.name||req.body?.name||"My Stocks");
   if(!WATCHLIST_NAMES.includes(name))throw Object.assign(new Error("Choose a valid watchlist name."),{status:400});
   return name;
