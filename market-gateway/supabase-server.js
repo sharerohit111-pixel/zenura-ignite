@@ -51,7 +51,7 @@ const {nextUpstoxTokenExpiry}=require("../functions/lib/upstox-token-expiry");
 const {isUsableUpstoxTokenResponse}=require("../functions/lib/upstox-token-response");
 const {isUsableUpstoxOAuthCallback}=require("../functions/lib/upstox-oauth-callback-input");
 const {validateHttpsRedirectUri}=require("./lib/redirect-uri-policy");
-const {assertMarketDataRightsApproved}=require("./lib/market-data-rights-gate");
+const {assertMarketDataRightsApproved,marketDataRightsApproval}=require("./lib/market-data-rights-gate");
 
 const PORT=Number(process.env.PORT||8080);
 const SUPABASE_URL=process.env.SUPABASE_URL;
@@ -165,7 +165,7 @@ async function getQuote(accessToken,instrumentKey){
 }
 app.get("/health",(_req,res)=>res.json({
   ok:true,service:"zenura-supabase-market-gateway",authProvider:"supabase",
-  feedProtocol:"upstox-v3",instrumentMasterLoaded:instrumentCache.length>0,
+  feedProtocol:"upstox-v3",marketDataEnabled:!!marketDataRightsApproval(process.env),marketDataBlockReason:marketDataRightsApproval(process.env)?null:"written_provider_and_regulatory_approval_required",instrumentMasterLoaded:instrumentCache.length>0,
   instrumentMasterUpdatedAt:instrumentCacheUpdatedAt||null,
   limitWorker:{...paperLimitWorkerStatus},intradayLimitWorker:{...paperIntradayLimitWorkerStatus},futuresLimitSubmissionEnabled:process.env.PAPER_FUTURES_LIMIT_ENABLED==="true",futuresLimitWorker:{...paperFuturesLimitWorkerStatus},optionsLimitSubmissionEnabled:process.env.PAPER_OPTIONS_LIMIT_ENABLED==="true",optionsLimitWorker:{...paperOptionLimitWorkerStatus},protectiveWorker:{...paperProtectiveWorkerStatus}
 }));
@@ -173,9 +173,9 @@ app.get("/health",(_req,res)=>res.json({
 app.get("/upstox/connection",async(req,res)=>{
   try{
     const {user}=await auth(req),connection=await getConnection(user.id);
-    const connected=connectionUsable(connection);
+    const connected=connectionUsable(connection),marketDataEnabled=!!marketDataRightsApproval(process.env);
     res.set("Cache-Control","private, no-store");
-    res.json({connected,feedReady:connected,expiresAt:connected?connection.expiresAtMs:null,status:connected?"connected":"disconnected"});
+    res.json({connected,feedReady:connected&&marketDataEnabled,marketDataEnabled,expiresAt:connected?connection.expiresAtMs:null,status:connected?"connected":"disconnected"});
   }catch(error){sendError(res,error,"Upstox connection status could not be loaded.");}
 });
 app.post("/upstox/oauth/start",async(req,res)=>{
