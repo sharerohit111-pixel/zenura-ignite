@@ -156,8 +156,8 @@ function createUpstoxMarketDataAdapter({ client, resolveInstrument, now=()=>Date
         timestampMs, sourceSequence:"upstox:"+native.instrumentKey+":"+timestampMs, bids, asks };
     },
     async getCandles(args) {
-      const native=await resolveInstrument(args);
-      const payload=await client.getCandles({ ...args, instrumentKey:native?.instrumentKey });
+      const native=requireNativeInstrument(await resolveInstrument(args), "upstox");
+      const payload=await client.getCandles({ ...args, instrumentKey:native.instrumentKey });
       if (!payload || payload.status!=="success" || !Array.isArray(payload.data?.candles)) fail("Upstox historical candles response is unsuccessful.");
       return { providerId:"upstox", instrumentId:args.instrumentId, exchange:args.exchange,
         entitlementReference:args.entitlementReference, attribution:{displayName:"Upstox"},
@@ -202,8 +202,8 @@ function createAngelOneMarketDataAdapter({ client, resolveInstrument, now=()=>Da
         timestampMs, sourceSequence:"angelone:"+entry.symbolToken+":"+timestampMs, bids, asks };
     },
     async getCandles(args) {
-      const native=await resolveInstrument(args);
-      const payload=await client.getCandles({ ...args, exchange:native?.exchange, symbolToken:native?.symbolToken });
+      const native=requireNativeInstrument(await resolveInstrument(args), "angelone");
+      const payload=await client.getCandles({ ...args, exchange:native.exchange, symbolToken:native.symbolToken });
       if (!payload || payload.status!==true || !Array.isArray(payload.data)) fail("Angel One historical candle response is unsuccessful.");
       return { providerId:"angelone", instrumentId:args.instrumentId, exchange:args.exchange,
         entitlementReference:args.entitlementReference, attribution:{displayName:"Angel One SmartAPI"},
