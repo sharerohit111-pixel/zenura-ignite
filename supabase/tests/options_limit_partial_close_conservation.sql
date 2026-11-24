@@ -48,6 +48,8 @@ DECLARE
   v_fill_realized bigint;
   v_fill_charges bigint;
   v_released_basis bigint;
+  v_component_charges bigint;
+  v_invalid_schedule_rows integer;
 BEGIN
   SELECT starting_cash_paise INTO v_starting_cash
     FROM public.paper_accounts
@@ -101,8 +103,12 @@ BEGIN
 
   SELECT count(*),coalesce(sum(realized_pnl_paise),0),
          coalesce(sum(incremental_charges_paise),0),
-         coalesce(sum(gross_paise-incremental_charges_paise-realized_pnl_paise),0)
-    INTO v_fill_count,v_fill_realized,v_fill_charges,v_released_basis
+         coalesce(sum(gross_paise-incremental_charges_paise-realized_pnl_paise),0),
+         coalesce(sum(brokerage_paise+exchange_transaction_paise+ipft_paise
+           +sebi_paise+stamp_duty_paise+stt_paise+gst_paise),0),
+         count(*) FILTER (WHERE charge_schedule_version<>'NSE_OPTIONS_SIM_V1_2026_11')
+    INTO v_fill_count,v_fill_realized,v_fill_charges,v_released_basis,
+         v_component_charges,v_invalid_schedule_rows
     FROM public.paper_option_limit_fills
    WHERE order_id=repeat('2',64);
 
@@ -116,6 +122,8 @@ BEGIN
 
   IF v_status<>'FILLED' OR v_filled<>195 OR v_fill_count<>3
      OR v_fill_charges<>v_sell_charges
+     OR v_component_charges<>v_fill_charges
+     OR v_invalid_schedule_rows<>0
      OR v_released_basis<>v_entry_basis
      OR v_realized<>v_fill_realized
      OR v_cash<>v_expected_cash
@@ -126,9 +134,10 @@ BEGIN
           AND instrument_key='NSE_FO|CHAT6_PARTIAL_CLOSE'
      ) THEN
     RAISE EXCEPTION
-      'Repeated partial close conservation failed: status %, filled %, fills %, entry basis %, released basis %, fill realized %, account realized %, cash %, expected cash %, reserved cash %, reserved margin %',
+      'Repeated partial close conservation/charge breakdown failed: status %, filled %, fills %, entry basis %, released basis %, fill realized %, account realized %, cash %, expected cash %, reserved cash %, reserved margin %, booked charges %, component charges %, invalid schedule rows %',
       v_status,v_filled,v_fill_count,v_entry_basis,v_released_basis,
-      v_fill_realized,v_realized,v_cash,v_expected_cash,v_reserved_cash,v_reserved_margin;
+      v_fill_realized,v_realized,v_cash,v_expected_cash,v_reserved_cash,v_reserved_margin,
+      v_fill_charges,v_component_charges,v_invalid_schedule_rows;
   END IF;
 END
 $options_partial_close_conservation$;
