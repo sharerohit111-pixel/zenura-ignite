@@ -112,9 +112,8 @@ function buildOptionsAccountingSnapshot({
   const accountReservedCashPaise = integer(account.reserved_cash_paise ?? 0, "Account reserved cash");
   const reservedMarginPaise = integer(account.reserved_margin_paise ?? 0, "Reserved margin");
   const realizedAccountPnlPaise = signedInteger(account.realized_pnl_paise ?? 0, "Account realized P&L");
-  if (accountReservedCashPaise + reservedMarginPaise > cashPaise) {
-    fail("Account reservations exceed cash balance.");
-  }
+  const totalReservations = addSafe(accountReservedCashPaise, reservedMarginPaise, "Account reservations");
+  if (totalReservations > cashPaise) fail("Account reservations exceed cash balance.");
   const availableCashPaise = cashPaise - totalReservations;
 
   const normalizedPositions = positions.map(normalizePosition).filter(Boolean);
@@ -126,8 +125,6 @@ function buildOptionsAccountingSnapshot({
     }
     positionKeys.add(position.instrumentKey);
   }
-  const totalReservations = addSafe(accountReservedCashPaise, reservedMarginPaise, "Account reservations");
-  if (totalReservations > cashPaise) fail("Account reservations exceed cash balance.");
   const quoteMap = new Map();
   for (const quote of quotes) {
     if (!quote || typeof quote.instrumentKey !== "string" || quoteMap.has(quote.instrumentKey)) {
