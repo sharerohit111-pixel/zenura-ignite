@@ -15,7 +15,7 @@ on:
       - "markets/shared/paper-demo-adapter.mjs"
       - "market-gateway/test/paper-demo-adapter.test.mjs"
       - "markets/dashboard/**"
-      - "markets/stocks/demo-*"\n      - "markets/shared/paper-demo-adapter.mjs"\n      - "market-gateway/mock/fixtures/*.json"
+      - "markets/stocks/demo-*"\n      - "markets/shared/paper-demo-adapter.mjs"\n      - "market-gateway/mock/fixtures/*.json"\n      - "markets/shared/paper-demo-adapter.mjs"\n      - "market-gateway/mock/fixtures/*.json"
       - ".github/workflows/s-trade-mock-contracts.yml"
   push:
     branches:
@@ -30,7 +30,7 @@ on:
       - "markets/shared/paper-demo-adapter.mjs"
       - "market-gateway/test/paper-demo-adapter.test.mjs"
       - "markets/dashboard/**"
-      - "markets/stocks/demo-*"
+      - "markets/stocks/demo-*"\n      - "markets/shared/paper-demo-adapter.mjs"\n      - "market-gateway/mock/fixtures/*.json"
       - ".github/workflows/s-trade-mock-contracts.yml"
 
 permissions:
