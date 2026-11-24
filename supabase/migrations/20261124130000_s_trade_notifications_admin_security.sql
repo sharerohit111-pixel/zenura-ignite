@@ -140,19 +140,21 @@ DECLARE
   v_event text;
   v_title text;
   v_body text;
-  v_enabled boolean;
+  v_alerts_enabled boolean;
+  v_trades_enabled boolean;
 BEGIN
   v_user_id := (to_jsonb(NEW)->>'user_id')::uuid;
   v_status := upper(coalesce(to_jsonb(NEW)->>'status',''));
-  v_old_status := upper(coalesce(to_jsonb(OLD)->>'status',''));
+  v_old_status := CASE WHEN TG_OP='INSERT' THEN NULL ELSE upper(coalesce(to_jsonb(OLD)->>'status','')) END;
   v_order_id := coalesce(to_jsonb(NEW)->>'order_id',to_jsonb(NEW)->>'id');
   IF v_user_id IS NULL OR v_status=v_old_status OR v_status NOT IN ('FILLED','PARTIALLY_FILLED','CANCELLED','REJECTED') THEN
     RETURN NEW;
   END IF;
   SELECT coalesce(order_alerts,true),coalesce(trade_confirmations,true)
-    INTO v_enabled,v_enabled FROM public.s_trade_notification_preferences WHERE user_id=v_user_id;
-  IF NOT FOUND THEN v_enabled:=true; END IF;
-  IF NOT v_enabled THEN RETURN NEW; END IF;
+    INTO v_alerts_enabled,v_trades_enabled FROM public.s_trade_notification_preferences WHERE user_id=v_user_id;
+  IF NOT FOUND THEN v_alerts_enabled:=true; v_trades_enabled:=true; END IF;
+  IF (v_status='FILLED' AND NOT v_trades_enabled)
+    OR (v_status<>'FILLED' AND NOT v_alerts_enabled) THEN RETURN NEW; END IF;
   v_event := CASE WHEN v_status='FILLED' THEN 'trade_confirmation' ELSE 'order_alert' END;
   v_title := CASE v_status WHEN 'FILLED' THEN 'Trade confirmed'
     WHEN 'PARTIALLY_FILLED' THEN 'Order partially filled'
@@ -166,10 +168,10 @@ END;
 $$;
 
 DROP TRIGGER IF EXISTS s_trade_paper_order_notification ON public.paper_orders;
-CREATE TRIGGER s_trade_paper_order_notification AFTER UPDATE OF status ON public.paper_orders
+CREATE TRIGGER s_trade_paper_order_notification AFTER INSERT OR UPDATE ON public.paper_orders
   FOR EACH ROW EXECUTE FUNCTION public.s_trade_notify_order_event();
 DROP TRIGGER IF EXISTS s_trade_derivative_order_notification ON public.paper_derivative_orders;
-CREATE TRIGGER s_trade_derivative_order_notification AFTER UPDATE OF status ON public.paper_derivative_orders
+CREATE TRIGGER s_trade_derivative_order_notification AFTER INSERT OR UPDATE ON public.paper_derivative_orders
   FOR EACH ROW EXECUTE FUNCTION public.s_trade_notify_order_event();
 
 CREATE OR REPLACE FUNCTION public.s_trade_evaluate_price_alert(
