@@ -58,14 +58,30 @@
       "instrumentKey": "MOCK|NSE|EQ|0001",
       "bids": [
         {
-          "pricePaise": 125000,
-          "quantity": 20
+          "pricePaise": 124950,
+          "quantity": 2
+        },
+        {
+          "pricePaise": 124900,
+          "quantity": 3
+        },
+        {
+          "pricePaise": 124850,
+          "quantity": 4
         }
       ],
       "asks": [
         {
+          "pricePaise": 125050,
+          "quantity": 2
+        },
+        {
           "pricePaise": 125100,
-          "quantity": 15
+          "quantity": 3
+        },
+        {
+          "pricePaise": 125150,
+          "quantity": 4
         }
       ]
     }
