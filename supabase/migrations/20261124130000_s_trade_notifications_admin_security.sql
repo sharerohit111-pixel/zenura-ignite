@@ -182,6 +182,16 @@ DROP TRIGGER IF EXISTS s_trade_admin_registry_audit ON public.s_trade_admins;
 CREATE TRIGGER s_trade_admin_registry_audit AFTER INSERT OR DELETE ON public.s_trade_admins
   FOR EACH ROW EXECUTE FUNCTION public.s_trade_audit_admin_registry_change();
 
+CREATE OR REPLACE FUNCTION public.s_trade_reject_admin_registry_update()
+RETURNS trigger LANGUAGE plpgsql SET search_path='' AS $
+BEGIN
+  RAISE EXCEPTION 'S-TRADE administrator registry is immutable; revoke and re-grant with audit' USING ERRCODE='55000';
+END;
+$;
+DROP TRIGGER IF EXISTS s_trade_admin_registry_no_update ON public.s_trade_admins;
+CREATE TRIGGER s_trade_admin_registry_no_update BEFORE UPDATE ON public.s_trade_admins
+  FOR EACH ROW EXECUTE FUNCTION public.s_trade_reject_admin_registry_update();
+
 CREATE OR REPLACE FUNCTION public.s_trade_notify_order_event()
 RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
 DECLARE
@@ -266,6 +276,7 @@ $$;
 
 REVOKE ALL ON FUNCTION public.s_trade_reject_audit_mutation() FROM PUBLIC,anon,authenticated,service_role;
 REVOKE ALL ON FUNCTION public.s_trade_audit_admin_registry_change() FROM PUBLIC,anon,authenticated,service_role;
+REVOKE ALL ON FUNCTION public.s_trade_reject_admin_registry_update() FROM PUBLIC,anon,authenticated,service_role;
 REVOKE ALL ON FUNCTION public.s_trade_notify_order_event() FROM PUBLIC,anon,authenticated,service_role;
 REVOKE ALL ON FUNCTION public.s_trade_evaluate_price_alert(uuid,numeric) FROM PUBLIC,anon,authenticated;
 GRANT EXECUTE ON FUNCTION public.s_trade_evaluate_price_alert(uuid,numeric) TO service_role;
