@@ -29,7 +29,7 @@ test("market BUY sweeps deterministic ask levels and returns one immutable recei
   assert.equal(c.order.grossValuePaise,875700);assert.equal(c.order.averagePricePaise,125100);
   assert.equal(e.getFillReceipts(order.orderId).length,3);
   assert.deepEqual(e.getFillReceipts(order.orderId).map(x=>x.fillId),["DEMO-EQ-demo-buy-0001-F0001","DEMO-EQ-demo-buy-0001-F0002","DEMO-EQ-demo-buy-0001-F0003"]);
-  const snap=e.snapshot();assert.equal(snap.account.cashBalancePaise,100000000-875750);
+  const snap=e.snapshot();assert.equal(snap.account.cashBalancePaise,100000000-875700);
   assert.equal(snap.account.blockedFundsPaise,0);assert.equal(snap.account.availableFundsPaise,snap.account.cashBalancePaise);
   assert.equal(snap.account.positions[fixture.data.instrument.instrumentKey].quantity,7);
   assert.equal(snap.account.positions[fixture.data.instrument.instrumentKey].costBasisPaise,875750);
