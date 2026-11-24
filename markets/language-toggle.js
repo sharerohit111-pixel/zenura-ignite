@@ -76,8 +76,8 @@
     "Protective order history could not be loaded.":"सुरक्षात्मक ऑर्डर इतिहास लोड नहीं हो सका।","Protective execution is disabled on this gateway. No new protective exits can be created.":"इस गेटवे पर सुरक्षात्मक निष्पादन बंद है। नया सुरक्षात्मक ऑर्डर नहीं बनाया जा सकता।",
     "Equity protective worker is enabled. Orders are simulated; share quantity is rechecked at execution and is not reserved.":"इक्विटी सुरक्षात्मक वर्कर सक्षम है। ऑर्डर सिमुलेटेड हैं; निष्पादन के समय शेयर मात्रा दोबारा जाँची जाती है और रिज़र्व नहीं होती।",
     "NSE/BSE cash equities only · SELL-to-close · Simulated execution.":"केवल NSE/BSE कैश इक्विटी · SELL-to-close · सिमुलेटेड निष्पादन।","CANCEL":"रद्द करें",
-    "Protective order cancelled.":"सुरक्षात्मक ऑर्डर रद्द कर दिया गया।","Protective cancellation failed.":"सुरक्षात्मक ऑर्डर रद्द नहीं हो सका।","Protective order rejected.":"सुरक्षात्मक ऑर्डर अस्वीकार हुआ।"
-    "PROTECTED FUTURES EXECUTION":"सुरक्षित फ्यूचर्स निष्पादन",,
+    "Protective order cancelled.":"सुरक्षात्मक ऑर्डर रद्द कर दिया गया।","Protective cancellation failed.":"सुरक्षात्मक ऑर्डर रद्द नहीं हो सका।","Protective order rejected.":"सुरक्षात्मक ऑर्डर अस्वीकार हुआ।",
+    "PROTECTED FUTURES EXECUTION":"सुरक्षित फ्यूचर्स निष्पादन",
     "Futures LIMIT Ticket":"फ्यूचर्स लिमिट ऑर्डर टिकट",
     "BUY LIMIT":"लिमिट खरीदें","SELL LIMIT":"लिमिट बेचें",
     "e.g. 24850.00":"जैसे 24850.00",
