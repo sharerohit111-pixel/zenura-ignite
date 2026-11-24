@@ -90,13 +90,14 @@ function createAccountSessionHarness() {
  vm.runInNewContext(source.replace('import { supabase } from "./supabase-client.js";',"const {supabase}=globalThis.__test;"),{
   document,fetch,queueMicrotask,AbortSignal:{timeout:()=>({})},Intl,globalThis:{__test:{supabase}},console
  });
- return {elements,firstStarted,resolveFirst:()=>firstResolve({data:{user:{id:"user-1",email:"one@example.test",user_metadata:{display_name:"First User"}}},error:null}),switchUser:()=>{currentSession={user:{id:"user-2"},access_token:"token-user-2"};listener("SIGNED_IN",currentSession);},switchOut:()=>{currentSession=null;listener("SIGNED_OUT",null);}};
+ return {elements,firstStarted,resolveFirst:()=>firstResolve({data:{user:{id:"user-1",email:"one@example.test",user_metadata:{display_name:"First User"}}},error:null}),switchFirst:()=>{currentSession={user:{id:"user-1"},access_token:"token-user-1"};listener("SIGNED_IN",currentSession);},switchUser:()=>{currentSession={user:{id:"user-2"},access_token:"token-user-2"};listener("SIGNED_IN",currentSession);},switchOut:()=>{currentSession=null;listener("SIGNED_OUT",null);}};
 }
 test("a delayed previous-user profile response cannot overwrite the newly active account", async()=>{
  const h=createAccountSessionHarness();
  await new Promise(r=>setTimeout(r,0));
- h.switchUser();
+ h.switchFirst();
  await h.firstStarted;
+ h.switchUser();
  await new Promise(r=>setTimeout(r,0));
  h.resolveFirst();
  await new Promise(r=>setTimeout(r,10));
