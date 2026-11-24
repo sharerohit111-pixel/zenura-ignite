@@ -210,8 +210,8 @@ test("JSON parser failures preserve request IDs, CORS headers and safe JSON erro
  const firstRoute=server.indexOf('app.get("/health"');
  assert.ok(requestId>=0&&cors>requestId&&parser>cors&&parserError>parser&&firstRoute>parserError,
   "request ID and CORS middleware must precede body parsing and parser error handling must precede routes");
- assert.match(server,/status\(413\)\.json\(\{error:"Request body exceeds the 32 KB limit\.",requestId:req\.requestId\|\|null\}\)/);
- assert.match(server,/status\(400\)\.json\(\{error:"Request body must contain valid JSON\.",requestId:req\.requestId\|\|null\}\)/);
+ assert.match(server,/status\(413\)\.json\(\{error:"Request body exceeds the 32 KB limit\.",code:publicErrorCode\(413\),requestId:req\.requestId\|\|null\}\)/);
+ assert.match(server,/status\(400\)\.json\(\{error:"Request body must contain valid JSON\.",code:publicErrorCode\(400\),requestId:req\.requestId\|\|null\}\)/);
  assert.match(server,/errorName:"SyntaxError"/);
 });
 
