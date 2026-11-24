@@ -85,6 +85,17 @@ const axePath=require.resolve("axe-core/axe.min.js");
    }
    await page.goto("http://127.0.0.1:4173/markets/stocks/demo.html",{waitUntil:"domcontentloaded",timeout:30000});
    await page.addScriptTag({path:axePath});
+   const toggle=page.locator("#language-toggle");
+   await toggle.click();assert.equal(await page.locator("html").getAttribute("lang"),"hi",viewport.name+" Hindi language metadata");
+   assert.equal(await page.locator("#screen-nav button[data-screen=\"home\"]").textContent(),"होम",viewport.name+" Hindi nav translation");
+   await toggle.click();assert.equal(await page.locator("html").getAttribute("lang"),"en",viewport.name+" English language metadata");
+   await page.locator("#screen-nav button[data-screen=\"charts\"]").click();
+   assert.equal(await page.locator("[data-demo-timeframe=\"5m\"]").getAttribute("aria-pressed"),"true",viewport.name+" selected chart timeframe state");
+   await page.locator("[data-demo-timeframe=\"1m\"]").click();
+   assert.equal(await page.locator("[data-demo-timeframe=\"1m\"]").getAttribute("aria-pressed"),"true",viewport.name+" chart control state");
+   await page.locator("#screen-nav button[data-screen=\"options\"]").click();
+   assert.ok(await page.locator(".catalog-results .table-wrap").count(),viewport.name+" option chain table region");
+   if(viewport.width<500){const controls=await page.locator(".catalog-controls select").evaluateAll(nodes=>nodes.every(node=>node.getBoundingClientRect().width>0));assert.equal(controls,true,viewport.name+" option-chain controls remain visible");}
    const axe=await page.evaluate(async()=>window.axe.run(document,{runOnly:{type:"tag",values:["wcag2a","wcag2aa","wcag21a","wcag21aa"]}}));
    const serious=axe.violations.filter(v=>v.impact==="critical"||v.impact==="serious");
    if(serious.length) console.error(JSON.stringify(serious.map(v=>({id:v.id,help:v.help,nodes:v.nodes.map(n=>({target:n.target,html:n.html,failureSummary:n.failureSummary}))}))));
