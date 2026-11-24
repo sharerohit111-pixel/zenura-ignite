@@ -53,3 +53,16 @@ Outage tests should include timeout, connection reset, HTTP 401/429/5xx, WebSock
 6. Provider health monitoring and quota bucket retention deployed.
 7. No credential or provider enabled until explicit owner approval.
 8. Broker execution adapter remains independent and disabled; real orders require separate written owner approval and broker entitlement.
+
+## Canonical NSE/BSE instrument identity and provider symbol mapping
+
+The first identity layer is deliberately provider-neutral and accepts normalized records only. Raw NSE/BSE/provider file parsers remain separate adapters and must be added only against verified official schemas and source rights.
+
+- Cash equity identity is exchange-scoped and ISIN-based: `EQ:NSE:<ISIN>` or `EQ:BSE:<ISIN>`. NSE and BSE listings are distinct tradable instruments even when they share an ISIN.
+- Futures identity uses exchange, derivative segment, canonical underlying instrument ID and exact expiry date.
+- Options identity additionally uses CE/PE and integer-paise strike. Provider trading symbols and instrument tokens are aliases, never canonical identities.
+- Each provider mapping is keyed by provider ID, exchange and provider instrument key, and retains the canonical ID plus source date and SHA-256 provenance.
+- Segment/exchange mismatch, malformed ISIN/date, missing underlying, invalid tick/lot size, unsupported contract type, duplicate canonical identity and provider-key collision fail closed.
+- Instrument master generation timestamps must be non-future and within the configured seven-day bound. Source date, source reference and a 64-character SHA-256 are mandatory.
+
+This is an identity/normalization foundation, not a production NSE/BSE import, database registry, or connected provider adapter. Do not use guessed symbol matching, company-name fuzzy matching, or ticker-only joins. Before persisting registry tables, coordinate schema ownership and migration inventory with the database/security workstream. Raw vendor parsers must have official fixtures, checksum verification, row-count/duplicate controls, and exchange-specific validity checks. No external credentials or feeds are enabled.
