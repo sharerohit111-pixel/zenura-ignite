@@ -111,3 +111,13 @@ test("Demo entrypoint excludes authenticated, broker and production order module
  assert.doesNotMatch(equity,/fetch\s*\([^)]*(?:\/paper\/|\/s-trade\/|\/orders)/i);
  assert.doesNotMatch(fo,/fetch\s*\([^)]*(?:\/paper\/|\/s-trade\/|\/orders)/i);
 });
+
+test("production gateway entrypoints never import Demo adapters, engines or fixtures",async()=>{
+ const [supabaseServer,legacyServer]=await Promise.all([
+  readFile(new URL("../../market-gateway/supabase-server.js",import.meta.url),"utf8"),
+  readFile(new URL("../../market-gateway/server.js",import.meta.url),"utf8")
+ ]);
+ for(const source of [supabaseServer,legacyServer]){
+  assert.doesNotMatch(source,/(?:paper-demo-adapter|equity-demo-execution-engine|derivative-mock-simulator|mock\\/fixtures)/i);
+ }
+});
