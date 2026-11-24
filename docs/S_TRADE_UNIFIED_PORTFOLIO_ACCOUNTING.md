@@ -8,7 +8,7 @@ All monetary values are integer paise.
 - Starting capital comes from `paper_accounts.starting_cash_paise`; expected initial grant is 100,000,000 paise (₹10,00,000), initialized once. The read model never resets or tops up an account.
 - Cash comes from `paper_accounts.cash_paise`.
 - Blocked funds = reserved cash + reserved margin. Do not add asset-level reservations a second time.
-- Available cash = cash - reserved cash - reserved margin. Negative values are preserved and margin deficit remains visible.
+- Available cash = cash - reserved cash - reserved margin. Negative values are preserved and margin deficit remains visible. `margin_deficit_paise` must exactly equal `max(0, reserved cash + reserved margin - cash)`; both understated and overstated values fail closed.
 - Asset adapters provide user-scoped positions, orders and immutable trade receipts. They do not mutate cash or re-add reservations.
 - Realized P&L is gross of charges; charges are deducted once in net P&L.
 - Position/order/trade IDs must be unique across all three adapters.
