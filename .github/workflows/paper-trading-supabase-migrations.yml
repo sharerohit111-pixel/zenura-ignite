@@ -343,8 +343,8 @@ jobs:
             v_qty integer;
             v_replay boolean;
             v_error text;
-            v_market_order_id uuid := gen_random_uuid();
-            v_tiny_sell_order_id uuid := gen_random_uuid();
+            v_market_order_id text := md5(clock_timestamp()::text || random()::text || txid_current()::text) || md5(random()::text);
+            v_tiny_sell_order_id text := md5(clock_timestamp()::text || random()::text || txid_current()::text) || md5(random()::text);
           BEGIN
             -- MARKET BUY: 10 shares at ₹100; retry must not debit twice.
             v_result := public.execute_paper_market_order(
