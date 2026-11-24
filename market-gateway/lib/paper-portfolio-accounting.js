@@ -26,6 +26,7 @@ function buildPaperPortfolioAccounting({account,assetSnapshots,mode="PERSISTED",
   for(const p of s.positions){
    if(!p||p.asset!==s.asset)fail("Position asset does not match adapter.");
    const positionId=id(p.positionId,"Position ID"),quantity=money(p.quantity,"Position quantity"),costBasisPaise=money(p.costBasisPaise,"Position cost basis");
+   if(!["LONG","SHORT"].includes(p.side))fail("Position side must be LONG or SHORT.");
    if(positionIds.has(positionId))fail("Duplicate position ID across assets.");positionIds.add(positionId);
    if(quantity<1)fail("Open position quantity must be positive.");
    let row={...p,positionId,costBasisPaise};
@@ -33,7 +34,8 @@ function buildPaperPortfolioAccounting({account,assetSnapshots,mode="PERSISTED",
     const price=money(p.marketPricePaise,"Market price"),at=money(p.quoteTimestampMs,"Quote timestamp");
     if(at>now||now-at>maxQuoteAgeMs){row={...row,quoteStatus:"stale",marketPricePaise:null,marketValuePaise:null,unrealizedPnlPaise:null};stale++;unpriced=true;}
     else{const value=money(p.marketValuePaise,"Market value"),pnl=money(p.unrealizedPnlPaise,"Unrealized P&L",true);
-     if(!Number.isSafeInteger(price*quantity)||value!==price*quantity||pnl!==value-costBasisPaise)fail("Position valuation does not reconcile.");
+     const expectedPnl=p.side==="SHORT"?costBasisPaise-value:value-costBasisPaise;
+     if(!Number.isSafeInteger(price*quantity)||value!==price*quantity||pnl!==expectedPnl)fail("Position valuation does not reconcile.");
      marketValue=add(marketValue,value,"Market value");unrealized=add(unrealized,pnl,"Unrealized P&L");}
    }else{row={...row,quoteStatus:p.quoteStatus||"unavailable",marketPricePaise:null,marketValuePaise:null,unrealizedPnlPaise:null};stale++;unpriced=true;}
    positions.push(row);
