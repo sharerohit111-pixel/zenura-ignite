@@ -15,7 +15,9 @@ on:
       - "markets/shared/paper-demo-adapter.mjs"
       - "market-gateway/test/paper-demo-adapter.test.mjs"
       - "markets/dashboard/**"
-      - "markets/stocks/demo-*"\n      - "markets/shared/paper-demo-adapter.mjs"\n      - "market-gateway/mock/fixtures/*.json"\n      - "markets/shared/paper-demo-adapter.mjs"\n      - "market-gateway/mock/fixtures/*.json"
+      - "markets/stocks/demo-*"
+      - "markets/shared/paper-demo-adapter.mjs"
+      - "market-gateway/mock/fixtures/*.json"
       - ".github/workflows/s-trade-mock-contracts.yml"
   push:
     branches:
@@ -30,7 +32,9 @@ on:
       - "markets/shared/paper-demo-adapter.mjs"
       - "market-gateway/test/paper-demo-adapter.test.mjs"
       - "markets/dashboard/**"
-      - "markets/stocks/demo-*"\n      - "markets/shared/paper-demo-adapter.mjs"\n      - "market-gateway/mock/fixtures/*.json"
+      - "markets/stocks/demo-*"
+      - "markets/shared/paper-demo-adapter.mjs"
+      - "market-gateway/mock/fixtures/*.json"
       - ".github/workflows/s-trade-mock-contracts.yml"
 
 permissions:
@@ -53,7 +57,6 @@ jobs:
             'market-gateway/mock/contracts/paper-trading-envelope.schema.json',
             'market-gateway/mock/contracts/paper-trading-domain.schema.json',
             'markets/dashboard/mock-data.json',
-            'markets/stocks/demo-market-data.json',
             ...fs.readdirSync('market-gateway/mock/fixtures').filter(x => x.endsWith('.json'))
               .map(x => 'market-gateway/mock/fixtures/' + x)
           ];
