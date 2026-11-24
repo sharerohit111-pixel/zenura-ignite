@@ -22,9 +22,11 @@ Excluded: Crypto, production migration, deployment, staging writes, and live acc
 2. Added Supabase SMS OTP send/verify flow using E.164 phone input and `verifyOtp(type: "sms")`. It supports account creation through the Supabase Phone provider; project-level Phone/SMS provider configuration remains an external prerequisite.
 3. Added display-name profile editing through the signed-in user's own Supabase Auth metadata.
 4. Added session refresh, auth-state synchronization, logout, and clearing of displayed wallet values when the active account changes or signs out.
+5. Added authenticated Supabase email-change and password-change controls; email activation remains subject to Supabase confirmation policy, and password changes require a valid active session.
+6. Added a localhost-only UI mock preview with no Supabase session, API access, order execution, or database writes. Mock mode explicitly blocks profile, email/password, session-refresh and wallet-refresh actions; the control is removed on non-local hosts.
 5. Added a private wallet snapshot panel for starting capital, cash, blocked funds and available funds.
 6. Added integer-paise wallet projection validation in `market-gateway/lib/paper-wallet.js`; it rejects negative, fractional, unsafe or inconsistent balances. The gateway still reads `paper_accounts` through the authenticated user's JWT/RLS.
-7. Added frontend and gateway regression tests and wired the account module test into the disposable migration workflow.
+7. Added frontend and gateway regression tests covering local mock isolation and account-security updates, and wired the account module test into the disposable migration workflow.
 
 ## Wallet formula currently exposed
 
@@ -58,4 +60,4 @@ Required next ledger phase:
 
 ## Validation status
 
-Source and workflow wiring are committed for CI. This environment has not run the GitHub Actions workflow or a disposable PostgreSQL instance; do not treat the new tests as passed until CI reports success on the exact PR head.
+GitHub Actions has executed the account browser checks on the PR head, but the latest completed run failed only because a regression assertion expected the wrong literal for the production mock-button removal (`else mockButton.remove()`). That assertion has now been corrected on the current PR head; a new exact-head run is pending/not yet reported. Do not claim green CI until that run completes. SMS delivery/provider setup and real browser end-to-end flows remain external release gates.
