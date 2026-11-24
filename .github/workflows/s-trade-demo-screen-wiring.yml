@@ -44,7 +44,7 @@ jobs:
         with:
           node-version: "22"
       - name: Check browser module syntax
-        run: node --check markets/shared/paper-demo-adapter.mjs && node --check markets/stocks/demo.js && node --check markets/stocks/demo-chart-data.mjs && node --check markets/stocks/demo-chart-panel.mjs && node --check markets/stocks/demo-watchlist-persistence.mjs
+        run: node --check market-gateway/supabase-server.js && node --check market-gateway/lib/watchlist-instrument-resolver.js && node --check markets/shared/paper-demo-adapter.mjs && node --check markets/stocks/demo.js && node --check markets/stocks/demo-chart-data.mjs && node --check markets/stocks/demo-chart-panel.mjs && node --check markets/stocks/demo-watchlist-persistence.mjs
       - name: Validate shared fixtures
         run: |
           node - <<'NODE'
