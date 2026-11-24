@@ -294,7 +294,7 @@ declare
 begin
   if p_user_id is null or p_instrument_key is null
      or length(p_instrument_key) not between 1 and 100
-     or p_initial_margin_paise is null or p_initial_margin_paise<0
+     or p_initial_margin_paise is null or p_initial_margin_paise<=0
      or p_maintenance_margin_paise is null or p_maintenance_margin_paise<=0
      or p_provider is null or p_provider not in ('UPSTOX','ZERODHA','ANGEL_ONE','DHAN','FYERS','AUTHORIZED_VENDOR')
      or p_source_reference is null or length(p_source_reference) not between 1 and 500
@@ -419,11 +419,10 @@ declare
   v_new_account_margin bigint;
   v_server_now_ms bigint;
   v_event_id uuid;
-  v_expected_source text;
 begin
   if p_user_id is null or p_instrument_key is null
      or length(p_instrument_key) not between 1 and 100
-     or p_close_reason not in ('EXPIRY_SETTLEMENT','SIMULATED_SQUARE_OFF')
+     or p_close_reason is null or p_close_reason not in ('EXPIRY_SETTLEMENT','SIMULATED_SQUARE_OFF')
      or p_settlement_date is null
      or p_close_price_paise is null or p_close_price_paise<=0
      or p_charges_paise is null or p_charges_paise<0
@@ -440,17 +439,16 @@ begin
   v_server_now_ms:=floor(extract(epoch from clock_timestamp())*1000)::bigint;
   if abs(v_server_now_ms-p_now_ms)>2000
      or p_source_timestamp_ms>v_server_now_ms+2000
-     or v_server_now_ms-p_source_timestamp_ms>900000 then
-    raise exception 'Futures close price source is stale.' using errcode='22023';
+     or v_server_now_ms-p_source_timestamp_ms>900000
+     or p_settlement_date>(clock_timestamp() at time zone 'Asia/Kolkata')::date then
+    raise exception 'Futures close price source/date is stale or in the future.' using errcode='22023';
   end if;
 
   if p_close_reason='EXPIRY_SETTLEMENT' then
-    v_expected_source:='NSE_OFFICIAL_FINAL_SETTLEMENT';
     if lower(p_source_reference) !~ '^https://([a-z0-9-]+[.])*(nseindia[.]com|nsearchives[.]nseindia[.]com)(/|$)' then
       raise exception 'Expiry settlement requires an official NSE/NSE Clearing source.' using errcode='22023';
     end if;
   else
-    v_expected_source:='PROVIDER_SQUARE_OFF_QUOTE';
     if p_source_type not in ('UPSTOX_QUOTE','ZERODHA_QUOTE','ANGEL_ONE_QUOTE','DHAN_QUOTE','FYERS_QUOTE','AUTHORIZED_VENDOR_QUOTE') then
       raise exception 'Square-off requires an authorized provider quote source.' using errcode='22023';
     end if;
@@ -487,6 +485,9 @@ begin
   select * into v_position from public.paper_futures_positions
    where user_id=p_user_id and instrument_key=p_instrument_key for update;
   if not found then raise exception 'Open Futures position was not found.' using errcode='P0002'; end if;
+  if v_pending_close_quantity<>v_position.reserved_close_quantity then
+    raise exception 'Futures pending close reservations do not reconcile with the position.' using errcode='23514';
+  end if;
   if p_close_price_paise%v_position.tick_size_paise<>0 then
     raise exception 'Futures close price is off contract tick size.' using errcode='22023';
   end if;
@@ -567,3 +568,88 @@ comment on table public.paper_futures_risk_events is
   'Immutable Futures-only simulation accounting events. Corrections must be compensating events; never update/delete.';
 comment on column public.paper_accounts.margin_deficit_paise is
   'Generated shortfall between cash and reserved funds; a negative cash balance is preserved after MTM losses.';
+
+
+-- Risk state is enforced at both order acceptance and LIMIT fill time. A stale
+-- (older than 15 minutes), UNKNOWN or MARGIN_CALL provider snapshot blocks
+-- risk-increasing orders/fills, while position-reducing exits remain permitted.
+create or replace function public._guard_paper_futures_risk_increase()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+declare
+  v_user_id uuid;
+  v_instrument_key text;
+  v_side text;
+  v_position public.paper_futures_positions%rowtype;
+  v_risk public.paper_futures_risk_state%rowtype;
+  v_has_position boolean:=false;
+  v_now_ms bigint;
+begin
+  if tg_table_name='paper_futures_orders' then
+    v_user_id:=new.user_id;
+    v_instrument_key:=new.instrument_key;
+    v_side:=new.side;
+  else
+    select user_id,instrument_key,side into v_user_id,v_instrument_key,v_side
+      from public.paper_futures_orders where order_id=new.order_id;
+    if not found then
+      raise exception 'Futures fill has no owning order.' using errcode='23503';
+    end if;
+  end if;
+
+  select * into v_risk from public.paper_futures_risk_state
+   where user_id=v_user_id and instrument_key=v_instrument_key;
+  if not found then return new; end if;
+
+  v_now_ms:=floor(extract(epoch from clock_timestamp())*1000)::bigint;
+  if v_risk.risk_status='HEALTHY'
+     and v_now_ms-v_risk.source_timestamp_ms<=900000 then
+    return new;
+  end if;
+
+  select * into v_position from public.paper_futures_positions
+   where user_id=v_user_id and instrument_key=v_instrument_key;
+  v_has_position:=found;
+
+  -- With no position, only a MARKET close can be observed here (its atomic
+  -- transaction has already flattened the row); a LIMIT order/fill is opening.
+  if not v_has_position then
+    if tg_table_name='paper_futures_orders' and new.order_type='MARKET' then
+      return new;
+    end if;
+    raise exception 'Futures risk snapshot is UNKNOWN, stale or in margin call; opening exposure is blocked.'
+      using errcode='55000';
+  end if;
+
+  if (v_position.net_quantity>0 and v_side='SELL')
+     or (v_position.net_quantity<0 and v_side='BUY') then
+    return new;
+  end if;
+  raise exception 'Futures risk snapshot is UNKNOWN, stale or in margin call; risk-increasing exposure is blocked.'
+    using errcode='55000';
+end;
+$$;
+
+drop trigger if exists paper_futures_risk_guard_order on public.paper_futures_orders;
+create trigger paper_futures_risk_guard_order
+before insert on public.paper_futures_orders
+for each row execute function public._guard_paper_futures_risk_increase();
+
+drop trigger if exists paper_futures_risk_guard_fill on public.paper_futures_fills;
+create trigger paper_futures_risk_guard_fill
+before insert on public.paper_futures_fills
+for each row execute function public._guard_paper_futures_risk_increase();
+
+drop policy if exists paper_futures_risk_state_select_own on public.paper_futures_risk_state;
+create policy paper_futures_risk_state_select_own
+  on public.paper_futures_risk_state for select to authenticated
+  using (auth.uid()=user_id);
+
+drop policy if exists paper_futures_settlement_state_select_own on public.paper_futures_settlement_state;
+create policy paper_futures_settlement_state_select_own
+  on public.paper_futures_settlement_state for select to authenticated
+  using (auth.uid()=user_id);
+
+revoke all on function public._guard_paper_futures_risk_increase() from public,anon,authenticated;
