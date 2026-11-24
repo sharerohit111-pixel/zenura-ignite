@@ -31,7 +31,14 @@ require.cache[supabaseModule]={
       const query={
         select(){return this;},eq(){return this;},order(){return this;},in(){return this;},
         limit(){return Promise.resolve({data:[],error:null});},
-        maybeSingle(){return Promise.resolve({data:null,error:null});}
+        maybeSingle(){
+          if(table==="upstox_connections")return Promise.resolve({data:{
+            status:"connected",
+            token_expires_at:new Date(Date.now()+60_000).toISOString(),
+            token_ciphertext:{iv:"test-iv",ciphertext:"test-ciphertext",tag:"test-tag"}
+          },error:null});
+          return Promise.resolve({data:null,error:null});
+        }
       };
       return query;
     },
