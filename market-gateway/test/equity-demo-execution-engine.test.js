@@ -1,6 +1,9 @@
 "use strict";
 const test=require("node:test");
 const assert=require("node:assert/strict");
+const fs=require("node:fs");
+const path=require("node:path");
+const vm=require("node:vm");
 const fixture=require("../mock/fixtures/equity-execution.json");
 const accountFixture=require("../mock/fixtures/account.json");
 const {createEquityDemoExecutionEngine,validateEquityDemoFixture}=require("../lib/equity-demo-execution-engine");
@@ -107,4 +110,33 @@ test("Delivery and Intraday positions are accounted in separate books",()=>{
   e.matchNext(intraday.orderId);
   const s=e.snapshot();assert.equal(s.account.positions[fixture.data.instrument.instrumentKey].quantity,1);
   assert.equal(s.account.intradayPositions[fixture.data.instrument.instrumentKey].quantity,1);
+});
+
+test("browser build exposes the same engine without Node globals and can execute synthetic fills",()=>{
+  const source=fs.readFileSync(path.join(__dirname,"../lib/equity-demo-execution-engine.js"),"utf8");
+  const sandbox={window:{}};
+  vm.runInNewContext(source,sandbox,{filename:"equity-demo-execution-engine.browser.js"});
+  const api=sandbox.window.ZenuraEquityDemoEngine;
+  assert.equal(typeof api.createEquityDemoExecutionEngine,"function");
+  const browserEngine=api.createEquityDemoExecutionEngine({fixture,account:accountFixture.data,env:{NODE_ENV:"development"}});
+  const order=browserEngine.submitOrder(buy({quantity:5,idempotencyKey:"browser-demo-0001"}));
+  const first=browserEngine.matchNext(order.orderId);
+  assert.equal(first.fill.quantity,2);
+  assert.equal(first.order.status,"PARTIALLY_FILLED");
+  assert.equal(browserEngine.snapshot().account.positions[fixture.data.instrument.instrumentKey].quantity,2);
+});
+test("market page wires a separate, clearly labelled demo order sandbox and responsive styles",()=>{
+  const html=fs.readFileSync(path.join(__dirname,"../../markets/stocks/index.html"),"utf8");
+  const js=fs.readFileSync(path.join(__dirname,"../../markets/stocks/demo-equity-execution-workspace.js"),"utf8");
+  const css=fs.readFileSync(path.join(__dirname,"../../markets/stocks/demo-equity-execution-workspace.css"),"utf8");
+  assert.match(html,/id="demo-execution-lab"/);
+  assert.match(html,/SYNTHETIC · NOT A REAL ORDER/);
+  assert.match(html,/equity-demo-execution-engine\.js/);
+  assert.match(html,/demo-equity-execution-workspace\.js/);
+  assert.match(html,/demo-equity-execution-workspace\.css/);
+  assert.match(js,/../../market-gateway/mock/fixtures/equity-execution\.json/);
+  assert.match(js,/../../market-gateway/mock/fixtures/account\.json/);
+  assert.match(js,/No broker or exchange order is submitted|No broker or exchange order/);
+  assert.match(css,/@media\(max-width:760px\)/);
+  assert.match(css,/@media\(max-width:420px\)/);
 });
