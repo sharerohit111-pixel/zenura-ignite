@@ -82,3 +82,32 @@ This is not evidence that all screens are running on one Dummy JSON source. No s
 ## Out of scope / prohibited
 
 No live API purchase or integration, broker credentials, real orders, production/staging migration, PR merge, feature activation, deployment, or Crypto work. Any later release action requires separate explicit approval.
+
+
+## Round 2 follow-up — 2026-11-24
+
+### New adapter PR
+- PR #145 adds a browser-safe, pure consumer adapter over PR #137's canonical market/account/equity/derivatives fixtures.
+- Adapter requires explicit `{ enabled: true }`, rejects production mode, accepts only `MOCK|` instrument keys and `MOCK` provider quotes, preserves integer paise, and carries `ledgerReconciled=false` without upgrading it.
+- It does not fetch, authenticate, persist, submit orders, import a provider, or touch the ledger. It is not yet wired into dashboard or chart screens.
+- Exact-head PR #145 dedicated contract/adapter workflow passed at commit `583a86b3ff0eaac4cd5ea42e620cb710680594fb`: JSON parsing, fixture regression tests, adapter tests and production gateway import guard all succeeded.
+- PR #145's full PostgreSQL smoke workflow is still running; no full-stack or database pass is claimed.
+
+### Newly confirmed consumer mismatches
+- PR #138's dashboard fixture uses real-looking NSE symbols (e.g. RELIANCE/HDFCBANK) with illustrative price values. Although the fixture labels itself DEMO/DUMMY_JSON, it does not meet the canonical non-tradable MOCK-symbol rule. Do not connect these prices to live quote, valuation, order execution or the canonical adapter. Before integration, replace them with synthetic MOCK instrument identities and revalidate the dashboard calculations.
+- PR #139's chart demo uses a separate DEMO-prefixed instrument namespace and its own fixture contract. It is correctly labelled synthetic and read-only, but it is not yet the PR #137 canonical envelope. Add an explicit, tested mapping to the shared v1 envelope or update the chart consumer to the shared view model; do not allow DEMO and MOCK namespaces to drift.
+- The current adapter returns a shared read-only model but does not yet wire the nine dashboard screens or chart workspace. Browser/mobile E2E remains a release gate.
+
+### Revised Round 2 status
+| Work item | Status |
+|---|---|
+| Canonical shared fixture foundation (PR #137) | Dedicated CI passed on its latest observed exact head; full DB gate remains separate |
+| Shared browser-safe consumer adapter (PR #145) | Implemented; exact-head dedicated CI passed |
+| Dashboard fixture normalization (PR #138) | Blocked pending replacement of real-looking symbols/illustrative quotes |
+| Chart demo contract alignment (PR #139) | Pending canonical MOCK envelope adapter |
+| Screen-by-screen consumer wiring | Not yet done |
+| Cross-asset ledger/account reconciliation | Not yet done; PR #131 wallet remains unreconciled |
+| Browser/mobile/security full integration | Not yet verified |
+| Full PostgreSQL migration/RLS smoke on PR #145 head | In progress at this update |
+
+No PR was merged, no production or staging migration was applied, and no live API or Crypto code was added.
