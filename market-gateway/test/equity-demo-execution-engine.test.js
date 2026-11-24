@@ -70,7 +70,8 @@ test("cancelling a partially filled SELL preserves fills and releases only remai
   assert.equal(cancelled.order.filledQuantity,2);assert.equal(cancelled.order.remainingQuantity,5);
   assert.equal(cancelled.releasedShareQuantity,5);
   const p=e.snapshot().account.intradayPositions[key];
-  assert.equal(p.quantity,8); // cancellation releases the unfilled Intraday shares.
+  assert.equal(p.quantity,6); // two executed shares remain sold after cancellation.
+  assert.equal(p.reservedQuantity,0);
   assert.equal(e.snapshot().account.positions[key].quantity,8);
 });
 test("idempotency returns same order for same payload and rejects changed payload",()=>{
