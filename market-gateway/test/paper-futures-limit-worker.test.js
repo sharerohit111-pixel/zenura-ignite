@@ -12,8 +12,8 @@ const KEY="NSE_FO|NIFTY26NOVFUT";
 const order={
   order_id:ORDER,user_id:USER,instrument_key:KEY,trading_symbol:"NIFTY26NOVFUT",
   exchange:"NSE",segment:"NSE_FO",side:"BUY",product:"DELIVERY",
-  order_type:"LIMIT",status:"PENDING",quantity:25,filled_quantity:0,
-  remaining_quantity:25,limit_price_paise:10000,tick_size_paise:5,
+  order_type:"LIMIT",status:"PENDING",quantity:50,filled_quantity:0,
+  remaining_quantity:50,limit_price_paise:10000,tick_size_paise:5,
   lot_size:25,expiry:"2026-11-26",expires_at:"2026-11-23T06:00:00.000Z",
   reserved_open_margin_paise:200000,reserved_close_quantity:0,
   simulation_only:true,created_at:"2026-11-23T04:00:00.000Z"
@@ -66,7 +66,7 @@ function quotePayload(){
         instrument_token:KEY,timestamp:new Date(NOW-1000).toISOString(),
         depth:{
           buy:[{price:98.95,quantity:8,orders:2}],
-          sell:[{price:99,quantity:10,orders:3}]
+          sell:[{price:99,quantity:25,orders:3}]
         }
       }
     }
@@ -132,12 +132,12 @@ test("fills only the displayed best ask quantity using a fresh V3 snapshot",asyn
   assert.equal(result.scanned,1);
   assert.equal(result.partial,1);
   assert.equal(result.failed,0);
-  assert.equal(fillArgs.p_fill_quantity,10);
+  assert.equal(fillArgs.p_fill_quantity,25);
   assert.equal(fillArgs.p_execution_price_paise,9900);
   assert.equal(fillArgs.p_bid_price_paise,9895);
   assert.equal(fillArgs.p_ask_price_paise,9900);
   assert.equal(fillArgs.p_bid_quantity,8);
-  assert.equal(fillArgs.p_ask_quantity,10);
+  assert.equal(fillArgs.p_ask_quantity,25);
   assert.equal(fillArgs.p_quote_timestamp_ms,NOW-1000);
   assert.equal(fillArgs.p_now_ms,NOW);
   assert.match(fillArgs.p_execution_id,/^[a-f0-9]{64}$/);
@@ -301,4 +301,30 @@ test("uses a separate connected Upstox token for each Futures LIMIT account",asy
   assert.deepEqual(new Set(authorizationHeaders),new Set([
     "Bearer token-for-"+USER,"Bearer token-for-"+secondUser
   ]));
+});
+
+
+test("rejects Futures LIMIT quantity, lot-size and status/fill inconsistencies",()=>{
+  assert.equal(isValidNseFuture({...order,quantity:26},instrument),false);
+  assert.equal(isValidNseFuture({...order,filled_quantity:1,remaining_quantity:24},instrument),false);
+  assert.equal(isValidNseFuture({...order,filled_quantity:25,remaining_quantity:25},instrument),false);
+  assert.equal(isValidNseFuture({...order,remaining_quantity:0},instrument),false);
+  assert.equal(isValidNseFuture({...order,filled_quantity:-1},instrument),false);
+  assert.equal(isValidNseFuture({...order,remaining_quantity:24},instrument),false);
+  assert.equal(isValidNseFuture({...order,status:"PARTIALLY_FILLED"},instrument),false);
+  assert.equal(isValidNseFuture({...order,status:"PARTIALLY_FILLED",quantity:50,filled_quantity:25,remaining_quantity:25},instrument),true);
+});
+
+
+test("does not submit a Futures LIMIT partial fill smaller than one contract lot",async()=>{
+  const payload=quotePayload();
+  payload.data["NSE_FO:NIFTY26NOVFUT"].depth.sell[0].quantity=24;
+  let fillCalls=0;
+  const db=makeDb({onRpc:async(name)=>{
+    if(name==="execute_paper_futures_limit_fill")fillCalls++;
+    return {data:true,error:null};
+  }});
+  const result=await createPaperFuturesLimitWorker(deps(db,{payload}))({maxOrders:10});
+  assert.equal(fillCalls,0);
+  assert.equal(result.notEligible,1);
 });
