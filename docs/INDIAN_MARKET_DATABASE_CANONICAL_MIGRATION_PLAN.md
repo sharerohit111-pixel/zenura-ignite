@@ -414,3 +414,7 @@ Exact current source file fetched from PR #87 head `91ffb206693f4af3605d6734cc07
 The migration also adds `auth.users(id)` ownership FK with `ON DELETE CASCADE` for fills. This remains subject to the unresolved Firebase/Supabase identity architecture and financial-history retention decision: user deletion must not cascade-delete immutable financial history. Prefer restrictive ownership linkage and a separate anonymization/retention process after legal/product policy is decided.
 
 This is a draft-only finding. No SQL was changed or applied; no production/staging permissions were changed.
+
+### PR #87 disposable CI result
+
+PR #87 head `91ffb206693f4af3605d6734cc07b8029a5b0dbd` has GitHub Actions run #989 (`postgres-migration-smoke`) completed successfully. The job applied ordered draft migrations to disposable PostgreSQL and passed its listed Futures ledger cash/charges/realized-P&L/margin checks, along with the broader migration and tenant-isolation checks. This validates the tested scenarios only; it does **not** prove append-only permissions because the workflow step list does not include an assertion that UPDATE/DELETE are denied on `paper_futures_fills`. The service-role UPDATE/DELETE grant remains a release blocker until a regression test explicitly demonstrates immutability and the migration is corrected.
