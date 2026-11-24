@@ -143,6 +143,9 @@ function buildOptionsAccountingSnapshot({
       fail("An active Options LIMIT SELL reservation has no matching long position.");
     }
   }
+  if (blockedPremiumPaise > accountReservedCashPaise) {
+    fail("Blocked Options premium exceeds the account's aggregate reserved cash.");
+  }
 
   let realizedPnlPaise = 0;
   let chargesPaidPaise = 0;
@@ -154,20 +157,44 @@ function buildOptionsAccountingSnapshot({
     history.push({ source: "MARKET", id: order.order_id, side: order.side, quantity: order.quantity, grossPaise: order.gross_paise, chargesPaise: order.charges_paise ?? 0, realizedPnlPaise: order.realized_pnl_paise ?? 0, status: order.status, createdAt: order.created_at });
   }
   const fillsByOrder = new Map();
+  const seenExecutions = new Set();
   for (const fill of limitFills) {
-    if (!fill || typeof fill.order_id !== "string") fail("Options fill history contains an invalid order reference.");
+    if (!fill || typeof fill.order_id !== "string" || typeof fill.execution_id !== "string") {
+      fail("Options fill history contains an invalid order or execution reference.");
+    }
+    const identity = `${fill.order_id}:${fill.execution_id}`;
+    if (seenExecutions.has(identity)) fail("Duplicate Options execution appears in fill history.");
+    seenExecutions.add(identity);
     const prior = fillsByOrder.get(fill.order_id) ?? [];
     prior.push(fill);
     fillsByOrder.set(fill.order_id, prior);
   }
+  const knownLimitOrderIds = new Set(limitOrders.filter(isNseOption).map(order => order.order_id));
+  for (const orderId of fillsByOrder.keys()) {
+    if (!knownLimitOrderIds.has(orderId)) fail("Options fill history contains an orphaned order reference.");
+  }
   for (const order of limitOrders) {
     if (!isNseOption(order)) continue;
     const fills = fillsByOrder.get(order.order_id) ?? [];
+    fills.sort((a, b) => a.fill_sequence - b.fill_sequence);
     let orderRealized = 0;
     let orderCharges = 0;
-    for (const fill of fills) {
+    let fillQuantity = 0;
+    let fillGross = 0;
+    for (let index = 0; index < fills.length; index += 1) {
+      const fill = fills[index];
+      if (integer(fill.fill_sequence, "LIMIT fill sequence", { min: 1 }) !== index + 1) {
+        fail("Options fill sequence is not contiguous.");
+      }
+      fillQuantity = addSafe(fillQuantity, integer(fill.fill_quantity, "LIMIT fill quantity", { min: 1 }), "LIMIT filled quantity");
+      fillGross = addSafe(fillGross, integer(fill.gross_paise, "LIMIT fill gross", { min: 1 }), "LIMIT fill gross");
       orderRealized = addSafe(orderRealized, integer(fill.realized_pnl_paise ?? 0, "LIMIT fill realized P&L"), "LIMIT order realized P&L");
       orderCharges = addSafe(orderCharges, integer(fill.incremental_charges_paise ?? 0, "LIMIT fill charges"), "LIMIT order charges");
+    }
+    if (fillQuantity !== integer(order.filled_quantity ?? 0, "LIMIT order filled quantity")
+        || fillGross !== integer(order.cumulative_gross_paise ?? 0, "LIMIT cumulative gross")
+        || orderCharges !== integer(order.cumulative_charges_paise ?? 0, "LIMIT cumulative charges")) {
+      fail("Options LIMIT order totals do not reconcile to its immutable fills.");
     }
     realizedPnlPaise = addSafe(realizedPnlPaise, orderRealized, "Options realized P&L");
     chargesPaidPaise = addSafe(chargesPaidPaise, orderCharges, "Options charges");
