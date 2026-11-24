@@ -19,6 +19,67 @@ alter table public.paper_option_limit_fills
     default 'NSE_OPTIONS_SIM_V1_2026_11'
     check (length(charge_schedule_version) between 1 and 80);
 
+-- Backfill pre-existing immutable fills using the same cumulative-delta method.
+-- This preserves historical total charges while making every component auditable.
+with ordered_fills as (
+  select f.fill_id,f.order_id,f.gross_paise,f.incremental_charges_paise,
+         o.side,o.charge_schedule_version,
+         sum(f.gross_paise) over (
+           partition by f.order_id order by f.fill_sequence
+           rows between unbounded preceding and current row
+         ) as cumulative_gross
+    from public.paper_option_limit_fills f
+    join public.paper_option_limit_orders o on o.order_id=f.order_id
+), components as (
+  select *,
+    cumulative_gross-gross_paise as previous_gross,
+    case when cumulative_gross>0 then 2000 else 0 end as brokerage_total,
+    case when cumulative_gross-gross_paise>0 then 2000 else 0 end as brokerage_previous,
+    floor(cumulative_gross::numeric*0.0003552+0.5)::bigint as exchange_total,
+    floor((cumulative_gross-gross_paise)::numeric*0.0003552+0.5)::bigint as exchange_previous,
+    floor(cumulative_gross::numeric*0.000000001+0.5)::bigint as ipft_total,
+    floor((cumulative_gross-gross_paise)::numeric*0.000000001+0.5)::bigint as ipft_previous,
+    floor(cumulative_gross::numeric*0.000001+0.5)::bigint as sebi_total,
+    floor((cumulative_gross-gross_paise)::numeric*0.000001+0.5)::bigint as sebi_previous,
+    case when side='BUY' then floor(cumulative_gross::numeric*0.00003+0.5)::bigint else 0 end as stamp_total,
+    case when side='BUY' then floor((cumulative_gross-gross_paise)::numeric*0.00003+0.5)::bigint else 0 end as stamp_previous,
+    case when side='SELL' then floor(cumulative_gross::numeric*0.0015+0.5)::bigint else 0 end as stt_total,
+    case when side='SELL' then floor((cumulative_gross-gross_paise)::numeric*0.0015+0.5)::bigint else 0 end as stt_previous,
+    floor((2000+floor(cumulative_gross::numeric*0.0003552+0.5)
+      +floor(cumulative_gross::numeric*0.000000001+0.5))::numeric*0.18+0.5)::bigint as gst_total,
+    case when cumulative_gross-gross_paise=0 then 0 else
+      floor((2000+floor((cumulative_gross-gross_paise)::numeric*0.0003552+0.5)
+        +floor((cumulative_gross-gross_paise)::numeric*0.000000001+0.5))::numeric*0.18+0.5)::bigint
+    end as gst_previous
+  from ordered_fills
+)
+update public.paper_option_limit_fills f
+   set brokerage_paise=c.brokerage_total-c.brokerage_previous,
+       exchange_transaction_paise=c.exchange_total-c.exchange_previous,
+       ipft_paise=c.ipft_total-c.ipft_previous,
+       sebi_paise=c.sebi_total-c.sebi_previous,
+       stamp_duty_paise=c.stamp_total-c.stamp_previous,
+       stt_paise=c.stt_total-c.stt_previous,
+       gst_paise=c.gst_total-c.gst_previous,
+       charge_schedule_version=c.charge_schedule_version
+  from components c
+ where f.fill_id=c.fill_id
+   and f.brokerage_paise=0 and f.exchange_transaction_paise=0
+   and f.ipft_paise=0 and f.sebi_paise=0 and f.stamp_duty_paise=0
+   and f.stt_paise=0 and f.gst_paise=0;
+
+do $charge_backfill_guard$
+begin
+  if exists (
+    select 1 from public.paper_option_limit_fills
+     where brokerage_paise+exchange_transaction_paise+ipft_paise
+       +sebi_paise+stamp_duty_paise+stt_paise+gst_paise<>incremental_charges_paise
+  ) then
+    raise exception 'Historical Options LIMIT fee component backfill does not reconcile.';
+  end if;
+end
+$charge_backfill_guard$;
+
 create or replace function public._record_paper_option_limit_fill_charges()
 returns trigger
 language plpgsql
