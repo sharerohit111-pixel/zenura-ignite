@@ -32,26 +32,6 @@ export function createChartDemoModel(fixtures, options = {}) {
       changePaise: item.changePaise, timestamp: item.timestamp, seed: hash(item.instrumentKey)
     }));
   }
-  const future = viewModel.derivatives.futures;
-  const futurePrice = future.order.limitPricePaise ?? future.order.averagePricePaise;
-  if (Number.isSafeInteger(futurePrice) && futurePrice > 0) {
-    instruments.set(future.instrumentKey, assertInstrument({
-      instrumentKey: future.instrumentKey, symbol: future.symbol, name: future.symbol,
-      assetClass: "FUTURE", exchange: future.instrumentKey.split("|")[1],
-      basePricePaise: futurePrice, expiry: future.expiry, seed: hash(future.instrumentKey)
-    }));
-  }
-  const option = viewModel.derivatives.options;
-  const optionPrice = option.order.averagePricePaise ?? option.order.limitPricePaise;
-  if (Number.isSafeInteger(optionPrice) && optionPrice > 0) {
-    const symbol = option.underlying + "-" + option.optionType;
-    instruments.set(option.instrumentKey, assertInstrument({
-      instrumentKey: option.instrumentKey, symbol, name: symbol + " " + option.strikePaise / 100,
-      assetClass: "OPTION", exchange: option.instrumentKey.split("|")[1],
-      basePricePaise: optionPrice, expiry: option.expiry, strikePaise: option.strikePaise,
-      optionType: option.optionType, seed: hash(option.instrumentKey)
-    }));
-  }
   if (!instruments.size) fail("MOCK_CHART_INSTRUMENTS_REQUIRED");
   return Object.freeze({
     identity: Object.freeze({ mode: "MOCK", provider: "DUMMY_JSON", simulated: true,
@@ -88,22 +68,18 @@ export function createDemoCandles(instrument, timeframe = "5m", count = 64, asOf
   return bars;
 }
 
-/** Five-level illustrative depth expanded deterministically from shared MOCK depth. */
+/** Return only depth explicitly supplied for this exact canonical instrument. */
 export function createDemoDepth(instrument, model) {
   assertInstrument(instrument);
   if (!model || model.identity?.mode !== "MOCK" || !model.depth ||
       !Array.isArray(model.depth.bids) || !Array.isArray(model.depth.asks)) fail("INVALID_MOCK_CHART_DEPTH");
-  const matched = model.depth.instrumentKey === instrument.instrumentKey;
-  const bestBid = matched && model.depth.bids[0]?.pricePaise || Math.max(1, instrument.basePricePaise - Math.max(1, Math.round(instrument.basePricePaise * 4 / 10000)));
-  const bestAsk = matched && model.depth.asks[0]?.pricePaise || instrument.basePricePaise + Math.max(1, Math.round(instrument.basePricePaise * 4 / 10000));
-  const step = Math.max(1, Math.round(instrument.basePricePaise * 2 / 10000));
-  const bidQty = matched ? model.depth.bids[0]?.quantity || 100 : 100;
-  const askQty = matched ? model.depth.asks[0]?.quantity || 100 : 100;
-  const bids = Array.from({ length: 5 }, (_, i) => Object.freeze({
-    price: Math.max(1, bestBid - i * step) / 100, quantity: Math.max(1, Math.round(bidQty * (1 - i * 0.13)))
+  if (model.depth.instrumentKey !== instrument.instrumentKey) return null;
+  if (!model.depth.bids.length || !model.depth.asks.length) return null;
+  const bids = model.depth.bids.map(level => Object.freeze({
+    price: level.pricePaise / 100, quantity: level.quantity
   }));
-  const asks = Array.from({ length: 5 }, (_, i) => Object.freeze({
-    price: (bestAsk + i * step) / 100, quantity: Math.max(1, Math.round(askQty * (1 - i * 0.13)))
+  const asks = model.depth.asks.map(level => Object.freeze({
+    price: level.pricePaise / 100, quantity: level.quantity
   }));
   return Object.freeze({ bids: Object.freeze(bids), asks: Object.freeze(asks), simulated: true });
 }

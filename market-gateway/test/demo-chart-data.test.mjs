@@ -14,10 +14,16 @@ test("chart model consumes canonical shared MOCK fixtures through the shared ada
   const model = createChartDemoModel(fixtures, options);
   assert.equal(model.identity.mode, "MOCK");
   assert.equal(model.identity.provider, "DUMMY_JSON");
-  assert.ok(model.instruments.length >= 4);
+  const canonicalKeys = [
+    ...fixtures.market.data.quotes.map(item => item.instrumentKey),
+    ...fixtures.derivatives.data.contracts.map(item => item.instrumentKey)
+  ];
+  assert.deepEqual(model.instruments.map(item => item.instrumentKey), canonicalKeys);
   assert.ok(model.instruments.every(item => item.instrumentKey.startsWith("MOCK|") && item.symbol.startsWith("MOCK")));
   assert.ok(model.instruments.some(item => item.assetClass === "FUTURE"));
   assert.ok(model.instruments.some(item => item.assetClass === "OPTION"));
+  assert.ok(!model.instruments.some(item => ["MOCK|NSE|FUT|0001", "MOCK|NSE|OPT|0001"].includes(item.instrumentKey)),
+    "order fixture identities must not create non-catalog chart instruments");
 });
 
 test("chart adapter requires explicit non-production opt-in and rejects real identities", () => {
@@ -45,17 +51,22 @@ test("all supported timeframes produce deterministic, ordered OHLCV candles", ()
   }
 });
 
-test("five-level bid and ask depth is deterministic, ordered and non-crossed", () => {
+test("depth is shown only for the exact canonical instrument with fixture-provided levels", () => {
   const model = createChartDemoModel(fixtures, options);
-  for (const instrument of model.instruments) {
-    const depth = createDemoDepth(instrument, model);
-    assert.equal(depth.bids.length,5);
-    assert.equal(depth.asks.length,5);
-    assert.ok(depth.bids[0].price < depth.asks[0].price);
-    assert.ok(depth.bids.every((level,i,all) => !i || level.price < all[i-1].price));
-    assert.ok(depth.asks.every((level,i,all) => !i || level.price > all[i-1].price));
-    assert.deepEqual(depth,createDemoDepth(instrument,model));
+  const depthInstrument = model.instruments.find(item => item.instrumentKey === fixtures.market.data.depth.instrumentKey);
+  assert.ok(depthInstrument);
+  const depth = createDemoDepth(depthInstrument, model);
+  assert.equal(depth.bids.length, fixtures.market.data.depth.bids.length);
+  assert.equal(depth.asks.length, fixtures.market.data.depth.asks.length);
+  assert.deepEqual(depth.bids.map(level => level.price), fixtures.market.data.depth.bids.map(level => level.pricePaise / 100));
+  assert.deepEqual(depth.asks.map(level => level.price), fixtures.market.data.depth.asks.map(level => level.pricePaise / 100));
+  assert.ok(depth.bids[0].price < depth.asks[0].price);
+  assert.deepEqual(depth, createDemoDepth(depthInstrument, model));
+  for (const instrument of model.instruments.filter(item => item.instrumentKey !== depthInstrument.instrumentKey)) {
+    assert.equal(createDemoDepth(instrument, model), null, "must not synthesize depth for " + instrument.instrumentKey);
   }
+  const noMatch = { ...model, depth: { ...model.depth, instrumentKey: "MOCK|NSE|EQ|UNKNOWN" } };
+  assert.equal(createDemoDepth(depthInstrument, noMatch), null);
 });
 
 test("invalid instrument, timeframe, candle count and snapshot fail closed", () => {

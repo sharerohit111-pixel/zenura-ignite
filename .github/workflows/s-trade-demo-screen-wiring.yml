@@ -10,6 +10,9 @@ on:
       - "markets/stocks/index.html"
       - "market-gateway/test/paper-demo-dashboard.test.mjs"
       - "markets/stocks/demo-browser-smoke.cjs"
+      - "markets/stocks/demo-chart-data.mjs"
+      - "markets/stocks/demo-chart-panel.mjs"
+      - "market-gateway/test/demo-chart-data.test.mjs"
       - ".github/workflows/s-trade-demo-screen-wiring.yml"
   push:
     branches:

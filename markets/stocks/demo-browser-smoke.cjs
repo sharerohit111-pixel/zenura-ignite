@@ -11,7 +11,7 @@ const axePath=require.resolve("axe-core/axe.min.js");
    const page=await context.newPage();
    const pageErrors=[];
    page.on("pageerror",error=>pageErrors.push(error.message));
-   await page.goto("http://127.0.0.1:4173/markets/stocks/demo.html",{waitUntil:"networkidle",timeout:30000});
+   await page.goto("http://127.0.0.1:4173/markets/stocks/demo.html",{waitUntil:"domcontentloaded",timeout:30000});
    await page.waitForFunction(()=>document.querySelector("#demo-status")?.textContent.includes("4 canonical fixtures validated"),null,{timeout:10000});
    assert.equal(await page.locator("#screen-nav button[data-screen]").count(),15,viewport.name+" screen count");
    for(const name of ["home","market","watchlists","charts","equity","futures","options","orders","trades","portfolio","positions","holdings","account","profile","settings"]){
@@ -21,7 +21,7 @@ const axePath=require.resolve("axe-core/axe.min.js");
     const overflow=await page.evaluate(()=>document.documentElement.scrollWidth>window.innerWidth+1);
     assert.equal(overflow,false,viewport.name+" horizontal document overflow on "+name);
    }
-   await page.goto("http://127.0.0.1:4173/markets/stocks/demo.html",{waitUntil:"networkidle",timeout:30000});
+   await page.goto("http://127.0.0.1:4173/markets/stocks/demo.html",{waitUntil:"domcontentloaded",timeout:30000});
    await page.addScriptTag({path:axePath});
    const axe=await page.evaluate(async()=>window.axe.run(document,{runOnly:{type:"tag",values:["wcag2a","wcag2aa","wcag21a","wcag21aa"]}}));
    const serious=axe.violations.filter(v=>v.impact==="critical"||v.impact==="serious");
