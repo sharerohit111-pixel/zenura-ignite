@@ -162,6 +162,25 @@
         "week52Low": 399.3,
         "sector": "FMCG"
       }
-    ]
+    ],
+    "watchlists": {
+      "My Stocks": [
+        "RELIANCE",
+        "TCS"
+      ],
+      "Banking": [
+        "HDFCBANK",
+        "ICICIBANK"
+      ],
+      "NIFTY": [
+        "RELIANCE",
+        "HDFCBANK",
+        "INFY"
+      ],
+      "F&O": [
+        "TCS",
+        "INFY"
+      ]
+    }
   }
 }
