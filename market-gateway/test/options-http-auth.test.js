@@ -160,7 +160,7 @@ test("authenticated NSE Options MARKET BUY submits with fresh ask and verified u
 test("authenticated NSE Options LIMIT route rejects malformed inputs before account or provider reads",async()=>{
   const cases=[
     [{idempotency_key:"not-a-uuid"},"A valid UUID idempotency_key is required."],
-    [{instrument_key:"bad\\ninstrument"},"A valid NSE option instrument_key is required."],
+    [{instrument_key:"bad\ninstrument"},"A valid NSE option instrument_key is required."],
     [{side:"SHORT"},"Options LIMIT side must be BUY or SELL."],
     [{lots:1.5},"Lots must be a whole number between 1 and 10,000."],
     [{limit_price_paise:0},"LIMIT price must be a positive integer number of paise."]
