@@ -72,6 +72,25 @@ test("instrument search ranks exact symbol and filters by exchange, asset class 
  assert.ok(searchPaperDemoInstruments(model,{assetClass:"FUTURE",underlying:"MOCKNIFTY"}).every(x=>x.exchange==="NSE"));
  assert.equal(searchPaperDemoInstruments(model,{assetClass:"OPTION",exchange:"BSE"}).length,4);
 });
+test("Futures and Options sample receipts reuse exact canonical catalog contracts and quote prices", async () => {
+  const fixtures = await allFixtures();
+  const model = createPaperDemoViewModel(fixtures,{enabled:true});
+  const future = model.market.instruments.find(item => item.instrumentKey === model.derivatives.futures.instrumentKey);
+  const option = model.market.instruments.find(item => item.instrumentKey === model.derivatives.options.instrumentKey);
+  assert.ok(future && option);
+  assert.equal(future.symbol,model.derivatives.futures.symbol);
+  assert.equal(future.expiry,model.derivatives.futures.expiry);
+  assert.equal(future.lotSize,model.derivatives.futures.lotSize);
+  assert.equal(model.derivatives.futures.order.limitPricePaise,future.bidPricePaise);
+  assert.equal(option.symbol,model.derivatives.options.symbol);
+  assert.equal(option.expiry,model.derivatives.options.expiry);
+  assert.equal(option.strikePaise,model.derivatives.options.strikePaise);
+  assert.equal(model.derivatives.options.order.averagePricePaise,option.askPricePaise);
+  const mismatch = await allFixtures();
+  mismatch.derivatives.data.futures.instrumentKey = "MOCK|NSE|FUT|LEGACY";
+  assert.throws(() => createPaperDemoViewModel(mismatch,{enabled:true}),/MOCK_FUTURES_ORDER_INSTRUMENT_MISMATCH/);
+});
+
 test("expiry discovery is sorted and supports both Futures and Options", async () => {
  const model=createPaperDemoViewModel(await allFixtures(),{enabled:true});
  assert.deepEqual(getPaperDemoExpiries(model,{underlying:"MOCKNIFTY",assetClass:"OPTION"}),["2026-11-26","2026-12-31"]);
