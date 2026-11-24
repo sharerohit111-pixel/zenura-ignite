@@ -56,10 +56,10 @@ const server = http.createServer((req, res) => {
     await page.locator('[data-segment="FUTURES"]').click();
     assert.ok((await page.locator("#view").innerText()).includes("NIFTY26NOVFUT"));
     await page.locator('[data-segment="ALL"]').click();
-    await page.locator('.watch-toggle[data-symbol="RELIANCE"]').click();
+    await page.locator('.watch-toggle[data-symbol="SBIN"]').click();
     await page.locator('#sidebar-nav [data-screen="watchlist"]').click();
-    assert.ok((await page.locator("#view").innerText()).includes("RELIANCE"));
-    await page.locator('.watch-toggle[data-symbol="RELIANCE"]').click();
+    assert.ok((await page.locator("#view").innerText()).includes("SBIN"));
+    await page.locator('.watch-toggle[data-symbol="SBIN"]').click();
     assert.ok((await page.locator("#view").innerText()).includes("watchlist is empty"));
 
     await page.locator('#sidebar-nav [data-screen="orders"]').click();
