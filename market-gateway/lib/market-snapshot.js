@@ -60,9 +60,17 @@ function normalizeMarketStatus(payload,exchange,{nowMs=Date.now(),maxAgeMs=30000
   const ageMs=nowMs-data.last_updated;
   if(ageMs<0)fail("Provider market-status timestamp is in the future.");
   const cas=data.cas_eligible_status;
+  let casStatus=null,casLastUpdatedMs=null,casAgeMs=null;
+  if(cas!==undefined){
+    if(!cas||typeof cas!=="object"||Array.isArray(cas)||!MARKET_STATUSES.has(cas.status)
+      ||!Number.isSafeInteger(cas.last_updated)||cas.last_updated<=0)
+      fail("Provider returned an invalid closing-auction status.");
+    casLastUpdatedMs=cas.last_updated;casAgeMs=nowMs-casLastUpdatedMs;
+    if(casAgeMs<0)fail("Provider closing-auction timestamp is in the future.");
+    casStatus=cas.status;
+  }
   return Object.freeze({provider:"UPSTOX",exchange,status:data.status,lastUpdatedMs:data.last_updated,ageMs,
-    freshness:ageMs<=maxAgeMs?"fresh":"stale",
-    casStatus:cas&&MARKET_STATUSES.has(cas.status)?cas.status:null,
-    casLastUpdatedMs:Number.isSafeInteger(cas?.last_updated)?cas.last_updated:null});
+    freshness:ageMs<=maxAgeMs?"fresh":"stale",casStatus,casLastUpdatedMs,casAgeMs,
+    casFreshness:casAgeMs===null?null:casAgeMs<=maxAgeMs?"fresh":"stale"});
 }
 module.exports={normalizeMarketDepthQuote,normalizeMarketStatus};
