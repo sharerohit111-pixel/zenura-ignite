@@ -1,9 +1,17 @@
 "use strict";
 const BASE=new URL("./",self.registration.scope);
-const CACHE_NAME="zenura-markets-shell-v3";
+const CACHE_NAME="zenura-markets-shell-v4";
+const DEMO_FIXTURE_PATHS=new Set([
+ "../market-gateway/mock/fixtures/market.json",
+ "../market-gateway/mock/fixtures/account.json",
+ "../market-gateway/mock/fixtures/equity.json",
+ "../market-gateway/mock/fixtures/derivatives.json"
+].map(path=>new URL(path,BASE).pathname));
 const SHELL=[
  "", "index.html","portal.css","pwa-register.js","language-toggle.js","language-toggle.js",
- "stocks/","stocks/index.html","stocks/demo.html","stocks/demo.css","stocks/demo.js","shared/paper-demo-adapter.mjs","stocks/stocks.css","stocks/order-workspace.css","stocks/chart-theme.css",
+ "stocks/","stocks/index.html","stocks/demo.html","stocks/demo.css","stocks/demo.js","shared/paper-demo-adapter.mjs",
+ "../market-gateway/mock/fixtures/market.json","../market-gateway/mock/fixtures/account.json",
+ "../market-gateway/mock/fixtures/equity.json","../market-gateway/mock/fixtures/derivatives.json","stocks/stocks.css","stocks/order-workspace.css","stocks/chart-theme.css",
  "stocks/sse-parser.js","stocks/live-quote.js","stocks/reconnect-policy.js","stocks/paper-order-retry-policy.js",
  "stocks/chart-indicators.js","stocks/chart-engine.js","stocks/stocks.js","stocks/order-workspace.js","stocks/chart-theme.js",
  "stocks/supabase-client.js","stocks/connect.js","stocks/email-auth.js",
@@ -27,8 +35,22 @@ self.addEventListener("fetch",event=>{
  const request=event.request;
  if(request.method!=="GET"||request.headers.has("authorization"))return;
  const url=new URL(request.url);
- if(url.origin!==BASE.origin||!url.pathname.startsWith(BASE.pathname))return;
+ if(url.origin!==BASE.origin||(!url.pathname.startsWith(BASE.pathname)&&!DEMO_FIXTURE_PATHS.has(url.pathname)))return;
  if(url.searchParams.has("token"))return;
+ if(DEMO_FIXTURE_PATHS.has(url.pathname)){
+  event.respondWith((async()=>{
+   const cache=await caches.open(CACHE_NAME),cached=await cache.match(request);
+   if(cached)return cached;
+   try{
+    const response=await fetch(request);
+    if(response.ok)cache.put(request,response.clone()).catch(()=>{});
+    return response;
+   }catch(_){
+    return new Response("Synthetic demo fixture unavailable offline.",{status:503,headers:{"Content-Type":"text/plain; charset=utf-8"}});
+   }
+  })());
+  return;
+ }
  if(request.mode==="navigate"){
   event.respondWith((async()=>{
    try{
