@@ -88,7 +88,7 @@ const axePath=require.resolve("axe-core/axe.min.js");
    assert.ok(perf.transferBytes<5*1024*1024,viewport.name+" transfer budget");
    assert.deepEqual(pageErrors,[],viewport.name+" browser errors");
    console.log(JSON.stringify({viewport:viewport.name,screens:15,axeSeriousCritical:0,...perf}));
-   await context.close();
+   // Keep viewport contexts alive until browser.close() in finally. Closing an\n   // individual Chromium context here intermittently stalls CI after all checks\n   // have passed, preventing the PWA phase from starting.\n   console.log("Viewport QA complete; retaining context for final browser cleanup: "+viewport.name);
   }
 
   const pwa=await browser.newContext({viewport:{width:390,height:844},serviceWorkers:"allow"});
