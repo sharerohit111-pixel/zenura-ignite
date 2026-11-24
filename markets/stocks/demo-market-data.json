@@ -1,0 +1,32 @@
+{
+  "schemaVersion": "1.0.0",
+  "mode": "MOCK",
+  "simulated": true,
+  "requestId": "demo-chart-market-20261124-001",
+  "asOf": "2026-11-24T09:30:00+05:30",
+  "meta": { "source": "SYNTHETIC_FIXTURE", "exchange": "NONE", "stale": false },
+  "data": {
+    "instruments": [
+      { "instrumentKey": "DEMO|INDEX|ALPHA50", "symbol": "DEMO-ALPHA 50", "name": "Synthetic Broad Market Index", "basePricePaise": 2450000, "seed": 17, "changeBps": 42 },
+      { "instrumentKey": "DEMO|INDEX|BANK30", "symbol": "DEMO-BANK 30", "name": "Synthetic Banking Index", "basePricePaise": 5125000, "seed": 29, "changeBps": -31 },
+      { "instrumentKey": "DEMO|EQ|ZENMOTORS", "symbol": "DEMO-ZENMOTORS", "name": "Synthetic Motor Works", "basePricePaise": 187500, "seed": 43, "changeBps": 86 },
+      { "instrumentKey": "DEMO|EQ|NEXRETAIL", "symbol": "DEMO-NEXRETAIL", "name": "Synthetic Retail Labs", "basePricePaise": 92500, "seed": 61, "changeBps": -54 }
+    ],
+    "depth": {
+      "bids": [
+        { "priceOffsetBps": -4, "quantity": 1250 },
+        { "priceOffsetBps": -8, "quantity": 980 },
+        { "priceOffsetBps": -12, "quantity": 760 },
+        { "priceOffsetBps": -16, "quantity": 540 },
+        { "priceOffsetBps": -20, "quantity": 410 }
+      ],
+      "asks": [
+        { "priceOffsetBps": 4, "quantity": 1180 },
+        { "priceOffsetBps": 8, "quantity": 930 },
+        { "priceOffsetBps": 12, "quantity": 720 },
+        { "priceOffsetBps": 16, "quantity": 510 },
+        { "priceOffsetBps": 20, "quantity": 390 }
+      ]
+    }
+  }
+}
