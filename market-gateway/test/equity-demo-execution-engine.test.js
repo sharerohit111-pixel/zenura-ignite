@@ -134,9 +134,9 @@ test("market page wires a separate, clearly labelled demo order sandbox and resp
   assert.match(html,/equity-demo-execution-engine\.js/);
   assert.match(html,/demo-equity-execution-workspace\.js/);
   assert.match(html,/demo-equity-execution-workspace\.css/);
-  assert.match(js,/../../market-gateway/mock/fixtures/equity-execution\.json/);
-  assert.match(js,/../../market-gateway/mock/fixtures/account\.json/);
-  assert.match(js,/No broker or exchange order is submitted|No broker or exchange order/);
+  assert.ok(js.includes("../../market-gateway/mock/fixtures/equity-execution.json"));
+  assert.ok(js.includes("../../market-gateway/mock/fixtures/account.json"));
+  assert.match(html,/No broker or exchange order is submitted/);
   assert.match(css,/@media\(max-width:760px\)/);
   assert.match(css,/@media\(max-width:420px\)/);
 });
