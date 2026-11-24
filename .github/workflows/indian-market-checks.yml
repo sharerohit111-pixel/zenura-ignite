@@ -2,7 +2,7 @@ name: Validate Indian Market Code
 
 on:
   pull_request:
-    branches: ["main"]
+    branches: ["main", "feature/nse-options-accounting-complete-chat6-2026-11-24"]
     paths:
       - "markets/stocks/**"
       - "crypto/index.html"
