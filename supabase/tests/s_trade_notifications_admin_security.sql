@@ -40,6 +40,19 @@ BEGIN
   END IF;
   INSERT INTO public.s_trade_price_alerts(user_id,instrument_key,display_symbol,condition,target_price)
   VALUES ('12121212-1212-4212-8212-121212121212','NSE_EQ|INE001','TEST','above',100);
+  INSERT INTO public.s_trade_price_alerts(user_id,instrument_key,display_symbol,condition,target_price)
+  SELECT '12121212-1212-4212-8212-121212121212','NSE_EQ|CAP'||g,'CAP'||g,'above',10
+    FROM generate_series(1,49) AS g;
+  IF (SELECT count(*) FROM public.s_trade_price_alerts
+       WHERE user_id='12121212-1212-4212-8212-121212121212' AND active)<>50 THEN
+    RAISE EXCEPTION 'Price alert quota fixture did not create 50 active alerts';
+  END IF;
+  BEGIN
+    INSERT INTO public.s_trade_price_alerts(user_id,instrument_key,display_symbol,condition,target_price)
+    VALUES ('12121212-1212-4212-8212-121212121212','NSE_EQ|CAP51','CAP51','above',10);
+    RAISE EXCEPTION '51st active price alert unexpectedly succeeded';
+  EXCEPTION WHEN check_violation THEN NULL;
+  END;
   BEGIN
     INSERT INTO public.s_trade_price_alerts(user_id,instrument_key,display_symbol,condition,target_price)
     VALUES ('34343434-3434-4434-8434-343434343434','NSE_EQ|INE002','OTHER','below',50);
