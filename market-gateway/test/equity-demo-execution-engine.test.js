@@ -112,6 +112,30 @@ test("Delivery and Intraday positions are accounted in separate books",()=>{
   assert.equal(s.account.intradayPositions[fixture.data.instrument.instrumentKey].quantity,1);
 });
 
+test("execution ID replay returns the original receipt without double accounting",()=>{
+  const e=engine(),order=e.submitOrder(buy({quantity:3}));
+  const first=e.matchNext(order.orderId,{executionId:"stable-fill-replay-01"});
+  const afterFirst=e.snapshot();
+  const replay=e.matchNext(order.orderId,{executionId:"stable-fill-replay-01"});
+  assert.deepEqual(replay,first);
+  assert.deepEqual(e.snapshot(),afterFirst);
+  assert.equal(e.getFillReceipts(order.orderId).length,1);
+  const other=e.submitOrder(buy({idempotencyKey:"demo-buy-other-01",quantity:1}));
+  assert.throws(()=>e.matchNext(other.orderId,{executionId:"stable-fill-replay-01"}),/DEMO_EXECUTION_ID_REUSED/);
+});
+
+test("repeated partial SELL allocates exact residual cost basis on final close",()=>{
+  const key=fixture.data.instrument.instrumentKey;
+  const e=engine({account:{positions:{[key]:{quantity:3,costBasisPaise:10001,averagePricePaise:3334,investedValuePaise:10001,reservedQuantity:0}}}});
+  const order=e.submitOrder({idempotencyKey:"odd-basis-sell-01",instrumentKey:key,side:"SELL",orderType:"MARKET",product:"DELIVERY",quantity:3});
+  const first=e.matchNext(order.orderId),last=e.matchNext(order.orderId);
+  assert.deepEqual([first.fill.quantity,last.fill.quantity],[2,1]);
+  assert.equal(first.fill.realizedPnlPaise+last.fill.realizedPnlPaise,374800-10001);
+  assert.equal(last.order.status,"FILLED");
+  assert.equal(e.snapshot().account.positions[key],undefined);
+  assert.equal(e.snapshot().account.realizedPnlPaise,374800-10001);
+});
+
 test("browser build exposes the same engine without Node globals and can execute synthetic fills",()=>{
   const source=fs.readFileSync(path.join(__dirname,"../lib/equity-demo-execution-engine.js"),"utf8");
   const sandbox={window:{}};
