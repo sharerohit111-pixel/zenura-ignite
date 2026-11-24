@@ -134,6 +134,7 @@ test("authenticated NSE Options MARKET BUY submits with fresh ask and verified u
       assert.equal(rpcCalls[0].args.p_side,"BUY");
       assert.equal(rpcCalls[0].args.p_execution_price_paise,1240);
       assert.equal(rpcCalls[0].key,"test-service-role-key");
+      assert.ok(userQueries.some(q=>q.table==="upstox_connections"&&q.key==="test-service-role-key"));
       assert.ok(userQueries.some(q=>q.table==="paper_derivative_orders"&&q.key==="test-publishable-key"));
     });
   }finally{
