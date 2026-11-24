@@ -212,3 +212,35 @@ REVOKE ALL ON FUNCTION public.s_trade_reject_audit_mutation() FROM PUBLIC,anon,a
 REVOKE ALL ON FUNCTION public.s_trade_notify_order_event() FROM PUBLIC,anon,authenticated,service_role;
 REVOKE ALL ON FUNCTION public.s_trade_evaluate_price_alert(uuid,numeric) FROM PUBLIC,anon,authenticated;
 GRANT EXECUTE ON FUNCTION public.s_trade_evaluate_price_alert(uuid,numeric) TO service_role;
+
+-- Atomic provider health heartbeat. Only the server service role can report health.
+CREATE OR REPLACE FUNCTION public.s_trade_record_provider_health(
+  p_provider text,p_ok boolean,p_latency_ms integer
+) RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
+BEGIN
+  IF p_provider<>'upstox' OR p_ok IS NULL OR p_latency_ms IS NULL
+    OR p_latency_ms<0 OR p_latency_ms>120000 THEN
+    RAISE EXCEPTION 'Invalid provider health observation' USING ERRCODE='22023';
+  END IF;
+  INSERT INTO public.s_trade_provider_health(
+    provider,status,latency_ms,last_success_at,last_failure_at,consecutive_failures,safe_message,checked_at
+  ) VALUES (
+    p_provider,CASE WHEN p_ok THEN 'healthy' ELSE 'degraded' END,p_latency_ms,
+    CASE WHEN p_ok THEN clock_timestamp() ELSE NULL END,
+    CASE WHEN p_ok THEN NULL ELSE clock_timestamp() END,
+    CASE WHEN p_ok THEN 0 ELSE 1 END,
+    CASE WHEN p_ok THEN 'Provider request succeeded' ELSE 'Provider request failed' END,
+    clock_timestamp()
+  )
+  ON CONFLICT(provider) DO UPDATE SET
+    status=CASE WHEN EXCLUDED.status='healthy' THEN 'healthy'
+      WHEN public.s_trade_provider_health.consecutive_failures+1>=3 THEN 'down' ELSE 'degraded' END,
+    latency_ms=EXCLUDED.latency_ms,
+    last_success_at=CASE WHEN p_ok THEN EXCLUDED.last_success_at ELSE public.s_trade_provider_health.last_success_at END,
+    last_failure_at=CASE WHEN p_ok THEN public.s_trade_provider_health.last_failure_at ELSE EXCLUDED.last_failure_at END,
+    consecutive_failures=CASE WHEN p_ok THEN 0 ELSE public.s_trade_provider_health.consecutive_failures+1 END,
+    safe_message=EXCLUDED.safe_message,checked_at=clock_timestamp();
+END;
+$$;
+REVOKE ALL ON FUNCTION public.s_trade_record_provider_health(text,boolean,integer) FROM PUBLIC,anon,authenticated;
+GRANT EXECUTE ON FUNCTION public.s_trade_record_provider_health(text,boolean,integer) TO service_role;
