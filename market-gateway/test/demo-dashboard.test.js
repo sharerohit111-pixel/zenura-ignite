@@ -43,5 +43,5 @@ test("PWA shell caches the demo route and its scripts, and allowlists shared fix
     assert.ok(serviceWorker.includes('"' + asset + '"'), "missing PWA shell asset: " + asset);
   }
   assert.match(serviceWorker, /market\\|account\\|equity\\|derivatives\\|error/);
-  assert.match(serviceWorker, /market-gateway\\/mock\\/fixtures/);
+  assert.ok(serviceWorker.includes("/market-gateway/mock/fixtures/"));
 });
