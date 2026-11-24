@@ -19,7 +19,7 @@ function createPriceAlertWorker({serviceDb,getUpstoxAccessToken,fetchProvider,re
   const result={scanned:0,users:0,observed:0,triggered:0,stale:0,failed:0};
   const loaded=await serviceDb.from("s_trade_price_alerts")
    .select("alert_id,user_id,instrument_key,display_symbol,condition,target_price")
-   .eq("active",true).order("created_at",{ascending:true}).limit(maxAlerts);
+   .eq("active",true).order("updated_at",{ascending:true}).limit(maxAlerts);
   if(loaded.error)throw new Error("Active price alerts could not be scanned");
   const groups=[...groupAlertsByUser(loaded.data||[]).entries()].slice(0,maxUsersPerCycle);
   result.scanned=(loaded.data||[]).length;result.users=groups.length;
@@ -37,17 +37,17 @@ function createPriceAlertWorker({serviceDb,getUpstoxAccessToken,fetchProvider,re
       for(const alert of alerts.filter(a=>keys.includes(a.instrument_key))){
        try{
         const entry=entries.find(item=>item?.instrument_token===alert.instrument_key);
-        const quote=normalizeProviderQuote(entry,alert.instrument_key,{maxAgeMs:15000,nowMs:now()});
+        const quote=normalizeProviderQuote(entry,alert.instrument_key,{maxAgeMs:15000,now:now()});
         if(!quote||!Number.isSafeInteger(quote.pricePaise)||quote.pricePaise<=0){result.stale++;continue;}
         const evaluated=await serviceDb.rpc("s_trade_evaluate_price_alert",{
          p_alert_id:alert.alert_id,p_observed_price:quote.pricePaise/100
         });
         if(evaluated?.error)throw new Error("Price alert evaluation failed");
         result.observed++;if(evaluated.data===true)result.triggered++;
-       }catch(error){if(error?.name==="StaleQuoteError")result.stale++;else result.failed++;}
+       }catch(error){if(error?.status===409)result.stale++;else result.failed++;}
       }
      }
-    }catch(_error){result.failed+=alerts.length;}
+    }catch(_error){result.failed+=alerts.length;await serviceDb.from("s_trade_price_alerts").update({updated_at:new Date(now()).toISOString()}).in("alert_id",alerts.map(a=>a.alert_id));}
    }));
   }
   return result;
