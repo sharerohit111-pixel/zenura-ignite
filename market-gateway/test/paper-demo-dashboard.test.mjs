@@ -9,6 +9,9 @@ const screens=["home","market","watchlists","charts","equity","futures","options
 
 test("demo route loads the canonical shared adapter and exposes all 15 screens",async()=>{
  const html=await read("demo.html"),js=await read("demo.js"),index=await read("index.html");
+ assert.match(html,/<nav[^>]*aria-label="Demo screens"[^>]*tabindex="0"/);
+ assert.match(js,/wrap\.tabIndex=0/);
+ assert.match(js,/aria-label","Scrollable data table/);
  assert.match(html,/type="module" src="\.\/demo.js"/);
  assert.match(js,/from "\.\.\/shared\/paper-demo-adapter\.mjs"/);
  for(const screen of screens)assert.match(html,new RegExp('data-screen="'+screen+'"'));
@@ -49,6 +52,6 @@ test("responsive demo assets are included in the Markets PWA shell",async()=>{
  const sw=await readFile(new URL("../../markets/service-worker.js",import.meta.url),"utf8");
  assert.match(css,/@media\(max-width:900px\)/);
  assert.match(css,/@media\(max-width:520px\)/);
- assert.match(sw,/zenura-markets-shell-v3/);
+ assert.match(sw,/zenura-markets-shell-v4/);
  for(const asset of ["stocks/demo.html","stocks/demo.css","stocks/demo.js","shared/paper-demo-adapter.mjs"])assert.ok(sw.includes(asset));
 });

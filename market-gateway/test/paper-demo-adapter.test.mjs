@@ -38,10 +38,29 @@ test("adapter rejects real exchange symbols and malformed money", async () => {
   next.account.data.availableFundsPaise = 1;
   assert.throws(() => createPaperDemoViewModel(next,{enabled:true}), /INVALID_MOCK_ACCOUNT_SNAPSHOT/);
 });
-test("adapter returns detached view data and preserves unreconciled wallet state", async () => {
+test("adapter returns detached deeply frozen view data and preserves unreconciled wallet state", async () => {
   const fixtures = await allFixtures();
   const model = createPaperDemoViewModel(fixtures,{enabled:true});
-  model.market.instruments[0].symbol = "MUTATED";
+  assert.ok(Object.isFrozen(model));
+  assert.ok(Object.isFrozen(model.market.instruments));
+  assert.ok(Object.isFrozen(model.market.instruments[0]));
+  assert.throws(() => { model.market.instruments[0].symbol = "MUTATED"; }, TypeError);
   assert.equal(fixtures.market.data.quotes[0].symbol, "MOCKALPHA");
   assert.equal(model.account.ledgerReconciled, false);
+});
+
+test("adapter rejects envelopes outside the canonical synthetic source contract", async () => {
+  const fixtures = await allFixtures();
+  delete fixtures.market.meta.source;
+  assert.throws(() => createPaperDemoViewModel(fixtures,{enabled:true}), /INVALID_MOCK_META:market/);
+  const negative = await allFixtures();
+  negative.account.data.availableFundsPaise = -1;
+  negative.account.data.blockedFundsPaise = 100000001;
+  assert.throws(() => createPaperDemoViewModel(negative,{enabled:true}), /INVALID_MOCK_ACCOUNT_SNAPSHOT/);
+});
+
+test("adapter rejects a non-synthetic options underlying", async () => {
+  const fixtures = await allFixtures();
+  fixtures.derivatives.data.options.underlying = "NIFTY";
+  assert.throws(() => createPaperDemoViewModel(fixtures,{enabled:true}), /NON_SYNTHETIC_OPTION_UNDERLYING/);
 });
