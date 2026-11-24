@@ -159,7 +159,7 @@ function renderDemoWatchlists(host){
  addButton.addEventListener("click",()=>{const list=demoWatchlists[listSelect.value],key=instrumentSelect.value;if(!key||list.length>=50||list.includes(key))return;list.push(key);renderRows();});
  renderRows();
 }
-function orderRows(orders){return orders.map(o=>[o.orderId,o.assetClass,o.instrumentKey,o.side,o.orderType,o.quantity??o.lots,o.status,money(o.averagePricePaise??o.limitPricePaise??0),money(o.chargesPaise??0)]);}
+function orderRows(orders){return orders.map(o=>{const instrument=model.market.instruments.find(item=>item.instrumentKey===o.instrumentKey);return [o.orderId,o.assetClass,instrument?.symbol||o.instrumentKey,o.side,o.orderType,o.quantity??o.lots,o.status,money(o.averagePricePaise??o.limitPricePaise??0),money(o.chargesPaise??0)];});}
 function render(name){
  const a=model.account,equity=model.positions.find(x=>x.assetClass==="EQUITY"),orders=model.orders;
  content.replaceChildren(header(name,"Illustrative values from one validated, versioned Mock JSON view model. Not live exchange data."));
