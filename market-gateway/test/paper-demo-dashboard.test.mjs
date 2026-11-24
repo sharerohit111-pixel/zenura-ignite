@@ -118,6 +118,6 @@ test("production gateway entrypoints never import Demo adapters, engines or fixt
   readFile(new URL("../../market-gateway/server.js",import.meta.url),"utf8")
  ]);
  for(const source of [supabaseServer,legacyServer]){
-  assert.doesNotMatch(source,/(?:paper-demo-adapter|equity-demo-execution-engine|derivative-mock-simulator|mock\\/fixtures)/i);
+  assert.doesNotMatch(source,/(?:paper-demo-adapter|equity-demo-execution-engine|derivative-mock-simulator|mock\/fixtures)/i);
  }
 });
