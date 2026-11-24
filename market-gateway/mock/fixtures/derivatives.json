@@ -11,10 +11,10 @@
   },
   "data": {
     "futures": {
-      "instrumentKey": "MOCK|NSE|FUT|0001",
-      "symbol": "MOCKALPHA-FUT",
+      "instrumentKey": "MOCK|NSE|FUT|MOCKNIFTY|2026-12-31",
+      "symbol": "MOCKNIFTY-FUT-DEC26",
       "expiry": "2026-12-31",
-      "lotSize": 1,
+      "lotSize": 25,
       "tickSizePaise": 5,
       "order": {
         "orderId": "mock-future-001",
@@ -22,16 +22,16 @@
         "orderType": "LIMIT",
         "lots": 1,
         "status": "PENDING",
-        "limitPricePaise": 125000
+        "limitPricePaise": 2500000
       }
     },
     "options": {
-      "instrumentKey": "MOCK|NSE|OPT|0001",
-      "underlying": "MOCKALPHA",
+      "instrumentKey": "MOCK|NSE|OPT|MOCKNIFTY|25000|CE|2026-11-26",
+      "underlying": "MOCKNIFTY",
       "optionType": "CE",
-      "strikePaise": 125000,
-      "expiry": "2026-12-31",
-      "lotSize": 1,
+      "strikePaise": 2500000,
+      "expiry": "2026-11-26",
+      "lotSize": 25,
       "tickSizePaise": 5,
       "order": {
         "orderId": "mock-option-001",
@@ -39,8 +39,9 @@
         "orderType": "MARKET",
         "lots": 1,
         "status": "FILLED",
-        "averagePricePaise": 2500
-      }
+        "averagePricePaise": 15000
+      },
+      "symbol": "MOCKNIFTY-25000-CE-26NOV"
     },
     "contracts": [
       {
