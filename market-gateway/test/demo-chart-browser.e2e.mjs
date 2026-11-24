@@ -1,3 +1,4 @@
+// Chromium-backed browser smoke test; CI runs this on the supported Ubuntu 24.04 image.
 import test from "node:test";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
