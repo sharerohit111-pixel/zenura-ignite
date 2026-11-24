@@ -132,6 +132,17 @@ BEGIN
   IF (SELECT cash_paise FROM public.paper_accounts WHERE user_id='$USER_ID')<>99980174 THEN
     RAISE EXCEPTION 'Intraday LIMIT BUY race debited virtual cash more than once';
   END IF;
+  IF EXISTS (SELECT 1 FROM public.paper_equity_cash_ledger
+      WHERE order_id='$BUY_ORDER'
+        AND event_type='RESERVATION_RELEASE') THEN
+    RAISE EXCEPTION 'Fill-wins race incorrectly appended a reservation release';
+  END IF;
+  IF (SELECT count(*) FROM public.paper_equity_cash_ledger
+      WHERE order_id='$BUY_ORDER' AND event_type='TRADE_DEBIT')<>1
+     OR (SELECT count(*) FROM public.paper_equity_cash_ledger
+      WHERE order_id='$BUY_ORDER' AND event_type='RESERVATION_CONSUME')<>1 THEN
+    RAISE EXCEPTION 'Fill-wins race must append exactly one trade debit and one reservation consume';
+  END IF;
 END
 \$race_assertions\$;
 
