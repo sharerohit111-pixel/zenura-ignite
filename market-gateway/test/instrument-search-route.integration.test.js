@@ -48,6 +48,13 @@ test("GET /instruments ranks exact equity symbols before prefixes and substring 
   assert.equal(response.headers.get("cache-control"), "public, max-age=60");
 });
 
+test("GET /instruments includes NSE and BSE equities when exchange is not specified", async () => {
+  const response = await fetch(baseUrl + "/instruments?kind=equities&q=tcs");
+  const body = await response.json();
+  assert.equal(response.status, 200);
+  assert.deepEqual(body.results.map(x => x.instrument_key), ["NSE_EQ|TCS", "BSE_EQ|TCS", "NSE_EQ|TCSIND", "NSE_EQ|XTCS"]);
+});
+
 test("GET /instruments retains exchange and instrument-kind filters before ranking", async () => {
   const response = await fetch(baseUrl + "/instruments?kind=equities&exchange=BSE&q=tcs");
   const body = await response.json();
