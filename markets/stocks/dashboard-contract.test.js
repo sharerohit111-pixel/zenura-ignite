@@ -44,3 +44,11 @@ test("dashboard assets and Dummy JSON fixture are included in the Markets PWA sh
   assert.match(serviceWorker, /zenura-markets-shell-v3/);
   assert.match(serviceWorker, /url\.pathname\.endsWith\("\.json"\)/);
 });
+
+test("mobile bottom navigation renders every requested destination", () => {
+  assert.match(js, /id="mobile-nav"[^>]*>/);
+  assert.match(js, /NAV_ITEMS\.map\(\(\[id,label,icon\]\)/);
+  assert.doesNotMatch(js, /NAV_ITEMS\.slice\(0,5\)/);
+  assert.match(css, /grid-template-columns:repeat\(9,minmax\(62px,1fr\)\)/);
+  for (const screen of ["positions","holdings","profile","settings"]) assert.ok(model.includes('"'+screen+'"'));
+});
