@@ -112,3 +112,32 @@
 .protective-orders-panel{margin-top:14px;padding:14px}
 .protective-orders-panel button{min-height:30px;padding:6px 10px;border:1px solid #754653;border-radius:7px;background:#321e2a;color:#ffb4c0;font-size:9px;font-weight:850}
 @media(max-width:520px){.paper-protective-controls{grid-template-columns:1fr}.paper-protective-controls p{grid-column:auto}}
+
+/* Verified exchange status and market depth */
+.exchange-status-strip{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:12px 0}
+.exchange-status-card,.depth-panel{min-width:0;border:1px solid #29445c;border-radius:12px;background:#0b1a2a;padding:12px}
+.exchange-status-card{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.exchange-status-card b,.exchange-status-card small{display:block}
+.exchange-status-card b{font-size:10px;color:#dceaf5}
+.exchange-status-card small{font-size:9px;color:#8ba1b7;margin-top:4px}
+.exchange-status-value{font-size:10px;font-weight:800;color:#69dfba;text-align:right}
+.exchange-status-value.closed{color:#f1bf73}
+.exchange-status-value.stale,.depth-stale{color:#ff8d9e!important}
+.depth-panel{margin-top:12px}
+.depth-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px}
+.depth-head h3{font-size:12px;margin:0}
+.depth-head small{color:#8ba1b7;font-size:9px}
+.depth-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.depth-side h4{font-size:9px;letter-spacing:1px;margin:0 0 7px;color:#9fb5c8}
+.depth-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;padding:6px 5px;border-bottom:1px solid #1d354a;font-size:10px;font-variant-numeric:tabular-nums}
+.depth-row span:last-child{text-align:right;color:#90a8bc}
+.depth-row.bid span:first-child{color:#57ddb6}
+.depth-row.ask span:first-child{color:#ff8293}
+.depth-empty{padding:15px;text-align:center;color:#8198ad;font-size:10px}
+.strike-picker{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:10px}
+.strike-picker label{font-size:9px;color:#8fa8bc}
+.strike-picker select{max-width:180px;background:#0b1a2a;color:#eaf3fa;border:1px solid #29435c;border-radius:7px;padding:7px;font-size:10px}
+.saved-watch-order{display:flex;gap:4px}
+.saved-watch-order button{border:1px solid #29435c;background:#0b1a2a;color:#9bb1c4;border-radius:5px;padding:4px 6px;font-size:9px}
+.saved-watch-order button:disabled{opacity:.3}
+@media(max-width:640px){.exchange-status-strip{grid-template-columns:1fr}.depth-grid{gap:6px}.depth-row{font-size:9px;padding:6px 3px}.exchange-status-card,.depth-panel{padding:10px}}
