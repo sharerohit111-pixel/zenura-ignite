@@ -20,3 +20,5 @@ test("rejects unsafe paise and unsupported asset adapters",()=>{assert.throws(()
 test("persisted snapshots are not mislabeled as simulation",()=>{const r=buildPaperPortfolioAccounting({account,assetSnapshots:snapshots,mode:"PERSISTED",now});assert.equal(r.simulationOnly,false);assert.equal(r.mode,"PERSISTED");});
 
 test("rejects omitted asset adapters instead of reporting a complete partial portfolio",()=>{assert.throws(()=>buildPaperPortfolioAccounting({account,assetSnapshots:snapshots.slice(0,2),mode:"DUMMY",now}),/all required/);});
+
+test("rejects a reported margin deficit smaller than negative available cash",()=>{const a={...account,cash_paise:1000000,reserved_cash_paise:500000,reserved_margin_paise:2000000,margin_deficit_paise:1000000};assert.throws(()=>buildPaperPortfolioAccounting({account:a,assetSnapshots:snapshots,mode:"DUMMY",now}),/cannot be lower/);});
