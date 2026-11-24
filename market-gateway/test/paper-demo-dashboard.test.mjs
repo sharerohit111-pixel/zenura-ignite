@@ -21,12 +21,16 @@ test("demo route loads only shared synthetic fixtures with explicit opt-in",asyn
  assert.match(js,/createPaperDemoViewModel\(\{market,account,equity,derivatives\},\{enabled:true,production:false\}\)/);
  assert.match(js,/No live-data fallback/);
 });
-test("screen rendering is read-only and clearly discloses synthetic and unreconciled data",async()=>{
+test("Demo screens disclose synthetic data and isolate local Equity execution from Wallet",async()=>{
  const html=await read("demo.html"),js=await read("demo.js"),panel=await read("demo-derivative-panel.mjs");
  assert.match(html,/DEMO DATA · SYNTHETIC FIXTURES/);
  assert.match(js,/READ ONLY · MOCK/);
  assert.match(js,/ledgerReconciled/);
- assert.match(js,/No MARKET\/LIMIT submission/);
+ assert.match(js,/mountEquityDemo\(content\)/);
+ const equityPanel=await read("demo-equity-panel.mjs");
+ assert.match(equityPanel,/DEMO DATA · MOCK · SYNTHETIC ONLY/);
+ assert.match(equityPanel,/not reconciled with the Wallet/);
+ assert.match(equityPanel,/manual fill action to simulate execution/);
  assert.match(panel,/No production RPC, cash ledger, margin reservation, charges, broker API or background worker is called/);
  assert.doesNotMatch(js,/fetch\s*\([^)]*(?:\/orders|\/portfolio|\/watchlist)/i);
 });
@@ -49,6 +53,6 @@ test("responsive demo assets are included in the Markets PWA shell",async()=>{
  const sw=await readFile(new URL("../../markets/service-worker.js",import.meta.url),"utf8");
  assert.match(css,/@media\(max-width:900px\)/);
  assert.match(css,/@media\(max-width:520px\)/);
- assert.match(sw,/zenura-markets-shell-v3/);
+ assert.match(sw,/zenura-markets-shell-v4/);
  for(const asset of ["stocks/demo.html","stocks/demo.css","stocks/demo.js","shared/paper-demo-adapter.mjs"])assert.ok(sw.includes(asset));
 });
