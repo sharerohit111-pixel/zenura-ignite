@@ -345,7 +345,7 @@ app.get("/paper/account",async(req,res)=>{
   }catch(error){sendError(res,error,"Paper account could not be loaded.");}
 });
 
-function watchlistName(req){
+async function ensureWatchlistInstrumentCache(keys){\n  const needsOfficial=(keys||[]).some(key=>!mockWatchlistCatalog.has(key));\n  if(needsOfficial&&(!instrumentCache.length||Date.now()-instrumentCacheUpdatedAt>6*60*60*1000))await refreshInstrumentCache();\n}\nfunction watchlistName(req){
   const name=String(req.query?.name||req.body?.name||"My Stocks");
   if(!WATCHLIST_NAMES.includes(name))throw Object.assign(new Error("Choose a valid watchlist name."),{status:400});
   return name;
@@ -381,7 +381,7 @@ app.put("/watchlist",async(req,res)=>{
     const keys=[...new Set(raw)];
     if(!instrumentCache.length||Date.now()-instrumentCacheUpdatedAt>6*60*60*1000)await refreshInstrumentCache();
     const valid=new Set([...instrumentCache.map(x=>x.instrument_key),...mockWatchlistCatalog.keys()]);
-    if(keys.some(key=>!valid.has(key)))return res.status(400).json({error:"Watchlist contains an instrument not present in the official instrument master."});
+    if(keys.some(key=>!valid.has(key)))return res.status(400).json({error:"Watchlist contains an instrument not present in a supported instrument catalog."});
     const {error}=await userDb.from("paper_watchlists").upsert({user_id:user.id,name,instrument_keys:keys,updated_at:new Date().toISOString()},{onConflict:"user_id,name"});
     if(error)throw Object.assign(new Error("Watchlist could not be saved."),{status:503});
     res.set("Cache-Control","private, no-store").json({saved:true,name,count:keys.length,maxItems:50});
