@@ -153,7 +153,7 @@ test("failed fee-inclusive LIMIT BUY fill leaves cash and reservation unchanged"
   const limit = engine.submitOrder(buy({quantity:1, idempotencyKey:"atomic-limit-01"}));
   assert.equal(limit.status,"PENDING");
   const other = engine.submitOrder(buy({
-    instrumentKey:RELIANCE, orderType:"MARKET", limitPricePaise:undefined,
+    instrumentKey:fixtures.instruments[2].instrumentKey, orderType:"MARKET", limitPricePaise:undefined,
     quantity:1, idempotencyKey:"atomic-market-01"
   }));
   assert.equal(other.status,"FILLED");
