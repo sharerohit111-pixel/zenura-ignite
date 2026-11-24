@@ -57,6 +57,7 @@ const axePath=require.resolve("axe-core/axe.min.js");
 
     // Equity market order -> manual deterministic fill -> immutable receipt.
     await page.locator('#screen-nav button[data-screen="equity"]').click();
+    await page.waitForFunction(()=>document.querySelector(".demo-eq-status")?.textContent.includes("simulator ready"));
     await page.getByRole("button",{name:"PLACE DEMO ORDER"}).click();
     await page.getByRole("button",{name:"SIMULATE NEXT FILL"}).click();
     assert.ok((await page.locator(".demo-eq-status").textContent()).includes("Synthetic fill"),"Equity order fill flow");
@@ -64,9 +65,11 @@ const axePath=require.resolve("axe-core/axe.min.js");
 
     // Futures and Options MARKET order entry must accept a local synthetic order.
     await page.locator('#screen-nav button[data-screen="futures"]').click();
+    await page.waitForFunction(()=>document.querySelector(".demo-fo-status")?.textContent.includes("MOCK quote selected"));
     await page.getByRole("button",{name:"BUY",exact:true}).last().click();
     assert.ok((await page.locator(".demo-fo-status").textContent()).includes("DEMO receipt"),"Futures order entry");
     await page.locator('#screen-nav button[data-screen="options"]').click();
+    await page.waitForFunction(()=>document.querySelector(".demo-fo-status")?.textContent.includes("MOCK quote selected"));
     await page.getByRole("button",{name:"BUY",exact:true}).last().click();
     assert.ok((await page.locator(".demo-fo-status").textContent()).includes("DEMO receipt"),"Options order entry");
    }
