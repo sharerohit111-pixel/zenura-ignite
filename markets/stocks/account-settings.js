@@ -27,6 +27,16 @@ if (host && !document.getElementById("s-trade-account")) {
       <label>Display name
         <input id="s-trade-display-name" type="text" maxlength="80" autocomplete="name" placeholder="Your name">
       </label>
+      <div class="account-security">
+        <label>Change account email
+          <input id="s-trade-new-email" type="email" maxlength="254" autocomplete="email" placeholder="New email address">
+        </label>
+        <button type="button" id="s-trade-update-email">UPDATE EMAIL</button>
+        <label>New password
+          <input id="s-trade-new-password" type="password" minlength="8" maxlength="128" autocomplete="new-password" placeholder="At least 8 characters">
+        </label>
+        <button type="button" id="s-trade-change-password">CHANGE PASSWORD</button>
+      </div>
       <div class="account-actions">
         <button type="button" class="primary" id="s-trade-save-profile">SAVE PROFILE</button>
         <button type="button" id="s-trade-refresh-session">REFRESH SESSION</button>
@@ -157,6 +167,37 @@ if (host && !document.getElementById("s-trade-account")) {
       status.textContent = error.message || "OTP verification failed.";
     } finally { setBusy(["s-trade-send-otp","s-trade-verify-otp"], false); }
   });
+  $("s-trade-update-email").addEventListener("click", async () => {
+    if (devMockActive) { status.textContent = "Email changes are disabled in the local mock preview."; return; }
+    if (!currentUserId) return;
+    const email = $("s-trade-new-email").value.trim();
+    if (!email || !$("s-trade-new-email").checkValidity()) { status.textContent = "Enter a valid new email address."; return; }
+    $("s-trade-update-email").disabled = true;
+    try {
+      const { data, error } = await supabase.auth.updateUser({ email });
+      if (error) throw error;
+      if (data.user?.id !== currentUserId) throw new Error("Account changed. Please sign in again.");
+      $("s-trade-new-email").value = "";
+      status.textContent = "Email change requested. Complete the confirmation steps sent by Supabase before the new address becomes active.";
+    } catch (error) { status.textContent = error.message || "Email change could not be requested."; }
+    finally { $("s-trade-update-email").disabled = false; }
+  });
+  $("s-trade-change-password").addEventListener("click", async () => {
+    if (devMockActive) { status.textContent = "Password changes are disabled in the local mock preview."; return; }
+    if (!currentUserId) return;
+    const password = $("s-trade-new-password").value;
+    if (password.length < 8 || password.length > 128) { status.textContent = "Choose a password between 8 and 128 characters."; return; }
+    $("s-trade-change-password").disabled = true;
+    try {
+      const { data, error } = await supabase.auth.updateUser({ password });
+      if (error) throw error;
+      if (data.user?.id !== currentUserId) throw new Error("Account changed. Please sign in again.");
+      $("s-trade-new-password").value = "";
+      status.textContent = "Password updated successfully.";
+    } catch (error) { status.textContent = error.message || "Password could not be updated."; }
+    finally { $("s-trade-change-password").disabled = false; }
+  });
+
   $("s-trade-save-profile").addEventListener("click", async () => {
     if (devMockActive) { status.textContent = "Profile editing is disabled in the local mock preview."; return; }
     if (!currentUserId) return;
