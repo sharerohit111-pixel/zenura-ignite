@@ -109,7 +109,7 @@ begin
      or p_settlement_id is null or p_settlement_id !~ '^[a-f0-9]{64}$'
      or p_instrument_key is null or length(p_instrument_key) not between 1 and 160
      or p_trading_symbol is null or length(p_trading_symbol) not between 1 and 80
-     or p_instrument_type not in ('CE','PE')
+     or p_instrument_type is null or p_instrument_type not in ('CE','PE')
      or p_underlying_type is distinct from 'INDEX'
      or p_settlement_type is distinct from 'CASH_SETTLED'
      or p_expiry is null
@@ -132,7 +132,7 @@ begin
 
   v_now:=clock_timestamp();
   v_now_ms:=floor(extract(epoch from v_now)*1000)::bigint;
-  if abs(v_now_ms-p_now_ms)>2000
+  if abs(v_now_ms::numeric-p_now_ms::numeric)>2000
      or p_verified_at_ms>v_now_ms
      or p_settlement_timestamp_ms>p_verified_at_ms then
     raise exception 'Expiry settlement clock or verification timestamps are invalid.'
