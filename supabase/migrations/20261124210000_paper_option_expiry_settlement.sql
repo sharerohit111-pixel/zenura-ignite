@@ -1,6 +1,7 @@
 -- DRAFT ONLY. Atomic expiry settlement for verified cash-settled NSE index options.
 -- Stock/physical-settled and unknown settlement contracts are deliberately rejected.
 -- STT on exercised options is 0.15% of intrinsic value from 2026-04-01.
+create schema if not exists extensions;
 create extension if not exists pgcrypto with schema extensions;
 
 create table if not exists public.paper_option_expiry_settlements (
