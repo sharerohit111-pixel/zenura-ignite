@@ -71,6 +71,16 @@ function normalizeCandles(rows) {
     return { timestampMs:t, openPaise:open, highPaise:high, lowPaise:low, closePaise:close, volume };
   });
 }
+function requireNativeInstrument(native, providerId) {
+  if (!native || typeof native !== "object" || Array.isArray(native)) fail(providerId + " instrument mapping is missing.");
+  if (providerId === "upstox" &&
+      (typeof native.instrumentKey !== "string" || !native.instrumentKey.trim())) fail("Upstox instrument mapping is missing.");
+  if (providerId === "angelone" &&
+      (typeof native.symbolToken !== "string" || !native.symbolToken.trim() ||
+       typeof native.exchangeSegment !== "string" || !native.exchangeSegment.trim() ||
+       typeof native.exchange !== "string" || !native.exchange.trim())) fail("Angel One instrument mapping is missing.");
+  return native;
+}
 function makeBase(providerId, client, resolveInstrument, now) {
   assertDependencies(client, resolveInstrument, now);
   return {
@@ -98,7 +108,7 @@ function makeBase(providerId, client, resolveInstrument, now) {
         generatedAtMs:now(), sourceReference:providerId+"-instrument-master", instruments };
     },
     async openStream(args) {
-      const stream=await client.openStream({ ...args, nativeInstrument:await resolveInstrument(args) });
+      const nativeInstrument=requireNativeInstrument(await resolveInstrument(args),providerId);\n      const stream=await client.openStream({ ...args, nativeInstrument });
       if (!stream || typeof stream.close !== "function" ||
           (typeof stream.subscribe !== "function" && typeof stream[Symbol.asyncIterator] !== "function")) {
         fail("Provider stream transport did not return a closable stream.");
