@@ -106,7 +106,7 @@ test("returned fixtures are detached copies", () => {
 
 
 test("derivatives fixture contains deterministic MOCK-only Futures and CE/PE contracts", () => {
-  const fixture = store().read("derivatives");
+  const fixture = store().read("derivatives").data;
   assert.ok(fixture.contracts.length >= 8);
   assert.equal(fixture.quotes.length, fixture.contracts.length);
   assert.ok(fixture.contracts.every(item => item.instrumentKey.startsWith("MOCK|") && item.symbol.startsWith("MOCK")));
