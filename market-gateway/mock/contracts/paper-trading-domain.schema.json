@@ -35,7 +35,7 @@
         "lastPricePaise": { "type": "integer", "minimum": 1 },
         "changePaise": { "$ref": "#/$defs/signedPaise" },
         "volume": { "type": "integer", "minimum": 0 },
-        "provider": { "enum": ["MOCK", "AUTHORIZED_PROVIDER"] },
+        "provider": { "const": "MOCK" },
         "timestamp": { "type": "string", "format": "date-time" },
         "stale": { "type": "boolean" }
       },
@@ -43,7 +43,8 @@
     },
     "order": {
       "type": "object",
-      "required": ["orderId", "side", "orderType", "quantity", "status"],
+      "required": ["orderId", "side", "orderType", "status"],
+      "anyOf": [{ "required": ["quantity"] }, { "required": ["lots"] }],
       "properties": {
         "orderId": { "type": "string", "minLength": 1 },
         "side": { "$ref": "#/$defs/side" },
