@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#07111f"><title>ZENURA IGNITE · Equity Paper Trading Demo</title>
+<link rel="stylesheet" href="./equity-demo.css">
+<script defer src="./equity-dummy-engine.js"></script><script defer src="./equity-demo.js"></script>
+</head>
+<body>
+<main class="demo-shell">
+<header class="demo-header"><a href="./index.html">← Indian Market Terminal</a><span>ZENURA <b>IGNITE</b></span><span class="demo-chip">SIMULATION ONLY</span></header>
+<section class="demo-warning"><strong>DEMO JSON DATA — NOT LIVE NSE/BSE PRICES</strong><p>This isolated workspace uses bundled deterministic fixtures. No broker, exchange, gateway, database, real funds or live market feed is connected. Demo charges default to ₹0 and are not an exchange fee schedule.</p></section>
+<section class="demo-title"><div><small>EQUITY PAPER TRADING</small><h1>Execution Sandbox</h1><p>Intraday · Delivery · MARKET · LIMIT · Partial fills · Cancel · Receipts</p></div><span id="demo-mode-label">Loading demo fixtures…</span></section>
+<section class="demo-stats" aria-label="Virtual account">
+<article><small>VIRTUAL CASH</small><strong id="demo-cash">—</strong></article>
+<article><small>RESERVED CASH</small><strong id="demo-reserved">—</strong></article>
+<article><small>AVAILABLE CASH</small><strong id="demo-available">—</strong></article>
+<article><small>OPEN POSITIONS</small><strong id="demo-position-count">—</strong></article>
+</section>
+<section class="demo-grid">
+<article class="demo-panel">
+<h2>Order ticket</h2>
+<form id="demo-order-form">
+<label>Instrument<select id="demo-instrument" required></select></label>
+<div class="demo-two"><label>Product<select id="demo-product"><option value="DELIVERY">Delivery</option><option value="INTRADAY">Intraday</option></select></label><label>Order type<select id="demo-order-type"><option value="MARKET">MARKET</option><option value="LIMIT">LIMIT</option></select></label></div>
+<div class="demo-two"><label>Side<select id="demo-side"><option value="BUY">BUY</option><option value="SELL">SELL</option></select></label><label>Quantity<input id="demo-quantity" type="number" min="1" max="1000000" step="1" value="5" required></label></div>
+<label id="demo-limit-wrap" hidden>Limit price (₹)<input id="demo-limit-price" type="number" min="0.01" step="0.01" placeholder="e.g. 1523.50"></label>
+<div class="demo-quote"><span>DEMO QUOTE</span><strong id="demo-quote">—</strong><small id="demo-instrument-meta">Fixture loaded locally</small></div>
+<button class="demo-primary" type="submit">Place simulated order</button>
+<p id="demo-order-message" role="status">No real order will be sent.</p>
+</form>
+</article>
+<article class="demo-panel">
+<h2>Deterministic execution control</h2>
+<p>Advance the selected instrument's bundled demo quote through the existing limit conditions. Each tick fills at most the fixture's configured quantity, so repeated ticks can create partial fills.</p>
+<div class="demo-execution-control"><button id="demo-process-quote" type="button">Process current demo quote</button><button id="demo-refresh" type="button">Refresh snapshot</button></div>
+<p id="demo-execution-message" role="status">Select an instrument to inspect its demo quote.</p>
+<h3>Positions</h3><div class="demo-table-wrap"><table><thead><tr><th>Product</th><th>Symbol</th><th>Qty</th><th>Reserved</th><th>Cost basis</th></tr></thead><tbody id="demo-positions"></tbody></table></div>
+</article>
+</section>
+<section class="demo-panel">
+<div class="demo-section-head"><h2>Order book</h2><span>Includes PENDING, PARTIALLY_FILLED and terminal states</span></div>
+<div class="demo-table-wrap"><table><thead><tr><th>Order ID</th><th>Symbol</th><th>Product</th><th>Side / Type</th><th>Qty</th><th>Filled</th><th>Remaining</th><th>Avg. fill</th><th>Status</th><th>Action</th></tr></thead><tbody id="demo-orders"><tr><td colspan="10">No demo orders yet.</td></tr></tbody></table></div>
+</section>
+<section class="demo-panel">
+<div class="demo-section-head"><h2>Trade receipts</h2><span>One immutable receipt per simulated execution</span></div>
+<div class="demo-table-wrap"><table><thead><tr><th>Execution ID</th><th>Order ID</th><th>Symbol</th><th>Side</th><th>Product</th><th>Qty</th><th>Execution price</th><th>Gross</th><th>Charges</th><th>Time</th></tr></thead><tbody id="demo-receipts"><tr><td colspan="10">No simulated executions yet.</td></tr></tbody></table></div>
+</section>
+<footer>ZENURA IGNITE · Founder &amp; Developer: Rohit Kumar · DEMO ONLY · No real orders or live market data</footer>
+</main>
+</body></html>
