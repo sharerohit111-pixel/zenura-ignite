@@ -118,7 +118,7 @@ function createSTradeRouter({express,serviceDb,authenticate}){
       if(users.error||alerts.error||notifications.error||providers.error||controls.error)
         throw Object.assign(new Error("Admin overview is temporarily unavailable."),{status:503});
       res.set("Cache-Control","private, no-store").json({
-        totalUsers:users.data?.users?.length===1?null:null,
+        userDirectoryAvailable:true,
         activePriceAlerts:alerts.count||0,unreadNotifications:notifications.count||0,
         providers:providers.data||[],controls:controls.data||[]
       });
