@@ -1,0 +1,40 @@
+{
+  "mode": "DEMO_JSON",
+  "label": "DEMO DATA — NOT LIVE NSE/BSE PRICES",
+  "currency": "INR",
+  "asOf": "2026-11-24T09:15:00+05:30",
+  "startingCashPaise": 100000000,
+  "feePerFillPaise": 0,
+  "instruments": [
+    {
+      "instrumentKey": "NSE_EQ|INE009A01021",
+      "tradingSymbol": "INFY",
+      "name": "Infosys Limited",
+      "exchange": "NSE",
+      "tickSizePaise": 5,
+      "quotePaise": 152345,
+      "volume": 1250000,
+      "maxFillQuantity": 3
+    },
+    {
+      "instrumentKey": "NSE_EQ|INE002A01018",
+      "tradingSymbol": "RELIANCE",
+      "name": "Reliance Industries Limited",
+      "exchange": "NSE",
+      "tickSizePaise": 5,
+      "quotePaise": 128765,
+      "volume": 980000,
+      "maxFillQuantity": 2
+    },
+    {
+      "instrumentKey": "BSE_EQ|500325",
+      "tradingSymbol": "RELIANCE",
+      "name": "Reliance Industries Limited",
+      "exchange": "BSE",
+      "tickSizePaise": 5,
+      "quotePaise": 128760,
+      "volume": 420000,
+      "maxFillQuantity": 4
+    }
+  ]
+}
