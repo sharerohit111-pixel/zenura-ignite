@@ -75,7 +75,8 @@ BEGIN
   v_had_order:=FOUND;
   v_result:=public._cancel_paper_limit_order_without_ledger(p_user_id,p_order_id);
   IF v_had_order AND v_before.status='PENDING' AND v_before.side='BUY'
-     AND v_before.reserved_cash_paise>0 THEN
+     AND v_before.reserved_cash_paise>0
+     AND v_result->>'status'='CANCELLED' THEN
     SELECT * INTO v_account FROM public.paper_accounts WHERE user_id=p_user_id;
     INSERT INTO public.paper_equity_cash_ledger(
       user_id,order_id,event_key,event_type,cash_delta_paise,reserved_cash_delta_paise,
@@ -139,7 +140,8 @@ BEGIN
   v_had_order:=FOUND;
   v_result:=public._cancel_paper_intraday_limit_order_without_ledger(p_user_id,p_order_id);
   IF v_had_order AND v_before.status='PENDING' AND v_before.side='BUY'
-     AND v_before.reserved_cash_paise>0 THEN
+     AND v_before.reserved_cash_paise>0
+     AND v_result->>'status'='CANCELLED' THEN
     SELECT * INTO v_account FROM public.paper_accounts WHERE user_id=p_user_id;
     INSERT INTO public.paper_equity_cash_ledger(
       user_id,order_id,event_key,event_type,cash_delta_paise,reserved_cash_delta_paise,
