@@ -35,3 +35,12 @@ test("demo fixture has virtual capital and Indian market-only instruments", () =
   assert.ok(data.instruments.every(item => item.exchange === "NSE" || item.exchange === "BSE"));
   assert.ok(data.positions.every(item => ["FUTURES","OPTIONS"].includes(item.kind)));
 });
+
+test("dashboard assets and Dummy JSON fixture are included in the Markets PWA shell", () => {
+  const serviceWorker = read("../service-worker.js");
+  for (const asset of ["dashboard/index.html","dashboard/dashboard.css","dashboard/dashboard.js","dashboard/dashboard-model.js","dashboard/mock-data.json"]) {
+    assert.ok(serviceWorker.includes('"'+asset+'"'), "PWA shell missing "+asset);
+  }
+  assert.match(serviceWorker, /zenura-markets-shell-v3/);
+  assert.match(serviceWorker, /url\.pathname\.endsWith\("\.json"\)/);
+});
