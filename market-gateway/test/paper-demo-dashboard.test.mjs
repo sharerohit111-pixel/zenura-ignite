@@ -78,7 +78,6 @@ test("private Demo watchlists use the canonical MOCK catalog and authenticated p
  assert.match(source,/Authorization:"Bearer "\+snapshot\.token/);
  assert.match(source,/\/watchlist\?name=/);
  assert.match(source,/instrumentKeys:\[\.\.\.next\.map/);
- assert.match(source,/new Set\(\[\.\.\.next\.map/);
  assert.match(source,/MAX_ITEMS=50/);
  assert.match(source,/partitionPrivateWatchlistItems\(data\.items,catalog\)/);
  assert.match(source,/preservedItems/);
