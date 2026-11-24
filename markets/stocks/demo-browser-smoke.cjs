@@ -112,6 +112,7 @@ const axePath=require.resolve("axe-core/axe.min.js");
    return {state:registration.active?.state||"missing",scope:registration.scope||null};
   });
   assert.equal(workerState.state,"activated","service worker must be active before controlled reload");
+  assert.ok(workerState.scope.endsWith("/markets/"),"Markets service worker scope must not capture Crypto or production routes");
   console.log(JSON.stringify({pwaWorker:workerState.state,scope:workerState.scope}));
   // Wait for the activated registration before reloading into its controlled scope.
   console.log("PWA: reloading under active service worker");
