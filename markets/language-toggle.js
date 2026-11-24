@@ -117,7 +117,7 @@
     "Options portfolio unavailable":"Options पोर्टफोलियो उपलब्ध नहीं है",
     "Options LIMIT history unavailable":"Options LIMIT इतिहास उपलब्ध नहीं है",
     "Blocked premium and recent realized P&L/charges are derived from latest order history only.":"ब्लॉक प्रीमियम और हालिया लाभ/हानि व शुल्क केवल नवीनतम ऑर्डर इतिहास से निकाले जाते हैं।",
-    "Options MARKET BUY":"Options MARKET खरीदें","Options MARKET SELL":"Options MARKET बेचें",
+    "Lots to trade":"ट्रेड के लिए लॉट","Options MARKET BUY":"Options MARKET खरीदें","Options MARKET SELL":"Options MARKET बेचें",
     "MODIFY NOT AVAILABLE":"संशोधन उपलब्ध नहीं",
     "This backend does not expose an atomic pending-order modify endpoint. Cancel and replace is not treated as modify.":"इस बैकएंड में लंबित ऑर्डर संशोधित करने का atomic endpoint उपलब्ध नहीं है। रद्द करके नया ऑर्डर देना संशोधन नहीं माना जाता।",
   });
