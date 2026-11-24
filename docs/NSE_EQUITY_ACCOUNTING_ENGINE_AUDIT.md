@@ -125,6 +125,7 @@ Added `supabase/tests/equity_portfolio_reconciliation.sql` and wired it into the
 - Every fill has exactly one matching trade cash-ledger event with the same user, order, fill, side-derived event type and cash delta.
 - Trade event count equals fill count.
 - Per-product/instrument position quantities equal signed BUY/SELL fill quantities, detecting Delivery/Intraday cross-contamination.
+- Per-product/instrument remaining position cost basis equals fee-inclusive BUY cash debits less the cost basis released by SELL fills (net proceeds less immutable realized P&L).
 
 The test rolls back its disposable fixture. It does not claim unrealized P&L reconciliation: unrealized P&L is quote/mark-dependent and must be derived from a trusted current mark, with stale/missing mark behavior tested separately. It also does not implement partial fills, T+1 settlement, reversal/refund RPCs, or Intraday square-off.
 
