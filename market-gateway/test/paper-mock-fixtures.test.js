@@ -28,7 +28,7 @@ test("shared JSON schemas parse and define the expected domain contracts", () =>
   const domain = JSON.parse(fs.readFileSync(path.join(root, "paper-trading-domain.schema.json"), "utf8"));
   assert.equal(envelope.properties.schemaVersion.const, "1.0.0");
   assert.equal(envelope.properties.simulated.const, true);
-  for (const key of ["instrument", "quote", "order", "position", "account"]) {
+  for (const key of ["instrument", "quote", "order", "position", "account", "derivativeInstrument", "derivativeQuote"]) {
     assert.ok(domain.$defs[key], "missing domain definition: " + key);
   }
   assert.equal(domain.$defs.exchange.enum.join(","), "NSE,BSE");
