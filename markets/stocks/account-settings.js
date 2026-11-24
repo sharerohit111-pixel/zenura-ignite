@@ -218,12 +218,15 @@ if (host && !document.getElementById("s-trade-account")) {
     catch (error) { if (isCurrent(userId, sequence)) status.textContent = error.message || "Wallet refresh failed."; }
   });
   $("s-trade-sign-out").addEventListener("click", async () => {
+    const userId = currentUserId, sequence = authSequence;
+    if (!userId) return;
     $("s-trade-sign-out").disabled = true;
     try {
+      if (!isCurrent(userId, sequence)) return;
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
-      status.textContent = "Signed out.";
-    } catch (error) { status.textContent = error.message || "Sign out failed."; }
+      if (isCurrent(userId, sequence)) status.textContent = "Signed out.";
+    } catch (error) { if (isCurrent(userId, sequence)) status.textContent = error.message || "Sign out failed."; }
     finally { $("s-trade-sign-out").disabled = false; }
   });
   let authEventSeen = false;
