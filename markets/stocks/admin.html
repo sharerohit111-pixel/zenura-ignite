@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#07111f"><meta name="market-gateway-url" content="">
+<title>ZENURA IGNITE · S-TRADE Admin</title>
+<link rel="stylesheet" href="./admin.css">
+</head>
+<body>
+<main class="admin-shell">
+<header><a href="./" class="brand">ZENURA <b>IGNITE</b></a><span class="eyebrow">S-TRADE · SECURE OPERATIONS</span><button id="refresh">REFRESH</button></header>
+<section class="intro"><p>ADMINISTRATION / SECURITY</p><h1>Operations <em>Console</em></h1><span>Server-authorized controls. Every administrative mutation is reason-coded and audited.</span></section>
+<div id="status" class="status" role="status">Checking Supabase session…</div>
+<section class="metrics" id="metrics"></section>
+<section class="columns">
+<article class="panel"><h2>Provider monitoring</h2><div id="providers" class="stack">Loading…</div></article>
+<article class="panel"><h2>Operational controls</h2><p class="muted">Pausing new orders blocks order submissions at the gateway. Provider pause blocks market-data calls. Price-alert pause stops alert evaluation and creation.</p><div id="controls" class="stack">Loading…</div></article>
+</section>
+<section class="panel"><h2>User management</h2><div id="users" class="stack">Loading…</div><button id="more-users" class="secondary">LOAD NEXT PAGE</button></section>
+<section class="panel"><h2>Immutable admin audit log</h2><div id="audit" class="stack">Loading…</div></section>
+<footer>ZENURA IGNITE · S-TRADE · No Crypto data or controls are exposed here.</footer>
+</main>
+<script type="module" src="./admin.js"></script>
+</body></html>
