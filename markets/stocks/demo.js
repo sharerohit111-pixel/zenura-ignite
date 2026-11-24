@@ -100,7 +100,7 @@ function renderMarketDashboard(host){
  const instruments=model.market.instruments;
  const indices=instruments.filter(x=>x.assetClass==="INDEX");
  const equities=instruments.filter(x=>x.assetClass==="EQUITY");
- const statuses=["NSE","BSE"].map(exchange=>card(exchange+" MOCK status",model.market.marketStatus||"—","Synthetic fixture status · not official"));
+ const statuses=["NSE","BSE"].map(exchange=>{const supplied=model.market.exchange===exchange?model.market.marketStatus:"NOT SUPPLIED";return card(exchange+" MOCK status",supplied,"Synthetic fixture status · not official");});
  host.append(grid(...statuses));
  host.append(el("h3","","Synthetic index snapshot"),table(["INDEX","EXCHANGE","SAMPLE LEVEL","CHANGE"],indices.map(x=>[x.symbol,x.exchange,money(x.lastPricePaise),(instrumentChangePercent(x).toFixed(2))+"%"])));
  const gainers=equities.slice().sort((a,b)=>instrumentChangePercent(b)-instrumentChangePercent(a)).slice(0,3);
