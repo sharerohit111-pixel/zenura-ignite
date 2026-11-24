@@ -3,7 +3,7 @@
   "use strict";
   const gateway=(document.querySelector('meta[name="market-gateway-url"]')?.content||"").trim().replace(/\/+$/,"");
   const connector=()=>window.ZENURA_MARKET_CONNECTOR;
-  const state={instrument:null,depthTimer:null,statusTimer:null,depthRequest:0,statusRequest:0};
+  const state={instrument:null,depthTimer:null,statusTimer:null,depthRequest:0,statusRequest:0,depthInFlight:false};
   const statusStrip=document.createElement("section");
   statusStrip.className="exchange-status-strip";
   statusStrip.setAttribute("aria-label","NSE and BSE market status");
@@ -50,7 +50,10 @@
     return data;
   }
   async function refreshDepth(){
-    const item=state.instrument,requestId=++state.depthRequest;
+    const item=state.instrument;
+    if(state.depthInFlight||!item)return;
+    state.depthInFlight=true;
+    const requestId=++state.depthRequest;
     if(!item){showDepthMessage("No instrument selected");return;}
     try{
       const data=await request("/market-depth?"+new URLSearchParams({instrument_key:item.instrument_key}));
@@ -61,6 +64,7 @@
       stamp.classList.toggle("depth-stale",data.status!=="fresh");
       if(data.status!=="fresh")stamp.textContent+=" · DO NOT USE AS LIVE";
     }catch(error){if(requestId===state.depthRequest){showDepthMessage(error.message||"Depth unavailable");stamp.textContent="Unavailable";stamp.classList.add("depth-stale");}}
+    finally{state.depthInFlight=false;}
   }
   function statusLabel(value){
     return ({NORMAL_OPEN:"OPEN",NORMAL_CLOSE:"CLOSED",PRE_OPEN_START:"PRE-OPEN",PRE_OPEN_END:"PRE-OPEN ENDED",PRE_OPEN_M_END:"PRE-OPEN MATCHING",CLOSING_START:"CLOSING",CLOSING_END:"CLOSING ENDED",CTS_CLOSE:"CONTINUOUS TRADING CLOSED",CAS_LM_START:"CLOSING AUCTION",CAS_M_STOP:"CAS MARKET ORDERS STOPPED",CAS_STOP:"CAS CLOSED"})[value]||value||"UNKNOWN";
@@ -87,14 +91,14 @@
   async function populateExpiries(item){
     const select=document.getElementById("option-expiry");
     if(!select||!["NSE_INDEX","BSE_INDEX","NSE_EQ","BSE_EQ"].includes(item.segment))return;
-    const previous=select.value,underlying=item.trading_symbol||item.name||"";
+    const previous=select.value,underlying=item.underlying_symbol||String(item.trading_symbol||item.name||"").split(/\\s+/)[0];
     try{
       const data=await request("/instruments?"+new URLSearchParams({kind:"options",q:underlying,limit:"100"}));
       if(state.instrument?.instrument_key!==item.instrument_key)return;
       const dates=[...new Set((data.results||[]).map(x=>dateValue(x.expiry)).filter(Boolean))].sort();
       [...select.options].filter(o=>o.dataset.dynamic==="true").forEach(o=>o.remove());
       dates.forEach(date=>{const option=document.createElement("option");option.value=date;option.textContent=new Date(date+"T00:00:00+05:30").toLocaleDateString("en-IN",{day:"2-digit",month:"short",year:"numeric"});option.dataset.dynamic="true";select.append(option);});
-      if(dates.includes(previous))select.value=previous;
+      if(dates.includes(previous))select.value=previous;else if(dates.length)select.value=dates[0];
     }catch(_){/* Relative expiry presets remain available when listing is unavailable. */}
   }
   function setupStrikePicker(rows){
@@ -128,8 +132,8 @@
     try{
       const keys=[...container.querySelectorAll(".saved-watch-row")].map(x=>x.dataset.instrumentKey).filter(Boolean);
       const name=document.getElementById("watchlist-select")?.value||"My Stocks";
-      const data=await request("/watchlist?name="+encodeURIComponent(name));
-      const c=connector(),token=await c.getIdToken();
+      const c=connector(),uid=c?.getUserId?.();if(!c?.getIdToken||!uid)throw new Error("Sign in to reorder this watchlist.");
+      const token=await c.getIdToken();if(c.getUserId()!==uid)throw new Error("Account changed. Refresh the watchlist.");
       const response=await fetch(gateway+"/watchlist?name="+encodeURIComponent(name),{method:"PUT",headers:{Authorization:"Bearer "+token,"Content-Type":"application/json",Accept:"application/json"},body:JSON.stringify({name,instrumentKeys:keys})});
       const result=await response.json();if(!response.ok)throw new Error(result.error||"Watchlist order could not be saved.");
       const status=document.getElementById("watchlist-status");if(status)status.textContent="Watchlist order saved.";
