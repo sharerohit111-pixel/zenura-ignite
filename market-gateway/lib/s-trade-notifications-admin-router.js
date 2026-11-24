@@ -5,7 +5,10 @@ const {normalizePriceAlert,normalizePreferences,safeAdminReason,isProvider}=requ
 function createSTradeRouter({express,serviceDb,authenticate,resolvePriceAlertInstrument}){
   if(!express||!serviceDb||typeof authenticate!=="function")throw new TypeError("S-TRADE router dependencies are required");
   const router=express.Router();
-  const fail=(res,error,message)=>res.status(Number.isInteger(error?.status)?error.status:503).json({error:error?.status?error.message:message});
+  const fail=(res,error,message)=>{
+    if(Number.isInteger(error?.retryAfterSeconds))res.set("Retry-After",String(error.retryAfterSeconds));
+    return res.status(Number.isInteger(error?.status)?error.status:503).json({error:error?.status?error.message:message});
+  };
   async function signedIn(req){return authenticate(req);}
   async function requireAdmin(req){
     const session=await signedIn(req);
