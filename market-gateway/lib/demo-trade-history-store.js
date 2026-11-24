@@ -43,7 +43,8 @@ function createDemoTradeHistoryStore(options = {}) {
     }
     const orderId = input.orderId || "DEMO-" + input.assetClass + "-" + input.idempotencyKey;
     if (orders.has(orderId)) fail("DEMO_ORDER_ID_COLLISION");
-    const order = {...request,orderId,idempotencyKey:input.idempotencyKey,status:"PENDING",
+    const initialStatus = input.initialStatus === "REJECTED" ? "REJECTED" : "PENDING";
+    const order = {...request,orderId,idempotencyKey:input.idempotencyKey,status:initialStatus,
       filledQuantity:0,remainingQuantity:input.quantity,grossValuePaise:0,averagePricePaise:0,
       createdAt:input.createdAt,updatedAt:input.createdAt,simulationOnly:true,source:"SYNTHETIC_FIXTURE"};
     orders.set(orderId,order); submissions.set(input.idempotencyKey,{fingerprint,orderId});
@@ -107,15 +108,27 @@ function createDemoTradeHistoryStore(options = {}) {
       const key = keyOf(trade.assetClass,trade.product,trade.instrumentKey);
       const p = positions.get(key) || {assetClass:trade.assetClass,product:trade.product,instrumentKey:trade.instrumentKey,
         quantity:0,costBasisPaise:0,averagePricePaise:0,realizedPnlPaise:0};
-      if (trade.side === "BUY") {
-        p.quantity += trade.quantity; p.costBasisPaise += trade.grossValuePaise;
+      const signedFill = trade.side === "BUY" ? trade.quantity : -trade.quantity;
+      if (trade.assetClass !== "FUTURE" && signedFill < 0 && trade.quantity > p.quantity) fail("DEMO_POSITION_SELL_EXCEEDS_LONG");
+      const oldQuantity = p.quantity;
+      if (oldQuantity === 0 || Math.sign(oldQuantity) === Math.sign(signedFill)) {
+        const totalCost = p.costBasisPaise + trade.grossValuePaise;
+        p.quantity = oldQuantity + signedFill;
+        p.costBasisPaise = totalCost;
+        p.averagePricePaise = Math.round(totalCost / Math.abs(p.quantity));
       } else {
-        if (trade.quantity > p.quantity) fail("DEMO_POSITION_SELL_EXCEEDS_LONG");
-        const allocated = trade.quantity === p.quantity ? p.costBasisPaise : Math.round(p.costBasisPaise * trade.quantity / p.quantity);
-        p.quantity -= trade.quantity; p.costBasisPaise -= allocated;
-        p.realizedPnlPaise += trade.grossValuePaise - allocated;
+        const closeQuantity = Math.min(Math.abs(oldQuantity),trade.quantity);
+        const perUnit = oldQuantity > 0 ? trade.pricePaise - p.averagePricePaise : p.averagePricePaise - trade.pricePaise;
+        p.realizedPnlPaise += perUnit * closeQuantity;
+        const allocated = closeQuantity === Math.abs(oldQuantity) ? p.costBasisPaise : Math.round(p.costBasisPaise * closeQuantity / Math.abs(oldQuantity));
+        p.costBasisPaise -= allocated;
+        p.quantity = oldQuantity + signedFill;
+        if (p.quantity === 0) p.averagePricePaise = 0;
+        else if (Math.sign(p.quantity) !== Math.sign(oldQuantity)) {
+          p.costBasisPaise = trade.grossValuePaise - allocated;
+          p.averagePricePaise = trade.pricePaise;
+        }
       }
-      p.averagePricePaise = p.quantity ? Math.round(p.costBasisPaise / p.quantity) : 0;
       positions.set(key,p);
     }
     return clone({mode:"DEMO",provider:"DUMMY_JSON",simulationOnly:true,
@@ -127,7 +140,7 @@ function createDemoTradeHistoryStore(options = {}) {
     if (!Array.isArray(log)) fail("INVALID_DEMO_EVENT_LOG");
     const replayed = createDemoTradeHistoryStore(options);
     for (const event of log) {
-      if (event.type === "ORDER_ACCEPTED") replayed.submit({...event.order,createdAt:event.order.createdAt});
+      if (event.type === "ORDER_ACCEPTED") replayed.submit({...event.order,createdAt:event.order.createdAt,initialStatus:event.order.status});
       else if (event.type === "FILL_RECORDED") replayed.recordFill({...event.trade});
       else if (event.type === "ORDER_CANCELLED") replayed.cancel(event.orderId,event.cancelledAt);
       else fail("UNKNOWN_DEMO_EVENT");
