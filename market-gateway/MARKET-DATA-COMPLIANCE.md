@@ -37,3 +37,30 @@ These safeguards reduce accidental cross-user sharing but do **not** replace wri
 5. Record the written approval reference in GitHub Actions variable `MARKET_DATA_RIGHTS_REFERENCE` and set `MARKET_DATA_RIGHTS_APPROVED=true` only after approval is actually received.
 
 The production deployment workflow fails closed unless both GitHub variables are present and approved. Do not bypass this gate to make the app appear live.
+
+## Additional provider-specific restrictions (reviewed 2026-11-24)
+
+The runtime policy in `market-gateway/lib/provider-paper-trading-policy.js` now distinguishes generic API access from permission to supply market data to this app's paper-trading simulator:
+
+- Kite Connect terms expressly prohibit use of live market data for virtual/mock trading apps. It is not an eligible fallback.
+- Dhan's own support guidance says paper trading with virtual funds and live market data is not supported. Its sandbox is not a live-market simulator.
+- FYERS API terms expressly prohibit using exchange data to develop paper-trading, gaming, and virtual-trading tools; they also require written consent for certain third-party copying, caching, public display and redistribution.
+- Upstox and Angel One remain approval-required, not approved. API docs establish technical endpoints only.
+- Any authorized vendor must provide a signed agreement expressly covering S-TRADE's simulator use, live/delayed data, display, redistribution, derived data, storage/cache, user limits, attribution, and term.
+
+Official sources:
+- Kite Connect terms: https://www.kite.trade/terms/
+- Dhan support on live data + virtual funds: https://dhan.co/support/platforms/dhanhq-api/can-i-test-my-trading-strategy-with-virtual-money-before-going-live/
+- Dhan sandbox clarification: https://blog.dhan.co/support/platforms/dhanhq-api/can-i-use-dhanhq-sandbox-for-paper-trading-with-virtual-money-and-live-market-data/
+- FYERS API terms: https://fyers.in/terms-and-conditions-api
+
+## Runtime enforcement
+
+A route is denied unless the provider policy allows conditional approval and the authenticated entitlement resolver returns all of:
+- `approved: true`
+- `paperTradingAllowed: true`
+- `redistributionAllowed: true`
+- a non-empty account entitlement `reference`
+- a separate non-empty written `rightsApprovalReference`
+
+The Kite, Dhan and FYERS policy entries are hard-denied. Unknown providers are unreviewed and fail closed. A fallback provider must pass the same policy independently; failure of one provider never authorizes another.
