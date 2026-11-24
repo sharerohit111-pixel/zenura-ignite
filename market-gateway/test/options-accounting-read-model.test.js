@@ -99,7 +99,7 @@ test("rejects impossible LIMIT lifecycle states and reservation-release flags",(
 test("includes contract identity in the reconciled MARKET and LIMIT history read model",()=>{
  const snapshot=buildOptionsAccountingSnapshot(base);
  const market=snapshot.history.find(row=>row.source==="MARKET");
- const limit=snapshot.history.find(row=>row.source==="LIMIT");
+ const limit=snapshot.history.find(row=>row.source==="LIMIT"&&row.id===base.limitOrders[0].order_id);
  assert.equal(market.tradingSymbol,base.marketOrders[0].trading_symbol);
  assert.equal(market.instrumentKey,base.marketOrders[0].instrument_key);
  assert.equal(limit.tradingSymbol,base.limitOrders[0].trading_symbol);
