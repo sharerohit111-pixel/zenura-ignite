@@ -41,3 +41,32 @@ test("Futures product, option expiry/strike and MARKET/LIMIT controls are expose
   assert.match(panel, /MARKET/);
   assert.match(panel, /LIMIT/);
 });
+
+
+test("Demo controls retain native labels, mobile breakpoints and PWA shell coverage", async () => {
+  const panel = await read("markets/stocks/demo-derivative-panel.mjs");
+  const css = await read("markets/stocks/demo.css");
+  const html = await read("markets/stocks/demo.html");
+  const sw = await read("markets/service-worker.js");
+
+  // Every input/select is nested in a native label so assistive technology
+  // can identify its purpose without relying on placeholder text.
+  assert.match(panel, /const field=\(label,node\)=>\{const l=el\("label","demo-fo-field",label\);l\.append\(node\);return l;\}/);
+  for (const control of ["contract", "expiry", "optionType", "strike", "side", "orderType", "lots", "product", "limit"]) {
+    assert.match(panel, new RegExp("field\\([^\\n]*" + control + "\\)"));
+  }
+  assert.match(panel, /limit\.disabled=true/);
+  assert.match(panel, /limit\.disabled=orderType\.value!=="LIMIT"/);
+  assert.match(panel, /cancel\.addEventListener\("click"/);
+
+  // Responsive rules must cover tablet and narrow-phone widths.
+  assert.match(css, /@media\s*\(max-width:\s*900px\)/);
+  assert.match(css, /@media\s*\(max-width:\s*520px\)/);
+  assert.match(css, /\.demo-fo-controls\{grid-template-columns:1fr\}/);
+  assert.match(html, /name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/);
+
+  // The PWA shell must cache the exact simulator assets, not just the parent page.
+  assert.match(sw, /stocks\/demo-derivative-panel\.mjs/);
+  assert.match(sw, /stocks\/derivative-mock-simulator\.js/);
+  assert.match(sw, /mock\/fixtures\/derivatives\.json/);
+});
