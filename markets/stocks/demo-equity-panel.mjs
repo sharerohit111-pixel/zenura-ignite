@@ -47,14 +47,14 @@ export async function mountEquityDemo(container){
  panel.append(el("p","demo-eq-disclaimer","This reuses the canonical PR #148 Equity engine. Browser-memory only: no production RPC, live price, broker API, tax/fee calculation or database write. This local simulator is separate from the unreconciled Wallet snapshot."));
  const stats=el("div","demo-eq-stats");
  const controls=el("div","demo-eq-controls");
- const side=el("select","demo-eq-input"),type=el("select","demo-eq-input"),product=el("select","demo-eq-input"),quantity=el("input","demo-eq-input"),limit=el("input","demo-eq-input");
+ const side=el("select","demo-eq-input"),type=el("select","demo-eq-input"),product=el("select","demo-eq-input"),quantity=el("input","demo-eq-input"),limit=el("input","demo-eq-input"),activeOrderSelect=el("select","demo-eq-input");
  [["BUY","BUY"],["SELL","SELL"]].forEach(x=>add(side,x[0],x[1]));
  [["MARKET","MARKET"],["LIMIT","LIMIT"]].forEach(x=>add(type,x[0],x[1]));
  [["DELIVERY","Delivery"],["INTRADAY","Intraday"]].forEach(x=>add(product,x[0],x[1]));
  quantity.type="number";quantity.min="1";quantity.max="1000000";quantity.step="1";quantity.value="1";
  limit.type="text";limit.inputMode="decimal";limit.placeholder="e.g. 1,250.50";limit.disabled=true;
  const field=(label,node)=>{const wrap=el("label","demo-eq-field",label);wrap.append(node);return wrap;};
- controls.append(field("Side",side),field("Order type",type),field("Product",product),field("Quantity (shares)",quantity),field("LIMIT price (₹)",limit));
+ controls.append(field("Side",side),field("Order type",type),field("Product",product),field("Quantity (shares)",quantity),field("LIMIT price (₹)",limit),field("Pending order to manage",activeOrderSelect));
  panel.append(controls);
  const actions=el("div","demo-eq-actions");
  const submit=el("button","demo-eq-button primary","PLACE DEMO ORDER");
@@ -82,10 +82,13 @@ export async function mountEquityDemo(container){
   table(fills,["FILL ID","SIDE","PRODUCT","QTY","PRICE","GROSS VALUE","REALIZED P&L","EXECUTED AT"],fillRows(s),"No immutable fill receipts yet.");
   const active=s.orders.filter(x=>["PENDING","PARTIALLY_FILLED"].includes(x.status));
   if(!active.some(x=>x.orderId===activeOrderId))activeOrderId=active.at(-1)?.orderId||"";
+  activeOrderSelect.replaceChildren();active.forEach(order=>add(activeOrderSelect,order.orderId,order.orderId+" · "+order.status+" · "+order.remainingQuantity+" remaining"));
+  activeOrderSelect.value=activeOrderId;activeOrderSelect.disabled=!active.length;
   match.disabled=!activeOrderId;matchAll.disabled=!activeOrderId;cancel.disabled=!activeOrderId;
  }
  function stat(label,value){const c=el("article","demo-eq-stat");c.append(el("span","",label),el("strong","",value));return c;}
  type.addEventListener("change",()=>{limit.disabled=type.value!=="LIMIT";});
+ activeOrderSelect.addEventListener("change",()=>{activeOrderId=activeOrderSelect.value;});
  submit.addEventListener("click",async()=>{
   try{
    const q=Number(quantity.value);if(!Number.isSafeInteger(q)||q<1||q>1000000)throw new Error("Enter a valid whole-share quantity.");
