@@ -447,3 +447,24 @@ Exact worker implementation inspected from PR #99 branch `feature/indian-market-
 The `paper_futures_fills` SELECT/INSERT/UPDATE/DELETE grant remains separately blocked by the append-only requirement in Section 12. `paper_market_worker_state` UPDATE is required for lease/cursor lifecycle and should remain narrowly scoped; the worker's cursor writes are filtered by the current lease token in its query.
 
 No SQL or production grants were changed. No worker was activated.
+
+
+## 15. Production service_role ACL snapshot — read-only verification (2026-11-24)
+
+A read-only production catalog query checked `has_table_privilege('service_role', ..., SELECT/INSERT/UPDATE/DELETE)` and `relacl` for the current public tables used by the market gateway. For each of the following, service_role currently has **none** of SELECT, INSERT, UPDATE or DELETE at the table ACL level:
+
+- `upstox_connections`
+- `paper_market_worker_state`
+- `paper_orders`
+- `paper_protective_orders`
+- `paper_equity_positions`
+- `paper_accounts`
+- `paper_futures_orders`
+- `paper_futures_positions`
+- `paper_watchlists`
+
+The returned ACLs show table owner `postgres`, with `service_role=Dxtm` on these sampled tables; this does not include SELECT/INSERT/UPDATE/DELETE. `paper_market_worker_state` also has no authenticated client grant. This is consistent with the earlier observation that the draft gateway grant migrations have not been applied to production.
+
+**Deployment gate:** current gateway code uses service-role direct reads for `upstox_connections`, `paper_market_worker_state`, `paper_orders` and `paper_protective_orders`; dedicated workers also directly read Futures/Options tables and update worker cursor state. Under the observed production ACLs, these direct operations are not authorized. Do not deploy/activate these code paths until a reviewed, minimal service_role privilege set is rehearsed and explicitly approved. The grant set must be derived from actual serviceDb callsites and worker methods; keep userDb requests under authenticated RLS and do not grant client access to internal tables. For the Futures worker, add only the necessary SELECT on `paper_futures_orders` if direct reads remain; for `paper_futures_fills`, preserve SELECT/INSERT only and enforce append-only semantics.
+
+This finding is a production-readiness blocker, not authorization to change production. No production ACL, grant, policy or migration was modified.
