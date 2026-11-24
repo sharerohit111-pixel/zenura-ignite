@@ -61,3 +61,11 @@ test("Demo route exposes account return navigation and shared Hindi/English togg
  assert.match(html, /\.\.\/language-toggle\.js/);
  assert.doesNotMatch(html, /account-settings\.js|supabase-client\.js|email-auth\.js/);
 });
+
+test("shared language toggle includes Hindi strings for Demo and authenticated account UI", () => {
+ const fs = require("node:fs");
+ const language = fs.readFileSync(new URL("../../markets/language-toggle.js", import.meta.url), "utf8");
+ assert.match(language, /"USER ACCOUNT & WALLET":"यूज़र खाता और वॉलेट"/);
+ assert.match(language, /"Home Overview":"होम ओवरव्यू"/);
+ assert.match(language, /"VERIFY & SIGN IN":"सत्यापित करें और साइन इन करें"/);
+});
