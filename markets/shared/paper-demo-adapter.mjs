@@ -64,6 +64,9 @@ export function createPaperDemoViewModel(fixtures, options = {}) {
   const account = assertEnvelope(fixtures.account, "account");
   const equity = assertEnvelope(fixtures.equity, "equity");
   const derivatives = assertEnvelope(fixtures.derivatives, "derivatives");
+  if (![fixtures.account, fixtures.equity, fixtures.derivatives].every(item => item.asOf === fixtures.market.asOf)) {
+    fail("MOCK_FIXTURE_SNAPSHOT_MISMATCH");
+  }
 
   if (!Array.isArray(market.quotes) || market.quotes.length === 0) fail("MOCK_MARKET_QUOTES_REQUIRED");
   const instrumentKeys = new Set();
@@ -109,6 +112,8 @@ export function createPaperDemoViewModel(fixtures, options = {}) {
       typeof account.ledgerReconciled !== "boolean") fail("INVALID_MOCK_ACCOUNT_SNAPSHOT");
 
   assertMockInstrument(equity.instrumentKey, equity.symbol);
+  const equityQuote = market.quotes.find(quote => quote.instrumentKey === equity.instrumentKey);
+  if (!equityQuote || equityQuote.symbol !== equity.symbol) fail("MOCK_EQUITY_INSTRUMENT_MISMATCH");
   assertOrder(equity.order, "equity");
   if (!isObject(equity.position) || !Number.isSafeInteger(equity.position.quantity) || equity.position.quantity < 0 ||
       !Number.isSafeInteger(equity.position.averagePricePaise) || equity.position.averagePricePaise < 0) fail("INVALID_MOCK_EQUITY_POSITION");
