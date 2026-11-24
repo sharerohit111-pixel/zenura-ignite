@@ -195,6 +195,8 @@ jobs:
         run: psql -v ON_ERROR_STOP=1 -f supabase/tests/market_gateway_service_role_grants.sql
       - name: Reconcile Indian-market Futures ledger cash, charges, realized P&L and margin
         run: psql -v ON_ERROR_STOP=1 -f supabase/tests/futures_market_order_accounting.sql
+      - name: Exercise Futures append-only risk ledger, daily MTM, margin calls and expiry square-off
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/futures_risk_ledger_settlement.sql
       - name: Exercise atomic Futures LIMIT submit, reservation, cancel and expiry
         run: psql -v ON_ERROR_STOP=1 -f supabase/tests/futures_limit_submit_release.sql
       - name: Exercise atomic Futures LIMIT partial fills and settlement conservation
