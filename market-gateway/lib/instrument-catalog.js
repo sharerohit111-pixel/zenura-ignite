@@ -17,8 +17,8 @@ function filterAndRankInstrumentCatalog(items,options={}){
   const limit=options.limit===undefined?100:Number(options.limit);
   if(!VALID_KINDS.has(kind))catalogError("Unsupported instrument kind.");
   if(exchange&&!VALID_EXCHANGES.has(exchange))catalogError("Exchange must be NSE or BSE.");
-  if(expiry&&!/^\\d{4}-\\d{2}-\\d{2}$/.test(expiry))catalogError("Expiry must use YYYY-MM-DD format.");
-  if(asOf&&!/^\\d{4}-\\d{2}-\\d{2}$/.test(asOf))catalogError("As-of date must use YYYY-MM-DD format.");
+  if(expiry&&!/^\d{4}-\d{2}-\d{2}$/.test(expiry))catalogError("Expiry must use YYYY-MM-DD format.");
+  if(asOf&&!/^\d{4}-\d{2}-\d{2}$/.test(asOf))catalogError("As-of date must use YYYY-MM-DD format.");
   if(optionType&&!["CE","PE"].includes(optionType))catalogError("Option type must be CE or PE.");
   if(!Number.isInteger(limit)||limit<1||limit>100)catalogError("Limit must be between 1 and 100.");
   const minStrike=options.minStrike===undefined?null:Number(options.minStrike);
