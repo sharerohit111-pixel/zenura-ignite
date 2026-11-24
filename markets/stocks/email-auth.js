@@ -25,6 +25,8 @@ if (card && connectButton) {
     <div class="email-auth-actions">
       <button type="submit" id="email-sign-in">SIGN IN</button>
       <button type="button" id="email-create">CREATE ACCOUNT</button>
+      <button type="button" id="email-google">CONTINUE WITH GOOGLE</button>
+      <button type="button" id="email-reset">RESET PASSWORD</button>
       <button type="button" id="email-sign-out" hidden>SIGN OUT</button>
     </div>`;
   card.append(form);
@@ -34,6 +36,8 @@ if (card && connectButton) {
   const signIn = form.querySelector("#email-sign-in");
   const create = form.querySelector("#email-create");
   const signOutButton = form.querySelector("#email-sign-out");
+  const googleButton = form.querySelector("#email-google");
+  const resetButton = form.querySelector("#email-reset");
   let creating = false;
   create.addEventListener("click", () => {
     creating = !creating;
@@ -84,6 +88,38 @@ if (card && connectButton) {
       create.disabled = false;
     }
   });
+  googleButton.addEventListener("click", async () => {
+    googleButton.disabled = true;
+    message.textContent = "Redirecting to Google securely…";
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: { redirectTo: location.origin + location.pathname }
+      });
+      if (error) throw error;
+    } catch (error) {
+      message.textContent = error?.message || "Google sign-in could not be started. Check the Supabase Google provider configuration.";
+      googleButton.disabled = false;
+    }
+  });
+  resetButton.addEventListener("click", async () => {
+    const address = email.value.trim();
+    if (!address || !email.checkValidity()) {
+      message.textContent = "Enter your account email first to receive a password reset link.";
+      email.focus();
+      return;
+    }
+    resetButton.disabled = true;
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(address, {
+        redirectTo: location.origin + location.pathname
+      });
+      if (error) throw error;
+      message.textContent = "If this email belongs to an account, a password reset link has been sent.";
+    } catch (error) {
+      message.textContent = error?.message || "Password reset could not be requested.";
+    } finally { resetButton.disabled = false; }
+  });
   signOutButton.addEventListener("click", async () => {
     signOutButton.disabled = true;
     const { error } = await supabase.auth.signOut();
@@ -97,12 +133,16 @@ if (card && connectButton) {
       password.hidden = true;
       signIn.hidden = true;
       create.hidden = true;
+      googleButton.hidden = true;
+      resetButton.hidden = true;
       signOutButton.hidden = false;
     } else {
       email.hidden = false;
       password.hidden = false;
       signIn.hidden = false;
       create.hidden = false;
+      googleButton.hidden = false;
+      resetButton.hidden = false;
       signOutButton.hidden = true;
     }
   });
