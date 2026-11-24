@@ -17,6 +17,7 @@ INSERT INTO public.paper_derivative_positions(
 DO $expiry_settlement$
 DECLARE
   v_now bigint:=floor(extract(epoch from clock_timestamp())*1000)::bigint;
+  v_verified bigint;
   v_settlement_ms bigint:=floor(extract(epoch from ('2026-11-20 16:00:00'::timestamp at time zone 'Asia/Kolkata'))*1000)::bigint;
   v_source text:='NSE official settlement bhavcopy test fixture';
   v_sha text;
@@ -26,13 +27,14 @@ DECLARE
   v_count integer;
   v_rejected boolean;
 BEGIN
+  v_verified:=v_now;
   v_sha:=encode(extensions.digest(convert_to(v_source,'UTF8'),'sha256'),'hex');
   v_result:=public.settle_paper_long_index_option_expiry(
     'd2d2d2d2-d2d2-4d2d-8d2d-d2d2d2d2d2d2',repeat('c',64),
     'NSE_FO|EXPIRY_CE_TEST','EXPIRY CE TEST','CE','INDEX','CASH_SETTLED',
     '2026-11-20',250000,260000,
     'https://www.nseindia.com/reports/settlement-price',v_source,v_sha,
-    v_settlement_ms,v_now,v_now
+    v_settlement_ms,v_verified,v_now
   );
   IF v_result->>'idempotent_replay'<>'false'
      OR (v_result->>'gross_payout_paise')::bigint<>650000
@@ -61,7 +63,7 @@ BEGIN
     'NSE_FO|EXPIRY_CE_TEST','EXPIRY CE TEST','CE','INDEX','CASH_SETTLED',
     '2026-11-20',250000,260000,
     'https://www.nseindia.com/reports/settlement-price',v_source,v_sha,
-    v_settlement_ms,v_now,v_now
+    v_settlement_ms,v_verified,v_now
   );
   SELECT cash_paise INTO v_cash FROM public.paper_accounts
    WHERE user_id='d2d2d2d2-d2d2-4d2d-8d2d-d2d2d2d2d2d2';
