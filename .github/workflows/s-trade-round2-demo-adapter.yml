@@ -8,6 +8,7 @@ on:
       - "markets/stocks/demo.css"
       - "markets/stocks/demo.js"
       - "markets/stocks/index.html"
+      - "markets/service-worker.js"
       - "market-gateway/test/mock-demo-adapter.test.js"
       - "market-gateway/test/demo-dashboard.test.js"
       - "market-gateway/mock/fixtures/**"
