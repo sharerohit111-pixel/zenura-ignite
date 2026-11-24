@@ -145,3 +145,24 @@ test("BSE and NSE instruments are distinct and deterministic quote data is fixed
   assert.equal(engine.getInstrumentMaster()[0].quotePaise,152345);
   assert.equal(engine.getInstrumentMaster()[2].exchange,"BSE");
 });
+
+
+test("failed fee-inclusive LIMIT BUY fill leaves cash and reservation unchanged", () => {
+  const feePerFillPaise = 20001;
+  const engine = createEngine({fixtures, startingCashPaise: 301111, feePerFillPaise});
+  const limit = engine.submitOrder(buy({quantity:1, idempotencyKey:"atomic-limit-01"}));
+  assert.equal(limit.status,"PENDING");
+  const other = engine.submitOrder(buy({
+    instrumentKey:RELIANCE, orderType:"MARKET", limitPricePaise:undefined,
+    quantity:1, idempotencyKey:"atomic-market-01"
+  }));
+  assert.equal(other.status,"FILLED");
+  const before = engine.snapshot();
+  assert.throws(() => engine.executeFill(limit.orderId,1,152345,"atomic-failed-fill-01"), /Insufficient available demo cash/);
+  const after = engine.snapshot();
+  assert.equal(after.cashPaise,before.cashPaise);
+  assert.equal(after.reservedCashPaise,before.reservedCashPaise);
+  assert.equal(after.orders.find(o=>o.orderId===limit.orderId).remainingReservedCashPaise,152350);
+  assert.equal(after.orders.find(o=>o.orderId===limit.orderId).status,"PENDING");
+  assert.equal(after.fills.length,before.fills.length);
+});
