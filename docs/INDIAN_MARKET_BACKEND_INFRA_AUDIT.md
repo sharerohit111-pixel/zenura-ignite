@@ -403,3 +403,35 @@ This is **structured request telemetry and trace-context correlation**, not yet 
 ## 20. Trace-header CORS regression correction (2026-11-24)
 
 The next PR workflow run (#1303, head commit `e1f8d4413253b5e5c2b0cdf936e9cd5ef833d680`) reached the gateway deployment-boundary tests and failed because two pre-existing CORS assertions still expected the older expose-header list. The gateway now correctly exposes both `X-Request-Id` and `X-Trace-Id`; the older assertions and middleware-order lookup were updated to the new exact header list. This was a test expectation mismatch, not a runtime CORS failure. The corrected test commit is `fdb2fb918c03119d9737dfb62b6610f2a3ce4ce9`. A successful exact-head full Node + disposable PostgreSQL run is still required; no test or migration result is inferred from this correction.
+
+
+## 21. Worker lease integration matrix on PR #99 head (2026-11-24)
+
+Re-inspected the actual worker source files on the current PR #99 head rather than inferring integration from the shared helper's presence. The helper `lib/lease-heartbeat.js` exists and has focused unit tests, but **none of the five order/protective workers imported or invoked it on this PR head** at this audit point:
+
+| Worker | Lease key | TTL | Heartbeat on PR #99 head |
+|---|---|---:|---|
+| Equity Delivery LIMIT | `paper_limit_orders` | 240 s | Missing |
+| Equity Intraday LIMIT | `paper_intraday_limit_orders` | 240 s | Missing |
+| Equity Protective | `paper_protective_orders` | 240 s | Missing |
+| NSE Futures LIMIT | `paper_futures_limit_orders` | 240 s | Missing on this PR head; separately proposed in PR #93 |
+| NSE Options LIMIT | `paper_option_limit_orders` | 240 s | Missing on this PR head; separately proposed in PR #119 |
+
+The Futures and Options work must be reviewed at its own PR head and reconciled at integration time; it must not be treated as already present in this infrastructure branch. The lease heartbeat helper alone does not protect a worker unless the worker starts it after a successful lease acquisition, stops it in every exit path, and checks lease-loss state before each irreversible RPC and cursor mutation.
+
+### Retry and recovery observations
+
+- The 240-second lease is a single-writer exclusion mechanism, not a durable job queue. A process crash waits for lease expiry and later reacquisition; there is no immediate crash notification.
+- Equity Intraday, Futures and Options workers use persistent scan cursors. A per-order transient failure can still be passed by the cursor and may not be retried until the scan wraps; this is eventual rescan behavior, not bounded retry scheduling.
+- Protective orders rotate through `worker_checked_at`, but transient provider/token failures are recorded as a checked attempt rather than a durable retry with backoff/attempt count.
+- The current worker status summaries and console warnings are not a durable dead-letter or operator-replay mechanism.
+- Cursor updates check for RPC/query errors and lease-token ownership, but a zero-row update must be distinguished from a successful write; affected-row verification and stale-owner SQL fencing remain required.
+
+### Safe next implementation boundary
+
+1. Reconcile the single renewal RPC and allowlist with Chat 7 and the current migration order before changing any database function or grant.
+2. Integrate worker-side heartbeat and a fail-closed `leaseLost` gate into every worker in isolated commits, with deterministic injected timers and renewal-loss tests.
+3. Add bounded retry/backoff metadata and an operator-visible dead-letter/replay workflow only after Chat 7 approves the schema/RPC ownership. Until then, do not add speculative tables or mutate shared migrations.
+4. Add real PostgreSQL tests for expiry takeover, two concurrent claimants, renew-after-expiry rejection, stale owner fill rejection, cursor update with zero affected rows, and crash/restart recovery.
+
+No worker runtime, SQL, migration, scheduler, feature flag or production configuration was changed by this matrix update.
