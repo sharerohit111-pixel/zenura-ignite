@@ -470,3 +470,16 @@ Added a small, database-independent public error taxonomy in `market-gateway/lib
 - PR #116 remains Draft and documents migration reconciliation only. No shared migration/RPC contract has been approved for implementation in this branch.
 
 No SQL, worker execution RPC, lease schema, migration, service-role grant, feature flag or production configuration was changed by this status update.
+
+
+## 24. Parser failures use the same public error taxonomy (2026-11-24)
+
+Extended the shared stable API error-code contract to the Express JSON-parser rejection path, which executes before normal route handlers and therefore does not pass through `sendError`.
+
+- Oversized JSON bodies retain HTTP 413, the existing safe message and `requestId`, and now add `PAYLOAD_TOO_LARGE` through `publicErrorCode(413)`.
+- Malformed JSON retains HTTP 400, the existing safe message and `requestId`, and now adds `INVALID_REQUEST` through `publicErrorCode(400)`.
+- Existing parser-error logging remains unchanged and does not include raw body/parser messages.
+- Updated gateway deployment regression assertions to require the additive `code` field on both early-parser responses.
+- The previous exact-head Run #1341 validated the common error helper and normal `sendError` route path. This parser-path extension is a newer code change and requires a fresh full workflow before it is considered verified.
+
+No database, schema, migration, rate-limit or worker behavior changed.
