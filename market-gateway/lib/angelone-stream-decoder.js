@@ -135,4 +135,47 @@ function decodeAngelOneBinaryFeedPacket(input) {
   return Object.freeze(result);
 }
 
-module.exports = { decodeAngelOneBinaryFeedPacket, PACKET_LENGTHS, EXCHANGES };
+
+function decodeAndNormalizeAngelOneBinaryFeedPacket(input, {
+  instrumentMap,
+  now = Date.now(),
+  maxAgeMs = 15000,
+} = {}) {
+  if (!Number.isSafeInteger(now) || now <= 0 ||
+      !Number.isSafeInteger(maxAgeMs) || maxAgeMs <= 0) {
+    invalid("Angel One stream freshness policy is invalid.");
+  }
+  const packet = decodeAngelOneBinaryFeedPacket(input);
+  // Only Snap Quote contains a documented last-traded timestamp. Do not
+  // substitute exchange-feed time for trade time on LTP/Quote packets.
+  if (packet.mode !== 3) return null;
+  const key = packet.exchangeType + ":" + packet.symbolToken;
+  const mapping = instrumentMap instanceof Map
+    ? instrumentMap.get(key)
+    : instrumentMap && typeof instrumentMap === "object" && !Array.isArray(instrumentMap)
+      ? instrumentMap[key] : null;
+  if (!mapping || mapping.nativeSymbolToken !== packet.symbolToken ||
+      mapping.exchangeType !== packet.exchangeType ||
+      mapping.instrumentId == null || typeof mapping.instrumentId !== "string" ||
+      !mapping.instrumentId.trim() || mapping.exchange !== packet.exchange ||
+      typeof mapping.entitlementReference !== "string" ||
+      !mapping.entitlementReference.trim()) return null;
+  if (packet.exchangeTimestampMs > now || packet.lastTradeTimestampMs > now ||
+      now - packet.exchangeTimestampMs > maxAgeMs ||
+      now - packet.lastTradeTimestampMs > maxAgeMs) return null;
+  return Object.freeze({
+    providerId: "angelone",
+    instrumentId: mapping.instrumentId,
+    exchange: packet.exchange,
+    lastPricePaise: packet.lastPricePaise,
+    receivedAtMs: now,
+    exchangeTimestampMs: packet.exchangeTimestampMs,
+    lastTradeTimestampMs: packet.lastTradeTimestampMs,
+    sourceSequence: ["angelone", packet.exchangeType, packet.symbolToken,
+      packet.sequenceNumber, packet.exchangeTimestampMs, packet.lastPricePaise].join(":"),
+    entitlementReference: mapping.entitlementReference,
+    attribution: Object.freeze({ displayName: "Angel One SmartAPI" }),
+  });
+}
+
+module.exports = { decodeAngelOneBinaryFeedPacket, decodeAndNormalizeAngelOneBinaryFeedPacket, PACKET_LENGTHS, EXCHANGES };
