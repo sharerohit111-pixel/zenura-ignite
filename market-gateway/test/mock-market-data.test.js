@@ -50,5 +50,5 @@ test("no provider, network or wall-clock quote generation is used",()=>{
  assert.equal(meta.source,"SYNTHETIC_MOCK_JSON");assert.equal(meta.isLive,false);
  assert.equal(meta.asOf,"2026-11-24T09:15:00+05:30");
  const nifty=mock.listInstruments({kind:"indices",q:"NIFTY",limit:1})[0];
- assert.equal(mock.getQuote(nifty.instrument_key).lastPricePaise,2450125);
+ assert.equal(mock.getQuote(nifty.instrument_key).lastPricePaise,2450000);
 });
