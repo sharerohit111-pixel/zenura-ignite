@@ -25,7 +25,7 @@ All monetary values are integer paise.
 
 ## Adapter contract
 Exactly one snapshot for each of EQUITY, FUTURES and OPTIONS is mandatory: { asset, complete, positions: [], orders: [], trades: [] }. An unused asset must still supply an empty snapshot; omission must never make a partial portfolio look complete.
-Positions include positionId, asset, quantity, costBasisPaise, quoteStatus and, for fresh marks, marketPricePaise, quoteTimestampMs, marketValuePaise, unrealizedPnlPaise. Equity DELIVERY positions are holdings; Equity intraday, Futures and Options remain positions.
+Positions include globally unique positionId, asset, side (LONG or SHORT), positive quantity, costBasisPaise, quoteStatus and, for fresh marks, marketPricePaise, quoteTimestampMs, marketValuePaise, unrealizedPnlPaise. Unrealized P&L is market value minus cost basis for LONG and cost basis minus market value for SHORT; market value remains a positive absolute exposure. Equity DELIVERY positions are holdings; Equity intraday, Futures and Options remain positions.
 Orders include globally unique orderId, asset, status, remainingQuantity and createdAt. Trades include globally unique immutable tradeId, asset, realizedPnlPaise, chargesPaise and executedAt. Adapters own deterministic pagination and source deduplication.
 
 ## Dummy mode
