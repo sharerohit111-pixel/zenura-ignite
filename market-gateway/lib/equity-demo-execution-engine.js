@@ -57,7 +57,7 @@ function fingerprint(request){
   return JSON.stringify({instrumentKey:request.instrumentKey,side:request.side,orderType:request.orderType,
     product:request.product,quantity:request.quantity,limitPricePaise:request.limitPricePaise??null});
 }
-function createEquityDemoExecutionEngine({fixture,account,env=process.env}={}){
+function createEquityDemoExecutionEngine({fixture,account,env=(typeof process!=="undefined"?process.env:{})}={}){
   if(env?.NODE_ENV==="production")fail("EQUITY_DEMO_EXECUTION_DISABLED_IN_PRODUCTION",403);
   validateFixture(fixture);
   const instrument=fixture.data.instrument;
@@ -169,4 +169,6 @@ function createEquityDemoExecutionEngine({fixture,account,env=process.env}={}){
   return Object.freeze({submitOrder,matchNext,cancelOrder,getOrder:id=>{const o=state.orders.get(id);return o?orderView(o):null;},
     getFillReceipts:orderId=>clone(state.fills.filter(f=>!orderId||f.orderId===orderId)),snapshot});
 }
-module.exports={createEquityDemoExecutionEngine,validateEquityDemoFixture:validateFixture};
+const api={createEquityDemoExecutionEngine,validateEquityDemoFixture:validateFixture};
+if(typeof module!=="undefined"&&module.exports)module.exports=api;
+if(typeof window!=="undefined")window.ZenuraEquityDemoEngine=api;
