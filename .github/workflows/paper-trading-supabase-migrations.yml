@@ -369,14 +369,14 @@ jobs:
             IF v_cash <> 99897521 THEN
               RAISE EXCEPTION 'MARKET idempotent retry debited cash more than once';
             END IF;
-            -- Same key with a different fingerprint must fail.
+            -- Reuse the exact idempotency key and order identity; change only the limit price fingerprint.
             BEGIN
               PERFORM public.execute_paper_market_order(
                 '22222222-2222-4222-8222-222222222222',
-                repeat('c',64),
+                repeat('a',64),
                 '33333333-3333-4333-8333-333333333333',
-                repeat('d',64),'NSE_EQ|TEST001','TEST001','NSE',
-                'BUY','DELIVERY',10,10000,floor(extract(epoch from clock_timestamp())*1000)::bigint,0
+                repeat('b',64),'NSE_EQ|TEST001','TEST001','NSE',
+                'BUY','DELIVERY',10,10001,floor(extract(epoch from clock_timestamp())*1000)::bigint,0
               );
               RAISE EXCEPTION 'Changed MARKET fingerprint was unexpectedly accepted';
             EXCEPTION WHEN SQLSTATE 'P0001' THEN
