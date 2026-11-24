@@ -25,7 +25,8 @@ const axePath=require.resolve("axe-core/axe.min.js");
    await page.addScriptTag({path:axePath});
    const axe=await page.evaluate(async()=>window.axe.run(document,{runOnly:{type:"tag",values:["wcag2a","wcag2aa","wcag21a","wcag21aa"]}}));
    const serious=axe.violations.filter(v=>v.impact==="critical"||v.impact==="serious");
-   assert.equal(serious.length,0,viewport.name+" serious/critical accessibility violations: "+JSON.stringify(serious.map(v=>({id:v.id,help:v.help,nodes:v.nodes.length}))));
+   if(serious.length) console.error(JSON.stringify(serious.map(v=>({id:v.id,help:v.help,nodes:v.nodes.map(n=>({target:n.target,html:n.html,failureSummary:n.failureSummary}))}))));
+   assert.equal(serious.length,0,viewport.name+" serious/critical accessibility violations");
    const perf=await page.evaluate(()=>{
     const nav=performance.getEntriesByType("navigation")[0];
     return {domContentLoadedMs:Math.round(nav?.domContentLoadedEventEnd||0),loadMs:Math.round(nav?.loadEventEnd||0),
