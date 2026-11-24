@@ -214,8 +214,13 @@
         if (availableDepth < quantity) {
           order.rejectionReason = "Insufficient deterministic top-of-book depth; MARKET order rejected in full.";
         } else {
-          appendFill(order, quantity, executionPrice);
-          consumeDepth(quote, request.side, quantity);
+          try {
+            appendFill(order, quantity, executionPrice);
+            consumeDepth(quote, request.side, quantity);
+          } catch (error) {
+            // A boundary rejection must not leave a blank rejected receipt or consume quote depth.
+            order.rejectionReason = error && error.message ? error.message : "Synthetic execution was rejected.";
+          }
         }
       }
       return copy(order);
