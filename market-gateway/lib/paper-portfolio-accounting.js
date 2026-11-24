@@ -1,6 +1,7 @@
 "use strict";
 const ASSETS = new Set(["EQUITY","FUTURES","OPTIONS"]);
 const OPEN = new Set(["PENDING","PARTIALLY_FILLED"]);
+const INITIAL_CAPITAL_PAISE = 100000000;
 function fail(message){throw Object.assign(new Error(message),{status:422,code:"PAPER_PORTFOLIO_INVALID"});}
 function money(v,label,signed=false){if(!Number.isSafeInteger(v)||(!signed&&v<0))fail(label+" must be a safe integer in paise.");return v;}
 function add(a,b,label){const n=a+b;if(!Number.isSafeInteger(n))fail(label+" exceeds safe integer range.");return n;}
@@ -19,10 +20,10 @@ function buildPaperPortfolioAccounting({account,assetSnapshots,mode="PERSISTED",
  const marginDeficitPaise=money(account.margin_deficit_paise??minimumCashDeficitPaise,"Margin deficit");
  if(marginDeficitPaise<minimumCashDeficitPaise)fail("Margin deficit cannot be lower than the negative available-cash deficit.");
  const assets=new Set(),positions=[],orders=[],trades=[],positionIds=new Set(),orderIds=new Set(),tradeIds=new Set();
- let complete=true,stale=0,marketValue=0,unrealized=0,realized=0,charges=0,unpriced=false;
+ let historyComplete=true,stale=0,marketValue=0,unrealized=0,observedRealized=0,observedCharges=0,unpriced=false;
  for(const s of assetSnapshots){
   if(!s||!ASSETS.has(s.asset)||assets.has(s.asset)||!Array.isArray(s.positions)||!Array.isArray(s.orders)||!Array.isArray(s.trades)||typeof s.complete!=="boolean")fail("Invalid or duplicate asset adapter snapshot.");
-  assets.add(s.asset);complete=complete&&s.complete;
+  assets.add(s.asset);historyComplete=historyComplete&&s.complete;
   for(const p of s.positions){
    if(!p||p.asset!==s.asset)fail("Position asset does not match adapter.");
    const positionId=id(p.positionId,"Position ID"),quantity=money(p.quantity,"Position quantity"),costBasisPaise=money(p.costBasisPaise,"Position cost basis");
@@ -35,20 +36,38 @@ function buildPaperPortfolioAccounting({account,assetSnapshots,mode="PERSISTED",
     const price=money(p.marketPricePaise,"Market price"),at=money(p.quoteTimestampMs,"Quote timestamp");
     if(at>now||now-at>maxQuoteAgeMs){row={...row,quoteStatus:"stale",marketPricePaise:null,marketValuePaise:null,unrealizedPnlPaise:null};stale++;unpriced=true;}
     else{const value=money(p.marketValuePaise,"Market value"),pnl=money(p.unrealizedPnlPaise,"Unrealized P&L",true);
+     if(!Number.isSafeInteger(price*quantity)||value!==price*quantity)fail("Position market value does not reconcile to price and quantity.");
      const expectedPnl=p.side==="SHORT"?costBasisPaise-value:value-costBasisPaise;
-     if(!Number.isSafeInteger(price*quantity)||value!==price*quantity||pnl!==expectedPnl)fail("Position valuation does not reconcile.");
+     if(pnl!==expectedPnl)fail("Position unrealized P&L does not reconcile to side and cost basis.");
      marketValue=add(marketValue,value,"Market value");unrealized=add(unrealized,pnl,"Unrealized P&L");}
    }else{row={...row,quoteStatus:p.quoteStatus||"unavailable",marketPricePaise:null,marketValuePaise:null,unrealizedPnlPaise:null};stale++;unpriced=true;}
    positions.push(row);
   }
   for(const o of s.orders){if(!o||o.asset!==s.asset)fail("Order asset does not match adapter.");const orderId=id(o.orderId,"Order ID");if(orderIds.has(orderId))fail("Duplicate order ID across assets.");orderIds.add(orderId);money(o.remainingQuantity??0,"Remaining order quantity");if(typeof o.status!=="string")fail("Order status missing.");orders.push({...o,orderId});}
-  for(const t of s.trades){if(!t||t.asset!==s.asset)fail("Trade asset does not match adapter.");const tradeId=id(t.tradeId,"Trade ID");if(tradeIds.has(tradeId))fail("Duplicate trade ID across assets.");tradeIds.add(tradeId);const c=money(t.chargesPaise??0,"Trade charges"),r=money(t.realizedPnlPaise??0,"Realized P&L",true);charges=add(charges,c,"Charges");realized=add(realized,r,"Realized P&L");trades.push({...t,tradeId,chargesPaise:c,realizedPnlPaise:r});}
+  for(const t of s.trades){if(!t||t.asset!==s.asset)fail("Trade asset does not match adapter.");const tradeId=id(t.tradeId,"Trade ID");if(tradeIds.has(tradeId))fail("Duplicate trade ID across assets.");tradeIds.add(tradeId);const c=money(t.chargesPaise??0,"Trade charges"),r=money(t.realizedPnlPaise??0,"Realized P&L",true);observedCharges=add(observedCharges,c,"Observed charges");observedRealized=add(observedRealized,r,"Observed realized P&L");trades.push({...t,tradeId,chargesPaise:c,realizedPnlPaise:r});}
  }
  if(assets.size!==ASSETS.size)fail("Equity, Futures and Options snapshots are all required; use empty snapshots for unused assets.");
  positions.sort((a,b)=>a.asset.localeCompare(b.asset)||String(a.symbol||"").localeCompare(String(b.symbol||"")));
  orders.sort((a,b)=>String(b.createdAt||"").localeCompare(String(a.createdAt||""))||a.orderId.localeCompare(b.orderId));
  trades.sort((a,b)=>String(b.executedAt||"").localeCompare(String(a.executedAt||""))||a.tradeId.localeCompare(b.tradeId));
  const holdings=positions.filter(p=>p.asset==="EQUITY"&&(p.product==="DELIVERY"||p.positionType==="HOLDING"));
- return Object.freeze({mode,simulationOnly:mode==="DUMMY",startingCapitalPaise,cashPaise,reservedCashPaise,reservedMarginPaise,blockedFundsPaise:add(reservedCashPaise,reservedMarginPaise,"Blocked funds"),availableCashPaise,marginDeficitPaise,positions,holdings,orders,activeOrders:orders.filter(o=>OPEN.has(o.status)),trades,marketValuePaise:unpriced?null:marketValue,unrealizedPnlPaise:unpriced?null:unrealized,realizedPnlPaise:realized,chargesPaidPaise:charges,netPnlPaise:complete&&!unpriced?add(add(realized,unrealized,"Gross P&L"),-charges,"Net P&L after charges"):null,stalePositions:stale,valuationStatus:!positions.length?"empty":unpriced?"partial_or_stale":"fresh",reconciliationStatus:complete?"complete":"incomplete",sourceAssets:[...assets].sort()});
+ const blockedFundsPaise=add(reservedCashPaise,reservedMarginPaise,"Blocked funds");
+ const reconciliationBlockers=["No authoritative cross-asset ledger reconciliation attestation is available.","Account, positions, fills, reservations and settlement receipts are not read from one verified transactionally consistent snapshot."];
+ if(!historyComplete)reconciliationBlockers.push("At least one asset adapter supplied bounded or incomplete lifetime history.");
+ if(unpriced)reconciliationBlockers.push("At least one open position has a stale or unavailable mark.");
+ return Object.freeze({
+  mode,simulationOnly:mode==="DUMMY",startingCapitalPaise,expectedInitialCapitalPaise:INITIAL_CAPITAL_PAISE,
+  initialCapitalMatchesExpected:startingCapitalPaise===INITIAL_CAPITAL_PAISE,
+  cashPaise,reservedCashPaise,reservedMarginPaise,blockedFundsPaise,availableCashPaise,marginDeficitPaise,
+  positions,holdings,orders,activeOrders:orders.filter(o=>OPEN.has(o.status)),trades,
+  marketValuePaise:unpriced?null:marketValue,unrealizedPnlPaise:unpriced?null:unrealized,
+  realizedPnlPaise:historyComplete?observedRealized:null,chargesPaidPaise:historyComplete?observedCharges:null,
+  observedRealizedPnlPaise:observedRealized,observedChargesPaise:observedCharges,
+  netPnlPaise:historyComplete&&!unpriced?add(add(observedRealized,unrealized,"Gross P&L"),-observedCharges,"Net P&L after charges"):null,
+  historyComplete,historyStatus:historyComplete?"lifetime_complete":"partial_history",
+  stalePositions:stale,valuationStatus:!positions.length?"empty":unpriced?"partial_or_stale":"fresh",
+  ledgerReconciled:false,reconciliationStatus:"not_reconciled",snapshotConsistency:"unverified",
+  reconciliationBlockers,sourceAssets:[...assets].sort()
+ });
 }
 module.exports={buildPaperPortfolioAccounting};
