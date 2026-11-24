@@ -17,7 +17,8 @@
       "symbol": "MOCKALPHA",
       "name": "Synthetic Alpha Corporation",
       "assetClass": "EQUITY",
-      "tickSizePaise": 5
+      "tickSizePaise": 5,
+      "markPricePaise": 125000
     },
     "orderBook": {
       "asks": [
