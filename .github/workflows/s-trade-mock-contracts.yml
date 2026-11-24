@@ -4,14 +4,18 @@ on:
   pull_request:
     branches:
       - feature/s-trade-distributed-api-rate-limit-2026-11-24
+      - feature/s-trade-demo-charts-quotes-2026-11-24
     paths:
       - "market-gateway/mock/**"
       - "market-gateway/lib/paper-mock-fixtures.js"
+      - "market-gateway/lib/equity-demo-execution-engine.js"
+      - "market-gateway/test/equity-demo-execution-engine.test.js"
       - "market-gateway/test/paper-mock-fixtures.test.js"
       - ".github/workflows/s-trade-mock-contracts.yml"
   push:
     branches:
       - feature/s-trade-mock-contract-architecture-2026-11-24
+      - feature/s-trade-equity-demo-execution-2026-11-24
     paths:
       - "market-gateway/mock/**"
       - "market-gateway/lib/paper-mock-fixtures.js"
@@ -43,12 +47,16 @@ jobs:
           for (const file of files) JSON.parse(fs.readFileSync(file, 'utf8'));
           console.log('Parsed ' + files.length + ' contract/fixture JSON files.');
           NODE
-      - name: Run deterministic fixture tests
-        run: node --test market-gateway/test/paper-mock-fixtures.test.js
+      - name: Run deterministic fixture and equity execution tests
+        run: node --test market-gateway/test/paper-mock-fixtures.test.js market-gateway/test/equity-demo-execution-engine.test.js
       - name: Ensure fixture loader is not wired into production gateway
         run: |
           if grep -R "paper-mock-fixtures" market-gateway/supabase-server.js market-gateway/server.js; then
             echo "Mock fixtures must not be wired into production gateway routes."
             exit 1
           fi
-          echo "No production gateway fixture import found."
+          if grep -R "equity-demo-execution-engine" market-gateway/supabase-server.js market-gateway/server.js; then
+            echo "Demo execution engine must not be wired into production gateway routes."
+            exit 1
+          fi
+          echo "No production gateway fixture or demo-engine import found."
