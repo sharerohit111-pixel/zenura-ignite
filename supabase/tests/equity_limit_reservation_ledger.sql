@@ -28,7 +28,7 @@ BEGIN
   -- Delivery BUY: reservation creation is recorded with the same account snapshot.
   v_result:=public.submit_paper_limit_order(
     '88888888-8888-4888-8888-888888888888','deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef',
-    'aaaaaaaa-8888-4888-8888-888888888888',repeat('b',64),
+    '99999999-8888-4888-8888-888888888888','feedfacefeedfacefeedfacefeedfacefeedfacefeedfacefeedfacefeedface',
     'NSE_EQ|RESERVE_DELIVERY','RESERVE_DELIVERY','NSE','BUY',2,10000
   );
   SELECT cash_paise,reserved_cash_paise INTO v_cash,v_reserved
@@ -62,7 +62,7 @@ BEGIN
   -- Intraday BUY: session expiry must write the matching release event.
   PERFORM public.submit_paper_intraday_limit_order(
     '88888888-8888-4888-8888-888888888888','cafebabecafebabecafebabecafebabecafebabecafebabecafebabecafebabe',
-    'cccccccc-8888-4888-8888-888888888888',repeat('d',64),
+    '77777777-8888-4888-8888-888888888888','decafbaddecafbaddecafbaddecafbaddecafbaddecafbaddecafbaddecafbad',
     'NSE_EQ|RESERVE_INTRADAY','RESERVE_INTRADAY','NSE','BUY',1,10000
   );
   UPDATE public.paper_orders SET created_at=clock_timestamp()-interval '1 day'
