@@ -13,12 +13,12 @@
   },
   "data": {
     "instrument": {
-      "instrumentKey": "MOCK|SIM|EQ|0001",
+      "instrumentKey": "MOCK|NSE|EQ|0001",
       "symbol": "MOCKALPHA",
       "name": "Synthetic Alpha Corporation",
       "assetClass": "EQUITY",
       "tickSizePaise": 5,
-      "markPricePaise": 125000
+      "markPricePaise": 125050
     },
     "orderBook": {
       "asks": [
