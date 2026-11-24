@@ -112,9 +112,23 @@ export function createPaperDemoViewModel(fixtures, options = {}) {
   if (!isObject(derivatives.futures) || !isObject(derivatives.options)) fail("INVALID_MOCK_DERIVATIVES");
   assertMockInstrument(derivatives.futures.instrumentKey, derivatives.futures.symbol);
   assertOrder(derivatives.futures.order, "futures");
+  const futuresContract = instruments.find(item => item.instrumentKey === derivatives.futures.instrumentKey);
+  if (!futuresContract || futuresContract.assetClass !== "FUTURE" ||
+      futuresContract.symbol !== derivatives.futures.symbol || futuresContract.expiry !== derivatives.futures.expiry ||
+      futuresContract.lotSize !== derivatives.futures.lotSize || futuresContract.tickSizePaise !== derivatives.futures.tickSizePaise) {
+    fail("MOCK_FUTURES_ORDER_INSTRUMENT_MISMATCH");
+  }
   if (!["CE", "PE"].includes(derivatives.options.optionType)) fail("INVALID_MOCK_OPTION_TYPE");
-  assertMockInstrument(derivatives.options.instrumentKey, "MOCK" + derivatives.options.optionType);
+  assertMockInstrument(derivatives.options.instrumentKey, derivatives.options.symbol);
   assertOrder(derivatives.options.order, "options");
+  const optionContract = instruments.find(item => item.instrumentKey === derivatives.options.instrumentKey);
+  if (!optionContract || optionContract.assetClass !== "OPTION" ||
+      optionContract.symbol !== derivatives.options.symbol || optionContract.underlying !== derivatives.options.underlying ||
+      optionContract.optionType !== derivatives.options.optionType || optionContract.strikePaise !== derivatives.options.strikePaise ||
+      optionContract.expiry !== derivatives.options.expiry || optionContract.lotSize !== derivatives.options.lotSize ||
+      optionContract.tickSizePaise !== derivatives.options.tickSizePaise) {
+    fail("MOCK_OPTIONS_ORDER_INSTRUMENT_MISMATCH");
+  }
 
   if (!Array.isArray(derivatives.contracts) || derivatives.contracts.length === 0 ||
       !Array.isArray(derivatives.quotes) || derivatives.quotes.length !== derivatives.contracts.length) fail("MOCK_DERIVATIVE_CATALOG_REQUIRED");
