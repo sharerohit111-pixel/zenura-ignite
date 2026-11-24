@@ -29,6 +29,7 @@ permissions:
 jobs:
   demo-screen-wiring:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -50,6 +51,7 @@ jobs:
           npm install --prefix "$RUNNER_TEMP/zenura-playwright" playwright@1.61.1 axe-core@4.10.3 --ignore-scripts --no-audit --no-fund
           "$RUNNER_TEMP/zenura-playwright/node_modules/.bin/playwright" install --with-deps chromium
       - name: Run desktop, mobile, accessibility, performance and offline PWA smoke
+        timeout-minutes: 12
         run: |
           python3 -m http.server 4173 --bind 127.0.0.1 > "$RUNNER_TEMP/zenura-static-server.log" 2>&1 &
           echo $! > "$RUNNER_TEMP/zenura-static-server.pid"
