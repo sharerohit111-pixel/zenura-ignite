@@ -340,8 +340,16 @@ function buildOptionsAccountingSnapshot({
     const realized = signedInteger(settlement.realized_pnl_paise, "Expiry realized P&L");
     const expectedIntrinsic = settlement.instrument_type === "CE"
       ? Math.max(settlementPrice - strike, 0) : Math.max(strike - settlementPrice, 0);
+    const expectedExerciseStt = Math.floor((gross * 0.0015) / 100 + 0.5) * 100;
+    const settlementTimestamp = integer(settlement.settlement_timestamp_ms, "Expiry settlement timestamp", { min: 1 });
+    const verifiedTimestamp = integer(settlement.verified_at_ms, "Expiry verification timestamp", { min: 1 });
+    const expiryDate = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit"
+    }).format(new Date(settlementTimestamp));
     if (intrinsic !== expectedIntrinsic || multiplySafe(intrinsic, quantity, "Expiry payout") !== gross
-        || gross - exerciseStt !== net || net - basis !== realized
+        || exerciseStt !== expectedExerciseStt || gross - exerciseStt !== net || net - basis !== realized
+        || verifiedTimestamp < settlementTimestamp || verifiedTimestamp > now
+        || expiryDate !== settlement.expiry
         || typeof settlement.settlement_source_sha256 !== "string"
         || !/^[a-f0-9]{64}$/.test(settlement.settlement_source_sha256)
         || typeof settlement.settlement_source !== "string"
