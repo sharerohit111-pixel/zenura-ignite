@@ -44,7 +44,10 @@ function createPriceAlertWorker({serviceDb,getUpstoxAccessToken,fetchProvider,re
         });
         if(evaluated?.error)throw new Error("Price alert evaluation failed");
         result.observed++;if(evaluated.data===true)result.triggered++;
-       }catch(error){if(error?.status===409)result.stale++;else result.failed++;}
+       }catch(error){if(error?.status===409){
+         result.stale++;
+         await serviceDb.from("s_trade_price_alerts").update({updated_at:new Date(now()).toISOString()}).eq("alert_id",alert.alert_id);
+        }else result.failed++;}
       }
      }
     }catch(_error){result.failed+=alerts.length;await serviceDb.from("s_trade_price_alerts").update({updated_at:new Date(now()).toISOString()}).in("alert_id",alerts.map(a=>a.alert_id));}
