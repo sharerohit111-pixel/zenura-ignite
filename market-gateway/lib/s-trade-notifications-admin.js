@@ -6,8 +6,12 @@ const ADMIN_ACTIONS=new Set(["user_suspend","user_restore","provider_control","o
 
 function normalizePriceAlert(input){
   if(!input||typeof input!=="object"||Array.isArray(input))throw Object.assign(new Error("Invalid price alert"),{status:400});
-  const instrumentKey=typeof input.instrumentKey==="string"?input.instrumentKey.trim():"";
-  const symbol=typeof input.symbol==="string"?input.symbol.trim():"";
+  const rawInstrumentKey=typeof input.instrumentKey==="string"?input.instrumentKey:"";
+  const rawSymbol=typeof input.symbol==="string"?input.symbol:"";
+  if(/[\\r\\n]/.test(rawInstrumentKey)||/[\\r\\n]/.test(rawSymbol))
+    throw Object.assign(new Error("Price alert identifiers cannot contain line breaks"),{status:400});
+  const instrumentKey=rawInstrumentKey.trim();
+  const symbol=rawSymbol.trim();
   const condition=input.condition;
   const target=Number(input.targetPrice);
   if(!instrumentKey||instrumentKey.length>100||/[\r\n]/.test(instrumentKey)
