@@ -662,8 +662,8 @@
     if(derivativeOrderSubmitting)return;
     const connector=window.ZENURA_MARKET_CONNECTOR,uid=connector?.getUserId?.(),chainRequest=optionChainRequest,underlyingKey=selected?.instrument_key,expiry=optionExpiry.value;
     if(!gateway||!connector?.getIdToken||!uid||!underlyingKey){optionStatus.textContent='Sign in and connect Upstox before placing a paper order.';return;}
-    const lotsRaw=window.prompt('Number of '+type+' lots to '+side.toLowerCase()+' (market paper order):','1');
-    if(lotsRaw===null)return;
+    const lotsInput=document.getElementById('option-order-lots');
+    const lotsRaw=lotsInput?.value;
     if(connector.getUserId()!==uid||optionChainRequest!==chainRequest||selected?.instrument_key!==underlyingKey||optionExpiry.value!==expiry){optionStatus.textContent='Account, expiry or selected option chain changed. Reload the option chain before placing an order.';return;}
     const lots=Number(lotsRaw);
     if(!Number.isSafeInteger(lots)||lots<1||lots>10000){optionStatus.textContent='Enter a whole number of lots from 1 to 10,000.';return;}

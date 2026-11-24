@@ -2,7 +2,7 @@ name: Validate Indian Market Code
 
 on:
   pull_request:
-    branches: ["main"]
+    branches: ["main", "feature/nse-options-accounting-complete-chat6-2026-11-24"]
     paths:
       - "markets/stocks/**"
       - "crypto/index.html"
@@ -111,6 +111,8 @@ jobs:
           NODE
       - name: Check browser module syntax
         run: node --check markets/stocks/stocks.js
+      - name: Run Indian Market frontend contract tests
+        run: node --test markets/stocks/frontend-contract.test.js
       - name: Check chart theme module syntax
         run: node --check markets/stocks/chart-theme.js
       - name: Check SSE parser syntax
