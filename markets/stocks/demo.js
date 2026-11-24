@@ -1,5 +1,6 @@
 import { createPaperDemoViewModel, searchPaperDemoInstruments, getPaperDemoExpiries, getPaperDemoOptionChain } from "../shared/paper-demo-adapter.mjs";
 import { mountDerivativeDemo, appendDerivativeSummary } from "./demo-derivative-panel.mjs";
+import { mountDemoChart } from "./demo-chart-panel.mjs";
 import { mountEquityDemo, appendEquitySummary } from "./demo-equity-panel.mjs";
 
 "use strict";
@@ -106,10 +107,7 @@ function render(name){
   return;
  }
  if(name==="charts"){
-  const d=model.market.depth;
-  content.append(grid(card("Depth instrument",d.instrumentKey,"Synthetic depth fixture"),card("Bid levels",String(d.bids.length),"Illustrative only"),card("Ask levels",String(d.asks.length),"Illustrative only"),card("OHLC candles","Not supplied","No fabricated chart history")));
-  content.append(table(["SIDE","PRICE","QUANTITY"],[...d.bids.map(x=>["BID",money(x.pricePaise),x.quantity]),...d.asks.map(x=>["ASK",money(x.pricePaise),x.quantity])]));
-  content.append(notice("Depth is synthetic. OHLC candles are absent from this canonical fixture set and are intentionally not invented."));
+  const chart=el("section","demo-market-panel");content.append(chart);mountDemoChart(chart);
   return;
  }
  if(name==="equity"){
