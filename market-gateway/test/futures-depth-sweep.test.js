@@ -33,6 +33,9 @@ test("BUY sweeps asks in ascending order and preserves immutable per-level fills
   assert.equal(result.vwapNumeratorPaiseQty, "1000925");
   assert.equal(result.vwapDenominatorQuantity, 100);
   assert.equal(result.partialFillAllowed, false);
+  assert.match(result.snapshotHash, /^[a-f0-9]{64}$/);
+  assert.equal(result.snapshotHash, run().snapshotHash);
+  assert.notEqual(result.snapshotHash, run({ quote: { ...book, timestampMs: book.timestampMs + 1 } }).snapshotHash);
   assert.equal(result.simulationOnly, true);
   assert.ok(Object.isFrozen(result) && Object.isFrozen(result.fills) && Object.isFrozen(result.fills[0]));
 });
