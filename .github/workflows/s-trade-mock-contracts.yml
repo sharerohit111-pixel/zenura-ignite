@@ -6,17 +6,20 @@ on:
       - feature/s-trade-distributed-api-rate-limit-2026-11-24
       - feature/s-trade-mock-contract-architecture-2026-11-24
       - feature/s-trade-shared-demo-consumer-adapter-2026-11-24
+      - feature/s-trade-dashboard-mock-normalization-2026-11-24
     paths:
       - "market-gateway/mock/**"
       - "market-gateway/lib/paper-mock-fixtures.js"
       - "market-gateway/test/paper-mock-fixtures.test.js"
       - "markets/shared/paper-demo-adapter.mjs"
       - "market-gateway/test/paper-demo-adapter.test.mjs"
+      - "markets/dashboard/**"
       - ".github/workflows/s-trade-mock-contracts.yml"
   push:
     branches:
       - feature/s-trade-mock-contract-architecture-2026-11-24
       - feature/s-trade-shared-demo-consumer-adapter-2026-11-24
+      - feature/s-trade-dashboard-mock-normalization-2026-11-24
     paths:
       - "market-gateway/mock/**"
       - "market-gateway/lib/paper-mock-fixtures.js"
@@ -54,6 +57,8 @@ jobs:
         run: node --test market-gateway/test/paper-mock-fixtures.test.js
       - name: Run shared browser-safe demo adapter tests
         run: node --test market-gateway/test/paper-demo-adapter.test.mjs
+      - name: Run dashboard synthetic fixture validation
+        run: node --test markets/dashboard/dashboard-model.test.js
       - name: Ensure fixture loader is not wired into production gateway
         run: |
           if grep -R "paper-mock-fixtures" market-gateway/supabase-server.js market-gateway/server.js; then
