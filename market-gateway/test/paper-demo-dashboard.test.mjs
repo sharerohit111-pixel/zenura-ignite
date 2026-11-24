@@ -20,6 +20,9 @@ test("demo route loads only shared synthetic fixtures with explicit opt-in",asyn
  assert.match(js,/credentials:"omit"/);
  assert.match(js,/createPaperDemoViewModel\(\{market,account,equity,derivatives\},\{enabled:true,production:false\}\)/);
  assert.match(js,/No live-data fallback/);
+ assert.match(js,/searchPaperDemoInstruments/);
+ assert.match(js,/getPaperDemoExpiries/);
+ assert.match(js,/getPaperDemoOptionChain/);
 });
 test("screen rendering is read-only and clearly discloses synthetic and unreconciled data",async()=>{
  const html=await read("demo.html"),js=await read("demo.js");
@@ -40,7 +43,7 @@ test("canonical adapter can build the dashboard view model from shared fixtures"
  const [market,account,equity,derivatives]=await Promise.all(["market","account","equity","derivatives"].map(fixture));
  const model=createPaperDemoViewModel({market,account,equity,derivatives},{enabled:true,production:false});
  assert.equal(model.meta.provider,"DUMMY_JSON");
- assert.equal(model.market.instruments.length,2);
+ assert.equal(model.market.instruments.length,20);
  assert.equal(model.orders.length,3);
  assert.equal(model.account.ledgerReconciled,false);
 });
