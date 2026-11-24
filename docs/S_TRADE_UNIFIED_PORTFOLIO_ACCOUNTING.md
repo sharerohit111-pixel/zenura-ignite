@@ -18,7 +18,7 @@ All monetary values are integer paise.
 ## Adapter contract
 Exactly one snapshot for each of EQUITY, FUTURES and OPTIONS is mandatory: `{ asset, complete, positions: [], orders: [], trades: [] }`. An unused asset supplies an empty snapshot. Omitting an adapter must fail closed.
 Positions include globally unique positionId, asset, side, positive quantity, costBasisPaise and quote status. Fresh marks require marketPricePaise, quoteTimestampMs, marketValuePaise and unrealizedPnlPaise. Unrealized P&L is market value minus cost basis for LONG and cost basis minus market value for SHORT. Equity DELIVERY/HOLDING rows must be long Equity positions.
-Orders include unique orderId, asset, status, remainingQuantity and createdAt. Trades include unique immutable tradeId, asset, realizedPnlPaise, chargesPaise and executedAt.
+Orders include unique orderId, asset, status, remainingQuantity and createdAt. Trades include unique immutable tradeId, asset, explicitly present realizedPnlPaise and chargesPaise (never default missing values to zero), and executedAt. Orders must explicitly include remainingQuantity; PENDING/PARTIALLY_FILLED orders must have a positive remainder.
 
 ## Reconciliation and display contract
 This aggregator is not an authoritative reconciliation engine. It always returns `ledgerReconciled=false`, `reconciliationStatus=not_reconciled` and `snapshotConsistency=unverified`. Adapter history completeness must never be treated as ledger reconciliation. Keep blockers visible in operator and user-facing diagnostics.
