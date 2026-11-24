@@ -36,7 +36,9 @@ Date: 2026-11-24
 
 - `market-gateway/test/demo-chart-data.test.mjs` covers shared adapter consumption, explicit opt-in, rejection of non-MOCK symbols, deterministic OHLCV, all timeframes, OHLC invariants, depth ordering and fail-closed inputs.
 - The dedicated Mock Contract workflow syntax-checks both chart modules and runs the chart integration tests.
-- Browser/mobile E2E remains a separate release gate.
+- On exact PR head `f7379f24258673bd844197febbf47d9f7325e0de`, the dedicated Mock Contract workflow completed successfully: shared JSON schemas/fixtures, adapter tests, chart module syntax, all five chart integration tests, and production fixture isolation passed.
+- On the same exact PR head, the Supabase/PostgreSQL migration smoke and full market-gateway regression workflow completed successfully (71 workflow steps successful; no failed steps).
+- Browser/mobile E2E remains a separate release gate and has not been run/verified in this audit.
 
 ## Supersession
 
