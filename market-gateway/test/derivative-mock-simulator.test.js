@@ -210,7 +210,7 @@ test("simulator rejects a non-synthetic Options underlying", () => {
 test("idempotency returns the current order state and rejects payload reuse",()=>{
   const simulator=create();
   const instrument=future();
-  const request={instrumentKey:instrument.instrumentKey,side:"BUY",orderType:"LIMIT",lots:1,limitPricePaise:2500100,product:"DELIVERY",idempotencyKey:"fo-idempotent-001"};
+  const request={instrumentKey:instrument.instrumentKey,side:"BUY",orderType:"LIMIT",lots:3,limitPricePaise:2500100,product:"DELIVERY",idempotencyKey:"fo-idempotent-001"};
   const first=simulator.submit(request),replay=simulator.submit(request);
   assert.equal(first.orderId,replay.orderId);
   assert.equal(simulator.snapshot().orders.length,1);
