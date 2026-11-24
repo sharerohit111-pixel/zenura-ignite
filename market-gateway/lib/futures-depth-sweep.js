@@ -1,5 +1,7 @@
 "use strict";
 
+const { createHash } = require("node:crypto");
+
 // Pure, feature-inert NSE Futures depth sweep.
 // This module does not fetch quotes or write orders/accounting state.
 function reject(message) {
@@ -70,6 +72,14 @@ function resolveFuturesDepthSweep({
     reject("The NSE Futures order book is crossed; MARKET execution was rejected.");
   }
 
+  const canonicalSnapshot = JSON.stringify({
+    instrumentKey: expectedInstrumentKey,
+    timestampMs,
+    bids: bids.map(({ pricePaise, quantity }) => [pricePaise, quantity]),
+    asks: asks.map(({ pricePaise, quantity }) => [pricePaise, quantity])
+  });
+  const snapshotHash = createHash("sha256").update(canonicalSnapshot).digest("hex");
+
   const levels = side === "BUY" ? asks : bids;
   let remaining = quantity;
   let notionalPaise = 0n;
@@ -107,6 +117,7 @@ function resolveFuturesDepthSweep({
     vwapNumeratorPaiseQty: notionalPaise.toString(),
     vwapDenominatorQuantity: quantity,
     quoteTimestampMs: timestampMs,
+    snapshotHash,
     quoteAgeMs: ageMs,
     executionPolicy: side === "BUY" ? "SWEEP_ASKS_LOW_TO_HIGH" : "SWEEP_BIDS_HIGH_TO_LOW",
     partialFillAllowed: false,
