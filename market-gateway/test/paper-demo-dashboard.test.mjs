@@ -57,7 +57,7 @@ test("canonical adapter can build the dashboard view model from shared fixtures"
  const [market,account,equity,derivatives]=await Promise.all(["market","account","equity","derivatives"].map(fixture));
  const model=createPaperDemoViewModel({market,account,equity,derivatives},{enabled:true,production:false});
  assert.equal(model.meta.provider,"DUMMY_JSON");
- assert.equal(model.market.instruments.length,2);
+ assert.equal(model.market.instruments.length,20);
  assert.equal(model.orders.length,3);
  assert.equal(model.account.ledgerReconciled,false);
 });
