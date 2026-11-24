@@ -51,7 +51,21 @@ export async function mountDerivativeDemo(container,screen){
  function paint(){
   const s=engine.snapshot();
   renderTable(positions,["CONTRACT","TYPE","EXPIRY","NET QTY","AVG PRICE","RESERVED CLOSE","AVAILABLE CLOSE"],s.positions.map(x=>[x.symbol,x.assetClass==="OPTION"?x.optionType:"FUT",x.expiry,x.netQuantity,money(x.averagePricePaise),x.reservedCloseQuantity,x.availableCloseQuantity]),"No open demo positions.");
-  renderTable(orders,["ORDER ID","CONTRACT","SIDE","TYPE","LOTS / QTY","LIMIT","FILLED / REMAINING","AVG FILL","FILL RECEIPTS","STATUS"],s.orders.map(x=>[x.orderId,x.symbol,x.side,x.orderType,x.lots+" ("+x.quantity+")",x.limitPricePaise?money(x.limitPricePaise):"—",x.filledQuantity+" / "+x.remainingQuantity,x.averageFillPricePaise?money(x.averageFillPricePaise):"—",x.fills.map(f=>f.quantity+" @ "+money(f.pricePaise)).join(" · ")||"—",x.status]),"No demo orders yet.");
+  const wrap=el("div","table-wrap demo-fo-table-wrap"),t=el("table"),head=el("thead"),hr=el("tr"),body=el("tbody");
+  ["ORDER ID","CONTRACT","SIDE","TYPE","LOTS / QTY","LIMIT","FILLED / REMAINING","AVG FILL","FILL RECEIPTS","STATUS","ACTION"].forEach(x=>hr.append(el("th","",x)));
+  head.append(hr);
+  if(!s.orders.length){const tr=el("tr"),td=el("td","empty","No demo orders yet.");td.colSpan=11;tr.append(td);body.append(tr);}
+  s.orders.forEach(order=>{
+   const tr=el("tr");
+   [order.orderId,order.symbol,order.side,order.orderType,order.lots+" ("+order.quantity+")",order.limitPricePaise?money(order.limitPricePaise):"—",order.filledQuantity+" / "+order.remainingQuantity,order.averageFillPricePaise?money(order.averageFillPricePaise):"—",order.fills.map(f=>f.quantity+" @ "+money(f.pricePaise)).join(" · ")||"—",order.status].forEach(x=>tr.append(el("td","",x)));
+   const action=el("td");
+   if(["PENDING","PARTIALLY_FILLED"].includes(order.status)){
+    const cancel=el("button","demo-fo-button secondary","CANCEL");
+    cancel.addEventListener("click",()=>{try{engine.cancel(order.orderId);status.textContent="DEMO order "+order.orderId+" cancelled; unfilled remainder released.";paint();}catch(error){status.textContent=error.message||"Cancellation failed.";}});action.append(cancel);
+   }else action.textContent="—";
+   tr.append(action);body.append(tr);
+  });
+  t.append(head,body);wrap.append(t);orders.replaceChildren(wrap);
  }
  function parsePrice(v){if(!/^\d+(?:\.\d{1,2})?$/.test(String(v||"").trim()))return null;const p=String(v).split(".");const n=Number(p[0])*100+Number(((p[1]||"")+"00").slice(0,2));return Number.isSafeInteger(n)&&n>0?n:null;}
  function submit(which){try{const c=selected();if(!c)throw new Error("Select a valid synthetic contract.");const request={instrumentKey:c.instrumentKey,side:which,orderType:orderType.value,lots:Number(lots.value)};if(screen==="futures")request.product=product.value;if(orderType.value==="LIMIT"){request.limitPricePaise=parsePrice(limit.value);if(!request.limitPricePaise)throw new Error("Enter a valid LIMIT price in rupees.");}const receipt=engine.submit(request);status.textContent="DEMO receipt "+receipt.orderId+" · "+receipt.status+" · "+receipt.filledQuantity+"/"+receipt.quantity+" units filled.";paint();}catch(e){status.textContent=e.message||"Demo order rejected.";}}
