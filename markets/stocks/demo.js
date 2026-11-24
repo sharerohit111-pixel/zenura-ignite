@@ -1,4 +1,5 @@
 import { createPaperDemoViewModel } from "../shared/paper-demo-adapter.mjs";
+import { mountDerivativeDemo } from "./demo-derivative-panel.mjs";
 
 "use strict";
 const status=document.getElementById("demo-status");
@@ -49,7 +50,8 @@ function render(name){
   const order=orders.find(o=>o.assetClass===(name==="futures"?"FUTURE":"OPTION"));
   content.append(grid(card("Contract",x.symbol||x.underlying,"MOCK contract only"),card("Expiry",x.expiry,"Illustrative contract date"),card(name==="futures"?"Lot size":"Option type",name==="futures"?x.lotSize:x.optionType,"Fixture metadata"),card("Strike",name==="options"?money(x.strikePaise):"Not applicable",name==="options"?"Paise-based strike":"Futures contract")));
   content.append(table(["ORDER ID","INSTRUMENT","SIDE","TYPE","SIZE","STATUS","AVG / LIMIT"],orderRows(order?[order]:[])));
-  content.append(notice("Contract metadata and order are synthetic examples. No margin reservation, fill worker, order API or broker connection is called."));
+  content.append(notice("Canonical MOCK contracts power the local Futures/Options simulator below. Production execution and workers remain separate."));
+  mountDerivativeDemo(content,name);
   return;
  }
  if(name==="orders"||name==="trades"){
