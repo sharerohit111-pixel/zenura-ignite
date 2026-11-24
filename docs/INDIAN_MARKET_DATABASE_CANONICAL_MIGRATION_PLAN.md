@@ -223,3 +223,90 @@ This corrects the earlier draft's inaccurate count of functions missing an expli
 5. Run the complete combined migration chain from an empty disposable PostgreSQL database, then tenant-isolation, replay, race and ledger-conservation tests.
 6. Keep staging unavailable/unverified until a separate Supabase staging project or branch is provisioned and inspected. No production or staging SQL has been applied by this addendum.
 7. No Crypto schema, migration, function, policy or data was changed.
+
+
+## 11. Verified migration file manifest — 2026-11-24
+
+This is a source-file inventory from the named PR/branch refs, not an executable migration plan. The hashes below are Git blob object IDs (40-character SHA-1), not SHA-256 digests. They identify the exact UTF-8 file blobs fetched during this audit. Re-fetch and compare branch heads before any future canonicalization because draft branches can move.
+
+### 11.1 Production baseline and shared foundation files
+
+Source ref: `integration/supabase-native-auth-professional-launch-2026-11-22` (PR #83 head). These are the original repository migration files observed on that ref.
+
+| Version | File | Git blob SHA-1 |
+|---|---|---|
+| 20261122120654 | paper_trading_core_schema.sql | `a1e8abf468afc56e1193e3984b16ae21f558cc89` |
+| 20261122120703 | paper_order_transactions.sql | `2094ef76782e3ef41b315a4d71b0e8ae5b2a7ccb` |
+| 20261122120706 | paper_limit_order_transactions.sql | `091b0ac38076a44c310e7762f2584c21fc59cf68` |
+| 20261122120710 | paper_account_initialization.sql | `53480363260dc877ce664642b2350dc4145754db` |
+| 20261122120713 | paper_long_option_transaction.sql | `31b9254415cb0039e1aa65ed187528c6f8f362ea` |
+| 20261122120716 | paper_trading_authenticated_rls_grants.sql | `9459c09a49e9fa0c481dcde3826082c9d1fba7bb` |
+| 20261122120719 | professional_futures_investing_charts.sql | `e3913bb7c76b42e651d09c695cafab297dee10a0` |
+| 20261122120722 | futures_market_order_transaction.sql | `49033ab42f658477e9695226dc429a2869b8975c` |
+| 20261122120725 | upstox_oauth_stream_leases.sql | `0724abeecdbb25d35f8047d8de4add0d570d8b9f` |
+| 20261122120800 | index_upstox_oauth_states_user_id.sql | `a28d080fb6adc26991d0a5d6153416aa2b6a6c93` |
+| 20261122121443 | paper_market_worker_leases.sql | `26c972482b399041d85dfd3f18a1c9a85a154e9f` |
+| 20261122122110 | paper_market_worker_leases.sql | `74128bc1ec64ff3e7d2fd53894daa36f861171b8` |
+| 20261122123415 | paper_market_worker_lease_timeout.sql | `cfd9813854a0066006e7c122138efecc6643c02e` |
+| 20261122124500 | retire_paper_investing.sql | `793de57474f487eadacbf14e0bfee209b8a80610` |
+| 20261122131000 | equity_protective_order_atomic_fill.sql | `b28def6c74579193dbf3d94e503b02852a3861f4` |
+| 20261122134500 | paper_protective_order_atomic_cancel.sql | `1514bde8830ef9182eedc07a14e94bf5805fff0b` |
+| 20261122141000 | equity_protective_worker_scan_index.sql | `78734afff53a178a6a3e97f1cfde1df3d6d9b32b` |
+| 20261122142500 | create_equity_protective_order_rpc.sql | `d7c1d8c741b394a5ea765263f8c2ad9253abffe3` |
+| 20261122150000 | prevent_overlapping_equity_protective_exits.sql | `c4d161df30e7f0b494644c91569d3a747c0a217d` |
+| 20261122153000 | reserve_equity_protective_exit_shares.sql | `8352f97311a9df4607af0c003d61ee2ecc7135ad` |
+| 20261122214500 | align_option_charges_with_nse_ipft_schedule.sql | `722c3fe5f757209948c3327cf3e13f4d4d82276d` |
+| 20261123023500 | paper_exchange_session_calendar.sql | `5834d0fed231dec26627bec0f844be736fbb8804` |
+| 20261123040000 | paper_intraday_limit_reservations.sql | `e80308c61aa047703bf4fbcd709f44934c9dc83e` |
+| 20261123043000 | intraday_limit_worker_lease_key.sql | `f4e43e6322f0b0f675b490d0a7f1c3da1b0efcb5` |
+| 20261123050000 | nse_equity_market_atomic_charges.sql | `85ae5525519b240e086114ff17c3932ebaa94994` |
+| 20261123060000 | nse_equity_limit_atomic_charges.sql | `260004aadd2740932521988f7bb029b588c8899e` |
+| 20261123070000 | bse_equity_fee_master.sql | `469618465050ff8970c42426d1955f9eed4f4cfa` |
+| 20261123080000 | bse_equity_fee_aware_order_settlement.sql | `c3bf619876872f40f48549b8b776ed2ac4791de2` |
+| 20261123090000 | exchange_session_calendar_import.sql | `2dcc21ef68fd3b2ce6e22f7d75be77ee1f84cbf0` |
+| 20261123091000 | require_verified_session_snapshot_for_intraday_limits.sql | `76c525c9f4c84d5b6d47860b11b792a92b7882da` |
+| 20261123100000 | allow_long_option_orders_with_reserved_futures_margin.sql | `7e1839032d3873f09d020c2639f6994d0d30e9f1` |
+| 20261123110000 | market_gateway_service_role_runtime_grants.sql | `861fc885495d8f855e4a861c8d935f8e45582a68` |
+| 20261123120000 | make_derivative_expiry_cutoff_exclusive.sql | `73c661faeb6945b684ea1b90732a7fecfb9af509` |
+
+### 11.2 Feature-branch migrations and collision registry
+
+| Source PR / branch | Version | File | Git blob SHA-1 | Dependency / disposition |
+|---|---|---|---|---|
+| #87 `feature/indian-market-futures-limit-ledger` | 20261123140000 | futures_limit_ledger_foundation.sql | `f9f0979e960ad0966ff2b00f3b05634c8428d1c5` | Futures ledger foundation; timestamp collides with #92 Equity trigger |
+| #92 `feature/indian-equity-lifecycle-audit-2026-11-23` | 20261123130000 | equity_append_only_fill_cash_ledgers.sql | `1e0794ab697a7db08043e614f4099e8180cbdd78` | Base for #100 integrity/atomic writers |
+| #92 same ref | 20261123140000 | equity_order_audit_ledger_trigger.sql | `ccbbdc9d890b302e972b69a36c4983800543c624` | Do not combine as duplicate writer with #100 explicit wrappers |
+| #92 same ref | 20261123141000 | cash_equity_market_fill_cash_ledger.sql | `e11b4aeec162389a56abe8bbe4cd8a5836755c5e` | Dependency branch MARKET ledger implementation; compare with #100 replacement path |
+| #89 `feature/indian-market-futures-limit-atomic-fill` | 20261123160000 | futures_limit_atomic_submit_release.sql | `4b197771fed318708638c355340ac91316dcd107` | Futures submit/release; collides with #100 |
+| #89 same ref | 20261123170000 | futures_limit_atomic_fill.sql | `89bfca39cc2e61876e6441f090f28e644529364a` | Futures fill; collides with #100 |
+| #93 `feature/s-trade-nse-futures-worker-lease-2026-11-23` | 20261123180000 | futures_limit_worker_lease_key.sql | `6f4db8e63bee7020c65bdd543e11e5661c41e5a8` | Futures-only replacement; superseded by combined allowlist after callsite verification |
+| #91 `feature/indian-market-options-limit-schema` | 20261123180000 | paper_option_limit_schema.sql | `944fe680f2431923b4eb6f7f50b9ebb243c38cf8` | Options schema; collides with #93 and #100 |
+| #91 same ref | 20261123200000 | paper_option_limit_submit_release.sql | `31dd622783a29a31e293611ef414625da1307e83` | Requires Options schema |
+| #91 same ref | 20261123210000 | paper_option_limit_atomic_fill.sql | `c7998579b2da70614991dc78c730b1d381e22c71` | Requires submit/release |
+| #91 same ref | 20261123220000 | derivative_limit_worker_lease_keys.sql | `251154084b4ff2f67cf383c89ea9f0a073ebb1fb` | Combined worker-key allowlist; retain only after all worker callsites reviewed |
+| #91 same ref | 20261123230000 | market_gateway_service_role_read_grants.sql | `1e46d7fbf816d55b4a8ace4fe63a086598e35810` | Duplicate grant source vs #83 runtime grants; reconcile |
+| #93 and #119 | 20261123240000 | paper_market_worker_lease_renewal.sql | `e1fde57d0264f3ba97186a3400abe382ae845d32` | Exact same blob in both PRs; include once only |
+| #98 `feature/nse-options-accounting-risk-2026-11-23` | 20261123250000 | harden_option_limit_expiry_calendar.sql | `37291b25c9902a1e783844f2c0dd7d2d0c4d2f0f` | After Options release RPC exists; fail-closed expected-guard patch |
+| #100 `feature/nse-equity-accounting-engine-2026-11-23` | 20261123143000 | equity_ledger_integrity_hardening.sql | `510c711dd46890658df119fb2323b7a493c97e99` | After #92 ledger schema |
+| #100 same ref | 20261123160000 | nse_equity_market_fill_cash_ledger_atomic.sql | `011079f9c4ca366bea6a76fc36ab9da16e801061` | Atomic MARKET ledger writer; collides with Futures submit/release |
+| #100 same ref | 20261123170000 | nse_equity_limit_fill_cash_ledger_atomic.sql | `485b16b926226bb690ed486ab8b584be60146570` | Atomic LIMIT fill writer; collides with Futures fill |
+| #100 same ref | 20261123180000 | nse_equity_limit_reservation_ledger_atomic.sql | `ad533662c7872154686a80d761073975cb5bf582` | Reservation writer; three-way timestamp collision |
+| #98 / #119 current worker branch | 20261123240000 | paper_market_worker_lease_renewal.sql | `e1fde57d0264f3ba97186a3400abe382ae845d32` | Reconfirmed byte-identical Git blob; one canonical migration |
+
+### 11.3 Manifest completeness and hashing caveats
+
+- The table above records the migration files directly fetched and hashed from the listed refs. Git blob SHA-1 is a stable content-addressed identifier for the fetched Git blob; it is not a SHA-256 security digest. A future canonical release manifest should additionally calculate SHA-256 over the exact raw file bytes from a checked-out commit.
+- PR #83 contains additional migration files listed in §11.1; PR #87, #89, #91, #92, #93, #98 and #100 contribute the feature migrations in §11.2. PR #99 itself changes gateway/docs and does not add a migration path in its changed-file list; its grant migration is inherited from the shared Options chain and is listed above.
+- PR #119's branch head moved during this audit. The shared renewal migration blob was re-fetched and remains identical; revalidate all current PR heads before constructing the final executable chain.
+- This manifest intentionally does not assign replacement timestamps or claim dependency-complete ordering. The timestamp collisions remain unresolved and block merging any combined migration directory.
+- Rollback classification is not yet approved. Treat financial ledger, order lifecycle, and identity transformations as forward-repair/restore-required until each migration's data-loss and dependency behavior is tested in disposable PostgreSQL.
+- SQL body dependency graph (objects read/written, RPC replacement targets, trigger ownership, grants) still requires automated parsing plus manual review. File/hash inventory alone is not a dependency proof.
+
+### 11.4 Next safe gate
+
+1. Re-fetch all PR head SHAs and changed migration files in one locked snapshot.
+2. Compute SHA-256 from raw bytes for every SQL file; preserve the Git blob SHA-1 as a secondary locator.
+3. Build a single manifest with source PR, source head SHA, path, both hashes, dependency edges, collision resolution, and rollback class.
+4. Review exact grants against every worker/gateway callsite; protect financial ledger tables from UPDATE/DELETE and add database-enforced append-only controls where absent.
+5. Build the full chain in a disposable PostgreSQL database and run every schema, RLS, accounting, race, idempotency and worker-fencing test.
+6. No staging/production apply until a staging target is explicitly provisioned, rehearsed, and separately approved.
