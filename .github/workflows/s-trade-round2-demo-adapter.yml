@@ -9,6 +9,7 @@ on:
       - "markets/stocks/demo.js"
       - "markets/stocks/index.html"
       - "market-gateway/test/mock-demo-adapter.test.js"
+      - "market-gateway/test/demo-dashboard.test.js"
       - "market-gateway/mock/fixtures/**"
       - ".github/workflows/s-trade-round2-demo-adapter.yml"
 
