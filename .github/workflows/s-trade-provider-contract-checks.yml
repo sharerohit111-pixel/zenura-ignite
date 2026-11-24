@@ -76,6 +76,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
+      - name: Install production gateway dependencies required by provider tests
+        run: npm install --prefix market-gateway --omit=dev --no-audit --no-fund --package-lock=false
       - name: Check provider contract, router and quota adapter syntax
         run: |
           node --check market-gateway/lib/market-data-provider-contract.js
