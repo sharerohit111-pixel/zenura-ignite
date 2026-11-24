@@ -188,7 +188,7 @@
         const prior = idempotency.get(request.idempotencyKey);
         if (prior) {
           if (prior.fingerprint !== requestFingerprint) fail("Demo idempotency key was reused with a different order payload.");
-          return copy(prior.order);
+          return copy(orders.find(order => order.orderId === prior.orderId));
         }
       }
       sequence += 1;
@@ -230,7 +230,7 @@
           consumeDepth(quote, request.side, quantity);
         }
       }
-      if (request.idempotencyKey) idempotency.set(request.idempotencyKey,{fingerprint:requestFingerprint,order:copy(order)});
+      if (request.idempotencyKey) idempotency.set(request.idempotencyKey,{fingerprint:requestFingerprint,orderId:order.orderId});
       return copy(order);
     }
 
