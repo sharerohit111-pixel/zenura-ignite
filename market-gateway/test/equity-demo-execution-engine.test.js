@@ -184,7 +184,8 @@ test("position quantity and BUY cost-basis boundaries reject atomically",()=>{
 test("SELL realized-P&L overflow rejects before cash, position, depth or receipt mutation",()=>{
   const key=fixture.data.instrument.instrumentKey;
   const e=engine({account:{
-    realizedPnlPaise:Number.MAX_SAFE_INTEGER,
+    // Initial snapshot remains safe: mark value 250100 less cost basis 1 gives +250099 unrealized.
+    realizedPnlPaise:Number.MAX_SAFE_INTEGER-250099,
     positions:{[key]:{quantity:2,costBasisPaise:1,averagePricePaise:1,reservedQuantity:0}}
   }});
   const order=e.submitOrder({idempotencyKey:"boundary-sell-pnl-01",instrumentKey:key,side:"SELL",orderType:"MARKET",product:"DELIVERY",quantity:1});
