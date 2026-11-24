@@ -331,3 +331,72 @@ Required forward-only remedy (do not rewrite the draft or any applied migration)
 5. Add disposable PostgreSQL tests for direct UPDATE/DELETE denial, cross-owner fill insertion denial, account deletion restriction, atomic fill insert success and replay idempotency.
 
 Coordination comments were posted on PR #87 (comment `7127483113`) and PR #89 (comment `7127483883`). This is a release blocker; no SQL migration was authored/applied and no staging/production database was touched.
+
+
+## 11. Exact migration hash register — verified PR heads (2026-11-24)
+
+The following are GitHub Git blob SHA-1 values (not SHA-256). Each identifies the exact file content fetched from the stated PR head. This is a source-file register for collision and dependency control, not yet an approved executable migration order.
+
+| PR | Exact migration file | Git blob SHA |
+|---|---|---|
+| #83 | 20261122120654_paper_trading_core_schema.sql | a1e8abf468afc56e1193e3984b16ae21f558cc89 |
+| #83 | 20261122120703_paper_order_transactions.sql | 2094ef76782e3ef41b315a4d71b0e8ae5b2a7ccb |
+| #83 | 20261122120706_paper_limit_order_transactions.sql | 091b0ac38076a44c310e7762f2584c21fc59cf68 |
+| #83 | 20261122120710_paper_account_initialization.sql | 53480363260dc877ce664642b2350dc4145754db |
+| #83 | 20261122120713_paper_long_option_transaction.sql | 31b9254415cb0039e1aa65ed187528c6f8f362ea |
+| #83 | 20261122120716_paper_trading_authenticated_rls_grants.sql | 9459c09a49e9fa0c481dcde3826082c9d1fba7bb |
+| #83 | 20261122120719_professional_futures_investing_charts.sql | e3913bb7c76b42e651d09c695cafab297dee10a0 |
+| #83 | 20261122120722_futures_market_order_transaction.sql | 49033ab42f658477e9695226dc429a2869b8975c |
+| #83 | 20261122120725_upstox_oauth_stream_leases.sql | 0724abeecdbb25d35f8047d8de4add0d570d8b9f |
+| #83 | 20261122120800_index_upstox_oauth_states_user_id.sql | a28d080fb6adc26991d0a5d6153416aa2b6a6c93 |
+| #83 | 20261122121443_paper_market_worker_leases.sql | 26c972482b399041d85dfd3f18a1c9a85a154e9f |
+| #83 | 20261122122110_paper_market_worker_leases.sql | 74128bc1ec64ff3e7d2fd53894daa36f861171b8 |
+| #83 | 20261122123415_paper_market_worker_lease_timeout.sql | cfd9813854a0066006e7c122138efecc6643c02e |
+| #83 | 20261122124500_retire_paper_investing.sql | 793de57474f487eadacbf14e0bfee209b8a80610 |
+| #83 | 20261122131000_equity_protective_order_atomic_fill.sql | b28def6c74579193dbf3d94e503b02852a3861f4 |
+| #83 | 20261122134500_paper_protective_order_atomic_cancel.sql | 1514bde8830ef9182eedc07a14e94bf5805fff0b |
+| #83 | 20261122141000_equity_protective_worker_scan_index.sql | 78734afff53a178a6a3e97f1cfde1df3d6d9b32b |
+| #83 | 20261122142500_create_equity_protective_order_rpc.sql | d7c1d8c741b394a5ea765263f8c2ad9253abffe3 |
+| #83 | 20261122150000_prevent_overlapping_equity_protective_exits.sql | c4d161df30e7f0b494644c91569d3a747c0a217d |
+| #83 | 20261122153000_reserve_equity_protective_exit_shares.sql | 8352f97311a9df4607af0c003d61ee2ecc7135ad |
+| #83 | 20261122214500_align_option_charges_with_nse_ipft_schedule.sql | 722c3fe5f757209948c3327cf3e13f4d4d82276d |
+| #83 | 20261123023500_paper_exchange_session_calendar.sql | 5834d0fed231dec26627bec0f844be736fbb8804 |
+| #83 | 20261123040000_paper_intraday_limit_reservations.sql | e80308c61aa047703bf4fbcd709f44934c9dc83e |
+| #83 | 20261123043000_intraday_limit_worker_lease_key.sql | f4e43e6322f0b0f675b490d0a7f1c3da1b0efcb5 |
+| #83 | 20261123050000_nse_equity_market_atomic_charges.sql | 85ae5525519b240e086114ff17c3932ebaa94994 |
+| #83 | 20261123060000_nse_equity_limit_atomic_charges.sql | 260004aadd2740932521988f7bb029b588c8899e |
+| #83 | 20261123070000_bse_equity_fee_master.sql | 469618465050ff8970c42426d1955f9eed4f4cfa |
+| #83 | 20261123080000_bse_equity_fee_aware_order_settlement.sql | c3bf619876872f40f48549b8b776ed2ac4791de2 |
+| #83 | 20261123090000_exchange_session_calendar_import.sql | 2dcc21ef68fd3b2ce6e22f7d75be77ee1f84cbf0 |
+| #83 | 20261123091000_require_verified_session_snapshot_for_intraday_limits.sql | 76c525c9f4c84d5b6d47860b11b792a92b7882da |
+| #83 | 20261123100000_allow_long_option_orders_with_reserved_futures_margin.sql | 7e1839032d3873f09d020c2639f6994d0d30e9f1 |
+| #83 | 20261123110000_market_gateway_service_role_runtime_grants.sql | 861fc885495d8f855e4a861c8d935f8e45582a68 |
+| #83 | 20261123120000_make_derivative_expiry_cutoff_exclusive.sql | 73c661faeb6945b684ea1b90732a7fecfb9af509 |
+| #92 | 20261123130000_equity_append_only_fill_cash_ledgers.sql | 1e0794ab697a7db08043e614f4099e8180cbdd78 |
+| #92 | 20261123140000_equity_order_audit_ledger_trigger.sql | ccbbdc9d890b302e972b69a36c4983800543c624 |
+| #92 | 20261123141000_cash_equity_market_fill_cash_ledger.sql | e11b4aeec162389a56abe8bbe4cd8a5836755c5e |
+| #100 | 20261123143000_equity_ledger_integrity_hardening.sql | 510c711dd46890658df119fb2323b7a493c97e99 |
+| #89 | 20261123160000_futures_limit_atomic_submit_release.sql | 4b197771fed318708638c355340ac91316dcd107 |
+| #100 | 20261123160000_nse_equity_market_fill_cash_ledger_atomic.sql | 011079f9c4ca366bea6a76fc36ab9da16e801061 |
+| #89 | 20261123170000_futures_limit_atomic_fill.sql | 89bfca39cc2e61876e6441f090f28e644529364a |
+| #100 | 20261123170000_nse_equity_limit_fill_cash_ledger_atomic.sql | 485b16b926226bb690ed486ab8b584be60146570 |
+| #91 | 20261123180000_paper_option_limit_schema.sql | 944fe680f2431923b4eb6f7f50b9ebb243c38cf8 |
+| #93 | 20261123180000_futures_limit_worker_lease_key.sql | 6f4db8e63bee7020c65bdd543e11e5661c41e5a8 |
+| #100 | 20261123180000_nse_equity_limit_reservation_ledger_atomic.sql | ad533662c7872154686a80d761073975cb5bf582 |
+| #91 | 20261123200000_paper_option_limit_submit_release.sql | 31dd622783a29a31e293611ef414625da1307e83 |
+| #91 | 20261123210000_paper_option_limit_atomic_fill.sql | c7998579b2da70614991dc78c730b1d381e22c71 |
+| #91 | 20261123220000_derivative_limit_worker_lease_keys.sql | 251154084b4ff2f67cf383c89ea9f0a073ebb1fb |
+| #91 | 20261123230000_market_gateway_service_role_read_grants.sql | 1e46d7fbf816d55b4a8ace4fe63a086598e35810 |
+| #93 / #119 | 20261123240000_paper_market_worker_lease_renewal.sql | e1fde57d0264f3ba97186a3400abe382ae845d32 |
+| #98 | 20261123250000_harden_option_limit_expiry_calendar.sql | 37291b25c9902a1e783844f2c0dd7d2d0c4d2f0f |
+| #121 | 20261124100000_market_data_distributed_provider_quotas.sql | b9d46e7294d322cc0e955b0c1dab12224caadf50 |
+
+### Inventory limitations
+
+- 50 exact migration files or collision participants were recorded from current PR heads in this pass; the register is not yet the complete repository-wide migration manifest.
+- The 20261123140000 Futures ledger foundation collision remains in the prior collision register; its owning source file and exact blob hash still need to be captured from the Futures branch.
+- Git blob SHA-1 is not SHA-256. Generate a separate reproducible SHA-256 manifest from exact canonical file bytes in CI before approval.
+- Source branches are not one linear history. This register records changed-file owners and exact fetched content, not proof that each file is present in the final combined branch or applied in production.
+- The 20261123160000, 20261123170000 and three-way 20261123180000 collisions remain unresolved. Prepare forward-only uniquely versioned canonical copies only after dependency review; do not rewrite production-applied history.
+- Rollback classification remains pending per migration. Treat ledger writes and financial history as forward-repair-only unless a data-safe rollback is demonstrated in disposable PostgreSQL.
+- No production or staging SQL was applied.
