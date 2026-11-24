@@ -1,6 +1,8 @@
 "use strict";
 const test=require("node:test");
 const assert=require("node:assert/strict");
+const fs=require("node:fs");
+const path=require("node:path");
 const {normalizePriceAlert,normalizePreferences,safeAdminReason,isProvider,isAdminAction}=require("../lib/s-trade-notifications-admin");
 
 test("validates and normalizes bounded price alert inputs",()=>{
@@ -29,4 +31,13 @@ test("admin reasons and action/provider identifiers are allowlisted",()=>{
  assert.equal(isProvider("arbitrary-url"),false);
  assert.equal(isAdminAction("provider_control"),true);
  assert.equal(isAdminAction("grant_admin"),false);
+});
+
+test("browser admin console contains no service-role key or client-side admin bypass",()=>{
+ const browser=fs.readFileSync(path.join(__dirname,"../../markets/stocks/admin.js"),"utf8");
+ assert.doesNotMatch(browser,/SUPABASE_SERVICE_ROLE_KEY|service_role/i);
+ assert.doesNotMatch(browser,/grant_admin|isAdmin\s*=\s*true/i);
+ const router=fs.readFileSync(path.join(__dirname,"../lib/s-trade-notifications-admin-router.js"),"utf8");
+ assert.match(router,/from\("s_trade_admins"\)/);
+ assert.match(router,/eq\("user_id",session\.user\.id\)/);
 });
