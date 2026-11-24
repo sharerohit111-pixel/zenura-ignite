@@ -56,7 +56,7 @@
       if (contract.assetClass === "OPTION" &&
           (!["CE", "PE"].includes(contract.optionType) ||
            !Number.isSafeInteger(contract.strikePaise) || contract.strikePaise < 1 ||
-           typeof contract.underlying !== "string")) {
+           typeof contract.underlying !== "string" || !/^MOCK[A-Z0-9-]*$/.test(contract.underlying))) {
         fail("Fixture contains an invalid CE/PE strike contract.");
       }
       if (contract.assetClass === "FUTURE" && contract.optionType != null) {
