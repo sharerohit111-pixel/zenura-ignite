@@ -169,3 +169,31 @@ test("canonical 15-screen Demo mounts the shared Equity engine and responsive pa
   assert.match(css,/@media\(max-width:900px\)/);
   assert.match(css,/@media\(max-width:520px\)/);
 });
+
+
+test("position quantity and BUY cost-basis boundaries reject atomically",()=>{
+  const key=fixture.data.instrument.instrumentKey;
+  assert.throws(()=>engine({account:{positions:{[key]:{quantity:1000001,costBasisPaise:1,reservedQuantity:0}}}}),/INVALID_EQUITY_DEMO_POSITION/);
+  const e=engine({account:{positions:{[key]:{quantity:1000000,costBasisPaise:1000000,reservedQuantity:0}}}});
+  const order=e.submitOrder(buy({idempotencyKey:"boundary-buy-qty-01",quantity:1}));
+  const before=e.snapshot();
+  assert.throws(()=>e.matchNext(order.orderId),/DEMO_POSITION_QUANTITY_LIMIT/);
+  assert.deepEqual(e.snapshot(),before);
+});
+
+test("SELL realized-P&L overflow rejects before cash, position, depth or receipt mutation",()=>{
+  const key=fixture.data.instrument.instrumentKey;
+  const e=engine({account:{
+    realizedPnlPaise:Number.MAX_SAFE_INTEGER,
+    positions:{[key]:{quantity:2,costBasisPaise:1,averagePricePaise:1,reservedQuantity:0}}
+  }});
+  const order=e.submitOrder({idempotencyKey:"boundary-sell-pnl-01",instrumentKey:key,side:"SELL",orderType:"MARKET",product:"DELIVERY",quantity:1});
+  const before=e.snapshot();
+  assert.throws(()=>e.matchNext(order.orderId),/DEMO_AMOUNT_OUT_OF_RANGE/);
+  assert.deepEqual(e.snapshot(),before);
+  assert.equal(e.getFillReceipts(order.orderId).length,0);
+});
+
+test("unsafe account P&L is rejected instead of silently reset",()=>{
+  assert.throws(()=>engine({account:{realizedPnlPaise:Number.MAX_SAFE_INTEGER+1}}),/INVALID_EQUITY_DEMO_ACCOUNT/);
+});
