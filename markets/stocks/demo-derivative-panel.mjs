@@ -2,7 +2,23 @@ let fixturePromise=null,simulator=null,history=null;
 const el=(tag,cls,value)=>{const n=document.createElement(tag);if(cls)n.className=cls;if(value!==undefined)n.textContent=String(value);return n;};
 const money=value=>Number.isSafeInteger(value)?"₹"+(value/100).toLocaleString("en-IN",{minimumFractionDigits:2,maximumFractionDigits:2}):"—";
 const add=(select,value,label)=>{const o=document.createElement("option");o.value=value;o.textContent=label;select.append(o);};
-function getHistory(){\n if(history)return history;\n const api=window.ZENURA_DEMO_TRADE_HISTORY;\n if(!api?.createDemoTradeHistoryStore)throw new Error("DEMO_TRADE_HISTORY_STORE_UNAVAILABLE");\n history=api.createDemoTradeHistoryStore({production:false,env:{NODE_ENV:"development"}});return history;\n}\nfunction syncHistory(engine){\n const store=getHistory(),snapshot=engine.snapshot();\n for(const order of snapshot.orders){\n  const key=order.idempotencyKey||("history_"+order.orderId);\n  store.submit({assetClass:order.assetClass,side:order.side,orderType:order.orderType,product:order.product||"DELIVERY",instrumentKey:order.instrumentKey,quantity:order.quantity,limitPricePaise:order.limitPricePaise||undefined,idempotencyKey:key,orderId:order.orderId,createdAt:order.createdAt,initialStatus:order.status==="REJECTED"?"REJECTED":undefined});\n  for(const fill of order.fills)store.recordFill({orderId:order.orderId,fillId:fill.fillId,quantity:fill.quantity,pricePaise:fill.pricePaise,filledAt:fill.executedAt});\n  if(order.status==="CANCELLED")store.cancel(order.orderId,order.updatedAt);\n }\n return store.snapshot();\n}\nasync function getSimulator(){
+function getHistory(){
+ if(history)return history;
+ const api=window.ZENURA_DEMO_TRADE_HISTORY;
+ if(!api?.createDemoTradeHistoryStore)throw new Error("DEMO_TRADE_HISTORY_STORE_UNAVAILABLE");
+ history=api.createDemoTradeHistoryStore({production:false,env:{NODE_ENV:"development"}});return history;
+}
+function syncHistory(engine){
+ const store=getHistory(),snapshot=engine.snapshot();
+ for(const order of snapshot.orders){
+  const key=order.idempotencyKey||("history_"+order.orderId);
+  store.submit({assetClass:order.assetClass,side:order.side,orderType:order.orderType,product:order.product||"DELIVERY",instrumentKey:order.instrumentKey,quantity:order.quantity,limitPricePaise:order.limitPricePaise||undefined,idempotencyKey:key,orderId:order.orderId,createdAt:order.createdAt,initialStatus:order.status==="REJECTED"?"REJECTED":undefined});
+  for(const fill of order.fills)store.recordFill({orderId:order.orderId,fillId:fill.fillId,quantity:fill.quantity,pricePaise:fill.pricePaise,filledAt:fill.executedAt});
+  if(order.status==="CANCELLED")store.cancel(order.orderId,order.updatedAt);
+ }
+ return store.snapshot();
+}
+async function getSimulator(){
  if(simulator)return simulator;
  if(!fixturePromise)fixturePromise=fetch(new URL("../../market-gateway/mock/fixtures/derivatives.json",import.meta.url),{method:"GET",credentials:"omit",cache:"no-store",headers:{Accept:"application/json"}}).then(r=>{if(!r.ok)throw new Error("DEMO_DERIVATIVES_FIXTURE_UNAVAILABLE");return r.json();});
  const fixture=await fixturePromise;
@@ -49,7 +65,8 @@ export async function mountDerivativeDemo(container,screen){
   strike.replaceChildren();opts.filter(x=>x.expiry===expiry.value&&x.optionType===optionType.value).map(x=>x.strikePaise).filter((x,i,a)=>a.indexOf(x)===i).sort((a,b)=>a-b).forEach(x=>add(strike,String(x),money(x)));if([...strike.options].some(x=>x.value===oldStrike))strike.value=oldStrike;
  }
  function paint(){
-  const s=engine.snapshot();\n  syncHistory(engine);
+  const s=engine.snapshot();
+  syncHistory(engine);
   renderTable(positions,["CONTRACT","TYPE","EXPIRY","NET QTY","AVG PRICE","RESERVED CLOSE","AVAILABLE CLOSE"],s.positions.map(x=>[x.symbol,x.assetClass==="OPTION"?x.optionType:"FUT",x.expiry,x.netQuantity,money(x.averagePricePaise),x.reservedCloseQuantity,x.availableCloseQuantity]),"No open demo positions.");
   const wrap=el("div","table-wrap demo-fo-table-wrap"),t=el("table"),head=el("thead"),hr=el("tr"),body=el("tbody");
   ["ORDER ID","CONTRACT","SIDE","TYPE","LOTS / QTY","LIMIT","FILLED / REMAINING","AVG FILL","FILL RECEIPTS","STATUS","ACTION"].forEach(x=>hr.append(el("th","",x)));
