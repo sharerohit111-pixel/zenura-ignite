@@ -17,4 +17,6 @@ test("order pause control authenticates before reading operational state",()=>{
  assert.ok(block.indexOf("await auth(req)")>=0);
  assert.ok(block.indexOf("await auth(req)")<block.indexOf('from("s_trade_operational_controls")'));
  assert.match(block,/ORDER_SUBMISSION_PATHS/);
+ assert.match(block,/paper\\/protective-orders/);
+ assert.match(block,/replace\\(\/\\\\\\+\$\/,""\)\.toLowerCase\(\)/);
 });
