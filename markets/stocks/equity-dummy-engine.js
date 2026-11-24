@@ -107,6 +107,14 @@
       assert(safeInt(pricePaise) && pricePaise > 0, 'Execution price must be positive integer paise.');
       const instrument = instruments.get(order.instrumentKey);
       assert(pricePaise % instrument.tickSizePaise === 0, 'Execution price does not match the instrument tick size.');
+      if (executionId) {
+        const priorFill = state.fills.find(row => row.executionId === executionId);
+        if (priorFill) {
+          assert(priorFill.orderId === order.orderId && priorFill.quantity === quantity &&
+            priorFill.executionPricePaise === pricePaise, 'Execution ID was replayed with a different fill payload.');
+          return clone(priorFill);
+        }
+      }
       if (order.orderType === 'LIMIT') {
         if (order.side === 'BUY') assert(pricePaise <= order.limitPricePaise, 'BUY limit price condition is not met.');
         else assert(pricePaise >= order.limitPricePaise, 'SELL limit price condition is not met.');
@@ -240,6 +248,11 @@
       }
       return snapshotOrder(order);
     }
+    function executeFill(orderId, quantity, pricePaise, executionId) {
+      const order = state.orders.get(orderId);
+      assert(order, 'Demo order was not found.');
+      return fill(order, quantity, pricePaise, executionId);
+    }
     function processQuote(instrumentKey, pricePaise, options = {}) {
       const instrument = instruments.get(instrumentKey);
       assert(instrument, 'Instrument is not present in the demo instrument master.');
@@ -258,7 +271,10 @@
         const quantity = Math.min(order.remainingQuantity, cap);
         if (quantity <= 0) continue;
         try {
-          receipts.push(fill(order, quantity, pricePaise));
+          const executionId = options.executionIdPrefix
+            ? options.executionIdPrefix + ':' + order.orderId + ':' + order.filledQuantity
+            : undefined;
+          receipts.push(fill(order, quantity, pricePaise, executionId));
         } catch (error) {
           order.status = order.filledQuantity > 0 ? 'PARTIALLY_FILLED' : 'REJECTED';
           order.rejectReason = error.message;
@@ -297,7 +313,7 @@
 
     return Object.freeze({
       mode: 'DEMO_JSON', label: state.label,
-      submitOrder, processQuote, cancelOrder, getOrder,
+      submitOrder, processQuote, executeFill, cancelOrder, getOrder,
       getTradeReceipts, getInstrumentMaster, snapshot
     });
   }
