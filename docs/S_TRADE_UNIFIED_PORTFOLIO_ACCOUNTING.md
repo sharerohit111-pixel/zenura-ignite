@@ -18,7 +18,8 @@ All monetary values are integer paise.
 - Blocked funds = reserved_cash_paise + reserved_margin_paise. Do not add asset-level reservations again.
 - Available cash = cash_paise - reserved_cash_paise - reserved_margin_paise. Preserve negative values and expose margin deficit; never clamp a genuine Futures MTM debit.
 - Asset adapters return user-scoped positions, orders and immutable trade receipts; they do not mutate account cash or re-add reservations.
-- Realized P&L and charges come from unique immutable trade/settlement receipts, not position summaries or Futures risk events a second time.
+- Realized P&L is gross of charges; charges are separately summed from unique immutable trade/settlement receipts and deducted exactly once in net P&L. Do not feed net-of-charge realized values into this adapter. Do not count position summaries or Futures risk events a second time.
+- Position IDs, order IDs and trade IDs must each be globally unique across the three asset adapters in one user snapshot.
 - Unrealized P&L uses fresh timestamped marks and cost basis. Any stale/unpriced open position makes aggregate market value and unrealized/net P&L null.
 - Lifetime net P&L is null unless every asset adapter declares its history complete. Bounded latest-N history must set complete=false.
 
