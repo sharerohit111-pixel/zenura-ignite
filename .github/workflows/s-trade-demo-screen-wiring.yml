@@ -8,12 +8,14 @@ on:
       - "markets/stocks/demo.css"
       - "markets/stocks/demo.js"
       - "markets/service-worker.js"
+      - "markets/stocks/demo-browser-smoke.cjs"
       - "markets/stocks/index.html"
       - "markets/dashboard/index.html"
       - "market-gateway/test/paper-demo-adapter.test.mjs"
       - "market-gateway/test/paper-demo-dashboard.test.mjs"
       - "market-gateway/test/paper-demo-dashboard-alias.test.mjs"
       - "market-gateway/test/paper-demo-pwa-cache.test.mjs"
+      - "markets/stocks/demo-browser-smoke.cjs"
       - ".github/workflows/s-trade-demo-screen-wiring.yml"
   push:
     branches:
@@ -55,6 +57,20 @@ jobs:
           NODE
       - name: Run adapter, screen and compatibility tests
         run: node --test market-gateway/test/paper-demo-adapter.test.mjs market-gateway/test/paper-demo-dashboard.test.mjs market-gateway/test/paper-demo-dashboard-alias.test.mjs market-gateway/test/paper-demo-pwa-cache.test.mjs
+      - name: Install Chromium browser QA dependencies
+        run: |
+          npm install --prefix "$RUNNER_TEMP/zenura-playwright" playwright@1.55.0 axe-core@4.10.3 --ignore-scripts --no-audit --no-fund
+          "$RUNNER_TEMP/zenura-playwright/node_modules/.bin/playwright" install --with-deps chromium
+      - name: Run desktop, mobile, accessibility, performance and offline PWA smoke
+        run: |
+          python3 -m http.server 4173 --bind 127.0.0.1 > "$RUNNER_TEMP/zenura-static-server.log" 2>&1 &
+          echo $! > "$RUNNER_TEMP/zenura-static-server.pid"
+          for attempt in $(seq 1 30); do
+            if curl --silent --fail http://127.0.0.1:4173/markets/stocks/demo.html >/dev/null; then break; fi
+            sleep 1
+          done
+          curl --silent --fail http://127.0.0.1:4173/markets/stocks/demo.html >/dev/null
+          NODE_PATH="$RUNNER_TEMP/zenura-playwright/node_modules" node markets/stocks/demo-browser-smoke.cjs
       - name: Guard production gateway isolation
         run: |
           if grep -R "paper-demo-adapter\|paper-mock-fixtures" market-gateway/supabase-server.js market-gateway/server.js; then
