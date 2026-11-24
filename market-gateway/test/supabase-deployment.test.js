@@ -146,3 +146,89 @@ test("Paper Trading discloses per-user Upstox authorization and data rights",()=
  assert.match(tradingPage,/Public real-time display remains subject to Upstox permission/);
  assert.doesNotMatch(tradingPage,/PAPER INVESTING|Paper Investing/);
 });
+
+test("Equity LIMIT cancellation resolves the authenticated user's scoped Supabase client",()=>{
+ const start=server.indexOf('app.post("/paper/orders/:orderId/cancel"');
+ const end=server.indexOf('app.post("/paper/protective-orders"',start);
+ assert.ok(start>=0&&end>start,"Equity LIMIT cancellation route must exist");
+ const route=server.slice(start,end);
+ assert.match(route,/const \{user,userDb\}=await auth\(req\)/);
+ assert.match(route,/userDb\.from\("paper_orders"\)/);
+ assert.match(route,/eq\("user_id",user\.id\)/);
+});
+
+
+test("Equity, Futures and Options order histories use composite keyset pagination",()=>{
+ for(const route of [
+  'app.get("/paper/orders"',
+  'app.get("/paper/futures/orders"',
+  'app.get("/paper/derivative/orders"',
+  'app.get("/paper/derivative/limit-orders"'
+ ]){
+  const start=server.indexOf(route);
+  const end=server.indexOf("\napp.",start+5);
+  assert.ok(start>=0&&end>start,route+" route must exist");
+  const source=server.slice(start,end);
+  assert.match(source,/decodeHistoryCursor\(req\.query\.cursor\)/);
+  assert.match(source,/applyHistoryCursor\(query,decoded\.cursor\)/);
+  assert.match(source,/order\("created_at",\{ascending:false\}\)\.order\("order_id",\{ascending:false\}\)\.limit\(limit\+1\)/);
+  assert.match(source,/hasMore:page\.hasMore,nextCursor:page\.nextCursor/);
+ }
+});
+test("Gateway attaches a server-generated request correlation ID",()=>{
+ assert.match(server,/const requestId=crypto\.randomUUID\(\)/);
+ assert.match(server,/req\.requestId=requestId/);
+ assert.match(server,/res\.set\("X-Request-Id",requestId\)/);
+});
+test("API error logs are structured and exclude raw error messages",()=>{
+ const start=server.indexOf("function sendError(");
+ const end=server.indexOf("function decryptToken(",start);
+ assert.ok(start>=0&&end>start,"sendError helper must exist");
+ const helper=server.slice(start,end);
+ assert.match(helper,/event:"api_request_failed"/);
+ assert.match(helper,/requestId/);
+ assert.match(helper,/method:/);
+ assert.match(helper,/path:/);
+ const logCall=helper.slice(helper.indexOf("console.error("));
+ assert.ok(logCall.length>0,"structured error log must be emitted");
+ assert.doesNotMatch(logCall,/error\.message/);
+});
+
+test("Request correlation IDs are attached before JSON parsing and exposed to browser clients",()=>{
+ const requestIdMiddleware=server.indexOf('const requestId=crypto.randomUUID()');
+ const jsonParser=server.indexOf('app.use(express.json({limit:"32kb"}))');
+ assert.ok(requestIdMiddleware>=0&&jsonParser>requestIdMiddleware,
+  "request ID middleware must run before body parsing can reject malformed JSON");
+ assert.match(server,/Access-Control-Expose-Headers","Retry-After, X-Request-Id, X-Trace-Id"/);
+});
+
+test("JSON parser failures preserve request IDs, CORS headers and safe JSON errors",()=>{
+ const requestId=server.indexOf('const requestId=crypto.randomUUID()');
+ const cors=server.indexOf('Access-Control-Expose-Headers","Retry-After, X-Request-Id, X-Trace-Id"');
+ const parser=server.indexOf('app.use(express.json({limit:"32kb"}))');
+ const parserError=server.indexOf('error?.type==="entity.too.large"');
+ const firstRoute=server.indexOf('app.get("/health"');
+ assert.ok(requestId>=0&&cors>requestId&&parser>cors&&parserError>parser&&firstRoute>parserError,
+  "request ID and CORS middleware must precede body parsing and parser error handling must precede routes");
+ assert.match(server,/status\(413\)\.json\(\{error:"Request body exceeds the 32 KB limit\.",code:publicErrorCode\(413\),requestId:req\.requestId\|\|null\}\)/);
+ assert.match(server,/status\(400\)\.json\(\{error:"Request body must contain valid JSON\.",code:publicErrorCode\(400\),requestId:req\.requestId\|\|null\}\)/);
+ assert.match(server,/errorName:"SyntaxError"/);
+});
+
+test("API errors preserve legacy fields and add a stable public code without leaking internal codes",()=>{
+ assert.match(server,/const \{publicErrorCode\}=require\("\.\/lib\/api-error-contract"\)/);
+ assert.match(server,/json\(\{error:error\.status\?error\.message:fallback,code:publicErrorCode\(status\),requestId\}\)/);
+ assert.doesNotMatch(server,/json\(\{[^}]*error\.code/);
+});
+
+test("Supabase gateway attaches safe trace context and structured request telemetry",()=>{
+ const telemetry=fs.readFileSync(path.join(root,"lib/http-telemetry.js"),"utf8");
+ assert.match(server,/createHttpTelemetry/);
+ assert.match(server,/app\.use\(httpTelemetry\.middleware\)/);
+ assert.match(server,/Access-Control-Allow-Headers","Authorization, Content-Type, Accept, traceparent"/);
+ assert.match(server,/Access-Control-Expose-Headers","Retry-After, X-Request-Id, X-Trace-Id"/);
+ assert.match(telemetry,/event:"http_server_request"/);
+ assert.match(telemetry,/durationMs:/);
+ assert.match(telemetry,/logging\.googleapis\.com\/trace/);
+ assert.doesNotMatch(telemetry,/req\.originalUrl|req\.url|authorization|access_token/i);
+});

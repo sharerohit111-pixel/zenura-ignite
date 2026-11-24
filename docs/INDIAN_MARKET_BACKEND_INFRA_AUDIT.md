@@ -1,0 +1,485 @@
+# Indian Market Backend API & Worker Infrastructure Audit
+
+**Audit date:** 2026-11-23  
+**Repository:** `sharerohit111-pixel/zenura-ignite`  
+**Dedicated branch:** `feature/indian-market-backend-infra-supabase-2026-11-23`  
+**Base:** Existing NSE Options LIMIT implementation branch `feature/indian-market-options-limit-schema`  
+**Scope:** Indian Market gateway, authenticated APIs, market-data proxy, order APIs, worker lifecycle, retries, leases, idempotency, authorization, observability and failure recovery.  
+**Excluded:** Crypto backend/runtime, production activation/deployment, and shared database migrations.
+
+## 1. Repository and branch baseline
+
+- Default branch is `main`.
+- The Indian Market integration branch is `integration/supabase-native-auth-professional-launch-2026-11-22`.
+- The backend gateway is implemented in `market-gateway/supabase-server.js`; the legacy Firebase gateway remains in `market-gateway/server.js`.
+- The current Supabase-native backend line includes the existing Equity, Futures and NSE Options work from the open implementation PR chain, including PR #89 and PR #91.
+- Related review work remains separate: PR #92 (equity append-only ledger schema foundation), PR #93 (Futures worker lease compatibility), and PR #94 (equity order-engine audit).
+- This branch is based on the Supabase-native Options LIMIT implementation line so its backend inspection is against the current gateway, not the older `main` snapshot.
+
+## 2. Existing API surface
+
+### Gateway and market data
+
+| API | Current behavior |
+|---|---|
+| `GET /health` | Public safe readiness data: instrument-master cache and worker status |
+| `GET /instruments` | Public official Upstox BOD instrument-master search |
+| `GET /candles` | Authenticated historical candle proxy |
+| `GET /option-chain` | Authenticated option-chain proxy |
+| `POST /stream` | Authenticated Upstox V3 WebSocket-to-SSE stream |
+| `GET /upstox/connection` | Authenticated connection status |
+| `POST /upstox/oauth/start`, `GET /upstox/oauth/callback`, `DELETE /upstox/connection` | OAuth lifecycle |
+
+### Account, portfolio and equity
+
+| API | Current behavior |
+|---|---|
+| `GET /paper/account` | Owner-scoped account snapshot |
+| `POST /paper/orders` | Equity MARKET and LIMIT submission; DELIVERY and INTRADAY paths |
+| `POST /paper/orders/:orderId/cancel` | Equity LIMIT cancellation |
+| `GET /paper/orders` | Owner-scoped order history |
+| `GET /paper/portfolio` | Owner-scoped cash-equity positions and quote-based valuation |
+| `POST/GET /paper/protective-orders` and cancel route | Opt-in equity protective order APIs |
+
+### Futures and Options
+
+| API | Current behavior |
+|---|---|
+| `POST /paper/derivative/margin-preview` | Authenticated Futures margin preview with a database-backed per-user cooldown |
+| `POST /paper/futures/orders` | Futures MARKET and LIMIT submission |
+| `POST /paper/futures/orders/:orderId/cancel` | Futures LIMIT cancellation |
+| `GET /paper/futures/orders`, `GET /paper/futures/portfolio` | Owner-scoped Futures history and valuation |
+| `POST /paper/derivative/orders` | Options MARKET long BUY and SELL-to-close path |
+| `POST /paper/derivative/limit-orders` | NSE Options LIMIT submit, guarded by two explicit feature flags and worker readiness |
+| `GET /paper/derivative/limit-orders`, `DELETE /paper/derivative/limit-orders/:orderId` | Owner-scoped Options LIMIT history/fills and cancellation |
+| `GET /paper/derivative/orders`, `GET /paper/derivatives/portfolio` | Owner-scoped derivative order history and portfolio |
+
+Paper execution routes are simulation-only; the gateway does not submit broker/exchange orders.
+
+## 3. Authentication and authorization
+
+- Bearer tokens are parsed by `readBearerToken`.
+- `createSupabaseRuntime.authenticateRequest` validates each token through Supabase Auth `getUser(token)` using the server-side service client and rejects missing/invalid UUID user identities.
+- User-facing reads and writes use a Supabase client carrying the verified user's bearer token and rely on RLS.
+- `callUserRpc` enforces a server RPC allowlist and injects the verified user ID rather than accepting a caller-supplied `p_user_id`.
+- Worker-only and privileged operations use the service-role client from server-side code.
+- The Options/Futures LIMIT PRs document service-role-only lease/fill RPCs and least-privilege table grants; do not broaden browser-role grants to bypass RLS.
+
+**Review point:** continue checking every newly added route for explicit authentication, user scoping and RLS; avoid direct service-role reads for user-owned records unless an exact privileged boundary is documented.
+
+## 4. Transaction boundaries and idempotency
+
+- Order mutation boundaries are PostgreSQL RPC calls, rather than multi-step browser writes.
+- Existing Equity MARKET/LIMIT paths use user-scoped RPC calls; PR #94 documents account-first locking and idempotency/fingerprint behavior in the audited equity paths.
+- Futures and Options LIMIT implementations use dedicated submit/cancel/expiry/fill RPCs, reservations and per-fill records. PR #91 documents account → order → position lock order for Options.
+- Idempotency keys are UUIDs; order IDs are deterministically derived from user ID plus key, and request fingerprints reject changed-payload key reuse.
+- Worker execution uses stable execution identifiers and transactional fill RPCs in the derivative LIMIT paths.
+
+**Shared DB boundary:** this audit does not modify SQL, migrations, RLS policies, RPC definitions or shared ledger contracts. Any such change must first be coordinated with the database/migrations owner (Chat 7).
+
+## 5. Worker lifecycle, leases and retries
+
+- Separate worker modules exist for Equity Delivery LIMIT, Equity Intraday LIMIT, Equity protective orders, Futures LIMIT and NSE Options LIMIT.
+- Worker enablement is controlled by environment flags; Futures, Options, Intraday and protective workers are explicitly opt-in in the gateway code. Options LIMIT requires both submit and worker flags.
+- Derivative LIMIT workers acquire a dedicated state-key lease with a random owner token and bounded TTL, scan a bounded order batch using a persisted cursor, group work by user, and release the lease in `finally`.
+- Stream connections use per-process single-stream limits plus a database lease and lease heartbeat.
+- Worker loops have a process-local single-flight/busy guard and bounded exponential backoff. Provider requests have a timeout wrapper; instrument refresh uses single-flight and a cooldown.
+- A process crash should leave the lease to expire rather than requiring an unsafe forced release; this still needs explicit crash/reacquisition regression coverage for every lease key.
+- Do not activate any worker in this branch or in a production environment without explicit approval.
+
+**Deployment caution:** the existing deployment runbook/workflow describes enabling the Equity Delivery LIMIT worker during a manual production deployment. Do not run that workflow as part of this task. Actual deployed environment variables and live worker state have not been independently verified here.
+
+## 6. Confirmed source-level issue fixed in this branch
+
+The Equity LIMIT cancellation route queried `userDb.from("paper_orders")` but destructured only `user` from `auth(req)`. This left `userDb` undefined and could fail before reaching the cancellation RPC.
+
+This branch now destructures `{user,userDb}` and adds a regression assertion to `market-gateway/test/supabase-deployment.test.js` that checks the route binds the authenticated user-scoped client and filters by the verified user ID.
+
+## 7. Remaining infrastructure gaps / follow-up
+
+1. **Gateway-wide rate limiting:** the inspected code has a database-backed 5-second per-user cooldown for margin preview and one active stream per account, but no common rate-limit middleware covering auth, market-data, watchlist, order, history and portfolio routes. Add a distributed, user/IP-aware policy only after choosing a shared implementation that does not require an uncoordinated migration.
+2. **Pagination:** several order-history APIs cap results at 100; at least one returns `hasMore:false,nextCursor:null` regardless of whether more rows exist. Implement stable keyset cursors and explicit `hasMore` semantics.
+3. **Request observability:** `/health` exposes safe worker/cache status, and workers emit console messages, but consistent request IDs, structured route logs, latency/error counters and correlation across RPC/provider calls are not yet standardized.
+4. **Error taxonomy:** `sendError` maps status/timeouts to HTTP responses, but database RPC errors are often normalized to generic 409s. Define stable public error codes and preserve detailed internal diagnostics without leaking SQL/provider secrets.
+5. **Cancellation symmetry:** verify Equity, Futures and Options cancellation ownership checks, idempotent replay semantics, terminal-state handling and fill-vs-cancel races using route and PostgreSQL tests.
+6. **Lease recovery:** test wrong-owner release, expired-lease takeover, heartbeat loss, process crash, overlapping instances and cursor recovery for each worker key.
+7. **Operational readiness:** staging authenticated browser-to-gateway rehearsal, provider data-rights approval, independent security review and controlled deployment/rollback remain release gates.
+
+## 8. Safety and validation boundary
+
+- Regression test selector was corrected after the first CI attempt; rerun must execute against the latest branch head (`f9287e14`) rather than the original PR commit.
+
+- No shared database migration or schema change is included.
+- No production deployment, worker activation, scheduler activation, secret change or live account operation is included.
+- Crypto code and data paths are excluded.
+- The Equity cancellation fix has a source-level regression test added; CI execution must be checked before treating the fix as runtime-verified.
+- Keep this work in Draft until API contract, security, concurrency and staging checks pass.
+
+## 9. Request correlation and structured error logging hardening
+
+- The Supabase-native gateway now assigns a server-generated UUID request ID to each request and returns it in the `X-Request-Id` response header.
+- The shared `sendError` path includes the request ID in the JSON error response for backward-compatible correlation.
+- Failed requests emit one-line JSON logs with event name, request ID, HTTP status, method, route/path and error class.
+- Raw error messages, request headers, bearer tokens, query values and provider payloads are deliberately excluded from these structured logs.
+- Regression assertions cover request-ID generation/header propagation and the safe structured-log field set.
+- This is request correlation, not a full metrics/tracing system; route latency histograms, RPC/provider spans and centralized log retention remain follow-up work.
+
+## 10. Stable keyset pagination for order histories
+
+- Added a bounded, validated opaque cursor helper using the composite `created_at` + `order_id` key.
+- Equity, Futures, Options derivative history and Options LIMIT history now use descending composite ordering and a `limit + 1` query to compute truthful `hasMore` and `nextCursor` values.
+- Cursor payloads are length-limited, base64url-only, timestamp-validated and order-ID-character-validated before being used in PostgREST filters.
+- Existing `limit` parameter remains supported (1–100); clients can pass the returned `cursor` on the next request. Responses include `hasMore` and `nextCursor`.
+- Options LIMIT fills are fetched only for the orders in the returned page.
+- No database migration is required; this relies on existing `created_at` and `order_id` columns. Regression tests cover cursor round-trip, malformed input, composite boundary construction, page sizing and all four route integrations.
+- This is keyset pagination, not a snapshot across multiple requests: newly inserted orders can appear ahead of the cursor, while the composite boundary prevents timestamp ties from duplicating or skipping rows.
+
+## 11. Distributed rate-limiting architecture audit
+
+**Finding:** the Supabase-native gateway has no shared route-wide rate-limit middleware. No Redis/Upstash package, endpoint, environment configuration or documented distributed limiter was found in the inspected gateway package/runtime configuration. Do not describe the process-local stream registry, worker busy flags, instrument-refresh cooldown or single-flight helpers as distributed rate limiting.
+
+### Existing controls (narrow scope)
+
+- POST /paper/derivative/margin-preview calls the database RPC consume_paper_margin_preview_slot after validating the instrument and before obtaining the user's Upstox token or calling the provider. The route currently returns 429 Retry-After: 5 when the RPC returns false **or when the RPC errors**. The latter is fail-closed but misclassifies limiter-backend unavailability as client throttling; a future common limiter should return 503 for backend failure, not 429.
+- POST /stream has an in-process per-user reservation plus a database-backed account lease and heartbeat. This enforces one active stream per account across gateway instances when the lease RPC is healthy; it does not rate-limit connection attempts, reconnections or other API routes. The process-local map is only an optimization.
+- OAuth callback state is consumed through a database RPC and is single-use, which protects replay but is not an IP/request-rate policy.
+- Instrument refresh has process-local single-flight and a 30-second attempt cooldown; it is not a distributed client limiter.
+- No common 429 response contract or route-level request budgets are currently enforced across orders, cancellations, history, portfolio, watchlists, candles, option-chain and OAuth routes.
+
+### Deployment / identity findings
+
+- The gateway package declares Express, Supabase JS, WebSocket and protobuf dependencies; no Redis/Upstash client is declared.
+- Deployment documentation describes Cloud Run autoscaling from one to five instances and request concurrency of 40. Per-process counters therefore cannot provide a global quota.
+- Express does not configure trust proxy in the inspected gateway. Do not use arbitrary X-Forwarded-For values as an IP identity. The correct client-IP source must be established from the actual Cloud Run ingress/load-balancer topology; if a trusted proxy chain is configured, trust only the known proxy boundary and test spoofed forwarding headers. Prefer an ingress/WAF policy for unauthenticated IP protection rather than relying solely on application parsing.
+- The public surface includes /health, /instruments and /upstox/oauth/callback; authenticated routes call Supabase Auth before user-scoped work. IP-level controls must protect expensive unauthenticated paths before provider/database work. User-level quotas can only be keyed after verified Supabase identity is available.
+
+### Recommended design (proposal only; not implemented)
+
+1. **Ingress / IP layer:** apply Cloud Armor or an equivalent trusted edge policy for unauthenticated traffic, especially OAuth callback attempts and public instrument-master requests. Keep health checks separately allowlisted with conservative protection. Do not trust caller-supplied IP headers.
+2. **Authenticated shared limiter:** prefer a single atomic shared backend. The existing Supabase/Postgres stack is a viable candidate for a dedicated atomic token-bucket/GCRA RPC, but it requires a new shared table/RPC/migration and therefore **must be reviewed with Chat 7 before any implementation**. Redis/Upstash is an alternative only after a service, credentials, network path, availability target and cost are explicitly selected; none is configured in the inspected branch.
+3. **Keys and scopes:** combine verified user ID + route family for authenticated budgets; use a trusted, privacy-preserving IP key at ingress for unauthenticated budgets. Separate expensive provider-backed reads (candles, option-chain, quotes, margin preview, stream start), state-changing order submit/cancel, low-cost history/account reads, and OAuth lifecycle. Apply per-user and global/provider concurrency budgets where needed.
+4. **Algorithm:** use an atomic token bucket or GCRA with explicit burst capacity and refill/window semantics. Avoid process-local counters and naive fixed windows that permit boundary bursts. The storage operation must be atomic across concurrent requests and all Cloud Run instances; keys need TTL/cleanup and bounded cardinality.
+5. **Ordering:** apply body-size and ingress protections first; authenticate before user-keyed quotas; validate cheap shape/instrument constraints before consuming expensive-provider budgets; consume the appropriate quota before external provider calls or costly RPCs. Preserve order idempotency and ensure safe retries do not create duplicate effects.
+6. **Failure policy:** fail closed for order mutations, OAuth token exchange, stream starts and expensive provider calls when the shared limiter is unavailable, returning 503 rate_limit_unavailable (not 429). Low-cost, non-sensitive reads may use a deliberately documented degraded policy only if an edge limit still protects the service. Never silently fall back to a per-process limiter.
+7. **Response contract:** quota exhaustion returns 429, a stable code: "rate_limited", integer Retry-After, request ID and a safe message. CORS must expose Retry-After (already present for allowed origins). Do not return remaining quota or raw keys unless intentionally designed.
+8. **Observability:** record route family, limiter decision, policy identifier, backend latency/failure, status and request ID. Never log raw IPs, bearer tokens, idempotency keys, OAuth codes/state, or limiter key material. Add dashboards/alerts for denied requests, backend errors, quota saturation and provider spend.
+
+### Required tests before rollout
+
+- Concurrent requests from multiple simulated gateway instances cannot exceed one shared budget.
+- Burst/refill timing, exact boundary behavior, TTL expiry and clock-skew assumptions are deterministic.
+- Verified users cannot consume another user's quota; spoofed user IDs and forwarding headers do not change identity.
+- Unauthenticated OAuth callback and public instrument endpoints are protected at the trusted ingress.
+- Limiter backend timeout/error maps to the documented fail-closed status; quota exhaustion maps to 429 + Retry-After.
+- Order idempotent retries, submit/cancel races and existing margin/stream lease semantics remain intact.
+- Load tests cover Cloud Run's documented instance concurrency and autoscaling; no production worker or gateway activation is part of this audit.
+
+**Decision:** architecture audit and documentation only. No limiter middleware, process-local substitute, Redis/Upstash dependency, secret, SQL migration, RPC, RLS change or infrastructure activation is introduced in this change. Shared database work remains blocked on Chat 7 coordination.
+
+
+## 12. Existing shared-schema coordination check
+
+- Repository PR #70 (draft Supabase migration foundation) describes a proposed rate-limit-state table among its draft schema objects. Its own PR description says the migration set remains draft, has not been applied, and still requires SQL/RLS/runtime/concurrency validation.
+- This is not evidence that a compatible shared limiter table/RPC exists in the current Indian Market migration chain or in the hosted database. Do not assume the PR #70 draft table is deployed, mergeable, or suitable for the new route-family/token-bucket policy.
+- Before implementation, Chat 7 should reconcile PR #70's proposed rate-limit state with the current ordered migration chain and current hosted migration history, then decide whether to extend an existing draft object or create a forward-only migration. Avoid duplicate tables, conflicting key formats, or broadening service-role grants.
+- No SQL file was copied, modified, applied, or merged as part of this coordination check.
+
+
+## 13. Proposed route-family policy matrix (review required)
+
+This matrix classifies work by cost and side-effect risk so Chat 7 / backend owners can agree a policy before implementation. It intentionally specifies **no numeric quotas, burst sizes or refill rates**; those require expected traffic, provider limits, product UX and shared-database capacity decisions.
+
+| Route family | Representative routes | Identity / scope | Suggested enforcement point | Degraded-mode posture |
+|---|---|---|---|---|
+| Order mutations | Equity, Futures and Options submit; cancel; protective-order mutations | Verified Supabase user + mutation family; retain order-level idempotency | After authentication and cheap schema/instrument validation, before mutation RPC | Fail closed with 503 if shared limiter unavailable; quota exhaustion 429 |
+| Expensive market/provider reads | Candles, option-chain, quote/provider-backed reads, margin preview | Verified user + provider/operation family; also global provider concurrency budget | After auth and cheap validation, before token/provider lookup or expensive provider call | Fail closed with 503; never translate backend outage to 429 |
+| Stream lifecycle | Stream start/stop/reconnect | Verified user/account + stream lifecycle family; preserve DB account lease | Before acquiring/renewing stream lease; keep lease as a separate concurrency invariant | Fail closed for new stream starts if limiter/lease backend unavailable; cleanup existing streams safely |
+| History and portfolio reads | Equity/Futures/Options order history, fills, portfolio, account | Verified user + read family | After auth; preserve user-scoped queries and cursor validation | A documented low-cost-read degraded policy may be considered only with ingress protection; no local-counter fallback |
+| Public catalogue / health | Instruments, health | Trusted ingress identity for public catalogue; health isolated for platform probes | Edge/WAF before application/provider work; health has separate probe policy | Serve only from bounded cache where designed; protect origin from unauthenticated floods |
+| OAuth lifecycle | OAuth start/callback/token exchange | Verified user for start; trusted ingress identity + validated one-time state for callback | Edge protection before callback parsing; user quota before start/token exchange | Fail closed for token exchange when shared policy backend is unavailable; preserve single-use state |
+| Instrument refresh / admin jobs | Internal refresh and maintenance tasks | Service identity / job identity, not caller-supplied user identity | Scheduler/worker admission and global provider concurrency | Bounded retry with backoff; no overlapping refresh; never expose internal controls publicly |
+
+### Cross-cutting invariants
+
+- Route-family policy is additive to authentication, RLS, ownership checks, idempotency, order-state validation, worker leases and provider concurrency controls; it must not replace them.
+- A user quota key must derive only from the authenticated Supabase subject. A request body, URL parameter or client header must never select another user's bucket.
+- Public IP identity must come from a verified ingress boundary. Until Cloud Run's actual proxy chain is confirmed, application code must not treat arbitrary X-Forwarded-For as authoritative.
+- Mutation retries must preserve the same idempotency key and request fingerprint. Rate limiting must not cause a second financial side effect or bypass a prior idempotent result.
+- A 429 rate_limited response means a valid request exceeded a configured policy and includes integer Retry-After; a 503 rate_limit_unavailable response means the policy backend could not make a trustworthy decision. They are distinct operational conditions.
+- Apply request/body limits and edge protection before parsing expensive payloads. Authenticate before user-keyed decisions. Perform cheap deterministic validation before consuming provider-heavy budgets.
+- Quota values, global concurrency caps, route exceptions, retention/TTL, clock source and alert thresholds remain open design decisions. Record approvals and load-test evidence before rollout.
+- Do not implement this matrix until Chat 7 confirms the shared schema/RPC contract and migration ordering. This section is a proposal, not an active policy.
+
+
+## 14. Worker lease expiry, renewal and crash-recovery audit
+
+### Observed implementation
+
+- The Supabase worker lease RPC is an atomic `INSERT ... ON CONFLICT DO UPDATE` claim keyed by `state_key`. A claim can replace a lease only when the stored token/expiry is null or its expiry is at/before the caller-supplied `p_now_ms`. The RPC returns true only when the persisted token matches the caller token.
+- The latest lease-key migration registers five isolated worker keys: Delivery LIMIT, Equity protective, Equity Intraday LIMIT, Futures LIMIT and Options LIMIT. The RPC accepts TTL values from 5,000 to 300,000 ms. The current worker modules inspected pass 240,000 ms.
+- Release is owner-token guarded (`WHERE state_key = ... AND lease_token = p_lease_token`), so an old owner cannot release a newer owner's lease. Release does not require that the lease is still unexpired.
+- The worker modules inspected acquire before scanning and release in `finally`. A process crash, forced termination, host loss or hard timeout skips `finally`; the lease remains until its persisted expiry and then becomes reclaimable. This is expected TTL-based crash recovery, but recovery latency can be up to the remaining lease duration.
+- The shared `createLeaseHeartbeat` helper is tested in isolation, including overlap suppression, lost-lease callback and renewal-error callback. The inspected Equity Delivery LIMIT, Equity Intraday LIMIT, Futures LIMIT, Options LIMIT and protective worker modules do not import/use this helper or invoke a renewal RPC. No renewal RPC was found in the inspected lease migrations. Therefore there is no active lease extension during a long-running worker batch in these implementations.
+- Cursor writes in the Intraday, Futures and Options LIMIT workers include both `state_key` and the current `lease_token`, which prevents an expired former owner from overwriting cursor state after a replacement claim. The inspected worker execution RPC calls do not pass the lease token as a fencing token; correctness during a stale worker's in-flight request must therefore rely on the order-level atomic status/reservation checks and execution-id/idempotency constraints inside each execution RPC.
+
+### Existing test coverage and gaps
+
+- Worker unit tests verify that a competing lease result (`data: false`) causes an early return without scanning or releasing another worker's lease. They also verify release is attempted after normal success and selected errors.
+- `lease-heartbeat.test.js` tests the helper only; it does not prove any production worker uses it.
+- `supabase/tests/intraday_limit_worker_lease.sql` verifies service-role-only grants, first acquisition, rejection of a concurrent second owner, rejection of non-owner release, owner release and reacquisition after explicit release.
+- The inspected SQL test does not simulate a worker crash or prove takeover after the lease expiry timestamp. It also does not exercise simultaneous SQL claim transactions. No equivalent SQL lease test was found for Delivery LIMIT, protective, Futures LIMIT or Options LIMIT keys in the inspected test paths.
+- The worker unit-test DB fakes generally return a preselected boolean for acquire/release. They do not model a real expiry clock, stale-owner takeover, release failure, process death between claim and cursor/fill, or a worker whose batch runs beyond 240 seconds.
+
+### Risk assessment
+
+1. **Long batch overlap:** without heartbeat renewal, a batch that exceeds its 240-second lease can overlap with a replacement worker. Per-order atomic RPCs should prevent duplicate accounting, but this needs explicit stale-worker fencing/race tests rather than assumption.
+2. **Crash recovery delay:** a crashed worker is not immediately unlocked; another worker must wait for TTL expiry. The 240-second TTL is a recovery bound, not a recovery guarantee if the database clock/claim path is unhealthy.
+3. **Clock authority:** acquire/takeover compares the caller-supplied millisecond timestamp to persisted expiry. Worker clocks should be synchronized, and the SQL contract should be reviewed for whether database time should be authoritative for lease expiry decisions.
+4. **Cursor fencing is not execution fencing:** token-guarded cursor writes protect scan progress, but do not stop a stale process from attempting a fill RPC already in flight after lease takeover. Order-level compare-and-set/idempotency is the last line of defense.
+5. **Heartbeat helper is currently orphaned from the inspected worker paths:** do not claim worker leases are renewed merely because the helper exists and has unit tests.
+
+### Required follow-up before production confidence
+
+- Add database-level expiry takeover tests with a controllable `p_now_ms`: active lease cannot be stolen; exact-expiry boundary can be reclaimed; expired owner cannot release replacement lease; invalid/overflow TTL inputs fail; independent state keys do not contend.
+- Add concurrent SQL claim tests using two sessions/transactions to prove exactly one winner.
+- Add stale-owner fencing tests: worker A claims, lease expires, worker B claims, then A attempts cursor update and execution RPC. A must not mutate cursor or create a duplicate fill; B must remain the sole valid lease owner.
+- Exercise each registered key (Delivery, protective, Intraday, Futures, Options) against the same RPC contract and grants.
+- Add deterministic worker tests for RPC failure after claim, provider timeout, cursor-save failure, release error, abrupt termination/restart, and batch duration beyond lease TTL.
+- Decide explicitly whether workers should renew leases. If so, coordinate a forward-only shared RPC/migration with Chat 7, integrate heartbeat with cancellation on lease loss, and ensure every state mutation is fenced by the current token. Do not add heartbeat-only code that still permits stale execution RPCs.
+- Keep TTL and batch-duration limits aligned with Cloud Run/job execution timeout and provider latency budgets. Do not change production schedules or worker activation as part of this audit.
+
+**Decision:** audit/documentation only. No worker behavior, SQL, RPC, TTL, schedule, deployment or production activation was changed. A production-readiness claim for crash recovery remains blocked on the tests and fencing review above.
+
+## 11. Route-by-route API contract and authorization review (2026-11-23)
+
+Reviewed the current market-gateway/supabase-server.js, lib/supabase-runtime.js, history cursor helper and route regression tests on this branch.
+
+### Authentication boundary
+
+- All account, watchlist, quote-history, order, portfolio, derivative and SSE stream routes reviewed call the shared auth(req) helper before accessing user data or provider credentials.
+- auth(req) extracts a single Bearer token, validates it through Supabase Auth getUser(token), then creates a user-scoped Supabase client with the verified access token.
+- The OAuth callback and public instrument-master endpoint are intentionally unauthenticated protocol/public-data routes; they must remain narrowly scoped and must not expose account data.
+- /health is a public readiness endpoint. Keep its output limited to non-secret operational status.
+- The public /instruments route currently has bounded output (1–100) and bounded search text (60 chars), but no route-level or distributed rate limiter.
+- The SSE /stream route uses the shared authenticated user path and a per-user active-stream guard.
+
+### RPC and ownership boundary
+
+- createSupabaseRuntime.callUserRpc rejects unallowlisted RPC names and rejects caller-supplied p_user_id; it injects the verified user UUID.
+- User-owned reads use the user-scoped client and explicit user_id filters in the inspected order-history/account paths; RLS remains an independent required boundary.
+- Worker/service-role operations are separate from user request RPC calls.
+- Do not add service-role data reads to ordinary user routes as a shortcut.
+
+### Confirmed gaps / required follow-up
+
+1. **No gateway-wide distributed rate limiting:** the only explicit route-level throttle confirmed in this file is the 5-second database-backed margin-preview slot. This is not a global limiter. Public /instruments, authentication attempts, candles, option chain, portfolio and order routes need a designed shared policy. No Redis/Upstash dependency or implementation is present in market-gateway/package.json.
+2. **Malformed JSON error contract — source fix committed:** CORS now runs before express.json; parser errors for malformed JSON and bodies over 32 KB receive safe JSON 400/413 responses with the already assigned request ID. The syntax-error log contains only request metadata and error class, not body or credentials. A regression assertion covers middleware order and response contracts; CI execution remains pending.
+3. **Error taxonomy:** sendError returns a request ID and safe structured failure log, but it does not consistently map Supabase/Postgres error codes to stable public API codes. callUserRpc currently normalizes RPC failures to generic 409 while retaining an internal code on the thrown error. Define a route-independent internal taxonomy and safe public mapping without leaking database/provider details.
+4. **Input schemas:** route handlers use a mix of explicit checks and ad-hoc coercion (String, Number, parseInt). Complete a route contract matrix for required fields, types, bounds, unknown fields, and stable 400/401/403/409/429/502/503 responses before introducing a shared validator.
+5. **OAuth/public endpoints:** preserve the callback's state/redirect validation and test replay, missing/expired state, mismatched redirect and provider error paths. Keep public instrument search output restricted to official instrument-master fields.
+6. **Pagination:** order-history routes reviewed use the existing composite descending keyset cursor and limit + 1 lookahead. Preserve this contract and add route-level tests for equal timestamps, malformed cursor, page boundary and user isolation; do not replace it with offset pagination.
+
+### No-activation reminder
+
+The repository deployment workflow contains a manual production deployment path that sets PAPER_LIMIT_WORKER_ENABLED=true. This review did not execute the workflow, deploy a service, change environment variables, or activate any worker/scheduler. Treat that workflow as a separate, explicitly gated release operation and do not run it during infrastructure audit work.
+
+### API audit status
+
+- Source-level review: complete for the route/authentication patterns and shared runtime helpers inspected.
+- Full request/response schema matrix and end-to-end authenticated route execution: pending.
+- Malformed JSON parser handling and source-level regression assertion: committed; CI execution pending.
+- No SQL, migration, RLS, RPC or shared database changes were made.
+
+## 15. Worker retry boundaries and cursor persistence review (2026-11-23)
+
+### Confirmed behavior
+
+- All five worker loops use a process-local `workerBusy` guard and bounded exponential backoff after cycle-level exceptions. The Delivery LIMIT loop caps backoff at 30 seconds; Intraday, Futures, Options and Protective loops cap at 60 seconds. These controls prevent overlap only inside one Node.js process; the database lease remains the cross-instance coordination boundary.
+- The lease heartbeat helper is imported and used by the SSE market-stream lifecycle, not by any of the five order/protective workers. Its unit tests prove helper behavior only; they do not prove order-worker renewal.
+- Intraday, Futures and Options workers advance their persisted keyset cursor to the last row in the scanned batch after processing, including when individual user batches or fill attempts have incremented `summary.failed`. A failed row is therefore retried only after the cursor wraps and the next scan starts from the beginning; it is not immediately retried on the next cycle.
+- The three cursor-based derivative/equity LIMIT workers reset the cursor when a scan after the current cursor returns no rows. Cursor writes and resets filter by both `state_key` and the current `lease_token`, so a stale token cannot overwrite a replacement owner's cursor.
+- The cursor update checks the PostgREST `error` field but does not request/verify an affected-row count. A zero-row update caused by a lost lease can therefore look like a successful save to the old worker. This does not itself overwrite the new cursor, but it does not stop the stale worker from continuing to attempt per-order execution RPCs.
+- The Protective worker uses `worker_checked_at` ordering rather than a persisted keyset cursor. It updates that timestamp after evaluation and attempts to rotate invalid or failed user batches. If the timestamp update itself fails for the first rows in the ordered batch, those rows can remain at the head of the scan and repeatedly consume the bounded batch, delaying later protective orders.
+- Per-user worker errors are caught and summarized; retries are scan-driven rather than backed by a durable attempt counter/dead-letter state. There is no general durable retry schedule, maximum-attempt policy or operator-visible poison-order queue in the inspected worker modules.
+
+### Reliability implications
+
+1. **Retry latency is scan-cycle dependent:** a transient provider/token/fill error can be delayed until a complete cursor wrap, particularly with a large pending-order population. This is not permanent loss, but it is not a prompt retry guarantee.
+2. **Lease-loss handling is incomplete at the worker layer:** token-guarded cursor writes protect persisted progress, but workers do not heartbeat and do not consistently detect a zero-row cursor update as lease loss before attempting more work.
+3. **Execution fencing remains a database contract:** worker-side lease ownership is not passed as a fencing token to the inspected fill/expiry RPC calls. Each RPC must independently lock/validate current order state and enforce idempotent, reservation-safe transitions. A stale worker must never be able to mutate a terminal order or double-apply a fill.
+4. **Protective scan fairness depends on successful rotation:** failed `worker_checked_at` writes can cause head-of-scan repetition. Add a deterministic test for this failure mode before claiming starvation resistance.
+5. **Cycle-level exponential backoff is not per-order retry policy:** it handles thrown cycle failures, but individual per-user errors are summarized and the cycle can still complete and advance its cursor.
+
+### Required follow-up (no implementation authorized by this audit)
+
+- Add a deterministic test where one row fails processing, later rows succeed, the cursor advances, and the failed row is retried after wrap; document the maximum expected retry delay under realistic pending-order volume.
+- Add tests where a cursor update returns no error but affects zero rows; treat this as lease loss and stop the stale worker before any subsequent execution RPC. Coordinate any needed PostgREST representation/count contract with Chat 7 if the database contract must change.
+- Add lease-expiry takeover and stale-worker tests that attempt both cursor persistence and execution after a replacement owner claims the key.
+- Add protective-worker tests where `worker_checked_at` updates fail repeatedly; ensure one bad row cannot permanently monopolize the bounded scan.
+- Define durable retry classification for transient provider/auth/network failures versus permanent validation/terminal-state failures. Avoid unbounded hot retries and do not retry an execution with a changed idempotency identity.
+- Evaluate a bounded per-order attempt/backoff or dead-letter mechanism only after agreeing its schema and RPC ownership with Chat 7. No migration is included here.
+
+**Decision:** source audit and documentation only. No worker implementation, lease RPC, cursor schema, SQL migration, environment setting, activation or deployment was changed.
+
+
+## 16. Reconciliation with open PR #93 lease-renewal work (2026-11-23)
+
+A follow-up review of PR #93's changed-file list and exact patches found additional work that is **not present in this audit branch snapshot**:
+
+- PR #93 proposes `supabase/migrations/20261123240000_paper_market_worker_lease_renewal.sql`, defining a service-role-only `renew_paper_market_worker_lease` RPC. It permits only registered worker state keys, requires the matching current token and an unexpired lease, bounds TTL to 5–300 seconds, and returns false for a non-owner/expired lease. This is a candidate PR migration, not proof that the migration is applied to any database.
+- PR #93 adds heartbeat integration to the Futures LIMIT worker at a 60-second interval against a 240-second lease. It checks the in-memory `leaseLost` flag at several boundaries and stops heartbeat in `finally`.
+- The PR #93 patch reviewed here changes the Futures worker only. The shared renewal RPC allowlist includes Equity Delivery, Equity Intraday, Protective, Futures and Options keys, but the other four workers in this audit branch do not thereby gain heartbeat integration.
+- PR #93's SQL regression patch tests active-owner renewal, non-owner rejection, expired-token non-resurrection, unsafe timestamp rejection, grants and the Options key namespace. It does not establish simultaneous renewal/expiry takeover behavior across all worker types.
+
+### Remaining PR #93 review risks
+
+1. **Renewal is not execution fencing:** Futures worker checks `leaseLost` before fill RPC calls, but a lease can be lost after the check and before or during the RPC. The execution RPC does not receive the lease token in the reviewed patch. A database-enforced fencing predicate or equivalent order-state/idempotency proof is still needed for the stale-owner race.
+2. **Heartbeat error is treated as lease loss:** this is appropriately fail-closed for further work, but the worker must reliably stop all outstanding concurrent user batches. The current `Promise.all` batches may already have in-flight work when the heartbeat reports loss.
+3. **Renewal uses caller-supplied time:** the SQL compares expiry to `p_now_ms`; confirm clock-skew assumptions or move authority to database time in a coordinated follow-up.
+4. **Cursor affected-row count remains unchecked:** token filtering prevents a stale cursor overwrite, but a zero-row update is not surfaced as lease loss by the worker.
+5. **Coverage is uneven:** a common RPC does not mean all worker implementations are renewed. Delivery, Intraday, Protective and Options still require separate heartbeat/loss handling or an explicit short-batch/lease-duration proof.
+
+### Branch and migration boundary
+
+- The renewal migration and Futures heartbeat integration are visible in PR #93's patch, but the corresponding files are absent from `feature/indian-market-backend-infra-supabase-2026-11-23` at this audit point.
+- Do not cherry-pick, merge, apply or deploy PR #93 as part of this audit. Chat 7 must confirm migration ordering and database state; the owning Futures/worker chat must review the heartbeat integration and its CI evidence.
+- This reconciliation corrects the broader repository-level picture: the earlier Section 14 statement that no renewal RPC was found describes the files in this audit branch, not the separate proposed PR #93 patch.
+
+**Decision:** reconciliation/documentation only. No PR #93 files were copied, no migration was applied, and no worker behavior or deployment setting was changed.
+
+
+## 17. Cross-chat worker heartbeat reconciliation (2026-11-24)
+
+This section supersedes the earlier point-in-time statement that none of the five order/protective workers used the heartbeat helper. That statement remains accurate for the older audit-branch snapshot, but the following isolated PR heads have since added worker-level renewal:
+
+- **Futures LIMIT (PR #93):** the latest PR description reports disposable PostgreSQL / full gateway validation passing through workflow run #1211. The worker imports the shared `createLeaseHeartbeat`, renews its own `paper_futures_limit_orders` lease every 60 seconds against the existing 240-second TTL, and stops subsequent work on renewal loss/error. This is still a Draft PR and its migration is not proof of hosted-schema application.
+- **Options LIMIT (PR #119):** the current branch `fix/options-limit-worker-lease-heartbeat-2026-11-24` imports the same helper and renews `paper_option_limit_orders` every 60 seconds against the 240-second TTL. It checks lease loss around instrument/cursor/session/quote and execution boundaries and suppresses cursor persistence after loss. PR #119's own description reports workflow run #1270 was interrupted during the full Node regression step and was being rerun; do not treat its full Node/SQL suite as passed until an exact-head successful run is recorded.
+- **Shared helper / migration:** both PRs intentionally use the same `createLeaseHeartbeat` implementation and renewal RPC contract. Integration must retain one canonical helper and one forward-only renewal migration with the complete approved worker-key allowlist. Do not apply both overlapping migration copies independently.
+- **Equity Delivery LIMIT, Equity Intraday LIMIT and Equity Protective:** the inspected PR #99 audit-branch snapshots still do not import/use the helper. The shared renewal RPC allowlist alone does not renew these workers. Their heartbeat integration, lease-loss handling and regressions remain outstanding.
+
+### Remaining cross-worker safety gaps
+
+1. A heartbeat is lease renewal, not a complete fencing guarantee. A worker may lose ownership after its last local check and before an execution RPC commits. Each side-effecting RPC must enforce order-state/idempotency invariants, and stale-owner execution must be explicitly tested. Any lease-token execution-fencing change is a shared database contract and requires Chat 7 approval.
+2. Renewal currently compares caller-supplied `p_now_ms` against stored expiry. Chat 7 must review whether database time should be authoritative and document the clock-skew bound before canonical migration approval.
+3. The Futures and Options PRs must be reconciled with the same current migration baseline, registered lease-key allowlist and shared helper before either is integrated. Confirm no duplicate function definitions, conflicting migration versions or grant widening.
+4. All five workers need explicit fault-injection coverage for renewal RPC error, ownership loss during provider wait, ownership loss during parallel user batches, cursor write returning zero affected rows, process crash and expiry takeover. Delivery/Intraday/Protective additionally need worker heartbeat integration or a tested, documented batch-duration bound below the lease TTL.
+5. Do not enable any worker or change production deployment settings as part of this work.
+
+### Updated status
+
+- Futures heartbeat implementation: present on PR #93 branch; PR description records successful run #1211.
+- Options heartbeat implementation: present on PR #119 branch; exact-head full regression status remains unconfirmed by its PR description.
+- Equity Delivery / Intraday / Protective heartbeat integration: outstanding.
+- Canonical shared migration integration and hosted migration verification: outstanding with Chat 7.
+- Stale-owner execution fencing and full five-worker crash-recovery confidence: outstanding.
+
+**Decision:** coordination/audit update only. No shared SQL, migration, worker runtime, feature flag, deployment, secret or production state was changed.
+
+
+## 18. HTTP request telemetry and trace correlation implementation (2026-11-24)
+
+Added an isolated, dependency-free HTTP telemetry helper and wired it into the Supabase-native Express gateway:
+
+- A validated W3C Trace Context version-00 `traceparent` is accepted for correlation; malformed, all-zero or unsupported-version values are ignored and a new trace ID is generated.
+- Each request receives a generated server span identifier and an `X-Trace-Id` response header. CORS allows the `traceparent` request header and exposes `X-Trace-Id` alongside the existing request/retry headers.
+- A single structured `http_server_request` record is emitted on response finish, or on premature close. It contains request/trace IDs, method, matched route template, status, duration, severity and outcome.
+- The logger deliberately excludes raw URL/path, query string, request/response headers, bearer tokens, body, user IDs and provider payloads. Unmatched paths are recorded only as the constant `unmatched` to avoid leaking path parameters.
+- When a valid Google Cloud project ID is configured through the standard project environment variables, the log includes the Cloud Logging trace resource field so request logs can be correlated with a trace ID.
+- Added focused tests for traceparent validation, correlation headers, duration/outcome records, duplicate finish/close suppression, aborted responses and sensitive-field exclusion. Added the helper to the gateway syntax-check command.
+
+### Scope and limitations
+
+This is **structured request telemetry and trace-context correlation**, not yet a complete distributed tracing or metrics backend. It does not create/export OpenTelemetry spans, propagate child context into Supabase/provider calls, expose Prometheus metrics, or configure Cloud Monitoring log-based metrics/alerts. Those require an agreed exporter/collector and operational configuration. The new code is on this PR branch; its exact-head CI result is pending. No production telemetry configuration or deployment was changed.
+
+
+## 19. Telemetry CI correction (2026-11-24)
+
+- The first workflow run after telemetry wiring was Run #1290, commit `f05e81e55e819e28b7fafe92069995317a438dcd`. It failed in the static gateway deployment-boundary test before the full Node suite or disposable PostgreSQL migration tests ran.
+- The failing assertion prohibited all `req.headers` access, which also prohibited the intentionally supported, strictly validated `traceparent` header. The helper reads only that one header (or Express's `req.get("traceparent")`) and does not log headers or sensitive values.
+- Corrected the assertion to prohibit raw URL/path and credential access while allowing the validated trace-context header. Added a regression test that malformed trace context is discarded and replaced by a fresh server-generated trace ID.
+- The corrected commits are on the PR #99 head. No subsequent workflow run is visible for the corrected head at the time of this update; do not mark CI passed. Re-run the full PR workflow on the corrected head and require all gateway Node and disposable PostgreSQL jobs to pass.
+
+
+## 20. Trace-header CORS regression correction (2026-11-24)
+
+The next PR workflow run (#1303, head commit `e1f8d4413253b5e5c2b0cdf936e9cd5ef833d680`) reached the gateway deployment-boundary tests and failed because two pre-existing CORS assertions still expected the older expose-header list. The gateway now correctly exposes both `X-Request-Id` and `X-Trace-Id`; the older assertions and middleware-order lookup were updated to the new exact header list. This was a test expectation mismatch, not a runtime CORS failure. The corrected test commit is `fdb2fb918c03119d9737dfb62b6610f2a3ce4ce9`. A successful exact-head full Node + disposable PostgreSQL run is still required; no test or migration result is inferred from this correction.
+
+
+## 21. Worker lease integration matrix on PR #99 head (2026-11-24)
+
+Re-inspected the actual worker source files on the current PR #99 head rather than inferring integration from the shared helper's presence. The helper `lib/lease-heartbeat.js` exists and has focused unit tests, but **none of the five order/protective workers imported or invoked it on this PR head** at this audit point:
+
+| Worker | Lease key | TTL | Heartbeat on PR #99 head |
+|---|---|---:|---|
+| Equity Delivery LIMIT | `paper_limit_orders` | 240 s | Missing |
+| Equity Intraday LIMIT | `paper_intraday_limit_orders` | 240 s | Missing |
+| Equity Protective | `paper_protective_orders` | 240 s | Missing |
+| NSE Futures LIMIT | `paper_futures_limit_orders` | 240 s | Missing on this PR head; separately proposed in PR #93 |
+| NSE Options LIMIT | `paper_option_limit_orders` | 240 s | Missing on this PR head; separately proposed in PR #119 |
+
+The Futures and Options work must be reviewed at its own PR head and reconciled at integration time; it must not be treated as already present in this infrastructure branch. The lease heartbeat helper alone does not protect a worker unless the worker starts it after a successful lease acquisition, stops it in every exit path, and checks lease-loss state before each irreversible RPC and cursor mutation.
+
+### Retry and recovery observations
+
+- The 240-second lease is a single-writer exclusion mechanism, not a durable job queue. A process crash waits for lease expiry and later reacquisition; there is no immediate crash notification.
+- Equity Intraday, Futures and Options workers use persistent scan cursors. A per-order transient failure can still be passed by the cursor and may not be retried until the scan wraps; this is eventual rescan behavior, not bounded retry scheduling.
+- Protective orders rotate through `worker_checked_at`, but transient provider/token failures are recorded as a checked attempt rather than a durable retry with backoff/attempt count.
+- The current worker status summaries and console warnings are not a durable dead-letter or operator-replay mechanism.
+- Cursor updates check for RPC/query errors and lease-token ownership, but a zero-row update must be distinguished from a successful write; affected-row verification and stale-owner SQL fencing remain required.
+
+### Safe next implementation boundary
+
+1. Reconcile the single renewal RPC and allowlist with Chat 7 and the current migration order before changing any database function or grant.
+2. Integrate worker-side heartbeat and a fail-closed `leaseLost` gate into every worker in isolated commits, with deterministic injected timers and renewal-loss tests.
+3. Add bounded retry/backoff metadata and an operator-visible dead-letter/replay workflow only after Chat 7 approves the schema/RPC ownership. Until then, do not add speculative tables or mutate shared migrations.
+4. Add real PostgreSQL tests for expiry takeover, two concurrent claimants, renew-after-expiry rejection, stale owner fill rejection, cursor update with zero affected rows, and crash/restart recovery.
+
+No worker runtime, SQL, migration, scheduler, feature flag or production configuration was changed by this matrix update.
+
+
+## 22. Backward-compatible public API error codes (2026-11-24)
+
+Added a small, database-independent public error taxonomy in `market-gateway/lib/api-error-contract.js` and wired it into the Supabase gateway's shared `sendError` response path.
+
+- Error responses retain the existing `error` and `requestId` fields and HTTP status; an additive `code` field now provides a stable status-derived identifier.
+- Known codes cover invalid request, unauthenticated, forbidden, not found, request timeout, conflict, payload too large, validation failed, rate limited, upstream error, service unavailable and upstream timeout. Unknown 5xx statuses map to `INTERNAL_ERROR`; unknown non-5xx statuses map to `REQUEST_FAILED`.
+- Raw PostgreSQL/PostgREST/provider error codes are deliberately not surfaced. Existing generic error text/fallback behavior and safe structured logging remain unchanged.
+- Added isolated mapping unit tests, gateway response-contract assertions and a syntax-check entry. No route-specific response body outside the shared error path was changed.
+- Exact-head full CI has not yet run for these commits. Keep this additive contract in Draft until the full gateway regression and disposable PostgreSQL workflow passes.
+
+
+## 23. Exact-head CI and cross-chat worker fencing gate (2026-11-24)
+
+### PR #99 exact-head verification
+
+- Full workflow Run #1341 (45365953617) completed successfully with **67/67 steps** on the exact current PR #99 head e775741b71c348c317a2c36570ed6333185ccab6.
+- This includes the new public API error-code helper, gateway wiring, unit/contract tests, complete market-gateway regression suite, production gateway image/dependency-boundary check and disposable PostgreSQL smoke tests.
+- The exact PR head remained unchanged at verification time. This supersedes the earlier pending- or stale-CI notes in Sections 18–22 for the PR #99 observability/error-contract changes.
+
+### Worker PRs: green CI is not execution-fence approval
+
+- The current Futures worker heartbeat PR #93 head fb7c253f9fa16ec05439bfb9eec8df80b6cfd199 has workflow Run #1337 (45365774901) completed successfully.
+- The current Options worker heartbeat PR #119 head 5503f6ee1f0eb22d8668e1723c38f8ea14638c6d has workflow Run #1344 (45366194880) completed successfully.
+- Chat 7's latest canonical-plan review identifies a critical remaining Options gap: the irreversible worker RPCs execute_paper_option_limit_fill and expire_paper_option_limit_order do not accept/validate the lease owner token. A worker can lose/expire its lease after the JavaScript heartbeat check but before the SQL transaction commits. Local leaseLost gates and cursor fencing do not close this time-of-check/time-of-use race.
+- Therefore, neither green worker PR workflow is sufficient to authorize integration or activation. The database must enforce worker key + matching owner token + unexpired lease inside the same transaction/lock boundary as the fill/expiry and account/ledger/position mutation. User-initiated cancellation must remain a separate authenticated user-scoped path.
+- Require two-session PostgreSQL takeover tests: pause the old owner after read, expire/reacquire with a new token, then prove old-owner fill/expiry attempts fail without changing cash, positions, reservations or ledger. Define database-authoritative time and zero-row cursor semantics.
+
+### Database deployment boundary
+
+- Chat 7's latest PR #116 review also records that sampled production service_role ACLs currently lack table privileges for gateway/worker objects, while proposed grant migrations remain unapplied. Treat service-role table operations as deployment-blocked until exact least-privilege grants are reviewed and tested; do not infer deployed readiness from disposable-database CI.
+- PR #116 remains Draft and documents migration reconciliation only. No shared migration/RPC contract has been approved for implementation in this branch.
+
+No SQL, worker execution RPC, lease schema, migration, service-role grant, feature flag or production configuration was changed by this status update.
+
+
+## 24. Parser failures use the same public error taxonomy (2026-11-24)
+
+Extended the shared stable API error-code contract to the Express JSON-parser rejection path, which executes before normal route handlers and therefore does not pass through `sendError`.
+
+- Oversized JSON bodies retain HTTP 413, the existing safe message and `requestId`, and now add `PAYLOAD_TOO_LARGE` through `publicErrorCode(413)`.
+- Malformed JSON retains HTTP 400, the existing safe message and `requestId`, and now adds `INVALID_REQUEST` through `publicErrorCode(400)`.
+- Existing parser-error logging remains unchanged and does not include raw body/parser messages.
+- Updated gateway deployment regression assertions to require the additive `code` field on both early-parser responses.
+- The previous exact-head Run #1341 validated the common error helper and normal `sendError` route path. This parser-path extension is a newer code change and requires a fresh full workflow before it is considered verified.
+
+No database, schema, migration, rate-limit or worker behavior changed.
