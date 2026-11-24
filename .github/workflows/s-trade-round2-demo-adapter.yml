@@ -29,6 +29,8 @@ jobs:
         run: node --check markets/stocks/mock-demo-adapter.js
       - name: Check demo dashboard script syntax
         run: node --check markets/stocks/demo.js
+      - name: Check market service worker syntax
+        run: node --check markets/service-worker.js
       - name: Run adapter and shared fixture tests
         working-directory: market-gateway
         run: node --test test/mock-demo-adapter.test.js test/demo-dashboard.test.js test/paper-mock-fixtures.test.js
