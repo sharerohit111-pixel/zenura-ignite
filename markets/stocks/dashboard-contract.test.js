@@ -52,3 +52,9 @@ test("mobile bottom navigation renders every requested destination", () => {
   assert.match(css, /grid-template-columns:repeat\(9,minmax\(62px,1fr\)\)/);
   for (const screen of ["positions","holdings","profile","settings"]) assert.ok(model.includes('"'+screen+'"'));
 });
+
+test("Markets install manifest remains valid JSON and keeps existing shortcuts", () => {
+  const manifest = JSON.parse(read("../manifest.webmanifest"));
+  assert.equal(manifest.name, "ZENURA IGNITE – Paper Trading");
+  assert.ok(manifest.shortcuts.some(item => item.url === "/markets/stocks/"));
+});
