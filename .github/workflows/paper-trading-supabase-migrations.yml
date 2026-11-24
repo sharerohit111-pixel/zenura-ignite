@@ -88,6 +88,7 @@ jobs:
           node --input-type=module --check < markets/stocks/supabase-client.js
           node --input-type=module --check < markets/stocks/connect.js
           node --input-type=module --check < markets/stocks/email-auth.js
+          node --test markets/stocks/email-auth.test.js
           node --input-type=module --check < markets/stocks/account-settings.js
           node --test markets/stocks/account-settings.test.js
           node --check markets/stocks/stocks.js
