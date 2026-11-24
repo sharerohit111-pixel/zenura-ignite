@@ -345,7 +345,7 @@ app.get("/paper/account",async(req,res)=>{
   }catch(error){sendError(res,error,"Paper account could not be loaded.");}
 });
 
-async async function ensureWatchlistInstrumentCache(keys){
+async function ensureWatchlistInstrumentCache(keys){
   const needsOfficial=(keys||[]).some(key=>!mockWatchlistCatalog.has(key));
   if(needsOfficial&&(!instrumentCache.length||Date.now()-instrumentCacheUpdatedAt>6*60*60*1000))await refreshInstrumentCache();
 }
