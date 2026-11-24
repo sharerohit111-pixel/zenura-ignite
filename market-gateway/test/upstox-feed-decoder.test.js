@@ -3,7 +3,7 @@ const test=require("node:test");
 const assert=require("node:assert/strict");
 const path=require("node:path");
 const protobuf=require("protobufjs");
-const {decodeFeedResponse}=require("../lib/upstox-feed-decoder");
+const {decodeFeedResponse,decodeAndNormalizeUpstoxFeedResponse}=require("../lib/upstox-feed-decoder");
 let FeedResponse;
 test("loads the checked-in Upstox v3 protobuf schema",async()=>{
  const root=await protobuf.load(path.join(__dirname,"..","proto","MarketDataFeedV3.proto"));
@@ -82,4 +82,26 @@ test("receives and decodes a binary feed frame over a local WebSocket server",as
  const result=await decoded;
  assert.equal(result.feeds["NSE_EQ|INE001A01036"].ltpc.ltp,250.25);
  assert.equal(result.currentTs,"1731931200123");
+});
+
+test("decodes binary Upstox frames directly into entitlement-bound provider snapshots",async()=>{
+ const root=await protobuf.load(path.join(__dirname,"..","proto","MarketDataFeedV3.proto"));
+ const Type=root.lookupType("com.upstox.marketdatafeederv3udapi.rpc.proto.FeedResponse");
+ const now=Date.parse("2026-11-24T04:30:00Z");
+ const key="NSE_EQ|INE001A01036";
+ const bytes=Type.encode(Type.create({
+  type:1,currentTs:String(now-100),
+  feeds:{[key]:{ltpc:{ltp:245.65,ltt:String(now-200),ltq:"12",cp:240.1}}}
+ })).finish();
+ const result=decodeAndNormalizeUpstoxFeedResponse(Type,bytes,{
+  now,maxAgeMs:15000,
+  instrumentMap:{[key]:{
+   nativeInstrumentKey:key,instrumentId:key,exchange:"NSE",
+   entitlementReference:"upstox-entitlement-test"
+  }}
+ });
+ assert.equal(result.length,1);
+ assert.equal(result[0].lastPricePaise,24565);
+ assert.equal(result[0].instrumentId,key);
+ assert.equal(result[0].entitlementReference,"upstox-entitlement-test");
 });
