@@ -15,15 +15,24 @@ const axePath=require.resolve("axe-core/axe.min.js");
   for(const viewport of [{width:1440,height:900,name:"desktop"},{width:390,height:844,name:"android-mobile"},{width:360,height:800,name:"small-mobile"}]){
    const context=await browser.newContext({viewport:{width:viewport.width,height:viewport.height},isMobile:viewport.width<500,hasTouch:viewport.width<500,serviceWorkers:"allow"});
    const page=await context.newPage();
-   const pageErrors=[];
+   const pageErrors=[],consoleErrors=[];
    page.on("pageerror",error=>pageErrors.push(error.message));
+   page.on("console",message=>{if(message.type()==="error")consoleErrors.push(message.text());});
    await page.goto("http://127.0.0.1:4173/markets/stocks/demo.html",{waitUntil:"domcontentloaded",timeout:30000});
    await page.waitForFunction(()=>document.querySelector("#demo-status")?.textContent.includes("4 canonical fixtures validated"),null,{timeout:10000});
+   await page.addScriptTag({path:axePath});
    assert.equal(await page.locator("#screen-nav button[data-screen]").count(),15,viewport.name+" screen count");
+   const firstNav=page.locator("#screen-nav button[data-screen=\"home\"]");await firstNav.focus();
+   assert.equal(await page.evaluate(()=>document.activeElement?.dataset.screen),"home",viewport.name+" keyboard focus reaches navigation");
+   await page.keyboard.press("Tab");assert.equal(await page.evaluate(()=>document.activeElement?.dataset.screen),"market",viewport.name+" Tab moves through screen navigation");
    for(const name of ["home","market","watchlists","charts","equity","futures","options","orders","trades","portfolio","positions","holdings","account","profile","settings"]){
     await page.locator('#screen-nav button[data-screen="'+name+'"]').click();
     await page.locator("#screen-content > .screen-title h2").waitFor();
     assert.ok(await page.locator("#screen-content > .screen-title h2").isVisible(),viewport.name+" "+name+" heading");
+    assert.equal(await page.locator("#screen-nav button[aria-current=\"page\"]").getAttribute("data-screen"),name,viewport.name+" active navigation semantics");
+    assert.ok((await page.locator("#screen-content .read-only").textContent())?.includes("MOCK"),viewport.name+" "+name+" visible MOCK identity");
+    const screenAxe=await page.evaluate(async()=>window.axe.run(document,{runOnly:{type:"tag",values:["wcag2a","wcag2aa","wcag21a","wcag21aa"]}}));
+    const seriousScreen=screenAxe.violations.filter(v=>v.impact==="critical"||v.impact==="serious");assert.equal(seriousScreen.length,0,viewport.name+" "+name+" serious/critical accessibility violations: "+seriousScreen.map(v=>v.id).join(","));
     const overflow=await page.evaluate(()=>document.documentElement.scrollWidth>window.innerWidth+1);
     assert.equal(overflow,false,viewport.name+" horizontal document overflow on "+name);
    }
@@ -45,6 +54,7 @@ const axePath=require.resolve("axe-core/axe.min.js");
     await page.locator('#screen-nav button[data-screen="charts"]').click();
     await page.locator('[data-demo-timeframe="1m"]').click();
     assert.ok(await page.locator('[data-demo-timeframe="1m"]').evaluate(node=>node.classList.contains("active")),"chart timeframe control");
+    assert.equal(await page.locator('[data-demo-timeframe="1m"]').getAttribute("aria-pressed"),"true","chart timeframe is exposed to assistive technology");
     await page.locator('[data-demo-chart-type="LINE"]').click();
     assert.ok(await page.locator('[data-demo-chart-type="LINE"]').evaluate(node=>node.classList.contains("active")),"chart style control");
 
@@ -75,6 +85,17 @@ const axePath=require.resolve("axe-core/axe.min.js");
    }
    await page.goto("http://127.0.0.1:4173/markets/stocks/demo.html",{waitUntil:"domcontentloaded",timeout:30000});
    await page.addScriptTag({path:axePath});
+   const toggle=page.locator("#language-toggle");
+   await toggle.click();assert.equal(await page.locator("html").getAttribute("lang"),"hi",viewport.name+" Hindi language metadata");
+   assert.equal(await page.locator("#screen-nav button[data-screen=\"home\"]").textContent(),"होम",viewport.name+" Hindi nav translation");
+   await toggle.click();assert.equal(await page.locator("html").getAttribute("lang"),"en",viewport.name+" English language metadata");
+   await page.locator("#screen-nav button[data-screen=\"charts\"]").click();
+   assert.equal(await page.locator("[data-demo-timeframe=\"5m\"]").getAttribute("aria-pressed"),"true",viewport.name+" selected chart timeframe state");
+   await page.locator("[data-demo-timeframe=\"1m\"]").click();
+   assert.equal(await page.locator("[data-demo-timeframe=\"1m\"]").getAttribute("aria-pressed"),"true",viewport.name+" chart control state");
+   await page.locator("#screen-nav button[data-screen=\"options\"]").click();
+   assert.ok(await page.locator(".catalog-results .table-wrap").count(),viewport.name+" option chain table region");
+   if(viewport.width<500){const controls=await page.locator(".catalog-controls select").evaluateAll(nodes=>nodes.every(node=>node.getBoundingClientRect().width>0));assert.equal(controls,true,viewport.name+" option-chain controls remain visible");}
    const axe=await page.evaluate(async()=>window.axe.run(document,{runOnly:{type:"tag",values:["wcag2a","wcag2aa","wcag21a","wcag21aa"]}}));
    const serious=axe.violations.filter(v=>v.impact==="critical"||v.impact==="serious");
    if(serious.length) console.error(JSON.stringify(serious.map(v=>({id:v.id,help:v.help,nodes:v.nodes.map(n=>({target:n.target,html:n.html,failureSummary:n.failureSummary}))}))));
@@ -87,7 +108,8 @@ const axePath=require.resolve("axe-core/axe.min.js");
    assert.ok(perf.domContentLoadedMs<8000,viewport.name+" DOMContentLoaded performance budget");
    assert.ok(perf.transferBytes<5*1024*1024,viewport.name+" transfer budget");
    assert.deepEqual(pageErrors,[],viewport.name+" browser errors");
-   console.log(JSON.stringify({viewport:viewport.name,screens:15,axeSeriousCritical:0,...perf}));
+   assert.deepEqual(consoleErrors,[],viewport.name+" console errors");
+   console.log(JSON.stringify({viewport:viewport.name,screens:15,perScreenAxe:true,keyboardNavigation:true,axeSeriousCritical:0,consoleErrors:0,...perf}));
    // Keep viewport contexts alive until browser.close() in finally. Closing an\n   // individual Chromium context here intermittently stalls CI after all checks\n   // have passed, preventing the PWA phase from starting.\n   console.log("Viewport QA complete; retaining context for final browser cleanup: "+viewport.name);
   }
 
