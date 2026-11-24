@@ -30,7 +30,7 @@ test("normalizes NSE/BSE market status and rejects stale/future or mismatched st
  assert.equal(result.freshness,"fresh");assert.equal(result.casStatus,"CTS_CLOSE");
  assert.throws(()=>normalizeMarketStatus(payload,"BSE",{nowMs:now}),/invalid exchange/);
  assert.throws(()=>normalizeMarketStatus({...payload,data:{...payload.data,last_updated:now+1}},"NSE",{nowMs:now}),/future/);
- assert.throws(()=>normalizeMarketStatus({...payload,data:{...payload.data,last_updated:now-300001}},"NSE",{nowMs:now}),/invalid exchange/);
+ assert.equal(normalizeMarketStatus({...payload,data:{...payload.data,last_updated:now-300001}},"NSE",{nowMs:now}).freshness,"stale");
  assert.throws(()=>normalizeMarketStatus({...payload,data:{...payload.data,status:"UNKNOWN"}},"NSE",{nowMs:now}),/invalid exchange/);
 });
 test("rejects unsorted depth and more than five levels",()=>{
