@@ -88,7 +88,7 @@ function render(){
  const screen=views[state.screen]?state.screen:"home";
  $("#screen-title").textContent=t(screen);
  $("#sidebar-nav").innerHTML=NAV_ITEMS.map(([id,label,icon])=>`<button data-screen="${id}" class="nav-item ${screen===id?"active":""}" ${screen===id?'aria-current="page"':""}><span class="nav-icon">${icon}</span><span>${t(id)}</span>${id==="orders"?'<i class="nav-count">2</i>':""}</button>`).join("");
- $("#mobile-nav").innerHTML=NAV_ITEMS.slice(0,5).map(([id,label,icon])=>`<button data-screen="${id}" class="${screen===id?"active":""}"><span>${icon}</span><small>${t(id)}</small></button>`).join("");
+ $("#mobile-nav").innerHTML=NAV_ITEMS.map(([id,label,icon])=>`<button data-screen="${id}" class="${screen===id?"active":""}"><span>${icon}</span><small>${t(id)}</small></button>`).join("");
  $("#view").innerHTML=views[screen]();
  document.body.dataset.theme=state.theme;
  $("#language-toggle").textContent=state.language==="en"?"हिन्दी":"English";
