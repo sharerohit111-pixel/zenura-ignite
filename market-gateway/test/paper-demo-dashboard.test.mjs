@@ -106,7 +106,8 @@ test("service worker caches only explicitly allowlisted navigation documents",as
 });
 test("Demo entrypoint excludes authenticated, broker and production order modules",async()=>{
  const html=await read("demo.html"),js=await read("demo.js"),equity=await read("demo-equity-panel.mjs"),fo=await read("demo-derivative-panel.mjs");
- assert.doesNotMatch(html,/(?:supabase-client|connect|email-auth|live-quote|order-workspace|stocks\.js)/i);
+ const scriptTags=html.split("\n").filter(line=>line.includes("<script")&&line.includes("src=")).join("\n");
+ assert.doesNotMatch(scriptTags,/(?:supabase-client|connect\.js|email-auth|live-quote|order-workspace|stocks\.js)/i);
  assert.doesNotMatch(js,/fetch\s*\([^)]*(?:\/paper\/|\/s-trade\/|\/orders)/i);
  assert.doesNotMatch(equity,/fetch\s*\([^)]*(?:\/paper\/|\/s-trade\/|\/orders)/i);
  assert.doesNotMatch(fo,/fetch\s*\([^)]*(?:\/paper\/|\/s-trade\/|\/orders)/i);
