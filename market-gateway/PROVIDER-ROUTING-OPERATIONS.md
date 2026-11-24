@@ -31,7 +31,7 @@ The server-only createDistributedProviderRateLimiter adapter calls this RPC, and
 
 **No provider quota policy is seeded or enabled by this migration.** Before enabling a provider, an operator must verify the actual provider account, plan, operation definitions, contractual limits and windows, then insert an enabled policy row using those exact values. Do not invent limits from examples or generic documentation.
 
-The in-memory ProviderRateLimitPolicy remains useful for isolated unit tests only. It is not the production quota authority. A retention job for old quota buckets should be added before high-volume production rollout and must preserve active windows.
+The in-memory ProviderRateLimitPolicy remains useful for isolated unit tests only. It is not the production quota authority. The server-only prune_market_data_provider_quota_buckets RPC provides bounded cleanup (maximum 10,000 rows per call), refuses cutoffs newer than 24 hours, and skips rows updated after the cutoff. Schedule it through an approved maintenance runner after deployment; no cron schedule is enabled by this migration. Monitor deleted-row counts and table growth.
 
 Honor provider Retry-After, documented daily/hourly/minute limits, WebSocket connection limits, instrument subscription caps, and plan entitlements. Do not retry non-idempotent broker orders automatically.
 
