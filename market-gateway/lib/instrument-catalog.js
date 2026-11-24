@@ -5,6 +5,11 @@ const VALID_KINDS=new Set(["all","equities","indices","futures","options"]);
 const VALID_EXCHANGES=new Set(["NSE","BSE"]);
 
 function catalogError(message){throw Object.assign(new Error(message),{status:400});}
+function isIsoDate(value){
+  if(typeof value!=="string"||! /^\d{4}-\d{2}-\d{2}$/.test(value))return false;
+  const date=new Date(value+"T00:00:00.000Z");
+  return !Number.isNaN(date.getTime())&&date.toISOString().slice(0,10)===value;
+}
 function filterAndRankInstrumentCatalog(items,options={}){
   if(!Array.isArray(items))throw new TypeError("Instrument catalog must be an array.");
   const kind=String(options.kind||"all").toLowerCase();
@@ -17,8 +22,8 @@ function filterAndRankInstrumentCatalog(items,options={}){
   const limit=options.limit===undefined?100:Number(options.limit);
   if(!VALID_KINDS.has(kind))catalogError("Unsupported instrument kind.");
   if(exchange&&!VALID_EXCHANGES.has(exchange))catalogError("Exchange must be NSE or BSE.");
-  if(expiry&&!/^\d{4}-\d{2}-\d{2}$/.test(expiry))catalogError("Expiry must use YYYY-MM-DD format.");
-  if(asOf&&!/^\d{4}-\d{2}-\d{2}$/.test(asOf))catalogError("As-of date must use YYYY-MM-DD format.");
+  if(expiry&&!isIsoDate(expiry))catalogError("Expiry must use YYYY-MM-DD format.");
+  if(asOf&&!isIsoDate(asOf))catalogError("As-of date must use YYYY-MM-DD format.");
   if(optionType&&!["CE","PE"].includes(optionType))catalogError("Option type must be CE or PE.");
   if(!Number.isInteger(limit)||limit<1||limit>100)catalogError("Limit must be between 1 and 100.");
   const minStrike=options.minStrike===undefined?null:Number(options.minStrike);
