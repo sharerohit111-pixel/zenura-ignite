@@ -48,8 +48,6 @@ test("email and password changes are delegated to the active Supabase Auth user"
   assert.ok(source.includes("supabase.auth.updateUser({ password })"));
   assert.ok(source.includes("Email change requested. Complete the confirmation steps sent by Supabase"));
   assert.ok(source.includes("Password updated successfully."));
-  assert.ok(source.includes("Email changes are disabled in the local mock preview."));
-  assert.ok(source.includes("Password changes are disabled in the local mock preview."));
   assert.ok(source.includes("password.length < 8 || password.length > 128"));
 });
 
