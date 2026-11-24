@@ -51,7 +51,7 @@ function normalizeMarketDepthQuote(payload,instrument,{nowMs=Date.now(),maxAgeMs
     volume:Number.isSafeInteger(quote.volume)&&quote.volume>=0?quote.volume:null
   });
 }
-const MARKET_STATUSES=new Set(["NORMAL_OPEN","NORMAL_CLOSE","PRE_OPEN_START","PRE_OPEN_END","PRE_OPEN_M_END","CLOSING_START","CLOSING_END"]);
+const MARKET_STATUSES=new Set(["NORMAL_OPEN","NORMAL_CLOSE","PRE_OPEN_START","PRE_OPEN_END","PRE_OPEN_M_END","CLOSING_START","CLOSING_END","CTS_CLOSE","CAS_LM_START","CAS_M_STOP","CAS_STOP"]);
 function normalizeMarketStatus(payload,exchange,{nowMs=Date.now(),maxAgeMs=300000}={}){
   const data=payload?.data;
   if(payload?.status!=="success"||!data||data.exchange!==exchange||!["NSE","BSE"].includes(exchange)
