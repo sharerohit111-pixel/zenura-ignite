@@ -52,11 +52,12 @@ test("sell fills close long positions and compute deterministic realized P&L",()
   const store=createDemoTradeHistoryStore({env:{NODE_ENV:"test"}});
   const buyOrder=store.submit(base({quantity:3,limitPricePaise:120000,idempotencyKey:"history-buy-0001"}));
   store.recordFill(fill(buyOrder.orderId,{fillId:"buy-fill-1",quantity:3,pricePaise:120000}));
-  const sellOrder=store.submit(base({side:"SELL",quantity:2,limitPricePaise:125000,idempotencyKey:"history-sell-001"}));
-  store.recordFill(fill(sellOrder.orderId,{fillId:"sell-fill-1",quantity:2,pricePaise:125000}));
+  const sellOrder=store.submit(base({side:"SELL",quantity:1,limitPricePaise:125000,idempotencyKey:"history-sell-001"}));
+  store.recordFill(fill(sellOrder.orderId,{fillId:"sell-fill-1",quantity:1,pricePaise:125000}));
   const p=store.snapshot().positions[0];
-  assert.equal(p.quantity,1);assert.equal(p.costBasisPaise,120000);assert.equal(p.realizedPnlPaise,10000);
-  assert.throws(()=>store.recordFill(fill(sellOrder.orderId,{fillId:"sell-fill-2",quantity:1,pricePaise:125000})),/DEMO_POSITION_SELL_EXCEEDS_LONG/);
+  assert.equal(p.quantity,2);assert.equal(p.costBasisPaise,240000);assert.equal(p.realizedPnlPaise,5000);
+  const oversell=store.submit(base({side:"SELL",quantity:2,limitPricePaise:125000,idempotencyKey:"history-sell-002"}));
+  assert.throws(()=>store.recordFill(fill(oversell.orderId,{fillId:"sell-fill-2",quantity:2,pricePaise:125000})),/DEMO_POSITION_SELL_EXCEEDS_LONG/);
 });
 
 test("event replay is deterministic and detached snapshots cannot mutate store",()=>{
