@@ -54,7 +54,7 @@ function createAuthHarness() {
     async dispatch(name, event = {}) {
       for (const callback of this.listeners[name] || []) await callback({ preventDefault() {}, ...event });
     }
-    append() {}
+    append(...children) { this.children = [...(this.children || []), ...children]; }
     focus() {}
     checkValidity() { return /^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$/.test(this.value); }
     reportValidity() { return true; }
@@ -88,15 +88,15 @@ function createAuthHarness() {
     document, location: { origin: "https://demo.example", pathname: "/markets/stocks/" },
     globalThis: { __test: { supabase: { auth } } }
   });
-  return { elements, calls, authListener };
+  return { elements, calls, authListener, form: card.children[0] };
 }
 
 test("auth module interactions call Supabase for registration, login, OAuth, recovery and logout", async () => {
-  const { elements, calls } = createAuthHarness();
+  const { elements, calls, form } = createAuthHarness();
   const email = elements.get("market-email"), password = elements.get("market-password");
   email.value = "trader@example.com"; password.value = "StrongPass123";
   await elements.get("email-create").dispatch("click");
-  await elements.get("email-sign-in").dispatch("click", { preventDefault() {} });
+  await form.dispatch("submit");
   assert.equal(calls[0][0], "signUp");
   assert.equal(calls[0][1].email, "trader@example.com");
   assert.equal(calls[0][1].options.emailRedirectTo, "https://demo.example/markets/stocks/");
