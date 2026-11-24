@@ -44,7 +44,7 @@ function normalizeAccount(account){
     if(!map||typeof map!=="object"||Array.isArray(map))fail("INVALID_EQUITY_DEMO_POSITIONS",409);
     for(const p of Object.values(map)){
       if(!p||!Number.isSafeInteger(p.quantity)||p.quantity<0||!Number.isSafeInteger(p.costBasisPaise)||p.costBasisPaise<0||
-        !Number.isSafeInteger(p.reservedQuantity||0)||(p.reservedQuantity||0)>p.quantity||
+        !Number.isSafeInteger(p.reservedQuantity||0)||(p.reservedQuantity||0)<0||(p.reservedQuantity||0)>p.quantity||
         (p.quantity===0&&p.costBasisPaise!==0))fail("INVALID_EQUITY_DEMO_POSITION",409);
     }
   }
