@@ -49,7 +49,7 @@
   function render(){
     if(!simulator)return;
     const snapshot=simulator.snapshot();ordersBody.textContent="";
-    if(!snapshot.orders.length){const row=document.createElement("tr"),td=cell(row,"No demo orders yet.");td.colSpan=9;ordersBody.append(row);}
+    if(!snapshot.orders.length){const row=document.createElement("tr"),td=cell(row,"No demo orders yet.");td.colSpan=10;ordersBody.append(row);}
     snapshot.orders.forEach(order=>{
       const row=document.createElement("tr");
       cell(row,order.orderId);cell(row,order.symbol);cell(row,order.side);cell(row,order.orderType);
