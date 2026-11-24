@@ -15,7 +15,7 @@ test("Demo execution is manual, synthetic and isolated from production routes",a
  const panel=await read("markets/stocks/demo-derivative-panel.mjs"),sw=await read("markets/service-worker.js"),gateway=await read("market-gateway/supabase-server.js");
  assert.match(panel,/DEMO DATA · MOCK/);
  assert.match(panel,/credentials:"omit"/);
- assert.match(panel,/processLimitFills/);
+ assert.match(panel,/processLimitFills/);\n assert.match(panel,/engine\\.cancel/);
  assert.match(panel,/engine\.cancel/);
  assert.match(sw,/stocks\/demo-derivative-panel\.mjs/);
  assert.doesNotMatch(gateway,/derivative-mock-simulator|paper-demo-adapter|paper-mock-fixtures/);
