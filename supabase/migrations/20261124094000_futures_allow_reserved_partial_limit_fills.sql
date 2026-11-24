@@ -50,13 +50,14 @@ begin
 
   -- A fill sequence > 1 is a continuation of the same previously accepted
   -- LIMIT order. Its opening margin was already reserved at submit time.
-  if v_risk.risk_status='UNKNOWN'
-     and tg_table_name='paper_futures_fills'
-     and new.fill_sequence>1
-     and new.allocated_margin_paise>0
-     and ((v_position.net_quantity>0 and v_side='BUY')
-       or (v_position.net_quantity<0 and v_side='SELL')) then
-    return new;
+  if tg_table_name='paper_futures_fills' then
+    if v_risk.risk_status='UNKNOWN'
+       and new.fill_sequence>1
+       and new.allocated_margin_paise>0
+       and ((v_position.net_quantity>0 and v_side='BUY')
+         or (v_position.net_quantity<0 and v_side='SELL')) then
+      return new;
+    end if;
   end if;
 
   if (v_position.net_quantity>0 and v_side='SELL')
