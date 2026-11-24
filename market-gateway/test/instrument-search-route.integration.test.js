@@ -40,7 +40,7 @@ test.before(async () => {
 test.after(async () => { if (server) await new Promise(resolve => server.close(resolve)); });
 
 test("GET /instruments ranks exact equity symbols before prefixes and substring matches", async () => {
-  const response = await fetch(baseUrl + "/instruments?kind=equities&q=tcs&limit=10");
+  const response = await fetch(baseUrl + "/instruments?kind=equities&exchange=NSE&q=tcs&limit=10");
   const body = await response.json();
   assert.equal(response.status, 200);
   assert.deepEqual(body.results.map(x => x.instrument_key), ["NSE_EQ|TCS", "NSE_EQ|TCSIND", "NSE_EQ|XTCS"]);
