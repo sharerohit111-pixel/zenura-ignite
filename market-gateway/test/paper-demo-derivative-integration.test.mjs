@@ -17,6 +17,9 @@ test("Futures and Options Demo screens mount the shared local simulator", async 
   assert.match(html, /derivative-position\.js/);
   assert.match(html, /derivative-mock-simulator\.js/);
   assert.match(panel, /createDerivativeMockSimulator/);
+  const positionHelper=await read("market-gateway/lib/derivative-position.js");
+  assert.match(positionHelper,/root\.ZENURA_DERIVATIVE_POSITION=api/);
+  assert.match(positionHelper,/typeof module==="object"&&module\.exports/);
 });
 
 test("Demo execution is manual, synthetic and isolated from production routes", async () => {
