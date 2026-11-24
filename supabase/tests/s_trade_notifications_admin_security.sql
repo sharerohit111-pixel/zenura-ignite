@@ -7,6 +7,26 @@ ON CONFLICT(id) DO NOTHING;
 INSERT INTO public.s_trade_notification_preferences(user_id,trade_confirmations,order_alerts,price_alerts)
 VALUES ('12121212-1212-4212-8212-121212121212',true,false,true)
 ON CONFLICT(user_id) DO UPDATE SET trade_confirmations=true,order_alerts=false,price_alerts=true;
+INSERT INTO public.s_trade_price_alerts(user_id,instrument_key,display_symbol,condition,target_price)
+VALUES ('12121212-1212-4212-8212-121212121212','NSE_EQ|INE001','TEST','above',100),
+       ('34343434-3434-4434-8434-343434343434','NSE_EQ|INE002','OTHER','below',50);
+INSERT INTO public.s_trade_price_alerts(user_id,instrument_key,display_symbol,condition,target_price)
+SELECT '12121212-1212-4212-8212-121212121212','NSE_EQ|CAP'||g,'CAP'||g,'above',10
+  FROM generate_series(1,49) AS g;
+DO $quota$
+BEGIN
+  IF (SELECT count(*) FROM public.s_trade_price_alerts
+       WHERE user_id='12121212-1212-4212-8212-121212121212' AND active)<>50 THEN
+    RAISE EXCEPTION 'Price alert quota fixture did not create 50 active alerts';
+  END IF;
+  BEGIN
+    INSERT INTO public.s_trade_price_alerts(user_id,instrument_key,display_symbol,condition,target_price)
+    VALUES ('12121212-1212-4212-8212-121212121212','NSE_EQ|CAP51','CAP51','above',10);
+    RAISE EXCEPTION '51st active price alert unexpectedly succeeded';
+  EXCEPTION WHEN check_violation THEN NULL;
+  END;
+END;
+$quota$;
 INSERT INTO public.paper_orders(
  order_id,user_id,request_fingerprint,instrument_key,side,product,order_type,status,quantity
 ) VALUES
@@ -38,27 +58,13 @@ BEGIN
   IF has_table_privilege(current_user,'public.s_trade_provider_health','SELECT') THEN
     RAISE EXCEPTION 'Authenticated role can read internal provider health';
   END IF;
-  INSERT INTO public.s_trade_price_alerts(user_id,instrument_key,display_symbol,condition,target_price)
-  VALUES ('12121212-1212-4212-8212-121212121212','NSE_EQ|INE001','TEST','above',100);
-  INSERT INTO public.s_trade_price_alerts(user_id,instrument_key,display_symbol,condition,target_price)
-  SELECT '12121212-1212-4212-8212-121212121212','NSE_EQ|CAP'||g,'CAP'||g,'above',10
-    FROM generate_series(1,49) AS g;
-  IF (SELECT count(*) FROM public.s_trade_price_alerts
-       WHERE user_id='12121212-1212-4212-8212-121212121212' AND active)<>50 THEN
-    RAISE EXCEPTION 'Price alert quota fixture did not create 50 active alerts';
+  SELECT count(*) INTO v_count FROM public.s_trade_price_alerts;
+  IF v_count<>50 THEN RAISE EXCEPTION 'Price-alert tenant isolation failed: visible rows=%',v_count; END IF;
+  IF has_table_privilege(current_user,'public.s_trade_price_alerts','INSERT')
+     OR has_table_privilege(current_user,'public.s_trade_price_alerts','UPDATE')
+     OR has_table_privilege(current_user,'public.s_trade_price_alerts','DELETE') THEN
+    RAISE EXCEPTION 'Authenticated role can bypass the rate-limited price-alert gateway';
   END IF;
-  BEGIN
-    INSERT INTO public.s_trade_price_alerts(user_id,instrument_key,display_symbol,condition,target_price)
-    VALUES ('12121212-1212-4212-8212-121212121212','NSE_EQ|CAP51','CAP51','above',10);
-    RAISE EXCEPTION '51st active price alert unexpectedly succeeded';
-  EXCEPTION WHEN check_violation THEN NULL;
-  END;
-  BEGIN
-    INSERT INTO public.s_trade_price_alerts(user_id,instrument_key,display_symbol,condition,target_price)
-    VALUES ('34343434-3434-4434-8434-343434343434','NSE_EQ|INE002','OTHER','below',50);
-    RAISE EXCEPTION 'Cross-tenant price alert insert unexpectedly succeeded';
-  EXCEPTION WHEN insufficient_privilege THEN NULL;
-  END;
 END;
 $security$;
 RESET ROLE;
