@@ -133,4 +133,6 @@ function createDemoTradeHistoryStore(options = {}) {
   }
   return Object.freeze({submit,recordFill,cancel,snapshot,replay,exportEvents:()=>clone(events)});
 }
-module.exports = {createDemoTradeHistoryStore};
+const api = {createDemoTradeHistoryStore};
+if (typeof module === "object" && module.exports) module.exports = api;
+if (typeof window !== "undefined") window.ZenuraDemoTradeHistory = api;
