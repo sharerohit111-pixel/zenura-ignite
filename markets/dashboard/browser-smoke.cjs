@@ -60,7 +60,8 @@ const server = http.createServer((req, res) => {
     await page.locator('#sidebar-nav [data-screen="watchlist"]').click();
     assert.ok((await page.locator("#view").innerText()).includes("SBIN"));
     await page.locator('.watch-toggle[data-symbol="SBIN"]').click();
-    assert.ok((await page.locator("#view").innerText()).includes("watchlist is empty"));
+    assert.equal(await page.locator('.watch-toggle[data-symbol="SBIN"]').count(), 0, "removed symbol must no longer be in the watchlist");
+    assert.equal(await page.locator(".empty-state").count(), 1, "empty watchlist state should be shown after removing its last item");
 
     await page.locator('#sidebar-nav [data-screen="orders"]').click();
     await page.locator('[data-order-filter="PENDING"]').click();
