@@ -446,3 +446,27 @@ Added a small, database-independent public error taxonomy in `market-gateway/lib
 - Raw PostgreSQL/PostgREST/provider error codes are deliberately not surfaced. Existing generic error text/fallback behavior and safe structured logging remain unchanged.
 - Added isolated mapping unit tests, gateway response-contract assertions and a syntax-check entry. No route-specific response body outside the shared error path was changed.
 - Exact-head full CI has not yet run for these commits. Keep this additive contract in Draft until the full gateway regression and disposable PostgreSQL workflow passes.
+
+
+## 23. Exact-head CI and cross-chat worker fencing gate (2026-11-24)
+
+### PR #99 exact-head verification
+
+- Full workflow Run #1341 (45365953617) completed successfully with **67/67 steps** on the exact current PR #99 head e775741b71c348c317a2c36570ed6333185ccab6.
+- This includes the new public API error-code helper, gateway wiring, unit/contract tests, complete market-gateway regression suite, production gateway image/dependency-boundary check and disposable PostgreSQL smoke tests.
+- The exact PR head remained unchanged at verification time. This supersedes the earlier pending- or stale-CI notes in Sections 18–22 for the PR #99 observability/error-contract changes.
+
+### Worker PRs: green CI is not execution-fence approval
+
+- The current Futures worker heartbeat PR #93 head fb7c253f9fa16ec05439bfb9eec8df80b6cfd199 has workflow Run #1337 (45365774901) completed successfully.
+- The current Options worker heartbeat PR #119 head 5503f6ee1f0eb22d8668e1723c38f8ea14638c6d has workflow Run #1344 (45366194880) completed successfully.
+- Chat 7's latest canonical-plan review identifies a critical remaining Options gap: the irreversible worker RPCs execute_paper_option_limit_fill and expire_paper_option_limit_order do not accept/validate the lease owner token. A worker can lose/expire its lease after the JavaScript heartbeat check but before the SQL transaction commits. Local leaseLost gates and cursor fencing do not close this time-of-check/time-of-use race.
+- Therefore, neither green worker PR workflow is sufficient to authorize integration or activation. The database must enforce worker key + matching owner token + unexpired lease inside the same transaction/lock boundary as the fill/expiry and account/ledger/position mutation. User-initiated cancellation must remain a separate authenticated user-scoped path.
+- Require two-session PostgreSQL takeover tests: pause the old owner after read, expire/reacquire with a new token, then prove old-owner fill/expiry attempts fail without changing cash, positions, reservations or ledger. Define database-authoritative time and zero-row cursor semantics.
+
+### Database deployment boundary
+
+- Chat 7's latest PR #116 review also records that sampled production service_role ACLs currently lack table privileges for gateway/worker objects, while proposed grant migrations remain unapplied. Treat service-role table operations as deployment-blocked until exact least-privilege grants are reviewed and tested; do not infer deployed readiness from disposable-database CI.
+- PR #116 remains Draft and documents migration reconciliation only. No shared migration/RPC contract has been approved for implementation in this branch.
+
+No SQL, worker execution RPC, lease schema, migration, service-role grant, feature flag or production configuration was changed by this status update.
