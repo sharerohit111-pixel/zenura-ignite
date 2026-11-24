@@ -5,6 +5,8 @@ on:
     branches: ["main"]
     paths:
       - "markets/stocks/**"
+      - "markets/dashboard/**"
+      - "markets/index.html"
       - "crypto/index.html"
       - "index.html"
       - "admin.html"
@@ -111,6 +113,11 @@ jobs:
           NODE
       - name: Check browser module syntax
         run: node --check markets/stocks/stocks.js
+      - name: Check and test S-TRADE dummy dashboard
+        run: |
+          node --input-type=module --check < markets/dashboard/dashboard.js
+          node --input-type=module --check < markets/dashboard/dashboard-model.js
+          node --test markets/stocks/dashboard-contract.test.js markets/dashboard/dashboard-model.test.js
       - name: Check chart theme module syntax
         run: node --check markets/stocks/chart-theme.js
       - name: Check SSE parser syntax
