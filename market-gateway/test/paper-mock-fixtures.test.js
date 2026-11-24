@@ -2,7 +2,7 @@
 
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { createMockFixtureStore } = require("../mock/paper-mock-fixtures");
+const { createMockFixtureStore } = require("../lib/paper-mock-fixtures");
 
 test("all published mock fixtures use the shared simulated envelope", () => {
   const store = createMockFixtureStore({ env: { NODE_ENV: "test" } });
