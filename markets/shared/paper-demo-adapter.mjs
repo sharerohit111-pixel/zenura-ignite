@@ -13,7 +13,6 @@ function deepFreeze(value) {
   }
   return value;
 }
-
 function assertEnvelope(value, name) {
   if (!isObject(value) || value.schemaVersion !== ENVELOPE_VERSION ||
       value.mode !== "MOCK" || value.simulated !== true ||
@@ -29,9 +28,7 @@ function assertMockInstrument(instrumentKey, symbol) {
 }
 function assertOrder(order, name) {
   if (!isObject(order) || typeof order.orderId !== "string" || !order.orderId ||
-      !SIDES.has(order.side) || !ORDER_TYPES.has(order.orderType) || !ORDER_STATUSES.has(order.status)) {
-    fail("INVALID_MOCK_ORDER:" + name);
-  }
+      !SIDES.has(order.side) || !ORDER_TYPES.has(order.orderType) || !ORDER_STATUSES.has(order.status)) fail("INVALID_MOCK_ORDER:" + name);
   if (order.quantity !== undefined && (!Number.isSafeInteger(order.quantity) || order.quantity < 1)) fail("INVALID_MOCK_ORDER_QUANTITY:" + name);
   if (order.lots !== undefined && (!Number.isSafeInteger(order.lots) || order.lots < 1)) fail("INVALID_MOCK_ORDER_LOTS:" + name);
   if (order.quantity === undefined && order.lots === undefined) fail("MOCK_ORDER_SIZE_REQUIRED:" + name);
@@ -39,6 +36,22 @@ function assertOrder(order, name) {
     const minimum = field === "limitPricePaise" ? 1 : 0;
     if (order[field] !== undefined && (!Number.isSafeInteger(order[field]) || order[field] < minimum)) fail("INVALID_MOCK_ORDER_MONEY:" + name + ":" + field);
   }
+}
+function validDate(value) {
+  return typeof value === "string" && /^\\d{4}-\\d{2}-\\d{2}$/.test(value) &&
+    !Number.isNaN(Date.parse(value + "T00:00:00Z")) && new Date(value + "T00:00:00Z").toISOString().slice(0, 10) === value;
+}
+function searchScore(item, query) {
+  const symbol = String(item.symbol || "").toLowerCase();
+  const underlying = String(item.underlying || "").toLowerCase();
+  const key = String(item.instrumentKey || "").toLowerCase();
+  if (symbol === query) return 0;
+  if (symbol.startsWith(query)) return 1;
+  if (underlying === query) return 2;
+  if (underlying.startsWith(query)) return 3;
+  if (symbol.includes(query)) return 4;
+  if (underlying.includes(query) || key.includes(query)) return 5;
+  return Number.POSITIVE_INFINITY;
 }
 
 /** Pure browser-safe adapter. Explicit non-production DEMO opt-in is mandatory. */
@@ -53,12 +66,27 @@ export function createPaperDemoViewModel(fixtures, options = {}) {
   const derivatives = assertEnvelope(fixtures.derivatives, "derivatives");
 
   if (!Array.isArray(market.quotes) || market.quotes.length === 0) fail("MOCK_MARKET_QUOTES_REQUIRED");
-  for (const quote of market.quotes) {
+  const instrumentKeys = new Set();
+  const instruments = market.quotes.map(quote => {
     if (!isObject(quote) || quote.provider !== "MOCK" || quote.stale !== false ||
         !Number.isSafeInteger(quote.lastPricePaise) || quote.lastPricePaise <= 0 ||
         !Number.isFinite(Date.parse(quote.timestamp))) fail("INVALID_SYNTHETIC_QUOTE");
     assertMockInstrument(quote.instrumentKey, quote.symbol);
-  }
+    const [, exchange, segment] = quote.instrumentKey.split("|");
+    if (!["NSE", "BSE"].includes(exchange) || !["EQ", "INDEX"].includes(segment) || instrumentKeys.has(quote.instrumentKey)) fail("INVALID_OR_DUPLICATE_MOCK_MARKET_INSTRUMENT");
+    instrumentKeys.add(quote.instrumentKey);
+    return {
+      instrumentKey: quote.instrumentKey, symbol: quote.symbol, exchange,
+      assetClass: segment === "INDEX" ? "INDEX" : "EQUITY",
+      underlying: quote.symbol, expiry: null, optionType: null, strikePaise: null,
+      lotSize: null, tickSizePaise: null, lastPricePaise: quote.lastPricePaise,
+      changePaise: Number.isSafeInteger(quote.changePaise) ? quote.changePaise : 0,
+      volume: Number.isSafeInteger(quote.volume) ? quote.volume : 0,
+      bidPricePaise: null, askPricePaise: null, bidQuantity: null, askQuantity: null,
+      timestamp: quote.timestamp, stale: false, simulated: true
+    };
+  });
+
   if (!isObject(market.depth) || !Array.isArray(market.depth.bids) || !Array.isArray(market.depth.asks)) fail("INVALID_SYNTHETIC_DEPTH");
   const depthQuote = market.quotes.find(quote => quote.instrumentKey === market.depth.instrumentKey);
   if (!depthQuote) fail("UNKNOWN_SYNTHETIC_DEPTH_INSTRUMENT");
@@ -86,21 +114,49 @@ export function createPaperDemoViewModel(fixtures, options = {}) {
   assertOrder(derivatives.futures.order, "futures");
   if (!["CE", "PE"].includes(derivatives.options.optionType)) fail("INVALID_MOCK_OPTION_TYPE");
   assertMockInstrument(derivatives.options.instrumentKey, "MOCK" + derivatives.options.optionType);
-  if (typeof derivatives.options.underlying !== "string" || !/^MOCK[A-Z0-9-]*$/.test(derivatives.options.underlying)) fail("NON_SYNTHETIC_OPTION_UNDERLYING");
   assertOrder(derivatives.options.order, "options");
 
-  const instruments = market.quotes.map(quote => {
-    const [, exchange, segment] = quote.instrumentKey.split("|");
-    if (!["NSE", "BSE"].includes(exchange)) fail("INVALID_MOCK_EXCHANGE");
-    return {
-      instrumentKey: quote.instrumentKey, symbol: quote.symbol, exchange,
-      assetClass: segment === "FUT" ? "FUTURE" : segment === "OPT" ? "OPTION" : "EQUITY",
-      lastPricePaise: quote.lastPricePaise,
-      changePaise: Number.isSafeInteger(quote.changePaise) ? quote.changePaise : 0,
-      volume: Number.isSafeInteger(quote.volume) ? quote.volume : 0,
+  if (!Array.isArray(derivatives.contracts) || derivatives.contracts.length === 0 ||
+      !Array.isArray(derivatives.quotes) || derivatives.quotes.length !== derivatives.contracts.length) fail("MOCK_DERIVATIVE_CATALOG_REQUIRED");
+  const derivativeQuotes = new Map();
+  for (const quote of derivatives.quotes) {
+    if (!isObject(quote) || quote.provider !== "MOCK" || quote.stale !== false ||
+        !Number.isSafeInteger(quote.bidPricePaise) || quote.bidPricePaise <= 0 ||
+        !Number.isSafeInteger(quote.askPricePaise) || quote.askPricePaise < quote.bidPricePaise ||
+        !Number.isSafeInteger(quote.bidQuantity) || quote.bidQuantity < 0 ||
+        !Number.isSafeInteger(quote.askQuantity) || quote.askQuantity < 0 ||
+        !Number.isFinite(Date.parse(quote.timestamp)) || derivativeQuotes.has(quote.instrumentKey)) fail("INVALID_MOCK_DERIVATIVE_QUOTE");
+    derivativeQuotes.set(quote.instrumentKey, quote);
+  }
+  for (const contract of derivatives.contracts) {
+    if (!isObject(contract) || !["NSE", "BSE"].includes(contract.exchange) ||
+        !["FUTURE", "OPTION"].includes(contract.assetClass) || !validDate(contract.expiry) ||
+        !Number.isSafeInteger(contract.lotSize) || contract.lotSize < 1 ||
+        !Number.isSafeInteger(contract.tickSizePaise) || contract.tickSizePaise < 1) fail("INVALID_MOCK_DERIVATIVE_CONTRACT");
+    assertMockInstrument(contract.instrumentKey, contract.symbol);
+    if (instrumentKeys.has(contract.instrumentKey)) fail("DUPLICATE_MOCK_INSTRUMENT_KEY");
+    instrumentKeys.add(contract.instrumentKey);
+    if (typeof contract.underlying !== "string" || !/^MOCK[A-Z0-9-]*$/.test(contract.underlying)) fail("INVALID_MOCK_UNDERLYING");
+    if (contract.assetClass === "OPTION" &&
+        (!["CE", "PE"].includes(contract.optionType) || !Number.isSafeInteger(contract.strikePaise) || contract.strikePaise < 1)) fail("INVALID_MOCK_OPTION_CONTRACT");
+    if (contract.assetClass === "FUTURE" && (contract.optionType !== undefined || contract.strikePaise !== undefined)) fail("INVALID_MOCK_FUTURE_CONTRACT");
+    const quote = derivativeQuotes.get(contract.instrumentKey);
+    if (!quote) fail("MISSING_MOCK_DERIVATIVE_QUOTE");
+    const [, keyExchange] = contract.instrumentKey.split("|");
+    if (keyExchange !== contract.exchange) fail("MOCK_CONTRACT_EXCHANGE_MISMATCH");
+    instruments.push({
+      instrumentKey: contract.instrumentKey, symbol: contract.symbol, exchange: contract.exchange,
+      assetClass: contract.assetClass, underlying: contract.underlying, expiry: contract.expiry,
+      optionType: contract.optionType || null, strikePaise: contract.strikePaise ?? null,
+      lotSize: contract.lotSize, tickSizePaise: contract.tickSizePaise,
+      lastPricePaise: Math.round((quote.bidPricePaise + quote.askPricePaise) / 2),
+      changePaise: 0, volume: 0, bidPricePaise: quote.bidPricePaise, askPricePaise: quote.askPricePaise,
+      bidQuantity: quote.bidQuantity, askQuantity: quote.askQuantity,
       timestamp: quote.timestamp, stale: quote.stale, simulated: true
-    };
-  });
+    });
+  }
+  if (derivativeQuotes.size !== derivatives.contracts.length) fail("ORPHAN_MOCK_DERIVATIVE_QUOTE");
+
   const orders = [
     {assetClass:"EQUITY",instrumentKey:equity.instrumentKey,...clone(equity.order)},
     {assetClass:"FUTURE",instrumentKey:derivatives.futures.instrumentKey,...clone(derivatives.futures.order)},
@@ -118,8 +174,58 @@ export function createPaperDemoViewModel(fixtures, options = {}) {
     account:Object.freeze(clone(account)),
     orders:Object.freeze(orders),
     positions:Object.freeze(positions),
-    derivatives:Object.freeze({futures:clone(derivatives.futures),options:clone(derivatives.options)})
+    derivatives:Object.freeze({futures:clone(derivatives.futures),options:clone(derivatives.options),contracts:clone(derivatives.contracts),quotes:clone(derivatives.quotes)})
   });
+}
+
+export function searchPaperDemoInstruments(model, filters = {}) {
+  if (!isPaperDemoViewModel(model)) fail("INVALID_PAPER_DEMO_VIEW_MODEL");
+  const query = String(filters.query || "").trim().toLowerCase().slice(0, 60);
+  const exchange = String(filters.exchange || "").toUpperCase();
+  const assetClass = String(filters.assetClass || "").toUpperCase();
+  const underlying = String(filters.underlying || "").toUpperCase();
+  const expiry = filters.expiry ? String(filters.expiry) : "";
+  const optionType = String(filters.optionType || "").toUpperCase();
+  const strikePaise = filters.strikePaise === undefined || filters.strikePaise === "" ? null : Number(filters.strikePaise);
+  const allowedClasses = new Set(["EQUITY", "INDEX", "FUTURE", "OPTION"]);
+  if (exchange && !["NSE", "BSE"].includes(exchange)) fail("INVALID_DEMO_EXCHANGE_FILTER");
+  if (assetClass && !allowedClasses.has(assetClass)) fail("INVALID_DEMO_ASSET_FILTER");
+  if (optionType && !["CE", "PE"].includes(optionType)) fail("INVALID_DEMO_OPTION_TYPE_FILTER");
+  if (expiry && !validDate(expiry)) fail("INVALID_DEMO_EXPIRY_FILTER");
+  if (strikePaise !== null && (!Number.isSafeInteger(strikePaise) || strikePaise < 1)) fail("INVALID_DEMO_STRIKE_FILTER");
+  const matches = model.market.instruments.filter(item =>
+    (!exchange || item.exchange === exchange) &&
+    (!assetClass || item.assetClass === assetClass) &&
+    (!underlying || item.underlying === underlying) &&
+    (!expiry || item.expiry === expiry) &&
+    (!optionType || item.optionType === optionType) &&
+    (strikePaise === null || item.strikePaise === strikePaise) &&
+    (!query || Number.isFinite(searchScore(item, query)))
+  );
+  if (!query) return matches.slice();
+  return matches.map((item,index)=>({item,index,score:searchScore(item,query)}))
+    .sort((a,b)=>a.score-b.score||a.item.symbol.localeCompare(b.item.symbol)||a.item.instrumentKey.localeCompare(b.item.instrumentKey)||a.index-b.index)
+    .map(x=>x.item);
+}
+export function getPaperDemoExpiries(model, {underlying, assetClass = "OPTION", exchange = ""} = {}) {
+  if (!isPaperDemoViewModel(model)) fail("INVALID_PAPER_DEMO_VIEW_MODEL");
+  const u = String(underlying || "").toUpperCase(), kind = String(assetClass || "").toUpperCase(), ex = String(exchange || "").toUpperCase();
+  if (!u || !["OPTION", "FUTURE"].includes(kind) || (ex && !["NSE", "BSE"].includes(ex))) fail("INVALID_DEMO_EXPIRY_QUERY");
+  return [...new Set(model.market.instruments.filter(item => item.underlying === u && item.assetClass === kind && (!ex || item.exchange === ex)).map(item => item.expiry).filter(Boolean))].sort();
+}
+export function getPaperDemoOptionChain(model, {underlying, expiry, strikePaise, optionType, exchange = ""} = {}) {
+  if (!isPaperDemoViewModel(model)) fail("INVALID_PAPER_DEMO_VIEW_MODEL");
+  const u = String(underlying || "").toUpperCase(), ex = String(exchange || "").toUpperCase();
+  if (!u || !validDate(expiry) || (ex && !["NSE", "BSE"].includes(ex)) || (optionType && !["CE", "PE"].includes(optionType))) fail("INVALID_DEMO_OPTION_CHAIN_QUERY");
+  const rows = model.market.instruments.filter(item => item.assetClass === "OPTION" && item.underlying === u &&
+    item.expiry === expiry && (!ex || item.exchange === ex) && (!optionType || item.optionType === optionType) &&
+    (strikePaise === undefined || item.strikePaise === Number(strikePaise)));
+  const strikes = [...new Set(rows.map(item => item.strikePaise))].sort((a,b)=>a-b);
+  return strikes.map(strike => ({
+    strikePaise: strike,
+    CE: rows.find(item => item.strikePaise === strike && item.optionType === "CE") || null,
+    PE: rows.find(item => item.strikePaise === strike && item.optionType === "PE") || null
+  }));
 }
 export function isPaperDemoViewModel(value) {
   return isObject(value) && value.meta?.provider === "DUMMY_JSON" &&
