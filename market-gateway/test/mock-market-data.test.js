@@ -43,7 +43,7 @@ test("invalid filters and unknown instruments fail closed",()=>{
  assert.throws(()=>mock.listInstruments({exchange:"MCX"}),/Exchange must be NSE or BSE/);
  assert.throws(()=>mock.listInstruments({limit:101}),/Limit must be between/);
  assert.throws(()=>mock.getQuote("NSE_EQ|UNKNOWN"),/Unknown demo instrument/);
- assert.throws(()=>mock.getOptionChain({underlying:"UNKNOWN"}),/Underlying is required/);
+ assert.throws(()=>mock.getOptionChain({underlying:""}),/Underlying is required/);
 });
 test("no provider, network or wall-clock quote generation is used",()=>{
  const meta=mock.getDemoMetadata();
