@@ -220,7 +220,6 @@
         simulationOnly: true
       };
       orders.unshift(order);
-      if (request.idempotencyKey) idempotency.set(request.idempotencyKey,{fingerprint:requestFingerprint,order:copy(order)});
       if (request.orderType === "MARKET") {
         const executionPrice = request.side === "BUY" ? quote.base.askPricePaise : quote.base.bidPricePaise;
         const availableDepth = request.side === "BUY" ? quote.askRemaining : quote.bidRemaining;
@@ -231,6 +230,7 @@
           consumeDepth(quote, request.side, quantity);
         }
       }
+      if (request.idempotencyKey) idempotency.set(request.idempotencyKey,{fingerprint:requestFingerprint,order:copy(order)});
       return copy(order);
     }
 
