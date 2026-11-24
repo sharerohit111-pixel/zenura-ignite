@@ -55,8 +55,8 @@ jobs:
         run: npm run check --prefix market-gateway
       - name: Guard production gateway isolation
         run: |
-          if grep -R -E "paper-demo-adapter|derivative-mock-simulator|paper-mock-fixtures" market-gateway/supabase-server.js market-gateway/server.js; then
-            echo "Demo modules must remain outside production routes."
+          if grep -R -E "paper-demo-adapter|derivative-mock-simulator|paper-mock-fixtures|equity-demo-execution-engine|demo-(equity|chart|derivative)-panel|market-gateway/mock/fixtures|equity-execution.json" market-gateway/supabase-server.js market-gateway/server.js; then
+            echo "Browser Demo modules and synthetic fixtures must remain outside production routes."
             exit 1
           fi
       - name: Verify interactive Demo screen wiring
