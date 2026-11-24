@@ -41,3 +41,15 @@ test("account settings layout is responsive and does not expose controls while s
   assert.match(css, /@media\(max-width:520px\)/);
   assert.match(css, /grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/);
 });
+
+
+test("development mock login is localhost-only and never creates a backend auth session", () => {
+  assert.match(source, /\["localhost", "127\\.0\\.0\\.1", "\\[::1\\]"\]/);
+  assert.match(source, /if \(!isLocalDevelopment\) mockButton\.remove\(\)/);
+  assert.match(source, /DEVELOPMENT MOCK SESSION — local UI preview only/);
+  assert.match(source, /No API access, orders, database writes or real authentication/);
+  assert.match(source, /devMockActive = true/);
+  assert.match(source, /if \(devMockActive\) return/);
+  assert.match(source, /devMockActive = false/);
+  assert.doesNotMatch(source, /localStorage|sessionStorage|service_role|SUPABASE_SERVICE_ROLE_KEY/i);
+});
