@@ -9,11 +9,15 @@ on:
       - "market-gateway/lib/market-data-provider-router.js"
       - "market-gateway/lib/provider-rate-limit.js"
       - "market-gateway/lib/provider-health-registry.js"
+      - "market-gateway/lib/distributed-provider-rate-limit.js"
       - "market-gateway/test/provider-contract.test.js"
       - "market-gateway/test/market-data-router.test.js"
       - "market-gateway/test/market-data-shapes.test.js"
       - "market-gateway/test/provider-health-registry.test.js"
+      - "market-gateway/test/distributed-provider-rate-limit.test.js"
+      - "supabase/migrations/*market_data_distributed_provider_quotas.sql"
       - "market-gateway/PROVIDER-CAPABILITY-MATRIX.md"
+      - "market-gateway/PROVIDER-ROUTING-OPERATIONS.md"
       - ".github/workflows/s-trade-provider-contract-checks.yml"
   pull_request:
     branches:
@@ -23,11 +27,15 @@ on:
       - "market-gateway/lib/market-data-provider-router.js"
       - "market-gateway/lib/provider-rate-limit.js"
       - "market-gateway/lib/provider-health-registry.js"
+      - "market-gateway/lib/distributed-provider-rate-limit.js"
       - "market-gateway/test/provider-contract.test.js"
       - "market-gateway/test/market-data-router.test.js"
       - "market-gateway/test/market-data-shapes.test.js"
       - "market-gateway/test/provider-health-registry.test.js"
+      - "market-gateway/test/distributed-provider-rate-limit.test.js"
+      - "supabase/migrations/*market_data_distributed_provider_quotas.sql"
       - "market-gateway/PROVIDER-CAPABILITY-MATRIX.md"
+      - "market-gateway/PROVIDER-ROUTING-OPERATIONS.md"
       - ".github/workflows/s-trade-provider-contract-checks.yml"
   workflow_dispatch:
 
@@ -42,12 +50,13 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-      - name: Check provider contract and router syntax
+      - name: Check provider contract, router and quota adapter syntax
         run: |
           node --check market-gateway/lib/market-data-provider-contract.js
           node --check market-gateway/lib/broker-execution-provider-contract.js
           node --check market-gateway/lib/market-data-provider-router.js
           node --check market-gateway/lib/provider-rate-limit.js
           node --check market-gateway/lib/provider-health-registry.js
-      - name: Run provider contract, routing, outage and health tests
-        run: node --test market-gateway/test/provider-contract.test.js market-gateway/test/market-data-router.test.js market-gateway/test/market-data-shapes.test.js market-gateway/test/provider-health-registry.test.js
+          node --check market-gateway/lib/distributed-provider-rate-limit.js
+      - name: Run provider contract, routing, outage, health and distributed quota tests
+        run: node --test market-gateway/test/provider-contract.test.js market-gateway/test/market-data-router.test.js market-gateway/test/market-data-shapes.test.js market-gateway/test/provider-health-registry.test.js market-gateway/test/distributed-provider-rate-limit.test.js
