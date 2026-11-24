@@ -24,6 +24,7 @@ function normalizePreferences(input){
     ||Object.values(input).some(value=>typeof value!=="boolean")){
     throw Object.assign(new Error("Notification preferences must contain only supported boolean fields"),{status:400});
   }
+  if(input.email_enabled===true||input.push_enabled===true)throw Object.assign(new Error("Email and push delivery providers are not configured."),{status:400});
   return Object.freeze({...input});
 }
 function safeAdminReason(value){
