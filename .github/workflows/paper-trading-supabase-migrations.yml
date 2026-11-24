@@ -247,6 +247,10 @@ jobs:
           END
           $worker_lease$;
           SQL
+      - name: Verify owner-bound paper market worker lease renewal
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/paper_market_worker_lease_renewal.sql
+      - name: Exercise concurrent NSE Options worker lease renewal races
+        run: bash supabase/tests/paper_option_limit_worker_lease_renewal_race.sh
       - name: Reject non-finite option strike prices
         run: |
           psql -v ON_ERROR_STOP=1 <<'SQL'
