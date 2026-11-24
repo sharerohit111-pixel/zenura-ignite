@@ -160,6 +160,7 @@ test("market page wires a separate, clearly labelled demo order sandbox and resp
   assert.match(html,/demo-equity-execution-workspace\.css/);
   assert.ok(js.includes("../../market-gateway/mock/fixtures/equity-execution.json"));
   assert.ok(js.includes("../../market-gateway/mock/fixtures/account.json"));
+  assert.match(js,/reserved \"\+\(p\.reservedQuantity\|\|0\)/);
   assert.match(html,/No broker or exchange order is submitted/);
   assert.match(css,/@media\(max-width:760px\)/);
   assert.match(css,/@media\(max-width:420px\)/);
