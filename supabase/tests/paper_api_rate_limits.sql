@@ -35,6 +35,16 @@ BEGIN
     RAISE EXCEPTION 'A separate bucket inherited the OAuth budget: %',v_result;
   END IF;
 
+  -- Expired windows reuse the same bounded row and reset their counter.
+  UPDATE public.paper_api_rate_limits
+     SET window_start_ms=window_start_ms-60000,request_count=30
+   WHERE user_id=v_user_a AND bucket='market_data';
+  v_result:=public.consume_paper_api_rate_limit(v_user_a,'market_data');
+  IF v_result->>'allowed'<>'true'
+     OR (v_result->>'remaining')::integer<>29 THEN
+    RAISE EXCEPTION 'An expired window did not reset its request budget: %',v_result;
+  END IF;
+
   -- A fixed bucket cannot be selected with an arbitrary or unbounded name.
   BEGIN
     PERFORM public.consume_paper_api_rate_limit(v_user_a,'unbounded');
