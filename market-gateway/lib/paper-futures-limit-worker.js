@@ -45,7 +45,13 @@ function isValidNseFuture(order,instrument){
     &&normalizeExpiryDate(instrument.expiry)===normalizeExpiryDate(order.expiry)
     &&Number.isSafeInteger(instrument.lot_size)&&instrument.lot_size===order.lot_size
     &&normalizeTickSizePaise(instrument.tick_size)===order.tick_size_paise
+    &&Number.isSafeInteger(order.quantity)&&order.quantity>0
+    &&Number.isSafeInteger(order.filled_quantity)&&order.filled_quantity>=0
     &&Number.isSafeInteger(order.remaining_quantity)&&order.remaining_quantity>0
+    &&order.quantity===order.filled_quantity+order.remaining_quantity
+    &&order.quantity%order.lot_size===0
+    &&order.filled_quantity%order.lot_size===0
+    &&order.remaining_quantity%order.lot_size===0
     &&Number.isSafeInteger(order.limit_price_paise)&&order.limit_price_paise>0
     &&Number.isSafeInteger(order.tick_size_paise)&&order.tick_size_paise>0
     &&order.limit_price_paise%order.tick_size_paise===0
