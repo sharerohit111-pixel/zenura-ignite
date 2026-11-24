@@ -15,7 +15,7 @@ const el=(tag,cls,text)=>{const n=document.createElement(tag);if(cls)n.className
 const money=paise=>"₹"+(Number(paise||0)/100).toLocaleString("en-IN",{minimumFractionDigits:2,maximumFractionDigits:2});
 const card=(label,value,detail)=>{const c=el("article","card");c.append(el("h3","",label),el("div","metric",value),el("div","sub",detail||""));return c;};
 const grid=(...items)=>{const g=el("div","grid");items.forEach(x=>g.append(x));return g;};
-const table=(headers,rows)=>{const wrap=el("div","table-wrap"),t=el("table"),head=el("thead"),hr=el("tr"),body=el("tbody");headers.forEach(h=>hr.append(el("th","",h)));head.append(hr);rows.forEach(row=>{const tr=el("tr");row.forEach(v=>tr.append(el("td","",v??"—")));body.append(tr);});if(!rows.length){const tr=el("tr"),td=el("td","empty","No record exists in the current canonical fixture.");td.colSpan=headers.length;tr.append(td);body.append(tr);}t.append(head,body);wrap.append(t);return wrap;};
+const table=(headers,rows)=>{const wrap=el("div","table-wrap"),t=el("table"),head=el("thead"),hr=el("tr"),body=el("tbody");wrap.tabIndex=0;wrap.setAttribute("role","region");wrap.setAttribute("aria-label","Scrollable data table");headers.forEach(h=>hr.append(el("th","",h)));head.append(hr);rows.forEach(row=>{const tr=el("tr");row.forEach(v=>tr.append(el("td","",v??"—")));body.append(tr);});if(!rows.length){const tr=el("tr"),td=el("td","empty","No record exists in the current canonical fixture.");td.colSpan=headers.length;tr.append(td);body.append(tr);}t.append(head,body);wrap.append(t);return wrap;};
 const notice=text=>el("div","notice",text);
 function header(name,description){const row=el("div","screen-title"),left=el("div");left.append(el("h2","",titles[name]||name),el("p","",description));row.append(left,el("span","read-only","MOCK · LOCAL DEMO"));return row;}
 function quoteRows(){return model.market.instruments.map(x=>[x.symbol,x.exchange,x.assetClass,money(x.lastPricePaise),(x.changePaise>=0?"+":"")+money(x.changePaise),x.volume,x.timestamp]);}
@@ -141,7 +141,7 @@ function renderDemoWatchlists(host){
    return [item.symbol,item.exchange,item.assetClass,money(item.lastPricePaise),
     index>0?"↑":"—",index<list.length-1?"↓":"—","REMOVE"];
   }).filter(Boolean);
-  const wrap=el("div","table-wrap"),tableNode=el("table"),head=el("thead"),hr=el("tr"),body=el("tbody");
+  const wrap=el("div","table-wrap"),tableNode=el("table"),head=el("thead"),hr=el("tr"),body=el("tbody");wrap.tabIndex=0;wrap.setAttribute("role","region");wrap.setAttribute("aria-label","Scrollable demo watchlist");
   ["SYMBOL","EXCHANGE","TYPE","MOCK PRICE","UP","DOWN","REMOVE"].forEach(x=>hr.append(el("th","",x)));head.append(hr);
   if(!rows.length){const tr=el("tr"),td=el("td","empty","This demo watchlist is empty.");td.colSpan=7;tr.append(td);body.append(tr);}
   list.forEach((key,index)=>{
