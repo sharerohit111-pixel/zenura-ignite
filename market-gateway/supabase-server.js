@@ -7,6 +7,7 @@ const crypto=require("node:crypto");
 const path=require("node:path");
 const {createClient}=require("@supabase/supabase-js");
 const {createHttpTelemetry}=require("./lib/http-telemetry");
+const {publicErrorCode}=require("./lib/api-error-contract");
 const {createSupabaseRuntime,readBearerToken}=require("./lib/supabase-runtime");
 const {downloadInstrumentMaster}=require("./lib/instrument-master-download");
 const {validateUpstoxFeedUrl}=require("./lib/upstox-feed-url");
@@ -117,7 +118,7 @@ function errorStatus(error){
 function sendError(res,error,fallback){
   const status=errorStatus(error);
   const requestId=res.req?.requestId||null;
-  if(!res.headersSent)res.status(status).json({error:error.status?error.message:fallback,requestId});
+  if(!res.headersSent)res.status(status).json({error:error.status?error.message:fallback,code:publicErrorCode(status),requestId});
   console.error(JSON.stringify({
     event:"api_request_failed",requestId,status,
     method:res.req?.method||null,path:res.req?.route?.path||res.req?.path||null,
