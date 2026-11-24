@@ -57,6 +57,14 @@ test("market fixture contains only explicitly synthetic quote data", () => {
   }
 });
 
+test("equity execution fixture is explicitly synthetic and separate from exchange instruments", () => {
+  const demo = store().read("equityExecution");
+  assert.equal(demo.meta.exchange, "NONE");
+  assert.equal(demo.meta.provider, "MOCK");
+  assert.equal(demo.meta.fees, "NOT_MODELED");
+  assert.ok(demo.data.instrument.instrumentKey.startsWith("MOCK|SIM|"));
+});
+
 test("equity and derivatives fixtures expose supported order enums and integer prices", () => {
   const equity = store().read("equity").data;
   const derivatives = store().read("derivatives").data;
