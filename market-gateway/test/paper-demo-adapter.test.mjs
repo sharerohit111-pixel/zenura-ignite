@@ -87,7 +87,7 @@ test("option chain groups CE/PE by strike and supports exact strike and side fil
 });
 test("catalog rejects duplicate derivative identities and missing derivative quotes", async () => {
  const fixtures=await allFixtures();
- fixtures.derivatives.data.contracts.push({...fixtures.derivatives.data.contracts[0]});
+ fixtures.derivatives.data.contracts.push({...fixtures.derivatives.data.contracts[0]});\n fixtures.derivatives.data.quotes.push({...fixtures.derivatives.data.quotes[0],instrumentKey:"MOCK|NSE|FUT|ORPHAN"});
  assert.throws(()=>createPaperDemoViewModel(fixtures,{enabled:true}),/DUPLICATE_MOCK_INSTRUMENT_KEY/);
  const missing=await allFixtures();missing.derivatives.data.quotes.pop();
  assert.throws(()=>createPaperDemoViewModel(missing,{enabled:true}),/MOCK_DERIVATIVE_CATALOG_REQUIRED/);
