@@ -151,3 +151,51 @@ test("snapshot explicitly disclaims cash, charges and margin ledger effects", ()
   assert.equal(snapshot.mode, "MOCK");
   assert.match(snapshot.accountingNotice, /no cash ledger, charges, margin reservation/);
 });
+
+
+test("Options CE and PE LIMIT BUYs partially and fully fill only in whole lots", () => {
+  for (const type of ["CE", "PE"]) {
+    const simulator = create();
+    const instrument = option(type, 2500000);
+    const order = simulator.submit({
+      instrumentKey: instrument.instrumentKey, side: "BUY", orderType: "LIMIT",
+      lots: 3, limitPricePaise: 20000
+    });
+    assert.equal(order.status, "PENDING");
+    let result = simulator.processLimitFills();
+    assert.equal(result.partial, 1);
+    let current = simulator.snapshot().orders[0];
+    assert.equal(current.filledQuantity, 50);
+    assert.equal(current.remainingQuantity, 25);
+    simulator.refreshQuoteDepth();
+    result = simulator.processLimitFills();
+    assert.equal(result.filled, 1);
+    current = simulator.snapshot().orders[0];
+    assert.equal(current.status, "FILLED");
+    assert.equal(current.filledQuantity, 75);
+  }
+});
+
+test("partially filled Options SELL LIMIT retains only its remaining close reservation until cancel", () => {
+  const fixtureWithThinBid = JSON.parse(JSON.stringify(fixture));
+  const instrument = option("CE", 2500000);
+  const quote = fixtureWithThinBid.data.quotes.find(item => item.instrumentKey === instrument.instrumentKey);
+  quote.bidQuantity = 25;
+  const simulator = createDerivativeMockSimulator(fixtureWithThinBid, { now });
+  simulator.submit({ instrumentKey: instrument.instrumentKey, side: "BUY", orderType: "MARKET", lots: 2 });
+  const sell = simulator.submit({
+    instrumentKey: instrument.instrumentKey, side: "SELL", orderType: "LIMIT",
+    lots: 2, limitPricePaise: 15000
+  });
+  const result = simulator.processLimitFills();
+  assert.equal(result.partial, 1);
+  let position = simulator.snapshot().positions.find(item => item.instrumentKey === instrument.instrumentKey);
+  assert.equal(position.netQuantity, 25);
+  assert.equal(position.reservedCloseQuantity, 25);
+  assert.equal(position.availableCloseQuantity, 0);
+  const cancelled = simulator.cancel(sell.orderId);
+  assert.equal(cancelled.status, "CANCELLED");
+  position = simulator.snapshot().positions.find(item => item.instrumentKey === instrument.instrumentKey);
+  assert.equal(position.reservedCloseQuantity, 0);
+  assert.equal(position.availableCloseQuantity, 25);
+});
