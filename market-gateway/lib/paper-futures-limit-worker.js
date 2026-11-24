@@ -49,6 +49,8 @@ function isValidNseFuture(order,instrument){
     &&Number.isSafeInteger(order.filled_quantity)&&order.filled_quantity>=0
     &&Number.isSafeInteger(order.remaining_quantity)&&order.remaining_quantity>0
     &&order.quantity===order.filled_quantity+order.remaining_quantity
+    &&((order.status==="PENDING"&&order.filled_quantity===0)
+      ||(order.status==="PARTIALLY_FILLED"&&order.filled_quantity>0))
     &&order.quantity%order.lot_size===0
     &&order.filled_quantity%order.lot_size===0
     &&order.remaining_quantity%order.lot_size===0
