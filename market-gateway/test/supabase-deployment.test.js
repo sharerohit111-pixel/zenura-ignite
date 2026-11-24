@@ -214,3 +214,15 @@ test("JSON parser failures preserve request IDs, CORS headers and safe JSON erro
  assert.match(server,/status\(400\)\.json\(\{error:"Request body must contain valid JSON\.",requestId:req\.requestId\|\|null\}\)/);
  assert.match(server,/errorName:"SyntaxError"/);
 });
+
+test("Supabase gateway attaches safe trace context and structured request telemetry",()=>{
+ const telemetry=fs.readFileSync(path.join(root,"lib/http-telemetry.js"),"utf8");
+ assert.match(server,/createHttpTelemetry/);
+ assert.match(server,/app\.use\(httpTelemetry\.middleware\)/);
+ assert.match(server,/Access-Control-Allow-Headers","Authorization, Content-Type, Accept, traceparent"/);
+ assert.match(server,/Access-Control-Expose-Headers","Retry-After, X-Request-Id, X-Trace-Id"/);
+ assert.match(telemetry,/event:"http_server_request"/);
+ assert.match(telemetry,/durationMs:/);
+ assert.match(telemetry,/logging\.googleapis\.com\/trace/);
+ assert.doesNotMatch(telemetry,/req\.originalUrl|req\.url|req\.headers|authorization|access_token/i);
+});
