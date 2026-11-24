@@ -18,7 +18,7 @@ function buildPaperPortfolioAccounting({account,assetSnapshots,mode="PERSISTED",
  if(!Number.isSafeInteger(availableCashPaise))fail("Available cash exceeds safe integer range.");
  const minimumCashDeficitPaise=Math.max(0,-availableCashPaise);
  const marginDeficitPaise=money(account.margin_deficit_paise??minimumCashDeficitPaise,"Margin deficit");
- if(marginDeficitPaise<minimumCashDeficitPaise)fail("Margin deficit cannot be lower than the negative available-cash deficit.");
+ if(marginDeficitPaise!==minimumCashDeficitPaise)fail("Margin deficit must exactly reconcile to blocked funds minus cash.");
  const assets=new Set(),positions=[],orders=[],trades=[],positionIds=new Set(),orderIds=new Set(),tradeIds=new Set(),historyEvidence=[];
  let historyComplete=true,stale=0,marketValue=0,unrealized=0,observedRealized=0,observedCharges=0,unpriced=false;
  for(const s of assetSnapshots){
