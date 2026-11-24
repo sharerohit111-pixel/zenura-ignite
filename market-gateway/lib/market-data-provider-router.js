@@ -112,8 +112,10 @@ function validateStreamResult(result) {
 }
 
 class MarketDataProviderRouter {
-  constructor({ providers, plan, entitlementResolver, clock = () => Date.now(), maxQuoteAgeMs = 15000 }) {
+  constructor({ providers, plan, entitlementResolver, healthRegistry = null, clock = () => Date.now(), maxQuoteAgeMs = 15000 }) {
     if (!(providers instanceof Map) || typeof entitlementResolver !== "function" ||
+        (healthRegistry !== null && (typeof healthRegistry.isAvailable !== "function" ||
+          typeof healthRegistry.recordSuccess !== "function" || typeof healthRegistry.recordFailure !== "function")) ||
         typeof clock !== "function" || !Number.isSafeInteger(maxQuoteAgeMs) || maxQuoteAgeMs <= 0) {
       throw new TypeError("Market-data router dependencies are invalid.");
     }
@@ -124,6 +126,7 @@ class MarketDataProviderRouter {
     this.providers = new Map(providers);
     this.plan = validateProviderPlan(plan);
     this.entitlementResolver = entitlementResolver;
+    this.healthRegistry = healthRegistry;
     this.clock = clock;
     this.maxQuoteAgeMs = maxQuoteAgeMs;
   }
@@ -140,14 +143,10 @@ class MarketDataProviderRouter {
       capability === "candles" ? "getCandles" :
       capability === "depth" ? "getDepth" : "getQuote";
     const nowMs = this.clock();
-    const failures = [];
 
     for (const providerId of this.plan[capability]) {
       const provider = this.providers.get(providerId);
-      if (!provider) {
-        failures.push({ providerId, reason: "provider_not_registered" });
-        continue;
-      }
+      if (!provider) continue;
 
       let entitlement;
       try {
@@ -155,24 +154,22 @@ class MarketDataProviderRouter {
           userId, providerId, capability, instrumentId, exchange,
         });
       } catch {
-        failures.push({ providerId, reason: "entitlement_lookup_failed" });
         continue;
       }
       if (!entitlement || entitlement.approved !== true ||
-          typeof entitlement.reference !== "string" || !entitlement.reference.trim()) {
-        failures.push({ providerId, reason: "entitlement_not_approved" });
-        continue;
-      }
+          typeof entitlement.reference !== "string" || !entitlement.reference.trim()) continue;
+
+      if (this.healthRegistry && !this.healthRegistry.isAvailable(providerId)) continue;
 
       let health;
       try {
         health = await provider.getHealth();
       } catch {
-        failures.push({ providerId, reason: "health_check_failed" });
+        this.healthRegistry?.recordFailure(providerId, "health_check_failed");
         continue;
       }
       if (!health || health.healthy !== true) {
-        failures.push({ providerId, reason: "provider_unhealthy" });
+        this.healthRegistry?.recordFailure(providerId, "provider_unhealthy");
         continue;
       }
 
@@ -184,32 +181,31 @@ class MarketDataProviderRouter {
           exchange,
           entitlementReference: entitlement.reference,
         });
+        let accepted;
         if (capability === "quote") {
-          const snapshot = normalizeMarketDataSnapshot(result, {
+          accepted = normalizeMarketDataSnapshot(result, {
             expectedProviderId: providerId,
             expectedInstrumentId: instrumentId,
             nowMs,
             maxAgeMs: maxAgeMs ?? this.maxQuoteAgeMs,
           });
-          if (snapshot.exchange !== exchange) fail("Quote exchange does not match the request.", "instrument_mismatch", 409);
-          return snapshot;
+          if (accepted.exchange !== exchange) fail("Quote exchange does not match the request.", "instrument_mismatch", 409);
+        } else {
+          validateCommonResult(result, {
+            providerId, instrumentId, exchange, entitlementReference: entitlement.reference,
+          });
+          if (capability === "depth") validateDepthResult(result, nowMs, maxAgeMs ?? this.maxQuoteAgeMs);
+          if (capability === "candles") validateCandlesResult(result, nowMs);
+          if (capability === "instrumentMaster") validateInstrumentMasterResult(result, nowMs);
+          if (capability === "stream") validateStreamResult(result);
+          accepted = Object.freeze({ ...result, attribution: Object.freeze({ ...result.attribution }) });
         }
-
-        validateCommonResult(result, {
-          providerId, instrumentId, exchange, entitlementReference: entitlement.reference,
-        });
-        if (capability === "depth") validateDepthResult(result, nowMs, maxAgeMs ?? this.maxQuoteAgeMs);
-        if (capability === "candles") validateCandlesResult(result, nowMs);
-        if (capability === "instrumentMaster") validateInstrumentMasterResult(result, nowMs);
-        if (capability === "stream") validateStreamResult(result);
-
-        return Object.freeze({ ...result, attribution: Object.freeze({ ...result.attribution }) });
+        this.healthRegistry?.recordSuccess(providerId);
+        return accepted;
       } catch (error) {
+        this.healthRegistry?.recordFailure(providerId, error?.code || "provider_request_failed");
         if (!isTransientProviderFailure(error) && error?.code !== "stale_market_data" &&
-            error?.code !== "invalid_market_data" && error?.code !== "instrument_mismatch") {
-          throw error;
-        }
-        failures.push({ providerId, reason: error?.code || "provider_request_failed" });
+            error?.code !== "invalid_market_data" && error?.code !== "instrument_mismatch") throw error;
       }
     }
     fail("No authorized, healthy provider returned acceptable market data. Request rejected.", "market_data_unavailable", 503);
