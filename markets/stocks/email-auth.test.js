@@ -66,6 +66,7 @@ function createAuthHarness() {
     querySelector(selector) { return elements.get(selector.replace(/^#/, "")); }
   }
   const card = new Element("connection");
+  elements.set("upstox-connect", new Element("upstox-connect"));
   const calls = [];
   let authListener;
   const auth = {
