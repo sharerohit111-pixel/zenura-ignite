@@ -41,8 +41,10 @@ const axePath=require.resolve("axe-core/axe.min.js");
 
   const pwa=await browser.newContext({viewport:{width:390,height:844},serviceWorkers:"allow"});
   const page=await pwa.newPage();
-  await page.goto("http://127.0.0.1:4173/markets/",{waitUntil:"networkidle",timeout:30000});
+  console.log("PWA: opening market shell");
+  await page.goto("http://127.0.0.1:4173/markets/",{waitUntil:"domcontentloaded",timeout:30000});
   await page.waitForFunction(()=>navigator.serviceWorker.getRegistration().then(r=>!!r?.active),null,{timeout:15000});
+  console.log("PWA: waiting for service worker activation");
   await page.evaluate(async()=>{
    const registration=await navigator.serviceWorker.ready;
    if(!registration.active)throw new Error("PWA_SERVICE_WORKER_NOT_ACTIVE");
@@ -50,10 +52,12 @@ const axePath=require.resolve("axe-core/axe.min.js");
   // The first navigation installs the worker but is not guaranteed to be controlled
   // until the activation/claim lifecycle completes. Reload only after ready so the
   // next navigation is deterministically within the active worker's scope.
-  await page.reload({waitUntil:"networkidle",timeout:30000});
+  console.log("PWA: reloading under active service worker");
+  await page.reload({waitUntil:"domcontentloaded",timeout:30000});
   await page.waitForFunction(()=>!!navigator.serviceWorker.controller,null,{timeout:15000});
   const controlledPage=await pwa.newPage();
-  await controlledPage.goto("http://127.0.0.1:4173/markets/stocks/demo.html",{waitUntil:"networkidle",timeout:30000});
+  console.log("PWA: opening demo under service worker");
+  await controlledPage.goto("http://127.0.0.1:4173/markets/stocks/demo.html",{waitUntil:"domcontentloaded",timeout:30000});
   await controlledPage.waitForFunction(()=>!!navigator.serviceWorker.controller,null,{timeout:15000});
   await page.close();
   const demoPage=controlledPage;
@@ -66,6 +70,7 @@ const axePath=require.resolve("axe-core/axe.min.js");
    return found;
   });
   assert.ok(cached.every(x=>x.found),"all four canonical fixture JSON files must be precached");
+  console.log("PWA: validating offline cached fixtures");
   await pwa.setOffline(true);
   await demoPage.reload({waitUntil:"domcontentloaded",timeout:15000});
   await demoPage.waitForFunction(()=>document.querySelector("#demo-status")?.textContent.includes("4 canonical fixtures validated"),null,{timeout:10000});
