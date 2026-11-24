@@ -57,9 +57,10 @@ test("Equity order, trade, positions and holdings projections remain visibly sep
 });
 
 test("PWA caches the simulator and synthetic fixtures; production gateway stays isolated", async () => {
-  const [sw, gateway, workflow] = await Promise.all([
+  const [sw, supabaseGateway, legacyGateway, workflow] = await Promise.all([
     read("markets/service-worker.js"),
     read("market-gateway/supabase-server.js"),
+    read("market-gateway/server.js"),
     read(".github/workflows/s-trade-fo-demo-ui-integration.yml")
   ]);
   assert.match(sw, /zenura-markets-shell-v5/);
@@ -74,6 +75,8 @@ test("PWA caches the simulator and synthetic fixtures; production gateway stays 
   assert.match(sw, /SHELL\.includes\(url\.toString\(\)\)/);
   assert.match(sw, /if\(shellAsset\|\|/);
   assert.match(sw, /!url\.pathname\.startsWith\(BASE\.pathname\)&&!shellAsset/);
-  assert.doesNotMatch(gateway, /equity-demo-execution-engine|demo-equity-panel|equity-execution\.json/);
+  const productionBoundary = /paper-demo-adapter|derivative-mock-simulator|paper-mock-fixtures|equity-demo-execution-engine|demo-(equity|chart|derivative)-panel|market-gateway\/mock\/fixtures|equity-execution\.json/;
+  assert.doesNotMatch(supabaseGateway, productionBoundary);
+  assert.doesNotMatch(legacyGateway, productionBoundary);
   assert.match(workflow, /paper-demo-equity-integration\.test\.mjs/);
 });
