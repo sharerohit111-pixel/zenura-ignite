@@ -215,6 +215,12 @@ test("JSON parser failures preserve request IDs, CORS headers and safe JSON erro
  assert.match(server,/errorName:"SyntaxError"/);
 });
 
+test("API errors preserve legacy fields and add a stable public code without leaking internal codes",()=>{
+ assert.match(server,/const \{publicErrorCode\}=require\("\.\/lib\/api-error-contract"\)/);
+ assert.match(server,/json\(\{error:error\.status\?error\.message:fallback,code:publicErrorCode\(status\),requestId\}\)/);
+ assert.doesNotMatch(server,/json\(\{[^}]*error\.code/);
+});
+
 test("Supabase gateway attaches safe trace context and structured request telemetry",()=>{
  const telemetry=fs.readFileSync(path.join(root,"lib/http-telemetry.js"),"utf8");
  assert.match(server,/createHttpTelemetry/);
