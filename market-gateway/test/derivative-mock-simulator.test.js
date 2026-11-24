@@ -199,3 +199,10 @@ test("partially filled Options SELL LIMIT retains only its remaining close reser
   assert.equal(position.reservedCloseQuantity, 0);
   assert.equal(position.availableCloseQuantity, 25);
 });
+
+test("simulator rejects a non-synthetic Options underlying", () => {
+  const invalid = structuredClone(fixture);
+  const target = invalid.data.contracts.find(item => item.assetClass === "OPTION");
+  target.underlying = "NIFTY";
+  assert.throws(() => createDerivativeMockSimulator(invalid, { now }), /invalid CE\/PE strike contract/);
+});
