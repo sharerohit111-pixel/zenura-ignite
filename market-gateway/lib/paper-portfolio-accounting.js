@@ -16,7 +16,7 @@ function buildPaperPortfolioAccounting({account,assetSnapshots,mode="PERSISTED",
  const availableCashPaise=cashPaise-reservedCashPaise-reservedMarginPaise;
  if(!Number.isSafeInteger(availableCashPaise))fail("Available cash exceeds safe integer range.");
  const marginDeficitPaise=money(account.margin_deficit_paise??Math.max(0,-availableCashPaise),"Margin deficit");
- const assets=new Set(),positions=[],orders=[],trades=[],orderIds=new Set(),tradeIds=new Set();
+ const assets=new Set(),positions=[],orders=[],trades=[],positionIds=new Set(),orderIds=new Set(),tradeIds=new Set();
  let complete=true,stale=0,marketValue=0,unrealized=0,realized=0,charges=0,unpriced=false;
  for(const s of assetSnapshots){
   if(!s||!ASSETS.has(s.asset)||assets.has(s.asset)||!Array.isArray(s.positions)||!Array.isArray(s.orders)||!Array.isArray(s.trades)||typeof s.complete!=="boolean")fail("Invalid or duplicate asset adapter snapshot.");
@@ -24,6 +24,7 @@ function buildPaperPortfolioAccounting({account,assetSnapshots,mode="PERSISTED",
   for(const p of s.positions){
    if(!p||p.asset!==s.asset)fail("Position asset does not match adapter.");
    const positionId=id(p.positionId,"Position ID"),quantity=money(p.quantity,"Position quantity"),costBasisPaise=money(p.costBasisPaise,"Position cost basis");
+   if(positionIds.has(positionId))fail("Duplicate position ID across assets.");positionIds.add(positionId);
    if(quantity<1)fail("Open position quantity must be positive.");
    let row={...p,positionId,costBasisPaise};
    if(p.quoteStatus==="fresh"){
