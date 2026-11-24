@@ -6,6 +6,13 @@ const ORDER_TYPES = new Set(["MARKET", "LIMIT"]);
 function fail(code) { throw new TypeError(code); }
 function isObject(value) { return value !== null && typeof value === "object" && !Array.isArray(value); }
 function clone(value) { return JSON.parse(JSON.stringify(value)); }
+function deepFreeze(value) {
+  if (value && typeof value === "object" && !Object.isFrozen(value)) {
+    Object.freeze(value);
+    for (const child of Object.values(value)) deepFreeze(child);
+  }
+  return value;
+}
 
 function assertEnvelope(value, name) {
   if (!isObject(value) || value.schemaVersion !== ENVELOPE_VERSION ||
@@ -13,7 +20,7 @@ function assertEnvelope(value, name) {
       typeof value.requestId !== "string" || !value.requestId ||
       typeof value.asOf !== "string" || !Number.isFinite(Date.parse(value.asOf)) ||
       !isObject(value.data)) fail("INVALID_MOCK_ENVELOPE:" + name);
-  if (value.meta !== undefined && !isObject(value.meta)) fail("INVALID_MOCK_META:" + name);
+  if (!isObject(value.meta) || value.meta.source !== "SYNTHETIC_FIXTURE") fail("INVALID_MOCK_META:" + name);
   return value.data;
 }
 function assertMockInstrument(instrumentKey, symbol) {
@@ -29,7 +36,8 @@ function assertOrder(order, name) {
   if (order.lots !== undefined && (!Number.isSafeInteger(order.lots) || order.lots < 1)) fail("INVALID_MOCK_ORDER_LOTS:" + name);
   if (order.quantity === undefined && order.lots === undefined) fail("MOCK_ORDER_SIZE_REQUIRED:" + name);
   for (const field of ["averagePricePaise", "limitPricePaise", "chargesPaise"]) {
-    if (order[field] !== undefined && (!Number.isSafeInteger(order[field]) || order[field] < 0)) fail("INVALID_MOCK_ORDER_MONEY:" + name + ":" + field);
+    const minimum = field === "limitPricePaise" ? 1 : 0;
+    if (order[field] !== undefined && (!Number.isSafeInteger(order[field]) || order[field] < minimum)) fail("INVALID_MOCK_ORDER_MONEY:" + name + ":" + field);
   }
 }
 
@@ -52,6 +60,9 @@ export function createPaperDemoViewModel(fixtures, options = {}) {
     assertMockInstrument(quote.instrumentKey, quote.symbol);
   }
   if (!isObject(market.depth) || !Array.isArray(market.depth.bids) || !Array.isArray(market.depth.asks)) fail("INVALID_SYNTHETIC_DEPTH");
+  const depthQuote = market.quotes.find(quote => quote.instrumentKey === market.depth.instrumentKey);
+  if (!depthQuote) fail("UNKNOWN_SYNTHETIC_DEPTH_INSTRUMENT");
+  assertMockInstrument(market.depth.instrumentKey, depthQuote.symbol);
   for (const level of [...market.depth.bids, ...market.depth.asks]) {
     if (!isObject(level) || !Number.isSafeInteger(level.pricePaise) || level.pricePaise <= 0 ||
         !Number.isSafeInteger(level.quantity) || level.quantity < 0) fail("INVALID_SYNTHETIC_DEPTH_LEVEL");
@@ -60,13 +71,15 @@ export function createPaperDemoViewModel(fixtures, options = {}) {
   if (account.currency !== "INR" || account.startingCapitalPaise !== 100000000 ||
       !Number.isSafeInteger(account.cashBalancePaise) || !Number.isSafeInteger(account.blockedFundsPaise) ||
       !Number.isSafeInteger(account.availableFundsPaise) ||
+      account.cashBalancePaise < 0 || account.blockedFundsPaise < 0 || account.availableFundsPaise < 0 ||
+      !Number.isSafeInteger(account.blockedFundsPaise + account.availableFundsPaise) ||
       account.cashBalancePaise !== account.blockedFundsPaise + account.availableFundsPaise ||
       typeof account.ledgerReconciled !== "boolean") fail("INVALID_MOCK_ACCOUNT_SNAPSHOT");
 
   assertMockInstrument(equity.instrumentKey, equity.symbol);
   assertOrder(equity.order, "equity");
-  if (!isObject(equity.position) || !Number.isSafeInteger(equity.position.quantity) ||
-      !Number.isSafeInteger(equity.position.averagePricePaise)) fail("INVALID_MOCK_EQUITY_POSITION");
+  if (!isObject(equity.position) || !Number.isSafeInteger(equity.position.quantity) || equity.position.quantity < 0 ||
+      !Number.isSafeInteger(equity.position.averagePricePaise) || equity.position.averagePricePaise < 0) fail("INVALID_MOCK_EQUITY_POSITION");
 
   if (!isObject(derivatives.futures) || !isObject(derivatives.options)) fail("INVALID_MOCK_DERIVATIVES");
   assertMockInstrument(derivatives.futures.instrumentKey, derivatives.futures.symbol);
@@ -94,7 +107,7 @@ export function createPaperDemoViewModel(fixtures, options = {}) {
   ];
   const positions = [{assetClass:"EQUITY",instrumentKey:equity.instrumentKey,...clone(equity.position)}];
 
-  return Object.freeze({
+  return deepFreeze({
     meta: Object.freeze({provider:"DUMMY_JSON",mode:"DEMO",simulated:true,schemaVersion:ENVELOPE_VERSION,
       disclaimer:"DEMO DATA — synthetic paper-trading fixtures only; not live NSE/BSE data."}),
     asOf: fixtures.market.asOf,
