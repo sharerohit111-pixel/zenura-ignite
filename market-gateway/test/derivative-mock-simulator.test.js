@@ -16,6 +16,30 @@ const option = (type, strike) => contract(item => item.assetClass === "OPTION" &
   item.expiry === "2026-12-31");
 const create = () => createDerivativeMockSimulator(fixture, { now });
 
+test("default simulator clock is anchored to the fixture snapshot, not the wall clock", () => {
+  const originalNow = Date.now;
+  Date.now = () => Date.parse("2027-01-01T00:00:00.000Z");
+  try {
+    const simulator = createDerivativeMockSimulator(fixture);
+    const order = simulator.submit({
+      instrumentKey: future().instrumentKey, side: "BUY", orderType: "MARKET", lots: 1
+    });
+    assert.equal(order.status, "FILLED");
+    assert.equal(order.createdAt, new Date(Date.parse(fixture.asOf)).toISOString());
+  } finally {
+    Date.now = originalNow;
+  }
+});
+
+test("derivatives simulator rejects fixtures without a synthetic timestamp and provenance", () => {
+  const noTimestamp = structuredClone(fixture);
+  delete noTimestamp.asOf;
+  assert.throws(() => createDerivativeMockSimulator(noTimestamp), /valid DEMO DATA derivatives fixture/);
+  const noProvenance = structuredClone(fixture);
+  delete noProvenance.meta.source;
+  assert.throws(() => createDerivativeMockSimulator(noProvenance), /valid DEMO DATA derivatives fixture/);
+});
+
 test("fixture exposes multiple synthetic Futures expiries and CE/PE expiry-strike contracts", () => {
   const simulator = create();
   const contracts = simulator.contracts();
