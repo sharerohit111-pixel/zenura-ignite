@@ -155,7 +155,14 @@ async function auth(req){
   Object.defineProperty(req,AUTH_SESSION,{value:session,configurable:false});
   return session;
 }
-app.use("/s-trade",createSTradeRouter({express,serviceDb,authenticate:auth}));
+app.use("/s-trade",createSTradeRouter({
+  express,serviceDb,authenticate:auth,
+  resolvePriceAlertInstrument:async instrumentKey=>{
+    if(!instrumentCache.length||Date.now()-instrumentCacheUpdatedAt>6*60*60*1000)await refreshInstrumentCache();
+    return instrumentCache.find(item=>item.instrument_key===instrumentKey
+      &&["NSE_EQ","BSE_EQ","NSE_FO","BSE_FO"].includes(item.segment))||null;
+  }
+}));
 const ORDER_SUBMISSION_PATHS=new Set([
   "/paper/orders","/paper/derivative/orders","/paper/derivative/limit-orders","/paper/futures/orders"
 ]);
