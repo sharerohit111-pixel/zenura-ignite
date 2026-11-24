@@ -398,3 +398,8 @@ This is **structured request telemetry and trace-context correlation**, not yet 
 - The failing assertion prohibited all `req.headers` access, which also prohibited the intentionally supported, strictly validated `traceparent` header. The helper reads only that one header (or Express's `req.get("traceparent")`) and does not log headers or sensitive values.
 - Corrected the assertion to prohibit raw URL/path and credential access while allowing the validated trace-context header. Added a regression test that malformed trace context is discarded and replaced by a fresh server-generated trace ID.
 - The corrected commits are on the PR #99 head. No subsequent workflow run is visible for the corrected head at the time of this update; do not mark CI passed. Re-run the full PR workflow on the corrected head and require all gateway Node and disposable PostgreSQL jobs to pass.
+
+
+## 20. Trace-header CORS regression correction (2026-11-24)
+
+The next PR workflow run (#1303, head commit `e1f8d4413253b5e5c2b0cdf936e9cd5ef833d680`) reached the gateway deployment-boundary tests and failed because two pre-existing CORS assertions still expected the older expose-header list. The gateway now correctly exposes both `X-Request-Id` and `X-Trace-Id`; the older assertions and middleware-order lookup were updated to the new exact header list. This was a test expectation mismatch, not a runtime CORS failure. The corrected test commit is `fdb2fb918c03119d9737dfb62b6610f2a3ce4ce9`. A successful exact-head full Node + disposable PostgreSQL run is still required; no test or migration result is inferred from this correction.
