@@ -60,4 +60,4 @@ jobs:
             exit 1
           fi
       - name: Verify interactive Demo screen wiring
-        run: node --test market-gateway/test/paper-demo-derivative-integration.test.mjs market-gateway/test/paper-demo-equity-integration.test.mjs
+        run: node --test market-gateway/test/paper-demo-derivative-integration.test.mjs market-gateway/test/paper-demo-equity-integration.test.mjs market-gateway/test/demo-chart-data.test.mjs
