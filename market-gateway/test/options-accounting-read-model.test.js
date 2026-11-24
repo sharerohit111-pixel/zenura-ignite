@@ -149,11 +149,12 @@ test("validates and exposes the existing Options MARKET receipt charge breakdown
  const market={...base.marketOrders[0],charges_breakdown:{
   grossPaise:65000,brokeragePaise:20,exchangeTransactionPaise:10,ipftPaise:0,
   sebiPaise:5,stampDutyPaise:0,gstPaise:5,sttPaise:60,totalChargesPaise:100,
-  exchange:"NSE",side:"SELL",indicative:true,simulationOnly:true
+  exchange:"NSE",side:"SELL",chargeScheduleVersion:"NSE_OPTIONS_MARKET_SIM_V1_2026_11",indicative:true,simulationOnly:true
  }};
  const r=buildOptionsAccountingSnapshot({...base,marketOrders:[market]});
  const row=r.history.find(item=>item.source==="MARKET");
  assert.equal(row.chargeBreakdownPaise.stt,60);
+ assert.equal(row.chargeScheduleVersion,"NSE_OPTIONS_MARKET_SIM_V1_2026_11");
  assert.equal(row.chargesPaise,100);
  assert.throws(()=>buildOptionsAccountingSnapshot({...base,marketOrders:[{...market,charges_breakdown:{...market.charges_breakdown,sttPaise:61}}]}),/does not reconcile/);
 });
