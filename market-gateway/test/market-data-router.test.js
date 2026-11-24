@@ -23,7 +23,7 @@ function quote(providerId, overrides = {}) {
     exchangeTimestampMs: NOW - 200,
     lastTradeTimestampMs: NOW - 250,
     sourceSequence: providerId + "-tick-1",
-    entitlementReference: "rights-" + providerId,
+    entitlementReference: "entitlement-" + providerId,
     attribution: { displayName: providerId.toUpperCase() },
     ...overrides,
   };
@@ -32,10 +32,10 @@ function provider(providerId, getQuote) {
   return {
     providerId,
     getQuote,
-    getCandles: async () => ({ providerId, instrumentId: "NSE_EQ|INE002A01018", exchange: "NSE", entitlementReference: "rights-" + providerId, attribution: { displayName: providerId } }),
-    getDepth: async () => ({ providerId, instrumentId: "NSE_EQ|INE002A01018", exchange: "NSE", entitlementReference: "rights-" + providerId, attribution: { displayName: providerId } }),
-    getInstrumentMaster: async () => ({ providerId, instrumentId: "NSE_EQ|INE002A01018", exchange: "NSE", entitlementReference: "rights-" + providerId, attribution: { displayName: providerId } }),
-    openStream: async () => ({ providerId, instrumentId: "NSE_EQ|INE002A01018", exchange: "NSE", entitlementReference: "rights-" + providerId, attribution: { displayName: providerId } }),
+    getCandles: async () => ({ providerId, instrumentId: "NSE_EQ|INE002A01018", exchange: "NSE", entitlementReference: "entitlement-" + providerId, attribution: { displayName: providerId } }),
+    getDepth: async () => ({ providerId, instrumentId: "NSE_EQ|INE002A01018", exchange: "NSE", entitlementReference: "entitlement-" + providerId, attribution: { displayName: providerId } }),
+    getInstrumentMaster: async () => ({ providerId, instrumentId: "NSE_EQ|INE002A01018", exchange: "NSE", entitlementReference: "entitlement-" + providerId, attribution: { displayName: providerId } }),
+    openStream: async () => ({ providerId, instrumentId: "NSE_EQ|INE002A01018", exchange: "NSE", entitlementReference: "entitlement-" + providerId, attribution: { displayName: providerId } }),
     getHealth: async () => ({ healthy: true }),
   };
 }
@@ -62,7 +62,7 @@ test("routes to first authorized and healthy provider with attribution", async (
   ]);
   const result = await router.route("quote", {}, request);
   assert.equal(result.providerId, "upstox");
-  assert.equal(result.entitlementReference, "rights-upstox");
+  assert.equal(result.entitlementReference, "entitlement-upstox");
 });
 
 test("fails over after upstream outage to independently entitled provider", async () => {
@@ -153,4 +153,22 @@ test("distributed quota service failure fails closed when no other provider is c
   });
   await assert.rejects(router.route("quote", {}, request), { code: "market_data_unavailable", status: 503 });
   assert.equal(providerCalls, 0);
+});
+
+test("requires explicit paper-trading and redistribution rights, not a generic API entitlement", async () => {
+  let calls = 0;
+  const upstream = provider("upstox", async () => { calls += 1; return quote("upstox"); });
+  const router = makeRouter([["upstox", upstream]], async () => ({
+    approved: true, reference: "broker-api-access-only",
+  }));
+  await assert.rejects(router.route("quote", {}, request), { code: "market_data_unavailable" });
+  assert.equal(calls, 0);
+});
+
+test("hard-blocks providers whose published terms/support prohibit live-data paper trading", async () => {
+  let calls = 0;
+  const dhan = provider("dhan", async () => { calls += 1; return quote("dhan"); });
+  const router = makeRouter([["dhan", dhan]]);
+  await assert.rejects(router.route("quote", {}, request), { code: "market_data_unavailable" });
+  assert.equal(calls, 0);
 });
