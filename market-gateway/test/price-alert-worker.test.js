@@ -16,7 +16,7 @@ test("groups only well-formed alerts by tenant",()=>{
 test("uses each user's own Upstox token, batches instruments and evaluates fresh quotes",async()=>{
  const calls={tokens:[],urls:[],evaluated:[]};
  const db={
-  from(){return {select(){return this;},eq(){return this;},order(){return this;},limit:async()=>({data:alerts,error:null}),update(){return this;},in(){return Promise.resolve({error:null});}};},
+  from(){return {select(){return this;},eq(){return this;},order(){return this;},maybeSingle:async()=>({data:null,error:null}),limit:async()=>({data:alerts,error:null}),update(){return this;},in(){return Promise.resolve({error:null});}};},
   async rpc(name,args){calls.evaluated.push({name,args});return {data:args.p_alert_id==="a",error:null};}
  };
  const worker=createPriceAlertWorker({
