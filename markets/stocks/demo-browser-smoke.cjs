@@ -50,17 +50,19 @@ const axePath=require.resolve("axe-core/axe.min.js");
   console.log("PWA: opening market shell");
   await page.goto("http://127.0.0.1:4173/markets/",{waitUntil:"domcontentloaded",timeout:30000});
   await page.waitForLoadState("load",{timeout:10000});
-  await page.waitForFunction(()=>navigator.serviceWorker.getRegistration().then(r=>!!r?.active),null,{timeout:20000});
+  await page.waitForFunction(async()=>{
+   const registrations=await navigator.serviceWorker.getRegistrations();
+   return registrations.some(registration=>registration.active?.state==="activated");
+  },null,{timeout:20000});
   console.log("PWA: waiting for service worker activation");
   const workerState=await page.evaluate(async()=>{
-   const registration=await navigator.serviceWorker.getRegistration(new URL(".",location.href).pathname);
+   const registrations=await navigator.serviceWorker.getRegistrations();
+   const registration=registrations.find(item=>item.active?.state==="activated");
    return {state:registration?.active?.state||"missing",scope:registration?.scope||null};
   });
   assert.equal(workerState.state,"activated","service worker must be active before controlled reload");
   console.log(JSON.stringify({pwaWorker:workerState.state,scope:workerState.scope}));
-  // The first navigation installs the worker but is not guaranteed to be controlled
-  // until the activation/claim lifecycle completes. Reload only after ready so the
-  // next navigation is deterministically within the active worker's scope.
+  // Wait for the activated registration before reloading into its controlled scope.
   console.log("PWA: reloading under active service worker");
   await page.reload({waitUntil:"domcontentloaded",timeout:30000});
   await page.waitForFunction(()=>!!navigator.serviceWorker.controller,null,{timeout:15000});
