@@ -1,0 +1,344 @@
+{
+  "meta": {
+    "mode": "DEMO",
+    "market": "INDIAN_MARKET",
+    "provider": "DUMMY_JSON",
+    "asOf": "2026-11-24T15:30:00+05:30",
+    "disclaimer": "Illustrative simulated values only. Not live market data. No real orders are placed."
+  },
+  "account": {
+    "name": "Paper Trader",
+    "email": "demo@zenuraignite.local",
+    "virtualCapital": 1000000,
+    "availableCash": 642850,
+    "blockedFunds": 85750,
+    "investedValue": 271400,
+    "totalValue": 1094250,
+    "dayPnl": 8250,
+    "totalPnl": 94250,
+    "pnlPercent": 9.43
+  },
+  "indices": [
+    {
+      "symbol": "NIFTY 50",
+      "exchange": "NSE",
+      "price": 26142.35,
+      "change": 184.2,
+      "changePercent": 0.71
+    },
+    {
+      "symbol": "SENSEX",
+      "exchange": "BSE",
+      "price": 85672.4,
+      "change": 512.8,
+      "changePercent": 0.6
+    },
+    {
+      "symbol": "BANK NIFTY",
+      "exchange": "NSE",
+      "price": 59214.8,
+      "change": -126.3,
+      "changePercent": -0.21
+    },
+    {
+      "symbol": "NIFTY IT",
+      "exchange": "NSE",
+      "price": 41280.15,
+      "change": 328.6,
+      "changePercent": 0.8
+    }
+  ],
+  "instruments": [
+    {
+      "symbol": "RELIANCE",
+      "name": "Reliance Industries",
+      "exchange": "NSE",
+      "segment": "Equity",
+      "price": 1482.6,
+      "change": 18.4,
+      "changePercent": 1.26,
+      "volume": "82.4L",
+      "sector": "Energy"
+    },
+    {
+      "symbol": "HDFCBANK",
+      "name": "HDFC Bank",
+      "exchange": "NSE",
+      "segment": "Equity",
+      "price": 987.35,
+      "change": -6.2,
+      "changePercent": -0.62,
+      "volume": "64.1L",
+      "sector": "Banking"
+    },
+    {
+      "symbol": "TCS",
+      "name": "Tata Consultancy Services",
+      "exchange": "NSE",
+      "segment": "Equity",
+      "price": 3188.5,
+      "change": 42.75,
+      "changePercent": 1.36,
+      "volume": "18.7L",
+      "sector": "IT"
+    },
+    {
+      "symbol": "ICICIBANK",
+      "name": "ICICI Bank",
+      "exchange": "NSE",
+      "segment": "Equity",
+      "price": 1326.8,
+      "change": 11.3,
+      "changePercent": 0.86,
+      "volume": "51.2L",
+      "sector": "Banking"
+    },
+    {
+      "symbol": "INFY",
+      "name": "Infosys",
+      "exchange": "NSE",
+      "segment": "Equity",
+      "price": 1642.2,
+      "change": -8.55,
+      "changePercent": -0.52,
+      "volume": "39.6L",
+      "sector": "IT"
+    },
+    {
+      "symbol": "SBIN",
+      "name": "State Bank of India",
+      "exchange": "NSE",
+      "segment": "Equity",
+      "price": 824.1,
+      "change": 9.65,
+      "changePercent": 1.18,
+      "volume": "92.3L",
+      "sector": "Banking"
+    },
+    {
+      "symbol": "NIFTY26NOVFUT",
+      "name": "NIFTY 26 Nov Futures",
+      "exchange": "NSE",
+      "segment": "Futures",
+      "price": 26188,
+      "change": 190,
+      "changePercent": 0.73,
+      "volume": "12.8L",
+      "sector": "Index"
+    },
+    {
+      "symbol": "BANKNIFTY26NOVFUT",
+      "name": "BANK NIFTY 26 Nov Futures",
+      "exchange": "NSE",
+      "segment": "Futures",
+      "price": 59280,
+      "change": -115,
+      "changePercent": -0.19,
+      "volume": "5.2L",
+      "sector": "Index"
+    },
+    {
+      "symbol": "NIFTY26NOV26200CE",
+      "name": "NIFTY 26200 CE · 26 Nov",
+      "exchange": "NSE",
+      "segment": "Options",
+      "price": 184.5,
+      "change": 12.8,
+      "changePercent": 7.45,
+      "volume": "8.4L",
+      "sector": "Index Option"
+    },
+    {
+      "symbol": "NIFTY26NOV26200PE",
+      "name": "NIFTY 26200 PE · 26 Nov",
+      "exchange": "NSE",
+      "segment": "Options",
+      "price": 206.2,
+      "change": -9.4,
+      "changePercent": -4.36,
+      "volume": "7.1L",
+      "sector": "Index Option"
+    }
+  ],
+  "watchlist": [
+    "RELIANCE",
+    "HDFCBANK",
+    "TCS",
+    "ICICIBANK",
+    "NIFTY26NOVFUT",
+    "NIFTY26NOV26200CE"
+  ],
+  "orders": [
+    {
+      "id": "ZG-D-10482",
+      "time": "24 Nov, 14:42",
+      "symbol": "RELIANCE",
+      "side": "BUY",
+      "product": "DELIVERY",
+      "type": "LIMIT",
+      "quantity": 40,
+      "price": 1460,
+      "status": "FILLED",
+      "filled": 40
+    },
+    {
+      "id": "ZG-D-10479",
+      "time": "24 Nov, 14:18",
+      "symbol": "TCS",
+      "side": "BUY",
+      "product": "DELIVERY",
+      "type": "MARKET",
+      "quantity": 10,
+      "price": 3145.75,
+      "status": "FILLED",
+      "filled": 10
+    },
+    {
+      "id": "ZG-D-10476",
+      "time": "24 Nov, 13:56",
+      "symbol": "HDFCBANK",
+      "side": "SELL",
+      "product": "INTRADAY",
+      "type": "LIMIT",
+      "quantity": 25,
+      "price": 1002,
+      "status": "PENDING",
+      "filled": 0
+    },
+    {
+      "id": "ZG-D-10471",
+      "time": "24 Nov, 12:34",
+      "symbol": "NIFTY26NOVFUT",
+      "side": "BUY",
+      "product": "FUTURES",
+      "type": "MARKET",
+      "quantity": 1,
+      "price": 26020,
+      "status": "FILLED",
+      "filled": 1
+    },
+    {
+      "id": "ZG-D-10468",
+      "time": "24 Nov, 11:20",
+      "symbol": "INFY",
+      "side": "BUY",
+      "product": "DELIVERY",
+      "type": "LIMIT",
+      "quantity": 15,
+      "price": 1658,
+      "status": "CANCELLED",
+      "filled": 0
+    }
+  ],
+  "holdings": [
+    {
+      "symbol": "RELIANCE",
+      "name": "Reliance Industries",
+      "quantity": 40,
+      "avgPrice": 1460,
+      "ltp": 1482.6,
+      "invested": 58400,
+      "value": 59304,
+      "pnl": 904,
+      "pnlPercent": 1.55
+    },
+    {
+      "symbol": "TCS",
+      "name": "Tata Consultancy Services",
+      "quantity": 10,
+      "avgPrice": 3145.75,
+      "ltp": 3188.5,
+      "invested": 31457.5,
+      "value": 31885,
+      "pnl": 427.5,
+      "pnlPercent": 1.36
+    },
+    {
+      "symbol": "ICICIBANK",
+      "name": "ICICI Bank",
+      "quantity": 50,
+      "avgPrice": 1298.4,
+      "ltp": 1326.8,
+      "invested": 64920,
+      "value": 66340,
+      "pnl": 1420,
+      "pnlPercent": 2.19
+    },
+    {
+      "symbol": "SBIN",
+      "name": "State Bank of India",
+      "quantity": 100,
+      "avgPrice": 806.5,
+      "ltp": 824.1,
+      "invested": 80650,
+      "value": 82410,
+      "pnl": 1760,
+      "pnlPercent": 2.18
+    }
+  ],
+  "positions": [
+    {
+      "symbol": "NIFTY26NOVFUT",
+      "name": "NIFTY 26 Nov Futures",
+      "kind": "FUTURES",
+      "side": "LONG",
+      "quantity": 1,
+      "avgPrice": 26020,
+      "ltp": 26188,
+      "pnl": 168,
+      "product": "NRML"
+    },
+    {
+      "symbol": "NIFTY26NOV26200CE",
+      "name": "NIFTY 26200 CE · 26 Nov",
+      "kind": "OPTIONS",
+      "side": "LONG",
+      "quantity": 50,
+      "avgPrice": 168.2,
+      "ltp": 184.5,
+      "pnl": 815,
+      "product": "NRML"
+    },
+    {
+      "symbol": "BANKNIFTY26NOVFUT",
+      "name": "BANK NIFTY 26 Nov Futures",
+      "kind": "FUTURES",
+      "side": "SHORT",
+      "quantity": 1,
+      "avgPrice": 59420,
+      "ltp": 59280,
+      "pnl": 140,
+      "product": "NRML"
+    }
+  ],
+  "performance": [
+    {
+      "label": "18 Nov",
+      "value": 1000000
+    },
+    {
+      "label": "19 Nov",
+      "value": 1008200
+    },
+    {
+      "label": "20 Nov",
+      "value": 1004100
+    },
+    {
+      "label": "21 Nov",
+      "value": 1026500
+    },
+    {
+      "label": "22 Nov",
+      "value": 1031800
+    },
+    {
+      "label": "23 Nov",
+      "value": 1052000
+    },
+    {
+      "label": "24 Nov",
+      "value": 1094250
+    }
+  ]
+}
