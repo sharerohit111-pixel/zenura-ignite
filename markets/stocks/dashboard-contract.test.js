@@ -4,6 +4,7 @@ import {readFileSync} from "node:fs";
 const read = path => readFileSync(new URL(path, import.meta.url), "utf8");
 const html = read("../dashboard/index.html");
 const js = read("../dashboard/dashboard.js");
+const css = read("../dashboard/dashboard.css");
 const model = read("../dashboard/dashboard-model.js");
 const portal = read("../index.html");
 const data = JSON.parse(read("../dashboard/mock-data.json"));
@@ -46,7 +47,7 @@ test("dashboard assets and Dummy JSON fixture are included in the Markets PWA sh
 });
 
 test("mobile bottom navigation renders every requested destination", () => {
-  assert.match(js, /id="mobile-nav"[^>]*>/);
+  assert.match(html, /id="mobile-nav"/);
   assert.match(js, /NAV_ITEMS\.map\(\(\[id,label,icon\]\)/);
   assert.doesNotMatch(js, /NAV_ITEMS\.slice\(0,5\)/);
   assert.match(css, /grid-template-columns:repeat\(9,minmax\(62px,1fr\)\)/);
