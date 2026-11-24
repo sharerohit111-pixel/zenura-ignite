@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { createChartDemoModel, createDemoCandles, createDemoDepth, INTERVALS } from "./demo-chart-data.mjs";
+import { createChartDemoModel, createDemoCandles, createDemoDepth, INTERVALS } from "../../markets/stocks/demo-chart-data.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../market-gateway/mock/fixtures");
 const names = ["market","account","equity","derivatives"];
