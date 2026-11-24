@@ -208,9 +208,10 @@ jobs:
           node --check market-gateway/test/s-trade-notifications-admin.test.js
           node --check market-gateway/test/s-trade-notifications-admin-router.test.js
           node --check market-gateway/test/price-alert-worker.test.js
+          node --check market-gateway/test/s-trade-api-rate-limit.test.js
           node --input-type=module --check < markets/stocks/admin.js
           node --input-type=module --check < markets/stocks/notifications.js
-          node --test market-gateway/test/s-trade-notifications-admin.test.js market-gateway/test/s-trade-notifications-admin-router.test.js market-gateway/test/price-alert-worker.test.js
+          node --test market-gateway/test/s-trade-notifications-admin.test.js market-gateway/test/s-trade-notifications-admin-router.test.js market-gateway/test/price-alert-worker.test.js market-gateway/test/s-trade-api-rate-limit.test.js
           psql -v ON_ERROR_STOP=1 -f supabase/tests/s_trade_notifications_admin_security.sql
       - name: Reconcile Indian-market Futures ledger cash, charges, realized P&L and margin
         run: psql -v ON_ERROR_STOP=1 -f supabase/tests/futures_market_order_accounting.sql
