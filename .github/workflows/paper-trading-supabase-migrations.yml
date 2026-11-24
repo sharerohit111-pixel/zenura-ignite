@@ -146,6 +146,10 @@ jobs:
         run: node --test market-gateway/test/derivative-order-transaction.test.js
       - name: Run Existing transaction reference derivative contract validation tests
         run: node --test market-gateway/test/derivative-contract.test.js
+      - name: Verify unified Equity/Futures/Options portfolio accounting read model
+        run: |
+          node --check market-gateway/lib/paper-portfolio-accounting.js
+          node --test market-gateway/test/paper-portfolio-accounting.test.js
       - name: Run complete market-gateway regression suite
         run: |
           npm install --prefix market-gateway --no-audit --no-fund --package-lock=false
