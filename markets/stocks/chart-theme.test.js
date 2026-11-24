@@ -42,7 +42,8 @@ test("mount restores, toggles and persists the selected theme",()=>{
   const button=fakeElement(),languageButton=fakeElement("हिन्दी");
   const body={dataset:{}};
   const values=new Map([[STORAGE_KEY,"light"]]);
-  const documentRef={body,getElementById(id){
+  const documentListeners=new Map();
+  const documentRef={body,addEventListener(name,callback){documentListeners.set(name,callback);},dispatchEvent(event){documentListeners.get(event.type)?.(event);},getElementById(id){
     return id==="paper-chart-theme-toggle"?button:
       id==="paper-language-toggle"?languageButton:null;
   }};
@@ -70,7 +71,7 @@ test("mount restores, toggles and persists the selected theme",()=>{
 
 test("mount tolerates unavailable storage and missing page controls",()=>{
   const button=fakeElement(),body={dataset:{}};
-  const documentRef={body,getElementById:id=>id==="paper-chart-theme-toggle"?button:null};
+  const documentRef={body,addEventListener(){},dispatchEvent(){},getElementById:id=>id==="paper-chart-theme-toggle"?button:null};
   const controller=mount(documentRef,()=>{throw new Error("storage unavailable");});
   assert.equal(controller.getTheme(),"dark");
   assert.equal(body.dataset.chartTheme,"dark");
