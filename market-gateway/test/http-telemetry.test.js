@@ -97,3 +97,19 @@ test("marks premature response close as aborted and records a server error sever
   assert.equal(logs[0].outcome,"aborted");
   assert.equal(logs[0].severity,"ERROR");
 });
+
+test("replaces malformed incoming trace context with a fresh trace identifier",()=>{
+  const logs=[];
+  const telemetry=createHttpTelemetry({logger:entry=>logs.push(entry)});
+  const req={requestId:"r4",method:"GET",headers:{traceparent:"not-valid"}};
+  const res=makeResponse();
+  telemetry.middleware(req,res,()=>{});
+  assert.match(req.traceId,/^[a-f0-9]{32}$/);
+  assert.equal(req.parentSpanId,null);
+  assert.equal(req.traceSampled,false);
+  assert.equal(res.headers["X-Trace-Id"],req.traceId);
+  res.writableEnded=true;
+  res.emit("finish");
+  assert.equal(logs.length,1);
+  assert.equal(logs[0].traceId,req.traceId);
+});
