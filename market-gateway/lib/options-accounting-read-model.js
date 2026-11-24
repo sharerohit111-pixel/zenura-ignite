@@ -210,15 +210,42 @@ function buildOptionsAccountingSnapshot({
     }
     marketOrderIds.add(order.order_id);
     const quantity = integer(order.quantity, "MARKET order quantity", { min: 1 });
+    const executionPrice = integer(order.execution_price_paise, "MARKET execution price", { min: 1 });
     const gross = integer(order.gross_paise, "MARKET order gross", { min: 1 });
-    integer(order.charges_paise ?? 0, "MARKET order charges");
+    const charges = integer(order.charges_paise ?? 0, "MARKET order charges");
+    if (multiplySafe(executionPrice, quantity, "MARKET order notional") !== gross) {
+      fail("Options MARKET order gross does not equal execution price multiplied by quantity.");
+    }
+    let chargeBreakdownPaise = null;
+    let chargeScheduleVersion = null;
+    const rawBreakdown = order.charges_breakdown;
+    if (rawBreakdown && typeof rawBreakdown === "object" && !Array.isArray(rawBreakdown)
+        && Object.keys(rawBreakdown).length > 0) {
+      const fields = ["brokeragePaise","exchangeTransactionPaise","ipftPaise","sebiPaise","stampDutyPaise","gstPaise","sttPaise"];
+      const components = fields.map(field => integer(rawBreakdown[field], `MARKET charge ${field}`));
+      const componentTotal = components.reduce((sum,value) => addSafe(sum,value,"MARKET charge components"),0);
+      if (componentTotal !== charges || integer(rawBreakdown.totalChargesPaise,"MARKET total charge breakdown") !== charges
+          || integer(rawBreakdown.grossPaise,"MARKET breakdown gross",{min:1}) !== gross
+          || rawBreakdown.exchange !== order.exchange || rawBreakdown.side !== order.side
+          || rawBreakdown.indicative !== true || rawBreakdown.simulationOnly !== true) {
+        fail("Options MARKET charge breakdown does not reconcile to its immutable receipt.");
+      }
+      chargeBreakdownPaise = {
+        brokerage: components[0], exchangeTransaction: components[1], ipft: components[2],
+        sebi: components[3], stampDuty: components[4], gst: components[5], stt: components[6]
+      };
+      chargeScheduleVersion = typeof rawBreakdown.chargeScheduleVersion === "string"
+        ? rawBreakdown.chargeScheduleVersion : null;
+    } else if (rawBreakdown && (typeof rawBreakdown !== "object" || Array.isArray(rawBreakdown))) {
+      fail("Options MARKET charge breakdown has an invalid shape.");
+    }
     signedInteger(order.realized_pnl_paise ?? 0, "Market order realized P&L");
     if (order.side === "BUY" && (order.realized_pnl_paise ?? 0) !== 0) {
       fail("A long Options MARKET BUY cannot realize P&L.");
     }
     realizedPnlPaise = addSafe(realizedPnlPaise, order.realized_pnl_paise ?? 0, "Options realized P&L");
-    chargesPaidPaise = addSafe(chargesPaidPaise, order.charges_paise ?? 0, "Options charges");
-    history.push({ source: "MARKET", id: order.order_id, tradingSymbol: order.trading_symbol ?? order.instrument_key, instrumentKey: order.instrument_key, side: order.side, quantity, filledQuantity: quantity, grossPaise: gross, chargesPaise: order.charges_paise ?? 0, realizedPnlPaise: order.realized_pnl_paise ?? 0, status: order.status, createdAt: order.created_at });
+    chargesPaidPaise = addSafe(chargesPaidPaise, charges, "Options charges");
+    history.push({ source: "MARKET", id: order.order_id, tradingSymbol: order.trading_symbol ?? order.instrument_key, instrumentKey: order.instrument_key, side: order.side, quantity, filledQuantity: quantity, grossPaise: gross, chargesPaise: charges, chargeBreakdownPaise, chargeScheduleVersion, realizedPnlPaise: order.realized_pnl_paise ?? 0, status: order.status, createdAt: order.created_at });
   }
   const fillsByOrder = new Map();
   const seenExecutions = new Set();
