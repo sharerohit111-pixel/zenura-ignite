@@ -374,3 +374,19 @@ This section supersedes the earlier point-in-time statement that none of the fiv
 - Stale-owner execution fencing and full five-worker crash-recovery confidence: outstanding.
 
 **Decision:** coordination/audit update only. No shared SQL, migration, worker runtime, feature flag, deployment, secret or production state was changed.
+
+
+## 18. HTTP request telemetry and trace correlation implementation (2026-11-24)
+
+Added an isolated, dependency-free HTTP telemetry helper and wired it into the Supabase-native Express gateway:
+
+- A validated W3C Trace Context version-00 `traceparent` is accepted for correlation; malformed, all-zero or unsupported-version values are ignored and a new trace ID is generated.
+- Each request receives a generated server span identifier and an `X-Trace-Id` response header. CORS allows the `traceparent` request header and exposes `X-Trace-Id` alongside the existing request/retry headers.
+- A single structured `http_server_request` record is emitted on response finish, or on premature close. It contains request/trace IDs, method, matched route template, status, duration, severity and outcome.
+- The logger deliberately excludes raw URL/path, query string, request/response headers, bearer tokens, body, user IDs and provider payloads. Unmatched paths are recorded only as the constant `unmatched` to avoid leaking path parameters.
+- When a valid Google Cloud project ID is configured through the standard project environment variables, the log includes the Cloud Logging trace resource field so request logs can be correlated with a trace ID.
+- Added focused tests for traceparent validation, correlation headers, duration/outcome records, duplicate finish/close suppression, aborted responses and sensitive-field exclusion. Added the helper to the gateway syntax-check command.
+
+### Scope and limitations
+
+This is **structured request telemetry and trace-context correlation**, not yet a complete distributed tracing or metrics backend. It does not create/export OpenTelemetry spans, propagate child context into Supabase/provider calls, expose Prometheus metrics, or configure Cloud Monitoring log-based metrics/alerts. Those require an agreed exporter/collector and operational configuration. The new code is on this PR branch; its exact-head CI result is pending. No production telemetry configuration or deployment was changed.
