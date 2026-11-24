@@ -581,8 +581,19 @@ app.post("/paper/derivative/limit-orders",async(req,res)=>{
     if(!Number.isSafeInteger(limitPricePaise)||limitPricePaise<1)
       return res.status(400).json({error:"LIMIT price must be a positive integer number of paise."});
     const orderId=makeOrderId(user.id,idempotencyKey);
-    // Options requests are expressed in lots here; the verified contract quantity is resolved below.
-    const fingerprint=makeOrderFingerprint({instrumentKey,side,quantity:lots,orderType:"LIMIT",limitPricePaise});
+    if(!instrumentCache.length||Date.now()-instrumentCacheUpdatedAt>6*60*60*1000)await refreshInstrumentCache();
+    const instrument=instrumentCache.find(x=>x.instrument_key===instrumentKey
+      &&x.exchange==="NSE"&&x.segment==="NSE_FO"&&["CE","PE"].includes(x.instrument_type));
+    if(!instrument)return res.status(400).json({error:"Select a verified NSE CE/PE contract from the official instrument master."});
+    // The idempotency fingerprint is based on contract units, not user-entered lots.
+    // Resolve the official lot size before replay lookup, but defer expiry/session/quote
+    // validation so a legitimate retry can still recover its original receipt.
+    const lotSize=instrument.lot_size;
+    const contractQuantity=lots*lotSize;
+    if(!Number.isSafeInteger(lotSize)||lotSize<1||lotSize>1000000
+       ||!Number.isSafeInteger(contractQuantity)||contractQuantity<1||contractQuantity>1000000)
+      return res.status(400).json({error:"Contract lot size or quantity is invalid in the official instrument master."});
+    const fingerprint=makeOrderFingerprint({instrumentKey,side,quantity:contractQuantity,orderType:"LIMIT",limitPricePaise});
     // Resolve an identical retry before checking today's session, quote or expiry.
     // This lets users safely recover a response even after the order's session ends.
     const {data:prior,error:priorError}=await userDb.from("paper_option_limit_orders")
@@ -599,10 +610,6 @@ app.post("/paper/derivative/limit-orders",async(req,res)=>{
         status:prior.status,idempotentReplay:true,simulationOnly:true
       });
     }
-    if(!instrumentCache.length||Date.now()-instrumentCacheUpdatedAt>6*60*60*1000)await refreshInstrumentCache();
-    const instrument=instrumentCache.find(x=>x.instrument_key===instrumentKey
-      &&x.exchange==="NSE"&&x.segment==="NSE_FO"&&["CE","PE"].includes(x.instrument_type));
-    if(!instrument)return res.status(400).json({error:"Select a verified NSE CE/PE contract from the official instrument master."});
     const nowMs=Date.now();
     const contract=validateDerivativeContract(instrument,{lots,pricePaise:limitPricePaise,now:nowMs});
     const {data:account,error:accountError}=await userDb.from("paper_accounts")
