@@ -15,7 +15,7 @@
     const line=bars.map((b,i)=>(i?"L":"M")+x(i).toFixed(2)+" "+y(b.close).toFixed(2)).join(" ");
     const volumes=bars.map((b,i)=>{const xx=x(i),h=b.volume/maxVol*(volBottom-volTop);return '<rect x="'+(xx-2.5)+'" y="'+(volBottom-h)+'" width="5" height="'+h+'" fill="'+(b.close>=b.open?"#20c997":"#ff657d")+'" opacity=".72"/>';}).join("");
     const chart=kind==="LINE"?'<path d="'+line+'" class="demo-line"/><path d="'+line+' L'+right+' '+bottom+' L'+left+' '+bottom+' Z" class="demo-area"/>':candle;
-    $("demo-chart-svg").innerHTML=grid+chart+'<line x1="'+left+'" x2="'+right+'" y1="'+volTop-8+'" y2="'+volTop-8+'" class="demo-grid"/>'+volumes+'<text x="'+left+'" y="356" class="demo-axis">'+esc(time(first.timestamp))+'</text><text x="'+right+'" y="356" text-anchor="end" class="demo-axis">'+esc(time(last.timestamp))+'</text>';
+    $("demo-chart-svg").innerHTML=grid+chart+'<line x1="'+left+'" x2="'+right+'" y1="'+(volTop-8)+'" y2="'+(volTop-8)+'" class="demo-grid"/>'+volumes+'<text x="'+left+'" y="356" class="demo-axis">'+esc(time(first.timestamp))+'</text><text x="'+right+'" y="356" text-anchor="end" class="demo-axis">'+esc(time(last.timestamp))+'</text>';
     $("demo-symbol").textContent=instrument.symbol+" · "+instrument.name;
     $("demo-last").textContent=money(last.close);
     $("demo-change").textContent=((last.close-first.open)/first.open*100).toFixed(2)+"% simulated range";
