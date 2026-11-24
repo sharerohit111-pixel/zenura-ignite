@@ -31,6 +31,12 @@ test("Equity, Futures and Options screens call authenticated backend routes", ()
   for (const route of ["/paper/derivative/limit-orders", "/paper/derivative/limit-orders/"]) assert.ok(optionsLimits.includes(route));
 });
 
+test("Options MARKET lot entry is an in-page control, not a browser prompt", () => {
+  assert.match(html, /id="option-order-lots"/);
+  assert.doesNotMatch(stocks, /window\.prompt\s*\(/);
+  assert.match(language, /"Lots to trade":"[^"]+"/);
+});
+
 test("new Futures and Options accounting labels have Hindi translations", () => {
   for (const key of [
     "Futures LIMIT Ticket", "BUY LIMIT", "SELL LIMIT", "Futures Positions & History",
