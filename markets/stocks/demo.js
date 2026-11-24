@@ -1,5 +1,6 @@
 import { createPaperDemoViewModel } from "../shared/paper-demo-adapter.mjs";
 import { mountDerivativeDemo, appendDerivativeSummary } from "./demo-derivative-panel.mjs";
+import { mountEquityDemo, appendEquitySummary } from "./demo-equity-panel.mjs";
 
 "use strict";
 const status=document.getElementById("demo-status");
@@ -39,10 +40,7 @@ function render(name){
   return;
  }
  if(name==="equity"){
-  const list=orders.filter(x=>x.assetClass==="EQUITY");
-  content.append(grid(card("Equity position",equity?.quantity??0,"Fixture quantity"),card("Average price",money(equity?.averagePricePaise),"Integer-paise accounting"),card("Invested value",money(equity?.investedValuePaise),"Sample position"),card("Realized P&L",money(equity?.realizedPnlPaise),"Fixture value")));
-  content.append(table(["ORDER ID","INSTRUMENT","SIDE","TYPE","QTY","STATUS","AVG / LIMIT","CHARGES"],orderRows(list)));
-  content.append(notice("This is a read-only receipt preview. No MARKET/LIMIT submission, cancellation, fill or ledger mutation is available here."));
+  mountEquityDemo(content);
   return;
  }
  if(name==="futures"||name==="options"){
@@ -58,6 +56,7 @@ function render(name){
   const selected=name==="trades"?orders.filter(o=>o.status==="FILLED"):orders;
   content.append(grid(card("Records",String(selected.length),"Current fixture only"),card("Filled",String(selected.filter(o=>o.status==="FILLED").length),"Sample statuses"),card("Pending",String(selected.filter(o=>o.status==="PENDING"||o.status==="PARTIALLY_FILLED").length),"No worker runs"),card("Cancelled",String(selected.filter(o=>o.status==="CANCELLED").length),"No cancellation action")));
   content.append(table(["ORDER ID","ASSET","INSTRUMENT","SIDE","TYPE","SIZE","STATUS","AVG / LIMIT","CHARGES"],orderRows(selected)));
+  appendEquitySummary(content,name);
   appendDerivativeSummary(content,name);
   return;
  }
@@ -65,6 +64,7 @@ function render(name){
   content.append(grid(card("Starting capital",money(a.startingCapitalPaise),"Virtual only"),card("Available funds",money(a.availableFundsPaise),"Fixture snapshot"),card("Blocked funds",money(a.blockedFundsPaise),"Fixture snapshot"),card("Unrealized P&L",money(a.unrealizedPnlPaise),"Account fixture")));
   content.append(table(["ASSET","INSTRUMENT","QUANTITY","AVERAGE PRICE","INVESTED VALUE","REALIZED P&L","UNREALIZED P&L"],model.positions.map(p=>[p.assetClass,p.instrumentKey,p.quantity,money(p.averagePricePaise),money(p.investedValuePaise),money(p.realizedPnlPaise),money(p.unrealizedPnlPaise)])));
   content.append(notice("The account fixture remains unreconciled. Local F&O Demo positions below are browser-memory only and do not update the wallet or unified ledger."));
+  appendEquitySummary(content,name);
   if(name==="positions"||name==="portfolio") appendDerivativeSummary(content,name);
   return;
  }
