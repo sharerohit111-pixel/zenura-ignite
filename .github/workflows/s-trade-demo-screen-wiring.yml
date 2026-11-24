@@ -13,8 +13,10 @@ on:
       - "markets/stocks/demo-chart-data.mjs"
       - "markets/stocks/demo-chart-panel.mjs"
       - "markets/stocks/demo-watchlist-persistence.mjs"
+      - "markets/stocks/demo-watchlist-state.mjs"
+      - "market-gateway/test/demo-watchlist-state.test.mjs"
       - "market-gateway/lib/watchlist-instrument-resolver.js"
-      - "market-gateway/test/watchlist-instrument-resolver.test.js"
+      - "market-gateway/test/watchlist-instrument-resolver.test.js market-gateway/test/demo-watchlist-state.test.mjs"
       - "market-gateway/supabase-server.js"
       - "market-gateway/test/demo-chart-data.test.mjs"
       - ".github/workflows/s-trade-demo-screen-wiring.yml"
@@ -50,7 +52,7 @@ jobs:
       - name: Check shared Demo adapter syntax
         run: node --check markets/shared/paper-demo-adapter.mjs
       - name: Check Demo screen module syntax
-        run: node --check markets/stocks/demo.js && node --check markets/stocks/demo-chart-data.mjs && node --check markets/stocks/demo-chart-panel.mjs && node --check markets/stocks/demo-watchlist-persistence.mjs
+        run: node --check markets/stocks/demo.js && node --check markets/stocks/demo-chart-data.mjs && node --check markets/stocks/demo-chart-panel.mjs && node --check markets/stocks/demo-watchlist-persistence.mjs && node --check markets/stocks/demo-watchlist-state.mjs
       - name: Validate shared fixtures
         run: |
           node - <<'NODE'
