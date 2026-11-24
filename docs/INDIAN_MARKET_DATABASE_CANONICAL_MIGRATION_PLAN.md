@@ -32,12 +32,14 @@ The following version prefixes are reused by distinct SQL files across active/dr
 | `20261123140000` | Futures LIMIT ledger foundation (Options/Futures chain); Equity audit-ledger trigger (Equity accounting chain) |
 | `20261123160000` | Futures LIMIT atomic submit/release; Equity MARKET atomic fill/cash ledger |
 | `20261123170000` | Futures LIMIT atomic fill; Equity LIMIT fill/cash ledger |
-| `20261123180000` | Options LIMIT schema; derivative worker-lease key migration; Equity LIMIT reservation migration |
+| `20261123180000` | Options LIMIT schema; Futures-only worker lease-key migration; Equity LIMIT reservation migration |
 
-Other duplication requiring consolidation:
-- The Options/Futures branch has both `20261123110000_market_gateway_service_role_runtime_grants.sql` and `20261123230000_market_gateway_service_role_read_grants.sql`; compare exact grants and retain one canonical grant source only if the scopes are truly equivalent.
-- The Futures-only worker-key migration and combined derivative worker-key migration overlap. Preserve the combined allowlist only after verifying every worker key and RPC dependency.
-- PR #92's deferred Equity audit-ledger trigger is superseded by the PR #100 explicit atomic accounting path; do not install both mechanisms for the same execution events.
+Other duplication / sequencing findings verified against current PR heads:
+- PR #99's `20261123110000_market_gateway_service_role_runtime_grants.sql` and `20261123230000_market_gateway_service_role_read_grants.sql` have identical grant statements in the inspected SQL. Retain one canonical grant source only after the final callsite-derived privilege list is approved.
+- PR #93 and PR #119 both contain `20261123240000_paper_market_worker_lease_renewal.sql`; their Git blob SHA is identical (`e1fde57d0264f3ba97186a3400abe382ae845d32`). Include this migration exactly once in the canonical chain.
+- PR #99's `20261123220000_derivative_limit_worker_lease_keys.sql` contains the combined allowlist for Equity Delivery LIMIT, Protective, Intraday LIMIT, Futures LIMIT and Options LIMIT. PR #93's separate Futures-only key migration overlaps that shared RPC replacement and should not also be installed as an independent function definition. Preserve the combined allowlist after validating all worker callsites.
+- PR #98 adds the unique later migration `20261123250000_harden_option_limit_expiry_calendar.sql`. It patches `_release_paper_option_limit_order(text,text)` only if the expected old guard exists, and fails closed otherwise. It must follow the Options LIMIT release function migration and remain after the shared lease migration in the proposed ordering.
+- PR #92's deferred Equity audit-ledger trigger must not coexist as a second accounting writer with PR #100's explicit atomic accounting path for the same execution events.
 
 No version renumbering is performed by this PR. Assign final unique timestamps only after exact SQL dependency review and a single disposable full-chain run.
 
@@ -105,7 +107,7 @@ Before selecting one branch's migration, diff the combined derivative allowlist 
 A read-only production catalog audit observed:
 - RLS enabled on the 21 inspected Indian Market public tables.
 - Six internal tables have no client policies; their current client-role table grants were not present in the inspected grant checks.
-- 19 SECURITY DEFINER functions were found. 18 had no explicit function-level `search_path` in `proconfig`; one helper explicitly used `pg_catalog`. Absence of a per-function setting must be treated as an audit item, not as proof of a safe effective path.
+- 19 SECURITY DEFINER functions were found. A follow-up read-only catalog query verified 18 have explicit `search_path = ''` and one explicitly uses `search_path = pg_catalog`. The earlier statement that 18 lacked a function-level setting was incorrect and is superseded by this catalog result. Empty search_path is a useful hardening baseline, but function bodies still require schema-qualification review.
 - Inspected user-facing tables generally granted authenticated SELECT; `paper_watchlists` had authenticated CRUD. Internal worker and Upstox tables were not directly granted to authenticated.
 - Service-role direct table privileges were absent on sampled tables, while service-role execution grants exist for selected RPCs. Validate the real gateway's required table/RPC access before changing grants.
 
@@ -156,7 +158,7 @@ Required security verification:
 4. PR #100 needs fresh successful CI on its current head before its SQL is accepted as canonical.
 5. Futures fill ownership and immutable-ledger grants require hardening.
 6. Shared worker allowlists and lease migrations need one verified combined source.
-7. The 18 SECURITY DEFINER functions without explicit per-function search_path require review and explicit safe configuration.
+7. Review all 19 SECURITY DEFINER function bodies for schema-qualified object references and effective execution safety; catalog settings are 18 empty search paths and one `pg_catalog` path, not 18 missing settings.
 8. Exact gateway/worker service-role grant needs must be derived from callsites, not guessed.
 9. A complete empty-database migration run, rollback suite, and tenant isolation suite are still required.
 
@@ -166,3 +168,58 @@ No migration was applied to production or staging. No PR was merged. No existing
 
 ---
 This plan is a coordination baseline only. It must be updated from exact current PR heads and SQL diffs before implementation is authorized.
+
+
+## 10. Chat 7 follow-up verification — 2026-11-24
+
+This addendum records exact current PR-head observations after the initial plan was drafted. It does not authorize a merge, migration, deployment, or runtime activation.
+
+### Additional cross-chat PR state
+
+| PR | Current head / scope | Verified status |
+|---|---|---|
+| #93 | Futures LIMIT worker lease + heartbeat | Draft; contains Futures-only key migration and shared renewal migration |
+| #98 | Options LIMIT expiry-calendar hardening | Draft; migration `20261123250000_harden_option_limit_expiry_calendar.sql`; CI run #1135 succeeded on inspected head |
+| #100 | Equity ledger integrity hardening + atomic MARKET/LIMIT/reservation migrations | Draft; no workflow run found for inspected head SHA `fa3343de498d1522bad3871bd8d9f7cb8ece5299`; not CI-verified at this head |
+| #117 | Options accounting race fixture isolation | Draft; test-only changes, no migration file |
+| #119 | Options LIMIT worker heartbeat integration | Draft; exact-head workflow run #1302 was still in progress when inspected; do not mark full regression as passed |
+
+### Updated collision and duplicate registry
+
+1. `20261123140000`: Futures ledger foundation vs Equity audit-ledger trigger.
+2. `20261123160000`: Futures atomic submit/release vs Equity MARKET atomic fill/cash ledger.
+3. `20261123170000`: Futures atomic fill vs Equity LIMIT fill/cash ledger.
+4. `20261123180000`: Options LIMIT schema vs Futures-only worker lease-key migration vs Equity LIMIT reservation migration.
+5. `20261123240000_paper_market_worker_lease_renewal.sql`: duplicated across PR #93 and PR #119 with identical blob SHA; include one copy only.
+6. `20261123220000_derivative_limit_worker_lease_keys.sql`: combined lease-key function replacement. Prefer this single allowlist source over also applying the Futures-only duplicate function replacement from PR #93.
+7. `20261123250000_harden_option_limit_expiry_calendar.sql`: unique Options expiry guard hardening; sequence after the Options release function exists.
+8. PR #99's two service-role grant migrations repeat the same SELECT/UPDATE statements. Consolidate after callsite review; do not infer that identical SQL necessarily covers every current worker.
+
+### Revised logical dependency notes
+
+- Keep the immutable production baseline (15 applied rows; latest `20261122123415`) unchanged.
+- Resolve the three-way `20261123180000` collision by assigning unique new versions to the three independent migrations after dependency analysis. Do not edit the already-applied production history.
+- Place the shared combined lease-key migration once, after the worker-state table and before worker heartbeat/renewal consumers.
+- Place the single shared renewal migration once, after the lease acquire/release RPC contract.
+- Place Options expiry hardening after `_release_paper_option_limit_order(text,text)` exists.
+- PR #98's successful CI is evidence for its own tested branch chain, not proof that the eventual cross-chat canonical chain is green.
+- PR #119's in-progress run and PR #100's absent exact-head run remain validation blockers.
+
+### Security catalog correction
+
+The current production catalog result is:
+- 19 SECURITY DEFINER functions total.
+- 18 with explicit empty function-level search_path.
+- 1 with explicit `pg_catalog` search_path.
+
+This corrects the earlier draft's inaccurate count of functions missing an explicit setting. Continue to inspect function bodies for schema-qualified references, owner, EXECUTE ACL and unintended PUBLIC/anon/authenticated execution.
+
+### Remaining high-priority implementation blockers
+
+1. Reconcile Firebase identity resolution with Supabase-native Auth and existing `auth.users(id)` foreign keys before claiming a supported identity path.
+2. Complete a single deterministic migration manifest with version, file path, Git blob SHA-256/content digest, source PR, dependency and rollback classification.
+3. Harden Futures fills as append-only and ensure composite user/order ownership FKs are present in the canonical chain.
+4. Derive exact service_role grants from all current gateway and worker callsites; specifically include required Futures worker reads only after review, and remove unnecessary UPDATE/DELETE from financial ledgers.
+5. Run the complete combined migration chain from an empty disposable PostgreSQL database, then tenant-isolation, replay, race and ledger-conservation tests.
+6. Keep staging unavailable/unverified until a separate Supabase staging project or branch is provisioned and inspected. No production or staging SQL has been applied by this addendum.
+7. No Crypto schema, migration, function, policy or data was changed.
