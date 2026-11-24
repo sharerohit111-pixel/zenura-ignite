@@ -1,6 +1,7 @@
 "use strict";
 
 const { assertMarketDataProvider, normalizeMarketDataSnapshot } = require("./market-data-provider-contract");
+const { hasPaperTradingMarketDataRights } = require("./provider-paper-trading-policy");
 
 const CAPABILITIES = Object.freeze(["quote", "candles", "depth", "instrumentMaster", "stream"]);
 const TRANSIENT_STATUSES = new Set([408, 425, 429, 500, 502, 503, 504]);
@@ -158,8 +159,7 @@ class MarketDataProviderRouter {
       } catch {
         continue;
       }
-      if (!entitlement || entitlement.approved !== true ||
-          typeof entitlement.reference !== "string" || !entitlement.reference.trim()) continue;
+      if (!hasPaperTradingMarketDataRights(providerId, entitlement)) continue;
 
       // Shared PostgreSQL quota is consumed before any upstream call. A missing
       // policy or unavailable quota service never falls back to an in-memory limit.
