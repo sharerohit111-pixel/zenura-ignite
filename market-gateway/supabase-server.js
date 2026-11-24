@@ -21,6 +21,7 @@ const {createPaperFuturesLimitWorker,isVerifiedSessionOpen}=require("./lib/paper
 const {createPaperOptionLimitWorker}=require("./lib/paper-option-limit-worker");
 const {loadVerifiedExchangeSession}=require("./lib/exchange-session-calendar");
 const {buildPortfolioValuation}=require("./lib/paper-portfolio-valuation");
+const {buildOptionsAccountingSnapshot}=require("./lib/options-accounting-read-model");
 const {calculateDerivativePortfolio}=require("./lib/derivative-portfolio");
 const {validateDerivativeContract,normalizeTickSizePaise}=require("./lib/derivative-contract");
 const {validateOptionLimitOrder,evaluateOptionLimitQuote}=require("./lib/option-limit-policy");
@@ -758,6 +759,62 @@ app.post("/paper/derivative/orders",async(req,res)=>{
     });
   }catch(error){sendError(res,error,"Derivative paper order could not be completed.");}
 });
+
+async function loadAllOptionsRows(userDb,table,userId,orderColumn="created_at"){
+  const rows=[],pageSize=500;
+  for(let offset=0;offset<100000;offset+=pageSize){
+    const {data,error}=await userDb.from(table).select("*").eq("user_id",userId)
+      .order(orderColumn,{ascending:true}).range(offset,offset+pageSize-1);
+    if(error)throw Object.assign(new Error("Options accounting history could not be loaded."),{status:503});
+    const page=data||[];rows.push(...page);
+    if(page.length<pageSize)return rows;
+  }
+  throw Object.assign(new Error("Options accounting history exceeds the supported reconciliation window."),{status:503});
+}
+
+app.get("/paper/options/accounting",async(req,res)=>{
+  try{
+    const {user,userDb}=await auth(req);
+    const [{data:account,error:accountError},{data:positions,error:positionError},
+      marketOrders,limitOrders]=await Promise.all([
+      userDb.from("paper_accounts").select("cash_paise,reserved_cash_paise,reserved_margin_paise,realized_pnl_paise")
+        .eq("user_id",user.id).maybeSingle(),
+      userDb.from("paper_derivative_positions").select("*").eq("user_id",user.id),
+      loadAllOptionsRows(userDb,"paper_derivative_orders",user.id),
+      loadAllOptionsRows(userDb,"paper_option_limit_orders",user.id)
+    ]);
+    if(accountError||!account)return res.status(404).json({error:"Indian paper account has not been initialized."});
+    if(positionError)throw Object.assign(new Error("Options positions could not be loaded."),{status:503});
+    const optionOrders=(marketOrders||[]).filter(isNseOption);
+    const optionLimitOrders=(limitOrders||[]).filter(isNseOption);
+    const orderIds=optionLimitOrders.map(order=>order.order_id);
+    const limitFills=[];
+    for(let offset=0;offset<orderIds.length;offset+=500){
+      const ids=orderIds.slice(offset,offset+500);
+      if(!ids.length)continue;
+      const {data,error}=await userDb.from("paper_option_limit_fills").select("*")
+        .in("order_id",ids).order("fill_id",{ascending:true});
+      if(error)throw Object.assign(new Error("Options immutable fill history could not be loaded."),{status:503});
+      limitFills.push(...(data||[]));
+    }
+    const optionPositions=(positions||[]).filter(isNseOption);
+    const quotes=[];
+    if(optionPositions.length){
+      const {token}=await getUpstoxAccessToken(user.id);
+      for(const position of optionPositions){
+        const {quote}=await getQuote(token,position.instrument_key);
+        const normalized=normalizeProviderQuote(quote,position.instrument_key,{maxAgeMs:15000});
+        quotes.push({instrumentKey:position.instrument_key,pricePaise:normalized.pricePaise,observedAtMs:normalized.tradeTimeMs});
+      }
+    }
+    const snapshot=buildOptionsAccountingSnapshot({
+      account,positions:optionPositions,marketOrders:optionOrders,
+      limitOrders:optionLimitOrders,limitFills,quotes,now:Date.now()
+    });
+    res.set("Cache-Control","private, no-store").json(snapshot);
+  }catch(error){sendError(res,error,"NSE Options accounting snapshot could not be reconciled.");}
+});
+
 app.get("/paper/derivative/orders",async(req,res)=>{
   try{
     const {user,userDb}=await auth(req),raw=String(req.query.limit??"50");
