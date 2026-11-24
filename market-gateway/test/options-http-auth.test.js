@@ -279,6 +279,45 @@ test("authenticated NSE Options LIMIT BUY and SELL submit through verified sessi
   }
 });
 
+test("authenticated NSE Options LIMIT route rejects malformed inputs before account or provider reads",async()=>{
+  authenticated=true;
+  rpcCalls.length=0;userQueries.length=0;
+  const oldEnabled=paperOptionLimitWorkerStatus.enabled;
+  const oldLimitFlag=process.env.PAPER_OPTIONS_LIMIT_ENABLED;
+  const oldWorkerFlag=process.env.PAPER_OPTIONS_LIMIT_WORKER_ENABLED;
+  process.env.PAPER_OPTIONS_LIMIT_ENABLED="true";
+  process.env.PAPER_OPTIONS_LIMIT_WORKER_ENABLED="true";
+  paperOptionLimitWorkerStatus.enabled=true;
+  try{
+    await withServer(async base=>{
+      const headers={Authorization:"Bearer valid-options-test-token"};
+      const valid={instrument_key:TEST_INSTRUMENT_KEY,side:"BUY",lots:1,
+        limit_price_paise:1250,idempotency_key:"00000000-0000-4000-8000-000000000030"};
+      const cases=[
+        [{...valid,idempotency_key:"not-a-uuid"},"A valid UUID idempotency_key is required."],
+        [{...valid,instrument_key:"bad\\ninstrument"},"A valid NSE option instrument_key is required."],
+        [{...valid,side:"SHORT"},"Options LIMIT side must be BUY or SELL."],
+        [{...valid,lots:1.5},"Lots must be a whole number between 1 and 10,000."],
+        [{...valid,limit_price_paise:0},"LIMIT price must be a positive integer number of paise."]
+      ];
+      for(const [body,message] of cases){
+        const result=await request(base,"/paper/derivative/limit-orders",{method:"POST",headers,body});
+        assert.equal(result.status,400,JSON.stringify(result.body));
+        assert.equal(result.body.error,message);
+      }
+      assert.equal(userQueries.length,0,"invalid requests must not read account, positions, tokens or sessions");
+      assert.equal(rpcCalls.length,0,"invalid requests must not invoke accounting RPCs");
+    });
+  }finally{
+    authenticated=false;
+    paperOptionLimitWorkerStatus.enabled=oldEnabled;
+    if(oldLimitFlag===undefined)delete process.env.PAPER_OPTIONS_LIMIT_ENABLED;
+    else process.env.PAPER_OPTIONS_LIMIT_ENABLED=oldLimitFlag;
+    if(oldWorkerFlag===undefined)delete process.env.PAPER_OPTIONS_LIMIT_WORKER_ENABLED;
+    else process.env.PAPER_OPTIONS_LIMIT_WORKER_ENABLED=oldWorkerFlag;
+  }
+});
+
 test("authenticated Options history and cancellation APIs use verified user scope",async()=>{
   authenticated=true;
   rpcCalls.length=0;userQueries.length=0;
