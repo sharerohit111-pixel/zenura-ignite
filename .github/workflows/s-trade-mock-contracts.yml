@@ -26,6 +26,7 @@ on:
       - "market-gateway/test/paper-mock-fixtures.test.js"
       - "markets/shared/paper-demo-adapter.mjs"
       - "market-gateway/test/paper-demo-adapter.test.mjs"
+      - "markets/dashboard/**"
       - ".github/workflows/s-trade-mock-contracts.yml"
 
 permissions:
