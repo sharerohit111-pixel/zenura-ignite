@@ -69,6 +69,14 @@ function createDemoTradeHistoryStore(options = {}) {
       return {duplicate:true,order:orderCopy(order),trade:clone(prior)};
     }
     if (!OPEN.has(order.status) || input.quantity > order.remainingQuantity) fail("DEMO_FILL_EXCEEDS_REMAINING");
+    if (order.side === "SELL") {
+      const positionKey = keyOf(order.assetClass,order.product,order.instrumentKey);
+      let held = 0;
+      for (const priorFill of fills.values()) if (keyOf(priorFill.assetClass,priorFill.product,priorFill.instrumentKey) === positionKey) {
+        held += priorFill.side === "BUY" ? priorFill.quantity : -priorFill.quantity;
+      }
+      if (input.quantity > held) fail("DEMO_POSITION_SELL_EXCEEDS_LONG");
+    }
     const nextFilled = order.filledQuantity + input.quantity;
     const nextGross = order.grossValuePaise + receipt.grossValuePaise;
     if (!safe(nextFilled) || !safe(nextGross)) fail("DEMO_FILL_TOTAL_OUT_OF_RANGE");
