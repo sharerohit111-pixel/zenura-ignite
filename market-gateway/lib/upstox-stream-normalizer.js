@@ -47,7 +47,8 @@ function normalizeUpstoxFeedQuotes(payload, {
   const snapshots = [];
   for (const [instrumentKey, feed] of Object.entries(payload.feeds)) {
     const mapping = getMapping(instrumentMap, instrumentKey);
-    if (!mapping || typeof mapping.instrumentId !== "string" || !mapping.instrumentId.trim() ||
+    if (!mapping || mapping.nativeInstrumentKey !== instrumentKey ||
+        typeof mapping.instrumentId !== "string" || !mapping.instrumentId.trim() ||
         !["NSE", "BSE"].includes(mapping.exchange) ||
         typeof mapping.entitlementReference !== "string" || !mapping.entitlementReference.trim()) continue;
 
