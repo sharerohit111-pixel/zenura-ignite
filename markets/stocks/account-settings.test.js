@@ -56,3 +56,14 @@ test("development mock login is localhost-only and never creates a backend auth 
   assert.ok(source.includes("Wallet refresh is disabled in the local mock preview."));
   assert.doesNotMatch(source, /localStorage|sessionStorage|service_role|SUPABASE_SERVICE_ROLE_KEY/i);
 });
+
+
+test("email and password changes are delegated to the active Supabase Auth user", () => {
+  assert.match(source, /supabase\\.auth\\.updateUser\\(\\{ email \\}\\)/);
+  assert.match(source, /supabase\\.auth\\.updateUser\\(\\{ password \\}\\)/);
+  assert.match(source, /Email change requested\\. Complete the confirmation steps sent by Supabase/);
+  assert.match(source, /Password updated successfully/);
+  assert.match(source, /Email changes are disabled in the local mock preview/);
+  assert.match(source, /Password changes are disabled in the local mock preview/);
+  assert.match(source, /password.length < 8 \|\| password.length > 128/);
+});
