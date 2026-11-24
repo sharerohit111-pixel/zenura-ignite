@@ -2,7 +2,7 @@
 
 const instrumentsFixture=require("../fixtures/mock-instrument-master.json");
 const snapshotsFixture=require("../fixtures/mock-market-snapshots.json");
-const {rankInstrumentSearchResults}=require("./instrument-search");
+const {filterAndRankInstrumentCatalog}=require("./instrument-catalog");
 
 const DEMO_AS_OF_DATE=instrumentsFixture.as_of;
 const SOURCE="SYNTHETIC_MOCK_JSON";
@@ -32,35 +32,11 @@ function matchesKind(item,kind){
   return item.instrument_type==="CE"||item.instrument_type==="PE";
 }
 function listInstruments(options={}){
-  const kind=String(options.kind||"all").toLowerCase();
-  const exchange=String(options.exchange||"").toUpperCase();
-  const query=String(options.q||"").trim().slice(0,60);
-  const underlying=String(options.underlying||"").trim().toUpperCase();
-  const expiry=options.expiry?normalizeDate(options.expiry):"";
-  const optionType=String(options.optionType||"").toUpperCase();
   const asOf=normalizeDate(options.asOf);
-  const limit=options.limit===undefined?100:Number(options.limit);
-  if(!VALID_KINDS.has(kind))throw Object.assign(new Error("Unsupported instrument kind."),{status:400});
-  if(exchange&&!VALID_EXCHANGES.has(exchange))throw Object.assign(new Error("Exchange must be NSE or BSE."),{status:400});
-  if(!Number.isInteger(limit)||limit<1||limit>100)throw Object.assign(new Error("Limit must be between 1 and 100."),{status:400});
-  if(optionType&&!["CE","PE"].includes(optionType))throw Object.assign(new Error("Option type must be CE or PE."),{status:400});
-  const minStrike=options.minStrike===undefined?null:Number(options.minStrike);
-  const maxStrike=options.maxStrike===undefined?null:Number(options.maxStrike);
-  const exactStrike=options.strike===undefined?null:Number(options.strike);
-  for(const n of [minStrike,maxStrike,exactStrike])if(n!==null&&(!Number.isFinite(n)||n<=0))throw Object.assign(new Error("Strike filters must be positive numbers."),{status:400});
-  const filtered=INSTRUMENTS.filter(item=>{
-    if(!matchesKind(item,kind))return false;
-    if(exchange&&item.exchange!==exchange)return false;
-    if(underlying&&item.underlying_symbol!==underlying)return false;
-    if(expiry&&item.expiry!==expiry)return false;
-    if(item.expiry&&item.expiry<asOf)return false;
-    if(optionType&&item.instrument_type!==optionType)return false;
-    if(exactStrike!==null&&item.strike_price!==exactStrike)return false;
-    if(minStrike!==null&&(item.strike_price===null||item.strike_price<minStrike))return false;
-    if(maxStrike!==null&&(item.strike_price===null||item.strike_price>maxStrike))return false;
-    return true;
-  });
-  return rankInstrumentSearchResults(filtered,query,limit).map(item=>({...item}));
+  const expiry=options.expiry?normalizeDate(options.expiry):undefined;
+  return filterAndRankInstrumentCatalog(INSTRUMENTS,{
+    ...options,expiry,asOf,optionType:options.optionType,limit:options.limit===undefined?100:Number(options.limit)
+  }).map(item=>({...item}));
 }
 function listExpiries({underlying,exchange,kind="options",asOf}={}){
   const u=String(underlying||"").trim().toUpperCase();
