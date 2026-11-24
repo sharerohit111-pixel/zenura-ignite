@@ -74,6 +74,24 @@ test("canonical adapter can build the dashboard view model from shared fixtures"
  assert.equal(model.orders.length,3);
  assert.equal(model.account.ledgerReconciled,false);
 });
+test("private Demo watchlists use the canonical MOCK catalog and authenticated per-user API",async()=>{
+ const source=await read("demo-watchlist-persistence.mjs"),js=await read("demo.js"),html=await read("demo.html");
+ assert.match(js,/mountPrivateWatchlists\(host,\{model\}\)/);
+ assert.match(source,/client\.auth\.getSession/);
+ assert.match(source,/client\.auth\.onAuthStateChange/);
+ assert.match(source,/Authorization:"Bearer "\+snapshot\.token/);
+ assert.match(source,/\/watchlist\?name=/);
+ assert.match(source,/instrumentKeys:\[\.\.\.next\.map/);
+ assert.match(source,/new Set\(\[\.\.\.next\.map/);
+ assert.match(source,/MAX_ITEMS=50/);
+ assert.match(source,/currentCatalogItem\(x\.instrument_key\)/);
+ assert.match(source,/preservedItems/);
+ assert.match(source,/Account changed/);
+ assert.match(source,/window\.ZENURA_SUPABASE/);
+ assert.match(source,/zenura-market-auth-ready/);
+ assert.match(source,/Demo Watchlists remain available without sign-in/);
+ assert.match(html,/name="market-gateway-url"/);
+});
 test("chart fixture requests omit account credentials",async()=>{
  const chart=await read("demo-chart-panel.mjs");
  assert.match(chart,/credentials: "omit"/);
@@ -88,6 +106,6 @@ test("responsive demo assets are included in the Markets PWA shell",async()=>{
  const sw=await readFile(new URL("../../markets/service-worker.js",import.meta.url),"utf8");
  assert.match(css,/@media\(max-width:900px\)/);
  assert.match(css,/@media\(max-width:520px\)/);
- assert.match(sw,/zenura-markets-shell-v5/);
- for(const asset of ["stocks/demo.html","stocks/demo.css","stocks/demo.js","stocks/demo-chart-panel.mjs","stocks/demo-chart-data.mjs","shared/paper-demo-adapter.mjs"])assert.ok(sw.includes(asset));
+ assert.match(sw,/zenura-markets-shell-v6/);
+ for(const asset of ["stocks/demo.html","stocks/demo.css","stocks/demo.js","stocks/demo-chart-panel.mjs","stocks/demo-chart-data.mjs","stocks/demo-watchlist-persistence.mjs","shared/paper-demo-adapter.mjs"])assert.ok(sw.includes(asset));
 });

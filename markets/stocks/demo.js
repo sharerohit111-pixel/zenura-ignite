@@ -2,6 +2,7 @@ import { createPaperDemoViewModel, searchPaperDemoInstruments, getPaperDemoExpir
 import { mountDerivativeDemo, appendDerivativeSummary } from "./demo-derivative-panel.mjs";
 import { mountDemoChart } from "./demo-chart-panel.mjs";
 import { mountEquityDemo, appendEquitySummary } from "./demo-equity-panel.mjs";
+import { mountPrivateWatchlists } from "./demo-watchlist-persistence.mjs";
 
 "use strict";
 const status=document.getElementById("demo-status");
@@ -11,6 +12,7 @@ const screens=["home","market","watchlists","charts","equity","futures","options
 const titles={home:"Home Overview",market:"Market Snapshot",watchlists:"Watchlists",charts:"Charts & Depth",equity:"Equity Paper Trading",futures:"Futures Paper Trading",options:"Options Paper Trading",orders:"Orders",trades:"Trade History",portfolio:"Portfolio",positions:"Positions",holdings:"Holdings",account:"Virtual Wallet",profile:"Demo Profile",settings:"Settings"};
 let model=null;
 let demoWatchlists=null;
+let privateWatchlistPanel=null;
 const el=(tag,cls,text)=>{const n=document.createElement(tag);if(cls)n.className=cls;if(text!==undefined)n.textContent=String(text);return n;};
 const money=paise=>"₹"+(Number(paise||0)/100).toLocaleString("en-IN",{minimumFractionDigits:2,maximumFractionDigits:2});
 const card=(label,value,detail)=>{const c=el("article","card");c.append(el("h3","",label),el("div","metric",value),el("div","sub",detail||""));return c;};
@@ -158,6 +160,8 @@ function renderDemoWatchlists(host){
  instrumentSelect.addEventListener("change",renderRows);
  addButton.addEventListener("click",()=>{const list=demoWatchlists[listSelect.value],key=instrumentSelect.value;if(!key||list.length>=50||list.includes(key))return;list.push(key);renderRows();});
  renderRows();
+ privateWatchlistPanel?.dispose?.();
+ privateWatchlistPanel=mountPrivateWatchlists(host,{model});
 }
 function orderRows(orders){return orders.map(o=>{const instrument=model.market.instruments.find(item=>item.instrumentKey===o.instrumentKey);return [o.orderId,o.assetClass,instrument?.symbol||o.instrumentKey,o.side,o.orderType,o.quantity??o.lots,o.status,money(o.averagePricePaise??o.limitPricePaise??0),money(o.chargesPaise??0)];});}
 function render(name){
