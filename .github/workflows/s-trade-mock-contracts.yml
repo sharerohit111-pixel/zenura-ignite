@@ -4,6 +4,8 @@ on:
   pull_request:
     branches:
       - feature/s-trade-distributed-api-rate-limit-2026-11-24
+      - feature/s-trade-mock-contract-architecture-2026-11-24
+      - feature/s-trade-shared-demo-consumer-adapter-2026-11-24
     paths:
       - "market-gateway/mock/**"
       - "market-gateway/lib/paper-mock-fixtures.js"
