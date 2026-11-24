@@ -80,7 +80,7 @@ if (host && !document.getElementById("s-trade-account")) {
   async function loadWallet(userId, sequence = authSequence) {
     if (!gateway) throw new Error("Market gateway is not configured.");
     const { data, error } = await supabase.auth.getSession();
-    if (error || !data.session?.access_token) throw new Error("Your session expired. Sign in again.");
+    if (error || !data.session?.access_token || data.session.user?.id !== userId) throw new Error("Your session expired or the active account changed. Sign in again.");
     const response = await fetch(gateway + "/paper/account", {
       headers: { Authorization: "Bearer " + data.session.access_token, Accept: "application/json" },
       cache: "no-store",
@@ -99,6 +99,7 @@ if (host && !document.getElementById("s-trade-account")) {
     const user = session?.user || null;
     currentUserId = user?.id || null;
     clearWallet();
+    for (const id of ["s-trade-new-email", "s-trade-new-password"]) $(id).value = "";
     $("s-trade-display-name").value = "";
     $("s-trade-session-info").textContent = "";
     if (!user) {
