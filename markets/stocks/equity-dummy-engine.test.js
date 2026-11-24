@@ -31,13 +31,15 @@ test("validates side, product, order type, quantity, tick and idempotency", () =
 
 test("Delivery and Intraday positions remain isolated", () => {
   const engine = createEngine({fixtures});
-  const delivery = engine.submitOrder(buy({orderType:"MARKET",limitPricePaise:undefined,quantity:2,idempotencyKey:"delivery-001"}));
-  const intraday = engine.submitOrder(buy({orderType:"MARKET",limitPricePaise:undefined,product:"INTRADAY",quantity:2,idempotencyKey:"intraday-001"}));
-  assert.equal(delivery.status, "PARTIALLY_FILLED");
-  assert.equal(intraday.status, "PARTIALLY_FILLED");
+  const delivery = engine.submitOrder(buy({orderType:"MARKET",limitPricePaise:undefined,quantity:5,idempotencyKey:"delivery-001"}));
+  const intraday = engine.submitOrder(buy({orderType:"MARKET",limitPricePaise:undefined,product:"INTRADAY",quantity:4,idempotencyKey:"intraday-001"}));
+  assert.equal(delivery.status, "CANCELLED");
+  assert.equal(intraday.status, "CANCELLED");
+  assert.equal(delivery.filledQuantity,3);
+  assert.equal(delivery.remainingQuantity,2);
   const positions = engine.snapshot().positions;
-  assert.equal(positions.find(p=>p.product==="DELIVERY").quantity,2);
-  assert.equal(positions.find(p=>p.product==="INTRADAY").quantity,2);
+  assert.equal(positions.find(p=>p.product==="DELIVERY").quantity,3);
+  assert.equal(positions.find(p=>p.product==="INTRADAY").quantity,3);
 });
 
 test("MARKET BUY/SELL executes immediately and preserves individual receipts", () => {
@@ -125,13 +127,16 @@ test("idempotent order replay returns original order; changed payload is rejecte
   assert.throws(()=>engine.submitOrder(buy({quantity:4})),/different order payload/);
 });
 
-test("duplicate execution IDs cannot create duplicate receipts", () => {
-  const engine = createEngine({fixtures});
-  const order = engine.submitOrder(buy());
-  engine.processQuote(INFY,152345,{maxFillQuantity:1});
-  const receipts = engine.getTradeReceipts(order.orderId);
-  assert.equal(receipts.length,1);
-  assert.equal(new Set(receipts.map(x=>x.executionId)).size,receipts.length);
+test("execution retry returns the original immutable receipt without double accounting", () => {
+  const engine = createEngine({fixtures:{...fixtures,instruments:fixtures.instruments.map(x=>({...x,maxFillQuantity:10}))}});
+  const order = engine.submitOrder(buy({quantity:2}));
+  const first = engine.executeFill(order.orderId,2,152345,"stable-execution-0001");
+  const afterFirst = engine.snapshot();
+  const replay = engine.executeFill(order.orderId,2,152345,"stable-execution-0001");
+  assert.deepEqual(replay,first);
+  assert.equal(engine.getTradeReceipts(order.orderId).length,1);
+  assert.equal(engine.snapshot().cashPaise,afterFirst.cashPaise);
+  assert.throws(()=>engine.executeFill(order.orderId,1,152345,"stable-execution-0001"),/different fill payload/);
 });
 
 test("BSE and NSE instruments are distinct and deterministic quote data is fixed", () => {
