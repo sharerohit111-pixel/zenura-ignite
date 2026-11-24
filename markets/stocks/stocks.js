@@ -853,9 +853,10 @@
     const derivativeBody=document.getElementById('derivative-positions');
     const derivativeStatus=document.getElementById('derivative-portfolio-status');
     const derivativeHistory=document.getElementById('derivative-history');
-    if(derivativeBody)tableMessage(derivativeBody,6,'Sign in to view derivative positions.');
-    if(derivativeHistory)tableMessage(derivativeHistory,6,'Sign in to view derivative order history.');
+    if(derivativeBody)tableMessage(derivativeBody,8,'Sign in to view private NSE Options positions.');
+    if(derivativeHistory)tableMessage(derivativeHistory,10,'Sign in to view private Options trade and exit history.');
     if(derivativeStatus)derivativeStatus.textContent='Sign in required';
+    ['options-available-balance','options-blocked-premium','options-premium-invested','options-realized-pnl','options-unrealized-pnl','options-charges-paid'].forEach(id=>{const node=document.getElementById(id);if(node)node.textContent='—';});
     paperOrderStatus.textContent='Sign in to place a private paper order.';
     optionStatus.textContent='Sign in to load a private option chain or place an option paper order.';
     price.textContent='—';title.textContent='No instrument selected';symbol.textContent='Sign in to load market data';
