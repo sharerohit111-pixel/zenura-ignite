@@ -86,6 +86,7 @@ export function createPaperDemoViewModel(fixtures, options = {}) {
   assertOrder(derivatives.futures.order, "futures");
   if (!["CE", "PE"].includes(derivatives.options.optionType)) fail("INVALID_MOCK_OPTION_TYPE");
   assertMockInstrument(derivatives.options.instrumentKey, "MOCK" + derivatives.options.optionType);
+  if (typeof derivatives.options.underlying !== "string" || !/^MOCK[A-Z0-9-]*$/.test(derivatives.options.underlying)) fail("NON_SYNTHETIC_OPTION_UNDERLYING");
   assertOrder(derivatives.options.order, "options");
 
   const instruments = market.quotes.map(quote => {
