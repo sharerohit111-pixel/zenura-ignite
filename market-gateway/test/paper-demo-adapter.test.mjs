@@ -63,7 +63,7 @@ test("adapter rejects non-synthetic account IDs and personal profile fields", as
   invalidId.account.data.accountId = "customer-123";
   assert.throws(() => createPaperDemoViewModel(invalidId,{enabled:true}),/INVALID_MOCK_ACCOUNT_IDENTITY/);
   const personal = await allFixtures();
-  personal.account.data.email = "private@example.invalid";
+  personal.account.data.fullName = "Private Customer";
   assert.throws(() => createPaperDemoViewModel(personal,{enabled:true}),/INVALID_MOCK_ACCOUNT_IDENTITY/);
 });
 
