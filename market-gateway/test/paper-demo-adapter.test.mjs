@@ -58,3 +58,9 @@ test("adapter rejects envelopes outside the canonical synthetic source contract"
   negative.account.data.blockedFundsPaise = 100000001;
   assert.throws(() => createPaperDemoViewModel(negative,{enabled:true}), /INVALID_MOCK_ACCOUNT_SNAPSHOT/);
 });
+
+test("adapter rejects a non-synthetic options underlying", async () => {
+  const fixtures = await allFixtures();
+  fixtures.derivatives.data.options.underlying = "NIFTY";
+  assert.throws(() => createPaperDemoViewModel(fixtures,{enabled:true}), /NON_SYNTHETIC_OPTION_UNDERLYING/);
+});
