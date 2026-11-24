@@ -12,6 +12,12 @@ const TYPES=new Set(["MARKET","LIMIT"]);
 const clone=value=>JSON.parse(JSON.stringify(value));
 const fail=(code,status=400)=>{throw Object.assign(new Error(code),{code,status});};
 function safeProduct(a,b){const n=a*b;if(!Number.isSafeInteger(n)||n<0)fail("DEMO_AMOUNT_OUT_OF_RANGE",409);return n;}
+function safeSum(a,b){const n=a+b;if(!Number.isSafeInteger(n))fail("DEMO_AMOUNT_OUT_OF_RANGE",409);return n;}
+function allocateCostPaise(total,quantity,totalQuantity){
+  if(!Number.isSafeInteger(total)||total<0||!Number.isSafeInteger(quantity)||!Number.isSafeInteger(totalQuantity)||
+    quantity<0||totalQuantity<1||quantity>totalQuantity)fail("INVALID_DEMO_COST_ALLOCATION",409);
+  return Number((BigInt(total)*BigInt(quantity)+BigInt(totalQuantity)/2n)/BigInt(totalQuantity));
+}
 function validateFixture(fixture){
   if(!fixture||fixture.schemaVersion!=="1.0.0"||fixture.mode!=="MOCK"||fixture.simulated!==true||
     fixture.meta?.source!=="SYNTHETIC_FIXTURE"||fixture.meta?.exchange!=="NONE"||
@@ -45,14 +51,15 @@ function normalizeAccount(account){
   for(const map of [positions,intradayPositions]){
     if(!map||typeof map!=="object"||Array.isArray(map))fail("INVALID_EQUITY_DEMO_POSITIONS",409);
     for(const p of Object.values(map)){
-      if(!p||!Number.isSafeInteger(p.quantity)||p.quantity<0||!Number.isSafeInteger(p.costBasisPaise)||p.costBasisPaise<0||
+      if(!p||!Number.isSafeInteger(p.quantity)||p.quantity<0||p.quantity>MAX_QUANTITY||!Number.isSafeInteger(p.costBasisPaise)||p.costBasisPaise<0||
         !Number.isSafeInteger(p.reservedQuantity||0)||(p.reservedQuantity||0)<0||(p.reservedQuantity||0)>p.quantity||
         (p.quantity===0&&p.costBasisPaise!==0))fail("INVALID_EQUITY_DEMO_POSITION",409);
     }
   }
   const result={...clone(account),positions:clone(positions),intradayPositions:clone(intradayPositions)};
   result.availableFundsPaise=result.cashBalancePaise-result.blockedFundsPaise;
-  result.realizedPnlPaise=Number.isSafeInteger(result.realizedPnlPaise)?result.realizedPnlPaise:0;
+  if(result.realizedPnlPaise!==undefined&&!Number.isSafeInteger(result.realizedPnlPaise))fail("INVALID_EQUITY_DEMO_ACCOUNT",409);
+  result.realizedPnlPaise=result.realizedPnlPaise??0;
   return result;
 }
 function fingerprint(request){
@@ -127,17 +134,21 @@ function createEquityDemoExecutionEngine({fixture,account,env=(typeof process!==
       state.account.cashBalancePaise-=gross;
       state.account.blockedFundsPaise-=safeProduct(order.orderType==="LIMIT"?order.limitPricePaise:state.book.asks.at(-1).pricePaise,quantity);
       const map=positionMap(order.product),old=map[order.instrumentKey]||{quantity:0,costBasisPaise:0,averagePricePaise:0,reservedQuantity:0};
-      old.quantity+=quantity;old.costBasisPaise+=gross;old.averagePricePaise=Math.round(old.costBasisPaise/old.quantity);old.investedValuePaise=old.costBasisPaise;
+      const nextQuantity=safeSum(old.quantity,quantity);
+      if(nextQuantity>MAX_QUANTITY)fail("DEMO_POSITION_QUANTITY_LIMIT",409);
+      old.quantity=nextQuantity;old.costBasisPaise=safeSum(old.costBasisPaise,gross);old.averagePricePaise=Math.round(old.costBasisPaise/old.quantity);old.investedValuePaise=old.costBasisPaise;
       map[order.instrumentKey]=old;
     }else{
       const nextCash=state.account.cashBalancePaise+gross;
       if(!Number.isSafeInteger(nextCash))fail("DEMO_AMOUNT_OUT_OF_RANGE",409);
       state.account.cashBalancePaise=nextCash;
       const map=positionMap(order.product),p=map[order.instrumentKey];
-      const allocatedCost=quantity===p.quantity?p.costBasisPaise:Math.round(p.costBasisPaise*quantity/p.quantity);
+      const allocatedCost=allocateCostPaise(p.costBasisPaise,quantity,p.quantity);
       const oldQuantity=p.quantity;p.quantity-=quantity;p.costBasisPaise-=allocatedCost;p.averagePricePaise=p.quantity?Math.round(p.costBasisPaise/p.quantity):0;
       p.investedValuePaise=p.costBasisPaise;p.reservedQuantity-=quantity;
-      const realized=gross-allocatedCost;order.realizedPnlPaise+=realized;state.account.realizedPnlPaise+=realized;
+      const realized=gross-allocatedCost;
+      order.realizedPnlPaise=safeSum(order.realizedPnlPaise,realized);
+      state.account.realizedPnlPaise=safeSum(state.account.realizedPnlPaise,realized);
       if(p.quantity===0)delete map[order.instrumentKey];
       order._lastFillRealizedPnlPaise=realized;
     }
@@ -175,11 +186,11 @@ function createEquityDemoExecutionEngine({fixture,account,env=(typeof process!==
   function snapshot(){
     const delivery=state.account.positions[instrument.instrumentKey]||{quantity:0,costBasisPaise:0};
     const intraday=state.account.intradayPositions[instrument.instrumentKey]||{quantity:0,costBasisPaise:0};
-    const quantity=delivery.quantity+intraday.quantity;
-    const costBasisPaise=delivery.costBasisPaise+intraday.costBasisPaise;
+    const quantity=safeSum(delivery.quantity,intraday.quantity);
+    const costBasisPaise=safeSum(delivery.costBasisPaise,intraday.costBasisPaise);
     const marketValuePaise=safeProduct(instrument.markPricePaise,quantity);
     const unrealizedPnlPaise=marketValuePaise-costBasisPaise;
-    const totalPnlPaise=state.account.realizedPnlPaise+unrealizedPnlPaise;
+    const totalPnlPaise=safeSum(state.account.realizedPnlPaise,unrealizedPnlPaise);
     return clone({mode:"MOCK",simulated:true,source:"SYNTHETIC_FIXTURE",fees:"NOT_MODELED",
       valuation:{instrumentKey:instrument.instrumentKey,markPricePaise:instrument.markPricePaise,quantity,costBasisPaise,marketValuePaise,unrealizedPnlPaise,totalPnlPaise},
       account:state.account,orders:[...state.orders.values()],fills:state.fills,
