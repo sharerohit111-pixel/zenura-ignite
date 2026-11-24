@@ -16,7 +16,7 @@ test("mobile OTP uses Supabase phone OTP and verifies only SMS codes", () => {
 test("profile updates only the signed-in user's Auth metadata", () => {
   assert.match(source, /supabase\.auth\.getUser\(\)/);
   assert.match(source, /supabase\.auth\.updateUser\(\{ data: \{ display_name: displayName \} \}\)/);
-  assert.match(source, /data\.user\?\.id !== currentUserId/);
+  assert.match(source, /data\.user\?\.id !== userId/);
 });
 
 test("session refresh, auth-state clearing and logout are wired", () => {
