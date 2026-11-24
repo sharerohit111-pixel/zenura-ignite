@@ -16,7 +16,7 @@ All monetary values are integer paise.
 - Starting capital is paper_accounts.starting_cash_paise; initial grant is 100,000,000 paise (₹10,00,000), idempotent and never reissued on retry.
 - Cash is paper_accounts.cash_paise, the transactional spendable-balance authority until a canonical cross-asset ledger transition is approved.
 - Blocked funds = reserved_cash_paise + reserved_margin_paise. Do not add asset-level reservations again.
-- Available cash = cash_paise - reserved_cash_paise - reserved_margin_paise. Preserve negative values and expose margin deficit; never clamp a genuine Futures MTM debit.
+- Available cash = cash_paise - reserved_cash_paise - reserved_margin_paise. Preserve negative values and expose margin deficit; never clamp a genuine Futures MTM debit. Reported margin deficit must be at least the negative available-cash amount (it may be higher for additional exchange/broker margin requirements).
 - Asset adapters return user-scoped positions, orders and immutable trade receipts; they do not mutate account cash or re-add reservations.
 - Realized P&L is gross of charges; charges are separately summed from unique immutable trade/settlement receipts and deducted exactly once in net P&L. Do not feed net-of-charge realized values into this adapter. Do not count position summaries or Futures risk events a second time.
 - Position IDs, order IDs and trade IDs must each be globally unique across the three asset adapters in one user snapshot.
