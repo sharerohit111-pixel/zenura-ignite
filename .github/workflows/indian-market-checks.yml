@@ -2,7 +2,7 @@ name: Validate Indian Market Code
 
 on:
   pull_request:
-    branches: ["main"]
+    branches: ["main", "feature/s-trade-round2-demo-screen-wiring-2026-11-24"]
     paths:
       - "markets/stocks/**"
       - "crypto/index.html"
@@ -35,7 +35,7 @@ on:
       - ".github/workflows/indian-market-checks.yml"
       - ".github/workflows/deploy-firebase-rules.yml"
   push:
-    branches: ["feature/indian-stock-market", "reconcile/indian-stock-market-main-sync"]
+    branches: ["feature/indian-stock-market", "reconcile/indian-stock-market-main-sync", "feature/s-trade-canonical-demo-integration-2026-11-24"]
     paths:
       - "markets/stocks/**"
       - "crypto/index.html"
