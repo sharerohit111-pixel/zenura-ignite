@@ -1,3 +1,4 @@
+import { syncDemoProjection } from "./demo-trade-projection.mjs";
 let fixturePromise=null,simulator=null;
 const el=(tag,cls,value)=>{const n=document.createElement(tag);if(cls)n.className=cls;if(value!==undefined)n.textContent=String(value);return n;};
 const money=value=>Number.isSafeInteger(value)?"₹"+(value/100).toLocaleString("en-IN",{minimumFractionDigits:2,maximumFractionDigits:2}):"—";
@@ -49,7 +50,7 @@ export async function mountDerivativeDemo(container,screen){
   strike.replaceChildren();opts.filter(x=>x.expiry===expiry.value&&x.optionType===optionType.value).map(x=>x.strikePaise).filter((x,i,a)=>a.indexOf(x)===i).sort((a,b)=>a-b).forEach(x=>add(strike,String(x),money(x)));if([...strike.options].some(x=>x.value===oldStrike))strike.value=oldStrike;
  }
  function paint(){
-  const s=engine.snapshot();
+  const s=engine.snapshot();syncDemoProjection("DERIVATIVES",s);
   renderTable(positions,["CONTRACT","TYPE","EXPIRY","NET QTY","AVG PRICE","RESERVED CLOSE","AVAILABLE CLOSE"],s.positions.map(x=>[x.symbol,x.assetClass==="OPTION"?x.optionType:"FUT",x.expiry,x.netQuantity,money(x.averagePricePaise),x.reservedCloseQuantity,x.availableCloseQuantity]),"No open demo positions.");
   const wrap=el("div","table-wrap demo-fo-table-wrap"),t=el("table"),head=el("thead"),hr=el("tr"),body=el("tbody");
   ["ORDER ID","CONTRACT","SIDE","TYPE","LOTS / QTY","LIMIT","FILLED / REMAINING","AVG FILL","FILL RECEIPTS","STATUS","ACTION"].forEach(x=>hr.append(el("th","",x)));
