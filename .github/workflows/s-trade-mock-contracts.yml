@@ -48,6 +48,7 @@ jobs:
           const files = [
             'market-gateway/mock/contracts/paper-trading-envelope.schema.json',
             'market-gateway/mock/contracts/paper-trading-domain.schema.json',
+            'markets/dashboard/mock-data.json',
             ...fs.readdirSync('market-gateway/mock/fixtures').filter(x => x.endsWith('.json'))
               .map(x => 'market-gateway/mock/fixtures/' + x)
           ];
@@ -58,6 +59,8 @@ jobs:
         run: node --test market-gateway/test/paper-mock-fixtures.test.js
       - name: Run shared browser-safe demo adapter tests
         run: node --test market-gateway/test/paper-demo-adapter.test.mjs
+      - name: Check dashboard module syntax
+        run: node --check markets/dashboard/dashboard-model.js && node --check markets/dashboard/dashboard.js
       - name: Run dashboard synthetic fixture validation
         run: node --test markets/dashboard/dashboard-model.test.js
       - name: Ensure fixture loader is not wired into production gateway
