@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#07111f"><meta name="market-gateway-url" content=""><title>ZENURA IGNITE · Alerts & Notifications</title><link rel="stylesheet" href="./admin.css"><style>
+.notify-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}.field{display:grid;gap:6px;margin:10px 0}.field label{font-size:11px;color:#9bb2c4}.field input,.field select{width:100%;background:#071624;border:1px solid #25435b;color:#e8f3fb;padding:11px;border-radius:8px}.item p{margin:6px 0;color:#9bb2c4}.item button{font-size:10px}.pref{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:9px 0;border-top:1px solid #1d374d}.pref input{accent-color:#61e6c2}.empty{color:#9bb2c4;padding:14px}@media(max-width:720px){.notify-grid{grid-template-columns:1fr}}
+</style></head><body><main class="admin-shell">
+<header><a href="./" class="brand">ZENURA <b>IGNITE</b></a><span class="eyebrow">S-TRADE · ALERTS</span><a href="./admin.html"><button type="button">ADMIN</button></a></header>
+<section class="intro"><p>ACCOUNT / NOTIFICATIONS</p><h1>Alerts & <em>Notifications</em></h1><span>Trade confirmations, order status changes and one-time price alerts for your own account.</span></section>
+<div id="status" class="status" role="status">Loading account…</div>
+<div class="notify-grid">
+<section class="panel"><h2>Notification preferences</h2><div id="preferences">Loading…</div><button id="save-preferences">SAVE PREFERENCES</button></section>
+<section class="panel"><h2>Create price alert</h2>
+<form id="alert-form">
+<div class="field"><label for="symbol">Trading symbol</label><input id="symbol" maxlength="40" required placeholder="e.g. RELIANCE"></div>
+<div class="field"><label for="instrument">Official instrument key</label><input id="instrument" maxlength="100" required placeholder="NSE_EQ|INE002A01018"></div>
+<div class="field"><label for="condition">Condition</label><select id="condition"><option value="above">Price rises to or above</option><option value="below">Price falls to or below</option></select></div>
+<div class="field"><label for="target">Target price (₹)</label><input id="target" type="number" min="0.000001" step="0.000001" required></div>
+<button type="submit">CREATE PRICE ALERT</button></form><p class="muted">Maximum 50 active alerts. Price alerts are evaluated only when the authorized market-data worker supplies a fresh observation.</p>
+</section></div>
+<section class="panel"><h2>Active & recent price alerts</h2><div id="alerts" class="stack">Loading…</div></section>
+<section class="panel"><h2>Notification inbox</h2><div id="inbox" class="stack">Loading…</div></section>
+<footer>ZENURA IGNITE · Private account notifications · Crypto remains separate.</footer>
+</main><script type="module" src="./notifications.js"></script></body></html>
