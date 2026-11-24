@@ -543,3 +543,29 @@ A test-only SQL contract has been added on the PR #99 backend branch at `supabas
 - real lease acquisition/release RPC behavior under `SET LOCAL ROLE service_role`, proving a stale token cannot release the current token or update the cursor.
 
 The file is explicitly marked as a disposable-PostgreSQL regression contract and is intentionally not wired into CI yet. This is deliberate: current draft migrations are expected to fail its checks until the missing Futures orders SELECT and excess Futures/Options direct DML grants are corrected. It has not been run against production, and no production SQL/ACL was changed. After grant reconciliation, wire it into the ordered disposable PostgreSQL workflow and require a green run before any staging rehearsal.
+
+
+
+## 19. Options accounting migration allocation and dependency gates — PR #129 (2026-11-24)
+
+The current PR #129 changed-file inventory contains these three new draft migrations on branch `feature/options-accounting-read-model-hardening-2026-11-24`:
+
+| Proposed version | Exact migration | Blob SHA | Required predecessor / gate |
+|---|---|---|---|
+| `20261124200000` | `20261124200000_paper_option_limit_charge_breakdown.sql` | `92a27f601f0e07112dbd9a0643a872e7a6fe9d29` | Existing Options LIMIT order/fill schema and atomic fill writer; validate backfill against historical fill data |
+| `20261124210000` | `20261124210000_paper_option_expiry_settlement.sql` | `ea2cae8f91bdabc9ee1fef1e696a13232643d6eb` | Options account/position schema and verified expiry contract; confirm source authenticity before enabling settlement |
+| `20261124220000` | `20261124220000_paper_option_market_charge_schedule_version.sql` | `8f8a3694306bef3602eb078db1711a599f12832c` | Exact existing `execute_paper_long_option_order(...)` function signature/body; run migration against the canonical MARKET function version |
+
+### Provisional ordering decision
+
+These versions form a proposed chronological sequence after the existing `20261123...` draft migration family. The inspected PR #129 file inventory contains all three exact filenames and no duplicate version among those three. This is **not yet a final global uniqueness or dependency approval**: reconcile them against every participating branch's full migration inventory, the production migration history, and the canonical Options LIMIT/worker/ledger chain before declaring the sequence merge-ready. Do not renumber or apply them from this note.
+
+### Specific SQL review gates
+
+1. **LIMIT charge breakdown backfill mutates historical fill rows.** The `20261124200000` migration adds fee-component columns, then runs an `UPDATE public.paper_option_limit_fills` to backfill existing executions. The file's own comment calls these historical fills immutable. Before this migration can be accepted, determine whether a DB immutability trigger/privilege boundary already exists at this point in the ordered chain. If it does, the backfill will conflict with that invariant and must be redesigned as a forward-only companion/audit record or a tightly controlled one-time migration exception with explicit evidence and tests. Do not silently weaken append-only enforcement.
+2. The same migration must prove, over representative historical orders and multiple partial fills, that each fee component sums exactly to `incremental_charges_paise`, cumulative rounding is deterministic, and rerunning the migration is safe. Its schedule is explicitly simulation-only; do not describe the rates as a live broker/exchange tariff.
+3. **Expiry source authenticity remains unresolved.** The `20261124210000` RPC validates an NSE-domain URL, caller-supplied source content and its SHA-256 digest, and timestamp relationships. A digest proves that the supplied bytes match the supplied digest; it does not independently prove those bytes were fetched from or published by NSE. Require a trusted server-side fetch/verification boundary (or another independently verifiable signed-source process) before any settlement can be treated as verified. Preserve the migration's cash-settled index-only restrictions and simulation-only flag.
+4. **MARKET charge schedule patch is function-body-sensitive.** The `20261124220000` migration resolves one exact `regprocedure` signature and text-replaces a unique JSON fragment in `pg_get_functiondef`. Test it against the exact canonical predecessor function, already-updated function, missing signature, changed body, and duplicate fragment. Confirm the resulting function retains its existing SECURITY DEFINER, hardened search_path, grants and accounting behavior.
+5. Run all three in the ordered disposable PostgreSQL workflow together with Options LIMIT partial-fill/close conservation, expiry idempotency/settlement, MARKET charge receipt, RLS/ACL and tenant-isolation tests. No production or staging apply is authorized.
+
+PR #129 remains Draft. These are canonical-plan review gates, not approval of the PR, its accounting formulas, migration timestamps, merge, or deployment. No SQL, migration history, staging or production state was changed in this audit.
