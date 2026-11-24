@@ -12,11 +12,16 @@ on:
       - "markets/stocks/demo-browser-smoke.cjs"
       - "markets/stocks/demo-chart-data.mjs"
       - "markets/stocks/demo-chart-panel.mjs"
-      - "market-gateway/test/demo-chart-data.test.mjs"
+      - "markets/stocks/demo-watchlist-persistence.mjs"
+      - "market-gateway/lib/watchlist-instrument-resolver.js"
+      - "market-gateway/test/watchlist-instrument-resolver.test.js"
+      - "market-gateway/supabase-server.js"
+      - "market-gateway/test/demo-chart-data.test.mjs market-gateway/test/watchlist-instrument-resolver.test.js"
       - ".github/workflows/s-trade-demo-screen-wiring.yml"
   push:
     branches:
       - feature/s-trade-round2-demo-screen-wiring-2026-11-24
+      - feature/s-trade-watchlist-persistence-demo-2026-11-25
     paths:
       - "markets/shared/paper-demo-adapter.mjs"
       - "markets/stocks/demo.html"
@@ -39,7 +44,7 @@ jobs:
         with:
           node-version: "22"
       - name: Check browser module syntax
-        run: node --check markets/shared/paper-demo-adapter.mjs && node --check markets/stocks/demo.js && node --check markets/stocks/demo-chart-data.mjs && node --check markets/stocks/demo-chart-panel.mjs
+        run: node --check markets/shared/paper-demo-adapter.mjs && node --check markets/stocks/demo.js && node --check markets/stocks/demo-chart-data.mjs && node --check markets/stocks/demo-chart-panel.mjs && node --check markets/stocks/demo-watchlist-persistence.mjs
       - name: Validate shared fixtures
         run: |
           node - <<'NODE'
