@@ -91,7 +91,12 @@
       }else detail.textContent=quote?'STALE / UNAVAILABLE':'Price not refreshed';
       info.append(pick,detail);
       const remove=document.createElement('button');remove.type='button';remove.className='saved-watch-remove';remove.textContent='REMOVE';remove.setAttribute('aria-label','Remove '+(item.trading_symbol||item.instrument_key)+' from watchlist');remove.addEventListener('click',async()=>{const previous=savedWatchlist;savedWatchlist=savedWatchlist.filter(x=>x.instrument_key!==item.instrument_key);const edit=++watchlistEditSeq;renderSavedWatchlist();if(!await saveWatchlist()&&edit===watchlistEditSeq){savedWatchlist=previous;watchlistEditSeq++;renderSavedWatchlist();}});
-      row.append(info,remove);watchBody.append(row);
+      const move=(delta)=>{const from=savedWatchlist.findIndex(x=>x.instrument_key===item.instrument_key),to=from+delta;if(from<0||to<0||to>=savedWatchlist.length)return;const previous=savedWatchlist.slice(),next=savedWatchlist.slice();[next[from],next[to]]=[next[to],next[from]];savedWatchlist=next;const edit=++watchlistEditSeq;renderSavedWatchlist();saveWatchlist().then(ok=>{if(!ok&&edit===watchlistEditSeq){savedWatchlist=previous;watchlistEditSeq++;renderSavedWatchlist();}});};
+      const order=document.createElement('div');order.className='saved-watch-order';
+      const up=document.createElement('button');up.type='button';up.className='saved-watch-move';up.textContent='↑';up.disabled=savedWatchlist.indexOf(item)===0;up.setAttribute('aria-label','Move '+(item.trading_symbol||item.instrument_key)+' up');up.addEventListener('click',()=>move(-1));
+      const down=document.createElement('button');down.type='button';down.className='saved-watch-move';down.textContent='↓';down.disabled=savedWatchlist.indexOf(item)===savedWatchlist.length-1;down.setAttribute('aria-label','Move '+(item.trading_symbol||item.instrument_key)+' down');down.addEventListener('click',()=>move(1));
+      order.append(up,down);
+      row.append(info,order,remove);watchBody.append(row);
     });
     watchAdd.disabled=!selected||savedWatchlist.some(x=>x.instrument_key===selected.instrument_key)||savedWatchlist.length>=50||!window.ZENURA_MARKET_CONNECTOR?.getIdToken||!window.ZENURA_MARKET_CONNECTOR?.getUserId?.();
   }
