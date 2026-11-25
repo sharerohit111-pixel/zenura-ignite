@@ -17,7 +17,7 @@ const el=(tag,cls,text)=>{const n=document.createElement(tag);if(cls)n.className
 const money=paise=>"₹"+(Number(paise||0)/100).toLocaleString("en-IN",{minimumFractionDigits:2,maximumFractionDigits:2});
 const card=(label,value,detail)=>{const c=el("article","card");c.append(el("h3","",label),el("div","metric",value),el("div","sub",detail||""));return c;};
 const grid=(...items)=>{const g=el("div","grid");items.forEach(x=>g.append(x));return g;};
-const table=(headers,rows)=>{const wrap=el("div","table-wrap"),t=el("table"),head=el("thead"),hr=el("tr"),body=el("tbody");wrap.tabIndex=0;wrap.setAttribute("role","region");wrap.setAttribute("aria-label","Scrollable data table");headers.forEach(h=>hr.append(el("th","",h)));head.append(hr);rows.forEach(row=>{const tr=el("tr");row.forEach(v=>tr.append(el("td","",v??"—")));body.append(tr);});if(!rows.length){const tr=el("tr"),td=el("td","empty","No record exists in the current canonical fixture.");td.colSpan=headers.length;tr.append(td);body.append(tr);}t.append(head,body);wrap.append(t);return wrap;};
+const table=(headers,rows)=>{const wrap=el("div","table-wrap"),t=el("table"),head=el("thead"),hr=el("tr"),body=el("tbody");wrap.tabIndex=0;wrap.setAttribute("role","region");wrap.setAttribute("aria-label","Scrollable data table");headers.forEach(h=>{const th=el("th","",h);th.scope="col";hr.append(th);});head.append(hr);rows.forEach(row=>{const tr=el("tr");row.forEach(v=>tr.append(el("td","",v??"—")));body.append(tr);});if(!rows.length){const tr=el("tr"),td=el("td","empty","No record exists in the current canonical fixture.");td.colSpan=headers.length;tr.append(td);body.append(tr);}t.append(head,body);wrap.append(t);return wrap;};
 const notice=text=>el("div","notice",text);
 function header(name,description){const row=el("div","screen-title"),left=el("div");left.append(el("h2","",titles[name]||name),el("p","",description));row.append(left,el("span","read-only","MOCK · LOCAL DEMO"));return row;}
 function quoteRows(){return model.market.instruments.map(x=>[x.symbol,x.exchange,x.assetClass,money(x.lastPricePaise),(x.changePaise>=0?"+":"")+money(x.changePaise),x.volume,x.timestamp]);}
@@ -231,7 +231,79 @@ function render(name){
   content.append(notice(model.meta.disclaimer));
  }
 }
-nav.addEventListener("click",event=>{const button=event.target.closest("button[data-screen]");if(!button||!model)return;nav.querySelectorAll("button").forEach(x=>x.classList.toggle("active",x===button));render(button.dataset.screen);});
+nav.addEventListener("click",event=>{const button=event.target.closest("button[data-screen]");if(!button||!model)return;nav.querySelectorAll("button[data-screen]").forEach(x=>{const active=x===button;x.classList.toggle("active",active);if(active)x.setAttribute("aria-current","page");else x.removeAttribute("aria-current");});render(button.dataset.screen);content.setAttribute("aria-busy","false");});
+const translations={
+ "Home":"होम","Market":"बाज़ार","Watchlist":"वॉचलिस्ट","Charts / Depth":"चार्ट / डेप्थ","Equity":"इक्विटी","Futures":"फ्यूचर्स","Options":"ऑप्शंस","Orders":"ऑर्डर","Trade History":"ट्रेड इतिहास","Portfolio":"पोर्टफोलियो","Positions":"पोज़िशन","Holdings":"होल्डिंग्स","Wallet":"वर्चुअल वॉलेट","Profile":"प्रोफ़ाइल","Settings":"सेटिंग्स",
+ "Home Overview":"होम अवलोकन","Market Snapshot":"बाज़ार स्नैपशॉट","Watchlists":"वॉचलिस्ट","Charts & Depth":"चार्ट और डेप्थ","Equity Paper Trading":"इक्विटी पेपर ट्रेडिंग","Futures Paper Trading":"फ्यूचर्स पेपर ट्रेडिंग","Options Paper Trading":"ऑप्शंस पेपर ट्रेडिंग","Virtual Wallet":"वर्चुअल वॉलेट","Demo Profile":"डेमो प्रोफ़ाइल",
+ "Search":"खोजें","Exchange":"एक्सचेंज","Asset class":"एसेट श्रेणी","Underlying":"अंडरलाइंग","Expiry":"एक्सपायरी","Strike":"स्ट्राइक","Option side":"ऑप्शन साइड","All exchanges":"सभी एक्सचेंज","All underlyings":"सभी अंडरलाइंग","All strikes":"सभी स्ट्राइक","Search MOCK symbol or underlying":"मॉक सिंबल या अंडरलाइंग खोजें","Search Futures contract":"फ्यूचर्स कॉन्ट्रैक्ट खोजें","Search option symbol":"ऑप्शन सिंबल खोजें","DEMO INSTRUMENT":"डेमो इंस्ट्रूमेंट","TIMEFRAME":"समयावधि","STYLE":"शैली","CANDLESTICK":"कैंडलस्टिक","LINE":"लाइन","Fixture Bid / Ask Depth":"फ़िक्स्चर बिड / आस्क डेप्थ","BIDS":"बिड","ASKS":"आस्क","QTY":"मात्रा","All instruments":"सभी इंस्ट्रूमेंट","All expiries":"सभी एक्सपायरी","CE + PE":"CE + PE","CE only":"केवल CE","PE only":"केवल PE",
+ "Side":"साइड","Order type":"ऑर्डर प्रकार","Product":"प्रोडक्ट","Quantity (shares)":"मात्रा (शेयर)","LIMIT price (₹)":"लिमिट मूल्य (₹)","Pending order to manage":"मैनेज करने के लिए पेंडिंग ऑर्डर","PLACE DEMO ORDER":"डेमो ऑर्डर दें","SIMULATE NEXT FILL":"अगला डेमो फिल","MATCH MARKETABLE DEPTH":"मार्केटेबल डेप्थ मैच करें","CANCEL REMAINDER":"बाकी ऑर्डर रद्द करें",
+ "DEMO DATA · SYNTHETIC FIXTURES":"डेमो डेटा · सिंथेटिक फ़िक्स्चर","DEMO · LOCAL DEMO":"डेमो · लोकल डेमो","MOCK · LOCAL DEMO":"मॉक · लोकल डेमो","DEMO DATA · MOCK · SYNTHETIC ONLY":"डेमो डेटा · मॉक · केवल सिंथेटिक","No record exists in the current canonical fixture.":"मौजूदा कैनोनिकल फ़िक्स्चर में कोई रिकॉर्ड नहीं है।","This demo watchlist is empty.":"यह डेमो वॉचलिस्ट खाली है।",
+ "Starting capital":"प्रारंभिक पूंजी","Available funds":"उपलब्ध राशि","Blocked funds":"ब्लॉक राशि","Cash balance":"नकद शेष","Realized P&L":"रियलाइज़्ड P&L","Unrealized P&L":"अनरियलाइज़्ड P&L","Records":"रिकॉर्ड","Filled":"भरे गए","Pending":"पेंडिंग","Cancelled":"रद्द",
+ "SYMBOL":"सिंबल","EXCHANGE":"एक्सचेंज","TYPE":"प्रकार","MOCK PRICE":"मॉक मूल्य","UP":"ऊपर","DOWN":"नीचे","REMOVE":"हटाएँ","CONTRACT":"कॉन्ट्रैक्ट","LOT SIZE":"लॉट साइज","BID":"बिड","ASK":"आस्क","STRIKE":"स्ट्राइक","INSTRUMENT":"इंस्ट्रूमेंट","QUANTITY":"मात्रा","AVERAGE PRICE":"औसत मूल्य","INVESTED VALUE":"निवेश राशि","STATUS":"स्थिति",
+ "Switch interface language to Hindi":"इंटरफ़ेस की भाषा अंग्रेज़ी करें","Switch interface language to English":"इंटरफ़ेस की भाषा हिंदी करें",
+ "FUTURES · LOCAL PAPER SIMULATOR":"फ्यूचर्स · लोकल पेपर सिम्युलेटर","OPTIONS · LOCAL PAPER SIMULATOR":"ऑप्शंस · लोकल पेपर सिम्युलेटर","Browser-memory orders and fills use deterministic fixture quotes only. No production RPC, cash ledger, margin reservation, charges, broker API or background worker is called.":"ब्राउज़र मेमोरी के ऑर्डर और फ़िल केवल निर्धारित फ़िक्स्चर कोट का उपयोग करते हैं। कोई प्रोडक्शन RPC, कैश लेजर, मार्जिन रिज़र्वेशन, शुल्क, ब्रोकर API या बैकग्राउंड वर्कर उपयोग नहीं होता।",
+ "Futures contract":"फ्यूचर्स कॉन्ट्रैक्ट","Underlying":"अंडरलाइंग","Expiry":"एक्सपायरी","Option type":"ऑप्शन प्रकार","Strike":"स्ट्राइक","Lots":"लॉट","Futures product":"फ्यूचर्स प्रोडक्ट","OPEN DEMO POSITIONS":"ओपन डेमो पोज़िशन","DEMO ORDER RECEIPTS":"डेमो ऑर्डर रसीद","SIMULATE LIMIT MATCH":"लिमिट मैच सिम्युलेट करें","RESET DEMO DEPTH":"डेमो डेप्थ रीसेट करें","CANCEL":"रद्द करें","CONTRACT":"कॉन्ट्रैक्ट","TYPE":"प्रकार","NET QTY":"नेट मात्रा","AVG PRICE":"औसत मूल्य","RESERVED CLOSE":"क्लोज़ के लिए रिज़र्व","AVAILABLE CLOSE":"क्लोज़ के लिए उपलब्ध","ORDER ID":"ऑर्डर ID","LOTS / QTY":"लॉट / मात्रा","LIMIT":"लिमिट","FILLED / REMAINING":"भरे / शेष","AVG FILL":"औसत फ़िल","FILL RECEIPTS":"फ़िल रसीद","ACTION":"कार्रवाई","No open demo positions.":"कोई ओपन डेमो पोज़िशन नहीं।","No demo orders yet.":"अभी कोई डेमो ऑर्डर नहीं।","DEMO receipt":"डेमो रसीद","Select a valid synthetic contract.":"मान्य सिंथेटिक कॉन्ट्रैक्ट चुनें।","Enter a valid LIMIT price in rupees.":"रुपये में मान्य लिमिट मूल्य दर्ज करें।","BUY":"खरीदें","SELL":"बेचें","Intraday":"इंट्राडे","Delivery":"डिलीवरी","MOCK quote selected":"मॉक कोट चुना गया","No matching contract.":"कोई मेल खाता कॉन्ट्रैक्ट नहीं।","Synthetic contracts loaded.":"सिंथेटिक कॉन्ट्रैक्ट लोड हुए।","Demo unavailable":"डेमो उपलब्ध नहीं","LOCAL FUTURES & OPTIONS POSITIONS":"लोकल फ्यूचर्स और ऑप्शंस पोज़िशन","LOCAL FUTURES & OPTIONS FILLS":"लोकल फ्यूचर्स और ऑप्शंस फ़िल","LOCAL FUTURES & OPTIONS ORDERS":"लोकल फ्यूचर्स और ऑप्शंस ऑर्डर","Browser-memory DEMO DATA only. These records are not part of the account fixture, cash ledger or production portfolio.":"केवल ब्राउज़र मेमोरी का डेमो डेटा। ये रिकॉर्ड अकाउंट फ़िक्स्चर, कैश लेजर या प्रोडक्शन पोर्टफोलियो का हिस्सा नहीं हैं।",
+ "Simulated Market Explorer":"सिम्युलेटेड मार्केट एक्सप्लोरर","CHARTS & MARKET DATA PLAYGROUND":"चार्ट और मार्केट डेटा प्लेग्राउंड","DEMO INSTRUMENT":"डेमो इंस्ट्रूमेंट","TIMEFRAME":"समयावधि","STYLE":"शैली","CANDLESTICK":"कैंडलस्टिक","LINE":"लाइन","Fixture Bid / Ask Depth":"फ़िक्स्चर बिड / आस्क डेप्थ","BIDS":"बिड","ASKS":"आस्क","Volume bars · synthetic units":"वॉल्यूम बार · सिंथेटिक यूनिट","Canonical fixture levels only":"केवल कैनोनिकल फ़िक्स्चर स्तर","Not executable liquidity":"एक्ज़ीक्यूटेबल लिक्विडिटी नहीं","MOCK · DEMO DATA · NOT LIVE NSE/BSE":"मॉक · डेमो डेटा · लाइव NSE/BSE नहीं"
+};
+Object.assign(translations,{
+ "Private Watchlists":"निजी वॉचलिस्ट","Account-saved lists · private to the signed-in user · separate from Demo Watchlists":"अकाउंट में सेव सूचियाँ · केवल साइन-इन उपयोगकर्ता के लिए निजी · डेमो वॉचलिस्ट से अलग",
+ "SAVE TO PRIVATE LIST":"निजी सूची में सेव करें","Private list":"निजी सूची","Add canonical MOCK instrument":"कैनोनिकल MOCK इंस्ट्रूमेंट जोड़ें",
+ "Sign in to restore and save private watchlists. Demo Watchlists remain available without sign-in.":"निजी वॉचलिस्ट वापस पाने और सेव करने के लिए साइन इन करें। डेमो वॉचलिस्ट बिना साइन-इन उपलब्ध हैं।",
+ "Signed in, but private watchlists are unavailable until the market gateway URL is configured.":"साइन इन है, लेकिन मार्केट गेटवे URL कॉन्फ़िगर होने तक निजी वॉचलिस्ट उपलब्ध नहीं हैं।",
+ "Restoring private watchlist…":"निजी वॉचलिस्ट वापस लाई जा रही है…","No saved instruments in this private list.":"इस निजी सूची में कोई इंस्ट्रूमेंट सेव नहीं है।",
+ "Private saved watchlist":"सेव की गई निजी वॉचलिस्ट","INSTRUMENT":"इंस्ट्रूमेंट","ORDER":"क्रम","REMOVE":"हटाएँ"
+});
+const languageToggle=document.getElementById("language-toggle");
+let currentLanguage=(()=>{try{return localStorage.getItem("zenura-s-trade-language")==="hi"?"hi":"en";}catch{return "en";}})();
+const originalText=new WeakMap();
+const originalAttributes=new WeakMap();
+const translatableAttributes=["aria-label","placeholder","title"];
+function translateTextNode(node){
+ if(node.nodeType!==Node.TEXT_NODE||!node.parentElement)return;
+ if(!originalText.has(node))originalText.set(node,node.nodeValue);
+ else {
+  const previous=originalText.get(node).trim(), current=node.nodeValue.trim(), previousHindi=translations[previous];
+  if(current!==previous && current!==previousHindi)originalText.set(node,node.nodeValue);
+ }
+ const source=originalText.get(node).trim();
+ if(!source)return;
+ const translated=currentLanguage==="hi"?(translations[source]||source):source;
+ if(node.nodeValue!==translated)node.nodeValue=translated;
+}
+function translateAttributes(element){
+ const saved=originalAttributes.get(element)||new Map();
+ for(const attribute of translatableAttributes){
+  if(!element.hasAttribute(attribute))continue;
+  const current=element.getAttribute(attribute);
+  if(!saved.has(attribute))saved.set(attribute,current);
+  else {const original=saved.get(attribute),translated=translations[original];if(current!==original&&current!==translated)saved.set(attribute,current);}
+  const original=saved.get(attribute);
+  let translated=currentLanguage==="hi"?(translations[original]||original):original;
+  if(currentLanguage==="hi"&&/^Move .+ up$/.test(original))translated=original.replace(/^Move (.+) up$/,"$1 को ऊपर ले जाएँ");
+  if(currentLanguage==="hi"&&/^Move .+ down$/.test(original))translated=original.replace(/^Move (.+) down$/,"$1 को नीचे ले जाएँ");
+  if(current!==translated)element.setAttribute(attribute,translated);
+ }
+ originalAttributes.set(element,saved);
+}
+function applyLanguage(){
+ document.documentElement.lang=currentLanguage==="hi"?"hi":"en";
+ languageToggle.textContent=currentLanguage==="hi"?"English":"हिन्दी";
+ languageToggle.setAttribute("aria-pressed",String(currentLanguage==="hi"));
+ languageToggle.setAttribute("aria-label",currentLanguage==="hi"?"Switch interface language to English":"Switch interface language to Hindi");
+ const walker=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT);
+ while(walker.nextNode())translateTextNode(walker.currentNode);
+ document.querySelectorAll("*").forEach(translateAttributes);
+}
+languageToggle.addEventListener("click",()=>{currentLanguage=currentLanguage==="en"?"hi":"en";try{localStorage.setItem("zenura-s-trade-language",currentLanguage);}catch{}applyLanguage();});
+const languageObserver=new MutationObserver(records=>records.forEach(record=>{
+ if(record.type==="characterData")translateTextNode(record.target);
+ if(record.type==="attributes")translateAttributes(record.target);
+ record.addedNodes?.forEach(node=>{
+  if(node.nodeType===Node.TEXT_NODE)translateTextNode(node);
+  else if(node.nodeType===Node.ELEMENT_NODE){translateAttributes(node);const walker=document.createTreeWalker(node,NodeFilter.SHOW_TEXT);while(walker.nextNode())translateTextNode(walker.currentNode);node.querySelectorAll?.("*").forEach(translateAttributes);}
+ });
+}));
+languageObserver.observe(document.body,{subtree:true,childList:true,characterData:true,attributes:true,attributeFilter:translatableAttributes});
 async function loadFixture(name){
  const url=new URL("../../market-gateway/mock/fixtures/"+name+".json",import.meta.url);
  const response=await fetch(url,{method:"GET",credentials:"omit",cache:"no-store",headers:{Accept:"application/json"}});
@@ -243,10 +315,10 @@ async function start(){
   const [market,account,equity,derivatives]=await Promise.all(["market","account","equity","derivatives"].map(loadFixture));
   model=createPaperDemoViewModel({market,account,equity,derivatives},{enabled:true,production:false});
   status.textContent="4 canonical fixtures validated · DUMMY_JSON · local Equity/F&O simulation only";
-  render("home");
+  render("home");content.setAttribute("aria-busy","false");applyLanguage();
  }catch(error){
   status.textContent="Demo unavailable: "+(error.message||"fixture validation failed");
-  content.replaceChildren(notice("The shared Mock JSON fixture set could not be loaded or validated. No live-data fallback is attempted."));
+  content.replaceChildren(notice("The shared Mock JSON fixture set could not be loaded or validated. No live-data fallback is attempted."));content.setAttribute("aria-busy","false");applyLanguage();
  }
 }
 start();

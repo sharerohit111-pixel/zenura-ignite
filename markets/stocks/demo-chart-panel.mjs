@@ -52,8 +52,10 @@ export function mountDemoChart(root) {
   }
 
   function setActive(selector, value, attribute) {
-    root.querySelectorAll(selector).forEach(el => el.classList.toggle("active", el.getAttribute(attribute) === value));
+    root.querySelectorAll(selector).forEach(el => {const active=el.getAttribute(attribute)===value;el.classList.toggle("active",active);el.setAttribute("aria-pressed",String(active));});
   }
+  setActive("[data-demo-timeframe]",timeframe,"data-demo-timeframe");
+  setActive("[data-demo-chart-type]",kind,"data-demo-chart-type");
   root.addEventListener("click", event => {
     const tf = event.target.closest("[data-demo-timeframe]"), type = event.target.closest("[data-demo-chart-type]");
     if (tf) { timeframe=tf.dataset.demoTimeframe; setActive("[data-demo-timeframe]",timeframe,"data-demo-timeframe"); render(); }

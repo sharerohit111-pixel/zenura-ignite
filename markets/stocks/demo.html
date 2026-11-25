@@ -9,28 +9,29 @@
 <link rel="stylesheet" href="./demo.css">
 </head>
 <body>
+<a class="skip-link" href="#screen-content">Skip to demo content</a>
 <main class="demo-shell">
 <header class="demo-header">
-  <a class="brand" href="./"><span class="brand-mark">Z✦</span><span><b>ZENURA <i>IGNITE</i></b><small>S-TRADE · INDIAN MARKET</small></span></a>
-  <span class="demo-chip">DEMO DATA · SYNTHETIC FIXTURES</span>
+  <a class="brand" href="./" aria-label="ZENURA IGNITE home"><span class="brand-mark" aria-hidden="true">Z✦</span><span><b>ZENURA <i>IGNITE</i></b><small>S-TRADE · INDIAN MARKET</small></span></a>
+  <div class="demo-header-actions"><span class="demo-chip">DEMO DATA · SYNTHETIC FIXTURES</span><button type="button" id="language-toggle" class="language-toggle" aria-label="Switch interface language to Hindi" aria-pressed="false">हिन्दी</button></div>
 </header>
-<section class="demo-intro">
+<section class="demo-intro" aria-labelledby="demo-title">
   <p class="eyebrow">PAPER TRADING · ISOLATED PREVIEW</p>
-  <h1>Explore the <em>market terminal</em></h1>
+  <h1 id="demo-title">Explore the <em>market terminal</em></h1>
   <p>Shared Mock JSON fixtures only. No exchange feed, broker connection, account sign-in or real order execution.</p>
   <div class="demo-status" id="demo-status" role="status" aria-live="polite">Loading validated synthetic fixtures…</div>
 </section>
-<nav class="screen-nav" id="screen-nav" aria-label="Demo screens">
-  <button data-screen="home" class="active">Home</button><button data-screen="market">Market</button>
-  <button data-screen="watchlists">Watchlist</button><button data-screen="charts">Charts / Depth</button>
-  <button data-screen="equity">Equity</button><button data-screen="futures">Futures</button>
-  <button data-screen="options">Options</button><button data-screen="orders">Orders</button>
-  <button data-screen="trades">Trade History</button><button data-screen="portfolio">Portfolio</button>
-  <button data-screen="positions">Positions</button><button data-screen="holdings">Holdings</button>
-  <button data-screen="account">Wallet</button><button data-screen="profile">Profile</button>
-  <button data-screen="settings">Settings</button>
+<nav class="screen-nav" id="screen-nav" aria-label="Demo screens" tabindex="0">
+  <button type="button" data-screen="home" class="active" aria-current="page">Home</button><button type="button" data-screen="market">Market</button>
+  <button type="button" data-screen="watchlists">Watchlist</button><button type="button" data-screen="charts">Charts / Depth</button>
+  <button type="button" data-screen="equity">Equity</button><button type="button" data-screen="futures">Futures</button>
+  <button type="button" data-screen="options">Options</button><button type="button" data-screen="orders">Orders</button>
+  <button type="button" data-screen="trades">Trade History</button><button type="button" data-screen="portfolio">Portfolio</button>
+  <button type="button" data-screen="positions">Positions</button><button type="button" data-screen="holdings">Holdings</button>
+  <button type="button" data-screen="account">Wallet</button><button type="button" data-screen="profile">Profile</button>
+  <button type="button" data-screen="settings">Settings</button>
 </nav>
-<section class="screen-content" id="screen-content" aria-live="polite">
+<section class="screen-content" id="screen-content" aria-live="polite" aria-busy="true" tabindex="-1">
   <div class="loading">Loading synthetic market snapshot…</div>
 </section>
 <footer>Powered by ZENURA IGNITE Technologies · Paper simulation only · Crypto remains separate</footer>
