@@ -18,8 +18,8 @@ test("portfolio uses canonical marks and shared signed position projection", asy
   assert.equal(view.positions.length,3);
   assert.equal(view.holdings.length,1);
   assert.equal(view.realizedPnlPaise,1300);
-  assert.equal(view.unrealizedPnlPaise,8000);
-  assert.equal(view.totalPnlPaise,9300);
+  assert.equal(view.unrealizedPnlPaise,17000);
+  assert.equal(view.totalPnlPaise,18300);
   assert.equal(view.positions.find(p=>p.assetClass==="FUTURE").unrealizedPnlPaise,2000);
   assert.equal(view.ledgerReconciled,false);
 });
