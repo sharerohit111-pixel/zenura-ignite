@@ -3,6 +3,7 @@ import { mountDerivativeDemo } from "./demo-derivative-panel.mjs";
 import { mountDemoChart } from "./demo-chart-panel.mjs";
 import { mountEquityDemo } from "./demo-equity-panel.mjs";
 import { appendUnifiedLedgerSummary } from "./demo-unified-ledger-panel.mjs";
+import { mountPrivateWatchlists } from "./demo-watchlist-persistence.mjs";
 
 "use strict";
 const status=document.getElementById("demo-status");
@@ -11,7 +12,8 @@ const nav=document.getElementById("screen-nav");
 const screens=["home","market","watchlists","charts","equity","futures","options","orders","trades","portfolio","positions","holdings","account","profile","settings"];
 const titles={home:"Home Overview",market:"Market Snapshot",watchlists:"Watchlists",charts:"Charts & Depth",equity:"Equity Paper Trading",futures:"Futures Paper Trading",options:"Options Paper Trading",orders:"Orders",trades:"Trade History",portfolio:"Portfolio",positions:"Positions",holdings:"Holdings",account:"Virtual Wallet",profile:"Demo Profile",settings:"Settings"};
 let model=null;
-let demoWatchlists=null;
+let watchlistCleanup=null;
+let renderGeneration=0;
 const el=(tag,cls,text)=>{const n=document.createElement(tag);if(cls)n.className=cls;if(text!==undefined)n.textContent=String(text);return n;};
 const money=paise=>"₹"+(Number(paise||0)/100).toLocaleString("en-IN",{minimumFractionDigits:2,maximumFractionDigits:2});
 const card=(label,value,detail)=>{const c=el("article","card");c.append(el("h3","",label),el("div","metric",value),el("div","sub",detail||""));return c;};
@@ -110,58 +112,10 @@ function renderMarketDashboard(host){
  const catalog=el("section","catalog-panel");host.append(catalog);renderInstrumentCatalog(catalog);
  host.append(notice("All indices, prices, movers and exchange statuses are synthetic MOCK values. They are not live NSE/BSE data or official exchange status."));
 }
-function initDemoWatchlists(){
- const all=model.market.instruments;
- const take=predicate=>all.filter(predicate).slice(0,50).map(x=>x.instrumentKey);
- demoWatchlists={
-  "My Stocks":take(x=>x.assetClass==="EQUITY"),
-  "Indices":take(x=>x.assetClass==="INDEX"),
-  "Futures":take(x=>x.assetClass==="FUTURE"),
-  "Options":take(x=>x.assetClass==="OPTION")
- };
-}
-function renderDemoWatchlists(host){
- if(!demoWatchlists)initDemoWatchlists();
- const names=Object.keys(demoWatchlists);
- const listSelect=selectControl("demo-watchlist-select",names.map(x=>[x,x]));
- const instrumentSelect=selectControl("demo-watchlist-instrument",model.market.instruments.map(x=>[x.instrumentKey,x.symbol+" · "+x.exchange+" · "+x.assetClass]));
- const addButton=el("button","catalog-add","ADD TO WATCHLIST");addButton.type="button";
- const controls=el("div","catalog-controls");
- controls.append(field("Watchlist",listSelect),field("Add MOCK instrument",instrumentSelect),addButton);
- const status=el("p","sub",""),rowsHost=el("div","catalog-results");
- host.append(controls,status,rowsHost);
- function renderRows(){
-  const list=demoWatchlists[listSelect.value]||[];
-  const present=new Set(list);
-  [...instrumentSelect.options].forEach(option=>{option.disabled=present.has(option.value);});
-  addButton.disabled=!instrumentSelect.value||present.has(instrumentSelect.value)||list.length>=50;
-  status.textContent=list.length+" / 50 instruments · current-page memory only · no account/database writes";
-  const rows=list.map((key,index)=>{
-   const item=model.market.instruments.find(x=>x.instrumentKey===key);
-   if(!item)return null;
-   return [item.symbol,item.exchange,item.assetClass,money(item.lastPricePaise),
-    index>0?"↑":"—",index<list.length-1?"↓":"—","REMOVE"];
-  }).filter(Boolean);
-  const wrap=el("div","table-wrap"),tableNode=el("table"),head=el("thead"),hr=el("tr"),body=el("tbody");wrap.tabIndex=0;wrap.setAttribute("role","region");wrap.setAttribute("aria-label","Scrollable demo watchlist");
-  ["SYMBOL","EXCHANGE","TYPE","MOCK PRICE","UP","DOWN","REMOVE"].forEach(x=>hr.append(el("th","",x)));head.append(hr);
-  if(!rows.length){const tr=el("tr"),td=el("td","empty","This demo watchlist is empty.");td.colSpan=7;tr.append(td);body.append(tr);}
-  list.forEach((key,index)=>{
-   const item=model.market.instruments.find(x=>x.instrumentKey===key);if(!item)return;
-   const tr=el("tr");
-   [item.symbol,item.exchange,item.assetClass,money(item.lastPricePaise)].forEach(x=>tr.append(el("td","",x)));
-   const upCell=el("td"),up=el("button","catalog-action","↑");up.type="button";up.disabled=index===0;up.setAttribute("aria-label","Move "+item.symbol+" up");up.addEventListener("click",()=>{const arr=demoWatchlists[listSelect.value];[arr[index-1],arr[index]]=[arr[index],arr[index-1]];renderRows();});upCell.append(up);tr.append(upCell);
-   const downCell=el("td"),down=el("button","catalog-action","↓");down.type="button";down.disabled=index===list.length-1;down.setAttribute("aria-label","Move "+item.symbol+" down");down.addEventListener("click",()=>{const arr=demoWatchlists[listSelect.value];[arr[index],arr[index+1]]=[arr[index+1],arr[index]];renderRows();});downCell.append(down);tr.append(downCell);
-   const removeCell=el("td"),remove=el("button","catalog-action","REMOVE");remove.type="button";remove.addEventListener("click",()=>{demoWatchlists[listSelect.value]=demoWatchlists[listSelect.value].filter(x=>x!==key);renderRows();});removeCell.append(remove);tr.append(removeCell);body.append(tr);
-  });
-  tableNode.append(head,body);wrap.append(tableNode);rowsHost.replaceChildren(wrap);
- }
- listSelect.addEventListener("change",renderRows);
- instrumentSelect.addEventListener("change",renderRows);
- addButton.addEventListener("click",()=>{const list=demoWatchlists[listSelect.value],key=instrumentSelect.value;if(!key||list.length>=50||list.includes(key))return;list.push(key);renderRows();});
- renderRows();
-}
 function orderRows(orders){return orders.map(o=>{const instrument=model.market.instruments.find(item=>item.instrumentKey===o.instrumentKey);return [o.orderId,o.assetClass,instrument?.symbol||o.instrumentKey,o.side,o.orderType,o.quantity??o.lots,o.status,money(o.averagePricePaise??o.limitPricePaise??0),money(o.chargesPaise??0)];});}
 function render(name){
+ const generation=++renderGeneration;
+ if(watchlistCleanup){watchlistCleanup();watchlistCleanup=null;}
  const a=model.account,equity=model.positions.find(x=>x.assetClass==="EQUITY"),orders=model.orders;
  content.replaceChildren(header(name,"Illustrative values from one validated, versioned Mock JSON view model. Not live exchange data."));
  if(name==="home"){
@@ -175,8 +129,10 @@ function render(name){
   return;
  }
  if(name==="watchlists"){
-  content.append(notice("Demo watchlists are session-only and use the canonical MOCK instrument catalog. They never read or write private account watchlists."));
-  renderDemoWatchlists(content);
+  mountPrivateWatchlists(content, { model, el, field, selectControl, money }).then(cleanup=>{
+   if(generation===renderGeneration)watchlistCleanup=cleanup;
+   else cleanup?.();
+  }).catch(error=>content.append(notice("Private watchlist unavailable: "+(error?.message||"Please retry."))));
   return;
  }
  if(name==="charts"){
