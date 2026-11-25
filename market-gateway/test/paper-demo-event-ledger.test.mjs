@@ -354,20 +354,24 @@ test("fill IDs are unique across Equity, Futures and Options in the shared accou
   const appendFill = (engine, assetClass, instrumentKey, orderId, eventId, fillId, occurredAt) => ledger.append(event({
     eventId, idempotencyKey: "idem-" + eventId, sourceEventId: "source-" + eventId,
     engine, type: "FILL_RECORDED", occurredAt,
-    deltas: { cashDeltaPaise: 0, blockedDeltaPaise: 0 },
+    deltas: { cashDeltaPaise: engine === "EQUITY" ? -10000 : 0, blockedDeltaPaise: 0 },
     payload: { fillId, orderId, assetClass, instrumentKey, side: "BUY", quantity: 1, pricePaise: 10000, grossPaise: 10000 }
   }));
+  const equityKey = "MOCK|NSE|EQ|0001";
   const futureKey = "MOCK|NSE|FUT|NIFTY-2026-11";
   const optionKey = "MOCK|NSE|OPT|NIFTY-2026-11-26000-CE";
-  appendOrder("FUTURES", "FUTURE", futureKey, "future-order", "2026-11-25T09:30:00+05:30");
-  appendFill("FUTURES", "FUTURE", futureKey, "future-order", "future-fill-event", "shared-fill-id", "2026-11-25T09:30:01+05:30");
-  appendOrder("OPTIONS", "OPTION", optionKey, "option-order", "2026-11-25T09:30:02+05:30");
+  appendOrder("EQUITY", "EQUITY", equityKey, "equity-order", "2026-11-25T09:30:00+05:30");
+  appendFill("EQUITY", "EQUITY", equityKey, "equity-order", "equity-fill-event", "shared-fill-id", "2026-11-25T09:30:01+05:30");
+  appendOrder("FUTURES", "FUTURE", futureKey, "future-order", "2026-11-25T09:30:02+05:30");
+  appendFill("FUTURES", "FUTURE", futureKey, "future-order", "future-fill-event", "future-fill-id", "2026-11-25T09:30:03+05:30");
+  appendOrder("OPTIONS", "OPTION", optionKey, "option-order", "2026-11-25T09:30:04+05:30");
   assert.throws(() => appendFill("OPTIONS", "OPTION", optionKey, "option-order",
-    "option-fill-event", "shared-fill-id", "2026-11-25T09:30:03+05:30"), /DUPLICATE_FILL_ID/);
+    "option-fill-event", "shared-fill-id", "2026-11-25T09:30:05+05:30"), /DUPLICATE_FILL_ID/);
   const snapshot = ledger.snapshot();
-  assert.equal(snapshot.fills.length, 1);
-  assert.equal(snapshot.fills[0].engine, "FUTURES");
-  assert.equal(snapshot.events.length, 3);
-  assert.equal(snapshot.orders.length, 2);
+  assert.equal(snapshot.fills.length, 2);
+  assert.deepEqual(snapshot.fills.map(fill => fill.engine), ["EQUITY", "FUTURES"]);
+  assert.equal(snapshot.events.length, 5);
+  assert.equal(snapshot.orders.length, 3);
+  assert.equal(snapshot.account.cashBalancePaise, opening.cashBalancePaise - 10000);
   assert.equal(snapshot.account.ledgerReconciled, false);
 });
