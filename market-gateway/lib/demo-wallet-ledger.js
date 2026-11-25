@@ -35,61 +35,6 @@ function createDemoWalletLedger({ accountId, openingCashPaise, openingEvidenceRe
   const fillSettlements = new Map();
   let cashPaise = openingCashPaise;
 
-  function append(input) {
-    if (!input || typeof input !== "object" || Array.isArray(input)) fail("DEMO_WALLET_INVALID_EVENT");
-    const eventId = required(input.eventId, "DEMO_WALLET_EVENT_ID_REQUIRED");
-    const sourceEventId = required(input.sourceEventId, "DEMO_WALLET_SOURCE_EVENT_REQUIRED");
-    const evidenceRef = required(input.evidenceRef, "DEMO_WALLET_EVENT_EVIDENCE_REQUIRED");
-    const occurredAt = required(input.occurredAt, "DEMO_WALLET_EVENT_TIME_REQUIRED");
-    if (!Number.isFinite(Date.parse(occurredAt))) fail("DEMO_WALLET_INVALID_EVENT_TIME");
-    if (!ASSETS.has(input.assetClass)) fail("DEMO_WALLET_INVALID_ASSET");
-    const common = { eventId, sourceEventId, evidenceRef, occurredAt, assetClass: input.assetClass };
-    let event;
-
-    if (input.type === "CASH_MOVEMENT") {
-      const orderId = required(input.orderId, "DEMO_WALLET_ORDER_ID_REQUIRED");
-      const fillId = required(input.fillId, "DEMO_WALLET_FILL_ID_REQUIRED");
-      const cashDeltaPaise = integer(input.cashDeltaPaise, "DEMO_WALLET_INVALID_CASH_DELTA", true);
-      event = { ...common, type: input.type, orderId, fillId, cashDeltaPaise };
-      const priorFill = fillSettlements.get(fillId);
-      if (priorFill && priorFill !== eventId) fail("DEMO_WALLET_FILL_SETTLED_MORE_THAN_ONCE");
-      if (!priorFill) {
-        const nextCash = cashPaise + cashDeltaPaise;
-        if (!Number.isSafeInteger(nextCash) || nextCash < 0) fail("DEMO_WALLET_CASH_OUT_OF_RANGE");
-        cashPaise = nextCash;
-        fillSettlements.set(fillId, eventId);
-      }
-    } else if (input.type === "RESERVATION_OPENED") {
-      const reservationId = required(input.reservationId, "DEMO_WALLET_RESERVATION_ID_REQUIRED");
-      const orderId = required(input.orderId, "DEMO_WALLET_ORDER_ID_REQUIRED");
-      const amountPaise = integer(input.amountPaise, "DEMO_WALLET_INVALID_RESERVATION");
-      if (amountPaise < 1 || reservations.has(reservationId)) fail("DEMO_WALLET_DUPLICATE_OR_EMPTY_RESERVATION");
-      if (amountPaise > cashPaise - blockedPaise()) fail("DEMO_WALLET_INSUFFICIENT_AVAILABLE_CASH");
-      event = { ...common, type: input.type, reservationId, orderId, amountPaise };
-      reservations.set(reservationId, { reservationId, orderId, assetClass: input.assetClass, amountPaise });
-    } else if (input.type === "RESERVATION_REDUCED") {
-      const reservationId = required(input.reservationId, "DEMO_WALLET_RESERVATION_ID_REQUIRED");
-      const current = reservations.get(reservationId);
-      if (!current) fail("DEMO_WALLET_RESERVATION_NOT_FOUND");
-      const amountPaise = integer(input.amountPaise, "DEMO_WALLET_INVALID_RESERVATION_REDUCTION");
-      if (amountPaise < 1 || amountPaise > current.amountPaise) fail("DEMO_WALLET_RESERVATION_REDUCTION_OUT_OF_RANGE");
-      if (input.orderId !== current.orderId) fail("DEMO_WALLET_RESERVATION_ORDER_MISMATCH");
-      event = { ...common, type: input.type, reservationId, orderId: current.orderId, amountPaise };
-      current.amountPaise -= amountPaise;
-      if (current.amountPaise === 0) reservations.delete(reservationId);
-    } else {
-      fail("DEMO_WALLET_UNKNOWN_EVENT_TYPE");
-    }
-
-    const prior = events.get(eventId);
-    if (prior) {
-      if (stable(prior) !== stable(event)) fail("DEMO_WALLET_EVENT_ID_REUSED");
-      return { duplicate: true, event: clone(prior) };
-    }
-    events.set(eventId, event);
-    return { duplicate: false, event: clone(event) };
-  }
-
   function blockedPaise() {
     let total = 0;
     for (const item of reservations.values()) {
@@ -97,6 +42,71 @@ function createDemoWalletLedger({ accountId, openingCashPaise, openingEvidenceRe
       if (!Number.isSafeInteger(total)) fail("DEMO_WALLET_BLOCKED_TOTAL_OUT_OF_RANGE");
     }
     return total;
+  }
+
+  function append(input) {
+    if (!input || typeof input !== "object" || Array.isArray(input)) fail("DEMO_WALLET_INVALID_EVENT");
+    const common = {
+      eventId: required(input.eventId, "DEMO_WALLET_EVENT_ID_REQUIRED"),
+      sourceEventId: required(input.sourceEventId, "DEMO_WALLET_SOURCE_EVENT_REQUIRED"),
+      evidenceRef: required(input.evidenceRef, "DEMO_WALLET_EVENT_EVIDENCE_REQUIRED"),
+      occurredAt: required(input.occurredAt, "DEMO_WALLET_EVENT_TIME_REQUIRED"),
+      assetClass: input.assetClass
+    };
+    if (!Number.isFinite(Date.parse(common.occurredAt))) fail("DEMO_WALLET_INVALID_EVENT_TIME");
+    if (!ASSETS.has(common.assetClass)) fail("DEMO_WALLET_INVALID_ASSET");
+    let event;
+
+    if (input.type === "CASH_MOVEMENT") {
+      event = { ...common, type: input.type,
+        orderId: required(input.orderId, "DEMO_WALLET_ORDER_ID_REQUIRED"),
+        fillId: required(input.fillId, "DEMO_WALLET_FILL_ID_REQUIRED"),
+        cashDeltaPaise: integer(input.cashDeltaPaise, "DEMO_WALLET_INVALID_CASH_DELTA", true) };
+    } else if (input.type === "RESERVATION_OPENED") {
+      event = { ...common, type: input.type,
+        reservationId: required(input.reservationId, "DEMO_WALLET_RESERVATION_ID_REQUIRED"),
+        orderId: required(input.orderId, "DEMO_WALLET_ORDER_ID_REQUIRED"),
+        amountPaise: integer(input.amountPaise, "DEMO_WALLET_INVALID_RESERVATION") };
+      if (event.amountPaise < 1) fail("DEMO_WALLET_DUPLICATE_OR_EMPTY_RESERVATION");
+    } else if (input.type === "RESERVATION_REDUCED") {
+      event = { ...common, type: input.type,
+        reservationId: required(input.reservationId, "DEMO_WALLET_RESERVATION_ID_REQUIRED"),
+        orderId: required(input.orderId, "DEMO_WALLET_ORDER_ID_REQUIRED"),
+        amountPaise: integer(input.amountPaise, "DEMO_WALLET_INVALID_RESERVATION_REDUCTION") };
+      if (event.amountPaise < 1) fail("DEMO_WALLET_RESERVATION_REDUCTION_OUT_OF_RANGE");
+    } else {
+      fail("DEMO_WALLET_UNKNOWN_EVENT_TYPE");
+    }
+
+    const prior = events.get(event.eventId);
+    if (prior) {
+      if (stable(prior) !== stable(event)) fail("DEMO_WALLET_EVENT_ID_REUSED");
+      return { duplicate: true, event: clone(prior) };
+    }
+
+    if (event.type === "CASH_MOVEMENT") {
+      const priorFill = fillSettlements.get(event.fillId);
+      if (priorFill) fail("DEMO_WALLET_FILL_SETTLED_MORE_THAN_ONCE");
+      const nextCash = cashPaise + event.cashDeltaPaise;
+      if (!Number.isSafeInteger(nextCash) || nextCash < 0) fail("DEMO_WALLET_CASH_OUT_OF_RANGE");
+      cashPaise = nextCash;
+      fillSettlements.set(event.fillId, event.eventId);
+    } else if (event.type === "RESERVATION_OPENED") {
+      if (reservations.has(event.reservationId)) fail("DEMO_WALLET_DUPLICATE_OR_EMPTY_RESERVATION");
+      if (event.amountPaise > cashPaise - blockedPaise()) fail("DEMO_WALLET_INSUFFICIENT_AVAILABLE_CASH");
+      reservations.set(event.reservationId, { reservationId: event.reservationId,
+        orderId: event.orderId, assetClass: event.assetClass, amountPaise: event.amountPaise });
+    } else {
+      const current = reservations.get(event.reservationId);
+      if (!current) fail("DEMO_WALLET_RESERVATION_NOT_FOUND");
+      if (event.orderId !== current.orderId) fail("DEMO_WALLET_RESERVATION_ORDER_MISMATCH");
+      if (event.amountPaise > current.amountPaise) fail("DEMO_WALLET_RESERVATION_REDUCTION_OUT_OF_RANGE");
+      current.amountPaise -= event.amountPaise;
+      if (current.amountPaise === 0) reservations.delete(event.reservationId);
+    }
+
+    events.set(event.eventId, event);
+    return { duplicate: false, event: clone(event) };
   }
 
   function snapshot() {
