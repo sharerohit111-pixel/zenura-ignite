@@ -52,7 +52,7 @@ export function mountDemoChart(root) {
   }
 
   function setActive(selector, value, attribute) {
-    root.querySelectorAll(selector).forEach(el => el.classList.toggle("active", el.getAttribute(attribute) === value));
+    root.querySelectorAll(selector).forEach(el => {const active=el.getAttribute(attribute)===value;el.classList.toggle("active",active);el.setAttribute("aria-pressed",String(active));});
   }
   root.addEventListener("click", event => {
     const tf = event.target.closest("[data-demo-timeframe]"), type = event.target.closest("[data-demo-chart-type]");
