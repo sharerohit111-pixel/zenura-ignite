@@ -64,7 +64,8 @@ test("PWA caches the simulator and synthetic fixtures; production gateway stays 
   ]);
   assert.match(sw, /zenura-markets-shell-v7/);
   assert.match(sw, /stocks\/demo-equity-panel\.mjs/);
-  assert.match(sw, /stocks\/demo-trade-projection\.mjs/);\n  assert.match(sw, /stocks\/demo-portfolio-panel\.mjs/);
+  assert.match(sw, /stocks\/demo-trade-projection\.mjs/);
+  assert.match(sw, /stocks\/demo-portfolio-panel\.mjs/);
   assert.match(sw, /demo-trade-history-store\.js/);
   assert.match(sw, /stocks\/demo-chart-panel\.mjs/);
   assert.match(sw, /stocks\/demo-chart-data\.mjs/);
