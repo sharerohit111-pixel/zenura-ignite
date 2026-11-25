@@ -17,8 +17,8 @@ test("Trade History, Orders, Portfolio, Positions and Holdings route through one
   assert.match(panel, /snapshot\.orders/);
   assert.match(panel, /snapshot\.positions/);
   assert.match(panel, /getSharedPaperDemoLedgerSession/);
-  assert.match(panel, /FUTURE/);
-  assert.match(panel, /OPTION/);
+  assert.match(panel, /assetClass/);
+  assert.match(panel, /positions/);
   assert.match(panel, /realizedPnlPaise/);
   assert.match(panel, /unrealized/);
   assert.match(panel, /ledgerReconciled/);
