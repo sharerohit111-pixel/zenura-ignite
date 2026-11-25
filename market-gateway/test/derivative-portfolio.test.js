@@ -88,8 +88,8 @@ test("rejects margin snapshots without the exact normalized Upstox provenance",(
 });
 
 
-const optionMaster=(overrides={})=>({instrument_key:"NSE_FO|NIFTY26DEC25000CE",instrument_type:"CE",segment:"NSE_FO",exchange:"NSE",expiry:"2026-12-31",strike_price:25000,lot_size:25,...overrides});
-const optionRow=(overrides={})=>({instrument_key:"NSE_FO|NIFTY26DEC25000CE",instrument_type:"CE",segment:"NSE_FO",exchange:"NSE",expiry:"2026-12-31",lot_size:25,net_quantity:25,average_price_paise:5000,cost_basis_paise:125000,...overrides});
+const optionMaster=(overrides={})=>({instrument_key:"NSE_FO|NIFTY26DEC25000CE",instrument_type:"CE",segment:"NSE_FO",exchange:"NSE",expiry:"2027-12-31",strike_price:25000,lot_size:25,...overrides});
+const optionRow=(overrides={})=>({instrument_key:"NSE_FO|NIFTY26DEC25000CE",instrument_type:"CE",segment:"NSE_FO",exchange:"NSE",expiry:"2027-12-31",lot_size:25,net_quantity:25,average_price_paise:5000,cost_basis_paise:125000,...overrides});
 
 test("binds long-option portfolio positions to the exact official contract, expiry, strike and lot size",()=>{
  const [p]=buildLongOptionPortfolioPositions([optionRow()],[optionMaster()]);
@@ -138,4 +138,15 @@ test("rejects futures portfolio contract identity, expiry, lot-size and malforme
   {row:futuresRow({net_quantity:0})}
  ];
  for(const item of cases)assert.throws(()=>validateFuturesPortfolioContracts([item.row||futuresRow()],[item.master||futuresMaster()]),/Stored Futures position/);
+});
+
+
+test("officially bound option positions and enriched quote metadata pass portfolio valuation",()=>{
+ const [p]=buildLongOptionPortfolioPositions([optionRow()],[optionMaster()]);
+ const enrichedQuote=quote({instrumentKey:p.instrumentKey,expiry:p.expiry,instrumentType:p.instrumentType,optionType:p.optionType,strikePaise:p.strikePaise});
+ const result=calculateDerivativePortfolio({positions:[p],quotes:[enrichedQuote],now});
+ assert.equal(result.positions[0].valuationStatus,undefined);
+ assert.equal(result.marketValuePaise,175000);
+ assert.equal(result.unrealizedPnlPaise,50000);
+ assert.equal(result.positions[0].marketPricePaise,7000);
 });
