@@ -167,7 +167,7 @@ function apply(projection, event) {
       if (p.remainingQuantity !== undefined && p.remainingQuantity !== totals.remainingQuantity) fail("DEMO_ORDER_REMAINING_QUANTITY_MISMATCH");
       validateOrderTransition(existing.status, p.status);
       validateOrderStatus(p.status, existing.quantity, totals.filledQuantity);
-      if (p.side === "SELL" && p.assetClass !== "FUTURE" && ["CANCELLED", "EXPIRED"].includes(p.status)) {
+      if (existing.status !== p.status && p.side === "SELL" && p.assetClass !== "FUTURE" && ["CANCELLED", "EXPIRED"].includes(p.status)) {
         expectedReservationDelta = -totals.remainingQuantity;
       }
       Object.assign(existing, next, totals);
