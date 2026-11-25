@@ -15,12 +15,15 @@ const canonicalStatus=value=>{
  if(["CANCELLED","CANCELED"].includes(status))return "CANCELLED";
  return status;
 };
-const time=value=>typeof value==="string"&&Number.isFinite(Date.parse(value))?value:new Date(0).toISOString();
+const time=value=>{
+ if(typeof value!=="string"||!Number.isFinite(Date.parse(value)))throw new Error("INVALID_DEMO_EVENT_TIMESTAMP");
+ return value;
+};
 function getStore(){
  if(projection)return projection;
  const api=window.ZenuraDemoTradeHistory;
  if(!api?.createDemoTradeHistoryStore)throw new Error("DEMO_TRADE_HISTORY_STORE_UNAVAILABLE");
- projection=api.createDemoTradeHistoryStore({env:{NODE_ENV:"development"}});
+ projection=api.createDemoTradeHistoryStore();
  return projection;
 }
 
@@ -33,7 +36,7 @@ function syncDemoProjection(source,snapshot){
   const fills=source==="EQUITY"?(snapshot.fills||[]).filter(fill=>fill.orderId===order.orderId):(order.fills||[]);
   for(const fill of fills)facts.push({type:"FILL",at:time(fill.filledAt||fill.executedAt),order,fill,assetClass});
   if(canonicalStatus(order.status)==="REJECTED")facts.push({type:"REJECT",at:time(order.updatedAt||order.createdAt),order});
-  if(canonicalStatus(order.status)==="CANCELLED")facts.push({type:"CANCEL",at:time(order.updatedAt),order});
+  if(canonicalStatus(order.status)==="CANCELLED")facts.push({type:"CANCEL",at:time(order.updatedAt||order.createdAt),order});
  }
  const priority={ORDER:0,FILL:1,REJECT:2,CANCEL:2};
  facts.sort((a,b)=>Date.parse(a.at)-Date.parse(b.at)||priority[a.type]-priority[b.type]||
