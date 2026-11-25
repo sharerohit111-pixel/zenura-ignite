@@ -158,7 +158,6 @@ function createDemoTradeHistoryStore(options = {}) {
       const at=timestampMs(event.occurredAt);
       if(at<previous)fail("DEMO_EVENT_TIME_ORDER_MISMATCH");
       previous=at;
-      const at=timestampMs(event.occurredAt);
       if(event.type==="ORDER_ACCEPTED")replayed.submit({...event.order,createdAt:event.occurredAt});
       else if(event.type==="ORDER_REJECTED")replayed.reject(event.orderId,event.reason,event.occurredAt);
       else if(event.type==="FILL_RECORDED")replayed.recordFill({...event.trade,filledAt:event.occurredAt});
