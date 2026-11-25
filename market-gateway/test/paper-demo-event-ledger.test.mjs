@@ -215,3 +215,35 @@ test("product-aware cost basis cannot become negative or outlive a flat position
   })), /DEMO_POSITION_INVARIANT/);
   assert.equal(ledger.snapshot().events.length, 0);
 });
+
+
+test("canonical events carry the supported schema version and reject unknown versions", () => {
+  const ledger = createPaperDemoEventLedger(opening);
+  const accepted = ledger.append(event());
+  assert.equal(accepted.event.schemaVersion, "1.2.0");
+  assert.throws(() => ledger.append(event({
+    eventId: "evt-2", idempotencyKey: "idem-2", sourceEventId: "future-schema",
+    occurredAt: "2026-11-25T09:30:01+05:30", schemaVersion: "2.0.0"
+  })), /UNSUPPORTED_EVENT_SCHEMA_VERSION/);
+  assert.equal(ledger.snapshot().events.length, 1);
+});
+
+test("event timestamps require an explicit ISO-8601 timezone", () => {
+  const ledger = createPaperDemoEventLedger(opening);
+  assert.throws(() => ledger.append(event({ occurredAt: "2026-11-25T09:30:00" })), /INVALID_EVENT_TIMESTAMP/);
+  assert.throws(() => ledger.append(event({ occurredAt: "2026-11-25" })), /INVALID_EVENT_TIMESTAMP/);
+  assert.equal(ledger.snapshot().events.length, 0);
+});
+
+test("replay rejects reordered events instead of silently sorting them", () => {
+  const ledger = createPaperDemoEventLedger(opening);
+  ledger.append(event());
+  ledger.append(event({
+    eventId: "evt-2", idempotencyKey: "idem-2", sourceEventId: "equity-fill-1",
+    type: "FILL_RECORDED", occurredAt: "2026-11-25T09:30:01+05:30",
+    deltas: { cashDeltaPaise: -125050, blockedDeltaPaise: -10000 },
+    payload: { fillId: "fill-1", orderId: "order-1", assetClass: "EQUITY", instrumentKey: "MOCK|NSE|EQ|0001", side: "BUY", quantity: 1, pricePaise: 125050 }
+  }));
+  const reversed = ledger.snapshot().events.slice().reverse();
+  assert.throws(() => replayPaperDemoEvents(opening, reversed), /DEMO_EVENT_SEQUENCE_MISMATCH/);
+});
