@@ -11,10 +11,10 @@
   },
   "data": {
     "futures": {
-      "instrumentKey": "MOCK|NSE|FUT|0001",
-      "symbol": "MOCKALPHA-FUT",
+      "instrumentKey": "MOCK|NSE|FUT|MOCKNIFTY|2026-12-31",
+      "symbol": "MOCKNIFTY-FUT-DEC26",
       "expiry": "2026-12-31",
-      "lotSize": 1,
+      "lotSize": 25,
       "tickSizePaise": 5,
       "order": {
         "orderId": "mock-future-001",
@@ -22,16 +22,16 @@
         "orderType": "LIMIT",
         "lots": 1,
         "status": "PENDING",
-        "limitPricePaise": 125000
+        "limitPricePaise": 2500000
       }
     },
     "options": {
-      "instrumentKey": "MOCK|NSE|OPT|0001",
-      "underlying": "MOCKALPHA",
+      "instrumentKey": "MOCK|NSE|OPT|MOCKNIFTY|25000|CE|2026-11-26",
+      "underlying": "MOCKNIFTY",
       "optionType": "CE",
-      "strikePaise": 125000,
-      "expiry": "2026-12-31",
-      "lotSize": 1,
+      "strikePaise": 2500000,
+      "expiry": "2026-11-26",
+      "lotSize": 25,
       "tickSizePaise": 5,
       "order": {
         "orderId": "mock-option-001",
@@ -39,8 +39,9 @@
         "orderType": "MARKET",
         "lots": 1,
         "status": "FILLED",
-        "averagePricePaise": 2500
-      }
+        "averagePricePaise": 15000
+      },
+      "symbol": "MOCKNIFTY-25000-CE-26NOV"
     },
     "contracts": [
       {
@@ -168,6 +169,64 @@
         "expiry": "2026-12-31",
         "lotSize": 25,
         "tickSizePaise": 5
+      },
+      {
+        "instrumentKey": "MOCK|BSE|FUT|MOCKSENSEX|2026-12-29",
+        "exchange": "BSE",
+        "symbol": "MOCKSENSEX-FUT-DEC26",
+        "assetClass": "FUTURE",
+        "underlying": "MOCKSENSEX",
+        "expiry": "2026-12-29",
+        "lotSize": 20,
+        "tickSizePaise": 5
+      },
+      {
+        "instrumentKey": "MOCK|BSE|OPT|MOCKSENSEX|81000|CE|2026-12-29",
+        "exchange": "BSE",
+        "symbol": "MOCKSENSEX-81000-CE-29DEC",
+        "assetClass": "OPTION",
+        "underlying": "MOCKSENSEX",
+        "expiry": "2026-12-29",
+        "lotSize": 20,
+        "tickSizePaise": 5,
+        "optionType": "CE",
+        "strikePaise": 8100000
+      },
+      {
+        "instrumentKey": "MOCK|BSE|OPT|MOCKSENSEX|81000|PE|2026-12-29",
+        "exchange": "BSE",
+        "symbol": "MOCKSENSEX-81000-PE-29DEC",
+        "assetClass": "OPTION",
+        "underlying": "MOCKSENSEX",
+        "expiry": "2026-12-29",
+        "lotSize": 20,
+        "tickSizePaise": 5,
+        "optionType": "PE",
+        "strikePaise": 8100000
+      },
+      {
+        "instrumentKey": "MOCK|BSE|OPT|MOCKSENSEX|82000|CE|2026-12-29",
+        "exchange": "BSE",
+        "symbol": "MOCKSENSEX-82000-CE-29DEC",
+        "assetClass": "OPTION",
+        "underlying": "MOCKSENSEX",
+        "expiry": "2026-12-29",
+        "lotSize": 20,
+        "tickSizePaise": 5,
+        "optionType": "CE",
+        "strikePaise": 8200000
+      },
+      {
+        "instrumentKey": "MOCK|BSE|OPT|MOCKSENSEX|82000|PE|2026-12-29",
+        "exchange": "BSE",
+        "symbol": "MOCKSENSEX-82000-PE-29DEC",
+        "assetClass": "OPTION",
+        "underlying": "MOCKSENSEX",
+        "expiry": "2026-12-29",
+        "lotSize": 20,
+        "tickSizePaise": 5,
+        "optionType": "PE",
+        "strikePaise": 8200000
       }
     ],
     "quotes": [
@@ -277,6 +336,56 @@
         "askPricePaise": 18100,
         "bidQuantity": 50,
         "askQuantity": 50,
+        "provider": "MOCK",
+        "timestamp": "2026-11-24T09:30:00+05:30",
+        "stale": false
+      },
+      {
+        "instrumentKey": "MOCK|BSE|FUT|MOCKSENSEX|2026-12-29",
+        "bidPricePaise": 8200000,
+        "askPricePaise": 8200050,
+        "bidQuantity": 40,
+        "askQuantity": 40,
+        "provider": "MOCK",
+        "timestamp": "2026-11-24T09:30:00+05:30",
+        "stale": false
+      },
+      {
+        "instrumentKey": "MOCK|BSE|OPT|MOCKSENSEX|81000|CE|2026-12-29",
+        "bidPricePaise": 12000,
+        "askPricePaise": 12050,
+        "bidQuantity": 40,
+        "askQuantity": 40,
+        "provider": "MOCK",
+        "timestamp": "2026-11-24T09:30:00+05:30",
+        "stale": false
+      },
+      {
+        "instrumentKey": "MOCK|BSE|OPT|MOCKSENSEX|81000|PE|2026-12-29",
+        "bidPricePaise": 12500,
+        "askPricePaise": 12550,
+        "bidQuantity": 40,
+        "askQuantity": 40,
+        "provider": "MOCK",
+        "timestamp": "2026-11-24T09:30:00+05:30",
+        "stale": false
+      },
+      {
+        "instrumentKey": "MOCK|BSE|OPT|MOCKSENSEX|82000|CE|2026-12-29",
+        "bidPricePaise": 9000,
+        "askPricePaise": 9050,
+        "bidQuantity": 40,
+        "askQuantity": 40,
+        "provider": "MOCK",
+        "timestamp": "2026-11-24T09:30:00+05:30",
+        "stale": false
+      },
+      {
+        "instrumentKey": "MOCK|BSE|OPT|MOCKSENSEX|82000|PE|2026-12-29",
+        "bidPricePaise": 17000,
+        "askPricePaise": 17050,
+        "bidQuantity": 40,
+        "askQuantity": 40,
         "provider": "MOCK",
         "timestamp": "2026-11-24T09:30:00+05:30",
         "stale": false

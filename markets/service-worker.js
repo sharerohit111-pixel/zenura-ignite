@@ -1,9 +1,9 @@
 "use strict";
 const BASE=new URL("./",self.registration.scope);
-const CACHE_NAME="zenura-markets-shell-v3";
+const CACHE_NAME="zenura-markets-shell-v5";
 const SHELL=[
  "", "index.html","portal.css","pwa-register.js","language-toggle.js",
- "stocks/","stocks/index.html","stocks/demo.html","stocks/demo.css","stocks/demo.js","stocks/demo-derivative-panel.mjs","stocks/derivative-mock-simulator.js","shared/paper-demo-adapter.mjs","../market-gateway/lib/derivative-position.js","../market-gateway/mock/fixtures/derivatives.json","stocks/stocks.css","stocks/order-workspace.css","stocks/chart-theme.css",
+ "stocks/","stocks/index.html","stocks/demo.html","stocks/demo.css","stocks/demo.js","stocks/demo-derivative-panel.mjs","stocks/demo-equity-panel.mjs","stocks/demo-chart-panel.mjs","stocks/demo-chart-data.mjs","stocks/derivative-mock-simulator.js","shared/paper-demo-adapter.mjs","../market-gateway/lib/derivative-position.js","../market-gateway/lib/equity-demo-execution-engine.js","../market-gateway/mock/fixtures/market.json","../market-gateway/mock/fixtures/account.json","../market-gateway/mock/fixtures/equity.json","../market-gateway/mock/fixtures/derivatives.json","../market-gateway/mock/fixtures/equity-execution.json","stocks/stocks.css","stocks/order-workspace.css","stocks/chart-theme.css",
  "stocks/sse-parser.js","stocks/live-quote.js","stocks/reconnect-policy.js","stocks/paper-order-retry-policy.js",
  "stocks/chart-indicators.js","stocks/chart-engine.js","stocks/stocks.js","stocks/order-workspace.js","stocks/chart-theme.js",
  "stocks/supabase-client.js","stocks/connect.js","stocks/email-auth.js",
@@ -27,10 +27,13 @@ self.addEventListener("fetch",event=>{
  const request=event.request;
  if(request.method!=="GET"||request.headers.has("authorization"))return;
  const url=new URL(request.url);
- const shellAsset=SHELL.includes(url.href);
+ const shellAsset=SHELL.includes(url.toString());
  if(url.origin!==BASE.origin||(!url.pathname.startsWith(BASE.pathname)&&!shellAsset))return;
  if(url.searchParams.has("token"))return;
  if(request.mode==="navigate"){
+  // Only explicitly listed static shell documents may be cached. Never cache
+  // arbitrary same-origin navigation responses that could become user-specific.
+  if(!shellAsset)return;
   event.respondWith((async()=>{
    try{
     const response=await fetch(request);
@@ -43,7 +46,7 @@ self.addEventListener("fetch",event=>{
   })());
   return;
  }
- if(["style","script","image","font"].includes(request.destination)||url.pathname.endsWith(".webmanifest")||shellAsset){
+ if(shellAsset||["style","script","image","font"].includes(request.destination)||url.pathname.endsWith(".webmanifest")){
   event.respondWith((async()=>{
    const cache=await caches.open(CACHE_NAME),cached=await cache.match(request);
    const network=fetch(request).then(response=>{

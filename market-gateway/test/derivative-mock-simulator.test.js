@@ -16,6 +16,30 @@ const option = (type, strike) => contract(item => item.assetClass === "OPTION" &
   item.expiry === "2026-12-31");
 const create = () => createDerivativeMockSimulator(fixture, { now });
 
+test("default simulator clock is anchored to the fixture snapshot, not the wall clock", () => {
+  const originalNow = Date.now;
+  Date.now = () => Date.parse("2027-01-01T00:00:00.000Z");
+  try {
+    const simulator = createDerivativeMockSimulator(fixture);
+    const order = simulator.submit({
+      instrumentKey: future().instrumentKey, side: "BUY", orderType: "MARKET", lots: 1
+    });
+    assert.equal(order.status, "FILLED");
+    assert.equal(order.createdAt, new Date(Date.parse(fixture.asOf)).toISOString());
+  } finally {
+    Date.now = originalNow;
+  }
+});
+
+test("derivatives simulator rejects fixtures without a synthetic timestamp and provenance", () => {
+  const noTimestamp = structuredClone(fixture);
+  delete noTimestamp.asOf;
+  assert.throws(() => createDerivativeMockSimulator(noTimestamp), /valid DEMO DATA derivatives fixture/);
+  const noProvenance = structuredClone(fixture);
+  delete noProvenance.meta.source;
+  assert.throws(() => createDerivativeMockSimulator(noProvenance), /valid DEMO DATA derivatives fixture/);
+});
+
 test("fixture exposes multiple synthetic Futures expiries and CE/PE expiry-strike contracts", () => {
   const simulator = create();
   const contracts = simulator.contracts();
@@ -205,4 +229,34 @@ test("simulator rejects a non-synthetic Options underlying", () => {
   const target = invalid.data.contracts.find(item => item.assetClass === "OPTION");
   target.underlying = "NIFTY";
   assert.throws(() => createDerivativeMockSimulator(invalid, { now }), /invalid CE\/PE strike contract/);
+});
+
+
+test("F&O lot boundaries reject zero, fractional and over-cap lots without creating orders",()=>{
+  const simulator=create();
+  const instrument=future();
+  for(const lots of [0,1.5,10001]){
+    assert.throws(()=>simulator.submit({
+      instrumentKey:instrument.instrumentKey,side:"BUY",orderType:"LIMIT",lots,limitPricePaise:2500050
+    }),/Lots (is invalid|exceed the demo limit)/);
+  }
+  assert.equal(simulator.snapshot().orders.length,0);
+  assert.equal(simulator.snapshot().positions.length,0);
+});
+
+test("F&O derivative position arithmetic rejects unsafe fill value without returning a position",()=>{
+  const simulator=create();
+  const instrument=future();
+  const altered=structuredClone(fixture);
+  const quote=altered.data.quotes.find(item=>item.instrumentKey===instrument.instrumentKey);
+  quote.askPricePaise=Math.floor(Number.MAX_SAFE_INTEGER/instrument.tickSizePaise)*instrument.tickSizePaise;
+  quote.askQuantity=instrument.lotSize;
+  const bounded=createDerivativeMockSimulator(altered,{now});
+  const rejected=bounded.submit({
+    instrumentKey:instrument.instrumentKey,side:"BUY",orderType:"MARKET",lots:1
+  });
+  assert.equal(rejected.status,"REJECTED");
+  assert.match(rejected.rejectionReason,/safe calculation limits|safe integer limits/);
+  assert.equal(bounded.snapshot().positions.length,0);
+  assert.equal(bounded.snapshot().orders.length,1);
 });

@@ -17,6 +17,9 @@ test("Futures and Options Demo screens mount the shared local simulator", async 
   assert.match(html, /derivative-position\.js/);
   assert.match(html, /derivative-mock-simulator\.js/);
   assert.match(panel, /createDerivativeMockSimulator/);
+  const positionHelper=await read("market-gateway/lib/derivative-position.js");
+  assert.match(positionHelper,/root\.ZENURA_DERIVATIVE_POSITION=api/);
+  assert.match(positionHelper,/typeof module==="object"&&module\.exports/);
 });
 
 test("Demo execution is manual, synthetic and isolated from production routes", async () => {
@@ -71,24 +74,26 @@ test("Demo controls retain native labels, mobile breakpoints and PWA shell cover
   assert.match(sw, /mock\/fixtures\/derivatives\.json/);
 });
 
-test("PWA shell serves explicitly cached root-level Demo assets offline", async () => {
+test("PWA shell serves explicitly cached root-level Demo assets offline and rejects private navigations", async () => {
   const sw = await read("markets/service-worker.js");
-  assert.ok(sw.includes("const shellAsset=SHELL.includes(url.href)"));
+  assert.ok(sw.includes("const shellAsset=SHELL.includes(url.toString())"));
   assert.ok(sw.includes("!url.pathname.startsWith(BASE.pathname)&&!shellAsset"));
-  assert.ok(sw.includes('url.pathname.endsWith(".webmanifest")||shellAsset'));
+  assert.ok(sw.includes('if(request.mode==="navigate"){'));
+  assert.ok(sw.includes("if(!shellAsset)return;"), "non-allowlisted navigation must never enter the offline cache");
+  assert.ok(sw.includes('url.pathname.endsWith(".webmanifest")'));
   assert.ok(sw.includes('"../market-gateway/lib/derivative-position.js"'));
   assert.ok(sw.includes('"../market-gateway/mock/fixtures/derivatives.json"'));
 });
 
 test("PWA shell cache manifest contains no duplicate request URLs", async () => {
   const sw = await read("markets/service-worker.js");
-  const match = sw.match(/const SHELL=\[([\s\S]*?)\]\.map\(path=>new URL\(path,BASE\)\.toString\(\)\);/);
-  assert.ok(match, "service-worker shell manifest must remain statically auditable");
-  const paths = [...match[1].matchAll(/"([^"]*)"/g)].map(entry => entry[1]);
+  const start = sw.indexOf("const SHELL=[");
+  const end = sw.indexOf("].map(path=>new URL(path,BASE).toString());", start);
+  assert.ok(start >= 0 && end > start, "service-worker shell manifest must remain statically auditable");
+  const paths = [...sw.slice(start, end).matchAll(/"([^"]*)"/g)].map(entry => entry[1]);
   assert.ok(paths.length > 0, "PWA shell must include assets");
   assert.equal(new Set(paths).size, paths.length, "cache.addAll must not receive duplicate asset URLs");
 });
-
 
 test("Standalone Demo exposes the shared persistent Hindi/English language toggle", async () => {
   const html = await read("markets/stocks/demo.html");

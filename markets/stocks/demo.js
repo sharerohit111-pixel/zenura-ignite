@@ -1,5 +1,7 @@
-import { createPaperDemoViewModel } from "../shared/paper-demo-adapter.mjs";
+import { createPaperDemoViewModel, searchPaperDemoInstruments, getPaperDemoExpiries, getPaperDemoOptionChain } from "../shared/paper-demo-adapter.mjs";
 import { mountDerivativeDemo, appendDerivativeSummary } from "./demo-derivative-panel.mjs";
+import { mountDemoChart } from "./demo-chart-panel.mjs";
+import { mountEquityDemo, appendEquitySummary } from "./demo-equity-panel.mjs";
 
 "use strict";
 const status=document.getElementById("demo-status");
@@ -8,15 +10,156 @@ const nav=document.getElementById("screen-nav");
 const screens=["home","market","watchlists","charts","equity","futures","options","orders","trades","portfolio","positions","holdings","account","profile","settings"];
 const titles={home:"Home Overview",market:"Market Snapshot",watchlists:"Watchlists",charts:"Charts & Depth",equity:"Equity Paper Trading",futures:"Futures Paper Trading",options:"Options Paper Trading",orders:"Orders",trades:"Trade History",portfolio:"Portfolio",positions:"Positions",holdings:"Holdings",account:"Virtual Wallet",profile:"Demo Profile",settings:"Settings"};
 let model=null;
+let demoWatchlists=null;
 const el=(tag,cls,text)=>{const n=document.createElement(tag);if(cls)n.className=cls;if(text!==undefined)n.textContent=String(text);return n;};
 const money=paise=>"₹"+(Number(paise||0)/100).toLocaleString("en-IN",{minimumFractionDigits:2,maximumFractionDigits:2});
 const card=(label,value,detail)=>{const c=el("article","card");c.append(el("h3","",label),el("div","metric",value),el("div","sub",detail||""));return c;};
 const grid=(...items)=>{const g=el("div","grid");items.forEach(x=>g.append(x));return g;};
-const table=(headers,rows)=>{const wrap=el("div","table-wrap"),t=el("table"),head=el("thead"),hr=el("tr"),body=el("tbody");headers.forEach(h=>hr.append(el("th","",h)));head.append(hr);rows.forEach(row=>{const tr=el("tr");row.forEach(v=>tr.append(el("td","",v??"—")));body.append(tr);});if(!rows.length){const tr=el("tr"),td=el("td","empty","No record exists in the current canonical fixture.");td.colSpan=headers.length;tr.append(td);body.append(tr);}t.append(head,body);wrap.append(t);return wrap;};
+const table=(headers,rows)=>{const wrap=el("div","table-wrap"),t=el("table"),head=el("thead"),hr=el("tr"),body=el("tbody");wrap.tabIndex=0;wrap.setAttribute("role","region");wrap.setAttribute("aria-label","Scrollable data table");headers.forEach(h=>hr.append(el("th","",h)));head.append(hr);rows.forEach(row=>{const tr=el("tr");row.forEach(v=>tr.append(el("td","",v??"—")));body.append(tr);});if(!rows.length){const tr=el("tr"),td=el("td","empty","No record exists in the current canonical fixture.");td.colSpan=headers.length;tr.append(td);body.append(tr);}t.append(head,body);wrap.append(t);return wrap;};
 const notice=text=>el("div","notice",text);
-function header(name,description){const row=el("div","screen-title"),left=el("div");left.append(el("h2","",titles[name]||name),el("p","",description));row.append(left,el("span","read-only","READ ONLY · MOCK"));return row;}
+function header(name,description){const row=el("div","screen-title"),left=el("div");left.append(el("h2","",titles[name]||name),el("p","",description));row.append(left,el("span","read-only","MOCK · LOCAL DEMO"));return row;}
 function quoteRows(){return model.market.instruments.map(x=>[x.symbol,x.exchange,x.assetClass,money(x.lastPricePaise),(x.changePaise>=0?"+":"")+money(x.changePaise),x.volume,x.timestamp]);}
-function orderRows(orders){return orders.map(o=>[o.orderId,o.assetClass,o.instrumentKey,o.side,o.orderType,o.quantity??o.lots,o.status,money(o.averagePricePaise??o.limitPricePaise??0),money(o.chargesPaise??0)]);}
+function field(label,control){const wrap=el("label","catalog-field");wrap.append(el("span","",label),control);return wrap;}
+function selectControl(id,options){const select=el("select");select.id=id;options.forEach(([value,label])=>{const option=el("option","",label);option.value=value;select.append(option);});return select;}
+function uniqueValues(items,key){return [...new Set(items.map(x=>x[key]).filter(Boolean))].sort();}
+function renderInstrumentCatalog(host,{assetClass=""}={}){
+ const controls=el("div","catalog-controls"),query=el("input");query.type="search";query.placeholder="Search MOCK symbol or underlying";query.setAttribute("aria-label","Search demo instruments");
+ const exchange=selectControl("catalog-exchange",[["","All exchanges"],["NSE","NSE"],["BSE","BSE"]]);
+ const kind=selectControl("catalog-kind",[["","All instruments"],["EQUITY","Equity"],["INDEX","Indices"],["FUTURE","Futures"],["OPTION","Options"]]);kind.value=assetClass;
+ controls.append(field("Search",query),field("Exchange",exchange),field("Asset class",kind));
+ const tableHost=el("div","catalog-results"),status=el("p","sub","");host.append(controls,status,tableHost);
+ function update(){
+  const rows=searchPaperDemoInstruments(model,{query:query.value,exchange:exchange.value,assetClass:kind.value});
+  status.textContent=rows.length+" MOCK instruments · filtered locally from canonical fixtures";
+  tableHost.replaceChildren(table(["SYMBOL","EXCHANGE","TYPE","UNDERLYING","EXPIRY","STRIKE","SAMPLE PRICE","BID / ASK"],rows.map(x=>[
+   x.symbol,x.exchange,x.assetClass,x.underlying,x.expiry||"—",x.strikePaise?money(x.strikePaise):"—",money(x.lastPricePaise),
+   x.bidPricePaise===null?"—":money(x.bidPricePaise)+" / "+money(x.askPricePaise)
+  ])));
+ }
+ [query,exchange,kind].forEach(control=>control.addEventListener("input",update));
+ [exchange,kind].forEach(control=>control.addEventListener("change",update));
+ update();
+}
+function renderFuturesCatalog(host){
+ const contracts=model.market.instruments.filter(x=>x.assetClass==="FUTURE");
+ const underlyings=uniqueValues(contracts,"underlying"),underlying=selectControl("futures-underlying",[...underlyings.map(x=>[x,x]),["","All underlyings"]]);
+ const exchange=selectControl("futures-exchange",[["","All exchanges"],["NSE","NSE"],["BSE","BSE"]]);
+ const expiry=selectControl("futures-expiry",[["","All expiries"]]);
+ const query=el("input");query.type="search";query.placeholder="Search Futures contract";
+ const controls=el("div","catalog-controls");controls.append(field("Underlying",underlying),field("Exchange",exchange),field("Expiry",expiry),field("Search",query));
+ const hostTable=el("div","catalog-results"),status=el("p","sub","");host.append(controls,status,hostTable);
+ function refreshExpiries(){const dates=[...new Set(contracts.filter(x=>(!underlying.value||x.underlying===underlying.value)&&(!exchange.value||x.exchange===exchange.value)).map(x=>x.expiry))].sort();const previous=expiry.value;expiry.replaceChildren(selectControl("unused",[["","All expiries"]]).firstChild);dates.forEach(x=>{const o=el("option","",x);o.value=x;expiry.append(o);});if(dates.includes(previous))expiry.value=previous;}
+ function update(){const rows=searchPaperDemoInstruments(model,{query:query.value,assetClass:"FUTURE",underlying:underlying.value,exchange:exchange.value,expiry:expiry.value});status.textContent=rows.length+" MOCK Futures contracts";hostTable.replaceChildren(table(["CONTRACT","EXCHANGE","UNDERLYING","EXPIRY","LOT SIZE","BID","ASK"],rows.map(x=>[x.symbol,x.exchange,x.underlying,x.expiry,x.lotSize,money(x.bidPricePaise),money(x.askPricePaise)])));}
+ underlying.addEventListener("change",()=>{refreshExpiries();update();});exchange.addEventListener("change",()=>{refreshExpiries();update();});expiry.addEventListener("change",update);query.addEventListener("input",update);refreshExpiries();update();
+}
+function renderOptionsCatalog(host){
+ const contracts=model.market.instruments.filter(x=>x.assetClass==="OPTION");
+ const underlyings=uniqueValues(contracts,"underlying");
+ const underlying=selectControl("options-underlying",underlyings.map(x=>[x,x]));
+ const exchange=selectControl("options-exchange",[["","All exchanges"],["NSE","NSE"],["BSE","BSE"]]);
+ const expiry=selectControl("options-expiry",[]);
+ const strike=selectControl("options-strike",[["","All strikes"]]);
+ const side=selectControl("options-side",[["","CE + PE"],["CE","CE only"],["PE","PE only"]]);
+ const query=el("input");query.type="search";query.placeholder="Search option symbol";
+ const controls=el("div","catalog-controls");controls.append(field("Underlying",underlying),field("Exchange",exchange),field("Expiry",expiry),field("Strike",strike),field("Option side",side),field("Search",query));
+ const status=el("p","sub",""),tableHost=el("div","catalog-results");host.append(controls,status,tableHost);
+ function refreshExpiry(){
+  const dates=getPaperDemoExpiries(model,{underlying:underlying.value,assetClass:"OPTION",exchange:exchange.value});
+  const previous=expiry.value;expiry.replaceChildren();dates.forEach(x=>{const o=el("option","",x);o.value=x;expiry.append(o);});if(dates.includes(previous))expiry.value=previous;
+  refreshStrikes();
+ }
+ function refreshStrikes(){
+  const chain=getPaperDemoOptionChain(model,{underlying:underlying.value,expiry:expiry.value,exchange:exchange.value});
+  const previous=strike.value;strike.replaceChildren();const all=el("option","","All strikes");all.value="";strike.append(all);
+  chain.forEach(row=>{const o=el("option","",money(row.strikePaise));o.value=String(row.strikePaise);strike.append(o);});
+  if([...strike.options].some(x=>x.value===previous))strike.value=previous;
+ }
+ function update(){
+  if(!expiry.value){status.textContent="No listed synthetic option expiry for this selection.";tableHost.replaceChildren();return;}
+  const chain=getPaperDemoOptionChain(model,{underlying:underlying.value,expiry:expiry.value,exchange:exchange.value,strikePaise:strike.value||undefined,optionType:side.value||undefined});
+  const filtered=chain.filter(row=>{
+   if(!query.value)return true;
+   const q=query.value.toLowerCase();
+   return [row.CE?.symbol,row.PE?.symbol,underlying.value].some(x=>String(x||"").toLowerCase().includes(q));
+  });
+  status.textContent=filtered.length+" strike rows · "+underlying.value+" · "+expiry.value+" · MOCK option chain";
+  tableHost.replaceChildren(table(["STRIKE","CE CONTRACT","CE BID","CE ASK","PE CONTRACT","PE BID","PE ASK"],filtered.map(row=>[
+   money(row.strikePaise),row.CE?.symbol||"—",row.CE?money(row.CE.bidPricePaise):"—",row.CE?money(row.CE.askPricePaise):"—",
+   row.PE?.symbol||"—",row.PE?money(row.PE.bidPricePaise):"—",row.PE?money(row.PE.askPricePaise):"—"
+  ])));
+ }
+ underlying.addEventListener("change",()=>{refreshExpiry();update();});exchange.addEventListener("change",()=>{refreshExpiry();update();});
+ expiry.addEventListener("change",()=>{refreshStrikes();update();});strike.addEventListener("change",update);side.addEventListener("change",update);query.addEventListener("input",update);
+ refreshExpiry();update();
+}
+function instrumentChangePercent(item){
+ const previous=item.lastPricePaise-item.changePaise;
+ return previous>0?item.changePaise/previous*100:0;
+}
+function renderMarketDashboard(host){
+ const instruments=model.market.instruments;
+ const indices=instruments.filter(x=>x.assetClass==="INDEX");
+ const equities=instruments.filter(x=>x.assetClass==="EQUITY");
+ const statuses=["NSE","BSE"].map(exchange=>{const supplied=model.market.exchange===exchange?model.market.marketStatus:"NOT SUPPLIED";return card(exchange+" MOCK status",supplied,"Synthetic fixture status · not official");});
+ host.append(grid(...statuses));
+ host.append(el("h3","","Synthetic index snapshot"),table(["INDEX","EXCHANGE","SAMPLE LEVEL","CHANGE"],indices.map(x=>[x.symbol,x.exchange,money(x.lastPricePaise),(instrumentChangePercent(x).toFixed(2))+"%"])));
+ const gainers=equities.slice().sort((a,b)=>instrumentChangePercent(b)-instrumentChangePercent(a)).slice(0,3);
+ const losers=equities.slice().sort((a,b)=>instrumentChangePercent(a)-instrumentChangePercent(b)).slice(0,3);
+ host.append(grid(card("Top synthetic gainers",gainers.map(x=>x.symbol+" "+instrumentChangePercent(x).toFixed(2)+"%").join(" · ")||"—","MOCK fixture only"),card("Top synthetic losers",losers.map(x=>x.symbol+" "+instrumentChangePercent(x).toFixed(2)+"%").join(" · ")||"—","MOCK fixture only")));
+ const catalog=el("section","catalog-panel");host.append(catalog);renderInstrumentCatalog(catalog);
+ host.append(notice("All indices, prices, movers and exchange statuses are synthetic MOCK values. They are not live NSE/BSE data or official exchange status."));
+}
+function initDemoWatchlists(){
+ const all=model.market.instruments;
+ const take=predicate=>all.filter(predicate).slice(0,50).map(x=>x.instrumentKey);
+ demoWatchlists={
+  "My Stocks":take(x=>x.assetClass==="EQUITY"),
+  "Indices":take(x=>x.assetClass==="INDEX"),
+  "Futures":take(x=>x.assetClass==="FUTURE"),
+  "Options":take(x=>x.assetClass==="OPTION")
+ };
+}
+function renderDemoWatchlists(host){
+ if(!demoWatchlists)initDemoWatchlists();
+ const names=Object.keys(demoWatchlists);
+ const listSelect=selectControl("demo-watchlist-select",names.map(x=>[x,x]));
+ const instrumentSelect=selectControl("demo-watchlist-instrument",model.market.instruments.map(x=>[x.instrumentKey,x.symbol+" · "+x.exchange+" · "+x.assetClass]));
+ const addButton=el("button","catalog-add","ADD TO WATCHLIST");addButton.type="button";
+ const controls=el("div","catalog-controls");
+ controls.append(field("Watchlist",listSelect),field("Add MOCK instrument",instrumentSelect),addButton);
+ const status=el("p","sub",""),rowsHost=el("div","catalog-results");
+ host.append(controls,status,rowsHost);
+ function renderRows(){
+  const list=demoWatchlists[listSelect.value]||[];
+  const present=new Set(list);
+  [...instrumentSelect.options].forEach(option=>{option.disabled=present.has(option.value);});
+  addButton.disabled=!instrumentSelect.value||present.has(instrumentSelect.value)||list.length>=50;
+  status.textContent=list.length+" / 50 instruments · current-page memory only · no account/database writes";
+  const rows=list.map((key,index)=>{
+   const item=model.market.instruments.find(x=>x.instrumentKey===key);
+   if(!item)return null;
+   return [item.symbol,item.exchange,item.assetClass,money(item.lastPricePaise),
+    index>0?"↑":"—",index<list.length-1?"↓":"—","REMOVE"];
+  }).filter(Boolean);
+  const wrap=el("div","table-wrap"),tableNode=el("table"),head=el("thead"),hr=el("tr"),body=el("tbody");wrap.tabIndex=0;wrap.setAttribute("role","region");wrap.setAttribute("aria-label","Scrollable demo watchlist");
+  ["SYMBOL","EXCHANGE","TYPE","MOCK PRICE","UP","DOWN","REMOVE"].forEach(x=>hr.append(el("th","",x)));head.append(hr);
+  if(!rows.length){const tr=el("tr"),td=el("td","empty","This demo watchlist is empty.");td.colSpan=7;tr.append(td);body.append(tr);}
+  list.forEach((key,index)=>{
+   const item=model.market.instruments.find(x=>x.instrumentKey===key);if(!item)return;
+   const tr=el("tr");
+   [item.symbol,item.exchange,item.assetClass,money(item.lastPricePaise)].forEach(x=>tr.append(el("td","",x)));
+   const upCell=el("td"),up=el("button","catalog-action","↑");up.type="button";up.disabled=index===0;up.setAttribute("aria-label","Move "+item.symbol+" up");up.addEventListener("click",()=>{const arr=demoWatchlists[listSelect.value];[arr[index-1],arr[index]]=[arr[index],arr[index-1]];renderRows();});upCell.append(up);tr.append(upCell);
+   const downCell=el("td"),down=el("button","catalog-action","↓");down.type="button";down.disabled=index===list.length-1;down.setAttribute("aria-label","Move "+item.symbol+" down");down.addEventListener("click",()=>{const arr=demoWatchlists[listSelect.value];[arr[index],arr[index+1]]=[arr[index+1],arr[index]];renderRows();});downCell.append(down);tr.append(downCell);
+   const removeCell=el("td"),remove=el("button","catalog-action","REMOVE");remove.type="button";remove.addEventListener("click",()=>{demoWatchlists[listSelect.value]=demoWatchlists[listSelect.value].filter(x=>x!==key);renderRows();});removeCell.append(remove);tr.append(removeCell);body.append(tr);
+  });
+  tableNode.append(head,body);wrap.append(tableNode);rowsHost.replaceChildren(wrap);
+ }
+ listSelect.addEventListener("change",renderRows);
+ instrumentSelect.addEventListener("change",renderRows);
+ addButton.addEventListener("click",()=>{const list=demoWatchlists[listSelect.value],key=instrumentSelect.value;if(!key||list.length>=50||list.includes(key))return;list.push(key);renderRows();});
+ renderRows();
+}
+function orderRows(orders){return orders.map(o=>{const instrument=model.market.instruments.find(item=>item.instrumentKey===o.instrumentKey);return [o.orderId,o.assetClass,instrument?.symbol||o.instrumentKey,o.side,o.orderType,o.quantity??o.lots,o.status,money(o.averagePricePaise??o.limitPricePaise??0),money(o.chargesPaise??0)];});}
 function render(name){
  const a=model.account,equity=model.positions.find(x=>x.assetClass==="EQUITY"),orders=model.orders;
  content.replaceChildren(header(name,"Illustrative values from one validated, versioned Mock JSON view model. Not live exchange data."));
@@ -25,32 +168,31 @@ function render(name){
   content.append(el("h3","","Synthetic market snapshot"),table(["SYMBOL","EXCHANGE","ASSET","SAMPLE PRICE","CHANGE","VOLUME","AS OF"],quoteRows()));
   return;
  }
- if(name==="market"||name==="watchlists"){
-  content.append(grid(card("Exchange",model.market.exchange||"NSE / BSE","Fixture metadata"),card("Market status",model.market.marketStatus||"—","Simulated status only"),card("Instrument count",String(model.market.instruments.length),"MOCK-only identities"),card("As of",model.asOf,"Fixed fixture timestamp")));
-  content.append(table(["SYMBOL","EXCHANGE","ASSET","SAMPLE PRICE","CHANGE","VOLUME","AS OF"],quoteRows()));
-  content.append(notice(name==="watchlists"?"The shared fixture contains sample instruments only. No private watchlist is read or modified in this isolated preview.":"Search and filtering against the authoritative instrument master are not simulated by this compact shared fixture."));
+ if(name==="market"){
+  content.append(grid(card("Market status",model.market.marketStatus||"—","Simulated fixture status"),card("MOCK instruments",String(model.market.instruments.length),"Canonical shared catalog"),card("Exchanges","NSE + BSE","Synthetic identities only"),card("As of",model.asOf,"Fixed fixture timestamp")));
+  renderMarketDashboard(content);
+  return;
+ }
+ if(name==="watchlists"){
+  content.append(notice("Demo watchlists are session-only and use the canonical MOCK instrument catalog. They never read or write private account watchlists."));
+  renderDemoWatchlists(content);
   return;
  }
  if(name==="charts"){
-  const d=model.market.depth;
-  content.append(grid(card("Depth instrument",d.instrumentKey,"Synthetic depth fixture"),card("Bid levels",String(d.bids.length),"Illustrative only"),card("Ask levels",String(d.asks.length),"Illustrative only"),card("OHLC candles","Not supplied","No fabricated chart history")));
-  content.append(table(["SIDE","PRICE","QUANTITY"],[...d.bids.map(x=>["BID",money(x.pricePaise),x.quantity]),...d.asks.map(x=>["ASK",money(x.pricePaise),x.quantity])]));
-  content.append(notice("Depth is synthetic. OHLC candles are absent from this canonical fixture set and are intentionally not invented."));
+  const chart=el("section","demo-market-panel");content.append(chart);mountDemoChart(chart);
   return;
  }
  if(name==="equity"){
-  const list=orders.filter(x=>x.assetClass==="EQUITY");
-  content.append(grid(card("Equity position",equity?.quantity??0,"Fixture quantity"),card("Average price",money(equity?.averagePricePaise),"Integer-paise accounting"),card("Invested value",money(equity?.investedValuePaise),"Sample position"),card("Realized P&L",money(equity?.realizedPnlPaise),"Fixture value")));
-  content.append(table(["ORDER ID","INSTRUMENT","SIDE","TYPE","QTY","STATUS","AVG / LIMIT","CHARGES"],orderRows(list)));
-  content.append(notice("This is a read-only receipt preview. No MARKET/LIMIT submission, cancellation, fill or ledger mutation is available here."));
+  mountEquityDemo(content);
   return;
  }
  if(name==="futures"||name==="options"){
   const x=name==="futures"?model.derivatives.futures:model.derivatives.options;
   const order=orders.find(o=>o.assetClass===(name==="futures"?"FUTURE":"OPTION"));
-  content.append(grid(card("Contract",x.symbol||x.underlying,"MOCK contract only"),card("Expiry",x.expiry,"Illustrative contract date"),card(name==="futures"?"Lot size":"Option type",name==="futures"?x.lotSize:x.optionType,"Fixture metadata"),card("Strike",name==="options"?money(x.strikePaise):"Not applicable",name==="options"?"Paise-based strike":"Futures contract")));
+  content.append(grid(card("Available contracts",String(model.market.instruments.filter(i=>i.assetClass===(name==="futures"?"FUTURE":"OPTION")).length),"NSE + BSE MOCK catalog"),card("Sample contract",x.symbol||x.underlying,"Order receipt fixture"),card("Expiry choices",String(getPaperDemoExpiries(model,{underlying:name==="futures"?"MOCKNIFTY":x.underlying,assetClass:name==="futures"?"FUTURE":"OPTION"}).length),"Deterministic fixture dates"),card("Order record",order?.status||"—","Read-only sample")));
+  const catalog=el("section","catalog-panel");content.append(catalog);if(name==="futures")renderFuturesCatalog(catalog);else renderOptionsCatalog(catalog);
   content.append(table(["ORDER ID","INSTRUMENT","SIDE","TYPE","SIZE","STATUS","AVG / LIMIT"],orderRows(order?[order]:[])));
-  content.append(notice("Canonical MOCK contracts power the local Futures/Options simulator below. Production execution and workers remain separate."));
+  content.append(notice("Contracts, strikes and quotes are synthetic MOCK fixtures. The local simulator below is browser-memory only; no production order API or broker connection is called."));
   mountDerivativeDemo(content,name);
   return;
  }
@@ -58,6 +200,7 @@ function render(name){
   const selected=name==="trades"?orders.filter(o=>o.status==="FILLED"):orders;
   content.append(grid(card("Records",String(selected.length),"Current fixture only"),card("Filled",String(selected.filter(o=>o.status==="FILLED").length),"Sample statuses"),card("Pending",String(selected.filter(o=>o.status==="PENDING"||o.status==="PARTIALLY_FILLED").length),"No worker runs"),card("Cancelled",String(selected.filter(o=>o.status==="CANCELLED").length),"No cancellation action")));
   content.append(table(["ORDER ID","ASSET","INSTRUMENT","SIDE","TYPE","SIZE","STATUS","AVG / LIMIT","CHARGES"],orderRows(selected)));
+  appendEquitySummary(content,name);
   appendDerivativeSummary(content,name);
   return;
  }
@@ -65,6 +208,7 @@ function render(name){
   content.append(grid(card("Starting capital",money(a.startingCapitalPaise),"Virtual only"),card("Available funds",money(a.availableFundsPaise),"Fixture snapshot"),card("Blocked funds",money(a.blockedFundsPaise),"Fixture snapshot"),card("Unrealized P&L",money(a.unrealizedPnlPaise),"Account fixture")));
   content.append(table(["ASSET","INSTRUMENT","QUANTITY","AVERAGE PRICE","INVESTED VALUE","REALIZED P&L","UNREALIZED P&L"],model.positions.map(p=>[p.assetClass,p.instrumentKey,p.quantity,money(p.averagePricePaise),money(p.investedValuePaise),money(p.realizedPnlPaise),money(p.unrealizedPnlPaise)])));
   content.append(notice("The account fixture remains unreconciled. Local F&O Demo positions below are browser-memory only and do not update the wallet or unified ledger."));
+  appendEquitySummary(content,name);
   if(name==="positions"||name==="portfolio") appendDerivativeSummary(content,name);
   return;
  }
@@ -79,7 +223,7 @@ function render(name){
   return;
  }
  if(name==="settings"){
-  content.append(grid(card("Data provider",model.meta.provider,"Explicit demo route"),card("Environment",model.meta.mode,"Production mode rejected by adapter"),card("Order submission","Disabled","Read-only preview"),card("Crypto","Separate","Excluded from Indian-market fixtures")));
+  content.append(grid(card("Data provider",model.meta.provider,"Explicit demo route"),card("Environment",model.meta.mode,"Production mode rejected by adapter"),card("Order execution","Local simulation only","No broker or production RPC"),card("Crypto","Separate","Excluded from Indian-market fixtures")));
   content.append(notice(model.meta.disclaimer));
  }
 }
@@ -94,7 +238,7 @@ async function start(){
  try{
   const [market,account,equity,derivatives]=await Promise.all(["market","account","equity","derivatives"].map(loadFixture));
   model=createPaperDemoViewModel({market,account,equity,derivatives},{enabled:true,production:false});
-  status.textContent="4 canonical fixtures validated · DUMMY_JSON · order actions disabled";
+  status.textContent="4 canonical fixtures validated · DUMMY_JSON · local Equity/F&O simulation only";
   render("home");
  }catch(error){
   status.textContent="Demo unavailable: "+(error.message||"fixture validation failed");

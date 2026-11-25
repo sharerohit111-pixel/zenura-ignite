@@ -1,0 +1,36 @@
+{
+  "schemaVersion": "1.0.0",
+  "mode": "MOCK",
+  "simulated": true,
+  "requestId": "mock-equity-execution-0001",
+  "asOf": "2026-11-24T09:30:00+05:30",
+  "meta": {
+    "source": "SYNTHETIC_FIXTURE",
+    "exchange": "NONE",
+    "provider": "MOCK",
+    "fees": "NOT_MODELED",
+    "stale": false
+  },
+  "data": {
+    "instrument": {
+      "instrumentKey": "MOCK|NSE|EQ|0001",
+      "symbol": "MOCKALPHA",
+      "name": "Synthetic Alpha Corporation",
+      "assetClass": "EQUITY",
+      "tickSizePaise": 5,
+      "markPricePaise": 125050
+    },
+    "orderBook": {
+      "asks": [
+        { "pricePaise": 125050, "quantity": 2 },
+        { "pricePaise": 125100, "quantity": 3 },
+        { "pricePaise": 125150, "quantity": 4 }
+      ],
+      "bids": [
+        { "pricePaise": 124950, "quantity": 2 },
+        { "pricePaise": 124900, "quantity": 3 },
+        { "pricePaise": 124850, "quantity": 4 }
+      ]
+    }
+  }
+}

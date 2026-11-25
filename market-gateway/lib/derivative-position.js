@@ -1,5 +1,10 @@
-"use strict";
-function applyDerivativeFill({instrumentType,side,quantity,pricePaise,position={netQuantity:0,averagePricePaise:0},now=Date.now()}){
+(function(root,factory){
+ const api=factory();
+ if(typeof module==="object"&&module.exports)module.exports=api;
+ if(root)root.ZENURA_DERIVATIVE_POSITION=api;
+})(typeof window!=="undefined"?window:globalThis,function(){
+ "use strict";
+ function applyDerivativeFill({instrumentType,side,quantity,pricePaise,position={netQuantity:0,averagePricePaise:0},now=Date.now()}){
  const fail=message=>{throw Object.assign(new Error(message),{status:400});};
  if(!["FUT","CE","PE"].includes(instrumentType))fail("Only futures and options positions are supported.");
  if(!["BUY","SELL"].includes(side))fail("Side must be BUY or SELL.");
@@ -29,4 +34,5 @@ function applyDerivativeFill({instrumentType,side,quantity,pricePaise,position={
  if(!Number.isSafeInteger(cashDeltaPaise))fail("Derivative cash movement exceeds safe calculation limits.");
  return {instrumentType,netQuantity:newQty,averagePricePaise:nextAverage,realizedPnlPaise,closedQuantity,openedQuantity,cashDeltaPaise,optionPremiumCashDeltaPaise,futuresSettlementCashDeltaPaise,positionStatus:newQty===0?"CLOSED":newQty>0?"LONG":"SHORT",simulationOnly:true,excludesCharges:true,executedAtMs:now};
 }
-module.exports={applyDerivativeFill};
+return Object.freeze({applyDerivativeFill});
+});
