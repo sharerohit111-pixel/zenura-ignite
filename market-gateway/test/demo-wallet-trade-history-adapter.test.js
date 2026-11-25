@@ -3,6 +3,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const { createDemoWalletLedger } = require("../lib/demo-wallet-ledger");
 const { syncDemoWalletFromTradeHistory } = require("../lib/demo-wallet-trade-history-adapter");
+const { createDemoTradeHistoryStore } = require("../lib/demo-trade-history-store");
 
 const at = "2026-11-25T10:00:00+05:30";
 const wallet = () => createDemoWalletLedger({ accountId: "mock-account-user-a",
@@ -117,4 +118,21 @@ test("rejects canonical fill when quantity times price does not equal gross rece
   assert.throws(() => syncDemoWalletFromTradeHistory({ wallet: w, historySnapshot: h }),
     /INVALID_CANONICAL_FILL/);
   assert.deepEqual(w.snapshot(), before);
+});
+
+test("adapts an actual canonical Trade History store snapshot without reshaping source receipts", () => {
+  const historyStore = createDemoTradeHistoryStore({ env: { NODE_ENV: "test" } });
+  const order = historyStore.submit({
+    orderId: "canonical-eq-actual-1", assetClass: "EQUITY", side: "BUY",
+    orderType: "MARKET", product: "DELIVERY", instrumentKey: "MOCK|NSE|EQ|0001",
+    quantity: 2, idempotencyKey: "canonical_eq_actual_1", createdAt: at
+  });
+  historyStore.recordFill({ orderId: order.orderId, fillId: "canonical-fill-actual-1",
+    quantity: 2, pricePaise: 125000, filledAt: at });
+  const canonicalSnapshot = historyStore.snapshot();
+  const result = syncDemoWalletFromTradeHistory({ wallet: wallet(), historySnapshot: canonicalSnapshot });
+  assert.equal(result.sourceOrderCount, 1);
+  assert.equal(result.sourceFillCount, 1);
+  assert.equal(result.snapshot.cashPaise, 99750000);
+  assert.equal(result.snapshot.settledFillIds[0], "canonical-fill-actual-1");
 });
