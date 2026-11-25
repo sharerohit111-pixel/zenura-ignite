@@ -105,6 +105,7 @@ function validateEvent(input, identity, expectedSequence) {
         !integer(p.quantityDelta) || !integer(p.realizedPnlDeltaPaise) ||
         !integer(p.costBasisDeltaPaise ?? 0) || !integer(p.reservedQuantityDelta ?? 0) ||
         !PRODUCTS.has(productOf(p))) fail("INVALID_POSITION_EVENT");
+    if ((p.reservedQuantityDelta ?? 0) !== 0) fail("UNAUTHORIZED_POSITION_RESERVATION_MOVEMENT");
     if (input.engine === "EQUITY" && p.assetClass !== "EQUITY") fail("ENGINE_ASSET_MISMATCH");
     if (input.engine === "FUTURES" && p.assetClass !== "FUTURE") fail("ENGINE_ASSET_MISMATCH");
     if (input.engine === "OPTIONS" && p.assetClass !== "OPTION") fail("ENGINE_ASSET_MISMATCH");
