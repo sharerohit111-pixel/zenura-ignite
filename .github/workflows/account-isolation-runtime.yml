@@ -1,0 +1,23 @@
+name: S-TRADE Account Isolation Runtime Regression
+
+on:
+  pull_request:
+    paths:
+      - "markets/stocks/connect.js"
+      - "markets/stocks/connect-session-isolation.runtime.test.js"
+      - ".github/workflows/account-isolation-runtime.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  account-switch-runtime:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Exercise delayed User A response after User B sign-in
+        run: node --test markets/stocks/connect-session-isolation.runtime.test.js
