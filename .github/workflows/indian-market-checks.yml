@@ -177,7 +177,7 @@ jobs:
           const runtime = firebase.functions?.find(item => item.source === 'functions')?.runtime;
           if (runtime !== 'nodejs22') throw new Error('Firebase Functions runtime must be nodejs22.');
           if (pkg.engines?.node !== '22') throw new Error('functions/package.json must require Node 22.');
-          if (!/node-version:\\s*["']22["']/.test(deploy)) throw new Error('Firebase deploy workflow must use Node 22.');
+          if (!/node-version:\s*["']22["']/.test(deploy)) throw new Error('Firebase deploy workflow must use Node 22.');
           console.log('Firebase Functions runtime, package engine and deployment workflow are aligned on Node 22.');
           NODE
       - name: Guard Firebase deployment scope
