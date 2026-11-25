@@ -97,7 +97,8 @@ test("queued write keeps its original list name if the user switches lists befor
   const first = controller.mutate(["MOCK|A"]);
   controller.setActiveName("Banking");
   const second = controller.mutate(["MOCK|B"]);
-  await Promise.resolve();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(typeof release, "function");
   release();
   await Promise.all([first, second]);
   assert.deepEqual(calls.map(x => x.name), ["My Stocks", "Banking"]);
