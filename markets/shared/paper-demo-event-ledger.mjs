@@ -106,6 +106,11 @@ function initialProjection(opening) {
   };
 }
 function apply(projection, event) {
+  // Wallet cash and blocked-fund balances may change only through the verified receipt append path.
+  if (event.type !== "SETTLEMENT_RECEIPT_ACCEPTED" &&
+      (event.deltas.cashDeltaPaise !== 0 || event.deltas.blockedDeltaPaise !== 0)) {
+    fail("WALLET_MOVEMENT_REQUIRES_VERIFIED_SETTLEMENT_RECEIPT");
+  }
   const cash = projection.account.cashBalancePaise + event.deltas.cashDeltaPaise;
   const blocked = projection.account.blockedFundsPaise + event.deltas.blockedDeltaPaise;
   const available = cash - blocked;
