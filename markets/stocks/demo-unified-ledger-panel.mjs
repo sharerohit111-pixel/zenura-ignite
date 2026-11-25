@@ -61,6 +61,9 @@ export function schedulePortfolioMarkExpiryRefresh({
   section, marks, render, now = Date.now, setTimer = setTimeout,
   clearTimer = clearTimeout, doc = globalThis.document
 } = {}) {
+  if (typeof doc?.addEventListener !== "function" || typeof doc?.removeEventListener !== "function") {
+    return () => {};
+  }
   let timer = null;
   let disposed = false;
   const dispose = () => {
