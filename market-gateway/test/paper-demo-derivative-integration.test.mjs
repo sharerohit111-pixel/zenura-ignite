@@ -88,3 +88,16 @@ test("PWA shell cache manifest contains no duplicate request URLs", async () => 
   assert.ok(paths.length > 0, "PWA shell must include assets");
   assert.equal(new Set(paths).size, paths.length, "cache.addAll must not receive duplicate asset URLs");
 });
+
+
+test("Standalone Demo exposes the shared persistent Hindi/English language toggle", async () => {
+  const html = await read("markets/stocks/demo.html");
+  const css = await read("markets/stocks/demo.css");
+  const language = await read("markets/language-toggle.js");
+  assert.match(html, /id="paper-language-toggle"/);
+  assert.match(html, /src="\.\.\/language-toggle\.js"/);
+  assert.match(css, /\.paper-language-toggle\{position:fixed/);
+  assert.match(language, /"FUTURES · LOCAL PAPER SIMULATOR"/);
+  assert.match(language, /"SIMULATE LIMIT MATCH"/);
+  assert.match(language, /"DEMO ORDER RECEIPTS"/);
+});
