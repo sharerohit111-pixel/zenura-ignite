@@ -1,0 +1,41 @@
+name: S-TRADE Account Isolation Runtime Regression
+
+on:
+  pull_request:
+    paths:
+      - "markets/stocks/connect.js"
+      - "markets/stocks/order-workspace.js"
+      - "markets/stocks/index.html"
+      - "markets/stocks/account-isolation.browser.test.cjs"
+      - "markets/stocks/connect-session-isolation.runtime.test.js"
+      - ".github/workflows/account-isolation-runtime.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  account-switch-runtime:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Run auth-switch, per-user storage, and stale-response regression tests
+        run: node --test markets/stocks/connect-session-isolation.runtime.test.js
+      - name: Install Chromium browser QA dependencies
+        run: |
+          npm install --prefix "$RUNNER_TEMP/zenura-playwright" playwright@1.61.1 --ignore-scripts --no-audit --no-fund
+          "$RUNNER_TEMP/zenura-playwright/node_modules/.bin/playwright" install --with-deps chromium
+      - name: Run real-browser account isolation regressions
+        timeout-minutes: 8
+        run: |
+          python3 -m http.server 4173 --bind 127.0.0.1 > "$RUNNER_TEMP/account-isolation-http.log" 2>&1 &
+          echo $! > "$RUNNER_TEMP/account-isolation-http.pid"
+          for attempt in $(seq 1 30); do
+            if curl --silent --fail http://127.0.0.1:4173/markets/stocks/index.html >/dev/null; then break; fi
+            sleep 1
+          done
+          curl --silent --fail http://127.0.0.1:4173/markets/stocks/index.html >/dev/null
+          NODE_PATH="$RUNNER_TEMP/zenura-playwright/node_modules" node markets/stocks/account-isolation.browser.test.cjs
