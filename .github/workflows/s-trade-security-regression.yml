@@ -1,0 +1,62 @@
+name: S-TRADE Dependency and Secret Regression
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "market-gateway/package.json"
+      - "functions/package.json"
+      - "market-gateway/**"
+      - "functions/**"
+      - "markets/**"
+      - ".github/workflows/s-trade-security-regression.yml"
+      - ".gitleaksignore"
+  push:
+    branches:
+      - "security/chat53-authenticated-csp-regression-2026-11-25"
+    paths:
+      - "market-gateway/package.json"
+      - "functions/package.json"
+      - "market-gateway/**"
+      - "functions/**"
+      - "markets/**"
+      - ".github/workflows/s-trade-security-regression.yml"
+      - ".gitleaksignore"
+
+permissions:
+  contents: read
+
+jobs:
+  dependency-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        directory: [market-gateway, functions]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Resolve temporary dependency lock for audit
+        working-directory: ${{ matrix.directory }}
+        run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+      - name: Fail on high or critical dependency advisories
+        working-directory: ${{ matrix.directory }}
+        run: npm audit --audit-level=high
+
+  git-history-secret-scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Scan full available Git history for secrets
+        run: |
+          docker run --rm -w /repo -v "$PWD:/repo" -v "$RUNNER_TEMP:/reports" zricethezav/gitleaks:v8.24.2 git --redact --no-banner --report-format json --report-path /reports/gitleaks.json --log-opts=--all . || scan_status=$?
+          if [ -f "$RUNNER_TEMP/gitleaks.json" ]; then
+            jq '[.[] | {RuleID, Description, File, StartLine, EndLine, Commit, Fingerprint}]' "$RUNNER_TEMP/gitleaks.json"
+          fi
+          exit "${scan_status:-0}"
