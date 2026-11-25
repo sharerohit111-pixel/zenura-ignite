@@ -176,14 +176,18 @@ function apply(projection, event) {
       Object.assign(existing, next);
     } else projection.orders.push(next);
     const autoReleaseOnTerminalSell = existing && p.side === "SELL" && p.assetClass !== "FUTURE" &&
-      ["CANCELLED", "EXPIRED"].includes(p.status) ? -existing.remainingQuantity : 0;
+      ["CANCELLED", "EXPIRED"].includes(p.status)
+      ? -(existing.quantity - projection.fills.filter(fill => fill.orderId === p.orderId)
+        .reduce((sum, fill) => sum + fill.quantity, 0))
+      : 0;
     if (autoReleaseOnTerminalSell !== 0 && p.reservedQuantityDelta !== undefined &&
         p.reservedQuantityDelta !== autoReleaseOnTerminalSell) {
       fail("SELL_RESERVATION_RELEASE_MISMATCH");
     }
-    const reservationDelta = autoReleaseOnTerminalSell ||
-      p.reservedQuantityDelta ??
-      (event.type === "ORDER_ACCEPTED" && p.side === "SELL" && p.assetClass !== "FUTURE" ? p.quantity : 0);
+    const reservationDelta = autoReleaseOnTerminalSell !== 0
+      ? autoReleaseOnTerminalSell
+      : (p.reservedQuantityDelta ??
+        (event.type === "ORDER_ACCEPTED" && p.side === "SELL" && p.assetClass !== "FUTURE" ? p.quantity : 0));
     if (reservationDelta !== 0) {
       const key = positionKey(p.assetClass, p.instrumentKey, product);
       const position = projection.positions.find(x => x.key === key);
