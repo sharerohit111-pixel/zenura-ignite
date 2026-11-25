@@ -335,7 +335,8 @@ test("recorded fills remain immutable in snapshots and duplicate fill IDs are re
   assert.throws(() => ledger.append({
     ...fill,
     eventId: "evt-fill-2", idempotencyKey: "idem-fill-2", sourceEventId: "source-fill-2",
-    occurredAt: "2026-11-25T09:30:02+05:30"
+    occurredAt: "2026-11-25T09:30:02+05:30",
+    deltas: { cashDeltaPaise: -125050, blockedDeltaPaise: 0 }
   }), /DUPLICATE_FILL_ID/);
   assert.equal(ledger.snapshot().fills.length, 1);
   assert.equal(ledger.snapshot().events.length, 2);
