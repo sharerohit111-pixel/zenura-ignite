@@ -167,6 +167,19 @@ function createDemoWalletLedger({ accountId, openingCashPaise, openingEvidenceRe
       const settlement = ledgerFillById.get(source.fillId);
       return settlement && settlement.orderId === source.orderId && settlement.assetClass === source.assetClass;
     }) && ledgerFillFacts.length === sourceFills.length;
+    // A matching fill ID is not enough: prove the cash direction and exact gross
+    // amount against the authoritative source fill receipt.
+    const settlementAmountsMatch = sourceFills.every(source => {
+      const settlement = ledgerFillById.get(source.fillId);
+      if (!settlement || !["EQUITY", "OPTION"].includes(source.assetClass) ||
+          !["BUY", "SELL"].includes(source.side) ||
+          !Number.isSafeInteger(source.quantity) || source.quantity < 1 ||
+          !Number.isSafeInteger(source.pricePaise) || source.pricePaise < 1 ||
+          !Number.isSafeInteger(source.grossValuePaise) || source.grossValuePaise < 1 ||
+          source.quantity * source.pricePaise !== source.grossValuePaise) return false;
+      const expectedDelta = source.side === "BUY" ? -source.grossValuePaise : source.grossValuePaise;
+      return settlement.cashDeltaPaise === expectedDelta;
+    }) && ledgerFillFacts.length === sourceFills.length;
     const reservationsMatch = reservationIds.size === ledgerReservationIds.size &&
       [...reservationIds].every(id => ledgerReservationIds.has(id)) &&
       sourceReservations.every(source => current.reservations.some(local =>
@@ -182,12 +195,13 @@ function createDemoWalletLedger({ accountId, openingCashPaise, openingEvidenceRe
     if (duplicateSourceIds) blockers.push("Source order, fill or reservation identifiers are duplicated.");
     if (!allOrdersReferenced) blockers.push("One or more source orders have no matching asset-scoped canonical wallet ledger reference.");
     if (!allFillsSettled) blockers.push("Source fills and exactly-once cash settlement receipts do not match.");
+    if (!settlementAmountsMatch) blockers.push("Cash settlement direction or exact gross amount does not match the source fill receipt.");
     if (!reservationsMatch) blockers.push("Active source reservations do not exactly match ledger reservations.");
     if (!evidenceComplete) blockers.push("Required independent snapshot and atomic-consistency evidence references are incomplete.");
     blockers.push("The audit helper cannot independently verify external evidence authenticity or atomic snapshot provenance.");
 
     return clone({
-      accountId, arithmeticMatches, allOrdersReferenced, allFillsSettled, reservationsMatch,
+      accountId, arithmeticMatches, allOrdersReferenced, allFillsSettled, settlementAmountsMatch, reservationsMatch,
       duplicateSourceIds, evidenceComplete, ledgerReconciled: false,
       reconciliationStatus: "calculated_unattested", reconciliationBlockers: blockers,
       evidenceRefs: evidenceComplete ? evidenceRefs.map(key => ({ key, ref: evidence[key] })) : []
