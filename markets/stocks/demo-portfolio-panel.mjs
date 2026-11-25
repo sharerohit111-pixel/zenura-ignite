@@ -131,6 +131,8 @@ function renderPortfolio(host, screen, view) {
 }
 
 let viewModelPromise;
+let enhancedHost = null;
+let enhancedScreen = null;
 function enhancePortfolioScreen() {
   const content = document.getElementById("screen-content");
   if (!content) return;
@@ -138,17 +140,17 @@ function enhancePortfolioScreen() {
   const screen = heading?.textContent === "Portfolio" ? "portfolio" :
     heading?.textContent === "Positions" ? "positions" :
     heading?.textContent === "Holdings" ? "holdings" : null;
-  if (!screen || content.dataset.portfolioEnhanced === screen) return;
+  if (!screen) { enhancedHost = null; enhancedScreen = null; return; }
   const existing = content.querySelector(".demo-unified-history");
-  if (!existing) return;
-  content.dataset.portfolioEnhanced = screen;
+  if (!existing || (existing === enhancedHost && screen === enhancedScreen)) return;
+  enhancedHost = existing; enhancedScreen = screen;
   viewModelPromise ||= loadFixtures();
   viewModelPromise.then(model => {
     if (!content.contains(existing) || enhancedHost !== existing || enhancedScreen !== screen) return;
     const view = buildDemoPortfolioView(getDemoProjectionSnapshot(), model.market.instruments, model.asOf);
     renderPortfolio(existing, screen, view);
   }).catch(error => {
-    content.dataset.portfolioEnhanced = "";
+    if (enhancedHost === existing) { enhancedHost = null; enhancedScreen = null; }
     existing.replaceChildren(node("div", "notice", "Portfolio valuation unavailable: " + (error.message || "fixture validation failed")));
   });
 }
