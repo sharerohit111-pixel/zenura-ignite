@@ -49,3 +49,12 @@ test("accepted/open aliases normalize to pending and cancelled spelling aliases 
  assert.equal(result.orders.find(x=>x.orderId==="ALIAS-EQ-ACCEPTED-001").status,"PENDING");
  assert.equal(result.orders.find(x=>x.orderId==="ALIAS-EQ-CANCELLED-001").status,"CANCELLED");
 });
+
+
+test("projection rejects malformed source timestamps instead of coercing them to the Unix epoch",async()=>{
+ if(!sync){({syncDemoProjection:sync}=await import("../../markets/stocks/demo-trade-projection.mjs"));}
+ const invalidOrder={orders:[{orderId:"BAD-TIME-ORDER-001",side:"BUY",orderType:"MARKET",product:"DELIVERY",instrumentKey:"MOCK|NSE|EQ|0099",quantity:1,status:"ACCEPTED",createdAt:"not-a-date",updatedAt:"not-a-date"}],fills:[]};
+ assert.throws(()=>sync("EQUITY",invalidOrder),/INVALID_DEMO_EVENT_TIMESTAMP/);
+ const invalidFill={orders:[{orderId:"BAD-TIME-FILL-001",side:"BUY",orderType:"MARKET",product:"DELIVERY",instrumentKey:"MOCK|NSE|EQ|0098",quantity:1,status:"FILLED",createdAt:"2026-11-25T09:30:00.000Z",updatedAt:"2026-11-25T09:30:01.000Z"}],fills:[{fillId:"bad-time-fill-001",orderId:"BAD-TIME-FILL-001",quantity:1,pricePaise:10000,filledAt:"not-a-date"}]};
+ assert.throws(()=>sync("EQUITY",invalidFill),/INVALID_DEMO_EVENT_TIMESTAMP/);
+});
