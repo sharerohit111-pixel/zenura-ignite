@@ -14,7 +14,7 @@ const stable = value => {
   return JSON.stringify(value);
 };
 function timestampMs(value, code = "INVALID_DEMO_TIMESTAMP") {
-  if (typeof value !== "string" || !/^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,3})?(?:Z|[+-]\\d{2}:\\d{2})$/.test(value)) fail(code);
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$/.test(value)) fail(code);
   const parsed = Date.parse(value);
   if (!Number.isFinite(parsed)) fail(code);
   return parsed;
