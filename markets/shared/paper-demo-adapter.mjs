@@ -43,7 +43,7 @@ function assertDerivativeInstrumentIdentity(contract) {
     fail("MOCK_DERIVATIVE_INSTRUMENT_IDENTITY_MISMATCH");
   }
   if (contract.assetClass === "OPTION" &&
-      (!/^\\d+$/.test(parts[4]) || Number(parts[4]) * 100 !== contract.strikePaise ||
+      (!/^\d+$/.test(parts[4]) || Number(parts[4]) * 100 !== contract.strikePaise ||
        parts[5] !== contract.optionType)) {
     fail("MOCK_DERIVATIVE_INSTRUMENT_IDENTITY_MISMATCH");
   }
