@@ -40,7 +40,7 @@ export function createEquityDemoLedgerBridge({ engine, accountId, sessionId, clo
     return ledger.append({
       eventId: "eq-ledger-" + id,
       idempotencyKey: "eq-idem-" + id,
-      sourceEventId: "equity-" + sourceKey,
+      sourceEventId: "equity-" + String(sourceKey).replace(/[^A-Za-z0-9._:-]/g, "-"),
       accountId, sessionId,
       occurredAt: new Date(time).toISOString(),
       engine: "EQUITY", type, payload, deltas
