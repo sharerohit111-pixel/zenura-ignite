@@ -1,4 +1,5 @@
-let fixturePromise=null,enginePromise=null,engine=null,orderSequence=0;
+import { createEquityDemoLedgerBridge } from "./demo-equity-ledger-bridge.mjs";
+let fixturePromise=null,enginePromise=null,engine=null,ledgerBridge=null,orderSequence=0;
 const el=(tag,cls,value)=>{const node=document.createElement(tag);if(cls)node.className=cls;if(value!==undefined)node.textContent=String(value);return node;};
 const money=paise=>Number.isSafeInteger(paise)?"₹"+(paise/100).toLocaleString("en-IN",{minimumFractionDigits:2,maximumFractionDigits:2}):"—";
 const add=(select,value,label)=>{const option=document.createElement("option");option.value=value;option.textContent=label;select.append(option);};
@@ -13,6 +14,8 @@ async function getEngine(){
   if(!window.ZenuraEquityDemoEngine?.createEquityDemoExecutionEngine)throw new Error("EQUITY_DEMO_ENGINE_UNAVAILABLE");
   if(accountEnvelope?.mode!=="MOCK"||accountEnvelope?.simulated!==true||accountEnvelope?.meta?.source!=="SYNTHETIC_FIXTURE")throw new Error("INVALID_EQUITY_DEMO_ACCOUNT_FIXTURE");
   engine=window.ZenuraEquityDemoEngine.createEquityDemoExecutionEngine({fixture:fixtureEnvelope,account:accountEnvelope.data,env:{NODE_ENV:(window.ZENURA_RUNTIME_ENV==="development"||window.ZENURA_RUNTIME_ENV==="test")?window.ZENURA_RUNTIME_ENV:"production"}});
+  const sessionToken=window.crypto?.randomUUID?.()||("session-"+Date.now()+"-"+Math.random().toString(36).slice(2));
+  ledgerBridge=createEquityDemoLedgerBridge({engine,accountId:accountEnvelope.data.accountId,sessionId:"demo-"+sessionToken});
   return engine;
  });
  return enginePromise;
@@ -63,8 +66,8 @@ export async function mountEquityDemo(container){
  const cancel=el("button","demo-eq-button danger","CANCEL REMAINDER");
  actions.append(submit,match,matchAll,cancel);panel.append(actions);
  const status=el("p","demo-eq-status","Loading validated Equity simulator…");
- const positions=el("div"),orders=el("div"),fills=el("div");
- panel.append(status,el("h3","demo-eq-subhead","EQUITY POSITIONS"),positions,el("h3","demo-eq-subhead","ORDER RECEIPTS"),orders,el("h3","demo-eq-subhead","IMMUTABLE FILL RECEIPTS"),fills);
+ const positions=el("div"),orders=el("div"),fills=el("div"),events=el("div");
+ panel.append(status,el("h3","demo-eq-subhead","EQUITY POSITIONS"),positions,el("h3","demo-eq-subhead","ORDER RECEIPTS"),orders,el("h3","demo-eq-subhead","IMMUTABLE FILL RECEIPTS"),fills,el("h3","demo-eq-subhead","CANONICAL EVENT LEDGER"),events);
  container.append(panel);
  let activeOrderId="";
  function paint(){
@@ -80,6 +83,8 @@ export async function mountEquityDemo(container){
   table(positions,["INSTRUMENT","PRODUCT","QTY","RESERVED","AVG PRICE","COST BASIS"],positionRows(s), "No Equity positions yet.");
   table(orders,["ORDER ID","SIDE","PRODUCT","TYPE","QTY","FILLED / REMAINING","LIMIT","AVG FILL","STATUS"],orderRows(s),"No Equity orders yet.");
   table(fills,["FILL ID","SIDE","PRODUCT","QTY","PRICE","GROSS VALUE","REALIZED P&L","EXECUTED AT"],fillRows(s),"No immutable fill receipts yet.");
+  const ledgerSnapshot=ledgerBridge?.snapshot();
+  table(events,["SEQ","EVENT","SOURCE ID","TIME"],(ledgerSnapshot?.events||[]).map(event=>[event.sequence,event.type,event.sourceEventId,event.occurredAt]),"No canonical events yet.");
   const active=s.orders.filter(x=>["PENDING","PARTIALLY_FILLED"].includes(x.status));
   if(!active.some(x=>x.orderId===activeOrderId))activeOrderId=active.at(-1)?.orderId||"";
   activeOrderSelect.replaceChildren();active.forEach(order=>add(activeOrderSelect,order.orderId,order.orderId+" · "+order.status+" · "+order.remainingQuantity+" remaining"));
@@ -94,20 +99,20 @@ export async function mountEquityDemo(container){
    const q=Number(quantity.value);if(!Number.isSafeInteger(q)||q<1||q>1000000)throw new Error("Enter a valid whole-share quantity.");
    const request={instrumentKey:engine.snapshot().valuation.instrumentKey,side:side.value,orderType:type.value,product:product.value,quantity:q,idempotencyKey:"equity-demo-"+String(++orderSequence).padStart(8,"0")};
    if(type.value==="LIMIT"){request.limitPricePaise=parsePrice(limit.value);if(!request.limitPricePaise)throw new Error("Enter a valid LIMIT price in rupees.");}
-   const order=engine.submitOrder(request);activeOrderId=order.orderId;status.textContent="Order accepted locally · "+order.orderId+" · reserved funds/shares updated. Use a manual fill action to simulate execution.";paint();
+   const order=ledgerBridge.submitOrder(request).order;activeOrderId=order.orderId;status.textContent="Order accepted · "+order.orderId+" · canonical ledger events: "+ledgerBridge.snapshot().events.length+". Manual MOCK fill only.";paint();
   }catch(error){status.textContent=error.message||"Demo order rejected.";}
  });
  match.addEventListener("click",()=>{
-  try{const result=engine.matchNext(activeOrderId,{executionId:"equity-fill-"+String(engine.snapshot().fills.length+1).padStart(8,"0")});status.textContent=result.matched?"Synthetic fill "+result.fill.fillId+" · "+result.fill.quantity+" shares @ "+money(result.fill.pricePaise):"No fill · "+result.reason;paint();}
+  try{const result=ledgerBridge.matchNext(activeOrderId,{executionId:"equity-fill-"+String(engine.snapshot().fills.length+1).padStart(8,"0")});status.textContent=result.matched?"Synthetic fill "+result.fill.fillId+" · "+result.fill.quantity+" shares @ "+money(result.fill.pricePaise)+" · ledger updated.":"No fill · "+result.reason;paint();}
   catch(error){status.textContent=error.message||"Demo fill failed.";}
  });
  matchAll.addEventListener("click",()=>{
-  try{let count=0,result;do{result=engine.matchNext(activeOrderId,{executionId:"equity-fill-"+String(engine.snapshot().fills.length+1).padStart(8,"0")});if(result.matched)count++;}while(result.matched&&engine.getOrder(activeOrderId)?.remainingQuantity>0);
+  try{let count=0,result;do{result=ledgerBridge.matchNext(activeOrderId,{executionId:"equity-fill-"+String(engine.snapshot().fills.length+1).padStart(8,"0")});if(result.matched)count++;}while(result.matched&&engine.getOrder(activeOrderId)?.remainingQuantity>0);
    status.textContent="Manual synthetic depth matching complete · "+count+" fill(s) · "+(result.reason||result.order.status)+". No worker ran.";paint();}
   catch(error){status.textContent=error.message||"Demo matching failed.";}
  });
  cancel.addEventListener("click",()=>{
-  try{const result=engine.cancelOrder(activeOrderId);status.textContent=result.cancelled?"Unfilled remainder cancelled · released cash "+money(result.releasedCashPaise)+" · released shares "+result.releasedShareQuantity+". Executed fills retained.":"Order not cancelled · "+(result.reason||"not open");paint();}
+  try{const result=ledgerBridge.cancelOrder(activeOrderId);status.textContent=result.cancelled?"Unfilled remainder cancelled · released cash "+money(result.releasedCashPaise)+" · released shares "+result.releasedShareQuantity+". Canonical ledger updated.":"Order not cancelled · "+(result.reason||"not open");paint();}
   catch(error){status.textContent=error.message||"Demo cancellation failed.";}
  });
  getEngine().then(()=>{status.textContent="Canonical Equity simulator ready · MOCKALPHA · synthetic book only.";paint();}).catch(error=>{status.textContent="Equity Demo unavailable · "+(error.message||"fixture validation failed")+". No live fallback.";submit.disabled=match.disabled=matchAll.disabled=cancel.disabled=true;});
