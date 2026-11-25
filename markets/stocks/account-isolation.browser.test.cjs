@@ -104,7 +104,7 @@ async function respondPair(requests, user, accountBody, ordersBody) {
         r => r.path.endsWith("/paper/account") && r.authorization === "Bearer token-user-A",
         "User A balance request");
       const aOrders = await waitForRequest(requests,
-        r => r.path.includes("/paper/orders?") && r.authorization === "Bearer token-user-A",
+        r => r.path.endsWith("/paper/orders") && r.authorization === "Bearer token-user-A",
         "User A order request");
 
       await switchUser(page, "user-B");
