@@ -140,7 +140,7 @@ const axePath=require.resolve("axe-core/axe.min.js");
   console.log("PWA: waiting for the Markets-scoped service worker activation");
   // Resolve the exact /markets/ registration. navigator.serviceWorker.ready
   // can refer to a different scope when more than one registration exists.
-  const marketsScope=new URL("/markets/",location.origin).href;
+  const marketsScope=new URL("/markets/",page.url()).href;
   await page.waitForFunction(async(scope)=>{
    const registration=await navigator.serviceWorker.getRegistration(scope);
    return registration?.active?.state==="activated" && !registration.installing;
