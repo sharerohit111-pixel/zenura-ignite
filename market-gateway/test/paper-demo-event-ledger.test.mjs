@@ -215,3 +215,89 @@ test("product-aware cost basis cannot become negative or outlive a flat position
   })), /DEMO_POSITION_INVARIANT/);
   assert.equal(ledger.snapshot().events.length, 0);
 });
+
+
+test("fill events atomically project order filled/remaining quantities and partial status", () => {
+  const ledger = createPaperDemoEventLedger(opening);
+  ledger.append(event());
+  ledger.append(event({
+    eventId: "evt-2", idempotencyKey: "idem-2", sourceEventId: "equity-fill-1",
+    type: "FILL_RECORDED", occurredAt: "2026-11-25T09:30:01+05:30",
+    deltas: { cashDeltaPaise: -125050, blockedDeltaPaise: -10000 },
+    payload: { fillId: "fill-1", orderId: "order-1", assetClass: "EQUITY", instrumentKey: "MOCK|NSE|EQ|0001", side: "BUY", quantity: 1, pricePaise: 125050 }
+  }));
+  const order = ledger.snapshot().orders[0];
+  assert.equal(order.status, "PARTIALLY_FILLED");
+  assert.equal(order.filledQuantity, 1);
+  assert.equal(order.remainingQuantity, 1);
+  assert.equal(order.averageFillPricePaise, 125050);
+});
+
+test("order status cannot regress after a partial fill or reopen after terminal fill", () => {
+  const ledger = createPaperDemoEventLedger(opening);
+  ledger.append(event());
+  ledger.append(event({
+    eventId: "evt-2", idempotencyKey: "idem-2", sourceEventId: "equity-fill-1",
+    type: "FILL_RECORDED", occurredAt: "2026-11-25T09:30:01+05:30",
+    deltas: { cashDeltaPaise: -125050, blockedDeltaPaise: -10000 },
+    payload: { fillId: "fill-1", orderId: "order-1", assetClass: "EQUITY", instrumentKey: "MOCK|NSE|EQ|0001", side: "BUY", quantity: 1, pricePaise: 125050 }
+  }));
+  assert.throws(() => ledger.append(event({
+    eventId: "evt-3", idempotencyKey: "idem-3", sourceEventId: "equity-order-regression",
+    type: "ORDER_UPDATED", occurredAt: "2026-11-25T09:30:02+05:30",
+    deltas: { cashDeltaPaise: 0, blockedDeltaPaise: 0 },
+    payload: { ...event().payload, status: "PENDING" }
+  })), /DEMO_ORDER_STATUS_TRANSITION_INVALID/);
+
+  const filled = createPaperDemoEventLedger(opening);
+  filled.append(event());
+  filled.append(event({
+    eventId: "evt-2", idempotencyKey: "idem-2", sourceEventId: "equity-fill-full",
+    type: "FILL_RECORDED", occurredAt: "2026-11-25T09:30:01+05:30",
+    deltas: { cashDeltaPaise: -250100, blockedDeltaPaise: -10000 },
+    payload: { fillId: "fill-full", orderId: "order-1", assetClass: "EQUITY", instrumentKey: "MOCK|NSE|EQ|0001", side: "BUY", quantity: 2, pricePaise: 125050 }
+  }));
+  assert.equal(filled.snapshot().orders[0].status, "FILLED");
+  assert.throws(() => filled.append(event({
+    eventId: "evt-3", idempotencyKey: "idem-3", sourceEventId: "equity-order-reopen",
+    type: "ORDER_UPDATED", occurredAt: "2026-11-25T09:30:02+05:30",
+    deltas: { cashDeltaPaise: 0, blockedDeltaPaise: 0 },
+    payload: { ...event().payload, status: "CANCELLED" }
+  })), /DEMO_ORDER_STATUS_TRANSITION_INVALID/);
+});
+
+test("order updates must agree with canonical fill-derived quantities", () => {
+  const ledger = createPaperDemoEventLedger(opening);
+  ledger.append(event());
+  ledger.append(event({
+    eventId: "evt-2", idempotencyKey: "idem-2", sourceEventId: "equity-fill-1",
+    type: "FILL_RECORDED", occurredAt: "2026-11-25T09:30:01+05:30",
+    deltas: { cashDeltaPaise: -125050, blockedDeltaPaise: -10000 },
+    payload: { fillId: "fill-1", orderId: "order-1", assetClass: "EQUITY", instrumentKey: "MOCK|NSE|EQ|0001", side: "BUY", quantity: 1, pricePaise: 125050 }
+  }));
+  assert.throws(() => ledger.append(event({
+    eventId: "evt-3", idempotencyKey: "idem-3", sourceEventId: "equity-order-bad-quantities",
+    type: "ORDER_UPDATED", occurredAt: "2026-11-25T09:30:02+05:30",
+    deltas: { cashDeltaPaise: 0, blockedDeltaPaise: 0 },
+    payload: { ...event().payload, status: "PARTIALLY_FILLED", filledQuantity: 0, remainingQuantity: 2 }
+  })), /DEMO_ORDER_FILL_QUANTITY_MISMATCH/);
+  assert.equal(ledger.snapshot().events.length, 2);
+  assert.equal(ledger.snapshot().orders[0].status, "PARTIALLY_FILLED");
+});
+
+test("fill-derived order state is deterministic after event replay", () => {
+  const ledger = createPaperDemoEventLedger(opening);
+  ledger.append(event());
+  ledger.append(event({
+    eventId: "evt-2", idempotencyKey: "idem-2", sourceEventId: "equity-fill-1",
+    type: "FILL_RECORDED", occurredAt: "2026-11-25T09:30:01+05:30",
+    deltas: { cashDeltaPaise: -125050, blockedDeltaPaise: -10000 },
+    payload: { fillId: "fill-1", orderId: "order-1", assetClass: "EQUITY", instrumentKey: "MOCK|NSE|EQ|0001", side: "BUY", quantity: 1, pricePaise: 125050 }
+  }));
+  const original = ledger.snapshot();
+  const replayed = replayPaperDemoEvents(opening, original.events);
+  assert.deepEqual(replayed, original);
+  assert.equal(replayed.orders[0].status, "PARTIALLY_FILLED");
+  assert.equal(replayed.orders[0].filledQuantity, 1);
+  assert.equal(replayed.orders[0].remainingQuantity, 1);
+});
