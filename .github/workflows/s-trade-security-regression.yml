@@ -54,6 +54,6 @@ jobs:
         run: |
           docker run --rm -v "$PWD:/repo" -v "$RUNNER_TEMP:/reports" zricethezav/gitleaks:v8.24.2 git --redact --no-banner --report-format json --report-path /reports/gitleaks.json --log-opts=--all /repo || scan_status=$?
           if [ -f "$RUNNER_TEMP/gitleaks.json" ]; then
-            jq '[.[] | {RuleID, Description, File, StartLine, EndLine, Commit}]' "$RUNNER_TEMP/gitleaks.json"
+            jq '[.[] | {RuleID, Description, File, StartLine, EndLine, Commit, Fingerprint}]' "$RUNNER_TEMP/gitleaks.json"
           fi
           exit "${scan_status:-0}"
