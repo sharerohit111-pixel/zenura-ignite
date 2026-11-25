@@ -21,6 +21,7 @@ on:
       - "functions/**"
       - "markets/**"
       - ".github/workflows/s-trade-security-regression.yml"
+      - ".gitleaksignore"
 
 permissions:
   contents: read
