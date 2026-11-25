@@ -52,7 +52,8 @@
         "underlying": "MOCKNIFTY",
         "expiry": "2026-12-31",
         "lotSize": 25,
-        "tickSizePaise": 5
+        "tickSizePaise": 5,
+        "underlyingType": "INDEX"
       },
       {
         "instrumentKey": "MOCK|NSE|FUT|MOCKBANK|2026-12-31",
@@ -62,7 +63,8 @@
         "underlying": "MOCKBANK",
         "expiry": "2026-12-31",
         "lotSize": 15,
-        "tickSizePaise": 5
+        "tickSizePaise": 5,
+        "underlyingType": "STOCK"
       },
       {
         "instrumentKey": "MOCK|NSE|FUT|MOCKNIFTY|2027-01-28",
@@ -72,7 +74,8 @@
         "underlying": "MOCKNIFTY",
         "expiry": "2027-01-28",
         "lotSize": 25,
-        "tickSizePaise": 5
+        "tickSizePaise": 5,
+        "underlyingType": "INDEX"
       },
       {
         "instrumentKey": "MOCK|NSE|OPT|MOCKNIFTY|25000|CE|2026-11-26",
@@ -84,7 +87,8 @@
         "strikePaise": 2500000,
         "expiry": "2026-11-26",
         "lotSize": 25,
-        "tickSizePaise": 5
+        "tickSizePaise": 5,
+        "underlyingType": "INDEX"
       },
       {
         "instrumentKey": "MOCK|NSE|OPT|MOCKNIFTY|25100|CE|2026-11-26",
@@ -96,7 +100,8 @@
         "strikePaise": 2510000,
         "expiry": "2026-11-26",
         "lotSize": 25,
-        "tickSizePaise": 5
+        "tickSizePaise": 5,
+        "underlyingType": "INDEX"
       },
       {
         "instrumentKey": "MOCK|NSE|OPT|MOCKNIFTY|25000|CE|2026-12-31",
@@ -108,7 +113,8 @@
         "strikePaise": 2500000,
         "expiry": "2026-12-31",
         "lotSize": 25,
-        "tickSizePaise": 5
+        "tickSizePaise": 5,
+        "underlyingType": "INDEX"
       },
       {
         "instrumentKey": "MOCK|NSE|OPT|MOCKNIFTY|25100|CE|2026-12-31",
@@ -120,7 +126,8 @@
         "strikePaise": 2510000,
         "expiry": "2026-12-31",
         "lotSize": 25,
-        "tickSizePaise": 5
+        "tickSizePaise": 5,
+        "underlyingType": "INDEX"
       },
       {
         "instrumentKey": "MOCK|NSE|OPT|MOCKNIFTY|25000|PE|2026-11-26",
@@ -132,7 +139,8 @@
         "strikePaise": 2500000,
         "expiry": "2026-11-26",
         "lotSize": 25,
-        "tickSizePaise": 5
+        "tickSizePaise": 5,
+        "underlyingType": "INDEX"
       },
       {
         "instrumentKey": "MOCK|NSE|OPT|MOCKNIFTY|25100|PE|2026-11-26",
@@ -144,7 +152,8 @@
         "strikePaise": 2510000,
         "expiry": "2026-11-26",
         "lotSize": 25,
-        "tickSizePaise": 5
+        "tickSizePaise": 5,
+        "underlyingType": "INDEX"
       },
       {
         "instrumentKey": "MOCK|NSE|OPT|MOCKNIFTY|25000|PE|2026-12-31",
@@ -156,7 +165,8 @@
         "strikePaise": 2500000,
         "expiry": "2026-12-31",
         "lotSize": 25,
-        "tickSizePaise": 5
+        "tickSizePaise": 5,
+        "underlyingType": "INDEX"
       },
       {
         "instrumentKey": "MOCK|NSE|OPT|MOCKNIFTY|25100|PE|2026-12-31",
@@ -168,7 +178,8 @@
         "strikePaise": 2510000,
         "expiry": "2026-12-31",
         "lotSize": 25,
-        "tickSizePaise": 5
+        "tickSizePaise": 5,
+        "underlyingType": "INDEX"
       },
       {
         "instrumentKey": "MOCK|BSE|FUT|MOCKSENSEX|2026-12-29",
@@ -178,7 +189,8 @@
         "underlying": "MOCKSENSEX",
         "expiry": "2026-12-29",
         "lotSize": 20,
-        "tickSizePaise": 5
+        "tickSizePaise": 5,
+        "underlyingType": "INDEX"
       },
       {
         "instrumentKey": "MOCK|BSE|OPT|MOCKSENSEX|81000|CE|2026-12-29",
@@ -190,7 +202,8 @@
         "lotSize": 20,
         "tickSizePaise": 5,
         "optionType": "CE",
-        "strikePaise": 8100000
+        "strikePaise": 8100000,
+        "underlyingType": "INDEX"
       },
       {
         "instrumentKey": "MOCK|BSE|OPT|MOCKSENSEX|81000|PE|2026-12-29",
@@ -202,7 +215,8 @@
         "lotSize": 20,
         "tickSizePaise": 5,
         "optionType": "PE",
-        "strikePaise": 8100000
+        "strikePaise": 8100000,
+        "underlyingType": "INDEX"
       },
       {
         "instrumentKey": "MOCK|BSE|OPT|MOCKSENSEX|82000|CE|2026-12-29",
@@ -214,7 +228,8 @@
         "lotSize": 20,
         "tickSizePaise": 5,
         "optionType": "CE",
-        "strikePaise": 8200000
+        "strikePaise": 8200000,
+        "underlyingType": "INDEX"
       },
       {
         "instrumentKey": "MOCK|BSE|OPT|MOCKSENSEX|82000|PE|2026-12-29",
@@ -226,7 +241,8 @@
         "lotSize": 20,
         "tickSizePaise": 5,
         "optionType": "PE",
-        "strikePaise": 8200000
+        "strikePaise": 8200000,
+        "underlyingType": "INDEX"
       }
     ],
     "quotes": [

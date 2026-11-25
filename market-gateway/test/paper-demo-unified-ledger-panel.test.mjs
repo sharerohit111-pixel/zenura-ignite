@@ -291,29 +291,63 @@ test("Portfolio expiry controller disposes its timer after the screen is removed
 });
 
 
-test("Futures and Options marks expire at the Indian exchange expiry-session cutoff", async () => {
+test("derivative expiry cutoff follows exchange, contract class and effective date", async () => {
+  const { portfolioDerivativeExpiryCutoff } =
+    await import("../../markets/stocks/demo-unified-ledger-panel.mjs?exchange-expiry-policy");
+  const at = (date, clock) => Date.parse(date + "T" + clock + "+05:30");
+
+  // Before NSE's 7 Dec 2026 timetable revision, expiry marks close at 15:30.
+  assert.equal(portfolioDerivativeExpiryCutoff("2026-11-26", {
+    exchange: "NSE", underlyingType: "INDEX"
+  }), at("2026-11-26", "15:30:00"));
+  assert.equal(portfolioDerivativeExpiryCutoff("2026-11-26", {
+    exchange: "NSE", underlyingType: "STOCK"
+  }), at("2026-11-26", "15:30:00"));
+
+  // From 7 Dec: expiring index contracts cease at 15:30; stock derivatives at 15:45.
+  assert.equal(portfolioDerivativeExpiryCutoff("2026-12-31", {
+    exchange: "NSE", underlyingType: "INDEX"
+  }), at("2026-12-31", "15:30:00"));
+  assert.equal(portfolioDerivativeExpiryCutoff("2026-12-31", {
+    exchange: "NSE", underlyingType: "STOCK"
+  }), at("2026-12-31", "15:45:00"));
+
+  // BSE's verified schedule through 6 Dec 2026 closes at 15:40.
+  assert.equal(portfolioDerivativeExpiryCutoff("2026-12-03", {
+    exchange: "BSE", underlyingType: "INDEX"
+  }), at("2026-12-03", "15:40:00"));
+  assert.equal(portfolioDerivativeExpiryCutoff("2026-12-29", {
+    exchange: "BSE", underlyingType: "INDEX"
+  }), null);
+
+  // Unknown exchange, missing classification and malformed dates fail closed.
+  assert.equal(portfolioDerivativeExpiryCutoff("2026-12-31", {
+    exchange: "NSE"
+  }), null);
+  assert.equal(portfolioDerivativeExpiryCutoff("2026-12-31", {
+    exchange: "UNKNOWN", underlyingType: "INDEX"
+  }), null);
+  assert.equal(portfolioDerivativeExpiryCutoff("2026-02-30", {
+    exchange: "NSE", underlyingType: "INDEX"
+  }), null);
+});
+
+test("expired derivatives suppress row valuation and aggregate unrealized P&L at their classified cutoff", async () => {
   const {
     createPortfolioMark, isUsablePortfolioMark, portfolioDerivativeExpiryCutoff,
     calculateAggregateUnrealized, portfolioMarketValueDisplay
-  } = await import("../../markets/stocks/demo-unified-ledger-panel.mjs?contract-expiry");
-  const expiryDate = "2026-11-26";
-  const cutoff = portfolioDerivativeExpiryCutoff(expiryDate);
-  assert.equal(cutoff, Date.parse("2026-11-26T15:30:00+05:30"));
+  } = await import("../../markets/stocks/demo-unified-ledger-panel.mjs?classified-contract-expiry");
+  const expiryDate = "2026-12-31";
+  const policy = { exchange: "NSE", underlyingType: "STOCK" };
+  const cutoff = portfolioDerivativeExpiryCutoff(expiryDate, policy);
+  assert.equal(cutoff, Date.parse("2026-12-31T15:45:00+05:30"));
   const beforeCutoff = cutoff - 1;
   const mark = createPortfolioMark(15000, beforeCutoff, {
-    now: beforeCutoff, maxAgeMs: 15_000, expiryDate, requiresExpiry: true
+    now: beforeCutoff, maxAgeMs: 15_000, expiryDate, ...policy, requiresExpiry: true
   });
   assert.equal(isUsablePortfolioMark(mark, beforeCutoff), true);
-  assert.equal(isUsablePortfolioMark(mark, cutoff - 1), true);
   assert.equal(isUsablePortfolioMark(mark, cutoff), false);
-  assert.equal(isUsablePortfolioMark(mark, cutoff + 60_000), false);
   assert.equal(portfolioMarketValueDisplay({ assetClass: "OPTION", quantity: 25 }, mark, cutoff), "—");
-  assert.equal(isUsablePortfolioMark(createPortfolioMark(15000, beforeCutoff, {
-    now: beforeCutoff, maxAgeMs: 15_000, requiresExpiry: true
-  }), beforeCutoff), false);
-  assert.equal(isUsablePortfolioMark(createPortfolioMark(15000, beforeCutoff, {
-    now: beforeCutoff, maxAgeMs: 15_000, expiryDate: "2026-02-30", requiresExpiry: true
-  }), beforeCutoff), false);
 
   const positions = [{ instrumentKey: "OPT-EXP", quantity: 25, averagePricePaise: 14000 }];
   const marks = new Map([["OPT-EXP", mark]]);
@@ -321,17 +355,21 @@ test("Futures and Options marks expire at the Indian exchange expiry-session cut
     { complete: true, value: 25000 });
   assert.deepEqual(calculateAggregateUnrealized(positions, marks, cutoff),
     { complete: false, value: null });
-});
 
+  const unclassified = createPortfolioMark(15000, beforeCutoff, {
+    now: beforeCutoff, maxAgeMs: 15_000, expiryDate, requiresExpiry: true
+  });
+  assert.equal(isUsablePortfolioMark(unclassified, beforeCutoff), false);
+});
 test("expiry-aware Portfolio refresh schedules the earlier of quote staleness and contract expiry", async () => {
   const { createPortfolioMark, schedulePortfolioMarkExpiryRefresh, portfolioDerivativeExpiryCutoff } =
     await import("../../markets/stocks/demo-unified-ledger-panel.mjs?contract-expiry-schedule");
-  const cutoff = portfolioDerivativeExpiryCutoff("2026-11-26");
+  const cutoff = portfolioDerivativeExpiryCutoff("2026-11-26", { exchange: "NSE", underlyingType: "INDEX" });
   let now = cutoff - 10_000;
   const timers = new Map();
   const doc = { addEventListener() {}, removeEventListener() {} };
   const mark = createPortfolioMark(100, now, {
-    now, maxAgeMs: 60_000, expiryDate: "2026-11-26", requiresExpiry: true
+    now, maxAgeMs: 60_000, expiryDate: "2026-11-26", exchange: "NSE", underlyingType: "INDEX", requiresExpiry: true
   });
   schedulePortfolioMarkExpiryRefresh({
     section: { isConnected: true }, marks: new Map([["FUT", mark]]), doc,

@@ -5,31 +5,55 @@ let dataPromise = null;
 export const EQUITY_MARK_MAX_AGE_MS = 60_000;
 export const DERIVATIVE_MARK_MAX_AGE_MS = 15_000;
 export const EQUITY_MARK_MAX_FUTURE_SKEW_MS = 5_000;
-export const DERIVATIVE_EXPIRY_CUTOFF_HOUR_IST = 15;
-export const DERIVATIVE_EXPIRY_CUTOFF_MINUTE_IST = 30;
+export const NSE_REVISED_DERIVATIVES_HOURS_EFFECTIVE_DATE = "2026-12-07";
+export const BSE_DERIVATIVES_HOURS_VERIFIED_THROUGH_DATE = "2026-12-06";
 
-export function portfolioDerivativeExpiryCutoff(expiryDate) {
+// Expiry is exchange- and contract-class-specific. Unknown classifications and
+// unverified post-effective BSE hours fail closed rather than inventing a cutoff.
+export function portfolioDerivativeExpiryCutoff(expiryDate, { exchange, underlyingType } = {}) {
   if (typeof expiryDate !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(expiryDate)) return null;
   const [year, month, day] = expiryDate.split("-").map(Number);
   const calendarDate = new Date(Date.UTC(year, month - 1, day));
   if (calendarDate.getUTCFullYear() !== year || calendarDate.getUTCMonth() !== month - 1 ||
       calendarDate.getUTCDate() !== day) return null;
-  const clock = String(DERIVATIVE_EXPIRY_CUTOFF_HOUR_IST).padStart(2, "0") + ":" +
-    String(DERIVATIVE_EXPIRY_CUTOFF_MINUTE_IST).padStart(2, "0") + ":00+05:30";
+
+  let hour;
+  let minute;
+  if (exchange === "NSE") {
+    if (expiryDate < NSE_REVISED_DERIVATIVES_HOURS_EFFECTIVE_DATE) {
+      hour = 15;
+      minute = 30;
+    } else if (underlyingType === "INDEX") {
+      hour = 15;
+      minute = 30;
+    } else if (underlyingType === "STOCK") {
+      hour = 15;
+      minute = 45;
+    } else {
+      return null;
+    }
+  } else if (exchange === "BSE" && expiryDate <= BSE_DERIVATIVES_HOURS_VERIFIED_THROUGH_DATE) {
+    hour = 15;
+    minute = 40;
+  } else {
+    return null;
+  }
+  const clock = String(hour).padStart(2, "0") + ":" +
+    String(minute).padStart(2, "0") + ":00+05:30";
   const cutoff = Date.parse(expiryDate + "T" + clock);
   return Number.isFinite(cutoff) ? cutoff : null;
 }
 
 export function createPortfolioMark(pricePaise, timestamp, {
   explicitStale = false, envelopeStale = false, now = Date.now(),
-  maxAgeMs, maxFutureSkewMs = 0, expiryDate = null, requiresExpiry = false
+  maxAgeMs, maxFutureSkewMs = 0, expiryDate = null, exchange = null, underlyingType = null, requiresExpiry = false
 } = {}) {
   const time = typeof timestamp === "number" ? timestamp : Date.parse(timestamp);
   const priceValid = Number.isSafeInteger(pricePaise) && pricePaise > 0;
   const timeValid = Number.isFinite(time) && time > 0 && Number.isFinite(now) &&
     Number.isFinite(maxAgeMs) && maxAgeMs >= 0 && Number.isFinite(maxFutureSkewMs) && maxFutureSkewMs >= 0;
   const ageMs = timeValid ? now - time : null;
-  const expiryCutoff = requiresExpiry ? portfolioDerivativeExpiryCutoff(expiryDate) : null;
+  const expiryCutoff = requiresExpiry ? portfolioDerivativeExpiryCutoff(expiryDate, { exchange, underlyingType }) : null;
   const expiryValid = !requiresExpiry || expiryCutoff !== null;
   const stale = explicitStale === true || envelopeStale === true || !priceValid || !timeValid ||
     !expiryValid || (requiresExpiry && now >= expiryCutoff) ||
@@ -41,6 +65,8 @@ export function createPortfolioMark(pricePaise, timestamp, {
     maxAgeMs: Number.isFinite(maxAgeMs) && maxAgeMs >= 0 ? maxAgeMs : null,
     maxFutureSkewMs: Number.isFinite(maxFutureSkewMs) && maxFutureSkewMs >= 0 ? maxFutureSkewMs : null,
     expiryDate,
+    exchange,
+    underlyingType,
     requiresExpiry
   };
 }
@@ -55,7 +81,7 @@ export function isUsablePortfolioMark(mark, now = Date.now()) {
   const ageMs = now - mark.timestamp;
   if (ageMs > mark.maxAgeMs || ageMs < -mark.maxFutureSkewMs) return false;
   if (mark.requiresExpiry === true) {
-    const expiryCutoff = portfolioDerivativeExpiryCutoff(mark.expiryDate);
+    const expiryCutoff = portfolioDerivativeExpiryCutoff(mark.expiryDate, { exchange: mark.exchange, underlyingType: mark.underlyingType });
     if (expiryCutoff === null || now >= expiryCutoff) return false;
   }
   return true;
@@ -107,7 +133,7 @@ export function schedulePortfolioMarkExpiryRefresh({
       if (!isUsablePortfolioMark(mark, currentTime)) continue;
       const ageExpiry = mark.timestamp + mark.maxAgeMs + 1;
       const contractExpiry = mark.requiresExpiry === true
-        ? portfolioDerivativeExpiryCutoff(mark.expiryDate) : null;
+        ? portfolioDerivativeExpiryCutoff(mark.expiryDate, { exchange: mark.exchange, underlyingType: mark.underlyingType }) : null;
       const expiry = contractExpiry === null ? ageExpiry : Math.min(ageExpiry, contractExpiry);
       nextExpiry = nextExpiry === null ? expiry : Math.min(nextExpiry, expiry);
     }
@@ -186,6 +212,8 @@ async function getData() {
         envelopeStale:derivativeEnvelope.meta?.stale===true,
         maxAgeMs:DERIVATIVE_MARK_MAX_AGE_MS,
         expiryDate:contractsByKey.get(quote.instrumentKey)?.expiry ?? null,
+        exchange:contractsByKey.get(quote.instrumentKey)?.exchange ?? null,
+        underlyingType:contractsByKey.get(quote.instrumentKey)?.underlyingType ?? null,
         requiresExpiry:true
       }));
     }
