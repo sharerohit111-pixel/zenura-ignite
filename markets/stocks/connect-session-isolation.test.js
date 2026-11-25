@@ -24,8 +24,10 @@ test("auth transitions publish previous and current user identities for account-
 
 test("stale auth refreshes and responses cannot overwrite a newer session state",()=>{
   assert.match(connector,/const session = await sessionSnapshot\(\)\.catch\(\(\) => null\);\s*if \(sequence !== authStateSequence\) return;/);
+  assert.match(connector,/const requestAuthSequence = authStateSequence/);
+  assert.match(connector,/requestAuthSequence !== authStateSequence/);
   assert.match(connector,/const requestUserId = session\.user\.id/);
-  assert.match(connector,/const latestSession = await sessionSnapshot\(\)\.catch\(\(\) => null\);\s*if \(latestSession\?\.user\?\.id !== requestUserId\)/);
+  assert.match(connector,/const latestSession = await sessionSnapshot\(\)\.catch\(\(\) => null\);\s*if \(requestAuthSequence !== authStateSequence \|\| latestSession\?\.user\?\.id !== requestUserId\)/);
 });
 
 test("Supabase browser client contains only a publishable key and persistent Auth session config",()=>{
