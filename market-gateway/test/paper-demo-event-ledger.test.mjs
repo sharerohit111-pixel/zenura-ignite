@@ -58,7 +58,7 @@ test("fill must refer to an accepted order from the same engine and instrument",
 test("cash and reservation invariants reject negative cash, negative blocks and overspending", () => {
   const ledger = createPaperDemoEventLedger(opening);
   assert.throws(() => ledger.append(event({ deltas: { cashDeltaPaise: 0, blockedDeltaPaise: 100000001 } })), /DEMO_CASH_RESERVATION_INVARIANT/);
-  assert.throws(() => ledger.append(event({ eventId: "evt-2", idempotencyKey: "idem-2", sourceEventId: "cancel", deltas: { cashDeltaPaise: 0, blockedDeltaPaise: -1 } })), /DEMO_CASH_RESERVATION_INVARIANT/);
+  assert.throws(() => ledger.append(event({ eventId: "evt-2", idempotencyKey: "idem-2", sourceEventId: "cancel", deltas: { cashDeltaPaise: 0, blockedDeltaPaise: -1 } })), /ORDER_ACCEPTANCE_CANNOT_RELEASE_RESERVATION/);
   assert.equal(ledger.snapshot().events.length, 0);
 });
 test("positions aggregate by asset class and MOCK instrument; realized P&L is projected", () => {
