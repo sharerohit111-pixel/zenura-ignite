@@ -1,0 +1,8 @@
+.email-auth{flex:1 0 100%;display:grid;gap:7px;padding-top:8px;border-top:1px solid #36536a}
+.email-auth[hidden]{display:none}
+.email-auth input{width:100%;box-sizing:border-box;padding:9px 10px;border:1px solid #36536a;border-radius:7px;background:#091624;color:#eaf3fa;font:inherit;font-size:11px}
+.email-auth-actions{display:flex;gap:7px;flex-wrap:wrap}
+.email-auth button{border:1px solid #287e70;background:#123c37;color:#70e8c8;border-radius:7px;padding:8px 10px;font-size:8px;font-weight:900;cursor:pointer}
+.email-auth button[type=submit]{background:#35dfb7;color:#03251d}
+.email-auth button:disabled{opacity:.5;cursor:wait}
+.email-auth small{color:#a7bfd1;font-size:9px;line-height:1.5}
