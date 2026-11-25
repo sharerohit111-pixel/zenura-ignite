@@ -42,8 +42,10 @@ async function openTerminal(browser, requests) {
   });
   await page.route("**/__test_gateway/paper/**", async route => {
     const request = route.request();
+    const requestPath = new URL(request.url()).pathname;
+    if (!requestPath.endsWith("/paper/account") && !requestPath.endsWith("/paper/orders") && !requestPath.endsWith("/paper/orders/order-A/cancel")) return route.continue();
     const item = {
-      path: new URL(request.url()).pathname,
+      path: requestPath,
       method: request.method(),
       authorization: request.headers().authorization || "",
       respond: async body => route.fulfill({
@@ -85,7 +87,7 @@ async function respondPair(requests, user, accountBody, ordersBody) {
     r => r.path.endsWith("/paper/account") && r.authorization === "Bearer token-" + user,
     user + " account request");
   const ordersRequest = await waitForRequest(requests,
-    r => r.path.includes("/paper/orders?") && r.authorization === "Bearer token-" + user,
+    r => r.path.endsWith("/paper/orders") && r.authorization === "Bearer token-" + user,
     user + " orders request");
   await accountRequest.respond(accountBody);
   await ordersRequest.respond(ordersBody);
