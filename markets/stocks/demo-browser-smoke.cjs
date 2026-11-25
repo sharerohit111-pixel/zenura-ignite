@@ -61,12 +61,15 @@ const axePath=require.resolve("axe-core/axe.min.js");
   await page.goto("http://127.0.0.1:4173/markets/",{waitUntil:"domcontentloaded",timeout:30000});
   await page.waitForLoadState("load",{timeout:10000});
   console.log("PWA: waiting for service worker activation");
-  const workerHandle=await page.waitForFunction(async()=>{
+  await page.waitForFunction(async()=>{
+   const registrations=await navigator.serviceWorker.getRegistrations();
+   return registrations.some(item=>item.scope.endsWith("/markets/")&&item.active?.state==="activated");
+  },null,{timeout:30000});
+  const workerState=await page.evaluate(async()=>{
    const registrations=await navigator.serviceWorker.getRegistrations();
    const registration=registrations.find(item=>item.scope.endsWith("/markets/")&&item.active?.state==="activated");
-   return registration?{state:registration.active.state,scope:registration.scope}:false;
-  },null,{timeout:30000});
-  const workerState=await workerHandle.jsonValue();
+   return {state:registration?.active?.state||"missing",scope:registration?.scope||null};
+  });
   assert.equal(workerState.state,"activated","service worker must finish activation");
   assert.ok(workerState.scope.endsWith("/markets/"),"service worker scope must be limited to /markets/");
   console.log(JSON.stringify({pwaWorker:workerState.state,scope:workerState.scope}));
