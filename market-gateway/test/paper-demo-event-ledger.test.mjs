@@ -515,3 +515,115 @@ test("Futures SELL orders do not create Equity-style share reservations", () => 
   assert.equal(snapshot.fills.length, 1);
   assert.deepEqual(replayPaperDemoEvents(opening, snapshot.events), snapshot);
 });
+
+
+test("weighted average fill price uses exact gross paise across unequal partial fills and rejects duplicate fill IDs", () => {
+  const ledger = createPaperDemoEventLedger(opening);
+  ledger.append(event({ payload: { ...event().payload, quantity: 5 } }));
+  const appendFill = (id, quantity, pricePaise, second) => ledger.append(event({
+    eventId: "evt-weighted-" + id, idempotencyKey: "idem-weighted-" + id,
+    sourceEventId: "source-weighted-" + id, type: "FILL_RECORDED",
+    occurredAt: "2026-11-25T09:30:0" + second + "+05:30",
+    deltas: { cashDeltaPaise: 0, blockedDeltaPaise: 0 },
+    payload: { fillId: "weighted-fill-" + id, orderId: "order-1", assetClass: "EQUITY",
+      instrumentKey: "MOCK|NSE|EQ|0001", side: "BUY", quantity, pricePaise }
+  }));
+  appendFill("1", 2, 10001, 1);
+  appendFill("2", 1, 10004, 2);
+  const order = ledger.snapshot().orders[0];
+  assert.equal(order.filledQuantity, 3);
+  assert.equal(order.remainingQuantity, 2);
+  assert.equal(order.averageFillPricePaise, 10002);
+  assert.throws(() => ledger.append(event({
+    eventId: "evt-weighted-duplicate", idempotencyKey: "idem-weighted-duplicate",
+    sourceEventId: "source-weighted-duplicate", type: "FILL_RECORDED",
+    occurredAt: "2026-11-25T09:30:03+05:30",
+    deltas: { cashDeltaPaise: 0, blockedDeltaPaise: 0 },
+    payload: { fillId: "weighted-fill-1", orderId: "order-1", assetClass: "EQUITY",
+      instrumentKey: "MOCK|NSE|EQ|0001", side: "BUY", quantity: 1, pricePaise: 10001 }
+  })), /DUPLICATE_FILL_ID/);
+  assert.equal(ledger.snapshot().fills.length, 2);
+});
+
+test("terminal SELL release cannot be suppressed or changed by an explicit reservation delta", () => {
+  const ledger = createPaperDemoEventLedger(opening);
+  ledger.append(event({
+    type: "POSITION_CHANGED", sourceEventId: "seed-terminal-guard", idempotencyKey: "seed-terminal-guard",
+    deltas: { cashDeltaPaise: 0, blockedDeltaPaise: 0 },
+    payload: { assetClass: "EQUITY", instrumentKey: "MOCK|NSE|EQ|0001", product: "DELIVERY",
+      quantityDelta: 5, costBasisDeltaPaise: 500000, realizedPnlDeltaPaise: 0 }
+  }));
+  ledger.append(event({
+    eventId: "evt-terminal-sell-accepted", idempotencyKey: "idem-terminal-sell-accepted",
+    sourceEventId: "source-terminal-sell-accepted", occurredAt: "2026-11-25T09:30:01+05:30",
+    deltas: { cashDeltaPaise: 0, blockedDeltaPaise: 0 },
+    payload: { ...event().payload, side: "SELL", quantity: 3, status: "PENDING" }
+  }));
+  ledger.append(event({
+    eventId: "evt-terminal-sell-fill", idempotencyKey: "idem-terminal-sell-fill",
+    sourceEventId: "source-terminal-sell-fill", type: "FILL_RECORDED",
+    occurredAt: "2026-11-25T09:30:02+05:30",
+    deltas: { cashDeltaPaise: 0, blockedDeltaPaise: 0 },
+    payload: { fillId: "terminal-sell-fill", orderId: "order-1", assetClass: "EQUITY",
+      instrumentKey: "MOCK|NSE|EQ|0001", product: "DELIVERY", side: "SELL", quantity: 1, pricePaise: 100000 }
+  }));
+  const terminalPayload = { ...event().payload, side: "SELL", quantity: 3, status: "CANCELLED" };
+  assert.throws(() => ledger.append(event({
+    eventId: "evt-terminal-sell-bypass", idempotencyKey: "idem-terminal-sell-bypass",
+    sourceEventId: "source-terminal-sell-bypass", type: "ORDER_UPDATED",
+    occurredAt: "2026-11-25T09:30:03+05:30",
+    deltas: { cashDeltaPaise: 0, blockedDeltaPaise: 0 },
+    payload: { ...terminalPayload, reservedQuantityDelta: 0 }
+  })), /DEMO_TERMINAL_SELL_RESERVATION_MISMATCH/);
+  assert.equal(ledger.snapshot().positions[0].reservedQuantity, 2);
+  assert.equal(ledger.snapshot().orders[0].status, "PARTIALLY_FILLED");
+  ledger.append(event({
+    eventId: "evt-terminal-sell-cancel", idempotencyKey: "idem-terminal-sell-cancel",
+    sourceEventId: "source-terminal-sell-cancel", type: "ORDER_UPDATED",
+    occurredAt: "2026-11-25T09:30:04+05:30",
+    deltas: { cashDeltaPaise: 0, blockedDeltaPaise: 0 },
+    payload: { ...terminalPayload, reservedQuantityDelta: -2 }
+  }));
+  assert.equal(ledger.snapshot().positions[0].reservedQuantity, 0);
+  assert.equal(ledger.snapshot().orders[0].status, "CANCELLED");
+  assert.deepEqual(replayPaperDemoEvents(opening, ledger.snapshot().events), ledger.snapshot());
+});
+
+
+test("order share reservations are lifecycle-derived and cannot be overridden on acceptance or updates", () => {
+  const ledger = createPaperDemoEventLedger(opening);
+  ledger.append(event({
+    type: "POSITION_CHANGED", sourceEventId: "seed-derived-reservation", idempotencyKey: "seed-derived-reservation",
+    deltas: { cashDeltaPaise: 0, blockedDeltaPaise: 0 },
+    payload: { assetClass: "EQUITY", instrumentKey: "MOCK|NSE|EQ|0001", product: "DELIVERY",
+      quantityDelta: 5, costBasisDeltaPaise: 500000, realizedPnlDeltaPaise: 0 }
+  }));
+  const sellPayload = { ...event().payload, side: "SELL", quantity: 3, status: "PENDING" };
+  assert.throws(() => ledger.append(event({
+    eventId: "evt-derived-reservation-bypass", idempotencyKey: "idem-derived-reservation-bypass",
+    sourceEventId: "source-derived-reservation-bypass", type: "ORDER_ACCEPTED",
+    occurredAt: "2026-11-25T09:30:01+05:30",
+    deltas: { cashDeltaPaise: 0, blockedDeltaPaise: 0 },
+    payload: { ...sellPayload, reservedQuantityDelta: 0 }
+  })), /DEMO_ORDER_RESERVATION_DELTA_MISMATCH/);
+  assert.equal(ledger.snapshot().orders.length, 0);
+  assert.equal(ledger.snapshot().positions[0].reservedQuantity, 0);
+  ledger.append(event({
+    eventId: "evt-derived-reservation-accepted", idempotencyKey: "idem-derived-reservation-accepted",
+    sourceEventId: "source-derived-reservation-accepted", type: "ORDER_ACCEPTED",
+    occurredAt: "2026-11-25T09:30:02+05:30",
+    deltas: { cashDeltaPaise: 0, blockedDeltaPaise: 0 },
+    payload: sellPayload
+  }));
+  assert.equal(ledger.snapshot().positions[0].reservedQuantity, 3);
+  assert.throws(() => ledger.append(event({
+    eventId: "evt-derived-reservation-update-bypass", idempotencyKey: "idem-derived-reservation-update-bypass",
+    sourceEventId: "source-derived-reservation-update-bypass", type: "ORDER_UPDATED",
+    occurredAt: "2026-11-25T09:30:03+05:30",
+    deltas: { cashDeltaPaise: 0, blockedDeltaPaise: 0 },
+    payload: { ...sellPayload, reservedQuantityDelta: -1 }
+  })), /DEMO_ORDER_RESERVATION_DELTA_MISMATCH/);
+  assert.equal(ledger.snapshot().orders[0].status, "PENDING");
+  assert.equal(ledger.snapshot().positions[0].reservedQuantity, 3);
+  assert.deepEqual(replayPaperDemoEvents(opening, ledger.snapshot().events), ledger.snapshot());
+});
