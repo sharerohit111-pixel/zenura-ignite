@@ -88,6 +88,25 @@ function initialProjection(opening) {
     orders: [], fills: [], positions: [], events: []
   };
 }
+function validateSettlementDeltas(event) {
+  const { cashDeltaPaise, blockedDeltaPaise } = event.deltas;
+  if (event.type !== "FILL_RECORDED" && cashDeltaPaise !== 0) {
+    fail("NON_FILL_CASH_MOVEMENT_FORBIDDEN");
+  }
+  if (event.type === "FILL_RECORDED" && blockedDeltaPaise > 0) {
+    fail("FILL_CANNOT_INCREASE_RESERVATION");
+  }
+  if ((event.type === "POSITION_CHANGED" || event.type === "RESERVATION_CHANGED") &&
+      blockedDeltaPaise !== 0) {
+    fail("NON_ORDER_RESERVATION_MOVEMENT_FORBIDDEN");
+  }
+  if (event.type === "ORDER_ACCEPTED" && blockedDeltaPaise < 0) {
+    fail("ORDER_ACCEPTANCE_CANNOT_RELEASE_RESERVATION");
+  }
+  if (event.type === "ORDER_REJECTED" && blockedDeltaPaise > 0) {
+    fail("ORDER_REJECTION_CANNOT_INCREASE_RESERVATION");
+  }
+}
 function apply(projection, event) {
   const cash = projection.account.cashBalancePaise + event.deltas.cashDeltaPaise;
   const blocked = projection.account.blockedFundsPaise + event.deltas.blockedDeltaPaise;
@@ -192,6 +211,7 @@ export function createPaperDemoEventLedger(opening) {
     if (sourceEvents.has(sourceKey)) fail("DUPLICATE_SOURCE_EVENT");
     const time = Date.parse(event.occurredAt);
     if (time < lastTimestamp) fail("DEMO_EVENT_TIME_ORDER_MISMATCH");
+    validateSettlementDeltas(event);
     const before = clone(projection);
     try {
       apply(projection, event);
