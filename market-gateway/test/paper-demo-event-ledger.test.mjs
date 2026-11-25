@@ -247,3 +247,37 @@ test("replay rejects reordered events instead of silently sorting them", () => {
   const reversed = ledger.snapshot().events.slice().reverse();
   assert.throws(() => replayPaperDemoEvents(opening, reversed), /DEMO_EVENT_SEQUENCE_MISMATCH/);
 });
+
+test("order status transitions reject terminal-state reopening and preserve partial fills", () => {
+  const ledger = createPaperDemoEventLedger(opening);
+  ledger.append(event());
+  const update = (status, suffix) => ledger.append(event({
+    eventId: "evt-status-" + suffix, idempotencyKey: "idem-status-" + suffix, sourceEventId: "status-" + suffix,
+    type: "ORDER_UPDATED", occurredAt: "2026-11-25T09:30:0" + (Number(suffix) + 1) + "+05:30",
+    deltas: { cashDeltaPaise: 0, blockedDeltaPaise: 0 },
+    payload: { ...event().payload, status }
+  }));
+  update("PARTIALLY_FILLED", "1");
+  update("PARTIALLY_FILLED", "2");
+  update("CANCELLED", "3");
+  assert.equal(ledger.snapshot().orders[0].status, "CANCELLED");
+  assert.throws(() => update("PARTIALLY_FILLED", "4"), /INVALID_ORDER_STATUS_TRANSITION/);
+  assert.throws(() => update("PENDING", "5"), /INVALID_ORDER_STATUS_TRANSITION/);
+  assert.equal(ledger.snapshot().events.length, 4);
+
+  const filled = createPaperDemoEventLedger(opening);
+  filled.append(event());
+  filled.append(event({
+    eventId: "evt-filled", idempotencyKey: "idem-filled", sourceEventId: "status-filled",
+    type: "ORDER_UPDATED", occurredAt: "2026-11-25T09:30:01+05:30",
+    deltas: { cashDeltaPaise: 0, blockedDeltaPaise: 0 },
+    payload: { ...event().payload, status: "FILLED" }
+  }));
+  assert.throws(() => filled.append(event({
+    eventId: "evt-reopen", idempotencyKey: "idem-reopen", sourceEventId: "status-reopen",
+    type: "ORDER_UPDATED", occurredAt: "2026-11-25T09:30:02+05:30",
+    deltas: { cashDeltaPaise: 0, blockedDeltaPaise: 0 },
+    payload: { ...event().payload, status: "PENDING" }
+  })), /INVALID_ORDER_STATUS_TRANSITION/);
+  assert.equal(filled.snapshot().orders[0].status, "FILLED");
+});

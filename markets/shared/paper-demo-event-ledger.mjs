@@ -2,6 +2,10 @@ const VERSION = "1.2.0";
 const ENGINES = new Set(["EQUITY", "FUTURES", "OPTIONS"]);
 const EVENT_TYPES = new Set(["ORDER_ACCEPTED", "ORDER_UPDATED", "ORDER_REJECTED", "FILL_RECORDED", "RESERVATION_CHANGED", "POSITION_CHANGED"]);
 const ORDER_STATUSES = new Set(["PENDING", "PARTIALLY_FILLED", "FILLED", "CANCELLED", "REJECTED", "EXPIRED"]);
+const ORDER_STATUS_TRANSITIONS = Object.freeze({
+  PENDING: new Set(["PARTIALLY_FILLED", "FILLED", "CANCELLED", "EXPIRED"]),
+  PARTIALLY_FILLED: new Set(["PARTIALLY_FILLED", "FILLED", "CANCELLED", "EXPIRED"])
+});
 const SIDES = new Set(["BUY", "SELL"]);
 const ORDER_TYPES = new Set(["MARKET", "LIMIT"]);
 const ASSETS = new Set(["EQUITY", "FUTURE", "OPTION"]);
@@ -107,6 +111,7 @@ function apply(projection, event) {
     const p = event.payload, existing = projection.orders.find(x => x.orderId === p.orderId);
     if ((event.type === "ORDER_ACCEPTED" || event.type === "ORDER_REJECTED") && existing) fail("DUPLICATE_ORDER_ID");
     if (event.type === "ORDER_UPDATED" && !existing) fail("ORDER_UPDATE_WITHOUT_ACCEPTANCE");
+    if (event.type === "ORDER_UPDATED" && !ORDER_STATUS_TRANSITIONS[existing.status]?.has(p.status)) fail("INVALID_ORDER_STATUS_TRANSITION");
     const product = productOf(p);
     const next = { ...p, product, engine: event.engine, lastSequence: event.sequence };
     if (existing) {
