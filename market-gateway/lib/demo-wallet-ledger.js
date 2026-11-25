@@ -62,6 +62,9 @@ function createDemoWalletLedger({ accountId, openingCashPaise, openingEvidenceRe
         orderId: required(input.orderId, "DEMO_WALLET_ORDER_ID_REQUIRED"),
         fillId: required(input.fillId, "DEMO_WALLET_FILL_ID_REQUIRED"),
         cashDeltaPaise: integer(input.cashDeltaPaise, "DEMO_WALLET_INVALID_CASH_DELTA", true) };
+    } else if (input.type === "ORDER_REFERENCE") {
+      event = { ...common, type: input.type,
+        orderId: required(input.orderId, "DEMO_WALLET_ORDER_ID_REQUIRED") };
     } else if (input.type === "RESERVATION_OPENED") {
       event = { ...common, type: input.type,
         reservationId: required(input.reservationId, "DEMO_WALLET_RESERVATION_ID_REQUIRED"),
@@ -84,7 +87,9 @@ function createDemoWalletLedger({ accountId, openingCashPaise, openingEvidenceRe
       return { duplicate: true, event: clone(prior) };
     }
 
-    if (event.type === "CASH_MOVEMENT") {
+    if (event.type === "ORDER_REFERENCE") {
+      // Evidence-only link to an existing canonical order; no cash or reservation mutation.
+    } else if (event.type === "CASH_MOVEMENT") {
       const priorFill = fillSettlements.get(event.fillId);
       if (priorFill) fail("DEMO_WALLET_FILL_SETTLED_MORE_THAN_ONCE");
       const nextCash = cashPaise + event.cashDeltaPaise;
