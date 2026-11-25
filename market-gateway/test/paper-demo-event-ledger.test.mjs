@@ -131,6 +131,7 @@ test("Equity fill cash movement must equal exact gross value and correct BUY/SEL
   ledger.append(event());
   const buy = {
     eventId: "evt-2", idempotencyKey: "fill-buy-1", sourceEventId: "equity-fill-buy-1",
+    accountId: opening.accountId, sessionId: opening.sessionId,
     occurredAt: "2026-11-25T09:30:01+05:30", type: "FILL_RECORDED",
     deltas: { cashDeltaPaise: -125050, blockedDeltaPaise: -10000 },
     payload: { fillId: "fill-buy-1", orderId: "order-1", assetClass: "EQUITY",
@@ -156,7 +157,7 @@ test("Futures and Options gross notional cannot be applied as wallet cash withou
     assert.throws(() => ledger.append(event({
       eventId: "deriv-fill-1", idempotencyKey: "deriv-fill-idem", sourceEventId: "deriv-fill",
       engine, type: "FILL_RECORDED", occurredAt: "2026-11-25T09:30:01+05:30",
-      deltas: { cashDeltaPaise: -100000, blockedDeltaPaise: 0 },
+      deltas: { cashDeltaPaise: 100000, blockedDeltaPaise: 0 },
       payload: { fillId: "deriv-fill", orderId: "derivative-order", assetClass,
         instrumentKey: "MOCK|NSE|DERIV|1", side: "BUY", quantity: 1, pricePaise: 100000 }
     })), /DERIVATIVE_CASH_SETTLEMENT_RECEIPT_REQUIRED/);
