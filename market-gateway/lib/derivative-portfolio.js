@@ -1,5 +1,6 @@
 "use strict";
 const MAX_QUOTE_AGE_MS=15_000,MAX_MARGIN_AGE_MS=30_000;
+const AUTHORITATIVE_MARGIN_SOURCE="upstox_v2_charges_margin";
 function expiryCutoff(expiry){
  if(typeof expiry!=="string"||!/^\d{4}-\d{2}-\d{2}$/.test(expiry))return NaN;
  const parts=expiry.split("-").map(Number);
@@ -17,7 +18,7 @@ function calculateDerivativePortfolio({positions,quotes,marginSnapshots=[],now=D
  }
  const marginByKey=new Map();
  for(const m of marginSnapshots){
-  if(!m||typeof m.instrumentKey!=="string"||marginByKey.has(m.instrumentKey)||!Number.isSafeInteger(m.requiredMarginPaise)||m.requiredMarginPaise<1||!Number.isSafeInteger(m.observedAtMs)||m.observedAtMs>now||now-m.observedAtMs>maxMarginAgeMs||typeof m.source!=="string"||!m.source.trim())fail("Invalid, duplicate or stale derivative margin snapshot.");
+  if(!m||typeof m.instrumentKey!=="string"||marginByKey.has(m.instrumentKey)||!Number.isSafeInteger(m.requiredMarginPaise)||m.requiredMarginPaise<1||!Number.isSafeInteger(m.observedAtMs)||m.observedAtMs>now||now-m.observedAtMs>maxMarginAgeMs||m.source!==AUTHORITATIVE_MARGIN_SOURCE)fail("Invalid, duplicate, stale or unverified derivative margin snapshot provenance.");
   marginByKey.set(m.instrumentKey,m);
  }
  const seen=new Set();let marketValuePaise=0,unrealizedPnlPaise=0,reservedMarginPaise=0;
@@ -56,4 +57,4 @@ function calculateDerivativePortfolio({positions,quotes,marginSnapshots=[],now=D
  }
  return {positions:valued,marketValuePaise,unrealizedPnlPaise,reservedMarginPaise,valuationStatus:"fresh",simulationOnly:true,includesEntryCharges:true,excludesEstimatedExitCharges:true};
 }
-module.exports={calculateDerivativePortfolio,MAX_QUOTE_AGE_MS,MAX_MARGIN_AGE_MS};
+module.exports={calculateDerivativePortfolio,MAX_QUOTE_AGE_MS,MAX_MARGIN_AGE_MS,AUTHORITATIVE_MARGIN_SOURCE};
