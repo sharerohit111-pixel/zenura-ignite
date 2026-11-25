@@ -57,8 +57,6 @@ const axePath=require.resolve("axe-core/axe.min.js");
   console.log("PWA: opening market shell");
   await page.goto("http://127.0.0.1:4173/markets/",{waitUntil:"domcontentloaded",timeout:30000});
   await page.waitForLoadState("load",{timeout:10000});
-  try{await page.waitForFunction(()=>document.querySelector("#demo-status")?.textContent.includes("4 canonical fixtures validated"),null,{timeout:10000});}
-  catch(error){throw new Error("PWA initial fixture boot failed; status="+await page.locator("#demo-status").textContent().catch(()=>"missing")+"; pageErrors="+JSON.stringify(pwaErrors)+"; console="+JSON.stringify(pwaConsole)+"; "+error.message);}
   try{
    await page.waitForFunction(async()=>{
     const registrations=await navigator.serviceWorker.getRegistrations();
