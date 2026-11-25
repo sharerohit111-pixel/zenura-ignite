@@ -299,3 +299,31 @@ test("canonical ledger rejects a settlement receipt whose account/session scope 
   ), /SETTLEMENT_RECEIPT_SCOPE_MISMATCH/);
   assert.equal(ledger.snapshot().events.length, 0);
 });
+
+test("authoritative Options fill settlement applies premium and charges as one canonical cash event", () => {
+  const trust = {
+    trustedIssuerIds: ["approved-clearing-source"],
+    verifyAttestation: receipt => receipt.attestation.signature === "cryptographically-verified-test-signature"
+  };
+  const ledger = createPaperDemoEventLedger(opening, trust);
+  const receipt = {
+    schemaVersion: "1.0.0", kind: "OPTIONS_FILL_SETTLEMENT", action: "SETTLE",
+    receiptId: "settle-option-001", eventReference: "provider-option-event-001",
+    fillId: "option-order-001-fill-001",
+    accountId: opening.accountId, sessionId: opening.sessionId, orderId: "option-order-001",
+    assetClass: "OPTION", side: "BUY", currency: "INR",
+    issuerId: "approved-clearing-source", sourceReference: "provider-option-source-001",
+    policyVersion: "options-policy-test-v1", issuedAt: "2026-11-25T09:30:00+05:30",
+    amounts: { premiumCashDeltaPaise: -100000, chargesCashDeltaPaise: -1250, cashDeltaPaise: -101250, blockedDeltaPaise: 0 },
+    attestation: { keyId: "test-key-1", signature: "cryptographically-verified-test-signature" }
+  };
+  const result = ledger.appendSettlementReceipt(receipt, {
+    orderId: receipt.orderId, fillId: receipt.fillId, assetClass: "OPTION", side: "BUY"
+  });
+  assert.equal(result.accepted, true);
+  assert.equal(result.snapshot.events[0].engine, "OPTIONS");
+  assert.equal(result.snapshot.account.cashBalancePaise, opening.cashBalancePaise - 101250);
+  assert.equal(result.snapshot.account.blockedFundsPaise, opening.blockedFundsPaise);
+  assert.equal(result.snapshot.account.availableFundsPaise, opening.cashBalancePaise - 101250);
+  assert.equal(result.snapshot.events[0].payload.receipt.amounts.chargesCashDeltaPaise, -1250);
+});
