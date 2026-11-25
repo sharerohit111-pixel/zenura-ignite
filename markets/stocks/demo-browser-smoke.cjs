@@ -60,23 +60,20 @@ const axePath=require.resolve("axe-core/axe.min.js");
   console.log("PWA: opening market shell");
   await page.goto("http://127.0.0.1:4173/markets/",{waitUntil:"domcontentloaded",timeout:30000});
   await page.waitForLoadState("load",{timeout:10000});
-  let workerState;
+  let workerActivated=false;
   try{
-   await page.waitForFunction(async()=>{
-    const registration=await navigator.serviceWorker.getRegistration(new URL("./",location.href).pathname);
-    return Boolean(registration?.active&&registration.active.state==="activated");
+   const activationHandle=await page.waitForFunction(async()=>{
+    const registrations=await navigator.serviceWorker.getRegistrations();
+    return registrations.some(registration=>registration.scope===new URL("./",location.href).href&&registration.active?.state==="activated");
    },null,{timeout:20000});
-   workerState=await page.evaluate(async()=>{
-    const registration=await navigator.serviceWorker.getRegistration(new URL("./",location.href).pathname);
-    return registration?.active?{state:registration.active.state,scope:registration.scope}:null;
-   });
+   workerActivated=await activationHandle.jsonValue();
   }catch(error){
    const state=await page.evaluate(async()=>({controller:!!navigator.serviceWorker.controller,registrations:(await navigator.serviceWorker.getRegistrations()).map(r=>({scope:r.scope,installing:r.installing?.state||null,waiting:r.waiting?.state||null,active:r.active?.state||null}))}));
    throw new Error("PWA service worker did not activate: "+JSON.stringify(state)+"; console: "+pwaConsole.join(" | ")+"; "+error.message);
   }
   console.log("PWA: waiting for service worker activation");
-  assert.ok(workerState&&workerState.state==="activated","service worker must be active before controlled reload");
-  console.log(JSON.stringify({pwaWorker:workerState.state,scope:workerState.scope}));
+  assert.equal(workerActivated,true,"service worker must be active before controlled reload");
+  console.log(JSON.stringify({pwaWorker:"activated",scope:"/markets/"}));
   // clients.claim() in the activate handler controls existing same-scope clients.
   // Open a fresh same-scope tab rather than forcing a navigation reload race.
   const controlledPage=await pwa.newPage();
