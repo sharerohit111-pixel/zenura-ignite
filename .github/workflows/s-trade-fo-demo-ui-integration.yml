@@ -9,6 +9,7 @@ on:
       - "market-gateway/test/paper-mock-fixtures.test.js"
       - "market-gateway/test/demo-trade-history-store.test.js"
       - "market-gateway/test/demo-trade-projection.test.js"
+      - "market-gateway/test/options-demo-event-integration.test.mjs"
       - "market-gateway/test/paper-demo-derivative-integration.test.mjs"
       - "market-gateway/test/paper-demo-equity-integration.test.mjs"
       - "market-gateway/test/equity-demo-execution-engine.test.js"
@@ -22,6 +23,7 @@ on:
     branches:
       - feature/s-trade-fo-demo-ui-integration-2026-11-24
       - feature/s-trade-round3-equity-demo-screen-integration-2026-11-24
+      - feature/s-trade-options-demo-engine-2026-11-25
     paths:
       - "market-gateway/mock/**"
       - "market-gateway/lib/derivative-position.js"
@@ -68,4 +70,4 @@ jobs:
             exit 1
           fi
       - name: Verify interactive Demo screen wiring and unified event projection
-        run: node --test market-gateway/test/paper-demo-derivative-integration.test.mjs market-gateway/test/paper-demo-equity-integration.test.mjs market-gateway/test/demo-chart-data.test.mjs market-gateway/test/demo-trade-projection.test.js
+        run: node --test market-gateway/test/paper-demo-derivative-integration.test.mjs market-gateway/test/paper-demo-equity-integration.test.mjs market-gateway/test/demo-chart-data.test.mjs market-gateway/test/demo-trade-projection.test.js market-gateway/test/options-demo-event-integration.test.mjs
