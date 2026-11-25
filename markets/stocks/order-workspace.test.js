@@ -17,7 +17,7 @@ const worker=fs.readFileSync(path.join(root,"functions/indian-market.js"),"utf8"
 test("Paper Trading page loads isolated order workspace assets",()=>{
   assert.match(html,/<link rel="stylesheet" href="\.\/order-workspace\.css">/);
   assert.match(html,/<script src="\.\/order-workspace\.js"><\/script>/);
-  assert.match(html,/<tbody id="paper-history"><tr><td colspan="8">No orders loaded\.<\/td><\/tr><\/tbody>/);
+  assert.match(html,/<tbody id="paper-history"><tr><td colspan="10">No orders loaded\.<\/td><\/tr><\/tbody>/);
   assert.match(html,/id="paper-order-ticket"/);
   assert.ok(fs.existsSync(path.join(__dirname,"order-workspace.js")));
   assert.ok(fs.existsSync(path.join(__dirname,"order-workspace.css")));
