@@ -251,7 +251,8 @@ test("authoritative Futures settlement appends one immutable canonical event and
     ...receipt, amounts: { ...receipt.amounts, blockedDeltaPaise: 24000 }
   }, scope), /SETTLEMENT_RECEIPT_REPLAY_MISMATCH/);
 
-  const replayed = replayPaperDemoEvents(opening, first.snapshot.events);
+  assert.throws(() => replayPaperDemoEvents(opening, first.snapshot.events), /SETTLEMENT_ATTESTATION_VERIFIER_REQUIRED/);
+  const replayed = replayPaperDemoEvents(opening, first.snapshot.events, trust);
   assert.deepEqual(replayed, first.snapshot);
 });
 test("canonical settlement append rejects reused provider event references and untrusted receipts", () => {
