@@ -23,6 +23,7 @@ async function scanTextContrast(page){
    if(node.children.length||!node.textContent.trim())continue;
    const rect=node.getBoundingClientRect(),style=getComputedStyle(node);
    if(!rect.width||!rect.height||style.visibility==="hidden"||style.display==="none")continue;
+   if(node.closest(':disabled,[aria-disabled="true"]'))continue;
    let opacity=1;const chain=[];
    for(let el=node;el&&el!==document.documentElement;el=el.parentElement){chain.push(el);opacity*=Number.parseFloat(getComputedStyle(el).opacity)||0;}
    if(opacity===0)continue;
