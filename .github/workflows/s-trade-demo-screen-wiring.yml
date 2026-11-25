@@ -16,6 +16,8 @@ on:
       - "market-gateway/test/paper-demo-event-ledger.test.mjs"
       - "market-gateway/test/paper-demo-equity-integration.test.mjs"
       - "market-gateway/test/paper-demo-equity-ledger-bridge.test.mjs"
+      - "market-gateway/test/paper-demo-derivative-ledger-bridge.test.mjs"
+      - "markets/stocks/demo-derivative-ledger-bridge.mjs"
       - "markets/stocks/demo-equity-ledger-bridge.mjs"
       - "market-gateway/test/paper-demo-derivative-integration.test.mjs"
       - "market-gateway/test/derivative-mock-simulator.test.js"
@@ -63,7 +65,7 @@ jobs:
         with:
           node-version: "22"
       - name: Check browser module syntax
-        run: node --check markets/shared/paper-demo-adapter.mjs && node --check markets/shared/paper-demo-event-ledger.mjs && node --check markets/stocks/demo.js && node --check markets/stocks/demo-chart-data.mjs && node --check markets/stocks/demo-chart-panel.mjs
+        run: node --check markets/shared/paper-demo-adapter.mjs && node --check markets/shared/paper-demo-event-ledger.mjs && node --check markets/stocks/demo.js && node --check markets/stocks/demo-derivative-panel.mjs && node --check markets/stocks/demo-derivative-ledger-bridge.mjs && node --check markets/stocks/derivative-mock-simulator.js && node --check markets/stocks/demo-chart-data.mjs && node --check markets/stocks/demo-chart-panel.mjs
       - name: Validate shared fixtures
         run: |
           node - <<'NODE'
@@ -72,7 +74,7 @@ jobs:
           console.log('Parsed all four canonical screen fixtures.');
           NODE
       - name: Run adapter, event-ledger and screen integration tests
-        run: node --test market-gateway/test/paper-demo-adapter.test.mjs market-gateway/test/paper-demo-event-ledger.test.mjs market-gateway/test/paper-demo-dashboard.test.mjs market-gateway/test/paper-demo-equity-integration.test.mjs market-gateway/test/paper-demo-equity-ledger-bridge.test.mjs market-gateway/test/paper-demo-derivative-integration.test.mjs market-gateway/test/demo-chart-data.test.mjs
+        run: node --test market-gateway/test/paper-demo-adapter.test.mjs market-gateway/test/paper-demo-event-ledger.test.mjs market-gateway/test/paper-demo-dashboard.test.mjs market-gateway/test/paper-demo-equity-integration.test.mjs market-gateway/test/paper-demo-equity-ledger-bridge.test.mjs market-gateway/test/paper-demo-derivative-integration.test.mjs market-gateway/test/paper-demo-derivative-ledger-bridge.test.mjs market-gateway/test/demo-chart-data.test.mjs
       - name: Install Chromium browser QA dependencies
         run: |
           npm install --prefix "$RUNNER_TEMP/zenura-playwright" playwright@1.61.1 axe-core@4.10.3 --ignore-scripts --no-audit --no-fund
@@ -90,7 +92,7 @@ jobs:
           NODE_PATH="$RUNNER_TEMP/zenura-playwright/node_modules" node markets/stocks/demo-browser-smoke.cjs
       - name: Guard production gateway isolation
         run: |
-          if grep -R -E "paper-demo-adapter|paper-demo-event-ledger|demo-equity-ledger-bridge|derivative-mock-simulator|paper-mock-fixtures|equity-demo-execution-engine|demo-(equity|chart|derivative)-panel|market-gateway/mock/fixtures|equity-execution.json" market-gateway/supabase-server.js market-gateway/server.js; then
+          if grep -R -E "paper-demo-adapter|paper-demo-event-ledger|demo-equity-ledger-bridge|demo-derivative-ledger-bridge|derivative-mock-simulator|paper-mock-fixtures|equity-demo-execution-engine|demo-(equity|chart|derivative)-panel|market-gateway/mock/fixtures|equity-execution.json" market-gateway/supabase-server.js market-gateway/server.js; then
             echo "Browser Demo modules and synthetic fixtures must remain outside production gateway routes."
             exit 1
           fi
