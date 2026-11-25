@@ -103,8 +103,8 @@ export function createDerivativeDemoLedgerBridge({
     }
     for (const order of after.orders) {
       const old = oldOrders.get(order.orderId);
-      if (!old) continue;
-      if (old.status !== order.status || old.filledQuantity !== order.filledQuantity) {
+      const projected = ledger.snapshot().orders.find(item => item.orderId === order.orderId);
+      if (projected && (projected.status !== order.status || (old?.filledQuantity || 0) !== order.filledQuantity)) {
         const reserveRelease = order.assetClass === "OPTION" && order.side === "SELL" &&
           order.status === "CANCELLED" ? -order.remainingQuantity : 0;
         append(engineFor(order), "ORDER_UPDATED", orderPayload(order, order.status, {
