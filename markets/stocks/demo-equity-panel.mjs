@@ -1,3 +1,4 @@
+import { getSharedPaperDemoLedgerSession } from "../shared/paper-demo-ledger-session.mjs";
 import { createEquityDemoLedgerBridge } from "./demo-equity-ledger-bridge.mjs";
 let fixturePromise=null,enginePromise=null,engine=null,ledgerBridge=null,orderSequence=0;
 const el=(tag,cls,value)=>{const node=document.createElement(tag);if(cls)node.className=cls;if(value!==undefined)node.textContent=String(value);return node;};
@@ -14,8 +15,12 @@ async function getEngine(){
   if(!window.ZenuraEquityDemoEngine?.createEquityDemoExecutionEngine)throw new Error("EQUITY_DEMO_ENGINE_UNAVAILABLE");
   if(accountEnvelope?.mode!=="MOCK"||accountEnvelope?.simulated!==true||accountEnvelope?.meta?.source!=="SYNTHETIC_FIXTURE")throw new Error("INVALID_EQUITY_DEMO_ACCOUNT_FIXTURE");
   engine=window.ZenuraEquityDemoEngine.createEquityDemoExecutionEngine({fixture:fixtureEnvelope,account:accountEnvelope.data,env:{NODE_ENV:(window.ZENURA_RUNTIME_ENV==="development"||window.ZENURA_RUNTIME_ENV==="test")?window.ZENURA_RUNTIME_ENV:"production"}});
-  const sessionToken=window.crypto?.randomUUID?.()||("session-"+Date.now()+"-"+Math.random().toString(36).slice(2));
-  ledgerBridge=createEquityDemoLedgerBridge({engine,accountId:accountEnvelope.data.accountId,sessionId:"demo-"+sessionToken});
+  const sharedSession=getSharedPaperDemoLedgerSession({
+    accountId:accountEnvelope.data.accountId,
+    cashBalancePaise:accountEnvelope.data.cashBalancePaise,
+    blockedFundsPaise:accountEnvelope.data.blockedFundsPaise
+  });
+  ledgerBridge=createEquityDemoLedgerBridge({engine,...sharedSession});
   return engine;
  });
  return enginePromise;
