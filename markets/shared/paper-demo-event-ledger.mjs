@@ -51,7 +51,10 @@ function validateOrderStatus(status, quantity, filledQuantity) {
 function validateOrderTransition(previous, next) {
   const allowed = {
     PENDING: new Set(["PENDING", "PARTIALLY_FILLED", "FILLED", "CANCELLED", "EXPIRED"]),
-    PARTIALLY_FILLED: new Set(["PARTIALLY_FILLED", "FILLED", "CANCELLED", "EXPIRED"])
+    PARTIALLY_FILLED: new Set(["PARTIALLY_FILLED", "FILLED", "CANCELLED", "EXPIRED"]),
+    FILLED: new Set(["FILLED"]),
+    CANCELLED: new Set(["CANCELLED"]),
+    EXPIRED: new Set(["EXPIRED"])
   };
   if (!allowed[previous]?.has(next)) fail("DEMO_ORDER_STATUS_TRANSITION_INVALID");
 }
