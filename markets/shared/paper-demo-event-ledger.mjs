@@ -1,4 +1,4 @@
-const VERSION = "1.1.0";
+const VERSION = "1.2.0";
 const ENGINES = new Set(["EQUITY", "FUTURES", "OPTIONS"]);
 const EVENT_TYPES = new Set(["ORDER_ACCEPTED", "ORDER_UPDATED", "ORDER_REJECTED", "FILL_RECORDED", "RESERVATION_CHANGED", "POSITION_CHANGED"]);
 const ORDER_STATUSES = new Set(["PENDING", "PARTIALLY_FILLED", "FILLED", "CANCELLED", "REJECTED", "EXPIRED"]);
@@ -26,14 +26,21 @@ function productOf(payload) {
 function positionKey(assetClass, instrumentKey, product) {
   return assetClass + "|" + instrumentKey + "|" + product;
 }
+function timestampMs(value) {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$/.test(value)) fail("INVALID_EVENT_TIMESTAMP");
+  const parsed = Date.parse(value);
+  if (!Number.isFinite(parsed)) fail("INVALID_EVENT_TIMESTAMP");
+  return parsed;
+}
 function validateEvent(input, identity, expectedSequence) {
   if (!object(input)) fail("INVALID_EVENT");
+  if (input.schemaVersion !== VERSION) fail("UNSUPPORTED_EVENT_SCHEMA_VERSION");
   validateIdentity(input.eventId, "EVENT_ID");
   validateIdentity(input.idempotencyKey, "IDEMPOTENCY_KEY");
   validateIdentity(input.sourceEventId, "SOURCE_EVENT_ID");
   if (input.sessionId !== identity.sessionId || input.accountId !== identity.accountId) fail("DEMO_EVENT_SCOPE_MISMATCH");
   if (input.sequence !== expectedSequence) fail("DEMO_EVENT_SEQUENCE_MISMATCH");
-  if (typeof input.occurredAt !== "string" || !Number.isFinite(Date.parse(input.occurredAt))) fail("INVALID_EVENT_TIMESTAMP");
+  timestampMs(input.occurredAt);
   if (!ENGINES.has(input.engine) || !EVENT_TYPES.has(input.type)) fail("INVALID_EVENT_KIND");
   if (!object(input.deltas)) fail("INVALID_EVENT_DELTAS");
   for (const key of ["cashDeltaPaise", "blockedDeltaPaise"]) {
@@ -60,14 +67,35 @@ function validateEvent(input, identity, expectedSequence) {
         !integer(p.pricePaise) || p.pricePaise < 1 ||
         !PRODUCTS.has(productOf(p))) fail("INVALID_FILL_EVENT");
     const calculatedGrossPaise = p.quantity * p.pricePaise;
-    if (!Number.isSafeInteger(calculatedGrossPaise) ||
+    if (!Number.isSafeInteger(calculatedGrossPaise) || calculatedGrossPaise < 1 ||
+        (p.grossPaise === undefined && p.grossValuePaise === undefined) ||
         (p.grossPaise !== undefined && p.grossPaise !== calculatedGrossPaise) ||
         (p.grossValuePaise !== undefined && p.grossValuePaise !== calculatedGrossPaise)) {
       fail("INVALID_FILL_GROSS_VALUE");
     }
+    if (input.engine === "EQUITY") {
+      const expectedCashDelta = p.side === "BUY" ? -calculatedGrossPaise : calculatedGrossPaise;
+      if (input.deltas.cashDeltaPaise !== expectedCashDelta) fail("EQUITY_FILL_CASH_SETTLEMENT_MISMATCH");
+    } else if (input.deltas.cashDeltaPaise !== 0 || input.deltas.blockedDeltaPaise !== 0) {
+      fail("DERIVATIVE_CASH_SETTLEMENT_RECEIPT_REQUIRED");
+    }
     if (input.engine === "EQUITY" && p.assetClass !== "EQUITY") fail("ENGINE_ASSET_MISMATCH");
     if (input.engine === "FUTURES" && p.assetClass !== "FUTURE") fail("ENGINE_ASSET_MISMATCH");
     if (input.engine === "OPTIONS" && p.assetClass !== "OPTION") fail("ENGINE_ASSET_MISMATCH");
+  }
+  if (input.engine !== "EQUITY" &&
+      (input.deltas.cashDeltaPaise !== 0 || input.deltas.blockedDeltaPaise !== 0)) {
+    fail("DERIVATIVE_CASH_SETTLEMENT_RECEIPT_REQUIRED");
+  }
+  if (input.type !== "FILL_RECORDED" && input.deltas.cashDeltaPaise !== 0) {
+    fail("UNAUTHORIZED_EVENT_CASH_MOVEMENT");
+  }
+  if (input.type === "POSITION_CHANGED" &&
+      (input.deltas.cashDeltaPaise !== 0 || input.deltas.blockedDeltaPaise !== 0)) {
+    fail("UNAUTHORIZED_POSITION_CASH_MOVEMENT");
+  }
+  if (input.type === "ORDER_REJECTED" && input.deltas.blockedDeltaPaise !== 0) {
+    fail("UNAUTHORIZED_REJECTION_RESERVATION_MOVEMENT");
   }
   if (input.type === "POSITION_CHANGED") {
     if (!ASSETS.has(p.assetClass) || !p.instrumentKey?.startsWith("MOCK|") ||
@@ -106,6 +134,24 @@ function apply(projection, event) {
     const p = event.payload, existing = projection.orders.find(x => x.orderId === p.orderId);
     if ((event.type === "ORDER_ACCEPTED" || event.type === "ORDER_REJECTED") && existing) fail("DUPLICATE_ORDER_ID");
     if (event.type === "ORDER_UPDATED" && !existing) fail("ORDER_UPDATE_WITHOUT_ACCEPTANCE");
+    if (event.type === "ORDER_ACCEPTED" && p.status !== "PENDING") fail("INVALID_INITIAL_ORDER_STATUS");
+    if (event.type === "ORDER_UPDATED") {
+      const terminal = new Set(["FILLED", "CANCELLED", "REJECTED", "EXPIRED"]);
+      const transitions = {
+        PENDING: new Set(["PARTIALLY_FILLED", "FILLED", "CANCELLED", "EXPIRED"]),
+        PARTIALLY_FILLED: new Set(["PARTIALLY_FILLED", "FILLED", "CANCELLED", "EXPIRED"])
+      };
+      if (terminal.has(existing.status)) fail("ORDER_TERMINAL_STATE_IMMUTABLE");
+      if (!transitions[existing.status]?.has(p.status)) fail("INVALID_ORDER_STATUS_TRANSITION");
+      const filledQuantity = projection.fills.filter(fill => fill.orderId === p.orderId)
+        .reduce((sum, fill) => sum + fill.quantity, 0);
+      if (p.status === "PENDING" && filledQuantity !== 0) fail("ORDER_FILL_STATUS_MISMATCH");
+      if (p.status === "PARTIALLY_FILLED" && !(filledQuantity > 0 && filledQuantity < p.quantity)) fail("ORDER_FILL_STATUS_MISMATCH");
+      if (p.status === "FILLED" && filledQuantity !== p.quantity) fail("ORDER_FILL_STATUS_MISMATCH");
+      if ((p.status === "CANCELLED" || p.status === "EXPIRED") && filledQuantity >= p.quantity) fail("ORDER_FILL_STATUS_MISMATCH");
+      if (p.filledQuantity !== undefined && p.filledQuantity !== filledQuantity) fail("ORDER_FILLED_QUANTITY_MISMATCH");
+      if (p.remainingQuantity !== undefined && p.remainingQuantity !== p.quantity - filledQuantity) fail("ORDER_REMAINING_QUANTITY_MISMATCH");
+    }
     const product = productOf(p);
     const next = { ...p, product, engine: event.engine, lastSequence: event.sequence };
     if (existing) {
@@ -175,7 +221,7 @@ export function createPaperDemoEventLedger(opening) {
   const eventIds = new Map(), sourceEvents = new Map(), idempotency = new Map();
   let lastTimestamp = -Infinity;
   function append(input) {
-    const candidate = { ...input, sequence: projection.events.length + 1 };
+    const candidate = { ...input, schemaVersion: input.schemaVersion === undefined ? VERSION : input.schemaVersion, sequence: projection.events.length + 1 };
     const event = validateEvent(candidate, identity, projection.events.length + 1);
     const fingerprint = JSON.stringify({ ...event, sequence: undefined });
     const prior = idempotency.get(event.idempotencyKey);
@@ -186,8 +232,8 @@ export function createPaperDemoEventLedger(opening) {
     if (eventIds.has(event.eventId)) fail("DUPLICATE_EVENT_ID");
     const sourceKey = event.engine + "|" + event.sourceEventId;
     if (sourceEvents.has(sourceKey)) fail("DUPLICATE_SOURCE_EVENT");
-    const time = Date.parse(event.occurredAt);
-    if (time < lastTimestamp) fail("DEMO_EVENT_TIME_ORDER_MISMATCH");
+    const time = timestampMs(event.occurredAt);
+    if (time <= lastTimestamp) fail("DEMO_EVENT_TIME_ORDER_MISMATCH");
     const before = clone(projection);
     try {
       apply(projection, event);
@@ -208,8 +254,8 @@ export function createPaperDemoEventLedger(opening) {
 export function replayPaperDemoEvents(opening, events) {
   if (!Array.isArray(events)) fail("DEMO_EVENT_ARRAY_REQUIRED");
   const ledger = createPaperDemoEventLedger(opening);
-  const ordered = [...events].sort((a, b) => a.sequence - b.sequence);
-  ordered.forEach((event, index) => {
+  events.forEach((event, index) => {
+    if (event.schemaVersion !== VERSION) fail("UNSUPPORTED_EVENT_SCHEMA_VERSION");
     if (event.sequence !== index + 1) fail("DEMO_EVENT_SEQUENCE_MISMATCH");
     const { sequence, ...input } = event;
     const result = ledger.append(input);
