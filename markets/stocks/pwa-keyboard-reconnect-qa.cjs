@@ -23,17 +23,19 @@ const SCREENS = ["home","market","watchlists","charts","equity","futures","optio
       const registration = registrations.find(item => item.scope === new URL("/markets/", location.origin).href);
       return registration?.active?.state === "activated" && !registration.installing;
     }, null, { timeout: 30000 });
-    await pwaPage.waitForFunction(async () => !(await caches.keys()).includes("zenura-markets-shell-v10"), null, { timeout: 5000 }).catch(() => null);
-    const activationInfo = await pwaPage.evaluate(async () => {
-      const registrations = await navigator.serviceWorker.getRegistrations();
-      const registration = registrations.find(item => item.scope === new URL("/markets/", location.origin).href);
-      return { keys: await caches.keys(), activeState: registration?.active?.state || null, activeScript: registration?.active?.scriptURL || null };
-    });
+    const activationInfo = await pwaPage.evaluate(async () => ({
+      keys: await caches.keys(),
+      controller: navigator.serviceWorker.controller?.scriptURL || null
+    }));
     assert.ok(activationInfo.keys.includes("zenura-markets-shell-v11"), "current v11 cache must be active: " + JSON.stringify(activationInfo));
-    assert.ok(!activationInfo.keys.includes("zenura-markets-shell-v10"), "activation must delete the seeded v10 cache: " + JSON.stringify(activationInfo));
     await pwaPage.reload({ waitUntil: "domcontentloaded" });
     await pwaPage.waitForFunction(() => !!navigator.serviceWorker.controller, null, { timeout: 15000 });
-
+    await pwaPage.waitForFunction(async () => !(await caches.keys()).includes("zenura-markets-shell-v10"), null, { timeout: 10000 });
+    const upgradeInfo = await pwaPage.evaluate(async () => ({
+      keys: await caches.keys(),
+      controller: navigator.serviceWorker.controller?.scriptURL || null
+    }));
+    assert.ok(!upgradeInfo.keys.includes("zenura-markets-shell-v10"), "activated worker must remove the seeded v10 cache after taking control: " + JSON.stringify(upgradeInfo));
     await pwaPage.evaluate(async () => {
       await fetch("/markets/private-session-qa-probe", { headers: { Authorization: "Bearer synthetic-qa-only" } }).catch(() => null);
     });
