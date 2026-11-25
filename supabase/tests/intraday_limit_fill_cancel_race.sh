@@ -14,8 +14,11 @@ wait_for_terminal_update_lock() {
 }
 
 USER_ID="22222222-2222-4222-8222-222222222222"
-BUY_ORDER="$(printf 'a%.0s' {1..64})"
-SELL_ORDER="$(printf 'b%.0s' {1..64})"
+# Use run-scoped deterministic IDs: append-only ledger rows prevent reusing
+# fixture IDs already persisted by the preceding Intraday reservation test.
+RUN_NAMESPACE="${GITHUB_RUN_ID:-local}"
+BUY_ORDER="$(printf 'ci-intraday-race-buy:%s' "$RUN_NAMESPACE" | sha256sum | cut -d' ' -f1)"
+SELL_ORDER="$(printf 'ci-intraday-race-sell:%s' "$RUN_NAMESPACE" | sha256sum | cut -d' ' -f1)"
 SELL_EXEC_NOW=""
 BUY_IDEMPOTENCY="44444444-4444-4444-8444-444444444444"
 SELL_IDEMPOTENCY="55555555-5555-4555-8555-555555555555"
