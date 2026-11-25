@@ -32,6 +32,10 @@ test("Equity and Futures events share one idempotent projection",async()=>{
  const combined=sync("DERIVATIVES",derivatives);
  assert.equal(combined.orders.length,4);assert.equal(combined.trades.length,4);
  assert.equal(combined.positions.find(p=>p.assetClass==="FUTURE").quantity,-2);
+ const replayed=sync("DERIVATIVES",derivatives);
+ assert.equal(replayed.orders.length,combined.orders.length);
+ assert.equal(replayed.trades.length,combined.trades.length);
+ assert.deepEqual(replayed.positions,combined.positions);
  assert.deepEqual(history.createDemoTradeHistoryStore({env:{NODE_ENV:"test"}}).replay([]),{mode:"DEMO",provider:"DUMMY_JSON",simulationOnly:true,orders:[],openOrders:[],trades:[],positions:[],events:[]});
 });
 
