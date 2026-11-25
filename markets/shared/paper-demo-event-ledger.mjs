@@ -173,6 +173,9 @@ function apply(projection, event) {
       Object.assign(existing, next, totals);
     } else projection.orders.push(next);
     if (p.reservedQuantityDelta !== undefined && p.reservedQuantityDelta !== expectedReservationDelta) {
+      if (existing && p.side === "SELL" && p.assetClass !== "FUTURE" && ["CANCELLED", "EXPIRED"].includes(p.status)) {
+        fail("DEMO_TERMINAL_SELL_RESERVATION_MISMATCH");
+      }
       fail("DEMO_ORDER_RESERVATION_DELTA_MISMATCH");
     }
     const reservationDelta = expectedReservationDelta;
