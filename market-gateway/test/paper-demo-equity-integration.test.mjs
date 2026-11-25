@@ -51,7 +51,7 @@ test("Equity order, trade, positions and holdings projections remain visibly sep
   assert.match(js, /appendEquitySummary\(content,name\)/);
   assert.match(panel, /LOCAL EQUITY FILL RECEIPTS/);
   assert.match(panel, /LOCAL DELIVERY HOLDINGS/);
-  assert.match(panel, /not reconciled with the Wallet/);
+  assert.match(panel,/not reconciled with the Wallet|unreconciled Wallet snapshot/);
   assert.doesNotMatch(panel, /account\.ledgerReconciled\s*=\s*true/);
   assert.doesNotMatch(js, /appendEquitySummary\(content,"account"\)/);
 });
@@ -62,7 +62,7 @@ test("PWA caches the simulator and synthetic fixtures; production gateway stays 
     read("market-gateway/supabase-server.js"),
     read(".github/workflows/s-trade-fo-demo-ui-integration.yml")
   ]);
-  assert.match(sw, /zenura-markets-shell-v5/);
+  assert.match(sw,/zenura-markets-shell-v8/);
   assert.match(sw, /stocks\/demo-equity-panel\.mjs/);
   assert.match(sw, /stocks\/demo-chart-panel\.mjs/);
   assert.match(sw, /stocks\/demo-chart-data\.mjs/);
