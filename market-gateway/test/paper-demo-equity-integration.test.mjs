@@ -33,7 +33,7 @@ test("15-screen Demo mounts the existing canonical Equity engine without a dupli
   assert.match(html, /equity-demo-execution-engine\.js/);
   assert.match(js, /from "\.\/demo-equity-panel\.mjs"/);
   assert.match(js, /mountEquityDemo\(content\)/);
-  assert.match(js, /appendEquitySummary\(content,name\)/);
+  assert.match(js, /appendUnifiedLedgerSummary\(content,name\)/);
   assert.match(panel, /createEquityDemoExecutionEngine/);
   assert.match(panel, /createEquityDemoLedgerBridge/);
   assert.match(panel, /submitOrder/);
@@ -49,7 +49,7 @@ test("Equity order, trade, positions and holdings projections remain visibly sep
     read("markets/stocks/demo.js"),
     read("markets/stocks/demo-equity-panel.mjs")
   ]);
-  assert.match(js, /appendEquitySummary\(content,name\)/);
+  assert.match(js, /appendUnifiedLedgerSummary\(content,name\)/);
   assert.match(panel, /CANONICAL EQUITY FILL RECEIPTS/);
   assert.match(panel, /CANONICAL DELIVERY HOLDINGS/);
   assert.match(panel, /wallet reconciliation remains false/);
