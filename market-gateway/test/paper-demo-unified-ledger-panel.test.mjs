@@ -291,12 +291,13 @@ test("Portfolio expiry controller disposes its timer after the screen is removed
 });
 
 
-test("derivative expiry cutoff follows exchange, contract class and effective date", async () => {
-  const { portfolioDerivativeExpiryCutoff } =
-    await import("../../markets/stocks/demo-unified-ledger-panel.mjs?exchange-expiry-policy");
+test("derivative expiry cutoff follows exchange, instrument class and verified effective dates", async () => {
+  const {
+    portfolioDerivativeExpiryCutoff, isVerifiedRegularDerivativeExpiryDate
+  } = await import("../../markets/stocks/demo-unified-ledger-panel.mjs?exchange-expiry-calendar");
   const at = (date, clock) => Date.parse(date + "T" + clock + "+05:30");
 
-  // Before NSE's 7 Dec 2026 timetable revision, expiry marks close at 15:30.
+  // NSE regular sessions before the 7 Dec revision.
   assert.equal(portfolioDerivativeExpiryCutoff("2026-11-26", {
     exchange: "NSE", underlyingType: "INDEX"
   }), at("2026-11-26", "15:30:00"));
@@ -304,34 +305,59 @@ test("derivative expiry cutoff follows exchange, contract class and effective da
     exchange: "NSE", underlyingType: "STOCK"
   }), at("2026-11-26", "15:30:00"));
 
-  // From 7 Dec: expiring index contracts cease at 15:30; stock derivatives at 15:45.
-  assert.equal(portfolioDerivativeExpiryCutoff("2026-12-31", {
+  // NSE and BSE apply the revised SEBI schedule from 7 Dec: index expiry 15:30,
+  // stock derivatives 15:45.
+  for (const exchange of ["NSE", "BSE"]) {
+    assert.equal(portfolioDerivativeExpiryCutoff("2026-12-31", {
+      exchange, underlyingType: "INDEX"
+    }), at("2026-12-31", "15:30:00"));
+    assert.equal(portfolioDerivativeExpiryCutoff("2026-12-31", {
+      exchange, underlyingType: "STOCK"
+    }), at("2026-12-31", "15:45:00"));
+  }
+
+  // BSE's 3 Aug–6 Dec 2026 schedule has a 15:40 derivative close.
+  assert.equal(portfolioDerivativeExpiryCutoff("2026-11-26", {
+    exchange: "BSE", underlyingType: "INDEX"
+  }), at("2026-11-26", "15:40:00"));
+  // Before the BSE CAS timing change, regular derivative close was 15:30.
+  assert.equal(portfolioDerivativeExpiryCutoff("2026-07-30", {
+    exchange: "BSE", underlyingType: "INDEX"
+  }), at("2026-07-30", "15:30:00"));
+
+  // Exchange calendars differ: 15 Jan is an NSE holiday but not on BSE's list.
+  assert.equal(isVerifiedRegularDerivativeExpiryDate("2026-01-15", "NSE"), false);
+  assert.equal(isVerifiedRegularDerivativeExpiryDate("2026-01-15", "BSE"), true);
+  assert.equal(portfolioDerivativeExpiryCutoff("2026-01-15", {
     exchange: "NSE", underlyingType: "INDEX"
-  }), at("2026-12-31", "15:30:00"));
-  assert.equal(portfolioDerivativeExpiryCutoff("2026-12-31", {
-    exchange: "NSE", underlyingType: "STOCK"
-  }), at("2026-12-31", "15:45:00"));
-
-  // BSE's verified schedule through 6 Dec 2026 closes at 15:40.
-  assert.equal(portfolioDerivativeExpiryCutoff("2026-12-03", {
-    exchange: "BSE", underlyingType: "INDEX"
-  }), at("2026-12-03", "15:40:00"));
-  assert.equal(portfolioDerivativeExpiryCutoff("2026-12-29", {
-    exchange: "BSE", underlyingType: "INDEX"
   }), null);
+  assert.equal(portfolioDerivativeExpiryCutoff("2026-01-15", {
+    exchange: "BSE", underlyingType: "INDEX"
+  }), at("2026-01-15", "15:30:00"));
 
-  // Unknown exchange, missing classification and malformed dates fail closed.
-  assert.equal(portfolioDerivativeExpiryCutoff("2026-12-31", {
-    exchange: "NSE"
-  }), null);
+  // Holidays, weekends, Muhurat special session, and unverified calendar years fail closed.
+  for (const [date, exchange] of [
+    ["2026-11-10", "NSE"], ["2026-11-10", "BSE"],
+    ["2026-11-08", "NSE"], ["2026-11-08", "BSE"],
+    ["2026-11-28", "NSE"], ["2026-11-29", "BSE"],
+    ["2027-01-28", "NSE"], ["2027-01-28", "BSE"]
+  ]) {
+    assert.equal(isVerifiedRegularDerivativeExpiryDate(date, exchange), false, date + " " + exchange);
+    assert.equal(portfolioDerivativeExpiryCutoff(date, {
+      exchange, underlyingType: "INDEX"
+    }), null, date + " " + exchange);
+  }
+
   assert.equal(portfolioDerivativeExpiryCutoff("2026-12-31", {
     exchange: "UNKNOWN", underlyingType: "INDEX"
+  }), null);
+  assert.equal(portfolioDerivativeExpiryCutoff("2026-12-31", {
+    exchange: "NSE"
   }), null);
   assert.equal(portfolioDerivativeExpiryCutoff("2026-02-30", {
     exchange: "NSE", underlyingType: "INDEX"
   }), null);
 });
-
 test("expired derivatives suppress row valuation and aggregate unrealized P&L at their classified cutoff", async () => {
   const {
     createPortfolioMark, isUsablePortfolioMark, portfolioDerivativeExpiryCutoff,
