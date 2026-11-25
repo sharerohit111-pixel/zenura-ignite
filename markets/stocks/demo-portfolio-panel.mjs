@@ -10,8 +10,7 @@ export function buildDemoPortfolioView(snapshot, instruments, asOf) {
   const referenceTime = Date.parse(asOf);
   if (!Number.isFinite(referenceTime)) throw new TypeError("INVALID_DEMO_PORTFOLIO_AS_OF");
   const marks = new Map(instruments.map(item => [item.instrumentKey, item]));
-  let realizedPnlPaise = 0, unrealizedPnlPaise = 0, valuationComplete = true;
-  const positions = snapshot.positions.map(position => {
+  const realizedPnlPaise = snapshot.positions.reduce((sum, position) => {\n    if (!Number.isSafeInteger(position?.realizedPnlPaise)) throw new TypeError("INVALID_DEMO_POSITION");\n    const next = sum + position.realizedPnlPaise;\n    if (!Number.isSafeInteger(next)) throw new TypeError("DEMO_PORTFOLIO_TOTAL_OUT_OF_RANGE");\n    return next;\n  }, 0);\n  let unrealizedPnlPaise = 0, valuationComplete = true;\n  const positions = snapshot.positions.filter(position => position.quantity !== 0).map(position => {
     const instrument = marks.get(position.instrumentKey);
     const quantity = position.quantity;
     const averagePricePaise = position.averagePricePaise;
@@ -30,8 +29,7 @@ export function buildDemoPortfolioView(snapshot, instruments, asOf) {
     if (unrealized !== null && !Number.isSafeInteger(unrealized)) throw new TypeError("DEMO_PNL_OUT_OF_RANGE");
     if (unrealized === null) valuationComplete = false;
     else unrealizedPnlPaise += unrealized;
-    realizedPnlPaise += position.realizedPnlPaise;
-    if (!Number.isSafeInteger(realizedPnlPaise) || !Number.isSafeInteger(unrealizedPnlPaise)) {
+    if (!Number.isSafeInteger(unrealizedPnlPaise)) {
       throw new TypeError("DEMO_PORTFOLIO_TOTAL_OUT_OF_RANGE");
     }
     return Object.freeze({
