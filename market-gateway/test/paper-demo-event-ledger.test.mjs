@@ -95,3 +95,31 @@ test("rejects live symbols, mismatched engine asset classes and out-of-order tim
   ledger.append(event());
   assert.throws(() => ledger.append(event({ eventId: "evt-2", idempotencyKey: "idem-2", sourceEventId: "later", occurredAt: "2026-11-25T09:29:59+05:30" })), /DEMO_EVENT_TIME_ORDER_MISMATCH/);
 });
+
+test("source event identity cannot be replayed under a different event or idempotency key", () => {
+  const ledger = createPaperDemoEventLedger(opening);
+  ledger.append(event());
+  assert.throws(() => ledger.append(event({
+    eventId: "evt-2", idempotencyKey: "idem-2"
+  })), /DUPLICATE_SOURCE_EVENT/);
+});
+test("order updates cannot mutate the original order identity", () => {
+  const ledger = createPaperDemoEventLedger(opening);
+  ledger.append(event());
+  assert.throws(() => ledger.append(event({
+    eventId: "evt-2", idempotencyKey: "idem-2", sourceEventId: "update-1",
+    type: "ORDER_UPDATED", occurredAt: "2026-11-25T09:30:01+05:30",
+    deltas: { cashDeltaPaise: 0, blockedDeltaPaise: 0 },
+    payload: { ...event().payload, quantity: 3, status: "PARTIALLY_FILLED" }
+  })), /ORDER_IDENTITY_MUTATION/);
+});
+test("fill quantity cannot exceed the accepted order quantity", () => {
+  const ledger = createPaperDemoEventLedger(opening);
+  ledger.append(event());
+  assert.throws(() => ledger.append(event({
+    eventId: "evt-2", idempotencyKey: "idem-2", sourceEventId: "fill-oversized",
+    type: "FILL_RECORDED", occurredAt: "2026-11-25T09:30:01+05:30",
+    deltas: { cashDeltaPaise: -125050, blockedDeltaPaise: -10000 },
+    payload: { fillId: "fill-1", orderId: "order-1", assetClass: "EQUITY", instrumentKey: "MOCK|NSE|EQ|0001", side: "BUY", quantity: 3, pricePaise: 125050 }
+  })), /FILL_QUANTITY_EXCEEDS_ORDER/);
+});
