@@ -1,4 +1,5 @@
 name: S-TRADE Demo Screen Wiring Tests
+# Keep manifest, registration, and offline precache-closure changes under this regression gate.
 
 on:
   pull_request:
