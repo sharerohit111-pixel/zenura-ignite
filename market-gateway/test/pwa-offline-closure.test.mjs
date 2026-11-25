@@ -56,4 +56,6 @@ test("service worker never caches arbitrary authenticated or private navigation 
  assert.match(sw,/url\.searchParams\.has\("token"\)/);
  assert.match(sw,/if\(request\.mode==="navigate"\)\{[\s\S]*?if\(!shellAsset\)return;/);
  assert.match(sw,/Only explicitly listed static shell documents may be cached/);
+ assert.match(sw,/if\(shellAsset\)\{/);
+ assert.doesNotMatch(sw,/request\.destination/,"dynamic same-origin scripts, styles, images and fonts must not be cached implicitly");
 });
