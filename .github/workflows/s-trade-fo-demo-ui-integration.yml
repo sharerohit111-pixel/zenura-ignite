@@ -20,6 +20,7 @@ on:
       - ".github/workflows/s-trade-fo-demo-ui-integration.yml"
   push:
     branches:
+      - feature/s-trade-order-lifecycle-replay-2026-11-25
       - feature/s-trade-fo-demo-ui-integration-2026-11-24
       - feature/s-trade-round3-equity-demo-screen-integration-2026-11-24
     paths:
