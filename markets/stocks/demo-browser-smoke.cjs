@@ -18,7 +18,7 @@ const axePath=require.resolve("axe-core/axe.min.js");
    const pageErrors=[];
    page.on("pageerror",error=>pageErrors.push(error.message));
    await page.goto("http://127.0.0.1:4173/markets/stocks/demo.html",{waitUntil:"domcontentloaded",timeout:30000});
-   await page.waitForFunction(()=>document.querySelector("#demo-status")?.textContent.includes("4 canonical fixtures validated"),null,{timeout:10000});
+   try{await page.waitForFunction(()=>document.querySelector("#demo-status")?.textContent.includes("4 canonical fixtures validated"),null,{timeout:10000});}catch(error){const diagnostic=await page.locator("#demo-status").textContent().catch(()=>"<missing #demo-status>");throw new Error(viewport.name+" fixture boot failed: "+diagnostic+"; page errors: "+pageErrors.join(" | ")+"; "+error.message);}
    assert.equal(await page.locator("#screen-nav button[data-screen]").count(),15,viewport.name+" screen count");
    for(const name of ["home","market","watchlists","charts","equity","futures","options","orders","trades","portfolio","positions","holdings","account","profile","settings"]){
     await page.locator('#screen-nav button[data-screen="'+name+'"]').click();
