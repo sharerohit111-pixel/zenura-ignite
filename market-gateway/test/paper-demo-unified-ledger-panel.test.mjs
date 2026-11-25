@@ -33,14 +33,40 @@ test("PWA precaches the unified panel and retains the single shared ledger sessi
   assert.match(panel, /market-gateway\/mock\/fixtures\/derivatives\.json/);
 });
 
-test("Portfolio valuation rejects missing, stale, invalid and future-dated marks and suppresses incomplete aggregate P&L", async () => {
-  const panel = await read("markets/stocks/demo-unified-ledger-panel.mjs");
-  assert.match(panel, /quote\.stale===true/);
-  assert.match(panel, /derivativeEnvelope\.meta\?\.stale===true/);
-  assert.match(panel, /equityEnvelope\.meta\?\.stale===true/);
-  assert.match(panel, /!Number\.isFinite\(time\)/);
-  assert.match(panel, /time>Date\.now\(\)/);
-  assert.match(panel, /mark\.stale===false/);
-  assert.match(panel, /Unavailable \(missing\/stale\)/);
-  assert.match(panel, /allMarksValid\?money\(aggregateUnrealized\)/);
+test("Portfolio marks enforce existing asset-specific freshness limits", async () => {
+  const { createPortfolioMark, EQUITY_MARK_MAX_AGE_MS, DERIVATIVE_MARK_MAX_AGE_MS,
+    EQUITY_MARK_MAX_FUTURE_SKEW_MS } = await import("../../markets/stocks/demo-unified-ledger-panel.mjs");
+  const now = 1_800_000_000_000;
+  const iso = ms => new Date(ms).toISOString();
+  assert.equal(EQUITY_MARK_MAX_AGE_MS, 60_000);
+  assert.equal(DERIVATIVE_MARK_MAX_AGE_MS, 15_000);
+  assert.equal(EQUITY_MARK_MAX_FUTURE_SKEW_MS, 5_000);
+  assert.equal(createPortfolioMark(100, iso(now - 60_000), { now, maxAgeMs: EQUITY_MARK_MAX_AGE_MS, maxFutureSkewMs: 5_000 }).stale, false);
+  assert.equal(createPortfolioMark(100, iso(now - 60_001), { now, maxAgeMs: EQUITY_MARK_MAX_AGE_MS, maxFutureSkewMs: 5_000 }).stale, true);
+  assert.equal(createPortfolioMark(100, iso(now - 15_000), { now, maxAgeMs: DERIVATIVE_MARK_MAX_AGE_MS }).stale, false);
+  assert.equal(createPortfolioMark(100, iso(now - 15_001), { now, maxAgeMs: DERIVATIVE_MARK_MAX_AGE_MS }).stale, true);
+  assert.equal(createPortfolioMark(100, iso(now + 5_000), { now, maxAgeMs: EQUITY_MARK_MAX_AGE_MS, maxFutureSkewMs: 5_000 }).stale, false);
+  assert.equal(createPortfolioMark(100, iso(now + 5_001), { now, maxAgeMs: EQUITY_MARK_MAX_AGE_MS, maxFutureSkewMs: 5_000 }).stale, true);
+  assert.equal(createPortfolioMark(100, iso(now + 1), { now, maxAgeMs: DERIVATIVE_MARK_MAX_AGE_MS }).stale, true);
+  assert.equal(createPortfolioMark(100, iso(now), { now, maxAgeMs: 60_000, explicitStale: true }).stale, true);
+  assert.equal(createPortfolioMark(100, "invalid", { now, maxAgeMs: 60_000 }).stale, true);
+  assert.equal(createPortfolioMark(0, iso(now), { now, maxAgeMs: 60_000 }).stale, true);
+});
+
+test("aggregate unrealized P&L is withheld when any open position lacks a fresh valid mark", async () => {
+  const { createPortfolioMark, calculateAggregateUnrealized } = await import("../../markets/stocks/demo-unified-ledger-panel.mjs");
+  const now = 1_800_000_000_000;
+  const positions = [
+    { instrumentKey: "EQ1", quantity: 10, averagePricePaise: 100 },
+    { instrumentKey: "FUT1", quantity: 2, averagePricePaise: 500 }
+  ];
+  const marks = new Map([
+    ["EQ1", createPortfolioMark(120, now, { now, maxAgeMs: 60_000 })],
+    ["FUT1", createPortfolioMark(550, now, { now, maxAgeMs: 15_000 })]
+  ]);
+  assert.deepEqual(calculateAggregateUnrealized(positions, marks), { complete: true, value: 300 });
+  marks.set("FUT1", createPortfolioMark(550, now - 15_001, { now, maxAgeMs: 15_000 }));
+  assert.deepEqual(calculateAggregateUnrealized(positions, marks), { complete: false, value: null });
+  marks.delete("FUT1");
+  assert.deepEqual(calculateAggregateUnrealized(positions, marks), { complete: false, value: null });
 });
