@@ -22,12 +22,17 @@ export function buildDemoPortfolioView(snapshot, instruments, asOf) {
     const quantity = position.quantity;
     const averagePricePaise = position.averagePricePaise;
     if (!Number.isSafeInteger(quantity) || !Number.isSafeInteger(averagePricePaise) ||
+        !Number.isSafeInteger(position.costBasisPaise) || position.costBasisPaise < 0 ||
         !Number.isSafeInteger(position.realizedPnlPaise) ||
+        !["EQUITY", "FUTURE", "OPTION"].includes(position.assetClass) ||
+        !["DELIVERY", "INTRADAY"].includes(position.product) ||
+        typeof position.instrumentKey !== "string" || !position.instrumentKey.startsWith("MOCK|") ||
         (position.assetClass !== "FUTURE" && quantity < 0)) {
       throw new TypeError("INVALID_DEMO_POSITION");
     }
     const signedQuantity = position.assetClass === "FUTURE" ? quantity : Math.abs(quantity);
-    const markIsValid = instrument && instrument.simulated === true && instrument.stale === false &&
+    const markIsValid = instrument && instrument.assetClass === position.assetClass &&
+      instrument.simulated === true && instrument.stale === false &&
       Number.isSafeInteger(instrument.lastPricePaise) && instrument.lastPricePaise > 0 &&
       Number.isFinite(Date.parse(instrument.timestamp)) && Date.parse(instrument.timestamp) <= referenceTime &&
       referenceTime - Date.parse(instrument.timestamp) <= 86400000;
