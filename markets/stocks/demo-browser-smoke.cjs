@@ -9,6 +9,38 @@ const shellEntries=[...shellBlock[1].matchAll(/"([^"]*)"/g)].map(match=>match[1]
 assert.equal(new Set(shellEntries).size,shellEntries.length,"duplicate precache URLs prevent reliable service worker installation");
 const axePath=require.resolve("axe-core/axe.min.js");
 
+async function scanTextContrast(page){
+ return page.evaluate(()=>{
+  const rgb=value=>{const m=String(value).match(/rgba?\(([^)]+)\)/);if(!m)return null;const p=m[1].split(",").map(x=>Number.parseFloat(x.trim()));return p.length>=3&&p.slice(0,3).every(Number.isFinite)?{r:p[0],g:p[1],b:p[2],a:p.length>3&&Number.isFinite(p[3])?p[3]:1}:null;};
+  const blend=(front,back)=>({r:front.r*front.a+back.r*(1-front.a),g:front.g*front.a+back.g*(1-front.a),b:front.b*front.a+back.b*(1-front.a),a:1});
+  const luminance=c=>{const channel=v=>{v/=255;return v<=.04045?v/12.92:((v+.055)/1.055)**2.4;};return .2126*channel(c.r)+.7152*channel(c.g)+.0722*channel(c.b);};
+  const ratio=(a,b)=>{const x=luminance(a),y=luminance(b);return (Math.max(x,y)+.05)/(Math.min(x,y)+.05);};
+  const bodyStyle=getComputedStyle(document.body),bodyColor=rgb(bodyStyle.backgroundColor);
+  const rootColor=rgb(getComputedStyle(document.documentElement).backgroundColor);
+  const cssFallback=rgb(bodyStyle.getPropertyValue("--bg").trim())||{r:7,g:17,b:31,a:1};
+  const failures=[],measured=[];
+  for(const node of document.querySelectorAll("body *")){
+   if(node.children.length||!node.textContent.trim())continue;
+   const rect=node.getBoundingClientRect(),style=getComputedStyle(node);
+   if(!rect.width||!rect.height||style.visibility==="hidden"||style.display==="none")continue;
+   if(node.closest(':disabled,[aria-disabled="true"]'))continue;
+   let opacity=1;const chain=[];
+   for(let el=node;el&&el!==document.documentElement;el=el.parentElement){chain.push(el);opacity*=Number.parseFloat(getComputedStyle(el).opacity)||0;}
+   if(opacity===0)continue;
+   let bg={...(rootColor&&rootColor.a>0?rootColor:cssFallback)};
+   if(bodyColor&&bodyColor.a>0)bg=blend(bodyColor,bg);
+   for(const el of chain.reverse()){const layer=rgb(getComputedStyle(el).backgroundColor);if(layer&&layer.a>0)bg=blend(layer,bg);}
+   const fg=rgb(style.color);if(!fg)continue;
+   const effectiveFg=blend({...fg,a:fg.a*opacity},bg);
+   const value=ratio(effectiveFg,bg),size=parseFloat(style.fontSize)||16,weight=parseInt(style.fontWeight,10)||400;
+   const large=size>=24||(size>=18.66&&weight>=700),minimum=large?3:4.5;
+   const record={text:node.textContent.trim().slice(0,70),foreground:style.color,background:"rgb("+Math.round(bg.r)+", "+Math.round(bg.g)+", "+Math.round(bg.b)+")",ratio:Number(value.toFixed(2)),minimum};
+   measured.push(record);if(value+0.01<minimum)failures.push(record);
+  }
+  return {textNodes:measured.length,minimumRatio:measured.length?Math.min(...measured.map(x=>x.ratio)):null,failures:failures.slice(0,30)};
+ });
+}
+
 (async()=>{
  const browser=await chromium.launch({headless:true});
  try{
@@ -31,13 +63,32 @@ const axePath=require.resolve("axe-core/axe.min.js");
     throw new Error("Demo fixture startup timed out: "+JSON.stringify({state,pageErrors,browserDiagnostics})+"; "+error.message);
    }
    assert.equal(await page.locator("#screen-nav button[data-screen]").count(),15,viewport.name+" screen count");
+   const contrastReports=[];
    for(const name of ["home","market","watchlists","charts","equity","futures","options","orders","trades","portfolio","positions","holdings","account","profile","settings"]){
     await page.locator('#screen-nav button[data-screen="'+name+'"]').click();
     await page.locator("#screen-content > .screen-title h2").waitFor();
     assert.ok(await page.locator("#screen-content > .screen-title h2").isVisible(),viewport.name+" "+name+" heading");
     const overflow=await page.evaluate(()=>document.documentElement.scrollWidth>window.innerWidth+1);
     assert.equal(overflow,false,viewport.name+" horizontal document overflow on "+name);
+    const contrast=await scanTextContrast(page);
+    assert.ok(contrast.textNodes>0,viewport.name+" "+name+" contrast scan found visible text");
+    assert.equal(contrast.failures.length,0,viewport.name+" "+name+" WCAG text contrast failures: "+JSON.stringify(contrast.failures));
+    contrastReports.push({screen:name,textNodes:contrast.textNodes,minimumRatio:contrast.minimumRatio,language:"en"});
    }
+   // Repeat contrast checks in Hindi; viewport emulation is not physical-device accessibility testing.
+   const languageToggle=page.locator("#paper-language-toggle");
+   await languageToggle.click();
+   assert.equal(await page.locator("html").getAttribute("lang"),"hi",viewport.name+" Hindi language metadata");
+   for(const name of ["home","market","watchlists","charts","equity","futures","options","orders","trades","portfolio","positions","holdings","account","profile","settings"]){
+    await page.locator('#screen-nav button[data-screen="'+name+'"]').click();
+    const contrast=await scanTextContrast(page);
+    assert.ok(contrast.textNodes>0,viewport.name+" Hindi "+name+" contrast scan found visible text");
+    assert.equal(contrast.failures.length,0,viewport.name+" Hindi "+name+" WCAG text contrast failures: "+JSON.stringify(contrast.failures));
+    contrastReports.push({screen:name,textNodes:contrast.textNodes,minimumRatio:contrast.minimumRatio,language:"hi"});
+   }
+   await languageToggle.click();
+   assert.equal(await page.locator("html").getAttribute("lang"),"en",viewport.name+" English language restored");
+   await page.locator('#screen-nav button[data-screen="charts"]').click();
    // Exercise chart interactions on desktop and both mobile viewports.
    await page.locator('#screen-nav button[data-screen="charts"]').click();
    assert.ok(await page.locator(".demo-badge").textContent().then(value=>value.includes("MOCK")&&value.includes("DEMO DATA")&&value.includes("NOT LIVE")),"chart MOCK / DEMO DATA identity");
@@ -51,8 +102,12 @@ const axePath=require.resolve("axe-core/axe.min.js");
    await page.locator('[data-demo-timeframe="1m"]').click();
    assert.ok(await page.locator('[data-demo-timeframe="1m"]').evaluate(node=>node.classList.contains("active")),"chart timeframe control");
    await page.locator('[data-demo-chart-type="LINE"]').click();
-   assert.ok(await page.locator('[data-demo-chart-type="LINE"]').evaluate(node=>node.classList.contains("active")),"chart style control");
-   assert.equal(await page.locator("#demo-chart-svg").getAttribute("aria-label"),"Synthetic candlestick or line chart with volume","chart accessible description");
+   assert.ok(await page.locator('[data-demo-chart-type="LINE"]').evaluate(node=>node.classList.contains("active")),"line chart style control");
+   assert.equal(await page.locator("#demo-chart-svg .demo-line").count(),1,"line chart SVG path");
+   await page.locator('[data-demo-chart-type="OHLC"]').click();
+   assert.ok(await page.locator('[data-demo-chart-type="OHLC"]').evaluate(node=>node.classList.contains("active")),"OHLC chart style control");
+   assert.equal(await page.locator("#demo-chart-svg .demo-ohlc-bar").count(),64,"OHLC bars render for every deterministic candle");
+   assert.equal(await page.locator("#demo-chart-svg").getAttribute("aria-label"),"Synthetic OHLC, candlestick or line chart with volume","chart accessible description");
 
    if(viewport.name==="desktop"){
     // Watchlist add / reorder / remove must mutate only the session Demo list.
@@ -126,7 +181,7 @@ const axePath=require.resolve("axe-core/axe.min.js");
    assert.ok(perf.domContentLoadedMs<8000,viewport.name+" DOMContentLoaded performance budget");
    assert.ok(perf.transferBytes<5*1024*1024,viewport.name+" transfer budget");
    assert.deepEqual(pageErrors,[],viewport.name+" browser errors");
-   console.log(JSON.stringify({viewport:viewport.name,screens:15,axeSeriousCritical:0,...perf}));
+   console.log(JSON.stringify({viewport:viewport.name,screens:15,axeSeriousCritical:0,contrastChecks:contrastReports.length,contrastTextNodes:contrastReports.reduce((sum,item)=>sum+item.textNodes,0),minimumObservedTextContrast:Math.min(...contrastReports.map(item=>item.minimumRatio)),contrastReports,...perf}));
    // Keep viewport contexts alive until browser.close() in finally. Closing an\n   // individual Chromium context here intermittently stalls CI after all checks\n   // have passed, preventing the PWA phase from starting.\n   console.log("Viewport QA complete; retaining context for final browser cleanup: "+viewport.name);
   }
 
@@ -164,18 +219,35 @@ const axePath=require.resolve("axe-core/axe.min.js");
   const demoPage=controlledPage;
   await demoPage.waitForFunction(()=>document.querySelector("#demo-status")?.textContent.includes("4 canonical fixtures validated"),null,{timeout:10000});
   const cached=await demoPage.evaluate(async()=>{
-   const cache=await caches.open("zenura-markets-shell-v9");
+   const cache=await caches.open("zenura-markets-shell-v11");
    const paths=["market","account","equity","derivatives"].map(name=>new URL("../../market-gateway/mock/fixtures/"+name+".json",location.href).href);
    const found=[];
    for(const url of paths)found.push({url,found:!!(await cache.match(url))});
-   return found;
+   return {found,keys:(await cache.keys()).map(request=>request.url)};
   });
-  assert.ok(cached.every(x=>x.found),"all four canonical fixture JSON files must be precached");
+  console.log("PWA fixture cache diagnostics: "+JSON.stringify(cached));
+  assert.ok(cached.found.every(x=>x.found),"all four canonical fixture JSON files must be precached");
   console.log("PWA: validating offline cached fixtures");
   await pwa.setOffline(true);
   await demoPage.reload({waitUntil:"domcontentloaded",timeout:15000});
   await demoPage.waitForFunction(()=>document.querySelector("#demo-status")?.textContent.includes("4 canonical fixtures validated"),null,{timeout:10000});
-  console.log(JSON.stringify({pwa:"offline demo fixture load PASS",cachedFixtures:cached.length}));
+  const offlineScreens=["home","market","watchlists","charts","equity","futures","options","orders","trades","portfolio","positions","holdings","account","profile","settings"];
+  for(const name of offlineScreens){
+   await demoPage.locator('#screen-nav button[data-screen="'+name+'"]').click();
+   await demoPage.locator("#screen-content > .screen-title h2").waitFor();
+   assert.ok(await demoPage.locator("#screen-content > .screen-title h2").isVisible(),"offline screen must render: "+name);
+   const overflow=await demoPage.evaluate(()=>document.documentElement.scrollWidth>window.innerWidth+1);
+   assert.equal(overflow,false,"offline horizontal overflow on "+name);
+  }
+  const cachePolicy=await demoPage.evaluate(async()=>{
+   const cache=await caches.open("zenura-markets-shell-v11");
+   const keys=(await cache.keys()).map(request=>request.url);
+   const privateSegments=["api","auth","account","profile","wallet","orders","positions","holdings"];
+   const privateLike=keys.filter(url=>new URL(url).pathname.split("/").some(segment=>privateSegments.includes(segment.toLowerCase())));
+   return {keys:keys.length,privateLike};
+  });
+  assert.deepEqual(cachePolicy.privateLike,[],"private account API/navigation paths must never enter the static shell cache");
+  console.log(JSON.stringify({pwa:"offline all 15 demo screens PASS",screens:offlineScreens.length,cachedFixtures:cached.found.length,cachePolicy}));
   await pwa.close();
  }finally{
   await browser.close();
