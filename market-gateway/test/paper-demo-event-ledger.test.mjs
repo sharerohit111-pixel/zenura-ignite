@@ -119,7 +119,7 @@ test("fill quantity cannot exceed the accepted order quantity", () => {
   assert.throws(() => ledger.append(event({
     eventId: "evt-2", idempotencyKey: "idem-2", sourceEventId: "fill-oversized",
     type: "FILL_RECORDED", occurredAt: "2026-11-25T09:30:01+05:30",
-    deltas: { cashDeltaPaise: -125050, blockedDeltaPaise: -10000 },
+    deltas: { cashDeltaPaise: 0, blockedDeltaPaise: 0 },
     payload: { fillId: "fill-1", orderId: "order-1", assetClass: "EQUITY", instrumentKey: "MOCK|NSE|EQ|0001", side: "BUY", quantity: 3, pricePaise: 125050 }
   })), /FILL_QUANTITY_EXCEEDS_ORDER/);
 });
