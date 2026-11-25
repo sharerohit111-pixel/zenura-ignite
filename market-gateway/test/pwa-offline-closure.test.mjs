@@ -15,6 +15,11 @@ test("Markets web app manifest is strict JSON and has a valid standalone scope",
  assert.equal(manifest.display,"standalone");
  assert.ok(Array.isArray(manifest.icons)&&manifest.icons.length>0);
  assert.ok(Array.isArray(manifest.shortcuts));
+ for(const shortcut of manifest.shortcuts){
+  const scope=new URL("./","https://example.test/zenura-ignite/markets/");
+  const target=new URL(shortcut.url,scope);
+  assert.ok(target.pathname.startsWith(scope.pathname),"shortcut must stay inside the repository-scoped Markets PWA: "+shortcut.url);
+ }
 });
 
 test("Markets service worker uses a new cache generation and precaches the canonical event ledger",async()=>{
