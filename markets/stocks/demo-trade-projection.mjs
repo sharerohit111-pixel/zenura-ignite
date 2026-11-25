@@ -9,20 +9,17 @@ function getStore(){
  projection=api.createDemoTradeHistoryStore({env:{NODE_ENV:"development"}});
  return projection;
 }
-const seenOrders=new Set(),seenFills=new Set(),cancelled=new Set(),rejected=new Set();
+
 function syncDemoProjection(source,snapshot){
  const store=getStore(),orders=source==="EQUITY"?(snapshot.orders||[]):(snapshot.orders||[]);
  for(const order of [...orders].reverse()){
   const assetClass=source==="EQUITY"?"EQUITY":order.assetClass;
   if(!["EQUITY","FUTURE","OPTION"].includes(assetClass))continue;
-  if(!seenOrders.has(order.orderId)){
-   store.submit({orderId:order.orderId,assetClass,side:order.side,orderType:order.orderType,
-    product:order.product||"DELIVERY",instrumentKey:order.instrumentKey,quantity:order.quantity,
-    limitPricePaise:order.limitPricePaise||undefined,idempotencyKey:cleanKey(order.orderId),
-    createdAt:time(order.createdAt)});
-   seenOrders.add(order.orderId);
-  }
-  if(order.status==="REJECTED"&&!rejected.has(order.orderId)){
+  store.submit({orderId:order.orderId,assetClass,side:order.side,orderType:order.orderType,
+   product:order.product||"DELIVERY",instrumentKey:order.instrumentKey,quantity:order.quantity,
+   limitPricePaise:order.limitPricePaise||undefined,idempotencyKey:cleanKey(order.orderId),
+   createdAt:time(order.createdAt)});
+  if(order.status==="REJECTED"){
    store.reject(order.orderId,order.rejectionReason||"Rejected by deterministic Demo simulator",time(order.updatedAt||order.createdAt));
    rejected.add(order.orderId);
   }
@@ -33,8 +30,8 @@ function syncDemoProjection(source,snapshot){
     pricePaise:fill.pricePaise,filledAt:time(fill.filledAt||fill.executedAt)});
    seenFills.add(fill.fillId);
   }
-  if(order.status==="CANCELLED"&&!cancelled.has(order.orderId)){
-   store.cancel(order.orderId,time(order.updatedAt));cancelled.add(order.orderId);
+  if(order.status==="CANCELLED"){
+   store.cancel(order.orderId,time(order.updatedAt));
   }
  }
  return store.snapshot();
