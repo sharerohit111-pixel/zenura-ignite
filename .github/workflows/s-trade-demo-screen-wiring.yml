@@ -40,6 +40,7 @@ on:
       - "markets/stocks/demo.css"
       - "markets/stocks/demo.js"
       - "markets/stocks/index.html"
+      - "markets/stocks/demo-browser-smoke.cjs"
       - "market-gateway/test/paper-demo-dashboard.test.mjs"
       - ".github/workflows/s-trade-demo-screen-wiring.yml"
 
