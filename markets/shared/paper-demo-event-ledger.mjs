@@ -88,6 +88,25 @@ function initialProjection(opening) {
     orders: [], fills: [], positions: [], events: []
   };
 }
+function validateSettlementDeltas(event) {
+  const { cashDeltaPaise, blockedDeltaPaise } = event.deltas;
+  if (event.type !== "FILL_RECORDED" && cashDeltaPaise !== 0) {
+    fail("NON_FILL_CASH_MOVEMENT_FORBIDDEN");
+  }
+  if (event.type === "FILL_RECORDED" && blockedDeltaPaise > 0) {
+    fail("FILL_CANNOT_INCREASE_RESERVATION");
+  }
+  if ((event.type === "POSITION_CHANGED" || event.type === "RESERVATION_CHANGED") &&
+      blockedDeltaPaise !== 0) {
+    fail("NON_ORDER_RESERVATION_MOVEMENT_FORBIDDEN");
+  }
+  if (event.type === "ORDER_ACCEPTED" && blockedDeltaPaise < 0) {
+    fail("ORDER_ACCEPTANCE_CANNOT_RELEASE_RESERVATION");
+  }
+  if (event.type === "ORDER_REJECTED" && blockedDeltaPaise > 0) {
+    fail("ORDER_REJECTION_CANNOT_INCREASE_RESERVATION");
+  }
+}
 function apply(projection, event) {
   const cash = projection.account.cashBalancePaise + event.deltas.cashDeltaPaise;
   const blocked = projection.account.blockedFundsPaise + event.deltas.blockedDeltaPaise;
@@ -101,10 +120,21 @@ function apply(projection, event) {
     if ((event.type === "ORDER_ACCEPTED" || event.type === "ORDER_REJECTED") && existing) fail("DUPLICATE_ORDER_ID");
     if (event.type === "ORDER_UPDATED" && !existing) fail("ORDER_UPDATE_WITHOUT_ACCEPTANCE");
     const product = productOf(p);
-    const next = { ...p, product, engine: event.engine, lastSequence: event.sequence };
+    const next = { ...p, product, engine: event.engine, lastSequence: event.sequence,
+      reservedQuantity: existing ? existing.reservedQuantity : (p.side === "SELL" && event.type === "ORDER_ACCEPTED" ? p.quantity : 0) };
     if (existing) {
       for (const field of ["assetClass", "instrumentKey", "side", "orderType", "quantity", "product"]) {
         if (existing[field] !== next[field]) fail("ORDER_IDENTITY_MUTATION");
+      }
+      if (["CANCELLED", "REJECTED", "EXPIRED", "FILLED"].includes(existing.status)) fail("TERMINAL_ORDER_REOPEN");
+      const requestedReservationDelta = p.reservedQuantityDelta ?? 0;
+      if (p.side === "SELL") {
+        const terminal = ["CANCELLED", "REJECTED", "EXPIRED"].includes(p.status);
+        const expectedRelease = terminal ? -existing.reservedQuantity : 0;
+        if (requestedReservationDelta !== expectedRelease) fail("SELL_RESERVATION_RELEASE_MISMATCH");
+        next.reservedQuantity = existing.reservedQuantity + requestedReservationDelta;
+      } else if (requestedReservationDelta !== 0) {
+        fail("BUY_SHARE_RESERVATION_FORBIDDEN");
       }
       Object.assign(existing, next);
     } else projection.orders.push(next);
@@ -123,12 +153,23 @@ function apply(projection, event) {
     if (!order || order.engine !== event.engine || order.instrumentKey !== p.instrumentKey ||
         order.assetClass !== p.assetClass || order.side !== p.side || order.product !== productOf(p) ||
         ["CANCELLED", "REJECTED", "EXPIRED", "FILLED"].includes(order.status)) fail("FILL_ORDER_MISMATCH");
+    const grossPaise = p.quantity * p.pricePaise;
+    if (!Number.isSafeInteger(grossPaise) || grossPaise < 1) fail("FILL_GROSS_VALUE_OUT_OF_RANGE");
+    if (p.assetClass === "EQUITY") {
+      const expectedCashDelta = p.side === "BUY" ? -grossPaise : grossPaise;
+      if (event.deltas.cashDeltaPaise !== expectedCashDelta) fail("EQUITY_FILL_CASH_SETTLEMENT_MISMATCH");
+    } else if (event.deltas.cashDeltaPaise !== 0) {
+      // F&O notional is not a cash settlement. Until approved margin / premium
+      // receipts exist, derivative bridges must not invent wallet movements.
+      fail("DERIVATIVE_CASH_SETTLEMENT_RECEIPT_REQUIRED");
+    }
     const alreadyFilled = projection.fills.filter(x => x.orderId === p.orderId).reduce((sum, x) => sum + x.quantity, 0);
     if (!Number.isSafeInteger(alreadyFilled + p.quantity) || alreadyFilled + p.quantity > order.quantity) fail("FILL_QUANTITY_EXCEEDS_ORDER");
     if (p.side === "SELL" && p.assetClass !== "FUTURE") {
       const position = projection.positions.find(x => x.key === positionKey(p.assetClass, p.instrumentKey, productOf(p)));
-      if (!position || position.reservedQuantity < p.quantity) fail("DEMO_SHARE_RESERVATION_INVARIANT");
+      if (!position || position.reservedQuantity < p.quantity || order.reservedQuantity < p.quantity) fail("DEMO_SHARE_RESERVATION_INVARIANT");
       position.reservedQuantity -= p.quantity;
+      order.reservedQuantity -= p.quantity;
     }
     projection.fills.push({ ...p, product: productOf(p), engine: event.engine, sequence: event.sequence, occurredAt: event.occurredAt });
   }
@@ -182,6 +223,7 @@ export function createPaperDemoEventLedger(opening) {
     if (sourceEvents.has(sourceKey)) fail("DUPLICATE_SOURCE_EVENT");
     const time = Date.parse(event.occurredAt);
     if (time < lastTimestamp) fail("DEMO_EVENT_TIME_ORDER_MISMATCH");
+    validateSettlementDeltas(event);
     const before = clone(projection);
     try {
       apply(projection, event);
