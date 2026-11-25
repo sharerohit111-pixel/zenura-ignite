@@ -8,6 +8,9 @@ assert.ok(shellBlock,"service worker shell precache list must exist");
 const shellEntries=[...shellBlock[1].matchAll(/"([^"]*)"/g)].map(match=>match[1]);
 assert.equal(new Set(shellEntries).size,shellEntries.length,"duplicate precache URLs prevent reliable service worker installation");
 const axePath=require.resolve("axe-core/axe.min.js");
+const axeBrowserPath="markets/stocks/.ci-axe-core.js";
+// Serve the accessibility test helper from the same origin so the Demo CSP remains strict.
+fs.copyFileSync(axePath,axeBrowserPath);
 
 (async()=>{
  const browser=await chromium.launch({headless:true});
@@ -94,7 +97,7 @@ const axePath=require.resolve("axe-core/axe.min.js");
     assert.ok((await page.locator(".demo-fo-status").textContent()).includes("DEMO receipt"),"Options order entry");
    }
    await page.goto("http://127.0.0.1:4173/markets/stocks/demo.html",{waitUntil:"domcontentloaded",timeout:30000});
-   await page.addScriptTag({path:axePath});
+   await page.addScriptTag({url:"/markets/stocks/.ci-axe-core.js"});
    const axe=await page.evaluate(async()=>window.axe.run(document,{runOnly:{type:"tag",values:["wcag2a","wcag2aa","wcag21a","wcag21aa"]}}));
    const serious=axe.violations.filter(v=>v.impact==="critical"||v.impact==="serious");
    if(serious.length) console.error(JSON.stringify(serious.map(v=>({id:v.id,help:v.help,nodes:v.nodes.map(n=>({target:n.target,html:n.html,failureSummary:n.failureSummary}))}))));
@@ -164,5 +167,6 @@ const axePath=require.resolve("axe-core/axe.min.js");
   await pwa.close();
  }finally{
   await browser.close();
+  try{fs.unlinkSync(axeBrowserPath);}catch(_){}
  }
 })().catch(error=>{console.error(error);process.exitCode=1;});
