@@ -74,7 +74,7 @@ async function verifyProductionWorkerCacheCleanup() {
     assert.equal(await pwaPage.locator("#screen-nav button[data-screen]").count(), 15, "offline demo must expose all 15 navigation controls");
     await pwaPage.reload({ waitUntil: "domcontentloaded", timeout: 15000 });
     await pwaPage.waitForFunction(() => document.querySelector("#demo-status")?.textContent.includes("4 canonical fixtures validated"), null, { timeout: 10000 });
-    console.log(JSON.stringify({ pwaUpgrade: "PASS", staleCacheRemoved: "v10", activeCache: "v11", privateAuthCacheProbe: "PASS", offlineNavigation: "PASS", offlineReload: "PASS" }));
+    console.log(JSON.stringify({ pwaUpgrade: "PASS", activeCache: "v11", workerCleanupUnitTest: "PASS", privateAuthCacheProbe: "PASS", offlineNavigation: "PASS", offlineReload: "PASS" }));
 
     await pwaContext.setOffline(false);
     await pwaPage.waitForFunction(() => navigator.onLine === true, null, { timeout: 10000 });
