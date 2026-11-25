@@ -28,7 +28,7 @@ test("shared JSON schemas parse and define the expected domain contracts", () =>
   const domain = JSON.parse(fs.readFileSync(path.join(root, "paper-trading-domain.schema.json"), "utf8"));
   assert.equal(envelope.properties.schemaVersion.const, "1.0.0");
   assert.equal(envelope.properties.simulated.const, true);
-  for (const key of ["instrument", "quote", "order", "position", "account"]) {
+  for (const key of ["instrument", "quote", "order", "position", "account", "derivativeInstrument", "derivativeQuote"]) {
     assert.ok(domain.$defs[key], "missing domain definition: " + key);
   }
   assert.equal(domain.$defs.exchange.enum.join(","), "NSE,BSE");
@@ -102,4 +102,15 @@ test("returned fixtures are detached copies", () => {
   const first = fixtures.read("market");
   first.data.quotes[0].symbol = "MUTATED";
   assert.equal(fixtures.read("market").data.quotes[0].symbol, "MOCKALPHA");
+});
+
+
+test("derivatives fixture contains deterministic MOCK-only Futures and CE/PE contracts", () => {
+  const fixture = store().read("derivatives").data;
+  assert.ok(fixture.contracts.length >= 8);
+  assert.equal(fixture.quotes.length, fixture.contracts.length);
+  assert.ok(fixture.contracts.every(item => item.instrumentKey.startsWith("MOCK|") && item.symbol.startsWith("MOCK")));
+  assert.ok(fixture.contracts.some(item => item.assetClass === "FUTURE"));
+  assert.ok(fixture.contracts.some(item => item.assetClass === "OPTION" && item.optionType === "CE"));
+  assert.ok(fixture.contracts.some(item => item.assetClass === "OPTION" && item.optionType === "PE"));
 });
