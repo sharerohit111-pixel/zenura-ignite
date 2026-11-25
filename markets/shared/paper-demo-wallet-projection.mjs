@@ -52,16 +52,14 @@ export function projectPaperDemoWallet(snapshot) {
   const orderIds = new Set();
   for (const order of snapshot.orders) {
     if (!order || typeof order.orderId !== "string" || !order.orderId ||
-        orderIds.has(order.orderId) || !Number.isSafeInteger(order.quantity) || order.quantity < 1 ||
-        !Number.isSafeInteger(order.filledQuantity) || order.filledQuantity < 0 ||
-        !Number.isSafeInteger(order.remainingQuantity) || order.remainingQuantity < 0 ||
-        order.filledQuantity + order.remainingQuantity !== order.quantity) {
+        orderIds.has(order.orderId) || !Number.isSafeInteger(order.quantity) || order.quantity < 1) {
       fail("CANONICAL_WALLET_ORDER_PROJECTION_INVALID");
     }
     orderIds.add(order.orderId);
   }
 
   const fillIds = new Set();
+  const fillsByOrder = new Map();
   for (const fill of snapshot.fills) {
     if (!fill || typeof fill.fillId !== "string" || !fill.fillId ||
         fillIds.has(fill.fillId) || !orderIds.has(fill.orderId) ||
@@ -72,7 +70,40 @@ export function projectPaperDemoWallet(snapshot) {
       fail("CANONICAL_WALLET_FILL_PROJECTION_INVALID");
     }
     fillIds.add(fill.fillId);
+    const aggregate = fillsByOrder.get(fill.orderId) || { quantity: 0, grossValuePaise: 0 };
+    aggregate.quantity += fill.quantity;
+    aggregate.grossValuePaise += fill.quantity * fill.pricePaise;
+    if (!Number.isSafeInteger(aggregate.quantity) || !Number.isSafeInteger(aggregate.grossValuePaise)) {
+      fail("CANONICAL_WALLET_FILL_TOTAL_OUT_OF_RANGE");
+    }
+    fillsByOrder.set(fill.orderId, aggregate);
   }
+
+  const projectedOrders = snapshot.orders.map(order => {
+    const fills = fillsByOrder.get(order.orderId) || { quantity: 0, grossValuePaise: 0 };
+    const filledQuantity = fills.quantity;
+    const remainingQuantity = order.quantity - filledQuantity;
+    if (remainingQuantity < 0 ||
+        (order.filledQuantity !== undefined && order.filledQuantity !== filledQuantity) ||
+        (order.remainingQuantity !== undefined && order.remainingQuantity !== remainingQuantity)) {
+      fail("CANONICAL_WALLET_ORDER_FILL_QUANTITY_MISMATCH");
+    }
+    if (order.status === "FILLED" && remainingQuantity !== 0) {
+      fail("CANONICAL_WALLET_TERMINAL_ORDER_FILL_MISMATCH");
+    }
+    const status = ["CANCELLED", "REJECTED", "EXPIRED"].includes(order.status)
+      ? order.status
+      : remainingQuantity === 0 ? "FILLED"
+      : filledQuantity > 0 ? "PARTIALLY_FILLED" : order.status;
+    return {
+      ...clone(order),
+      filledQuantity,
+      remainingQuantity,
+      averageFillPricePaise: filledQuantity > 0
+        ? Math.round(fills.grossValuePaise / filledQuantity) : 0,
+      status
+    };
+  });
 
   for (const position of snapshot.positions) {
     if (!position || typeof position.key !== "string" || !position.key ||
@@ -98,7 +129,7 @@ export function projectPaperDemoWallet(snapshot) {
       realizedPnlPaise: account.realizedPnlPaise,
       ledgerReconciled: false
     },
-    orders: clone(snapshot.orders),
+    orders: projectedOrders,
     fills: clone(snapshot.fills),
     positions: clone(snapshot.positions),
     eventCount: snapshot.events.length,
