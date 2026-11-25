@@ -13,7 +13,7 @@ const { createDerivativeMockSimulator } = require("../../markets/stocks/derivati
 const root = new URL("../../", import.meta.url);
 const json = async path => JSON.parse(await readFile(new URL(path, root), "utf8"));
 
-test("Equity, Futures and Options bridges append to one account-scoped ordered ledger", async () => {
+test("Equity, Futures and Options bridges append orders, fills and positions to one account-scoped ordered ledger", async () => {
   const [accountEnvelope, equityFixture, derivativeFixture] = await Promise.all([
     json("market-gateway/mock/fixtures/account.json"),
     json("market-gateway/mock/fixtures/equity-execution.json"),
@@ -44,22 +44,32 @@ test("Equity, Futures and Options bridges append to one account-scoped ordered l
     instrumentKey: option, side: "BUY", orderType: "MARKET", lots: 1,
     idempotencyKey: "shared-option-0001"
   });
-  equity.submitOrder({
+  const equityOrder = equity.submitOrder({
     instrumentKey: equityFixture.data.instrument.instrumentKey,
     side: "BUY", orderType: "MARKET", product: "DELIVERY",
     quantity: 1, idempotencyKey: "shared-equity-0001"
   });
+  const equityFill = equity.matchNext(equityOrder.order.orderId, {
+    executionId: "shared-equity-fill-0001"
+  });
+  assert.equal(equityFill.matched, true);
 
   const snapshot = shared.ledger.snapshot();
   assert.equal(equity.snapshot().events.length, derivatives.snapshot().events.length);
   assert.equal(equity.snapshot().account.sessionId, derivatives.snapshot().account.sessionId);
   assert.equal(snapshot.account.accountId, account.accountId);
-  assert.ok(snapshot.events.some(event => event.engine === "FUTURES"));
-  assert.ok(snapshot.events.some(event => event.engine === "OPTIONS"));
-  assert.ok(snapshot.events.some(event => event.engine === "EQUITY"));
   assert.deepEqual(new Set(snapshot.events.map(event => event.engine)), new Set(["EQUITY", "FUTURES", "OPTIONS"]));
   assert.ok(snapshot.events.every((event, index) => event.sequence === index + 1));
   assert.ok(snapshot.events.every((event, index, all) => index === 0 || Date.parse(event.occurredAt) >= Date.parse(all[index - 1].occurredAt)));
+
+  assert.equal(snapshot.orders.length, 3);
+  assert.ok(snapshot.orders.every(order => order.status === "FILLED"));
+  assert.deepEqual(new Set(snapshot.orders.map(order => order.assetClass)), new Set(["EQUITY", "FUTURE", "OPTION"]));
+  assert.equal(snapshot.fills.length, 3);
+  assert.deepEqual(new Set(snapshot.fills.map(fill => fill.assetClass)), new Set(["EQUITY", "FUTURE", "OPTION"]));
+  assert.deepEqual(new Set(snapshot.positions.filter(position => position.quantity !== 0).map(position => position.assetClass)),
+    new Set(["EQUITY", "FUTURE", "OPTION"]));
+
   assert.equal(snapshot.account.ledgerReconciled, false);
   assert.deepEqual(replayPaperDemoEvents({
     accountId: account.accountId, sessionId: shared.sessionId,
