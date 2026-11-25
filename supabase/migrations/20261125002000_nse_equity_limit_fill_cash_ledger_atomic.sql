@@ -23,10 +23,13 @@ declare
   v_account public.paper_accounts%rowtype;
   v_fill_id uuid;
   v_reserved_cash_paise bigint:=0;
+  v_user_id uuid;
 begin
-  -- Snapshot the reservation before the execution helper clears it on fill.
-  select * into strict v_order from public.paper_orders
-   where order_id=p_order_id for update;
+  -- Match cancellation lock order: account first, then order. Locking the order
+  -- first here can deadlock against cancellation holding the account row.
+  select user_id into strict v_user_id from public.paper_orders where order_id=p_order_id;
+  perform 1 from public.paper_accounts where user_id=v_user_id for update;
+  select * into strict v_order from public.paper_orders where order_id=p_order_id for update;
   v_reserved_cash_paise:=v_order.reserved_cash_paise;
 
   v_result:=public._execute_paper_limit_fill_without_ledger(
@@ -110,10 +113,12 @@ declare
   v_account public.paper_accounts%rowtype;
   v_fill_id uuid;
   v_reserved_cash_paise bigint:=0;
+  v_user_id uuid;
 begin
-  -- Snapshot the reservation before the execution helper clears it on fill.
-  select * into strict v_order from public.paper_orders
-   where order_id=p_order_id for update;
+  -- Match Intraday cancellation lock order: account first, then order.
+  select user_id into strict v_user_id from public.paper_orders where order_id=p_order_id;
+  perform 1 from public.paper_accounts where user_id=v_user_id for update;
+  select * into strict v_order from public.paper_orders where order_id=p_order_id for update;
   v_reserved_cash_paise:=v_order.reserved_cash_paise;
 
   v_result:=public._execute_paper_intraday_limit_fill_without_ledger(
