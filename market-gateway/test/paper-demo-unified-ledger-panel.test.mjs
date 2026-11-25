@@ -89,3 +89,90 @@ test("account realized P&L includes closed positions no longer present in open p
   assert.equal(accountRealizedPnlPaise(snapshot), 12500);
   assert.equal(accountRealizedPnlPaise({ account: { realizedPnlPaise: null } }), null);
 });
+
+
+test("Portfolio end-to-end renders fresh MOCK marks for Equity, Futures and Options", async () => {
+  const fixedNow = Date.parse("2026-11-25T09:30:00+05:30");
+  const iso = new Date(fixedNow).toISOString();
+  const [account, equity, derivatives] = await Promise.all([
+    read("market-gateway/mock/fixtures/account.json").then(JSON.parse),
+    read("market-gateway/mock/fixtures/equity-execution.json").then(JSON.parse),
+    read("market-gateway/mock/fixtures/derivatives.json").then(JSON.parse)
+  ]);
+  equity.asOf = iso;
+  derivatives.asOf = iso;
+  for (const quote of derivatives.data.quotes) quote.timestamp = iso;
+
+  class Element {
+    constructor(tag) { this.tagName = tag; this.children = []; this._text = ""; this.className = ""; }
+    append(...nodes) { this.children.push(...nodes); }
+    replaceChildren(...nodes) { this.children = [...nodes]; }
+    set textContent(value) { this._text = String(value); this.children = []; }
+    get textContent() { return this._text + this.children.map(node => node.textContent || "").join(""); }
+  }
+  const previous = {
+    now: Date.now,
+    fetch: globalThis.fetch,
+    document: globalThis.document
+  };
+  try {
+    Date.now = () => fixedNow;
+    globalThis.document = { createElement: tag => new Element(tag) };
+    globalThis.fetch = async input => {
+      const pathname = new URL(input).pathname;
+      const fixture = pathname.endsWith("/account.json") ? account
+        : pathname.endsWith("/equity-execution.json") ? equity
+        : pathname.endsWith("/derivatives.json") ? derivatives : null;
+      return { ok: Boolean(fixture), json: async () => structuredClone(fixture) };
+    };
+
+    const { getSharedPaperDemoLedgerSession } = await import("../../markets/shared/paper-demo-ledger-session.mjs");
+    const session = getSharedPaperDemoLedgerSession({
+      accountId: account.data.accountId,
+      cashBalancePaise: account.data.cashBalancePaise,
+      blockedFundsPaise: account.data.blockedFundsPaise
+    });
+    const appendPosition = (engine, assetClass, instrumentKey, quantity, averagePricePaise, suffix) => {
+      session.ledger.append({
+        eventId: "portfolio-e2e-event-" + suffix,
+        idempotencyKey: "portfolio-e2e-idem-" + suffix,
+        sourceEventId: "portfolio-e2e-source-" + suffix,
+        accountId: account.data.accountId,
+        sessionId: session.sessionId,
+        occurredAt: iso,
+        engine,
+        type: "POSITION_CHANGED",
+        payload: {
+          assetClass, instrumentKey, product: "DELIVERY",
+          quantityDelta: quantity,
+          costBasisDeltaPaise: quantity * averagePricePaise,
+          realizedPnlDeltaPaise: 0
+        },
+        deltas: { cashDeltaPaise: 0, blockedDeltaPaise: 0 }
+      });
+    };
+    appendPosition("EQUITY", "EQUITY", equity.data.instrument.instrumentKey, 2, 125000, "eq");
+    appendPosition("FUTURES", "FUTURE", derivatives.data.futures.instrumentKey, 25, 2500000, "future");
+    appendPosition("OPTIONS", "OPTION", derivatives.data.options.instrumentKey, 25, 15000, "option");
+
+    const { appendUnifiedLedgerSummary } = await import("../../markets/stocks/demo-unified-ledger-panel.mjs?fresh-portfolio-e2e");
+    const portfolio = new Element("main");
+    await appendUnifiedLedgerSummary(portfolio, "portfolio");
+    const portfolioText = portfolio.textContent;
+    assert.match(portfolioText, /MOCKALPHA/);
+    assert.match(portfolioText, /MOCKNIFTY-FUT-DEC26/);
+    assert.match(portfolioText, /MOCKNIFTY-25000-CE-26NOV/);
+    assert.match(portfolioText, /Not applicable \(Futures MTM\)/);
+    assert.match(portfolioText, /Aggregate unrealized P&L: ₹1\.00/);
+    assert.doesNotMatch(portfolioText, /Unavailable \(one or more marks missing\/stale\)/);
+
+    const holdings = new Element("main");
+    await appendUnifiedLedgerSummary(holdings, "holdings");
+    assert.match(holdings.textContent, /MOCKALPHA/);
+    assert.doesNotMatch(holdings.textContent, /MOCKNIFTY-FUT-DEC26|MOCKNIFTY-25000-CE-26NOV/);
+  } finally {
+    Date.now = previous.now;
+    if (previous.fetch === undefined) delete globalThis.fetch; else globalThis.fetch = previous.fetch;
+    if (previous.document === undefined) delete globalThis.document; else globalThis.document = previous.document;
+  }
+});
