@@ -56,20 +56,16 @@ const axePath=require.resolve("axe-core/axe.min.js");
   await page.goto("http://127.0.0.1:4173/markets/",{waitUntil:"domcontentloaded",timeout:30000});
   await page.waitForLoadState("load",{timeout:10000});
   try{
-   await page.waitForFunction(async()=>{
-    const registrations=await navigator.serviceWorker.getRegistrations();
-    return registrations.some(registration=>registration.active?.state==="activated");
+   const workerHandle=await page.waitForFunction(async()=>{
+    const registration=(await navigator.serviceWorker.getRegistrations()).find(item=>item.active?.state==="activated");
+    return registration?{state:registration.active.state,scope:registration.scope}:false;
    },null,{timeout:20000});
+   var workerState=await workerHandle.jsonValue();
   }catch(error){
    const state=await page.evaluate(async()=>({controller:!!navigator.serviceWorker.controller,registrations:(await navigator.serviceWorker.getRegistrations()).map(r=>({scope:r.scope,installing:r.installing?.state||null,waiting:r.waiting?.state||null,active:r.active?.state||null}))}));
    throw new Error("PWA service worker did not activate: "+JSON.stringify(state)+"; console: "+pwaConsole.join(" | ")+"; "+error.message);
   }
   console.log("PWA: waiting for service worker activation");
-  const workerState=await page.evaluate(async()=>{
-   const registrations=await navigator.serviceWorker.getRegistrations();
-   const registration=registrations.find(item=>item.active?.state==="activated");
-   return {state:registration?.active?.state||"missing",scope:registration?.scope||null};
-  });
   assert.equal(workerState.state,"activated","service worker must be active before controlled reload");
   console.log(JSON.stringify({pwaWorker:workerState.state,scope:workerState.scope}));
   // clients.claim() in the activate handler controls existing same-scope clients.
