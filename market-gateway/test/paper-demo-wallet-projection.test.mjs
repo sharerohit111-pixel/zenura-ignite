@@ -133,7 +133,7 @@ test("wallet refuses orphan fills and malformed order quantity projections", () 
   }), /CANONICAL_WALLET_FILL_PROJECTION_INVALID/);
   assert.throws(() => projectPaperDemoWallet({
     ...source, orders: [{ ...source.orders[0], filledQuantity: 1, remainingQuantity: 2 }]
-  }), /CANONICAL_WALLET_ORDER_PROJECTION_INVALID/);
+  }), /CANONICAL_WALLET_ORDER_FILL_QUANTITY_MISMATCH/);
 });
 
 test("wallet refuses invalid position reservations and keeps reconciliation false", () => {
