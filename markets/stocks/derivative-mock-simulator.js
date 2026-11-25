@@ -13,6 +13,7 @@
   const OPEN = new Set(["PENDING", "PARTIALLY_FILLED"]);
   const TYPES = new Set(["BUY", "SELL"]);
   const ORDER_TYPES = new Set(["MARKET", "LIMIT"]);
+  const MAX_QUOTE_AGE_MS = 15_000;
 
   function fail(message) { throw Object.assign(new Error(message), { status: 422 }); }
   function integer(value, label, min) {
@@ -26,6 +27,25 @@
     const date = new Date(Date.UTC(parts[0], parts[1] - 1, parts[2], 10, 0, 0, 0));
     return date.toISOString().slice(0, 10) === expiry ? date.getTime() : NaN;
   }
+  function validateContractIdentity(contract) {
+    const parts = contract.instrumentKey.split("|");
+    if (contract.assetClass === "FUTURE") {
+      if (parts.length !== 5 || parts[0] !== "MOCK" || parts[1] !== contract.exchange ||
+          parts[2] !== "FUT" || parts[3] !== contract.underlying || parts[4] !== contract.expiry ||
+          typeof contract.underlying !== "string" || !/^MOCK[A-Z0-9-]*$/.test(contract.underlying)) {
+        fail("Futures contract identity does not match its instrument key.");
+      }
+      return;
+    }
+    if (parts.length !== 7 || parts[0] !== "MOCK" || parts[1] !== contract.exchange ||
+        parts[2] !== "OPT" || parts[3] !== contract.underlying ||
+        !Number.isSafeInteger(contract.strikePaise) || contract.strikePaise % 100 !== 0 ||
+        parts[4] !== String(contract.strikePaise / 100) || parts[5] !== contract.optionType ||
+        parts[6] !== contract.expiry) {
+      fail("Options contract identity does not match its underlying, expiry, strike and CE/PE key.");
+    }
+  }
+
   function validateEnvelope(envelope) {
     if (!envelope || envelope.schemaVersion !== "1.0.0" || envelope.mode !== "MOCK" ||
         envelope.simulated !== true || envelope.meta?.source !== "SYNTHETIC_FIXTURE" ||
@@ -37,7 +57,18 @@
 
   function createDerivativeMockSimulator(envelope, options) {
     const data = validateEnvelope(envelope);
-    const now = options && Number.isSafeInteger(options.now) ? options.now : Date.parse(envelope.asOf);
+    const clock = options && typeof options.now === "function"
+      ? options.now
+      : () => options && Number.isSafeInteger(options.now) ? options.now : Date.parse(envelope.asOf);
+    const maxQuoteAgeMs = options && Number.isSafeInteger(options.maxQuoteAgeMs)
+      ? options.maxQuoteAgeMs : MAX_QUOTE_AGE_MS;
+    if (maxQuoteAgeMs < 0) fail("Derivative quote freshness limit is invalid.");
+    function currentNow() {
+      const value = clock();
+      if (!Number.isSafeInteger(value) || value < 0) fail("Derivative simulator clock is invalid.");
+      return value;
+    }
+    currentNow();
     const contracts = new Map();
     const quotes = new Map();
     const positions = new Map();
@@ -64,6 +95,7 @@
       if (contract.assetClass === "FUTURE" && contract.optionType != null) {
         fail("A Futures fixture must not contain an option type.");
       }
+      validateContractIdentity(contract);
       contracts.set(contract.instrumentKey, copy(contract));
     });
 
@@ -71,7 +103,7 @@
       const contract = contracts.get(quote && quote.instrumentKey);
       const timestamp = Date.parse(quote && quote.timestamp);
       if (!contract || quote.provider !== "MOCK" || quote.stale !== false ||
-          !Number.isSafeInteger(timestamp) || timestamp > now ||
+          !Number.isSafeInteger(timestamp) || timestamp > currentNow() || currentNow() - timestamp > maxQuoteAgeMs ||
           !Number.isSafeInteger(quote.bidPricePaise) || quote.bidPricePaise < 1 ||
           !Number.isSafeInteger(quote.askPricePaise) || quote.askPricePaise < quote.bidPricePaise ||
           quote.bidPricePaise % contract.tickSizePaise !== 0 ||
@@ -91,12 +123,16 @@
     function getContract(key) {
       const contract = contracts.get(key);
       if (!contract) fail("Select a contract from the synthetic fixture.");
-      if (now >= expiryCutoff(contract.expiry)) fail("Expired demo contracts cannot be traded.");
+      if (currentNow() >= expiryCutoff(contract.expiry)) fail("Expired demo contracts cannot be traded.");
       return contract;
     }
     function quoteFor(key) {
       const quote = quotes.get(key);
       if (!quote) fail("A deterministic DEMO DATA quote is unavailable for this contract.");
+      const age = currentNow() - Date.parse(quote.base.timestamp);
+      if (quote.base.stale !== false || age < 0 || age > maxQuoteAgeMs) {
+        fail("A stale or future-dated derivative quote cannot be used for execution or valuation.");
+      }
       return quote;
     }
     function positionKey(key, product) { return key + "|PRODUCT|" + (product || "DELIVERY"); }
@@ -125,7 +161,7 @@
         quantity,
         pricePaise,
         position: current,
-        now
+        now: currentNow()
       });
       if (contract.assetClass === "OPTION" && result.netQuantity < 0) {
         fail("Short CE/PE positions are disabled in this demo.");
@@ -146,7 +182,7 @@
         pricePaise,
         grossPaise,
         realizedPnlPaise: positionResult.realizedPnlPaise,
-        executedAt: new Date(now).toISOString(),
+        executedAt: new Date(currentNow()).toISOString(),
         simulated: true
       });
       order.filledQuantity += quantity;
@@ -154,7 +190,7 @@
       order.fillValuePaise += grossPaise;
       order.averageFillPricePaise = Math.round(order.fillValuePaise / order.filledQuantity);
       order.status = order.remainingQuantity === 0 ? "FILLED" : "PARTIALLY_FILLED";
-      order.updatedAt = new Date(now).toISOString();
+      order.updatedAt = new Date(currentNow()).toISOString();
     }
     function consumeDepth(quote, side, quantity) {
       if (side === "BUY") quote.askRemaining -= quantity;
@@ -207,8 +243,8 @@
         fills: [],
         status: request.orderType === "LIMIT" ? "PENDING" : "REJECTED",
         rejectionReason: null,
-        createdAt: new Date(now).toISOString(),
-        updatedAt: new Date(now).toISOString(),
+        createdAt: new Date(currentNow()).toISOString(),
+        updatedAt: new Date(currentNow()).toISOString(),
         simulationOnly: true
       };
       orders.unshift(order);
@@ -234,6 +270,13 @@
       const summary = { scanned: 0, filled: 0, partial: 0, notEligible: 0 };
       orders.filter(order => OPEN.has(order.status)).reverse().forEach(order => {
         summary.scanned += 1;
+        const contract = contracts.get(order.instrumentKey);
+        if (currentNow() >= expiryCutoff(contract.expiry)) {
+          order.status = "EXPIRED";
+          order.updatedAt = new Date(currentNow()).toISOString();
+          summary.expired = (summary.expired || 0) + 1;
+          return;
+        }
         const quote = quoteFor(order.instrumentKey);
         const executionPrice = order.side === "BUY" ? quote.base.askPricePaise : quote.base.bidPricePaise;
         const eligible = order.side === "BUY"
@@ -257,12 +300,13 @@
       if (!order) fail("Demo order was not found.");
       if (!OPEN.has(order.status)) fail("Only pending or partially filled LIMIT orders can be cancelled.");
       order.status = "CANCELLED";
-      order.updatedAt = new Date(now).toISOString();
+      order.updatedAt = new Date(currentNow()).toISOString();
       return copy(order);
     }
 
     function refreshQuoteDepth() {
-      quotes.forEach(quote => {
+      quotes.forEach((quote, key) => {
+        quoteFor(key);
         quote.bidRemaining = quote.base.bidQuantity;
         quote.askRemaining = quote.base.askQuantity;
       });
@@ -285,6 +329,9 @@
           optionType: contract.optionType || null,
           strikePaise: contract.strikePaise || null,
           expiry: contract.expiry,
+          valuationStatus: currentNow() >= expiryCutoff(contract.expiry) ? "EXPIRED" :
+            (() => { const q = quotes.get(key); const age = q ? currentNow() - Date.parse(q.base.timestamp) : Infinity;
+              return q && q.base.stale === false && age >= 0 && age <= maxQuoteAgeMs ? "FRESH" : "STALE"; })(),
           netQuantity: position.netQuantity,
           averagePricePaise: position.averagePricePaise,
           reservedCloseQuantity: contract.assetClass === "OPTION" ? reservedOptionSellQuantity(key) : 0,
@@ -311,5 +358,5 @@
     });
   }
 
-  return { createDerivativeMockSimulator };
+  return { createDerivativeMockSimulator, MAX_QUOTE_AGE_MS };
 });

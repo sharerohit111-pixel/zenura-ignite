@@ -1,5 +1,12 @@
 "use strict";
 const MAX_QUOTE_AGE_MS=15_000,MAX_MARGIN_AGE_MS=30_000;
+const AUTHORITATIVE_MARGIN_SOURCE="upstox_v2_charges_margin";
+function expiryCutoff(expiry){
+ if(typeof expiry!=="string"||!/^\d{4}-\d{2}-\d{2}$/.test(expiry))return NaN;
+ const parts=expiry.split("-").map(Number);
+ const date=new Date(Date.UTC(parts[0],parts[1]-1,parts[2],10,0,0,0));
+ return Number.isFinite(date.getTime())&&date.toISOString().slice(0,10)===expiry?date.getTime():NaN;
+}
 function calculateDerivativePortfolio({positions,quotes,marginSnapshots=[],now=Date.now(),maxQuoteAgeMs=MAX_QUOTE_AGE_MS,maxMarginAgeMs=MAX_MARGIN_AGE_MS}){
  const fail=message=>{throw Object.assign(new Error(message),{status:409});};
  if(!Array.isArray(positions)||!Array.isArray(quotes)||!Array.isArray(marginSnapshots)||!Number.isSafeInteger(now)||now<0)fail("Derivative portfolio inputs are invalid.");
@@ -11,15 +18,23 @@ function calculateDerivativePortfolio({positions,quotes,marginSnapshots=[],now=D
  }
  const marginByKey=new Map();
  for(const m of marginSnapshots){
-  if(!m||typeof m.instrumentKey!=="string"||marginByKey.has(m.instrumentKey)||!Number.isSafeInteger(m.requiredMarginPaise)||m.requiredMarginPaise<1||!Number.isSafeInteger(m.observedAtMs)||m.observedAtMs>now||now-m.observedAtMs>maxMarginAgeMs||typeof m.source!=="string"||!m.source.trim())fail("Invalid, duplicate or stale derivative margin snapshot.");
+  if(!m||typeof m.instrumentKey!=="string"||marginByKey.has(m.instrumentKey)||!Number.isSafeInteger(m.requiredMarginPaise)||m.requiredMarginPaise<1||!Number.isSafeInteger(m.observedAtMs)||m.observedAtMs>now||now-m.observedAtMs>maxMarginAgeMs||m.source!==AUTHORITATIVE_MARGIN_SOURCE)fail("Invalid, duplicate, stale or unverified derivative margin snapshot provenance.");
   marginByKey.set(m.instrumentKey,m);
  }
  const seen=new Set();let marketValuePaise=0,unrealizedPnlPaise=0,reservedMarginPaise=0;
  const valued=[];
  for(const p of positions){
   if(!p||typeof p.instrumentKey!=="string"||seen.has(p.instrumentKey)||!["FUT","CE","PE"].includes(p.instrumentType)||!Number.isSafeInteger(p.netQuantity)||p.netQuantity===0||Math.abs(p.netQuantity)>1000000||!Number.isSafeInteger(p.averagePricePaise)||p.averagePricePaise<1)fail("Derivative position is malformed or duplicated.");
+  const expiryMs=expiryCutoff(p.expiry);
+  if(!Number.isFinite(expiryMs))fail("Derivative position requires a valid contract expiry before valuation.");
+  if(now>=expiryMs)fail("Expired derivative positions cannot be valued from stale or synthetic marks.");
+  if(p.optionType!==undefined&&p.optionType!==p.instrumentType)fail("Derivative position CE/PE identity does not match its contract type.");
   seen.add(p.instrumentKey);
   const q=quoteByKey.get(p.instrumentKey);if(!q)fail("A fresh quote is required for every open derivative position.");
+  if((q.expiry!==undefined&&q.expiry!==p.expiry)||(q.instrumentType!==undefined&&q.instrumentType!==p.instrumentType)||
+     (q.optionType!==undefined&&q.optionType!==(p.optionType||p.instrumentType))||
+     (q.strikePaise!==undefined&&q.strikePaise!==p.strikePaise)||(q.underlying!==undefined&&q.underlying!==p.underlying))
+   fail("Derivative quote contract identity does not match the open position.");
   const signedValue=q.pricePaise*p.netQuantity;
   const costBasisPaise=p.costBasisPaise===undefined
    ?Math.abs(p.netQuantity)*p.averagePricePaise:p.costBasisPaise;
@@ -42,4 +57,4 @@ function calculateDerivativePortfolio({positions,quotes,marginSnapshots=[],now=D
  }
  return {positions:valued,marketValuePaise,unrealizedPnlPaise,reservedMarginPaise,valuationStatus:"fresh",simulationOnly:true,includesEntryCharges:true,excludesEstimatedExitCharges:true};
 }
-module.exports={calculateDerivativePortfolio,MAX_QUOTE_AGE_MS,MAX_MARGIN_AGE_MS};
+module.exports={calculateDerivativePortfolio,MAX_QUOTE_AGE_MS,MAX_MARGIN_AGE_MS,AUTHORITATIVE_MARGIN_SOURCE};

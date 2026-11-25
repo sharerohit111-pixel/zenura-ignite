@@ -24,6 +24,10 @@ on:
       - "markets/stocks/demo-equity-ledger-bridge.mjs"
       - "market-gateway/test/paper-demo-derivative-integration.test.mjs"
       - "market-gateway/test/derivative-mock-simulator.test.js"
+      - "market-gateway/lib/derivative-portfolio.js"
+      - "market-gateway/lib/derivative-portfolio-input.js"
+      - "market-gateway/supabase-server.js"
+      - "market-gateway/test/derivative-portfolio.test.js"
       - "markets/stocks/index.html"
       - "market-gateway/test/paper-demo-dashboard.test.mjs"
       - "markets/stocks/demo-browser-smoke.cjs"
@@ -47,6 +51,10 @@ on:
       - "market-gateway/test/paper-demo-equity-integration.test.mjs"
       - "market-gateway/test/paper-demo-derivative-integration.test.mjs"
       - "market-gateway/test/derivative-mock-simulator.test.js"
+      - "market-gateway/lib/derivative-portfolio.js"
+      - "market-gateway/lib/derivative-portfolio-input.js"
+      - "market-gateway/supabase-server.js"
+      - "market-gateway/test/derivative-portfolio.test.js"
       - "markets/stocks/demo.html"
       - "markets/stocks/demo.css"
       - "markets/stocks/demo.js"
@@ -68,7 +76,7 @@ jobs:
         with:
           node-version: "22"
       - name: Check browser module syntax
-        run: node --check markets/shared/paper-demo-adapter.mjs && node --check markets/shared/paper-demo-event-ledger.mjs && node --check markets/shared/paper-demo-ledger-session.mjs && node --check markets/stocks/demo.js && node --check markets/stocks/demo-derivative-panel.mjs && node --check markets/stocks/demo-unified-ledger-panel.mjs && node --check markets/stocks/demo-derivative-ledger-bridge.mjs && node --check markets/stocks/derivative-mock-simulator.js && node --check markets/stocks/demo-chart-data.mjs && node --check markets/stocks/demo-chart-panel.mjs
+        run: node --check market-gateway/supabase-server.js && node --check markets/shared/paper-demo-adapter.mjs && node --check markets/shared/paper-demo-event-ledger.mjs && node --check markets/shared/paper-demo-ledger-session.mjs && node --check markets/stocks/demo.js && node --check markets/stocks/demo-derivative-panel.mjs && node --check markets/stocks/demo-unified-ledger-panel.mjs && node --check markets/stocks/demo-derivative-ledger-bridge.mjs && node --check markets/stocks/derivative-mock-simulator.js && node --check markets/stocks/demo-chart-data.mjs && node --check markets/stocks/demo-chart-panel.mjs
       - name: Validate shared fixtures
         run: |
           node - <<'NODE'
@@ -77,7 +85,7 @@ jobs:
           console.log('Parsed all four canonical screen fixtures.');
           NODE
       - name: Run adapter, event-ledger and screen integration tests
-        run: node --test market-gateway/test/paper-demo-adapter.test.mjs market-gateway/test/paper-demo-event-ledger.test.mjs market-gateway/test/paper-demo-dashboard.test.mjs market-gateway/test/paper-demo-equity-integration.test.mjs market-gateway/test/paper-demo-equity-ledger-bridge.test.mjs market-gateway/test/paper-demo-derivative-integration.test.mjs market-gateway/test/paper-demo-derivative-ledger-bridge.test.mjs market-gateway/test/paper-demo-shared-ledger-session.test.mjs market-gateway/test/paper-demo-unified-ledger-panel.test.mjs market-gateway/test/demo-chart-data.test.mjs
+        run: node --test market-gateway/test/paper-demo-adapter.test.mjs market-gateway/test/paper-demo-event-ledger.test.mjs market-gateway/test/paper-demo-dashboard.test.mjs market-gateway/test/paper-demo-equity-integration.test.mjs market-gateway/test/paper-demo-equity-ledger-bridge.test.mjs market-gateway/test/paper-demo-derivative-integration.test.mjs market-gateway/test/paper-demo-derivative-ledger-bridge.test.mjs market-gateway/test/paper-demo-shared-ledger-session.test.mjs market-gateway/test/paper-demo-unified-ledger-panel.test.mjs market-gateway/test/demo-chart-data.test.mjs market-gateway/test/derivative-mock-simulator.test.js market-gateway/test/derivative-portfolio.test.js
       - name: Install Chromium browser QA dependencies
         run: |
           npm install --prefix "$RUNNER_TEMP/zenura-playwright" playwright@1.61.1 axe-core@4.10.3 --ignore-scripts --no-audit --no-fund

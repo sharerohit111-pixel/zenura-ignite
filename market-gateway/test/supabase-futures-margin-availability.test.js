@@ -74,11 +74,14 @@ test("unknown Futures order types fail closed and LIMIT submission remains behin
 });
 
  
-test("Futures portfolio withholds aggregate P&L and equity when any open-position quote is stale",()=>{
+test("Futures portfolio withholds aggregate P&L for stale quotes and expired contracts",()=>{
   const route=server.slice(server.indexOf('app.get("/paper/futures/portfolio"'),server.indexOf('// Paper Investing routes'));
-  assert.match(route,/unrealizedPnlPaise:stalePositions\?null:unrealizedPnlPaise/);
-  assert.match(route,/equityPaise:stalePositions\?null:account\.cash_paise\+unrealizedPnlPaise/);
-  assert.match(route,/valuationStatus:stalePositions\?"partial_stale":"fresh"/);
+  assert.match(route,/unrealizedPnlPaise:unavailablePositions\?null:unrealizedPnlPaise/);
+  assert.match(route,/equityPaise:unavailablePositions\?null:account\.cash_paise\+unrealizedPnlPaise/);
+  assert.match(route,/valuationStatus:expiredPositions\?"expired_or_partial_unavailable":stalePositions\?"partial_stale":"fresh"/);
+  assert.match(route,/if\(now>=contract\.expiryCutoffMs\)/);
+  assert.match(route,/valuationStatus:"expired"/);
+  assert.match(route,/validateFuturesPortfolioContracts\(positions,instrumentCache\)/);
   const ui=fs.readFileSync(path.join(__dirname,"../../markets/stocks/stocks.js"),"utf8");
   assert.match(ui,/Stale\/unavailable quotes for .*Aggregate unrealized P&L and equity are withheld/);
 });
