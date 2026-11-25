@@ -17,19 +17,31 @@ export function createPortfolioMark(pricePaise, timestamp, {
   const ageMs = timeValid ? now - time : null;
   const stale = explicitStale === true || envelopeStale === true || !priceValid || !timeValid ||
     ageMs > maxAgeMs || ageMs < -maxFutureSkewMs;
-  return { pricePaise: priceValid ? pricePaise : null, timestamp: timeValid ? time : null, stale };
+  return {
+    pricePaise: priceValid ? pricePaise : null,
+    timestamp: timeValid ? time : null,
+    stale,
+    maxAgeMs: Number.isFinite(maxAgeMs) && maxAgeMs >= 0 ? maxAgeMs : null,
+    maxFutureSkewMs: Number.isFinite(maxFutureSkewMs) && maxFutureSkewMs >= 0 ? maxFutureSkewMs : null
+  };
 }
 
-export function isUsablePortfolioMark(mark) {
-  return Boolean(mark && Number.isSafeInteger(mark.pricePaise) && mark.pricePaise > 0 &&
-    mark.stale === false && Number.isFinite(mark.timestamp));
+// Re-evaluate age at every valuation. A mark that was fresh when fetched must
+// expire as wall-clock time advances; cached quote snapshots are not leases.
+export function isUsablePortfolioMark(mark, now = Date.now()) {
+  if (!mark || !Number.isSafeInteger(mark.pricePaise) || mark.pricePaise <= 0 ||
+      mark.stale !== false || !Number.isFinite(mark.timestamp) || !Number.isFinite(now) ||
+      !Number.isFinite(mark.maxAgeMs) || mark.maxAgeMs < 0 ||
+      !Number.isFinite(mark.maxFutureSkewMs) || mark.maxFutureSkewMs < 0) return false;
+  const ageMs = now - mark.timestamp;
+  return ageMs <= mark.maxAgeMs && ageMs >= -mark.maxFutureSkewMs;
 }
 
-export function calculateAggregateUnrealized(positions, marks) {
+export function calculateAggregateUnrealized(positions, marks, now = Date.now()) {
   let value = 0;
   for (const position of positions) {
     const mark = marks.get(position.instrumentKey);
-    if (!isUsablePortfolioMark(mark) || !Number.isSafeInteger(position.quantity) ||
+    if (!isUsablePortfolioMark(mark, now) || !Number.isSafeInteger(position.quantity) ||
         !Number.isSafeInteger(position.averagePricePaise)) return { complete: false, value: null };
     const pnl = (mark.pricePaise - position.averagePricePaise) * position.quantity;
     if (!Number.isSafeInteger(pnl) || !Number.isSafeInteger(value + pnl)) return { complete: false, value: null };
@@ -38,11 +50,59 @@ export function calculateAggregateUnrealized(positions, marks) {
   return { complete: true, value };
 }
 
-export function portfolioMarketValueDisplay(position, mark) {
+export function portfolioMarketValueDisplay(position, mark, now = Date.now()) {
   if (position?.assetClass === "FUTURE") return "Not applicable (Futures MTM)";
-  if (!isUsablePortfolioMark(mark) || !Number.isSafeInteger(position?.quantity)) return "—";
+  if (!isUsablePortfolioMark(mark, now) || !Number.isSafeInteger(position?.quantity)) return "—";
   const value = mark.pricePaise * position.quantity;
   return Number.isSafeInteger(value) ? money(value) : "—";
+}
+
+export function schedulePortfolioMarkExpiryRefresh({
+  section, marks, render, now = Date.now, setTimer = setTimeout,
+  clearTimer = clearTimeout, doc = globalThis.document
+} = {}) {
+  if (typeof doc?.addEventListener !== "function" || typeof doc?.removeEventListener !== "function") {
+    return () => {};
+  }
+  let timer = null;
+  let disposed = false;
+  const dispose = () => {
+    if (disposed) return;
+    disposed = true;
+    if (timer !== null) clearTimer(timer);
+    timer = null;
+    doc?.removeEventListener?.("visibilitychange", onVisibilityChange);
+  };
+  const schedule = () => {
+    if (disposed) return;
+    if (timer !== null) clearTimer(timer);
+    timer = null;
+    const currentTime = now();
+    let nextExpiry = null;
+    for (const mark of marks?.values?.() ?? []) {
+      if (!isUsablePortfolioMark(mark, currentTime)) continue;
+      const expiry = mark.timestamp + mark.maxAgeMs + 1;
+      nextExpiry = nextExpiry === null ? expiry : Math.min(nextExpiry, expiry);
+    }
+    if (nextExpiry !== null) {
+      timer = setTimer(refresh, Math.max(0, nextExpiry - currentTime));
+    }
+  };
+  const refresh = () => {
+    if (disposed) return;
+    if (section?.isConnected === false) {
+      dispose();
+      return;
+    }
+    render(now());
+    schedule();
+  };
+  const onVisibilityChange = () => {
+    if (doc?.visibilityState === "visible") refresh();
+  };
+  doc?.addEventListener?.("visibilitychange", onVisibilityChange);
+  schedule();
+  return dispose;
 }
 
 export function accountRealizedPnlPaise(snapshot) {
@@ -138,29 +198,33 @@ export async function appendUnifiedLedgerSummary(container, screen) {
       table(host,["ORDER ID","ASSET","INSTRUMENT","PRODUCT","SIDE","TYPE","QTY","FILLED / REMAINING","AVG FILL","STATUS"],rows,
         "No shared Demo orders yet.");
     } else {
-      const rows=positions.map(position=>{
-        const mark=marks.get(position.instrumentKey);
-        const valid=isUsablePortfolioMark(mark);
-        const unrealized=valid?(mark.pricePaise-position.averagePricePaise)*position.quantity:null;
-        return [
-          position.assetClass,symbols.get(position.instrumentKey)||position.symbol||position.instrumentKey,
-          position.product,position.quantity,money(position.averagePricePaise),
-          valid?money(mark.pricePaise):"Unavailable (missing/stale)",money(position.costBasisPaise),
-          portfolioMarketValueDisplay(position,mark),money(position.realizedPnlPaise),valid?money(unrealized):"Unavailable"
-        ];
-      });
-      table(host,["ASSET","INSTRUMENT","PRODUCT","NET QTY","AVG PRICE","MOCK MARK","COST BASIS","MARK VALUE","REALIZED P&L","UNREALIZED P&L"],rows,
-        screen==="holdings"?"No Equity Delivery holdings yet.":"No shared Demo positions yet.");
-      const aggregate=calculateAggregateUnrealized(positions,marks);
-      host.append(el("p","demo-eq-disclaimer","Aggregate unrealized P&L: "+
-        (aggregate.complete?money(aggregate.value):"Unavailable (one or more marks missing/stale)")+
-        " · Account realized P&L: "+money(accountRealizedPnlPaise(snapshot))));
+      const renderPortfolio = now => {
+        const rows=positions.map(position=>{
+          const mark=marks.get(position.instrumentKey);
+          const valid=isUsablePortfolioMark(mark,now);
+          const unrealized=valid?(mark.pricePaise-position.averagePricePaise)*position.quantity:null;
+          return [
+            position.assetClass,symbols.get(position.instrumentKey)||position.symbol||position.instrumentKey,
+            position.product,position.quantity,money(position.averagePricePaise),
+            valid?money(mark.pricePaise):"Unavailable (missing/stale)",money(position.costBasisPaise),
+            portfolioMarketValueDisplay(position,mark,now),money(position.realizedPnlPaise),valid?money(unrealized):"Unavailable"
+          ];
+        });
+        table(host,["ASSET","INSTRUMENT","PRODUCT","NET QTY","AVG PRICE","MOCK MARK","COST BASIS","MARK VALUE","REALIZED P&L","UNREALIZED P&L"],rows,
+          screen==="holdings"?"No Equity Delivery holdings yet.":"No shared Demo positions yet.");
+        const aggregate=calculateAggregateUnrealized(positions,marks,now);
+        host.append(el("p","demo-eq-disclaimer","Aggregate unrealized P&L: "+
+          (aggregate.complete?money(aggregate.value):"Unavailable (one or more marks missing/stale)")+
+          " · Account realized P&L: "+money(accountRealizedPnlPaise(snapshot))));
+        const totals=el("div","demo-eq-disclaimer",
+          "Ledger events: "+snapshot.events.length+" · Account cash: "+money(snapshot.account.cashBalancePaise)+
+          " · Available: "+money(snapshot.account.availableFundsPaise)+" · Realized P&L: "+money(snapshot.account.realizedPnlPaise)+
+          " · Reconciled: "+String(snapshot.account.ledgerReconciled));
+        host.append(totals);
+      };
+      renderPortfolio(Date.now());
+      schedulePortfolioMarkExpiryRefresh({section,marks,render:renderPortfolio});
     }
-    const totals=el("div","demo-eq-disclaimer",
-      "Ledger events: "+snapshot.events.length+" · Account cash: "+money(snapshot.account.cashBalancePaise)+
-      " · Available: "+money(snapshot.account.availableFundsPaise)+" · Realized P&L: "+money(snapshot.account.realizedPnlPaise)+
-      " · Reconciled: "+String(snapshot.account.ledgerReconciled));
-    host.append(totals);
   } catch(error) {
     host.append(el("p","demo-eq-status","Unified Demo ledger unavailable · "+(error.message||"fixture error")));
   }

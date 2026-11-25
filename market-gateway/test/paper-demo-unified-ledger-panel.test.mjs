@@ -64,9 +64,9 @@ test("aggregate unrealized P&L is withheld when any open position lacks a fresh 
     ["EQ1", createPortfolioMark(120, now, { now, maxAgeMs: 60_000 })],
     ["FUT1", createPortfolioMark(550, now, { now, maxAgeMs: 15_000 })]
   ]);
-  assert.deepEqual(calculateAggregateUnrealized(positions, marks), { complete: true, value: 300 });
+  assert.deepEqual(calculateAggregateUnrealized(positions, marks, now), { complete: true, value: 300 });
   marks.set("FUT1", createPortfolioMark(550, now - 15_001, { now, maxAgeMs: 15_000 }));
-  assert.deepEqual(calculateAggregateUnrealized(positions, marks), { complete: false, value: null });
+  assert.deepEqual(calculateAggregateUnrealized(positions, marks, now), { complete: false, value: null });
   marks.delete("FUT1");
   assert.deepEqual(calculateAggregateUnrealized(positions, marks), { complete: false, value: null });
 });
@@ -76,8 +76,8 @@ test("Futures notional is not presented as ordinary portfolio market value", asy
   const now = 1_800_000_000_000;
   const fresh = createPortfolioMark(2500000, now, { now, maxAgeMs: 15000 });
   assert.equal(portfolioMarketValueDisplay({ assetClass: "FUTURE", quantity: 25 }, fresh), "Not applicable (Futures MTM)");
-  assert.equal(portfolioMarketValueDisplay({ assetClass: "OPTION", quantity: 25 }, fresh), "₹6,25,000.00");
-  assert.equal(portfolioMarketValueDisplay({ assetClass: "EQUITY", quantity: 10 }, null), "—");
+  assert.equal(portfolioMarketValueDisplay({ assetClass: "OPTION", quantity: 25 }, fresh, now), "₹6,25,000.00");
+  assert.equal(portfolioMarketValueDisplay({ assetClass: "EQUITY", quantity: 10 }, null, now), "—");
 });
 
 test("account realized P&L includes closed positions no longer present in open positions", async () => {
@@ -175,4 +175,117 @@ test("Portfolio end-to-end renders fresh MOCK marks for Equity, Futures and Opti
     if (previous.fetch === undefined) delete globalThis.fetch; else globalThis.fetch = previous.fetch;
     if (previous.document === undefined) delete globalThis.document; else globalThis.document = previous.document;
   }
+});
+
+
+test("cached Equity and derivative marks expire against advancing runtime time", async () => {
+  const {
+    createPortfolioMark, isUsablePortfolioMark, calculateAggregateUnrealized,
+    EQUITY_MARK_MAX_AGE_MS, DERIVATIVE_MARK_MAX_AGE_MS
+  } = await import("../../markets/stocks/demo-unified-ledger-panel.mjs?runtime-mark-expiry");
+  const now = 1_800_000_000_000;
+  const equity = createPortfolioMark(12500, now, { now, maxAgeMs: EQUITY_MARK_MAX_AGE_MS });
+  const derivative = createPortfolioMark(25000, now, { now, maxAgeMs: DERIVATIVE_MARK_MAX_AGE_MS });
+  assert.equal(isUsablePortfolioMark(equity, now), true);
+  assert.equal(isUsablePortfolioMark(equity, now + EQUITY_MARK_MAX_AGE_MS), true);
+  assert.equal(isUsablePortfolioMark(equity, now + EQUITY_MARK_MAX_AGE_MS + 1), false);
+  assert.equal(isUsablePortfolioMark(derivative, now + DERIVATIVE_MARK_MAX_AGE_MS), true);
+  assert.equal(isUsablePortfolioMark(derivative, now + DERIVATIVE_MARK_MAX_AGE_MS + 1), false);
+  const positions = [
+    { instrumentKey: "EQ-EXPIRY", quantity: 2, averagePricePaise: 10000 },
+    { instrumentKey: "FUT-EXPIRY", quantity: -1, averagePricePaise: 25000 }
+  ];
+  const marks = new Map([
+    ["EQ-EXPIRY", equity],
+    ["FUT-EXPIRY", derivative]
+  ]);
+  assert.deepEqual(calculateAggregateUnrealized(positions, marks, now), { complete: true, value: 5000 });
+  assert.deepEqual(calculateAggregateUnrealized(positions, marks, now + DERIVATIVE_MARK_MAX_AGE_MS + 1),
+    { complete: false, value: null });
+  assert.deepEqual(calculateAggregateUnrealized(positions, marks, now + EQUITY_MARK_MAX_AGE_MS + 1),
+    { complete: false, value: null });
+});
+
+test("runtime mark validation rejects newly future-dated timestamps beyond allowed skew", async () => {
+  const { createPortfolioMark, isUsablePortfolioMark, EQUITY_MARK_MAX_FUTURE_SKEW_MS } =
+    await import("../../markets/stocks/demo-unified-ledger-panel.mjs?runtime-future-skew");
+  const now = 1_800_000_000_000;
+  const mark = createPortfolioMark(100, now + EQUITY_MARK_MAX_FUTURE_SKEW_MS,
+    { now, maxAgeMs: 60_000, maxFutureSkewMs: EQUITY_MARK_MAX_FUTURE_SKEW_MS });
+  assert.equal(isUsablePortfolioMark(mark, now), true);
+  assert.equal(isUsablePortfolioMark(mark, now - 1), false);
+  assert.equal(isUsablePortfolioMark(mark, now - 1_001), false);
+});
+
+
+test("Portfolio UI refreshes exactly when cached marks expire and revalidates on tab visibility", async () => {
+  const {
+    createPortfolioMark, schedulePortfolioMarkExpiryRefresh,
+    isUsablePortfolioMark
+  } = await import("../../markets/stocks/demo-unified-ledger-panel.mjs?expiry-ui-controller");
+  let now = 10_000;
+  let timerId = 0;
+  const timers = new Map();
+  const listeners = new Map();
+  const doc = {
+    visibilityState: "visible",
+    addEventListener: (name, callback) => listeners.set(name, callback),
+    removeEventListener: name => listeners.delete(name)
+  };
+  const section = { isConnected: true };
+  const mark = createPortfolioMark(100, now, { now, maxAgeMs: 1_000 });
+  const marks = new Map([["EQ", mark]]);
+  const renders = [];
+  const controller = schedulePortfolioMarkExpiryRefresh({
+    section, marks, doc, now: () => now,
+    render: time => renders.push({ time, usable: isUsablePortfolioMark(mark, time) }),
+    setTimer: (callback, delay) => {
+      const id = ++timerId;
+      timers.set(id, { callback, delay });
+      return id;
+    },
+    clearTimer: id => timers.delete(id)
+  });
+  assert.equal(timers.size, 1);
+  assert.equal([...timers.values()][0].delay, 1_001);
+  now += 1_001;
+  const due = [...timers.entries()][0];
+  timers.delete(due[0]);
+  due[1].callback();
+  assert.deepEqual(renders, [{ time: 11_001, usable: false }]);
+  assert.equal(timers.size, 0);
+
+  now = 12_000;
+  listeners.get("visibilitychange")?.();
+  assert.deepEqual(renders[1], { time: 12_000, usable: false });
+  controller();
+  assert.equal(listeners.has("visibilitychange"), false);
+  assert.equal(timers.size, 0);
+});
+
+test("Portfolio expiry controller disposes its timer after the screen is removed", async () => {
+  const { createPortfolioMark, schedulePortfolioMarkExpiryRefresh } =
+    await import("../../markets/stocks/demo-unified-ledger-panel.mjs?expiry-ui-disposal");
+  let now = 20_000;
+  const timers = new Map();
+  const listeners = new Map();
+  let nextId = 0;
+  const doc = {
+    visibilityState: "visible",
+    addEventListener: (name, callback) => listeners.set(name, callback),
+    removeEventListener: name => listeners.delete(name)
+  };
+  const section = { isConnected: true };
+  const mark = createPortfolioMark(100, now, { now, maxAgeMs: 5_000 });
+  schedulePortfolioMarkExpiryRefresh({
+    section, marks: new Map([["EQ", mark]]), doc, now: () => now,
+    render: () => assert.fail("removed portfolio screen must not rerender"),
+    setTimer: callback => { const id = ++nextId; timers.set(id, callback); return id; },
+    clearTimer: id => timers.delete(id)
+  });
+  const callback = [...timers.values()][0];
+  section.isConnected = false;
+  callback();
+  assert.equal(timers.size, 0);
+  assert.equal(listeners.has("visibilitychange"), false);
 });
