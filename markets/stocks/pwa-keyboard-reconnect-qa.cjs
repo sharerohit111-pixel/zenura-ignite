@@ -1,5 +1,8 @@
 "use strict";
 const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const path = require("node:path");
+const vm = require("node:vm");
 const { chromium } = require("playwright");
 
 const ORIGIN = "http://127.0.0.1:4173";
@@ -7,16 +10,39 @@ const MARKET = ORIGIN + "/markets/";
 const DEMO = ORIGIN + "/markets/stocks/demo.html";
 const SCREENS = ["home","market","watchlists","charts","equity","futures","options","orders","trades","portfolio","positions","holdings","account","profile","settings"];
 
+async function verifyProductionWorkerCacheCleanup() {
+  const source = fs.readFileSync(path.join(__dirname, "..", "service-worker.js"), "utf8");
+  const handlers = {};
+  const existingCaches = ["zenura-markets-shell-v10", "zenura-markets-shell-v9", "unrelated-app-cache", "zenura-markets-shell-v11"];
+  const deleted = [];
+  const self = {
+    registration: { scope: "https://qa.example/markets/" },
+    addEventListener: (name, handler) => { handlers[name] = handler; },
+    clients: { claim: async () => {} },
+    skipWaiting: async () => {}
+  };
+  const caches = {
+    keys: async () => [...existingCaches],
+    delete: async name => { deleted.push(name); return true; },
+    open: async () => ({ addAll: async () => {} })
+  };
+  vm.runInNewContext(source, { self, caches, URL, Promise, Response, fetch: async () => new Response("") });
+  assert.equal(typeof handlers.activate, "function", "production worker must register its activate handler");
+  let activation;
+  handlers.activate({ waitUntil: promise => { activation = promise; } });
+  await activation;
+  assert.deepEqual(deleted.sort(), ["zenura-markets-shell-v10", "zenura-markets-shell-v9"]);
+  assert.ok(!deleted.includes("unrelated-app-cache"), "activation must preserve unrelated application caches");
+  assert.ok(!deleted.includes("zenura-markets-shell-v11"), "activation must preserve current shell cache");
+  console.log(JSON.stringify({ workerCacheCleanup: "PASS", deleted, preserved: ["unrelated-app-cache", "zenura-markets-shell-v11"] }));
+}
+
 (async () => {
+  await verifyProductionWorkerCacheCleanup();
   const browser = await chromium.launch({ headless: true });
   try {
     const pwaContext = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: "allow" });
     const pwaPage = await pwaContext.newPage();
-    await pwaPage.goto(MARKET + "manifest.webmanifest", { waitUntil: "domcontentloaded" });
-    await pwaPage.evaluate(async () => {
-      const old = await caches.open("zenura-markets-shell-v10");
-      await old.put(new Request(new URL("stale-marker.txt", location.href)), new Response("stale-v10"));
-    });
     await pwaPage.goto(MARKET, { waitUntil: "load", timeout: 30000 });
     await pwaPage.waitForFunction(async () => {
       const registrations = await navigator.serviceWorker.getRegistrations();
@@ -30,12 +56,8 @@ const SCREENS = ["home","market","watchlists","charts","equity","futures","optio
     assert.ok(activationInfo.keys.includes("zenura-markets-shell-v11"), "current v11 cache must be active: " + JSON.stringify(activationInfo));
     await pwaPage.reload({ waitUntil: "domcontentloaded" });
     await pwaPage.waitForFunction(() => !!navigator.serviceWorker.controller, null, { timeout: 15000 });
-    await pwaPage.waitForFunction(async () => !(await caches.keys()).includes("zenura-markets-shell-v10"), null, { timeout: 10000 });
-    const upgradeInfo = await pwaPage.evaluate(async () => ({
-      keys: await caches.keys(),
-      controller: navigator.serviceWorker.controller?.scriptURL || null
-    }));
-    assert.ok(!upgradeInfo.keys.includes("zenura-markets-shell-v10"), "activated worker must remove the seeded v10 cache after taking control: " + JSON.stringify(upgradeInfo));
+    const controlledWorker = await pwaPage.evaluate(() => navigator.serviceWorker.controller?.scriptURL || null);
+    assert.ok(controlledWorker && controlledWorker.endsWith("/markets/service-worker.js"), "Markets page must be controlled by its scoped production worker: " + controlledWorker);
     await pwaPage.evaluate(async () => {
       await fetch("/markets/private-session-qa-probe", { headers: { Authorization: "Bearer synthetic-qa-only" } }).catch(() => null);
     });
