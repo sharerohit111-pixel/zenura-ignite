@@ -1,4 +1,5 @@
 import { createPaperDemoViewModel, searchPaperDemoInstruments, getPaperDemoExpiries, getPaperDemoOptionChain } from "../shared/paper-demo-adapter.mjs";
+import { mountPrivateWatchlists } from "./demo-watchlist-persistence.mjs";
 import { mountDerivativeDemo, appendDerivativeSummary } from "./demo-derivative-panel.mjs";
 import { mountDemoChart } from "./demo-chart-panel.mjs";
 import { mountEquityDemo, appendEquitySummary } from "./demo-equity-panel.mjs";
@@ -174,8 +175,7 @@ function render(name){
   return;
  }
  if(name==="watchlists"){
-  content.append(notice("Demo watchlists are session-only and use the canonical MOCK instrument catalog. They never read or write private account watchlists."));
-  renderDemoWatchlists(content);
+  mountPrivateWatchlists(content, { model, el, field, selectControl, money });
   return;
  }
  if(name==="charts"){
