@@ -3,7 +3,7 @@ const test=require("node:test");
 const assert=require("node:assert/strict");
 const {calculateDerivativePortfolio}=require("../lib/derivative-portfolio");
 const now=1_800_000_000_000;
-const pos=(overrides={})=>({instrumentKey:"NSE_FO|NIFTY26NOV25000CE",instrumentType:"CE",netQuantity:25,averagePricePaise:5000,...overrides});
+const pos=(overrides={})=>({instrumentKey:"NSE_FO|NIFTY26NOV25000CE",instrumentType:"CE",expiry:"2027-12-30",netQuantity:25,averagePricePaise:5000,...overrides});
 const quote=(overrides={})=>({instrumentKey:"NSE_FO|NIFTY26NOV25000CE",pricePaise:7000,observedAtMs:now-1000,...overrides});
 const margin=(overrides={})=>({instrumentKey:"NSE_FO|NIFTY26NOV25000CE",requiredMarginPaise:150000,observedAtMs:now-1000,source:"broker_margin_api",...overrides});
 test("values long option market value and unrealized P&L",()=>{
@@ -61,4 +61,18 @@ test("accepts valid short legacy position without explicit cost basis",()=>{
  const r=calculateDerivativePortfolio({positions:[p],quotes:[quote()],marginSnapshots:[margin()],now});
  assert.equal(r.positions[0].costBasisPaise,125000);
  assert.equal(r.unrealizedPnlPaise,-50000);
+});
+
+
+test("rejects expired Futures and Options positions before reading a current-looking mark",()=>{
+ for(const p of [pos({expiry:"2026-12-31"}),pos({instrumentType:"FUT",expiry:"2026-12-31"})]){
+  assert.throws(()=>calculateDerivativePortfolio({positions:[p],quotes:[quote({instrumentKey:p.instrumentKey})],marginSnapshots:[margin({instrumentKey:p.instrumentKey})],now}),/Expired derivative positions/);
+ }
+});
+
+test("requires explicit valid expiry and rejects quote contract metadata mismatch",()=>{
+ const missing=pos();delete missing.expiry;
+ assert.throws(()=>calculateDerivativePortfolio({positions:[missing],quotes:[quote()],now}),/requires a valid contract expiry/);
+ assert.throws(()=>calculateDerivativePortfolio({positions:[pos()],quotes:[quote({expiry:"2027-12-31"})],now}),/identity does not match/);
+ assert.throws(()=>calculateDerivativePortfolio({positions:[pos()],quotes:[quote({optionType:"PE"})],now}),/identity does not match/);
 });
