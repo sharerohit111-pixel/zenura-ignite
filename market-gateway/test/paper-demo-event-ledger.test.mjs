@@ -231,3 +231,85 @@ test("product-aware cost basis cannot become negative or outlive a flat position
   })), /DEMO_POSITION_INVARIANT/);
   assert.equal(ledger.snapshot().events.length, 0);
 });
+
+
+test("canonical events carry the supported schema version and reject unknown versions", () => {
+  const ledger = createPaperDemoEventLedger(opening);
+  const accepted = ledger.append(event());
+  assert.equal(accepted.event.schemaVersion, "1.2.0");
+  assert.throws(() => ledger.append(event({
+    eventId: "evt-2", idempotencyKey: "idem-2", sourceEventId: "future-schema",
+    occurredAt: "2026-11-25T09:30:01+05:30", schemaVersion: "2.0.0"
+  })), /UNSUPPORTED_EVENT_SCHEMA_VERSION/);
+  assert.equal(ledger.snapshot().events.length, 1);
+});
+
+test("event timestamps require an explicit ISO-8601 timezone", () => {
+  const ledger = createPaperDemoEventLedger(opening);
+  assert.throws(() => ledger.append(event({ occurredAt: "2026-11-25T09:30:00" })), /INVALID_EVENT_TIMESTAMP/);
+  assert.throws(() => ledger.append(event({ occurredAt: "2026-11-25" })), /INVALID_EVENT_TIMESTAMP/);
+  assert.equal(ledger.snapshot().events.length, 0);
+});
+
+test("event timestamps reject impossible calendar dates and out-of-range clock fields", () => {
+  const ledger = createPaperDemoEventLedger(opening);
+  for (const occurredAt of [
+    "2026-02-30T09:30:00+05:30",
+    "2025-02-29T09:30:00+05:30",
+    "2026-13-01T09:30:00+05:30",
+    "2026-11-25T24:00:00+05:30",
+    "2026-11-25T09:60:00+05:30",
+    "2026-11-25T09:30:60+05:30"
+  ]) {
+    assert.throws(() => ledger.append(event({ occurredAt })), /INVALID_EVENT_TIMESTAMP/);
+  }
+  assert.equal(ledger.snapshot().events.length, 0);
+  assert.equal(ledger.append(event({ occurredAt: "2024-02-29T09:30:00+05:30" })).accepted, true);
+});
+
+test("replay rejects reordered events instead of silently sorting them", () => {
+  const ledger = createPaperDemoEventLedger(opening);
+  ledger.append(event());
+  ledger.append(event({
+    eventId: "evt-2", idempotencyKey: "idem-2", sourceEventId: "equity-fill-1",
+    type: "FILL_RECORDED", occurredAt: "2026-11-25T09:30:01+05:30",
+    deltas: { cashDeltaPaise: -125050, blockedDeltaPaise: -10000 },
+    payload: { fillId: "fill-1", orderId: "order-1", assetClass: "EQUITY", instrumentKey: "MOCK|NSE|EQ|0001", side: "BUY", quantity: 1, pricePaise: 125050 }
+  }));
+  const reversed = ledger.snapshot().events.slice().reverse();
+  assert.throws(() => replayPaperDemoEvents(opening, reversed), /DEMO_EVENT_SEQUENCE_MISMATCH/);
+});
+
+test("order status transitions reject terminal-state reopening and preserve partial fills", () => {
+  const ledger = createPaperDemoEventLedger(opening);
+  ledger.append(event());
+  const update = (status, suffix) => ledger.append(event({
+    eventId: "evt-status-" + suffix, idempotencyKey: "idem-status-" + suffix, sourceEventId: "status-" + suffix,
+    type: "ORDER_UPDATED", occurredAt: "2026-11-25T09:30:0" + (Number(suffix) + 1) + "+05:30",
+    deltas: { cashDeltaPaise: 0, blockedDeltaPaise: 0 },
+    payload: { ...event().payload, status }
+  }));
+  update("PARTIALLY_FILLED", "1");
+  update("PARTIALLY_FILLED", "2");
+  update("CANCELLED", "3");
+  assert.equal(ledger.snapshot().orders[0].status, "CANCELLED");
+  assert.throws(() => update("PARTIALLY_FILLED", "4"), /INVALID_ORDER_STATUS_TRANSITION/);
+  assert.throws(() => update("PENDING", "5"), /INVALID_ORDER_STATUS_TRANSITION/);
+  assert.equal(ledger.snapshot().events.length, 4);
+
+  const filled = createPaperDemoEventLedger(opening);
+  filled.append(event());
+  filled.append(event({
+    eventId: "evt-filled", idempotencyKey: "idem-filled", sourceEventId: "status-filled",
+    type: "ORDER_UPDATED", occurredAt: "2026-11-25T09:30:01+05:30",
+    deltas: { cashDeltaPaise: 0, blockedDeltaPaise: 0 },
+    payload: { ...event().payload, status: "FILLED" }
+  }));
+  assert.throws(() => filled.append(event({
+    eventId: "evt-reopen", idempotencyKey: "idem-reopen", sourceEventId: "status-reopen",
+    type: "ORDER_UPDATED", occurredAt: "2026-11-25T09:30:02+05:30",
+    deltas: { cashDeltaPaise: 0, blockedDeltaPaise: 0 },
+    payload: { ...event().payload, status: "PENDING" }
+  })), /INVALID_ORDER_STATUS_TRANSITION/);
+  assert.equal(filled.snapshot().orders[0].status, "FILLED");
+});
