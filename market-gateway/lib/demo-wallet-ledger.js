@@ -171,7 +171,8 @@ function createDemoWalletLedger({ accountId, openingCashPaise, openingEvidenceRe
     // amount against the authoritative source fill receipt.
     const settlementAmountsMatch = sourceFills.every(source => {
       const settlement = ledgerFillById.get(source.fillId);
-      if (!settlement || !["BUY", "SELL"].includes(source.side) ||
+      if (!settlement || !["EQUITY", "OPTION"].includes(source.assetClass) ||
+          !["BUY", "SELL"].includes(source.side) ||
           !Number.isSafeInteger(source.quantity) || source.quantity < 1 ||
           !Number.isSafeInteger(source.pricePaise) || source.pricePaise < 1 ||
           !Number.isSafeInteger(source.grossValuePaise) || source.grossValuePaise < 1 ||
