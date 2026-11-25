@@ -1,7 +1,8 @@
 import { createPaperDemoViewModel, searchPaperDemoInstruments, getPaperDemoExpiries, getPaperDemoOptionChain } from "../shared/paper-demo-adapter.mjs";
-import { mountDerivativeDemo, appendDerivativeSummary } from "./demo-derivative-panel.mjs";
+import { mountDerivativeDemo } from "./demo-derivative-panel.mjs";
 import { mountDemoChart } from "./demo-chart-panel.mjs";
-import { mountEquityDemo, appendEquitySummary } from "./demo-equity-panel.mjs";
+import { mountEquityDemo } from "./demo-equity-panel.mjs";
+import { appendUnifiedLedgerSummary } from "./demo-unified-ledger-panel.mjs";
 
 "use strict";
 const status=document.getElementById("demo-status");
