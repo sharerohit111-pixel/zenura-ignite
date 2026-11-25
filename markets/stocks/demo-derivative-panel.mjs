@@ -11,7 +11,8 @@ async function getSimulator(){
 }
 function renderTable(host,headers,rows,empty){
  const wrap=el("div","table-wrap demo-fo-table-wrap"),t=el("table"),h=el("thead"),hr=el("tr"),b=el("tbody");
- headers.forEach(x=>hr.append(el("th","",x)));h.append(hr);
+ wrap.tabIndex=0;wrap.setAttribute("role","region");wrap.setAttribute("aria-label","Futures and Options demo table");
+ headers.forEach(x=>{const th=el("th","",x);th.scope="col";hr.append(th);});h.append(hr);
  if(!rows.length){const tr=el("tr"),td=el("td","empty",empty);td.colSpan=headers.length;tr.append(td);b.append(tr);}
  else rows.forEach(row=>{const tr=el("tr");row.forEach(x=>tr.append(el("td","",x==null?"—":x)));b.append(tr);});
  t.append(h,b);wrap.append(t);host.replaceChildren(wrap);
