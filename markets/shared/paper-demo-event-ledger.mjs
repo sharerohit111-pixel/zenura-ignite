@@ -136,7 +136,7 @@ function apply(projection, event) {
     const p = event.payload, product = productOf(p), key = positionKey(p.assetClass, p.instrumentKey, product);
     let position = projection.positions.find(x => x.key === key);
     if (!position) {
-      position = { key, assetClass: p.assetClass, instrumentKey: p.instrumentKey, product, quantity: 0, reservedQuantity: 0, costBasisPaise: 0, averagePricePaise: 0, realizedPnlPaise: 0 };
+      position = { key, assetClass: p.assetClass, instrumentKey: p.instrumentKey, product, symbol: p.symbol, expiry: p.expiry, optionType: p.optionType, strikePaise: p.strikePaise, quantity: 0, reservedQuantity: 0, costBasisPaise: 0, averagePricePaise: 0, realizedPnlPaise: 0 };
       projection.positions.push(position);
     }
     const quantity = position.quantity + p.quantityDelta;
@@ -146,6 +146,7 @@ function apply(projection, event) {
     if (![quantity, costBasis, reserved, realized].every(Number.isSafeInteger) ||
         (p.assetClass !== "FUTURE" && quantity < 0) || costBasis < 0 || reserved < 0 || reserved > Math.max(0, quantity) ||
         (quantity === 0 && costBasis !== 0) || (p.assetClass === "FUTURE" && reserved !== 0)) fail("DEMO_POSITION_INVARIANT");
+    for (const field of ["symbol", "expiry", "optionType", "strikePaise"]) if (p[field] !== undefined) position[field] = p[field];
     position.quantity = quantity;
     position.costBasisPaise = costBasis;
     position.reservedQuantity = reserved;
