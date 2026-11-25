@@ -99,6 +99,8 @@ jobs:
           fi
       - name: Check installable market PWA and service worker
         run: node --check markets/service-worker.js
+      - name: Run account and session isolation regression tests
+        run: node --test markets/stocks/connect-session-isolation.test.js
       - name: Validate manual Supabase gateway deployment workflow YAML
         run: ruby -e 'require "yaml"; YAML.load_file(".github/workflows/deploy-supabase-market-gateway.yml")'
       - name: Check professional chart engine and indicator calculations
