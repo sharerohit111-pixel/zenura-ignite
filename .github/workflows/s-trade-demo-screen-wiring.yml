@@ -27,6 +27,7 @@ on:
       - "markets/stocks/index.html"
       - "market-gateway/test/paper-demo-dashboard.test.mjs"
       - "markets/stocks/demo-browser-smoke.cjs"
+      - "markets/stocks/pwa-keyboard-reconnect-qa.cjs"
       - "markets/stocks/demo-chart-data.mjs"
       - "markets/stocks/demo-chart-panel.mjs"
       - "market-gateway/test/demo-chart-data.test.mjs"
@@ -98,6 +99,7 @@ jobs:
           done
           curl --silent --fail http://127.0.0.1:4173/markets/stocks/demo.html >/dev/null
           NODE_PATH="$RUNNER_TEMP/zenura-playwright/node_modules" node markets/stocks/demo-browser-smoke.cjs
+          NODE_PATH="$RUNNER_TEMP/zenura-playwright/node_modules" node markets/stocks/pwa-keyboard-reconnect-qa.cjs
       - name: Guard production gateway isolation
         run: |
           if grep -R -E "paper-demo-adapter|paper-demo-event-ledger|paper-demo-ledger-session|demo-equity-ledger-bridge|demo-derivative-ledger-bridge|demo-unified-ledger-panel|derivative-mock-simulator|paper-mock-fixtures|equity-demo-execution-engine|demo-(equity|chart|derivative)-panel|market-gateway/mock/fixtures|equity-execution.json" market-gateway/supabase-server.js market-gateway/server.js; then
