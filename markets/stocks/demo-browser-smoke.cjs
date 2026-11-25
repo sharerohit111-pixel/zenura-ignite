@@ -15,15 +15,24 @@ const axePath=require.resolve("axe-core/axe.min.js");
   for(const viewport of [{width:1440,height:900,name:"desktop"},{width:390,height:844,name:"android-mobile"},{width:360,height:800,name:"small-mobile"}]){
    const context=await browser.newContext({viewport:{width:viewport.width,height:viewport.height},isMobile:viewport.width<500,hasTouch:viewport.width<500,serviceWorkers:"allow"});
    const page=await context.newPage();
-   const pageErrors=[];
+   const pageErrors=[],consoleErrors=[];
    page.on("pageerror",error=>pageErrors.push(error.message));
+   page.on("console",message=>{if(message.type()==="error")consoleErrors.push(message.text());});
    await page.goto("http://127.0.0.1:4173/markets/stocks/demo.html",{waitUntil:"domcontentloaded",timeout:30000});
    await page.waitForFunction(()=>document.querySelector("#demo-status")?.textContent.includes("4 canonical fixtures validated"),null,{timeout:10000});
+   await page.addScriptTag({path:axePath});
    assert.equal(await page.locator("#screen-nav button[data-screen]").count(),15,viewport.name+" screen count");
+   const firstNav=page.locator("#screen-nav button[data-screen=\"home\"]");await firstNav.focus();
+   assert.equal(await page.evaluate(()=>document.activeElement?.dataset.screen),"home",viewport.name+" keyboard focus reaches navigation");
+   await page.keyboard.press("Tab");assert.equal(await page.evaluate(()=>document.activeElement?.dataset.screen),"market",viewport.name+" Tab moves through screen navigation");
    for(const name of ["home","market","watchlists","charts","equity","futures","options","orders","trades","portfolio","positions","holdings","account","profile","settings"]){
     await page.locator('#screen-nav button[data-screen="'+name+'"]').click();
     await page.locator("#screen-content > .screen-title h2").waitFor();
     assert.ok(await page.locator("#screen-content > .screen-title h2").isVisible(),viewport.name+" "+name+" heading");
+    assert.equal(await page.locator("#screen-nav button[aria-current=\"page\"]").getAttribute("data-screen"),name,viewport.name+" active navigation semantics");
+    assert.ok((await page.locator("#screen-content .read-only").textContent())?.includes("MOCK"),viewport.name+" "+name+" visible MOCK identity");
+    const screenAxe=await page.evaluate(async()=>window.axe.run(document,{runOnly:{type:"tag",values:["wcag2a","wcag2aa","wcag21a","wcag21aa"]}}));
+    const seriousScreen=screenAxe.violations.filter(v=>v.impact==="critical"||v.impact==="serious");assert.equal(seriousScreen.length,0,viewport.name+" "+name+" serious/critical accessibility violations: "+seriousScreen.map(v=>v.id).join(","));
     const overflow=await page.evaluate(()=>document.documentElement.scrollWidth>window.innerWidth+1);
     assert.equal(overflow,false,viewport.name+" horizontal document overflow on "+name);
    }
