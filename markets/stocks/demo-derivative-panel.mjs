@@ -92,33 +92,36 @@ export async function mountDerivativeDemo(container,screen){
 export async function appendDerivativeSummary(container, screen) {
   const section = el("section", "demo-fo-summary");
   section.append(el("h3", "demo-fo-subhead",
-    screen === "positions" || screen === "portfolio" ? "LOCAL FUTURES & OPTIONS POSITIONS" :
-    screen === "trades" ? "LOCAL FUTURES & OPTIONS FILLS" : "LOCAL FUTURES & OPTIONS ORDERS"));
+    screen === "positions" || screen === "portfolio" ? "CANONICAL FUTURES & OPTIONS POSITIONS" :
+    screen === "trades" ? "CANONICAL FUTURES & OPTIONS FILLS" : "CANONICAL FUTURES & OPTIONS ORDERS"));
   section.append(el("p", "demo-fo-disclaimer",
-    "Browser-memory DEMO DATA only. These records are not part of the account fixture, cash ledger or production portfolio."));
+    "Canonical browser-memory DEMO event projection. MOCK only; no cash ledger, margin, charges, broker or production portfolio is changed."));
   const host = el("div");
   section.append(host);
   container.append(section);
   try {
-    const engine = await getSimulator();
-    const snapshot = engine.snapshot();
+    await getSimulator();
+    const snapshot = ledgerBridge.snapshot();
     if (screen === "positions" || screen === "portfolio") {
       renderTable(host,
-        ["CONTRACT","ASSET","EXPIRY","NET QTY","AVG PRICE","RESERVED CLOSE","AVAILABLE CLOSE"],
-        snapshot.positions.map(x => [x.symbol,x.assetClass === "OPTION" ? x.optionType : "FUT",x.expiry,x.netQuantity,money(x.averagePricePaise),x.reservedCloseQuantity,x.availableCloseQuantity]),
-        "No local Futures/Options demo positions.");
+        ["CONTRACT","ASSET","EXPIRY","PRODUCT","NET QTY","AVG PRICE","RESERVED CLOSE"],
+        snapshot.positions.map(x => [x.symbol || x.instrumentKey,x.assetClass === "OPTION" ? x.optionType : "FUT",x.expiry,x.product,x.quantity,money(x.averagePricePaise),x.reservedQuantity]),
+        "No canonical Futures/Options demo positions.");
     } else if (screen === "trades") {
-      const rows = snapshot.orders.flatMap(order => order.fills.map(fill => [
-        fill.fillId,order.symbol,order.side,order.orderType,fill.quantity,money(fill.pricePaise),money(fill.grossPaise),fill.executedAt
-      ]));
-      renderTable(host,["FILL ID","CONTRACT","SIDE","ORDER TYPE","QTY","FILL PRICE","GROSS VALUE","EXECUTED AT"],rows,"No local Futures/Options demo fills.");
+      const rows = snapshot.fills.map(fill => [
+        fill.fillId,fill.symbol || fill.instrumentKey,fill.side,fill.orderType,fill.quantity,
+        money(fill.pricePaise),money(fill.grossPaise),fill.executedAt
+      ]);
+      renderTable(host,["FILL ID","CONTRACT","SIDE","ORDER TYPE","QTY","FILL PRICE","GROSS VALUE","EXECUTED AT"],rows,"No canonical Futures/Options fills.");
     } else {
       renderTable(host,
         ["ORDER ID","CONTRACT","SIDE","TYPE","QTY","FILLED / REMAINING","AVG FILL","STATUS"],
-        snapshot.orders.map(x => [x.orderId,x.symbol,x.side,x.orderType,x.quantity,x.filledQuantity+" / "+x.remainingQuantity,x.averageFillPricePaise?money(x.averageFillPricePaise):"—",x.status]),
-        "No local Futures/Options demo orders.");
+        snapshot.orders.map(x => [x.orderId,x.symbol || x.instrumentKey,x.side,x.orderType,x.quantity,
+          (x.filledQuantity || 0)+" / "+(x.remainingQuantity ?? x.quantity),
+          x.averageFillPricePaise ? money(x.averageFillPricePaise) : "—",x.status]),
+        "No canonical Futures/Options orders.");
     }
   } catch (error) {
-    host.append(el("p","demo-fo-status","Local derivative Demo records unavailable · "+(error.message || "fixture error")));
+    host.append(el("p","demo-fo-status","Canonical derivative Demo records unavailable · "+(error.message || "fixture error")));
   }
 }
