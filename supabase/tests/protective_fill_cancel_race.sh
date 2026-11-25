@@ -4,8 +4,9 @@ set -euo pipefail
 USER_ID="11111111-1111-4111-8111-111111111111"
 ORDER_FILL="d1d1d1d1-d1d1-41d1-81d1-d1d1d1d1d1d1"
 ORDER_CANCEL="d2d2d2d2-d2d2-42d2-82d2-d2d2d2d2d2d2"
-EXEC_FILL="$(printf 'a%.0s' {1..64})"
-EXEC_CANCEL="$(printf 'c%.0s' {1..64})"
+RUN_ID="$(printf '%s' "${GITHUB_RUN_ID:-local}-${GITHUB_RUN_ATTEMPT:-0}-$-$(date +%s%N)" | sha256sum | cut -d' ' -f1)"
+EXEC_FILL="$(printf '%s' "${RUN_ID}-fill" | sha256sum | cut -d' ' -f1)"
+EXEC_CANCEL="$(printf '%s' "${RUN_ID}-cancel" | sha256sum | cut -d' ' -f1)"
 
 wait_for_terminal_update_lock() {
   local pattern="$1"
@@ -36,8 +37,6 @@ $account$;
 
 DELETE FROM public.paper_protective_orders
  WHERE order_id IN ('d1d1d1d1-d1d1-41d1-81d1-d1d1d1d1d1d1','d2d2d2d2-d2d2-42d2-82d2-d2d2d2d2d2d2');
-DELETE FROM public.paper_orders
- WHERE order_id IN (repeat('a',64),repeat('c',64));
 DELETE FROM public.paper_equity_positions
  WHERE user_id='11111111-1111-4111-8111-111111111111'
    AND product='DELIVERY' AND instrument_key IN ('NSE_EQ|PROTECTIVE_RACE','NSE_EQ|PROTECTIVE_RACE_CANCEL');
@@ -122,7 +121,9 @@ if psql -v ON_ERROR_STOP=1 -c "SET ROLE service_role; SELECT public.execute_pape
 fi
 wait "$CANCEL_PID"
 
-psql -v ON_ERROR_STOP=1 <<'SQL'
+psql -v ON_ERROR_STOP=1 -v exec_fill="$EXEC_FILL" -v exec_cancel="$EXEC_CANCEL" <<'SQL'
+SELECT set_config('test.exec_fill', :'exec_fill', false);
+SELECT set_config('test.exec_cancel', :'exec_cancel', false);
 DO $race_assertions$
 BEGIN
   IF (SELECT status FROM public.paper_protective_orders
@@ -133,10 +134,10 @@ BEGIN
       WHERE order_id='d2d2d2d2-d2d2-42d2-82d2-d2d2d2d2d2d2')<>'CANCELLED' THEN
     RAISE EXCEPTION 'Cancel-first race did not finish CANCELLED';
   END IF;
-  IF NOT EXISTS(SELECT 1 FROM public.paper_orders WHERE order_id=repeat('a',64) AND status='FILLED') THEN
+  IF NOT EXISTS(SELECT 1 FROM public.paper_orders WHERE order_id=current_setting('test.exec_fill') AND status='FILLED') THEN
     RAISE EXCEPTION 'Fill-first race did not create the canonical paper order';
   END IF;
-  IF EXISTS(SELECT 1 FROM public.paper_orders WHERE order_id=repeat('c',64)) THEN
+  IF EXISTS(SELECT 1 FROM public.paper_orders WHERE order_id=current_setting('test.exec_cancel')) THEN
     RAISE EXCEPTION 'Cancel-first race created an execution order';
   END IF;
 END
@@ -146,7 +147,6 @@ DROP TRIGGER IF EXISTS test_delay_protective_terminal_update ON public.paper_pro
 DROP FUNCTION IF EXISTS public.test_delay_protective_terminal_update();
 DELETE FROM public.paper_protective_orders
  WHERE order_id IN ('d1d1d1d1-d1d1-41d1-81d1-d1d1d1d1d1d1','d2d2d2d2-d2d2-42d2-82d2-d2d2d2d2d2d2');
-DELETE FROM public.paper_orders WHERE order_id IN (repeat('a',64),repeat('c',64));
 DELETE FROM public.paper_equity_positions
  WHERE user_id='11111111-1111-4111-8111-111111111111'
    AND product='DELIVERY' AND instrument_key IN ('NSE_EQ|PROTECTIVE_RACE','NSE_EQ|PROTECTIVE_RACE_CANCEL');

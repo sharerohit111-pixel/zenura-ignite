@@ -354,12 +354,29 @@ jobs:
             v_reserved bigint;
             v_qty integer;
             v_replay boolean;
+            v_order_market_buy text := md5(gen_random_uuid()::text)||md5(gen_random_uuid()::text);
+            v_order_market_changed text := md5(gen_random_uuid()::text)||md5(gen_random_uuid()::text);
+            v_order_market_sell text := md5(gen_random_uuid()::text)||md5(gen_random_uuid()::text);
+            v_order_bse_limit text := md5(gen_random_uuid()::text)||md5(gen_random_uuid()::text);
+            v_order_tiny_limit text := md5(gen_random_uuid()::text)||md5(gen_random_uuid()::text);
+            v_order_limit_buy_cancel text := md5(gen_random_uuid()::text)||md5(gen_random_uuid()::text);
+            v_order_limit_buy_fill text := md5(gen_random_uuid()::text)||md5(gen_random_uuid()::text);
+            v_order_limit_sell_cancel text := md5(gen_random_uuid()::text)||md5(gen_random_uuid()::text);
+            v_order_limit_sell_fill text := md5(gen_random_uuid()::text)||md5(gen_random_uuid()::text);
+            v_idem_market_buy uuid := gen_random_uuid();
+            v_idem_market_sell uuid := gen_random_uuid();
+            v_idem_bse_limit uuid := gen_random_uuid();
+            v_idem_tiny_limit uuid := gen_random_uuid();
+            v_idem_limit_buy_cancel uuid := gen_random_uuid();
+            v_idem_limit_buy_fill uuid := gen_random_uuid();
+            v_idem_limit_sell_cancel uuid := gen_random_uuid();
+            v_idem_limit_sell_fill uuid := gen_random_uuid();
           BEGIN
             -- MARKET BUY: 10 shares at ₹100; retry must not debit twice.
             v_result := public.execute_paper_market_order(
               '22222222-2222-4222-8222-222222222222',
-              repeat('a',64),
-              '33333333-3333-4333-8333-333333333333',
+              v_order_market_buy,
+              v_idem_market_buy,
               repeat('b',64),'NSE_EQ|TEST001','TEST001','NSE',
               'BUY','DELIVERY',10,10000,floor(extract(epoch from clock_timestamp())*1000)::bigint,0
             );
@@ -369,8 +386,8 @@ jobs:
             END IF;
             v_result := public.execute_paper_market_order(
               '22222222-2222-4222-8222-222222222222',
-              repeat('a',64),
-              '33333333-3333-4333-8333-333333333333',
+              v_order_market_buy,
+              v_idem_market_buy,
               repeat('b',64),'NSE_EQ|TEST001','TEST001','NSE',
               'BUY','DELIVERY',10,10000,floor(extract(epoch from clock_timestamp())*1000)::bigint,0
             );
@@ -386,8 +403,8 @@ jobs:
             BEGIN
               PERFORM public.execute_paper_market_order(
                 '22222222-2222-4222-8222-222222222222',
-                repeat('c',64),
-                '33333333-3333-4333-8333-333333333333',
+                v_order_market_changed,
+                v_idem_market_buy,
                 repeat('d',64),'NSE_EQ|TEST001','TEST001','NSE',
                 'BUY','DELIVERY',10,10000,floor(extract(epoch from clock_timestamp())*1000)::bigint,0
               );
@@ -398,8 +415,8 @@ jobs:
             -- SELL half the position: ₹10,000 gross spread; charges reduce net realized P&L, five shares remain.
             v_result := public.execute_paper_market_order(
               '22222222-2222-4222-8222-222222222222',
-              repeat('e',64),
-              '44444444-4444-4444-8444-444444444444',
+              v_order_market_sell,
+              v_idem_market_sell,
               repeat('f',64),'NSE_EQ|TEST001','TEST001','NSE',
               'SELL','DELIVERY',5,12000,floor(extract(epoch from clock_timestamp())*1000)::bigint,0
             );
@@ -411,8 +428,8 @@ jobs:
             END IF;
             BEGIN
               PERFORM public.submit_paper_limit_order(
-                '22222222-2222-4222-8222-222222222222',repeat('9',64),
-                '99999999-9999-4999-8999-999999999999',repeat('a',64),
+                '22222222-2222-4222-8222-222222222222',v_order_bse_limit,
+                v_idem_bse_limit,repeat('a',64),
                 'BSE_EQ|LIMIT_BSE_BLOCK','LIMIT_BSE_BLOCK','BSE','BUY',1,10000
               );
               RAISE EXCEPTION 'BSE Delivery LIMIT was accepted without scrip-group fee inputs';
@@ -421,8 +438,8 @@ jobs:
             -- Reject a LIMIT SELL whose minimum charges exceed gross proceeds.
             BEGIN
               PERFORM public.submit_paper_limit_order(
-                '22222222-2222-4222-8222-222222222222',repeat('b',64),
-                'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',repeat('c',64),
+                '22222222-2222-4222-8222-222222222222',v_order_tiny_limit,
+                v_idem_tiny_limit,repeat('c',64),
                 'NSE_EQ|TEST001','TEST001','NSE','SELL',1,1
               );
               RAISE EXCEPTION 'Tiny Delivery LIMIT SELL with negative net proceeds was accepted';
@@ -430,14 +447,14 @@ jobs:
               NULL;
             END;
             IF EXISTS(SELECT 1 FROM public.paper_orders
-              WHERE order_id='eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee') THEN
+              WHERE order_id=v_order_tiny_limit) THEN
               RAISE EXCEPTION 'Rejected tiny Delivery LIMIT SELL left a persisted order row';
             END IF;
             -- LIMIT BUY reservation then cancellation must release all reserved cash.
             v_result := public.submit_paper_limit_order(
               '22222222-2222-4222-8222-222222222222',
-              repeat('1',64),
-              '55555555-5555-4555-8555-555555555555',
+              v_order_limit_buy_cancel,
+              v_idem_limit_buy_cancel,
               repeat('2',64),'NSE_EQ|TEST002','TEST002','NSE',
               'BUY',2,20000
             );
@@ -447,7 +464,7 @@ jobs:
               RAISE EXCEPTION 'LIMIT BUY did not reserve expected cash';
             END IF;
             PERFORM public.cancel_paper_limit_order(
-              '22222222-2222-4222-8222-222222222222',repeat('1',64)
+              '22222222-2222-4222-8222-222222222222',v_order_limit_buy_cancel
             );
             SELECT reserved_cash_paise INTO v_reserved FROM public.paper_accounts
              WHERE user_id='22222222-2222-4222-8222-222222222222';
@@ -457,13 +474,13 @@ jobs:
             -- LIMIT BUY fill at a better price releases reservation and debits actual fill.
             PERFORM public.submit_paper_limit_order(
               '22222222-2222-4222-8222-222222222222',
-              repeat('3',64),
-              '66666666-6666-4666-8666-666666666666',
+              v_order_limit_buy_fill,
+              v_idem_limit_buy_fill,
               repeat('4',64),'NSE_EQ|TEST003','TEST003','NSE',
               'BUY',2,30000
             );
             v_result := public.execute_paper_limit_fill(
-              repeat('3',64),29000,floor(extract(epoch from clock_timestamp())*1000)::bigint,0,floor(extract(epoch from clock_timestamp())*1000)::bigint
+              v_order_limit_buy_fill,29000,floor(extract(epoch from clock_timestamp())*1000)::bigint,0,floor(extract(epoch from clock_timestamp())*1000)::bigint
             );
             SELECT reserved_cash_paise,cash_paise INTO v_reserved,v_cash
               FROM public.paper_accounts
@@ -476,8 +493,8 @@ jobs:
             -- LIMIT SELL must reserve shares, reject stale quotes, and release on cancel.
             PERFORM public.submit_paper_limit_order(
               '22222222-2222-4222-8222-222222222222',
-              repeat('5',64),
-              '77777777-7777-4777-8777-777777777777',
+              v_order_limit_sell_cancel,
+              v_idem_limit_sell_cancel,
               repeat('6',64),'NSE_EQ|TEST001','TEST001','NSE',
               'SELL',2,12500
             );
@@ -489,13 +506,13 @@ jobs:
               RAISE EXCEPTION 'LIMIT SELL did not reserve the expected shares';
             END IF;
             BEGIN
-              PERFORM public.execute_paper_limit_fill(repeat('5',64),13000,floor(extract(epoch from clock_timestamp())*1000)::bigint-15001,15001,floor(extract(epoch from clock_timestamp())*1000)::bigint);
+              PERFORM public.execute_paper_limit_fill(v_order_limit_sell_cancel,13000,floor(extract(epoch from clock_timestamp())*1000)::bigint-15001,15001,floor(extract(epoch from clock_timestamp())*1000)::bigint);
               RAISE EXCEPTION 'Stale LIMIT quote was unexpectedly accepted';
             EXCEPTION WHEN SQLSTATE '22023' THEN
               NULL;
             END;
             PERFORM public.cancel_paper_limit_order(
-              '22222222-2222-4222-8222-222222222222',repeat('5',64)
+              '22222222-2222-4222-8222-222222222222',v_order_limit_sell_cancel
             );
             SELECT quantity,reserved_quantity INTO v_qty,v_reserved
               FROM public.paper_equity_positions
@@ -507,12 +524,12 @@ jobs:
             -- A second LIMIT SELL fills at a better price and realizes allocated gain.
             PERFORM public.submit_paper_limit_order(
               '22222222-2222-4222-8222-222222222222',
-              repeat('7',64),
-              '88888888-8888-4888-8888-888888888888',
+              v_order_limit_sell_fill,
+              v_idem_limit_sell_fill,
               repeat('8',64),'NSE_EQ|TEST001','TEST001','NSE',
               'SELL',2,12500
             );
-            v_result := public.execute_paper_limit_fill(repeat('7',64),13000,floor(extract(epoch from clock_timestamp())*1000)::bigint,0,floor(extract(epoch from clock_timestamp())*1000)::bigint);
+            v_result := public.execute_paper_limit_fill(v_order_limit_sell_fill,13000,floor(extract(epoch from clock_timestamp())*1000)::bigint,0,floor(extract(epoch from clock_timestamp())*1000)::bigint);
             SELECT quantity,reserved_quantity INTO v_qty,v_reserved
               FROM public.paper_equity_positions
              WHERE user_id='22222222-2222-4222-8222-222222222222'

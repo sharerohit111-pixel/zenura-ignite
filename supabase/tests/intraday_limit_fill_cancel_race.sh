@@ -14,8 +14,11 @@ wait_for_terminal_update_lock() {
 }
 
 USER_ID="22222222-2222-4222-8222-222222222222"
-BUY_ORDER="$(printf 'a%.0s' {1..64})"
-SELL_ORDER="$(printf 'b%.0s' {1..64})"
+# Use run-scoped deterministic IDs: append-only ledger rows prevent reusing
+# fixture IDs already persisted by the preceding Intraday reservation test.
+RUN_NAMESPACE="${GITHUB_RUN_ID:-local}"
+BUY_ORDER="$(printf 'ci-intraday-race-buy:%s' "$RUN_NAMESPACE" | sha256sum | cut -d' ' -f1)"
+SELL_ORDER="$(printf 'ci-intraday-race-sell:%s' "$RUN_NAMESPACE" | sha256sum | cut -d' ' -f1)"
 SELL_EXEC_NOW=""
 BUY_IDEMPOTENCY="44444444-4444-4444-8444-444444444444"
 SELL_IDEMPOTENCY="55555555-5555-4555-8555-555555555555"
@@ -40,7 +43,7 @@ ON CONFLICT(exchange,session_date) DO UPDATE SET
   source_reference=excluded.source_reference,verified_at=excluded.verified_at,
   source_sha256=excluded.source_sha256;
 
-DELETE FROM public.paper_orders WHERE order_id IN ('$BUY_ORDER','$SELL_ORDER');
+-- Keep the orders: append-only Equity cash-ledger rows reference them restrictively.
 DELETE FROM public.paper_equity_positions
  WHERE user_id='$USER_ID' AND product='INTRADAY'
    AND instrument_key IN ('NSE_EQ|INTRADAY_RACE_BUY','NSE_EQ|INTRADAY_RACE_SELL');
@@ -137,7 +140,7 @@ END
 
 DROP TRIGGER IF EXISTS test_delay_intraday_limit_terminal_update ON public.paper_orders;
 DROP FUNCTION IF EXISTS public.test_delay_intraday_limit_terminal_update();
-DELETE FROM public.paper_orders WHERE order_id IN ('$BUY_ORDER','$SELL_ORDER');
+-- Keep the orders: append-only Equity cash-ledger rows reference them restrictively.
 DELETE FROM public.paper_equity_positions
  WHERE user_id='$USER_ID' AND product='INTRADAY'
    AND instrument_key IN ('NSE_EQ|INTRADAY_RACE_BUY','NSE_EQ|INTRADAY_RACE_SELL');
