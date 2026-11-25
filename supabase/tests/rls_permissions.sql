@@ -15,7 +15,27 @@ DO $rls_privileges$
 DECLARE
   v_count integer;
   v_rows integer;
+  v_table text;
+  v_policy_count integer;
 BEGIN
+  -- Every user-visible private trading table must have an authenticated
+  -- ownership policy. This guards against a future migration silently
+  -- enabling RLS without restoring the matching auth.uid() predicate.
+  FOREACH v_table IN ARRAY ARRAY[
+    'paper_accounts','paper_equity_positions','paper_derivative_positions',
+    'paper_orders','paper_derivative_orders','paper_watchlists'
+  ] LOOP
+    SELECT count(*) INTO v_policy_count
+      FROM pg_policies
+     WHERE schemaname='public'
+       AND tablename=v_table
+       AND 'authenticated'=ANY(roles)
+       AND coalesce(qual,'') ~* 'auth\.uid\(\)'
+       AND coalesce(qual,'') ~* 'user_id';
+    IF v_policy_count=0 THEN
+      RAISE EXCEPTION 'Missing authenticated owner-scoped SELECT policy for public.%',v_table;
+    END IF;
+  END LOOP;
   IF NOT has_table_privilege('authenticated','public.paper_accounts','SELECT')
      OR NOT has_table_privilege('authenticated','public.paper_orders','SELECT')
      OR NOT has_table_privilege('authenticated','public.paper_derivative_orders','SELECT')
