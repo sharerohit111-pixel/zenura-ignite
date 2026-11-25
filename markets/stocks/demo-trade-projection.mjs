@@ -54,4 +54,5 @@ function appendUnifiedDemoSummary(container,screen){
  if(!rows.length){const tr=document.createElement("tr"),td=document.createElement("td");td.colSpan=headers.length;td.textContent="No canonical DEMO records yet.";tr.append(td);tbody.append(tr);}
  table.append(thead,tbody);wrap.append(table);host.append(wrap);container.append(host);
 }
+export function getDemoProjectionSnapshot(){return getStore().snapshot();}
 export {syncDemoProjection,appendUnifiedDemoSummary};
