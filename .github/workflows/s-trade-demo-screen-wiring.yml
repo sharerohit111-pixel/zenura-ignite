@@ -21,6 +21,7 @@ on:
       - ".github/workflows/s-trade-demo-screen-wiring.yml"
   push:
     branches:
+      - feature/s-trade-order-lifecycle-replay-2026-11-25
       - feature/s-trade-round2-demo-screen-wiring-2026-11-24
     paths:
       - "markets/shared/paper-demo-adapter.mjs"
