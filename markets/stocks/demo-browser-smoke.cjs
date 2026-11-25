@@ -83,6 +83,21 @@ async function scanTextContrast(page){
     throw new Error("Demo fixture startup timed out: "+JSON.stringify({state,pageErrors,browserDiagnostics})+"; "+error.message);
    }
    assert.equal(await page.locator("#screen-nav button[data-screen]").count(),15,viewport.name+" screen count");
+   // Keyboard-only navigation must move through the native screen buttons in DOM order.
+   const firstScreenButton=page.locator('#screen-nav button[data-screen="home"]');
+   await firstScreenButton.focus();
+   await page.keyboard.press("Tab");
+   assert.equal(await page.locator(":focus").getAttribute("data-screen"),"market",viewport.name+" keyboard Tab follows screen navigation order");
+   await page.keyboard.press("Shift+Tab");
+   assert.equal(await page.locator(":focus").getAttribute("data-screen"),"home",viewport.name+" keyboard Shift+Tab reverses screen navigation order");
+   // WCAG 2.2 AA minimum target-size check (24 CSS px); report dimensions for every screen button.
+   const navTargets=await page.locator("#screen-nav button[data-screen]").evaluateAll(nodes=>nodes.map(node=>{
+    const rect=node.getBoundingClientRect();
+    return {screen:node.dataset.screen,width:Math.round(rect.width),height:Math.round(rect.height)};
+   }));
+   const undersizedTargets=navTargets.filter(target=>target.width<24||target.height<24);
+   assert.deepEqual(undersizedTargets,[],viewport.name+" screen navigation targets must meet 24x24 CSS px minimum");
+   console.log(JSON.stringify({viewport:viewport.name,keyboardOrder:"PASS",minimumTargetSizeCssPx:24,navTargets}));
    const contrastReports=[];
    for(const name of ["home","market","watchlists","charts","equity","futures","options","orders","trades","portfolio","positions","holdings","account","profile","settings"]){
     await page.locator('#screen-nav button[data-screen="'+name+'"]').click();
