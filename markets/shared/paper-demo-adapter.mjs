@@ -26,6 +26,28 @@ function assertMockInstrument(instrumentKey, symbol) {
   if (typeof instrumentKey !== "string" || !instrumentKey.startsWith("MOCK|")) fail("NON_SYNTHETIC_INSTRUMENT_KEY");
   if (typeof symbol !== "string" || !/^MOCK[A-Z0-9-]*$/.test(symbol)) fail("NON_SYNTHETIC_INSTRUMENT_SYMBOL");
 }
+function assertMarketInstrumentIdentity(instrumentKey, exchange, segment) {
+  const parts = typeof instrumentKey === "string" ? instrumentKey.split("|") : [];
+  if (parts.length !== 4 || parts[0] !== "MOCK" ||
+      !["NSE", "BSE"].includes(parts[1]) || parts[1] !== exchange ||
+      !["EQ", "INDEX"].includes(parts[2]) || parts[2] !== segment ||
+      !/^\\d{4,}$/.test(parts[3])) fail("MOCK_MARKET_INSTRUMENT_IDENTITY_MISMATCH");
+}
+function assertDerivativeInstrumentIdentity(contract) {
+  const parts = contract.instrumentKey.split("|");
+  const expectedSegment = contract.assetClass === "FUTURE" ? "FUT" : "OPT";
+  const expectedLength = contract.assetClass === "FUTURE" ? 5 : 7;
+  if (parts.length !== expectedLength || parts[0] !== "MOCK" ||
+      parts[1] !== contract.exchange || parts[2] !== expectedSegment ||
+      parts[3] !== contract.underlying || parts[parts.length - 1] !== contract.expiry) {
+    fail("MOCK_DERIVATIVE_INSTRUMENT_IDENTITY_MISMATCH");
+  }
+  if (contract.assetClass === "OPTION" &&
+      (!/^\\d+$/.test(parts[4]) || Number(parts[4]) * 100 !== contract.strikePaise ||
+       parts[5] !== contract.optionType)) {
+    fail("MOCK_DERIVATIVE_INSTRUMENT_IDENTITY_MISMATCH");
+  }
+}
 function assertOrder(order, name) {
   if (!isObject(order) || typeof order.orderId !== "string" || !order.orderId ||
       !SIDES.has(order.side) || !ORDER_TYPES.has(order.orderType) || !ORDER_STATUSES.has(order.status)) fail("INVALID_MOCK_ORDER:" + name);
@@ -77,6 +99,7 @@ export function createPaperDemoViewModel(fixtures, options = {}) {
     assertMockInstrument(quote.instrumentKey, quote.symbol);
     const [, exchange, segment] = quote.instrumentKey.split("|");
     if (!["NSE", "BSE"].includes(exchange) || !["EQ", "INDEX"].includes(segment) || instrumentKeys.has(quote.instrumentKey)) fail("INVALID_OR_DUPLICATE_MOCK_MARKET_INSTRUMENT");
+    assertMarketInstrumentIdentity(quote.instrumentKey, exchange, segment);
     instrumentKeys.add(quote.instrumentKey);
     return {
       instrumentKey: quote.instrumentKey, symbol: quote.symbol, exchange,
@@ -94,6 +117,8 @@ export function createPaperDemoViewModel(fixtures, options = {}) {
   const depthQuote = market.quotes.find(quote => quote.instrumentKey === market.depth.instrumentKey);
   if (!depthQuote) fail("UNKNOWN_SYNTHETIC_DEPTH_INSTRUMENT");
   assertMockInstrument(market.depth.instrumentKey, depthQuote.symbol);
+  const [, depthExchange, depthSegment] = market.depth.instrumentKey.split("|");
+  assertMarketInstrumentIdentity(market.depth.instrumentKey, depthExchange, depthSegment);
   for (const level of [...market.depth.bids, ...market.depth.asks]) {
     if (!isObject(level) || !Number.isSafeInteger(level.pricePaise) || level.pricePaise <= 0 ||
         !Number.isSafeInteger(level.quantity) || level.quantity < 0) fail("INVALID_SYNTHETIC_DEPTH_LEVEL");
@@ -118,7 +143,7 @@ export function createPaperDemoViewModel(fixtures, options = {}) {
 
   assertMockInstrument(equity.instrumentKey, equity.symbol);
   const equityQuote = market.quotes.find(quote => quote.instrumentKey === equity.instrumentKey);
-  if (!equityQuote || equityQuote.symbol !== equity.symbol) fail("MOCK_EQUITY_INSTRUMENT_MISMATCH");
+  if (!equityQuote || equityQuote.symbol !== equity.symbol || equity.instrumentKey.split("|")[2] !== "EQ") fail("MOCK_EQUITY_INSTRUMENT_MISMATCH");
   assertOrder(equity.order, "equity");
   if (!isObject(equity.position) || !Number.isSafeInteger(equity.position.quantity) || equity.position.quantity < 0 ||
       !Number.isSafeInteger(equity.position.averagePricePaise) || equity.position.averagePricePaise < 0) fail("INVALID_MOCK_EQUITY_POSITION");
@@ -148,6 +173,7 @@ export function createPaperDemoViewModel(fixtures, options = {}) {
         !Number.isSafeInteger(contract.lotSize) || contract.lotSize < 1 ||
         !Number.isSafeInteger(contract.tickSizePaise) || contract.tickSizePaise < 1) fail("INVALID_MOCK_DERIVATIVE_CONTRACT");
     assertMockInstrument(contract.instrumentKey, contract.symbol);
+    assertDerivativeInstrumentIdentity(contract);
     if (instrumentKeys.has(contract.instrumentKey)) fail("DUPLICATE_MOCK_INSTRUMENT_KEY");
     instrumentKeys.add(contract.instrumentKey);
     if (typeof contract.underlying !== "string" || !/^MOCK[A-Z0-9-]*$/.test(contract.underlying)) fail("INVALID_MOCK_UNDERLYING");
