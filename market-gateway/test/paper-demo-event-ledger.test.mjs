@@ -235,6 +235,22 @@ test("event timestamps require an explicit ISO-8601 timezone", () => {
   assert.equal(ledger.snapshot().events.length, 0);
 });
 
+test("event timestamps reject impossible calendar dates and out-of-range clock fields", () => {
+  const ledger = createPaperDemoEventLedger(opening);
+  for (const occurredAt of [
+    "2026-02-30T09:30:00+05:30",
+    "2025-02-29T09:30:00+05:30",
+    "2026-13-01T09:30:00+05:30",
+    "2026-11-25T24:00:00+05:30",
+    "2026-11-25T09:60:00+05:30",
+    "2026-11-25T09:30:60+05:30"
+  ]) {
+    assert.throws(() => ledger.append(event({ occurredAt })), /INVALID_EVENT_TIMESTAMP/);
+  }
+  assert.equal(ledger.snapshot().events.length, 0);
+  assert.equal(ledger.append(event({ occurredAt: "2024-02-29T09:30:00+05:30" })).accepted, true);
+});
+
 test("replay rejects reordered events instead of silently sorting them", () => {
   const ledger = createPaperDemoEventLedger(opening);
   ledger.append(event());
