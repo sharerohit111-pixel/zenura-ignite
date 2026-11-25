@@ -23,9 +23,14 @@ const SCREENS = ["home","market","watchlists","charts","equity","futures","optio
       const registration = registrations.find(item => item.scope === new URL("/markets/", location.origin).href);
       return registration?.active?.state === "activated" && !registration.installing;
     }, null, { timeout: 30000 });
-    const cachesAfterActivation = await pwaPage.evaluate(() => caches.keys());
-    assert.ok(cachesAfterActivation.includes("zenura-markets-shell-v11"), "current v11 cache must be active");
-    assert.ok(!cachesAfterActivation.includes("zenura-markets-shell-v10"), "activation must delete the seeded v10 cache");
+    await pwaPage.waitForFunction(async () => !(await caches.keys()).includes("zenura-markets-shell-v10"), null, { timeout: 5000 }).catch(() => null);
+    const activationInfo = await pwaPage.evaluate(async () => {
+      const registrations = await navigator.serviceWorker.getRegistrations();
+      const registration = registrations.find(item => item.scope === new URL("/markets/", location.origin).href);
+      return { keys: await caches.keys(), activeState: registration?.active?.state || null, activeScript: registration?.active?.scriptURL || null };
+    });
+    assert.ok(activationInfo.keys.includes("zenura-markets-shell-v11"), "current v11 cache must be active: " + JSON.stringify(activationInfo));
+    assert.ok(!activationInfo.keys.includes("zenura-markets-shell-v10"), "activation must delete the seeded v10 cache: " + JSON.stringify(activationInfo));
     await pwaPage.reload({ waitUntil: "domcontentloaded" });
     await pwaPage.waitForFunction(() => !!navigator.serviceWorker.controller, null, { timeout: 15000 });
 
