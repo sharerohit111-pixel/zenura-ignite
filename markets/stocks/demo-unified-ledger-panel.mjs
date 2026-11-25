@@ -6,38 +6,65 @@ export const EQUITY_MARK_MAX_AGE_MS = 60_000;
 export const DERIVATIVE_MARK_MAX_AGE_MS = 15_000;
 export const EQUITY_MARK_MAX_FUTURE_SKEW_MS = 5_000;
 export const NSE_REVISED_DERIVATIVES_HOURS_EFFECTIVE_DATE = "2026-12-07";
-export const BSE_DERIVATIVES_HOURS_VERIFIED_THROUGH_DATE = "2026-12-06";
+export const BSE_REVISED_DERIVATIVES_HOURS_EFFECTIVE_DATE = "2026-12-07";
+export const BSE_CAS_DERIVATIVES_HOURS_EFFECTIVE_DATE = "2026-08-03";
+export const DERIVATIVE_CALENDAR_VERIFIED_YEAR = 2026;
 
-// Expiry is exchange- and contract-class-specific. Unknown classifications and
-// unverified post-effective BSE hours fail closed rather than inventing a cutoff.
-export function portfolioDerivativeExpiryCutoff(expiryDate, { exchange, underlyingType } = {}) {
-  if (typeof expiryDate !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(expiryDate)) return null;
+// Official 2026 exchange holiday notices. Muhurat Trading is deliberately
+// excluded from regular expiry valuation because its segment/session timings
+// are separately notified and are not a regular derivatives session.
+const NSE_DERIVATIVES_HOLIDAYS_2026 = new Set([
+  "2026-01-15", "2026-01-26", "2026-03-03", "2026-03-26", "2026-03-31",
+  "2026-04-03", "2026-04-14", "2026-05-01", "2026-05-28", "2026-06-26",
+  "2026-09-14", "2026-10-02", "2026-10-20", "2026-11-10", "2026-11-24",
+  "2026-12-25"
+]);
+const BSE_DERIVATIVES_HOLIDAYS_2026 = new Set([
+  "2026-01-26", "2026-03-03", "2026-03-26", "2026-03-31", "2026-04-03",
+  "2026-04-14", "2026-05-01", "2026-05-28", "2026-06-26", "2026-09-14",
+  "2026-10-02", "2026-10-20", "2026-11-10", "2026-11-24", "2026-12-25"
+]);
+const SPECIAL_SESSION_DATES_2026 = new Set(["2026-11-08"]);
+
+export function isVerifiedRegularDerivativeExpiryDate(expiryDate, exchange) {
+  if (typeof expiryDate !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(expiryDate)) return false;
   const [year, month, day] = expiryDate.split("-").map(Number);
-  const calendarDate = new Date(Date.UTC(year, month - 1, day));
-  if (calendarDate.getUTCFullYear() !== year || calendarDate.getUTCMonth() !== month - 1 ||
-      calendarDate.getUTCDate() !== day) return null;
+  const date = new Date(Date.UTC(year, month - 1, day));
+  if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 ||
+      date.getUTCDate() !== day || year !== DERIVATIVE_CALENDAR_VERIFIED_YEAR) return false;
+  const weekday = date.getUTCDay();
+  if (weekday === 0 || weekday === 6 || SPECIAL_SESSION_DATES_2026.has(expiryDate)) return false;
+  if (exchange === "NSE") return !NSE_DERIVATIVES_HOLIDAYS_2026.has(expiryDate);
+  if (exchange === "BSE") return !BSE_DERIVATIVES_HOLIDAYS_2026.has(expiryDate);
+  return false;
+}
+
+// Exchange-specific expiry cutoffs. Calendar dates outside the verified
+// exchange calendar and all non-regular sessions fail closed.
+export function portfolioDerivativeExpiryCutoff(expiryDate, { exchange, underlyingType } = {}) {
+  if (!isVerifiedRegularDerivativeExpiryDate(expiryDate, exchange)) return null;
 
   let hour;
   let minute;
-  if (exchange === "NSE") {
-    if (expiryDate < NSE_REVISED_DERIVATIVES_HOURS_EFFECTIVE_DATE) {
-      hour = 15;
-      minute = 30;
-    } else if (underlyingType === "INDEX") {
-      hour = 15;
-      minute = 30;
-    } else if (underlyingType === "STOCK") {
-      hour = 15;
-      minute = 45;
-    } else {
-      return null;
-    }
-  } else if (exchange === "BSE" && expiryDate <= BSE_DERIVATIVES_HOURS_VERIFIED_THROUGH_DATE) {
+  if (exchange === "NSE" && expiryDate < NSE_REVISED_DERIVATIVES_HOURS_EFFECTIVE_DATE) {
+    hour = 15;
+    minute = 30;
+  } else if (exchange === "BSE" && expiryDate < BSE_CAS_DERIVATIVES_HOURS_EFFECTIVE_DATE) {
+    hour = 15;
+    minute = 30;
+  } else if (exchange === "BSE" && expiryDate < BSE_REVISED_DERIVATIVES_HOURS_EFFECTIVE_DATE) {
     hour = 15;
     minute = 40;
+  } else if ((exchange === "NSE" || exchange === "BSE") && underlyingType === "INDEX") {
+    hour = 15;
+    minute = 30;
+  } else if ((exchange === "NSE" || exchange === "BSE") && underlyingType === "STOCK") {
+    hour = 15;
+    minute = 45;
   } else {
     return null;
   }
+
   const clock = String(hour).padStart(2, "0") + ":" +
     String(minute).padStart(2, "0") + ":00+05:30";
   const cutoff = Date.parse(expiryDate + "T" + clock);
