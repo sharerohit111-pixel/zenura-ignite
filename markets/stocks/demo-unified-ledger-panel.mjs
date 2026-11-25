@@ -27,7 +27,7 @@ const BSE_DERIVATIVES_HOLIDAYS_2026 = new Set([
 const SPECIAL_SESSION_DATES_2026 = new Set(["2026-11-08"]);
 
 export function isVerifiedRegularDerivativeExpiryDate(expiryDate, exchange) {
-  if (typeof expiryDate !== "string" || !/^\\d{4}-\\d{2}-\\d{2}$/.test(expiryDate)) return false;
+  if (typeof expiryDate !== "string" || !/^\d{4}-\\d{2}-\\d{2}$/.test(expiryDate)) return false;
   const [year, month, day] = expiryDate.split("-").map(Number);
   const date = new Date(Date.UTC(year, month - 1, day));
   if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 ||
