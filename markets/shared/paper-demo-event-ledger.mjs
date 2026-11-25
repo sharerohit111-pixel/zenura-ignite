@@ -26,14 +26,21 @@ function productOf(payload) {
 function positionKey(assetClass, instrumentKey, product) {
   return assetClass + "|" + instrumentKey + "|" + product;
 }
+function timestampMs(value) {
+  if (typeof value !== "string" || !/^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,3})?(?:Z|[+-]\\d{2}:\\d{2})$/.test(value)) fail("INVALID_EVENT_TIMESTAMP");
+  const parsed = Date.parse(value);
+  if (!Number.isFinite(parsed)) fail("INVALID_EVENT_TIMESTAMP");
+  return parsed;
+}
 function validateEvent(input, identity, expectedSequence) {
   if (!object(input)) fail("INVALID_EVENT");
+  if (input.schemaVersion !== VERSION) fail("UNSUPPORTED_EVENT_SCHEMA_VERSION");
   validateIdentity(input.eventId, "EVENT_ID");
   validateIdentity(input.idempotencyKey, "IDEMPOTENCY_KEY");
   validateIdentity(input.sourceEventId, "SOURCE_EVENT_ID");
   if (input.sessionId !== identity.sessionId || input.accountId !== identity.accountId) fail("DEMO_EVENT_SCOPE_MISMATCH");
   if (input.sequence !== expectedSequence) fail("DEMO_EVENT_SEQUENCE_MISMATCH");
-  if (typeof input.occurredAt !== "string" || !Number.isFinite(Date.parse(input.occurredAt))) fail("INVALID_EVENT_TIMESTAMP");
+  timestampMs(input.occurredAt);
   if (!ENGINES.has(input.engine) || !EVENT_TYPES.has(input.type)) fail("INVALID_EVENT_KIND");
   if (!object(input.deltas)) fail("INVALID_EVENT_DELTAS");
   for (const key of ["cashDeltaPaise", "blockedDeltaPaise"]) {
@@ -169,7 +176,7 @@ export function createPaperDemoEventLedger(opening) {
   const eventIds = new Map(), sourceEvents = new Map(), idempotency = new Map();
   let lastTimestamp = -Infinity;
   function append(input) {
-    const candidate = { ...input, sequence: projection.events.length + 1 };
+    const candidate = { ...input, schemaVersion: input.schemaVersion === undefined ? VERSION : input.schemaVersion, sequence: projection.events.length + 1 };
     const event = validateEvent(candidate, identity, projection.events.length + 1);
     const fingerprint = JSON.stringify({ ...event, sequence: undefined });
     const prior = idempotency.get(event.idempotencyKey);
@@ -180,7 +187,7 @@ export function createPaperDemoEventLedger(opening) {
     if (eventIds.has(event.eventId)) fail("DUPLICATE_EVENT_ID");
     const sourceKey = event.engine + "|" + event.sourceEventId;
     if (sourceEvents.has(sourceKey)) fail("DUPLICATE_SOURCE_EVENT");
-    const time = Date.parse(event.occurredAt);
+    const time = timestampMs(event.occurredAt);
     if (time < lastTimestamp) fail("DEMO_EVENT_TIME_ORDER_MISMATCH");
     const before = clone(projection);
     try {
@@ -202,8 +209,8 @@ export function createPaperDemoEventLedger(opening) {
 export function replayPaperDemoEvents(opening, events) {
   if (!Array.isArray(events)) fail("DEMO_EVENT_ARRAY_REQUIRED");
   const ledger = createPaperDemoEventLedger(opening);
-  const ordered = [...events].sort((a, b) => a.sequence - b.sequence);
-  ordered.forEach((event, index) => {
+  events.forEach((event, index) => {
+    if (!object(event) || event.schemaVersion !== VERSION) fail("UNSUPPORTED_EVENT_SCHEMA_VERSION");
     if (event.sequence !== index + 1) fail("DEMO_EVENT_SEQUENCE_MISMATCH");
     const { sequence, ...input } = event;
     const result = ledger.append(input);
