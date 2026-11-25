@@ -21,6 +21,7 @@ on:
       - ".github/workflows/s-trade-demo-screen-wiring.yml"
   push:
     branches:
+      - feature/s-trade-order-lifecycle-replay-2026-11-25
       - feature/s-trade-round2-demo-screen-wiring-2026-11-24
     paths:
       - "markets/shared/paper-demo-adapter.mjs"
@@ -50,7 +51,7 @@ jobs:
         with:
           node-version: "22"
       - name: Check browser module syntax
-        run: node --check markets/shared/paper-demo-adapter.mjs && node --check markets/stocks/demo.js && node --check markets/stocks/demo-trade-projection.mjs && node --check markets/stocks/demo-chart-data.mjs && node --check markets/stocks/demo-chart-panel.mjs
+        run: node --check market-gateway/lib/demo-trade-history-store.js && node --check markets/shared/paper-demo-adapter.mjs && node --check markets/stocks/demo.js && node --check markets/stocks/demo-trade-projection.mjs && node --check markets/stocks/demo-chart-data.mjs && node --check markets/stocks/demo-chart-panel.mjs
       - name: Validate shared fixtures
         run: |
           node - <<'NODE'
