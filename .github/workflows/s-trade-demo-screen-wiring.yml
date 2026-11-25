@@ -12,7 +12,8 @@ on:
       - "markets/stocks/index.html"
       - "markets/service-worker.js"
       - "market-gateway/lib/demo-trade-history-store.js"
-      - "market-gateway/test/demo-trade-history-store.test.js"\n      - "market-gateway/test/demo-portfolio-panel.test.js"
+      - "market-gateway/test/demo-trade-history-store.test.js"
+      - "market-gateway/test/demo-portfolio-panel.test.js"
       - "market-gateway/test/demo-trade-projection.test.js"
       - "market-gateway/test/paper-demo-dashboard.test.mjs"
       - "market-gateway/test/paper-demo-equity-integration.test.mjs"
@@ -59,7 +60,7 @@ jobs:
           console.log('Parsed all four canonical screen fixtures.');
           NODE
       - name: Run adapter, screen and unified projection tests
-        run: node --test market-gateway/test/paper-demo-adapter.test.mjs market-gateway/test/paper-demo-dashboard.test.mjs market-gateway/test/demo-chart-data.test.mjs market-gateway/test/paper-demo-equity-integration.test.mjs market-gateway/test/paper-demo-derivative-integration.test.mjs market-gateway/test/demo-trade-projection.test.js market-gateway/test/demo-trade-history-store.test.js
+        run: node --test market-gateway/test/paper-demo-adapter.test.mjs market-gateway/test/paper-demo-dashboard.test.mjs market-gateway/test/demo-chart-data.test.mjs market-gateway/test/paper-demo-equity-integration.test.mjs market-gateway/test/paper-demo-derivative-integration.test.mjs market-gateway/test/demo-trade-projection.test.js market-gateway/test/demo-trade-history-store.test.js market-gateway/test/demo-portfolio-panel.test.js
       - name: Install Chromium browser QA dependencies
         run: |
           npm install --prefix "$RUNNER_TEMP/zenura-playwright" playwright@1.61.1 axe-core@4.10.3 --ignore-scripts --no-audit --no-fund
