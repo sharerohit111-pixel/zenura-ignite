@@ -70,10 +70,8 @@ const axePath=require.resolve("axe-core/axe.min.js");
   });
   assert.equal(workerState.state,"activated","service worker must be active before controlled reload");
   console.log(JSON.stringify({pwaWorker:workerState.state,scope:workerState.scope}));
-  // Wait for the activated registration before reloading into its controlled scope.
-  console.log("PWA: reloading under active service worker");
-  await page.reload({waitUntil:"domcontentloaded",timeout:30000});
-  await page.waitForFunction(()=>!!navigator.serviceWorker.controller,null,{timeout:15000});
+  // clients.claim() in the activate handler controls existing same-scope clients.
+  // Open a fresh same-scope tab rather than forcing a navigation reload race.
   const controlledPage=await pwa.newPage();
   console.log("PWA: opening demo under service worker");
   await controlledPage.goto("http://127.0.0.1:4173/markets/stocks/demo.html",{waitUntil:"domcontentloaded",timeout:30000});
