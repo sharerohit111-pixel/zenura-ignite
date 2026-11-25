@@ -33,3 +33,7 @@ test("auth-state transitions are the authority for showing or hiding credential 
   assert.match(source, /signOutButton\.hidden = false/);
   assert.match(source, /signOutButton\.hidden = true/);
 });
+
+test("auth-state changes release stale busy controls", () => {
+  assert.match(source, /authSequence\+\+;\s*signIn\.disabled = false;\s*create\.disabled = false;\s*signOutButton\.disabled = false;/);
+});
