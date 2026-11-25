@@ -75,13 +75,14 @@ const axePath=require.resolve("axe-core/axe.min.js");
     await page.locator("#options-side").selectOption("CE");
     assert.ok(await page.locator(".catalog-results tbody tr").count()>0,"filtered CE option chain rows");
 
-    // Equity market order -> manual deterministic fill -> immutable receipt.
+    // Equity wallet is deliberately fail-closed until a real authoritative receipt verifier is wired.
     await page.locator('#screen-nav button[data-screen="equity"]').click();
     await page.waitForFunction(()=>document.querySelector(".demo-eq-status")?.textContent.includes("simulator ready"));
     await page.getByRole("button",{name:"PLACE DEMO ORDER"}).click();
-    await page.getByRole("button",{name:"SIMULATE NEXT FILL"}).click();
-    assert.ok((await page.locator(".demo-eq-status").textContent()).includes("Synthetic fill"),"Equity order fill flow");
-    assert.ok(await page.locator(".demo-eq-table-wrap").nth(2).locator("tbody tr").count()>0,"Equity immutable fill receipt");
+    await page.waitForFunction(()=>document.querySelector(".demo-eq-status")?.textContent.includes("EQUITY_WALLET_RECEIPT_GATE_CLOSED"));
+    assert.ok((await page.locator(".demo-eq-status").textContent()).includes("EQUITY_WALLET_RECEIPT_GATE_CLOSED"),"Equity order must be blocked without an authoritative wallet receipt path");
+    assert.equal(await page.getByRole("button",{name:"SIMULATE NEXT FILL"}).isDisabled(),true,"unreceipted Equity order cannot enable fill execution");
+    assert.equal(await page.locator(".demo-eq-table-wrap").nth(2).locator("tbody tr").count(),1,"no fill receipt row may be created");
 
     // Futures and Options MARKET order entry must accept a local synthetic order.
     await page.locator('#screen-nav button[data-screen="futures"]').click();
