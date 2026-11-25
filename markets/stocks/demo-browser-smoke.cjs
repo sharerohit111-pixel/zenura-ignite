@@ -41,6 +41,7 @@ const axePath=require.resolve("axe-core/axe.min.js");
    // Exercise chart interactions on desktop and both mobile viewports.
    await page.locator('#screen-nav button[data-screen="charts"]').click();
    assert.ok(await page.locator(".demo-badge").textContent().then(value=>value.includes("MOCK")&&value.includes("DEMO DATA")&&value.includes("NOT LIVE")),"chart MOCK / DEMO DATA identity");
+   await page.waitForFunction(()=>document.querySelector("#demo-depth-status")?.textContent.includes("3 bid / 3 ask levels"),null,{timeout:10000});
    assert.ok((await page.locator("#demo-depth-status").textContent()).includes("3 bid / 3 ask levels"),"canonical matching instrument exposes fixture depth");
    const chartInstrument=page.locator("#demo-instrument");
    await chartInstrument.selectOption({index:1});
