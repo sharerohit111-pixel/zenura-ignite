@@ -73,7 +73,7 @@ test("Demo controls retain native labels, mobile breakpoints and PWA shell cover
 
 test("PWA shell cache manifest contains no duplicate request URLs", async () => {
   const sw = await read("markets/service-worker.js");
-  const match = sw.match(/const SHELL=\\[([\\s\\S]*?)\\]\\.map\\(path=>new URL\\(path,BASE\\)\\.toString\\(\\)\\);/);
+  const match = sw.match(/const SHELL=\[([\s\S]*?)\]\.map\(path=>new URL\(path,BASE\)\.toString\(\)\);/);
   assert.ok(match, "service-worker shell manifest must remain statically auditable");
   const paths = [...match[1].matchAll(/"([^"]*)"/g)].map(entry => entry[1]);
   assert.ok(paths.length > 0, "PWA shell must include assets");
