@@ -50,7 +50,7 @@ test("fill must refer to an accepted order from the same engine and instrument",
   const ledger = createPaperDemoEventLedger(opening);
   assert.throws(() => ledger.append(event({
     type: "FILL_RECORDED", payload: { fillId: "fill-1", orderId: "missing", assetClass: "EQUITY", instrumentKey: "MOCK|NSE|EQ|0001", side: "BUY", quantity: 1, pricePaise: 125050, grossPaise: 125050 },
-    deltas: { cashDeltaPaise: 0, blockedDeltaPaise: 0 }
+    deltas: { cashDeltaPaise: -125050, blockedDeltaPaise: 0 }
   })), /FILL_ORDER_MISMATCH/);
   assert.equal(ledger.snapshot().events.length, 0);
   assert.equal(ledger.snapshot().account.cashBalancePaise, opening.cashBalancePaise);
