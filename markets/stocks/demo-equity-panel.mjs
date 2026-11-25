@@ -45,7 +45,7 @@ export async function mountEquityDemo(container){
  const panel=el("section","demo-eq-panel");
  panel.append(el("div","demo-eq-heading","EQUITY · CANONICAL LOCAL PAPER SIMULATOR"));
  panel.append(el("div","demo-eq-identity","DEMO DATA · MOCK · SYNTHETIC ONLY"));
- panel.append(el("p","demo-eq-disclaimer","This reuses the canonical PR #148 Equity engine. Browser-memory only: no production RPC, live price, broker API, tax/fee calculation or database write. This local simulator is separate from the unreconciled Wallet snapshot."));
+ panel.append(el("p","demo-eq-disclaimer","This reuses the canonical PR #148 Equity engine. Browser-memory only: no production RPC, live price, broker API, tax/fee calculation or database write. This local simulator is not reconciled with the Wallet snapshot."));
  const stats=el("div","demo-eq-stats");
  const controls=el("div","demo-eq-controls");
  const side=el("select","demo-eq-input"),type=el("select","demo-eq-input"),product=el("select","demo-eq-input"),quantity=el("input","demo-eq-input"),limit=el("input","demo-eq-input"),activeOrderSelect=el("select","demo-eq-input");
