@@ -231,3 +231,88 @@ test("product-aware cost basis cannot become negative or outlive a flat position
   })), /DEMO_POSITION_INVARIANT/);
   assert.equal(ledger.snapshot().events.length, 0);
 });
+
+
+test("canonical events enforce schema version and timezone-qualified timestamps", () => {
+  const ledger = createPaperDemoEventLedger(opening);
+  const accepted = ledger.append(event());
+  assert.equal(accepted.event.schemaVersion, "1.2.0");
+  assert.throws(() => ledger.append(event({
+    eventId: "evt-2", idempotencyKey: "idem-2", sourceEventId: "future-schema",
+    occurredAt: "2026-11-25T09:30:01+05:30", schemaVersion: "2.0.0"
+  })), /UNSUPPORTED_EVENT_SCHEMA_VERSION/);
+  assert.throws(() => ledger.append(event({ eventId: "evt-3", idempotencyKey: "idem-3", sourceEventId: "no-zone", occurredAt: "2026-11-25T09:30:02" })), /INVALID_EVENT_TIMESTAMP/);
+  assert.equal(ledger.snapshot().events.length, 1);
+});
+
+test("replay rejects reordered events instead of silently sorting them", () => {
+  const ledger = createPaperDemoEventLedger(opening);
+  ledger.append(event());
+  ledger.append(event({
+    eventId: "evt-2", idempotencyKey: "idem-2", sourceEventId: "equity-fill-1",
+    type: "FILL_RECORDED", occurredAt: "2026-11-25T09:30:01+05:30",
+    deltas: { cashDeltaPaise: -125050, blockedDeltaPaise: -10000 },
+    payload: { fillId: "fill-1", orderId: "order-1", assetClass: "EQUITY", instrumentKey: "MOCK|NSE|EQ|0001", side: "BUY", quantity: 1, pricePaise: 125050 }
+  }));
+  assert.throws(() => replayPaperDemoEvents(opening, ledger.snapshot().events.slice().reverse()), /DEMO_EVENT_SEQUENCE_MISMATCH/);
+});
+
+test("order transitions cannot reopen terminal states or bypass PENDING on acceptance", () => {
+  const ledger = createPaperDemoEventLedger(opening);
+  ledger.append(event());
+  ledger.append(event({
+    eventId: "evt-2", idempotencyKey: "idem-2", sourceEventId: "partial",
+    type: "ORDER_UPDATED", occurredAt: "2026-11-25T09:30:01+05:30",
+    deltas: { cashDeltaPaise: 0, blockedDeltaPaise: 0 },
+    payload: { ...event().payload, status: "PARTIALLY_FILLED" }
+  }));
+  ledger.append(event({
+    eventId: "evt-3", idempotencyKey: "idem-3", sourceEventId: "cancel",
+    type: "ORDER_UPDATED", occurredAt: "2026-11-25T09:30:02+05:30",
+    deltas: { cashDeltaPaise: 0, blockedDeltaPaise: 0 },
+    payload: { ...event().payload, status: "CANCELLED" }
+  }));
+  assert.throws(() => ledger.append(event({
+    eventId: "evt-4", idempotencyKey: "idem-4", sourceEventId: "reopen",
+    type: "ORDER_UPDATED", occurredAt: "2026-11-25T09:30:03+05:30",
+    deltas: { cashDeltaPaise: 0, blockedDeltaPaise: 0 },
+    payload: { ...event().payload, status: "PENDING" }
+  })), /INVALID_ORDER_STATUS_TRANSITION/);
+  assert.throws(() => createPaperDemoEventLedger(opening).append(event({
+    payload: { ...event().payload, status: "FILLED" }
+  })), /INVALID_INITIAL_ORDER_STATUS/);
+});
+
+test("terminal orders reject fills and replay rejects terminal reopening", () => {
+  const ledger = createPaperDemoEventLedger(opening);
+  ledger.append(event());
+  ledger.append(event({
+    eventId: "evt-2", idempotencyKey: "idem-2", sourceEventId: "cancel",
+    type: "ORDER_UPDATED", occurredAt: "2026-11-25T09:30:01+05:30",
+    deltas: { cashDeltaPaise: 0, blockedDeltaPaise: 0 },
+    payload: { ...event().payload, status: "CANCELLED" }
+  }));
+  const history = ledger.snapshot().events;
+  assert.throws(() => ledger.append(event({
+    eventId: "evt-3", idempotencyKey: "idem-3", sourceEventId: "fill-after-cancel",
+    type: "FILL_RECORDED", occurredAt: "2026-11-25T09:30:02+05:30",
+    deltas: { cashDeltaPaise: -125050, blockedDeltaPaise: 0 },
+    payload: { fillId: "fill-after-cancel", orderId: "order-1", assetClass: "EQUITY", instrumentKey: "MOCK|NSE|EQ|0001", side: "BUY", quantity: 1, pricePaise: 125050 }
+  })), /FILL_ORDER_MISMATCH/);
+  const reopen = { ...history[1], eventId: "evt-replay", idempotencyKey: "idem-replay", sourceEventId: "replay-reopen",
+    sequence: 3, occurredAt: "2026-11-25T09:30:02+05:30",
+    payload: { ...history[1].payload, status: "PENDING" } };
+  assert.throws(() => replayPaperDemoEvents(opening, [...history, reopen]), /INVALID_ORDER_STATUS_TRANSITION/);
+});
+
+test("event timestamps reject invalid calendar dates and equal-time events", () => {
+  const invalid = createPaperDemoEventLedger(opening);
+  assert.throws(() => invalid.append(event({ occurredAt: "2026-02-30T09:30:00+05:30" })), /INVALID_EVENT_TIMESTAMP/);
+  const ledger = createPaperDemoEventLedger(opening);
+  ledger.append(event());
+  assert.throws(() => ledger.append(event({
+    eventId: "evt-2", idempotencyKey: "idem-2", sourceEventId: "equal-time",
+    type: "ORDER_UPDATED", payload: { ...event().payload, status: "PARTIALLY_FILLED" }
+  })), /DEMO_EVENT_TIME_ORDER_MISMATCH/);
+  assert.equal(ledger.snapshot().events.length, 1);
+});
