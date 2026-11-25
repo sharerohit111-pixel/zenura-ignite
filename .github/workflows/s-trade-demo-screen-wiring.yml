@@ -23,6 +23,7 @@ on:
       - "markets/stocks/demo-chart-data.mjs"
       - "markets/stocks/demo-chart-panel.mjs"
       - "market-gateway/test/demo-chart-data.test.mjs"
+      - "market-gateway/test/demo-watchlist-persistence.test.mjs"
       - ".github/workflows/s-trade-demo-screen-wiring.yml"
   push:
     branches:
@@ -61,7 +62,7 @@ jobs:
         with:
           node-version: "22"
       - name: Check browser module syntax
-        run: node --check markets/shared/paper-demo-adapter.mjs && node --check markets/shared/paper-demo-event-ledger.mjs && node --check markets/stocks/demo.js && node --check markets/stocks/demo-chart-data.mjs && node --check markets/stocks/demo-chart-panel.mjs
+        run: node --check markets/shared/paper-demo-adapter.mjs && node --check markets/shared/paper-demo-event-ledger.mjs && node --check markets/stocks/demo.js && node --check markets/stocks/demo-watchlist-persistence.mjs && node --check markets/stocks/demo-chart-data.mjs && node --check markets/stocks/demo-chart-panel.mjs
       - name: Validate shared fixtures
         run: |
           node - <<'NODE'
@@ -70,7 +71,7 @@ jobs:
           console.log('Parsed all four canonical screen fixtures.');
           NODE
       - name: Run adapter, event-ledger and screen integration tests
-        run: node --test market-gateway/test/paper-demo-adapter.test.mjs market-gateway/test/paper-demo-event-ledger.test.mjs market-gateway/test/paper-demo-dashboard.test.mjs market-gateway/test/paper-demo-equity-integration.test.mjs market-gateway/test/paper-demo-derivative-integration.test.mjs market-gateway/test/demo-chart-data.test.mjs
+        run: node --test market-gateway/test/paper-demo-adapter.test.mjs market-gateway/test/paper-demo-event-ledger.test.mjs market-gateway/test/paper-demo-dashboard.test.mjs market-gateway/test/paper-demo-equity-integration.test.mjs market-gateway/test/paper-demo-derivative-integration.test.mjs market-gateway/test/demo-chart-data.test.mjs market-gateway/test/demo-watchlist-persistence.test.mjs
       - name: Install Chromium browser QA dependencies
         run: |
           npm install --prefix "$RUNNER_TEMP/zenura-playwright" playwright@1.61.1 axe-core@4.10.3 --ignore-scripts --no-audit --no-fund
