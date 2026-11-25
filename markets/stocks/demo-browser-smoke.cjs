@@ -74,6 +74,12 @@ const axePath=require.resolve("axe-core/axe.min.js");
     assert.ok(await page.locator(".catalog-results tbody tr").count()>0,"option chain rows");
     await page.locator("#options-side").selectOption("CE");
     assert.ok(await page.locator(".catalog-results tbody tr").count()>0,"filtered CE option chain rows");
+    await page.locator("#options-exchange").selectOption("BSE");
+    assert.ok((await page.locator(".catalog-panel .sub").first().textContent()).includes("No listed synthetic option expiry"),"empty expiry selection shows safe empty state");
+    assert.equal(await page.locator(".catalog-results tbody tr").count(),0,"empty expiry has no stale option-chain rows");
+    assert.deepEqual(pageErrors,[], "empty expiry selection must not throw browser errors");
+    await page.locator("#options-exchange").selectOption("NSE");
+    assert.ok(await page.locator(".catalog-results tbody tr").count()>0,"option chain recovers when a listed exchange is selected");
 
     // Equity market order -> manual deterministic fill -> immutable receipt.
     await page.locator('#screen-nav button[data-screen="equity"]').click();
