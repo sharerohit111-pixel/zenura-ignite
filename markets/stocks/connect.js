@@ -32,7 +32,8 @@ async function sessionSnapshot() {
 }
 async function api(path, options = {}) {
   const session = await sessionSnapshot();
-  if (!session?.access_token) throw new Error("Sign in to continue.");
+  if (!session?.access_token || !session?.user?.id) throw new Error("Sign in to continue.");
+  const requestUserId = session.user.id;
   if (!gateway) throw new Error("Market gateway URL is not configured yet.");
   const response = await fetch(gateway + path, {
     ...options,
@@ -46,6 +47,10 @@ async function api(path, options = {}) {
     signal: AbortSignal.timeout(15000)
   });
   const payload = await response.json().catch(() => ({}));
+  const latestSession = await sessionSnapshot().catch(() => null);
+  if (latestSession?.user?.id !== requestUserId) {
+    throw new Error("Account changed while the request was processing. Sign in again.");
+  }
   if (!response.ok) {
     const error = new Error(payload.error || "Market service request failed (" + response.status + ").");
     error.status = response.status;
@@ -58,6 +63,7 @@ let authStateSequence = 0;
 let currentSession = null;
 async function refreshStatus(sequence = authStateSequence) {
   const session = await sessionSnapshot().catch(() => null);
+  if (sequence !== authStateSequence) return;
   if (!session?.user) {
     setState("SIGN IN REQUIRED", "Create an account or sign in using Supabase below. No Firebase account is used.");
     return;
@@ -130,10 +136,21 @@ window.ZENURA_MARKET_CONNECTOR = Object.freeze({
     return session.access_token;
   }
 });
-supabase.auth.onAuthStateChange((_event, session) => {
+supabase.auth.onAuthStateChange((authEvent, session) => {
+  const previousUserId = currentSession?.user?.id || null;
   currentSession = session || null;
+  const userId = currentSession?.user?.id || null;
   const sequence = ++authStateSequence;
-  window.dispatchEvent(new CustomEvent("zenura-market-auth-ready", { detail: { signedIn: !!session?.user } }));
+  window.dispatchEvent(new CustomEvent("zenura-market-auth-ready", {
+    detail: {
+      signedIn: !!userId,
+      userId,
+      previousUserId,
+      identityChanged: previousUserId !== userId,
+      authEvent,
+      sequence
+    }
+  }));
   // Defer network work until after the auth callback returns to avoid auth-lock deadlocks.
   queueMicrotask(() => refreshStatus(sequence));
 });

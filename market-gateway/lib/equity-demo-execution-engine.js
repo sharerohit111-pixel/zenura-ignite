@@ -1,3 +1,4 @@
+(function(){
 "use strict";
 
 /*
@@ -191,3 +192,4 @@ function createEquityDemoExecutionEngine({fixture,account,env=(typeof process!==
 const api={createEquityDemoExecutionEngine,validateEquityDemoFixture:validateFixture};
 if(typeof module!=="undefined"&&module.exports)module.exports=api;
 if(typeof window!=="undefined")window.ZenuraEquityDemoEngine=api;
+})();

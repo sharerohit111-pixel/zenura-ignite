@@ -15,10 +15,17 @@ const axePath=require.resolve("axe-core/axe.min.js");
   for(const viewport of [{width:1440,height:900,name:"desktop"},{width:390,height:844,name:"android-mobile"},{width:360,height:800,name:"small-mobile"}]){
    const context=await browser.newContext({viewport:{width:viewport.width,height:viewport.height},isMobile:viewport.width<500,hasTouch:viewport.width<500,serviceWorkers:"allow"});
    const page=await context.newPage();
-   const pageErrors=[];
+   const pageErrors=[],consoleErrors=[],failedRequests=[];
    page.on("pageerror",error=>pageErrors.push(error.message));
+   page.on("console",message=>{if(message.type()==="error")consoleErrors.push(message.text());});
+   page.on("requestfailed",request=>failedRequests.push({url:request.url(),error:request.failure()?.errorText||"request failed"}));
    await page.goto("http://127.0.0.1:4173/markets/stocks/demo.html",{waitUntil:"domcontentloaded",timeout:30000});
-   await page.waitForFunction(()=>document.querySelector("#demo-status")?.textContent.includes("4 canonical fixtures validated"),null,{timeout:10000});
+   try{
+    await page.waitForFunction(()=>document.querySelector("#demo-status")?.textContent.includes("4 canonical fixtures validated"),null,{timeout:10000});
+   }catch(error){
+    const diagnostic=await page.evaluate(()=>({status:document.querySelector("#demo-status")?.textContent||"missing",readyState:document.readyState,fixtureFetches:performance.getEntriesByType("resource").filter(x=>x.name.includes("/market-gateway/mock/fixtures/")).map(x=>({url:x.name,duration:Math.round(x.duration),transferSize:x.transferSize}))}));
+    throw new Error("Demo fixture readiness failed: "+JSON.stringify({diagnostic,pageErrors,consoleErrors,failedRequests})+"; "+error.message);
+   }
    assert.equal(await page.locator("#screen-nav button[data-screen]").count(),15,viewport.name+" screen count");
    for(const name of ["home","market","watchlists","charts","equity","futures","options","orders","trades","portfolio","positions","holdings","account","profile","settings"]){
     await page.locator('#screen-nav button[data-screen="'+name+'"]').click();
@@ -53,29 +60,23 @@ const axePath=require.resolve("axe-core/axe.min.js");
   console.log("PWA: opening market shell");
   await page.goto("http://127.0.0.1:4173/markets/",{waitUntil:"domcontentloaded",timeout:30000});
   await page.waitForLoadState("load",{timeout:10000});
-  try{
-   await page.waitForFunction(async()=>{
-    const registrations=await navigator.serviceWorker.getRegistrations();
-    return registrations.some(registration=>registration.active?.state==="activated");
-   },null,{timeout:20000});
-  }catch(error){
-   const state=await page.evaluate(async()=>({controller:!!navigator.serviceWorker.controller,registrations:(await navigator.serviceWorker.getRegistrations()).map(r=>({scope:r.scope,installing:r.installing?.state||null,waiting:r.waiting?.state||null,active:r.active?.state||null}))}));
-   throw new Error("PWA service worker did not activate: "+JSON.stringify(state)+"; console: "+pwaConsole.join(" | ")+"; "+error.message);
-  }
   console.log("PWA: waiting for service worker activation");
-  const workerState=await page.evaluate(async()=>{
+  const workerReady=await page.waitForFunction(async()=>{
    const registrations=await navigator.serviceWorker.getRegistrations();
-   const registration=registrations.find(item=>item.active?.state==="activated");
-   return {state:registration?.active?.state||"missing",scope:registration?.scope||null};
-  });
-  assert.equal(workerState.state,"activated","service worker must be active before controlled reload");
-  console.log(JSON.stringify({pwaWorker:workerState.state,scope:workerState.scope}));
+   return registrations.some(item=>item.scope.endsWith("/markets/")&&item.active?.state==="activated");
+  },null,{timeout:30000});
+  assert.ok(workerReady,"an activated service worker must own the /markets/ scope");
+  console.log("PWA: service worker is activated for /markets/");
   // clients.claim() in the activate handler controls existing same-scope clients.
   // Open a fresh same-scope tab rather than forcing a navigation reload race.
   const controlledPage=await pwa.newPage();
   console.log("PWA: opening demo under service worker");
   await controlledPage.goto("http://127.0.0.1:4173/markets/stocks/demo.html",{waitUntil:"domcontentloaded",timeout:30000});
-  await controlledPage.waitForFunction(()=>!!navigator.serviceWorker.controller,null,{timeout:15000});
+  await controlledPage.waitForFunction(()=>navigator.serviceWorker.controller?.state==="activated"&&navigator.serviceWorker.controller.scriptURL.endsWith("/markets/service-worker.js"),null,{timeout:15000});
+  const workerState=await controlledPage.evaluate(()=>({state:navigator.serviceWorker.controller?.state||"missing",scriptURL:navigator.serviceWorker.controller?.scriptURL||null}));
+  assert.equal(workerState.state,"activated","demo route must be controlled by the activated market service worker");
+  assert.ok(workerState.scriptURL.endsWith("/markets/service-worker.js"),"demo route must be controlled by the market-scoped service worker");
+  console.log(JSON.stringify({pwaWorker:workerState.state,scriptURL:workerState.scriptURL}));
   await page.close();
   const demoPage=controlledPage;
   await demoPage.waitForFunction(()=>document.querySelector("#demo-status")?.textContent.includes("4 canonical fixtures validated"),null,{timeout:10000});
