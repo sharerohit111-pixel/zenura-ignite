@@ -52,27 +52,25 @@ const axePath=require.resolve("axe-core/axe.min.js");
   console.log("PWA: opening market shell");
   await page.goto("http://127.0.0.1:4173/markets/",{waitUntil:"domcontentloaded",timeout:30000});
   await page.waitForLoadState("load",{timeout:10000});
-  await page.waitForFunction(async()=>{
-   const registrations=await navigator.serviceWorker.getRegistrations();
-   return registrations.some(registration=>registration.installing||registration.waiting||registration.active);
-  },null,{timeout:10000});
-  await page.waitForFunction(async()=>{
-   const registrations=await navigator.serviceWorker.getRegistrations();
-   return registrations.some(registration=>registration.active?.state==="activated");
-  },null,{timeout:20000}).catch(async error=>{
-   const diagnostics=await page.evaluate(async()=>({
-    controller:!!navigator.serviceWorker.controller,
-    registrations:(await navigator.serviceWorker.getRegistrations()).map(registration=>({scope:registration.scope,installing:registration.installing?.state||null,waiting:registration.waiting?.state||null,active:registration.active?.state||null}))
-   }));
-   console.error("PWA registration diagnostics:",JSON.stringify(diagnostics));
-   throw error;
-  });
   console.log("PWA: waiting for service worker activation");
+  // navigator.serviceWorker.ready returns the registration that actually
+  // controls this origin; avoid racing repeated getRegistrations() snapshots
+  // while Chromium transitions installing -> activated.
   const workerState=await page.evaluate(async()=>{
-   const registrations=await navigator.serviceWorker.getRegistrations();
-   const registration=registrations.find(item=>item.active?.state==="activated");
-   return {state:registration?.active?.state||"missing",scope:registration?.scope||null};
+   const timeout=new Promise(resolve=>setTimeout(()=>resolve(null),20000));
+   const registration=await Promise.race([navigator.serviceWorker.ready,timeout]);
+   if(!registration){
+    return {state:"missing",scope:null,controller:!!navigator.serviceWorker.controller,
+     registrations:(await navigator.serviceWorker.getRegistrations()).map(item=>({
+      scope:item.scope,installing:item.installing?.state||null,
+      waiting:item.waiting?.state||null,active:item.active?.state||null
+     })),
+     registerScript:!!document.querySelector('script[src="./pwa-register.js"]')};
+   }
+   return {state:registration.active?.state||"missing",scope:registration.scope,
+    controller:!!navigator.serviceWorker.controller};
   });
+  console.log("PWA registration result:",JSON.stringify(workerState));
   assert.equal(workerState.state,"activated","service worker must be active before controlled reload");
   console.log(JSON.stringify({pwaWorker:workerState.state,scope:workerState.scope}));
   // Wait for the activated registration before reloading into its controlled scope.
