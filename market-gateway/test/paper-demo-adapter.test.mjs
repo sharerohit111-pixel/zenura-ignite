@@ -134,7 +134,7 @@ test("catalog rejects duplicate derivative identities and missing derivative quo
 test("catalog rejects derivative keys whose exchange, type, underlying, strike, side or expiry disagree", async () => {
   const mutations = [
     c => { c.instrumentKey = c.instrumentKey.replace("|NSE|", "|BSE|"); },
-    c => { c.instrumentKey = c.instrumentKey.replace("|FUT|", "|OPT|"); },
+    c => { c.instrumentKey = c.instrumentKey.replace("|OPT|", "|FUT|"); },
     c => { c.instrumentKey = c.instrumentKey.replace("|MOCKNIFTY|", "|MOCKBANK|"); },
     c => { c.instrumentKey = c.instrumentKey.replace("|25000|", "|25100|"); },
     c => { c.instrumentKey = c.instrumentKey.replace("|CE|", "|PE|"); },
