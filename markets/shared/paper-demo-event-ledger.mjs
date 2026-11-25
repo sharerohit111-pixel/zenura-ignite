@@ -89,12 +89,21 @@ function apply(projection, event) {
     if (event.type === "ORDER_ACCEPTED" && existing) fail("DUPLICATE_ORDER_ID");
     if (event.type === "ORDER_UPDATED" && !existing) fail("ORDER_UPDATE_WITHOUT_ACCEPTANCE");
     const next = { ...p, engine: event.engine, lastSequence: event.sequence };
-    if (existing) Object.assign(existing, next); else projection.orders.push(next);
+    if (existing) {
+      for (const field of ["assetClass", "instrumentKey", "side", "orderType", "quantity"]) {
+        if (existing[field] !== p[field]) fail("ORDER_IDENTITY_MUTATION");
+      }
+      Object.assign(existing, next);
+    } else projection.orders.push(next);
   }
   if (event.type === "FILL_RECORDED") {
     if (projection.fills.some(x => x.fillId === event.payload.fillId)) fail("DUPLICATE_FILL_ID");
     const order = projection.orders.find(x => x.orderId === event.payload.orderId);
-    if (!order || order.engine !== event.engine || order.instrumentKey !== event.payload.instrumentKey) fail("FILL_ORDER_MISMATCH");
+    if (!order || order.engine !== event.engine || order.instrumentKey !== event.payload.instrumentKey ||
+        order.assetClass !== event.payload.assetClass || order.side !== event.payload.side ||
+        ["CANCELLED", "REJECTED", "EXPIRED", "FILLED"].includes(order.status)) fail("FILL_ORDER_MISMATCH");
+    const alreadyFilled = projection.fills.filter(x => x.orderId === event.payload.orderId).reduce((sum, x) => sum + x.quantity, 0);
+    if (!Number.isSafeInteger(alreadyFilled + event.payload.quantity) || alreadyFilled + event.payload.quantity > order.quantity) fail("FILL_QUANTITY_EXCEEDS_ORDER");
     projection.fills.push({ ...event.payload, engine: event.engine, sequence: event.sequence, occurredAt: event.occurredAt });
   }
   if (event.type === "POSITION_CHANGED") {
@@ -121,7 +130,7 @@ export function createPaperDemoEventLedger(opening) {
       opening.blockedFundsPaise > opening.cashBalancePaise) fail("INVALID_DEMO_OPENING_CASH");
   const identity = { accountId: opening.accountId, sessionId: opening.sessionId };
   const projection = initialProjection(opening);
-  const eventIds = new Map(), idempotency = new Map();
+  const eventIds = new Map(), sourceEvents = new Map(), idempotency = new Map();
   let lastTimestamp = -Infinity;
   function append(input) {
     const candidate = { ...input, sequence: projection.events.length + 1 };
@@ -133,6 +142,8 @@ export function createPaperDemoEventLedger(opening) {
       return { accepted: false, duplicate: true, event: prior.event, snapshot: snapshot() };
     }
     if (eventIds.has(event.eventId)) fail("DUPLICATE_EVENT_ID");
+    const sourceKey = event.engine + "|" + event.sourceEventId;
+    if (sourceEvents.has(sourceKey)) fail("DUPLICATE_SOURCE_EVENT");
     const time = Date.parse(event.occurredAt);
     if (time < lastTimestamp) fail("DEMO_EVENT_TIME_ORDER_MISMATCH");
     const before = clone(projection);
@@ -140,6 +151,7 @@ export function createPaperDemoEventLedger(opening) {
       apply(projection, event);
       lastTimestamp = time;
       eventIds.set(event.eventId, event);
+      sourceEvents.set(sourceKey, event.eventId);
       idempotency.set(event.idempotencyKey, { fingerprint, event });
     } catch (error) {
       Object.keys(projection).forEach(key => delete projection[key]);
