@@ -35,6 +35,34 @@ const axePath=require.resolve("axe-core/axe.min.js");
     const seriousScreen=screenAxe.violations.filter(v=>v.impact==="critical"||v.impact==="serious");const screenDetails=seriousScreen.map(v=>({id:v.id,nodes:v.nodes.map(n=>({target:n.target,html:n.html}))}));assert.equal(seriousScreen.length,0,viewport.name+" "+name+" serious/critical accessibility violations: "+JSON.stringify(screenDetails));
     const overflow=await page.evaluate(()=>document.documentElement.scrollWidth>window.innerWidth+1);
     assert.equal(overflow,false,viewport.name+" horizontal document overflow on "+name);
+    const contrast=await page.evaluate(()=>{
+     const rgb=value=>{const m=String(value).match(/rgba?\(([^)]+)\)/);if(!m)return null;const p=m[1].split(",").map(x=>Number.parseFloat(x.trim()));return p.length>=3&&p.slice(0,3).every(Number.isFinite)?{r:p[0],g:p[1],b:p[2],a:p.length>3&&Number.isFinite(p[3])?p[3]:1}:null;};
+     const blend=(front,back)=>({r:front.r*front.a+back.r*(1-front.a),g:front.g*front.a+back.g*(1-front.a),b:front.b*front.a+back.b*(1-front.a),a:1});
+     const luminance=c=>{const channel=v=>{v/=255;return v<=.04045?v/12.92:((v+.055)/1.055)**2.4;};return .2126*channel(c.r)+.7152*channel(c.g)+.0722*channel(c.b);};
+     const ratio=(a,b)=>{const x=luminance(a),y=luminance(b);return (Math.max(x,y)+.05)/(Math.min(x,y)+.05);};
+     const body=rgb(getComputedStyle(document.body).backgroundColor)||{r:7,g:17,b:31,a:1};
+     const failures=[],measured=[];
+     for(const node of document.querySelectorAll("body *")){
+      if(node.children.length||!node.textContent.trim())continue;
+      const rect=node.getBoundingClientRect(),style=getComputedStyle(node);
+      if(!rect.width||!rect.height||style.visibility==="hidden"||style.display==="none"||Number(style.opacity)===0)continue;
+      const fg=rgb(style.color);if(!fg)continue;
+      let bg={...body};
+      for(let parent=node;parent&&parent!==document.documentElement;parent=parent.parentElement){
+       const layer=rgb(getComputedStyle(parent).backgroundColor);
+       if(layer&&layer.a>0)bg=blend(layer,bg);
+       if(layer&&layer.a>=1)break;
+      }
+      const effectiveFg=fg.a<1?blend(fg,bg):fg;
+      const value=ratio(effectiveFg,bg),size=parseFloat(style.fontSize)||16,weight=parseInt(style.fontWeight,10)||400;
+      const large=size>=24||(size>=18.66&&weight>=700),minimum=large?3:4.5;
+      const record={text:node.textContent.trim().slice(0,70),foreground:style.color,background:"rgb("+Math.round(bg.r)+", "+Math.round(bg.g)+", "+Math.round(bg.b)+")",ratio:Number(value.toFixed(2)),minimum};
+      measured.push(record);if(value+0.01<minimum)failures.push(record);
+     }
+     return {textNodes:measured.length,minimumRatio:measured.length?Math.min(...measured.map(x=>x.ratio)):null,failures:failures.slice(0,30)};
+    });
+    assert.ok(contrast.textNodes>0,viewport.name+" "+name+" contrast scan found visible text");
+    assert.equal(contrast.failures.length,0,viewport.name+" "+name+" WCAG text contrast failures: "+JSON.stringify(contrast.failures));
    }
    if(viewport.name==="desktop"){
     await page.locator('#screen-nav button[data-screen="watchlists"]').click();
