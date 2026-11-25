@@ -14,11 +14,22 @@ const axePath=require.resolve("axe-core/axe.min.js");
  try{
   for(const viewport of [{width:1440,height:900,name:"desktop"},{width:390,height:844,name:"android-mobile"},{width:360,height:800,name:"small-mobile"}]){
    const context=await browser.newContext({viewport:{width:viewport.width,height:viewport.height},isMobile:viewport.width<500,hasTouch:viewport.width<500,serviceWorkers:"allow"});
+   // Browser QA explicitly opts into the local simulator; production remains fail-closed by default.
+   await context.addInitScript(()=>{window.ZENURA_RUNTIME_ENV="test";});
    const page=await context.newPage();
    const pageErrors=[];
+   const browserDiagnostics=[];
    page.on("pageerror",error=>pageErrors.push(error.message));
+   page.on("console",message=>{if(message.type()==="error")browserDiagnostics.push("console: "+message.text());});
+   page.on("requestfailed",request=>browserDiagnostics.push("request failed: "+request.url()+" "+(request.failure()?.errorText||"")));
+   page.on("response",response=>{if(response.status()>=400)browserDiagnostics.push("HTTP "+response.status()+": "+response.url());});
    await page.goto("http://127.0.0.1:4173/markets/stocks/demo.html",{waitUntil:"domcontentloaded",timeout:30000});
-   await page.waitForFunction(()=>document.querySelector("#demo-status")?.textContent.includes("4 canonical fixtures validated"),null,{timeout:10000});
+   try {
+    await page.waitForFunction(()=>document.querySelector("#demo-status")?.textContent.includes("4 canonical fixtures validated"),null,{timeout:10000});
+   } catch(error) {
+    const state=await page.evaluate(()=>({status:document.querySelector("#demo-status")?.textContent||null,heading:document.querySelector("#screen-content")?.innerText?.slice(0,500)||null,readyState:document.readyState}));
+    throw new Error("Demo fixture startup timed out: "+JSON.stringify({state,pageErrors,browserDiagnostics})+"; "+error.message);
+   }
    assert.equal(await page.locator("#screen-nav button[data-screen]").count(),15,viewport.name+" screen count");
    for(const name of ["home","market","watchlists","charts","equity","futures","options","orders","trades","portfolio","positions","holdings","account","profile","settings"]){
     await page.locator('#screen-nav button[data-screen="'+name+'"]').click();
@@ -92,6 +103,8 @@ const axePath=require.resolve("axe-core/axe.min.js");
   }
 
   const pwa=await browser.newContext({viewport:{width:390,height:844},serviceWorkers:"allow"});
+  // Keep the PWA fixture smoke in explicit test mode, never an implicit development default.
+  await pwa.addInitScript(()=>{window.ZENURA_RUNTIME_ENV="test";});
   const page=await pwa.newPage();
   console.log("PWA: opening market shell");
   await page.goto("http://127.0.0.1:4173/markets/",{waitUntil:"domcontentloaded",timeout:30000});

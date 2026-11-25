@@ -12,7 +12,7 @@ async function getEngine(){
   const [fixtureEnvelope,accountEnvelope]=await Promise.all([fixtureResponse.json(),accountResponse.json()]);
   if(!window.ZenuraEquityDemoEngine?.createEquityDemoExecutionEngine)throw new Error("EQUITY_DEMO_ENGINE_UNAVAILABLE");
   if(accountEnvelope?.mode!=="MOCK"||accountEnvelope?.simulated!==true||accountEnvelope?.meta?.source!=="SYNTHETIC_FIXTURE")throw new Error("INVALID_EQUITY_DEMO_ACCOUNT_FIXTURE");
-  engine=window.ZenuraEquityDemoEngine.createEquityDemoExecutionEngine({fixture:fixtureEnvelope,account:accountEnvelope.data,env:{NODE_ENV:"development"}});
+  engine=window.ZenuraEquityDemoEngine.createEquityDemoExecutionEngine({fixture:fixtureEnvelope,account:accountEnvelope.data,env:{NODE_ENV:(window.ZENURA_RUNTIME_ENV==="development"||window.ZENURA_RUNTIME_ENV==="test")?window.ZENURA_RUNTIME_ENV:"production"}});
   return engine;
  });
  return enginePromise;
