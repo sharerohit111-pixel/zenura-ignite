@@ -98,6 +98,19 @@ const axePath=require.resolve("axe-core/axe.min.js");
     assert.ok(optionsStatus.includes("MOCK quote selected"),optionsStatus);
     await page.getByRole("button",{name:"BUY",exact:true}).last().click();
     assert.ok((await page.locator(".demo-fo-status").textContent()).includes("DEMO receipt"),"Options order entry");
+    // Unified Trade History and Portfolio must project all three asset classes from the same ledger.
+    await page.locator('#screen-nav button[data-screen="trades"]').click();
+    await page.locator(".demo-unified-ledger").waitFor();
+    const tradeRows=await page.locator(".demo-unified-table-wrap tbody tr").allTextContents();
+    assert.ok(tradeRows.some(row=>row.includes("EQUITY")),"unified history includes Equity fills");
+    assert.ok(tradeRows.some(row=>row.includes("FUTURE")),"unified history includes Futures fills");
+    assert.ok(tradeRows.some(row=>row.includes("OPTION")),"unified history includes Options fills");
+    await page.locator('#screen-nav button[data-screen="portfolio"]').click();
+    await page.locator(".demo-unified-ledger").waitFor();
+    const portfolioRows=await page.locator(".demo-unified-table-wrap tbody tr").allTextContents();
+    assert.ok(portfolioRows.some(row=>row.includes("EQUITY")),"unified portfolio includes Equity");
+    assert.ok(portfolioRows.some(row=>row.includes("FUTURE")),"unified portfolio includes Futures");
+    assert.ok(portfolioRows.some(row=>row.includes("OPTION")),"unified portfolio includes Options");
    }
    await page.goto("http://127.0.0.1:4173/markets/stocks/demo.html",{waitUntil:"domcontentloaded",timeout:30000});
    await page.addScriptTag({path:axePath});
