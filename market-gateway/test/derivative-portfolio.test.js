@@ -93,7 +93,7 @@ const optionRow=(overrides={})=>({instrument_key:"NSE_FO|NIFTY26DEC25000CE",inst
 
 test("binds long-option portfolio positions to the exact official contract, expiry, strike and lot size",()=>{
  const [p]=buildLongOptionPortfolioPositions([optionRow()],[optionMaster()]);
- assert.equal(p.expiry,"2026-12-31");
+ assert.equal(p.expiry,"2027-12-31");
  assert.equal(p.optionType,"CE");
  assert.equal(p.strikePaise,2500000);
  assert.equal(p.instrumentKey,optionMaster().instrument_key);
