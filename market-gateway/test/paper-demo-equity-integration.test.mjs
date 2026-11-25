@@ -50,8 +50,8 @@ test("Equity order, trade, positions and holdings projections remain visibly sep
     read("markets/stocks/demo-equity-panel.mjs")
   ]);
   assert.match(js, /appendEquitySummary\(content,name\)/);
-  assert.match(panel, /LOCAL EQUITY FILL RECEIPTS/);
-  assert.match(panel, /LOCAL DELIVERY HOLDINGS/);
+  assert.match(panel, /CANONICAL EQUITY FILL RECEIPTS/);
+  assert.match(panel, /CANONICAL DELIVERY HOLDINGS/);
   assert.match(panel, /not reconciled with the Wallet/);
   assert.doesNotMatch(panel, /account\.ledgerReconciled\s*=\s*true/);
   assert.doesNotMatch(js, /appendEquitySummary\(content,"account"\)/);
