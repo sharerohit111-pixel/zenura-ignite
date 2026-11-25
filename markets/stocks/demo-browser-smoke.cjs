@@ -167,7 +167,7 @@ const axePath=require.resolve("axe-core/axe.min.js");
   const demoPage=controlledPage;
   await demoPage.waitForFunction(()=>document.querySelector("#demo-status")?.textContent.includes("4 canonical fixtures validated"),null,{timeout:10000});
   const cached=await demoPage.evaluate(async()=>{
-   const cache=await caches.open("zenura-markets-shell-v9");
+   const cache=await caches.open("zenura-markets-shell-v10");
    const paths=["market","account","equity","derivatives"].map(name=>new URL("../../market-gateway/mock/fixtures/"+name+".json",location.href).href);
    const found=[];
    for(const url of paths)found.push({url,found:!!(await cache.match(url))});
@@ -178,7 +178,18 @@ const axePath=require.resolve("axe-core/axe.min.js");
   await pwa.setOffline(true);
   await demoPage.reload({waitUntil:"domcontentloaded",timeout:15000});
   await demoPage.waitForFunction(()=>document.querySelector("#demo-status")?.textContent.includes("4 canonical fixtures validated"),null,{timeout:10000});
-  console.log(JSON.stringify({pwa:"offline demo fixture load PASS",cachedFixtures:cached.length}));
+  const offlinePageErrors=[];
+  demoPage.on("pageerror",error=>offlinePageErrors.push(error.message));
+  const offlineScreens=["home","market","watchlists","charts","equity","futures","options","orders","trades","portfolio","positions","holdings","account","profile","settings"];
+  for(const name of offlineScreens){
+   await demoPage.locator('#screen-nav button[data-screen="'+name+'"]').click();
+   await demoPage.locator("#screen-content > .screen-title h2").waitFor();
+   assert.ok(await demoPage.locator("#screen-content > .screen-title h2").isVisible(),"offline "+name+" screen heading");
+   const overflow=await demoPage.evaluate(()=>document.documentElement.scrollWidth>window.innerWidth+1);
+   assert.equal(overflow,false,"offline horizontal document overflow on "+name);
+  }
+  assert.deepEqual(offlinePageErrors,[],"offline screen navigation browser errors");
+  console.log(JSON.stringify({pwa:"offline all-screen navigation PASS",cachedFixtures:cached.length,offlineScreens:offlineScreens.length}));
   await pwa.close();
  }finally{
   await browser.close();
