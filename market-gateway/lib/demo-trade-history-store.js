@@ -23,13 +23,10 @@ function timestampMs(value, code = "INVALID_DEMO_TIMESTAMP") {
 function createDemoTradeHistoryStore(options = {}) {
   if (options.production === true || options.env?.NODE_ENV === "production") fail("DEMO_HISTORY_DISABLED_IN_PRODUCTION");
   const orders = new Map(), submissions = new Map(), fills = new Map(), events = [];
-  let lastEventTime = -Infinity;
   function appendEvent(type, payload, occurredAt) {
     const time = timestampMs(occurredAt);
-    if (time < lastEventTime) fail("DEMO_EVENT_TIME_ORDER_MISMATCH");
     const event = { sequence: events.length + 1, type, occurredAt, ...clone(payload) };
     events.push(event);
-    lastEventTime = time;
     return event;
   }
   function assertOrderTime(order, at) {
@@ -78,7 +75,6 @@ function createDemoTradeHistoryStore(options = {}) {
     }
     if (!OPEN.has(order.status) || input.quantity > order.remainingQuantity) fail("DEMO_FILL_EXCEEDS_REMAINING");
     assertOrderTime(order, input.filledAt);
-    if (fillTime < lastEventTime) fail("DEMO_EVENT_TIME_ORDER_MISMATCH");
     if (order.side === "SELL" && order.assetClass !== "FUTURE") {
       const positionKey = keyOf(order.assetClass,order.product,order.instrumentKey);
       let held = 0;
@@ -148,13 +144,10 @@ function createDemoTradeHistoryStore(options = {}) {
   function replay(log) {
     if(!Array.isArray(log))fail("INVALID_DEMO_EVENT_LOG");
     const replayed=createDemoTradeHistoryStore(options);
-    let previous=-Infinity;
     for(let i=0;i<log.length;i++){
       const event=log[i];
       if(!event||event.sequence!==i+1)fail("DEMO_EVENT_SEQUENCE_MISMATCH");
       const at=timestampMs(event.occurredAt);
-      if(at<previous)fail("DEMO_EVENT_TIME_ORDER_MISMATCH");
-      previous=at;
       if(event.type==="ORDER_ACCEPTED")replayed.submit({...event.order,createdAt:event.occurredAt});
       else if(event.type==="ORDER_REJECTED")replayed.reject(event.orderId,event.reason,event.occurredAt);
       else if(event.type==="FILL_RECORDED")replayed.recordFill({...event.trade,filledAt:event.occurredAt});
