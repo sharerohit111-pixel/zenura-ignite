@@ -60,7 +60,7 @@ test("refuses Futures until approved margin and settlement receipts exist", () =
   const h = history({
     orders: [{ orderId: "order-fut-1", assetClass: "FUTURE", side: "BUY", createdAt: at }],
     trades: [{ fillId: "future-fill-1", orderId: "order-fut-1", assetClass: "FUTURE",
-      side: "BUY", grossValuePaise: 1000000, filledAt: at }]
+      side: "BUY", quantity: 1, pricePaise: 1000000, grossValuePaise: 1000000, filledAt: at }]
   });
   assert.throws(() => syncDemoWalletFromTradeHistory({ wallet: w, historySnapshot: h }),
     /FUTURES_MARGIN_RECEIPT_REQUIRED/);
