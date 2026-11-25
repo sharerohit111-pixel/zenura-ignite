@@ -29,7 +29,7 @@ export function createEquityDemoLedgerBridge({ engine, accountId, sessionId, clo
     blockedFundsPaise: initial.account.blockedFundsPaise
   });
   let eventSequence = 0, lastTimestamp = -Infinity;
-  const submitted = new Map(), executions = new Map(), cancellations = new Map();
+  const submitted = new Map(), executions = new Map(), cancellations = new Map(), rejections = new Map();
 
   function append(type, payload, deltas, sourceKey) {
     const time = Math.max(Number(clock()), lastTimestamp + 1);
@@ -54,7 +54,29 @@ export function createEquityDemoLedgerBridge({ engine, accountId, sessionId, clo
     };
   }
   function submitOrder(request) {
-    const order = engine.submitOrder(request);
+    const rejectionKey = request?.idempotencyKey;
+    if (typeof rejectionKey === "string" && rejections.has(rejectionKey)) throw rejections.get(rejectionKey);
+    let order;
+    try {
+      order = engine.submitOrder(request);
+    } catch (error) {
+      const validRejection = request && typeof request.instrumentKey === "string" && request.instrumentKey.startsWith("MOCK|") &&
+        ["BUY", "SELL"].includes(request.side) && ["MARKET", "LIMIT"].includes(request.orderType) &&
+        ["DELIVERY", "INTRADAY"].includes(request.product) && Number.isSafeInteger(request.quantity) &&
+        request.quantity > 0 && request.quantity <= 1000000 &&
+        typeof rejectionKey === "string" && /^[A-Za-z0-9_-]{8,80}$/.test(rejectionKey);
+      if (validRejection && !rejections.has(rejectionKey)) {
+        const orderId = "DEMO-EQ-" + rejectionKey;
+        append("ORDER_REJECTED", {
+          orderId, assetClass: "EQUITY", instrumentKey: request.instrumentKey,
+          product: request.product, side: request.side, orderType: request.orderType,
+          quantity: request.quantity, status: "REJECTED",
+          rejectionCode: error.code || error.message || "DEMO_ORDER_REJECTED"
+        }, { cashDeltaPaise: 0, blockedDeltaPaise: 0 }, "rejected-" + orderId);
+        rejections.set(rejectionKey, error);
+      }
+      throw error;
+    }
     if (submitted.has(order.orderId)) return { order, snapshot: ledger.snapshot() };
     const after = engine.snapshot();
     const before = {
