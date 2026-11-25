@@ -75,13 +75,14 @@ const axePath=require.resolve("axe-core/axe.min.js");
     await page.locator("#options-side").selectOption("CE");
     assert.ok(await page.locator(".catalog-results tbody tr").count()>0,"filtered CE option chain rows");
 
-    // Equity market order -> manual deterministic fill -> immutable receipt.
+    // Equity wallet is deliberately fail-closed until a real authoritative receipt verifier is wired.
     await page.locator('#screen-nav button[data-screen="equity"]').click();
     await page.waitForFunction(()=>document.querySelector(".demo-eq-status")?.textContent.includes("simulator ready"));
     await page.getByRole("button",{name:"PLACE DEMO ORDER"}).click();
-    await page.getByRole("button",{name:"SIMULATE NEXT FILL"}).click();
-    assert.ok((await page.locator(".demo-eq-status").textContent()).includes("Synthetic fill"),"Equity order fill flow");
-    assert.ok(await page.locator(".demo-eq-table-wrap").nth(2).locator("tbody tr").count()>0,"Equity immutable fill receipt");
+    await page.waitForFunction(()=>document.querySelector(".demo-eq-status")?.textContent.includes("EQUITY_WALLET_RECEIPT_GATE_CLOSED"));
+    assert.ok((await page.locator(".demo-eq-status").textContent()).includes("EQUITY_WALLET_RECEIPT_GATE_CLOSED"),"Equity order must be blocked without an authoritative wallet receipt path");
+    assert.equal(await page.getByRole("button",{name:"SIMULATE NEXT FILL"}).isDisabled(),true,"unreceipted Equity order cannot enable fill execution");
+    assert.equal(await page.locator(".demo-eq-table-wrap").nth(2).locator("tbody tr").count(),1,"no fill receipt row may be created");
 
     // Futures and Options MARKET order entry must accept a local synthetic order.
     await page.locator('#screen-nav button[data-screen="futures"]').click();
@@ -102,13 +103,13 @@ const axePath=require.resolve("axe-core/axe.min.js");
     await page.locator('#screen-nav button[data-screen="trades"]').click();
     await page.locator(".demo-unified-ledger").waitFor();
     const tradeRows=await page.locator(".demo-unified-table-wrap tbody tr").allTextContents();
-    assert.ok(tradeRows.some(row=>row.includes("EQUITY")),"unified history includes Equity fills");
+    assert.equal(tradeRows.some(row=>row.includes("EQUITY")),false,"unreceipted Equity fills must not appear in unified history");
     assert.ok(tradeRows.some(row=>row.includes("FUTURE")),"unified history includes Futures fills");
     assert.ok(tradeRows.some(row=>row.includes("OPTION")),"unified history includes Options fills");
     await page.locator('#screen-nav button[data-screen="portfolio"]').click();
     await page.locator(".demo-unified-ledger").waitFor();
     const portfolioRows=await page.locator(".demo-unified-table-wrap tbody tr").allTextContents();
-    assert.ok(portfolioRows.some(row=>row.includes("EQUITY")),"unified portfolio includes Equity");
+    assert.equal(portfolioRows.some(row=>row.includes("EQUITY")),false,"unreceipted Equity positions must not appear in unified portfolio");
     assert.ok(portfolioRows.some(row=>row.includes("FUTURE")),"unified portfolio includes Futures");
     assert.ok(portfolioRows.some(row=>row.includes("OPTION")),"unified portfolio includes Options");
    }

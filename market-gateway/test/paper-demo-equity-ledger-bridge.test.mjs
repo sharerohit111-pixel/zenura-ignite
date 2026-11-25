@@ -24,70 +24,39 @@ async function setup(accountPatch = {}) {
   return { bridge, instrumentKey: fixture.data.instrument.instrumentKey, account };
 }
 
-test("BUY order, partial fills and completion project once into the canonical ledger", async () => {
+test("BUY orders fail closed before engine mutation when no authoritative wallet receipt path exists", async () => {
   const { bridge, instrumentKey, account } = await setup();
   const request = {
     instrumentKey, side: "BUY", orderType: "MARKET", product: "DELIVERY",
     quantity: 3, idempotencyKey: "equity-buy-0001"
   };
-  const first = bridge.submitOrder(request);
-  const retry = bridge.submitOrder(request);
-  assert.equal(retry.order.orderId, first.order.orderId);
-  assert.equal(bridge.snapshot().orders.length, 1);
-  assert.equal(bridge.snapshot().account.blockedFundsPaise, first.order.reservedCashPaise);
-
-  const fill1 = bridge.matchNext(first.order.orderId, { executionId: "equity-exec-0001" });
-  assert.equal(fill1.matched, true);
-  assert.equal(bridge.snapshot().orders[0].status, "PARTIALLY_FILLED");
-  assert.equal(bridge.snapshot().positions[0].quantity, 2);
-  assert.equal(bridge.snapshot().positions[0].costBasisPaise, 250100);
-  assert.equal(bridge.snapshot().account.cashBalancePaise, account.cashBalancePaise - 250100);
-
-  const fill2 = bridge.matchNext(first.order.orderId, { executionId: "equity-exec-0002" });
-  assert.equal(fill2.matched, true);
+  assert.throws(() => bridge.submitOrder(request), /EQUITY_WALLET_RECEIPT_GATE_CLOSED/);
+  assert.throws(() => bridge.submitOrder(request), /EQUITY_WALLET_RECEIPT_GATE_CLOSED/);
   const snapshot = bridge.snapshot();
-  assert.equal(snapshot.orders[0].status, "FILLED");
-  assert.equal(snapshot.positions[0].quantity, 3);
-  assert.equal(snapshot.positions[0].costBasisPaise, 375200);
-  assert.equal(snapshot.positions[0].averagePricePaise, Math.round(375200 / 3));
+  assert.equal(snapshot.orders.length, 0);
+  assert.equal(bridge.engineSnapshot().orders.length, 0);
+  assert.equal(snapshot.account.cashBalancePaise, account.cashBalancePaise);
   assert.equal(snapshot.account.blockedFundsPaise, 0);
   assert.equal(snapshot.account.ledgerReconciled, false);
-  assert.deepEqual(replayPaperDemoEvents({
-    accountId: account.accountId, sessionId: "demo-session-equity-test",
-    cashBalancePaise: account.cashBalancePaise, blockedFundsPaise: account.blockedFundsPaise
-  }, snapshot.events), snapshot);
 });
 
-test("SELL partial fill and cancellation release share reservation and retain realized P&L", async () => {
+test("SELL orders fail closed before engine mutation when no authoritative settlement receipt path exists", async () => {
   const instrumentKey = "MOCK|NSE|EQ|0001";
   const { bridge, account } = await setup({
     positions: {
       [instrumentKey]: { quantity: 5, costBasisPaise: 500000, averagePricePaise: 100000, reservedQuantity: 0 }
     }
   });
-  const seeded = bridge.snapshot();
-  assert.equal(seeded.positions[0].quantity, 5);
-  const order = bridge.submitOrder({
+  assert.equal(bridge.snapshot().positions[0].quantity, 5);
+  assert.throws(() => bridge.submitOrder({
     instrumentKey, side: "SELL", orderType: "LIMIT", product: "DELIVERY",
     quantity: 3, limitPricePaise: 100000, idempotencyKey: "equity-sell-0001"
-  }).order;
-  assert.equal(bridge.snapshot().positions[0].reservedQuantity, 3);
-
-  const fill = bridge.matchNext(order.orderId, { executionId: "equity-sell-fill-0001" });
-  assert.equal(fill.matched, true);
-  assert.equal(bridge.snapshot().positions[0].quantity, 3);
-  assert.equal(bridge.snapshot().positions[0].reservedQuantity, 1);
-  assert.equal(bridge.snapshot().positions[0].costBasisPaise, 300000);
-  assert.equal(bridge.snapshot().account.realizedPnlPaise, 49900);
-
-  const cancelled = bridge.cancelOrder(order.orderId);
-  assert.equal(cancelled.cancelled, true);
-  const snapshot = bridge.snapshot();
-  assert.equal(snapshot.orders[0].status, "CANCELLED");
-  assert.equal(snapshot.positions[0].reservedQuantity, 0);
-  assert.equal(snapshot.positions[0].quantity, 3);
-  assert.equal(snapshot.account.cashBalancePaise, account.cashBalancePaise + 249900);
-  assert.equal(snapshot.account.ledgerReconciled, false);
+  }), /EQUITY_WALLET_RECEIPT_GATE_CLOSED/);
+  assert.equal(bridge.snapshot().positions[0].quantity, 5);
+  assert.equal(bridge.snapshot().positions[0].reservedQuantity, 0);
+  assert.equal(bridge.engineSnapshot().orders.length, 0);
+  assert.equal(bridge.snapshot().account.cashBalancePaise, account.cashBalancePaise);
+  assert.equal(bridge.snapshot().account.ledgerReconciled, false);
 });
 
 test("bridge refuses a non-MOCK engine scope and does not touch production paths", async () => {
@@ -98,18 +67,16 @@ test("bridge refuses a non-MOCK engine scope and does not touch production paths
 });
 
 
-test("valid but unaffordable BUY requests produce one rejected order event without reserving cash", async () => {
+test("unaffordable BUY also fails closed before the engine can create a rejected order", async () => {
   const { bridge, instrumentKey, account } = await setup({ startingCapitalPaise: 1000, cashBalancePaise: 1000 });
   const request = {
     instrumentKey, side: "BUY", orderType: "MARKET", product: "DELIVERY",
     quantity: 1, idempotencyKey: "equity-reject-0001"
   };
-  assert.throws(() => bridge.submitOrder(request), /INSUFFICIENT_DEMO_CASH/);
-  assert.throws(() => bridge.submitOrder(request), /INSUFFICIENT_DEMO_CASH/);
+  assert.throws(() => bridge.submitOrder(request), /EQUITY_WALLET_RECEIPT_GATE_CLOSED/);
   const snapshot = bridge.snapshot();
-  assert.equal(snapshot.orders.length, 1);
-  assert.equal(snapshot.orders[0].status, "REJECTED");
-  assert.equal(snapshot.events.filter(event => event.type === "ORDER_REJECTED").length, 1);
+  assert.equal(snapshot.orders.length, 0);
+  assert.equal(bridge.engineSnapshot().orders.length, 0);
   assert.equal(snapshot.account.cashBalancePaise, account.cashBalancePaise);
   assert.equal(snapshot.account.blockedFundsPaise, 0);
   assert.equal(snapshot.account.ledgerReconciled, false);

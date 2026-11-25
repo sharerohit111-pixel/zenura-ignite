@@ -8,7 +8,7 @@ function event(overrides = {}) {
     eventId: "evt-1", idempotencyKey: "idem-1", sourceEventId: "equity-order-1",
     accountId: opening.accountId, sessionId: opening.sessionId,
     occurredAt: "2026-11-25T09:30:00+05:30", engine: "EQUITY", type: "ORDER_ACCEPTED",
-    deltas: { cashDeltaPaise: 0, blockedDeltaPaise: 10000 },
+    deltas: { cashDeltaPaise: 0, blockedDeltaPaise: 0 },
     payload: { orderId: "order-1", assetClass: "EQUITY", instrumentKey: "MOCK|NSE|EQ|0001", side: "BUY", orderType: "LIMIT", quantity: 2, status: "PENDING" },
     ...overrides
   };
@@ -27,12 +27,12 @@ test("cross-engine events share one ordered immutable event stream", () => {
     eventId: "evt-2", idempotencyKey: "idem-2", sourceEventId: "futures-order-1",
     engine: "FUTURES", type: "ORDER_ACCEPTED", occurredAt: "2026-11-25T09:30:01+05:30",
     payload: { orderId: "future-1", assetClass: "FUTURE", instrumentKey: "MOCK|NSE|FUT|NIFTY-2026-11", side: "BUY", orderType: "MARKET", quantity: 1, status: "PENDING" },
-    deltas: { cashDeltaPaise: 0, blockedDeltaPaise: 20000 }
+    deltas: { cashDeltaPaise: 0, blockedDeltaPaise: 0 }
   }));
   const snapshot = ledger.snapshot();
   assert.deepEqual(snapshot.events.map(x => [x.sequence, x.engine]), [[1, "EQUITY"], [2, "FUTURES"]]);
-  assert.equal(snapshot.account.blockedFundsPaise, 30000);
-  assert.equal(snapshot.account.availableFundsPaise, 99970000);
+  assert.equal(snapshot.account.blockedFundsPaise, 0);
+  assert.equal(snapshot.account.availableFundsPaise, 100000000);
   assert.ok(Object.isFrozen(snapshot.events[0]));
   assert.ok(Object.isFrozen(snapshot.events));
 });
@@ -43,7 +43,7 @@ test("idempotent retries return the original event without double reserving cash
   assert.equal(retry.accepted, false);
   assert.equal(retry.duplicate, true);
   assert.equal(retry.snapshot.events.length, 1);
-  assert.equal(retry.snapshot.account.blockedFundsPaise, 10000);
+  assert.equal(retry.snapshot.account.blockedFundsPaise, 0);
   assert.throws(() => ledger.append(event({ deltas: { cashDeltaPaise: 0, blockedDeltaPaise: 20000 } })), /IDEMPOTENCY_KEY_REUSE_MISMATCH/);
 });
 test("fill must refer to an accepted order from the same engine and instrument", () => {
@@ -55,10 +55,10 @@ test("fill must refer to an accepted order from the same engine and instrument",
   assert.equal(ledger.snapshot().events.length, 0);
   assert.equal(ledger.snapshot().account.cashBalancePaise, opening.cashBalancePaise);
 });
-test("cash and reservation invariants reject negative cash, negative blocks and overspending", () => {
+test("unreceipted wallet cash and blocked-fund movements fail closed", () => {
   const ledger = createPaperDemoEventLedger(opening);
-  assert.throws(() => ledger.append(event({ deltas: { cashDeltaPaise: 0, blockedDeltaPaise: 100000001 } })), /DEMO_CASH_RESERVATION_INVARIANT/);
-  assert.throws(() => ledger.append(event({ eventId: "evt-2", idempotencyKey: "idem-2", sourceEventId: "cancel", deltas: { cashDeltaPaise: 0, blockedDeltaPaise: -1 } })), /DEMO_CASH_RESERVATION_INVARIANT/);
+  assert.throws(() => ledger.append(event({ deltas: { cashDeltaPaise: 0, blockedDeltaPaise: 100000001 } })), /WALLET_MOVEMENT_REQUIRES_VERIFIED_SETTLEMENT_RECEIPT/);
+  assert.throws(() => ledger.append(event({ eventId: "evt-2", idempotencyKey: "idem-2", sourceEventId: "cancel", deltas: { cashDeltaPaise: 0, blockedDeltaPaise: -1 } })), /WALLET_MOVEMENT_REQUIRES_VERIFIED_SETTLEMENT_RECEIPT/);
   assert.equal(ledger.snapshot().events.length, 0);
 });
 test("positions aggregate by asset class and MOCK instrument; realized P&L is projected", () => {
@@ -81,7 +81,7 @@ test("event replay is deterministic and validates the original sequence", () => 
   ledger.append(event());
   ledger.append(event({ eventId: "evt-2", idempotencyKey: "idem-2", sourceEventId: "equity-fill-1",
     type: "FILL_RECORDED", occurredAt: "2026-11-25T09:30:01+05:30",
-    deltas: { cashDeltaPaise: -125050, blockedDeltaPaise: -10000 },
+    deltas: { cashDeltaPaise: 0, blockedDeltaPaise: 0 },
     payload: { fillId: "fill-1", orderId: "order-1", assetClass: "EQUITY", instrumentKey: "MOCK|NSE|EQ|0001", side: "BUY", quantity: 1, pricePaise: 125050 } }));
   const original = ledger.snapshot();
   const replayed = replayPaperDemoEvents(opening, original.events);
@@ -119,7 +119,7 @@ test("fill quantity cannot exceed the accepted order quantity", () => {
   assert.throws(() => ledger.append(event({
     eventId: "evt-2", idempotencyKey: "idem-2", sourceEventId: "fill-oversized",
     type: "FILL_RECORDED", occurredAt: "2026-11-25T09:30:01+05:30",
-    deltas: { cashDeltaPaise: -125050, blockedDeltaPaise: -10000 },
+    deltas: { cashDeltaPaise: 0, blockedDeltaPaise: 0 },
     payload: { fillId: "fill-1", orderId: "order-1", assetClass: "EQUITY", instrumentKey: "MOCK|NSE|EQ|0001", side: "BUY", quantity: 3, pricePaise: 125050 }
   })), /FILL_QUANTITY_EXCEEDS_ORDER/);
 });
@@ -167,7 +167,7 @@ test("SELL order acceptance reserves only unreserved shares; fills release reser
   ledger.append(event({
     eventId: "evt-3", idempotencyKey: "sell-fill-1", sourceEventId: "sell-fill",
     type: "FILL_RECORDED", occurredAt: "2026-11-25T09:30:03+05:30",
-    deltas: { cashDeltaPaise: 300000, blockedDeltaPaise: 0 },
+    deltas: { cashDeltaPaise: 0, blockedDeltaPaise: 0 },
     payload: { fillId: "sell-fill-1", orderId: "sell-1", assetClass: "EQUITY", instrumentKey: "MOCK|NSE|EQ|0001", product: "DELIVERY", side: "SELL", quantity: 3, pricePaise: 100000 }
   }));
   ledger.append(event({
@@ -180,7 +180,7 @@ test("SELL order acceptance reserves only unreserved shares; fills release reser
   assert.equal(snapshot.positions[0].quantity, 2);
   assert.equal(snapshot.positions[0].reservedQuantity, 0);
   assert.equal(snapshot.positions[0].costBasisPaise, 200000);
-  assert.equal(snapshot.account.cashBalancePaise, opening.cashBalancePaise + 300000);
+  assert.equal(snapshot.account.cashBalancePaise, opening.cashBalancePaise);
 });
 
 test("cancelled SELL remainder releases reserved shares without changing filled quantity", () => {

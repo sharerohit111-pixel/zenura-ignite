@@ -62,7 +62,12 @@ export function createEquityDemoLedgerBridge({ engine, accountId, sessionId, led
       grossValuePaise: order.grossValuePaise, reservedCashPaise: order.reservedCashPaise
     };
   }
+  function requireAuthoritativeWalletReceiptPath() {
+    // No Equity receipt adapter is wired into this bridge yet. Refuse before mutating the execution engine.
+    throw new TypeError("EQUITY_WALLET_RECEIPT_GATE_CLOSED");
+  }
   function submitOrder(request) {
+    requireAuthoritativeWalletReceiptPath();
     const rejectionKey = request?.idempotencyKey;
     if (typeof rejectionKey === "string" && rejections.has(rejectionKey)) throw rejections.get(rejectionKey);
     let order;
@@ -102,6 +107,7 @@ export function createEquityDemoLedgerBridge({ engine, accountId, sessionId, led
     return { order, snapshot: ledger.snapshot(), engineSnapshot: after, openingSnapshot: before };
   }
   function matchNext(orderId, options = {}) {
+    requireAuthoritativeWalletReceiptPath();
     const executionId = options.executionId || "equity-exec-" + (executions.size + 1);
     if (executions.has(executionId)) return executions.get(executionId);
     const before = engine.snapshot();
@@ -133,6 +139,7 @@ export function createEquityDemoLedgerBridge({ engine, accountId, sessionId, led
     return bridged;
   }
   function cancelOrder(orderId) {
+    requireAuthoritativeWalletReceiptPath();
     if (cancellations.has(orderId)) return cancellations.get(orderId);
     const before = engine.snapshot();
     const result = engine.cancelOrder(orderId);
