@@ -1,5 +1,6 @@
 "use strict";
 
+(function(){
 const OPEN = new Set(["PENDING", "PARTIALLY_FILLED"]);
 const TERMINAL = new Set(["FILLED", "CANCELLED", "REJECTED", "EXPIRED"]);
 const ASSETS = new Set(["EQUITY", "FUTURE", "OPTION"]);
@@ -150,3 +151,5 @@ function createDemoTradeHistoryStore(options = {}) {
 const api = {createDemoTradeHistoryStore};
 if (typeof module === "object" && module.exports) module.exports = api;
 if (typeof window !== "undefined") window.ZenuraDemoTradeHistory = api;
+
+})();
