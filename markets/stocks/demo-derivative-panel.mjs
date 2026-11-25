@@ -67,14 +67,18 @@ export async function mountDerivativeDemo(container,screen){
  }
  function paint(){
   const s=ledgerBridge.snapshot();
-  renderTable(positions,["CONTRACT","TYPE","EXPIRY","PRODUCT","NET QTY","AVG PRICE","RESERVED CLOSE","AVAILABLE CLOSE"],s.positions.filter(x=>x.quantity!==0).map(x=>[x.symbol||x.instrumentKey,x.assetClass==="OPTION"?x.optionType:"FUT",x.expiry,x.product,x.quantity,money(x.averagePricePaise),x.reservedQuantity,x.assetClass==="OPTION"?x.quantity-x.reservedQuantity:"—"]),"No open demo positions.");
+  const assetClass=screen==="futures"?"FUTURE":"OPTION";
+  const ownPositions=s.positions.filter(x=>x.assetClass===assetClass&&x.quantity!==0);
+  const ownOrders=s.orders.filter(x=>x.assetClass===assetClass);
+  const ownFills=s.fills.filter(x=>x.assetClass===assetClass);
+  renderTable(positions,["CONTRACT","TYPE","EXPIRY","PRODUCT","NET QTY","AVG PRICE","RESERVED CLOSE","AVAILABLE CLOSE"],ownPositions.map(x=>[x.symbol||x.instrumentKey,x.assetClass==="OPTION"?x.optionType:"FUT",x.expiry,x.product,x.quantity,money(x.averagePricePaise),x.reservedQuantity,x.assetClass==="OPTION"?x.quantity-x.reservedQuantity:"—"]),"No open demo positions.");
   const wrap=el("div","table-wrap demo-fo-table-wrap"),t=el("table"),head=el("thead"),hr=el("tr"),body=el("tbody");
   ["ORDER ID","CONTRACT","SIDE","TYPE","LOTS / QTY","LIMIT","FILLED / REMAINING","AVG FILL","FILL RECEIPTS","STATUS","ACTION"].forEach(x=>hr.append(el("th","",x)));
   head.append(hr);
-  if(!s.orders.length){const tr=el("tr"),td=el("td","empty","No demo orders yet.");td.colSpan=11;tr.append(td);body.append(tr);}
-  s.orders.forEach(order=>{
+  if(!ownOrders.length){const tr=el("tr"),td=el("td","empty","No demo orders yet.");td.colSpan=11;tr.append(td);body.append(tr);}
+  ownOrders.forEach(order=>{
    const tr=el("tr");
-   [order.orderId,order.symbol||order.instrumentKey,order.side,order.orderType,(order.lots||"—")+" ("+order.quantity+")",order.limitPricePaise?money(order.limitPricePaise):"—",(order.filledQuantity||0)+" / "+(order.remainingQuantity??order.quantity),order.averageFillPricePaise?money(order.averageFillPricePaise):"—",s.fills.filter(f=>f.orderId===order.orderId).map(f=>f.quantity+" @ "+money(f.pricePaise)).join(" · ")||"—",order.status].forEach(x=>tr.append(el("td","",x)));
+   [order.orderId,order.symbol||order.instrumentKey,order.side,order.orderType,(order.lots||"—")+" ("+order.quantity+")",order.limitPricePaise?money(order.limitPricePaise):"—",(order.filledQuantity||0)+" / "+(order.remainingQuantity??order.quantity),order.averageFillPricePaise?money(order.averageFillPricePaise):"—",ownFills.filter(f=>f.orderId===order.orderId).map(f=>f.quantity+" @ "+money(f.pricePaise)).join(" · ")||"—",order.status].forEach(x=>tr.append(el("td","",x)));
    const action=el("td");
    if(["PENDING","PARTIALLY_FILLED"].includes(order.status)){
     const cancel=el("button","demo-fo-button secondary","CANCEL");
@@ -115,13 +119,16 @@ export async function appendDerivativeSummary(container, screen) {
   try {
     await getSimulator();
     const snapshot = ledgerBridge.snapshot();
+    const ownPositions = snapshot.positions.filter(x => ["FUTURE","OPTION"].includes(x.assetClass) && x.quantity !== 0);
+    const ownOrders = snapshot.orders.filter(x => ["FUTURE","OPTION"].includes(x.assetClass));
+    const ownFills = snapshot.fills.filter(x => ["FUTURE","OPTION"].includes(x.assetClass));
     if (screen === "positions" || screen === "portfolio") {
       renderTable(host,
         ["CONTRACT","ASSET","EXPIRY","PRODUCT","NET QTY","AVG PRICE","RESERVED CLOSE"],
-        snapshot.positions.filter(x => x.quantity !== 0).map(x => [x.symbol || x.instrumentKey,x.assetClass === "OPTION" ? x.optionType : "FUT",x.expiry,x.product,x.quantity,money(x.averagePricePaise),x.reservedQuantity]),
+        ownPositions.map(x => [x.symbol || x.instrumentKey,x.assetClass === "OPTION" ? x.optionType : "FUT",x.expiry,x.product,x.quantity,money(x.averagePricePaise),x.reservedQuantity]),
         "No canonical Futures/Options demo positions.");
     } else if (screen === "trades") {
-      const rows = snapshot.fills.map(fill => [
+      const rows = ownFills.map(fill => [
         fill.fillId,fill.symbol || fill.instrumentKey,fill.side,fill.orderType,fill.quantity,
         money(fill.pricePaise),money(fill.grossPaise),fill.executedAt
       ]);
@@ -129,7 +136,7 @@ export async function appendDerivativeSummary(container, screen) {
     } else {
       renderTable(host,
         ["ORDER ID","CONTRACT","SIDE","TYPE","QTY","FILLED / REMAINING","AVG FILL","STATUS"],
-        snapshot.orders.map(x => [x.orderId,x.symbol || x.instrumentKey,x.side,x.orderType,x.quantity,
+        ownOrders.map(x => [x.orderId,x.symbol || x.instrumentKey,x.side,x.orderType,x.quantity,
           (x.filledQuantity || 0)+" / "+(x.remainingQuantity ?? x.quantity),
           x.averageFillPricePaise ? money(x.averageFillPricePaise) : "—",x.status]),
         "No canonical Futures/Options orders.");
