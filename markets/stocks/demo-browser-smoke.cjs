@@ -9,6 +9,38 @@ const shellEntries=[...shellBlock[1].matchAll(/"([^"]*)"/g)].map(match=>match[1]
 assert.equal(new Set(shellEntries).size,shellEntries.length,"duplicate precache URLs prevent reliable service worker installation");
 const axePath=require.resolve("axe-core/axe.min.js");
 
+async function scanTextContrast(page){
+ return page.evaluate(()=>{
+  const rgb=value=>{const m=String(value).match(/rgba?\(([^)]+)\)/);if(!m)return null;const p=m[1].split(",").map(x=>Number.parseFloat(x.trim()));return p.length>=3&&p.slice(0,3).every(Number.isFinite)?{r:p[0],g:p[1],b:p[2],a:p.length>3&&Number.isFinite(p[3])?p[3]:1}:null;};
+  const blend=(front,back)=>({r:front.r*front.a+back.r*(1-front.a),g:front.g*front.a+back.g*(1-front.a),b:front.b*front.a+back.b*(1-front.a),a:1});
+  const luminance=c=>{const channel=v=>{v/=255;return v<=.04045?v/12.92:((v+.055)/1.055)**2.4;};return .2126*channel(c.r)+.7152*channel(c.g)+.0722*channel(c.b);};
+  const ratio=(a,b)=>{const x=luminance(a),y=luminance(b);return (Math.max(x,y)+.05)/(Math.min(x,y)+.05);};
+  const bodyStyle=getComputedStyle(document.body),bodyColor=rgb(bodyStyle.backgroundColor);
+  const rootColor=rgb(getComputedStyle(document.documentElement).backgroundColor);
+  const cssFallback=rgb(bodyStyle.getPropertyValue("--bg").trim())||{r:7,g:17,b:31,a:1};
+  const failures=[],measured=[];
+  for(const node of document.querySelectorAll("body *")){
+   if(node.children.length||!node.textContent.trim())continue;
+   const rect=node.getBoundingClientRect(),style=getComputedStyle(node);
+   if(!rect.width||!rect.height||style.visibility==="hidden"||style.display==="none")continue;
+   if(node.closest(':disabled,[aria-disabled="true"]'))continue;
+   let opacity=1;const chain=[];
+   for(let el=node;el&&el!==document.documentElement;el=el.parentElement){chain.push(el);opacity*=Number.parseFloat(getComputedStyle(el).opacity)||0;}
+   if(opacity===0)continue;
+   let bg={...(rootColor&&rootColor.a>0?rootColor:cssFallback)};
+   if(bodyColor&&bodyColor.a>0)bg=blend(bodyColor,bg);
+   for(const el of chain.reverse()){const layer=rgb(getComputedStyle(el).backgroundColor);if(layer&&layer.a>0)bg=blend(layer,bg);}
+   const fg=rgb(style.color);if(!fg)continue;
+   const effectiveFg=blend({...fg,a:fg.a*opacity},bg);
+   const value=ratio(effectiveFg,bg),size=parseFloat(style.fontSize)||16,weight=parseInt(style.fontWeight,10)||400;
+   const large=size>=24||(size>=18.66&&weight>=700),minimum=large?3:4.5;
+   const record={text:node.textContent.trim().slice(0,70),foreground:style.color,background:"rgb("+Math.round(bg.r)+", "+Math.round(bg.g)+", "+Math.round(bg.b)+")",ratio:Number(value.toFixed(2)),minimum};
+   measured.push(record);if(value+0.01<minimum)failures.push(record);
+  }
+  return {textNodes:measured.length,minimumRatio:measured.length?Math.min(...measured.map(x=>x.ratio)):null,failures:failures.slice(0,30)};
+ });
+}
+
 (async()=>{
  const browser=await chromium.launch({headless:true});
  try{
@@ -25,6 +57,7 @@ const axePath=require.resolve("axe-core/axe.min.js");
    const firstNav=page.locator("#screen-nav button[data-screen=\"home\"]");await firstNav.focus();
    assert.equal(await page.evaluate(()=>document.activeElement?.dataset.screen),"home",viewport.name+" keyboard focus reaches navigation");
    await page.keyboard.press("Tab");assert.equal(await page.evaluate(()=>document.activeElement?.dataset.screen),"market",viewport.name+" Tab moves through screen navigation");
+   const contrastReports=[];
    for(const name of ["home","market","watchlists","charts","equity","futures","options","orders","trades","portfolio","positions","holdings","account","profile","settings"]){
     await page.locator('#screen-nav button[data-screen="'+name+'"]').click();
     await page.locator("#screen-content > .screen-title h2").waitFor();
@@ -35,6 +68,10 @@ const axePath=require.resolve("axe-core/axe.min.js");
     const seriousScreen=screenAxe.violations.filter(v=>v.impact==="critical"||v.impact==="serious");const screenDetails=seriousScreen.map(v=>({id:v.id,nodes:v.nodes.map(n=>({target:n.target,html:n.html}))}));assert.equal(seriousScreen.length,0,viewport.name+" "+name+" serious/critical accessibility violations: "+JSON.stringify(screenDetails));
     const overflow=await page.evaluate(()=>document.documentElement.scrollWidth>window.innerWidth+1);
     assert.equal(overflow,false,viewport.name+" horizontal document overflow on "+name);
+    const contrast=await scanTextContrast(page);
+    assert.ok(contrast.textNodes>0,viewport.name+" "+name+" contrast scan found visible text");
+    assert.equal(contrast.failures.length,0,viewport.name+" "+name+" WCAG text contrast failures: "+JSON.stringify(contrast.failures));
+    contrastReports.push({screen:name,textNodes:contrast.textNodes,minimumRatio:contrast.minimumRatio});
    }
    if(viewport.name==="desktop"){
     await page.locator('#screen-nav button[data-screen="watchlists"]').click();
@@ -57,6 +94,16 @@ const axePath=require.resolve("axe-core/axe.min.js");
    assert.equal(await page.locator("#screen-nav button[data-screen=\"home\"]").textContent(),"होम",viewport.name+" Hindi nav translation");
    assert.equal(await toggle.evaluate(node=>getComputedStyle(node).position),"fixed",viewport.name+" language toggle fixed positioning");
    assert.equal(await toggle.getAttribute("aria-label"),"इंटरफ़ेस की भाषा हिंदी करें",viewport.name+" translated toggle accessibility label");
+   const hindiContrastReports=[];
+   for(const name of ["home","market","watchlists","charts","equity","futures","options","orders","trades","portfolio","positions","holdings","account","profile","settings"]){
+    await page.locator('#screen-nav button[data-screen="'+name+'"]').click();
+    await page.locator("#screen-content > .screen-title h2").waitFor();
+    const contrast=await scanTextContrast(page);
+    assert.ok(contrast.textNodes>0,viewport.name+" Hindi "+name+" contrast scan found visible text");
+    assert.equal(contrast.failures.length,0,viewport.name+" Hindi "+name+" WCAG text contrast failures: "+JSON.stringify(contrast.failures));
+    hindiContrastReports.push({screen:name,textNodes:contrast.textNodes,minimumRatio:contrast.minimumRatio});
+   }
+   contrastReports.push(...hindiContrastReports.map(item=>({...item,language:"hi"})));
    await page.reload({waitUntil:"domcontentloaded",timeout:30000});
    await page.waitForFunction(()=>document.querySelector("#demo-status")?.textContent.includes("4 canonical fixtures validated"),null,{timeout:10000});
    await page.addScriptTag({path:axePath});
@@ -80,7 +127,7 @@ const axePath=require.resolve("axe-core/axe.min.js");
    assert.ok(perf.transferBytes<5*1024*1024,viewport.name+" transfer budget");
    assert.deepEqual(pageErrors,[],viewport.name+" browser errors");
    assert.deepEqual(consoleErrors,[],viewport.name+" console errors");
-   console.log(JSON.stringify({viewport:viewport.name,screens:15,perScreenAxe:true,keyboardNavigation:true,axeSeriousCritical:0,consoleErrors:0,...perf}));
+   console.log(JSON.stringify({viewport:viewport.name,screens:15,perScreenAxe:true,keyboardNavigation:true,axeSeriousCritical:0,contrastScreens:15,contrastLanguages:["en","hi"],contrastChecks:contrastReports.length,contrastTextNodes:contrastReports.reduce((sum,item)=>sum+item.textNodes,0),minimumObservedTextContrast:Math.min(...contrastReports.map(item=>item.minimumRatio)),contrastReports,consoleErrors:0,...perf}));
    await context.close();
   }
 
