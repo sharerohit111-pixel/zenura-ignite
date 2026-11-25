@@ -1,3 +1,4 @@
+(function(root) {
 "use strict";
 
 const OPEN = new Set(["PENDING", "PARTIALLY_FILLED"]);
@@ -147,4 +148,5 @@ function createDemoTradeHistoryStore(options = {}) {
 }
 const api = {createDemoTradeHistoryStore};
 if (typeof module === "object" && module.exports) module.exports = api;
-if (typeof window !== "undefined") window.ZenuraDemoTradeHistory = api;
+if (root) root.ZenuraDemoTradeHistory = api;
+})(typeof window !== "undefined" ? window : globalThis);
