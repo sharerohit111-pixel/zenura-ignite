@@ -51,8 +51,12 @@ const axePath=require.resolve("axe-core/axe.min.js");
    await page.locator('[data-demo-timeframe="1m"]').click();
    assert.ok(await page.locator('[data-demo-timeframe="1m"]').evaluate(node=>node.classList.contains("active")),"chart timeframe control");
    await page.locator('[data-demo-chart-type="LINE"]').click();
-   assert.ok(await page.locator('[data-demo-chart-type="LINE"]').evaluate(node=>node.classList.contains("active")),"chart style control");
-   assert.equal(await page.locator("#demo-chart-svg").getAttribute("aria-label"),"Synthetic candlestick or line chart with volume","chart accessible description");
+   assert.ok(await page.locator('[data-demo-chart-type="LINE"]').evaluate(node=>node.classList.contains("active")),"line chart style control");
+   assert.ok(await page.locator("#demo-chart-svg .demo-line").count()===1,"line chart SVG path");
+   await page.locator('[data-demo-chart-type="OHLC"]').click();
+   assert.ok(await page.locator('[data-demo-chart-type="OHLC"]').evaluate(node=>node.classList.contains("active")),"OHLC chart style control");
+   assert.equal(await page.locator("#demo-chart-svg .demo-ohlc-bar").count(),64,"OHLC bars render for every deterministic candle");
+   assert.equal(await page.locator("#demo-chart-svg").getAttribute("aria-label"),"Synthetic OHLC, candlestick or line chart with volume","chart accessible description");
 
    if(viewport.name==="desktop"){
     // Watchlist add / reorder / remove must mutate only the session Demo list.
