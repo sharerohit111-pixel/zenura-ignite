@@ -18,6 +18,7 @@ test("Futures and Options Demo screens mount the shared local simulator", async 
   assert.match(html, /derivative-mock-simulator\.js/);
   assert.match(panel, /createDerivativeMockSimulator/);
   assert.match(panel, /createDerivativeDemoLedgerBridge/);
+  assert.match(panel, /getSharedPaperDemoLedgerSession/);
   assert.ok(panel.includes("ledgerBridge.snapshot()"));
   const positionHelper=await read("market-gateway/lib/derivative-position.js");
   assert.match(positionHelper,/root\.ZENURA_DERIVATIVE_POSITION=api/);
