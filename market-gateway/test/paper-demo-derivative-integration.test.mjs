@@ -11,8 +11,8 @@ test("Futures and Options Demo screens mount the shared local simulator", async 
   const panel = await read("markets/stocks/demo-derivative-panel.mjs");
   assert.match(js, /mountDerivativeDemo\(content,name\)/);
   assert.match(js, /appendDerivativeSummary\(content,name\)/);
-  assert.match(panel, /LOCAL FUTURES & OPTIONS POSITIONS/);
-  assert.match(panel, /LOCAL FUTURES & OPTIONS FILLS/);
+  assert.match(panel, /CANONICAL FUTURES & OPTIONS POSITIONS/);
+  assert.match(panel, /CANONICAL FUTURES & OPTIONS FILLS/);
   assert.match(js, /from "\.\/demo-derivative-panel\.mjs"/);
   assert.match(html, /derivative-position\.js/);
   assert.match(html, /derivative-mock-simulator\.js/);
@@ -31,7 +31,7 @@ test("Demo execution is manual, synthetic and isolated from production routes", 
   assert.match(panel, /DEMO DATA · MOCK/);
   assert.match(panel, /credentials:"omit"/);
   assert.match(panel, /processLimitFills/);
-  assert.ok(panel.includes("engine.cancel"));
+  assert.ok(panel.includes("ledgerBridge.cancel"));
   assert.match(sw, /stocks\/demo-derivative-panel\.mjs/);
   assert.doesNotMatch(gateway, /derivative-mock-simulator|paper-demo-adapter|paper-mock-fixtures/);
 });
