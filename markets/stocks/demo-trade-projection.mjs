@@ -9,11 +9,10 @@ function getStore(){
  projection=api.createDemoTradeHistoryStore({env:{NODE_ENV:"development"}});
  return projection;
 }
-const seenOrders=new Set(),seenFills=new Set(),cancelled=new Set();
+const seenOrders=new Set(),seenFills=new Set(),cancelled=new Set(),rejected=new Set();
 function syncDemoProjection(source,snapshot){
  const store=getStore(),orders=source==="EQUITY"?(snapshot.orders||[]):(snapshot.orders||[]);
  for(const order of [...orders].reverse()){
-  if(order.status==="REJECTED")continue;
   const assetClass=source==="EQUITY"?"EQUITY":order.assetClass;
   if(!["EQUITY","FUTURE","OPTION"].includes(assetClass))continue;
   if(!seenOrders.has(order.orderId)){
@@ -22,6 +21,10 @@ function syncDemoProjection(source,snapshot){
     limitPricePaise:order.limitPricePaise||undefined,idempotencyKey:cleanKey(order.orderId),
     createdAt:time(order.createdAt)});
    seenOrders.add(order.orderId);
+  }
+  if(order.status==="REJECTED"&&!rejected.has(order.orderId)){
+   store.reject(order.orderId,order.rejectionReason||"Rejected by deterministic Demo simulator",time(order.updatedAt||order.createdAt));
+   rejected.add(order.orderId);
   }
   const fills=source==="EQUITY"?(snapshot.fills||[]).filter(f=>f.orderId===order.orderId):(order.fills||[]);
   for(const fill of fills){
