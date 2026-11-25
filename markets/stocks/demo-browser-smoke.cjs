@@ -61,20 +61,22 @@ const axePath=require.resolve("axe-core/axe.min.js");
   await page.goto("http://127.0.0.1:4173/markets/",{waitUntil:"domcontentloaded",timeout:30000});
   await page.waitForLoadState("load",{timeout:10000});
   console.log("PWA: waiting for service worker activation");
-  const workerScopeHandle=await page.waitForFunction(async()=>{
+  const workerReady=await page.waitForFunction(async()=>{
    const registrations=await navigator.serviceWorker.getRegistrations();
-   const registration=registrations.find(item=>item.scope.endsWith("/markets/")&&item.active?.state==="activated");
-   return registration?registration.scope:false;
+   return registrations.some(item=>item.scope.endsWith("/markets/")&&item.active?.state==="activated");
   },null,{timeout:30000});
-  const workerScope=await workerScopeHandle.jsonValue();
-  assert.ok(typeof workerScope==="string"&&workerScope.endsWith("/markets/"),"an activated service worker must own the /markets/ scope");
-  console.log(JSON.stringify({pwaWorker:"activated",scope:workerScope}));
+  assert.ok(workerReady,"an activated service worker must own the /markets/ scope");
+  console.log("PWA: service worker is activated for /markets/");
   // clients.claim() in the activate handler controls existing same-scope clients.
   // Open a fresh same-scope tab rather than forcing a navigation reload race.
   const controlledPage=await pwa.newPage();
   console.log("PWA: opening demo under service worker");
   await controlledPage.goto("http://127.0.0.1:4173/markets/stocks/demo.html",{waitUntil:"domcontentloaded",timeout:30000});
-  await controlledPage.waitForFunction(()=>!!navigator.serviceWorker.controller,null,{timeout:15000});
+  await controlledPage.waitForFunction(()=>navigator.serviceWorker.controller?.state==="activated"&&navigator.serviceWorker.controller.scriptURL.endsWith("/markets/service-worker.js"),null,{timeout:15000});
+  const workerState=await controlledPage.evaluate(()=>({state:navigator.serviceWorker.controller?.state||"missing",scriptURL:navigator.serviceWorker.controller?.scriptURL||null}));
+  assert.equal(workerState.state,"activated","demo route must be controlled by the activated market service worker");
+  assert.ok(workerState.scriptURL.endsWith("/markets/service-worker.js"),"demo route must be controlled by the market-scoped service worker");
+  console.log(JSON.stringify({pwaWorker:workerState.state,scriptURL:workerState.scriptURL}));
   await page.close();
   const demoPage=controlledPage;
   await demoPage.waitForFunction(()=>document.querySelector("#demo-status")?.textContent.includes("4 canonical fixtures validated"),null,{timeout:10000});
