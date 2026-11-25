@@ -32,3 +32,15 @@ test("PWA precaches the unified panel and retains the single shared ledger sessi
   assert.match(panel, /market-gateway\/mock\/fixtures\/account\.json/);
   assert.match(panel, /market-gateway\/mock\/fixtures\/derivatives\.json/);
 });
+
+test("Portfolio valuation rejects missing, stale, invalid and future-dated marks and suppresses incomplete aggregate P&L", async () => {
+  const panel = await read("markets/stocks/demo-unified-ledger-panel.mjs");
+  assert.match(panel, /quote\.stale===true/);
+  assert.match(panel, /derivativeEnvelope\.meta\?\.stale===true/);
+  assert.match(panel, /equityEnvelope\.meta\?\.stale===true/);
+  assert.match(panel, /!Number\.isFinite\(time\)/);
+  assert.match(panel, /time>Date\.now\(\)/);
+  assert.match(panel, /mark\.stale===false/);
+  assert.match(panel, /Unavailable \(missing\/stale\)/);
+  assert.match(panel, /allMarksValid\?money\(aggregateUnrealized\)/);
+});
