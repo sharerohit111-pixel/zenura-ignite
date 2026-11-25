@@ -1,4 +1,5 @@
 import { getSharedPaperDemoLedgerSession } from "../shared/paper-demo-ledger-session.mjs";
+import { projectPaperDemoWallet } from "../shared/paper-demo-wallet-projection.mjs";
 
 let dataPromise = null;
 const money = value => Number.isSafeInteger(value)
@@ -101,5 +102,70 @@ export async function appendUnifiedLedgerSummary(container, screen) {
     host.append(totals);
   } catch(error) {
     host.append(el("p","demo-eq-status","Unified Demo ledger unavailable · "+(error.message||"fixture error")));
+  }
+}
+
+
+export async function appendWalletSummary(container) {
+  const section = el("section", "demo-unified-ledger");
+  section.append(el("h3", "demo-eq-subhead", "CANONICAL VIRTUAL WALLET"));
+  section.append(el("p", "demo-eq-disclaimer",
+    "Read-only wallet projection from the same account/session event ledger used by Equity, Futures and Options. MOCK only; no cash mutation, fees, margin inference or settlement authority."));
+  const host = el("div");
+  section.append(host);
+  container.append(section);
+  try {
+    const { session } = await getData();
+    const wallet = projectPaperDemoWallet(session.ledger.snapshot());
+    host.append(el("div", "demo-wallet-identity",
+      "Account " + wallet.account.accountId + " · Session " + wallet.account.sessionId));
+    const cards = el("div", "grid");
+    cards.append(
+      el("article", "card"),
+      el("article", "card"),
+      el("article", "card"),
+      el("article", "card")
+    );
+    const values = [
+      ["Opening cash", money(wallet.account.openingCashPaise)],
+      ["Cash balance", money(wallet.account.cashBalancePaise)],
+      ["Blocked funds", money(wallet.account.blockedFundsPaise)],
+      ["Available funds", money(wallet.account.availableFundsPaise)]
+    ];
+    [...cards.children].forEach((node, index) => {
+      node.append(el("h3", "", values[index][0]), el("div", "metric", values[index][1]));
+    });
+    host.append(cards);
+    const orderRows = wallet.orders.map(order => [
+      order.orderId, order.assetClass, order.symbol || order.instrumentKey, order.side,
+      order.orderType, order.quantity, order.filledQuantity + " / " + order.remainingQuantity,
+      order.averageFillPricePaise ? money(order.averageFillPricePaise) : "—", order.status
+    ]);
+    host.append(el("h3", "demo-eq-subhead", "ORDERS"),
+      table(host, ["ORDER ID","ASSET","INSTRUMENT","SIDE","TYPE","QTY","FILLED / REMAINING","AVG FILL","STATUS"], orderRows,
+        "No canonical Demo orders yet."));
+    const fillRows = wallet.fills.map(fill => [
+      fill.fillId, fill.assetClass, fill.symbol || fill.instrumentKey, fill.side,
+      fill.quantity, money(fill.pricePaise), money(fill.quantity * fill.pricePaise),
+      fill.occurredAt || fill.executedAt
+    ]);
+    host.append(el("h3", "demo-eq-subhead", "FILL RECEIPTS"),
+      table(host, ["FILL ID","ASSET","INSTRUMENT","SIDE","QTY","PRICE","GROSS","TIME"], fillRows,
+        "No canonical Demo fills yet."));
+    const positionRows = wallet.positions.filter(position => position.quantity !== 0).map(position => [
+      position.assetClass, position.symbol || position.instrumentKey, position.product,
+      position.quantity, money(position.averagePricePaise), money(position.costBasisPaise),
+      money(position.realizedPnlPaise), position.reservedQuantity
+    ]);
+    host.append(el("h3", "demo-eq-subhead", "POSITIONS"),
+      table(host, ["ASSET","INSTRUMENT","PRODUCT","NET QTY","AVG PRICE","COST BASIS","REALIZED P&L","RESERVED"], positionRows,
+        "No canonical Demo positions yet."));
+    host.append(el("p", "demo-eq-disclaimer",
+      "Events: " + wallet.eventCount + " · Last sequence: " + wallet.lastSequence +
+      " · Reconciled: false (intentionally fail-closed). Unrealized P&L is not valued here."));
+  } catch (error) {
+    host.append(el("p", "demo-eq-status",
+      "Canonical wallet projection unavailable · " + (error.message || "fixture error") +
+      ". No fixture-balance fallback is shown."));
   }
 }
