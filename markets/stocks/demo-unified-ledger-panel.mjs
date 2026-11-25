@@ -17,19 +17,31 @@ export function createPortfolioMark(pricePaise, timestamp, {
   const ageMs = timeValid ? now - time : null;
   const stale = explicitStale === true || envelopeStale === true || !priceValid || !timeValid ||
     ageMs > maxAgeMs || ageMs < -maxFutureSkewMs;
-  return { pricePaise: priceValid ? pricePaise : null, timestamp: timeValid ? time : null, stale };
+  return {
+    pricePaise: priceValid ? pricePaise : null,
+    timestamp: timeValid ? time : null,
+    stale,
+    maxAgeMs: Number.isFinite(maxAgeMs) && maxAgeMs >= 0 ? maxAgeMs : null,
+    maxFutureSkewMs: Number.isFinite(maxFutureSkewMs) && maxFutureSkewMs >= 0 ? maxFutureSkewMs : null
+  };
 }
 
-export function isUsablePortfolioMark(mark) {
-  return Boolean(mark && Number.isSafeInteger(mark.pricePaise) && mark.pricePaise > 0 &&
-    mark.stale === false && Number.isFinite(mark.timestamp));
+// Re-evaluate age at every valuation. A mark that was fresh when fetched must
+// expire as wall-clock time advances; cached quote snapshots are not leases.
+export function isUsablePortfolioMark(mark, now = Date.now()) {
+  if (!mark || !Number.isSafeInteger(mark.pricePaise) || mark.pricePaise <= 0 ||
+      mark.stale !== false || !Number.isFinite(mark.timestamp) || !Number.isFinite(now) ||
+      !Number.isFinite(mark.maxAgeMs) || mark.maxAgeMs < 0 ||
+      !Number.isFinite(mark.maxFutureSkewMs) || mark.maxFutureSkewMs < 0) return false;
+  const ageMs = now - mark.timestamp;
+  return ageMs <= mark.maxAgeMs && ageMs >= -mark.maxFutureSkewMs;
 }
 
-export function calculateAggregateUnrealized(positions, marks) {
+export function calculateAggregateUnrealized(positions, marks, now = Date.now()) {
   let value = 0;
   for (const position of positions) {
     const mark = marks.get(position.instrumentKey);
-    if (!isUsablePortfolioMark(mark) || !Number.isSafeInteger(position.quantity) ||
+    if (!isUsablePortfolioMark(mark, now) || !Number.isSafeInteger(position.quantity) ||
         !Number.isSafeInteger(position.averagePricePaise)) return { complete: false, value: null };
     const pnl = (mark.pricePaise - position.averagePricePaise) * position.quantity;
     if (!Number.isSafeInteger(pnl) || !Number.isSafeInteger(value + pnl)) return { complete: false, value: null };
