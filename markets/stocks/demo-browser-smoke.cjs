@@ -58,6 +58,10 @@ const axePath=require.resolve("axe-core/axe.min.js");
   console.log("PWA: waiting for service worker activation");
   let workerState;
   try{
+   await page.waitForFunction(async()=>{
+    const registration=await navigator.serviceWorker.ready;
+    return registration.active?.state==="activated";
+   },null,{timeout:15000});
    workerState=await page.evaluate(async()=>{
     const registration=await navigator.serviceWorker.ready;
     return {state:registration.active?.state||"missing",scope:registration.scope||null};
