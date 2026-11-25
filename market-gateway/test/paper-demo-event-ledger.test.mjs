@@ -55,6 +55,28 @@ test("fill must refer to an accepted order from the same engine and instrument",
   assert.equal(ledger.snapshot().events.length, 0);
   assert.equal(ledger.snapshot().account.cashBalancePaise, opening.cashBalancePaise);
 });
+test("supplied fill gross value must equal quantity multiplied by price in integer paise", () => {
+  const makeFill = grossPaise => event({
+    eventId: "evt-2", idempotencyKey: "idem-2", sourceEventId: "equity-fill-gross-check",
+    type: "FILL_RECORDED", occurredAt: "2026-11-25T09:30:01+05:30",
+    deltas: { cashDeltaPaise: -125050, blockedDeltaPaise: -10000 },
+    payload: {
+      fillId: "fill-gross-check", orderId: "order-1", assetClass: "EQUITY",
+      instrumentKey: "MOCK|NSE|EQ|0001", side: "BUY", quantity: 1,
+      pricePaise: 125050, grossPaise
+    }
+  });
+  const rejected = createPaperDemoEventLedger(opening);
+  rejected.append(event());
+  assert.throws(() => rejected.append(makeFill(125049)), /INVALID_FILL_GROSS_VALUE/);
+  assert.equal(rejected.snapshot().events.length, 1);
+
+  const accepted = createPaperDemoEventLedger(opening);
+  accepted.append(event());
+  accepted.append(makeFill(125050));
+  assert.equal(accepted.snapshot().fills[0].grossPaise, 125050);
+});
+
 test("cash and reservation invariants reject negative cash, negative blocks and overspending", () => {
   const ledger = createPaperDemoEventLedger(opening);
   assert.throws(() => ledger.append(event({ deltas: { cashDeltaPaise: 0, blockedDeltaPaise: 100000001 } })), /DEMO_CASH_RESERVATION_INVARIANT/);
