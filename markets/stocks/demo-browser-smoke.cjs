@@ -32,7 +32,7 @@ const axePath=require.resolve("axe-core/axe.min.js");
     assert.equal(await page.locator("#screen-nav button[aria-current=\"page\"]").getAttribute("data-screen"),name,viewport.name+" active navigation semantics");
     assert.ok((await page.locator("#screen-content .read-only").textContent())?.includes("MOCK"),viewport.name+" "+name+" visible MOCK identity");
     const screenAxe=await page.evaluate(async()=>window.axe.run(document,{runOnly:{type:"tag",values:["wcag2a","wcag2aa","wcag21a","wcag21aa"]}}));
-    const seriousScreen=screenAxe.violations.filter(v=>v.impact==="critical"||v.impact==="serious");assert.equal(seriousScreen.length,0,viewport.name+" "+name+" serious/critical accessibility violations: "+seriousScreen.map(v=>v.id).join(","));
+    const seriousScreen=screenAxe.violations.filter(v=>v.impact==="critical"||v.impact==="serious");const screenDetails=seriousScreen.map(v=>({id:v.id,nodes:v.nodes.map(n=>({target:n.target,html:n.html}))}));assert.equal(seriousScreen.length,0,viewport.name+" "+name+" serious/critical accessibility violations: "+JSON.stringify(screenDetails));
     const overflow=await page.evaluate(()=>document.documentElement.scrollWidth>window.innerWidth+1);
     assert.equal(overflow,false,viewport.name+" horizontal document overflow on "+name);
    }
