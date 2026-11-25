@@ -133,7 +133,7 @@ export function schedulePortfolioMarkExpiryRefresh({
       if (!isUsablePortfolioMark(mark, currentTime)) continue;
       const ageExpiry = mark.timestamp + mark.maxAgeMs + 1;
       const contractExpiry = mark.requiresExpiry === true
-        ? portfolioDerivativeExpiryCutoff(mark.expiryDate) : null;
+        ? portfolioDerivativeExpiryCutoff(mark.expiryDate, { exchange: mark.exchange, underlyingType: mark.underlyingType }) : null;
       const expiry = contractExpiry === null ? ageExpiry : Math.min(ageExpiry, contractExpiry);
       nextExpiry = nextExpiry === null ? expiry : Math.min(nextExpiry, expiry);
     }
