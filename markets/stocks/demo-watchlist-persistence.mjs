@@ -43,13 +43,14 @@ export function createPrivateWatchlistController({ supabase, catalogKeys }) {
       return Promise.reject(new Error("Watchlists allow up to 50 valid instrument keys."));
     }
     const snapshot = [...new Set(nextKeys)];
+    const listName = activeName;
     const currentRevision = ++revision;
     keys = snapshot;
     const task = async () => {
       if (expectedUserId !== userId) throw new Error("Account changed; save cancelled.");
       const { error } = await supabase.from("paper_watchlists").upsert({
         user_id: expectedUserId,
-        name: activeName,
+        name: listName,
         instrument_keys: snapshot,
         updated_at: new Date().toISOString()
       }, { onConflict: "user_id,name" });
