@@ -156,7 +156,8 @@ function apply(projection, event) {
       Object.assign(next, { filledQuantity: 0, remainingQuantity: p.quantity, averageFillPricePaise: 0 });
       validateOrderStatus(next.status, next.quantity, 0);
     }
-    let terminalSellRelease = null;
+    let expectedReservationDelta = event.type === "ORDER_ACCEPTED" && p.side === "SELL" && p.assetClass !== "FUTURE"
+      ? p.quantity : 0;
     if (existing) {
       for (const field of ["assetClass", "instrumentKey", "side", "orderType", "quantity", "product"]) {
         if (existing[field] !== next[field]) fail("ORDER_IDENTITY_MUTATION");
@@ -167,15 +168,14 @@ function apply(projection, event) {
       validateOrderTransition(existing.status, p.status);
       validateOrderStatus(p.status, existing.quantity, totals.filledQuantity);
       if (p.side === "SELL" && p.assetClass !== "FUTURE" && ["CANCELLED", "EXPIRED"].includes(p.status)) {
-        terminalSellRelease = -totals.remainingQuantity;
-        if (p.reservedQuantityDelta !== undefined && p.reservedQuantityDelta !== terminalSellRelease) {
-          fail("DEMO_TERMINAL_SELL_RESERVATION_MISMATCH");
-        }
+        expectedReservationDelta = -totals.remainingQuantity;
       }
       Object.assign(existing, next, totals);
     } else projection.orders.push(next);
-    const reservationDelta = terminalSellRelease !== null ? terminalSellRelease :
-      (p.reservedQuantityDelta ?? (event.type === "ORDER_ACCEPTED" && p.side === "SELL" && p.assetClass !== "FUTURE" ? p.quantity : 0));
+    if (p.reservedQuantityDelta !== undefined && p.reservedQuantityDelta !== expectedReservationDelta) {
+      fail("DEMO_ORDER_RESERVATION_DELTA_MISMATCH");
+    }
+    const reservationDelta = expectedReservationDelta;
     if (reservationDelta !== 0) {
       const key = positionKey(p.assetClass, p.instrumentKey, product);
       const position = projection.positions.find(x => x.key === key);
