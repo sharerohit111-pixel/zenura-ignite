@@ -7,6 +7,7 @@ export const DERIVATIVE_MARK_MAX_AGE_MS = 15_000;
 export const EQUITY_MARK_MAX_FUTURE_SKEW_MS = 5_000;
 export const NSE_REVISED_DERIVATIVES_HOURS_EFFECTIVE_DATE = "2026-12-07";
 export const BSE_REVISED_DERIVATIVES_HOURS_EFFECTIVE_DATE = "2026-12-07";
+export const BSE_CAS_DERIVATIVES_HOURS_EFFECTIVE_DATE = "2026-08-03";
 export const DERIVATIVE_CALENDAR_VERIFIED_YEAR = 2026;
 
 // Official 2026 exchange holiday notices. Muhurat Trading is deliberately
@@ -45,19 +46,24 @@ export function portfolioDerivativeExpiryCutoff(expiryDate, { exchange, underlyi
 
   let hour;
   let minute;
-  if (expiryDate < NSE_REVISED_DERIVATIVES_HOURS_EFFECTIVE_DATE) {
+  if (exchange === "NSE" && expiryDate < NSE_REVISED_DERIVATIVES_HOURS_EFFECTIVE_DATE) {
     hour = 15;
     minute = 30;
-  } else if (underlyingType === "INDEX") {
+  } else if (exchange === "BSE" && expiryDate < BSE_CAS_DERIVATIVES_HOURS_EFFECTIVE_DATE) {
     hour = 15;
     minute = 30;
-  } else if (underlyingType === "STOCK") {
+  } else if (exchange === "BSE" && expiryDate < BSE_REVISED_DERIVATIVES_HOURS_EFFECTIVE_DATE) {
+    hour = 15;
+    minute = 40;
+  } else if ((exchange === "NSE" || exchange === "BSE") && underlyingType === "INDEX") {
+    hour = 15;
+    minute = 30;
+  } else if ((exchange === "NSE" || exchange === "BSE") && underlyingType === "STOCK") {
     hour = 15;
     minute = 45;
   } else {
     return null;
   }
-  if (exchange !== "NSE" && exchange !== "BSE") return null;
 
   const clock = String(hour).padStart(2, "0") + ":" +
     String(minute).padStart(2, "0") + ":00+05:30";
