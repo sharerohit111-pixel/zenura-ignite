@@ -117,6 +117,18 @@ export function createEquityDemoLedgerBridge({ engine, accountId, sessionId, clo
     cancellations.set(orderId, bridged);
     return bridged;
   }
+  for (const [product, positions] of [["DELIVERY", initial.account.positions], ["INTRADAY", initial.account.intradayPositions]]) {
+    for (const [instrumentKey, position] of Object.entries(positions || {})) {
+      if (!instrumentKey.startsWith("MOCK|")) throw new TypeError("NON_MOCK_OPENING_POSITION");
+      append("POSITION_CHANGED", {
+        assetClass: "EQUITY", instrumentKey, product,
+        quantityDelta: position.quantity,
+        costBasisDeltaPaise: position.costBasisPaise,
+        reservedQuantityDelta: position.reservedQuantity || 0,
+        realizedPnlDeltaPaise: 0
+      }, { cashDeltaPaise: 0, blockedDeltaPaise: 0 }, "opening-" + product + "-" + instrumentKey);
+    }
+  }
   return Object.freeze({
     submitOrder, matchNext, cancelOrder,
     snapshot: () => ledger.snapshot(),
