@@ -145,14 +145,22 @@ const axePath=require.resolve("axe-core/axe.min.js");
   // navigator.serviceWorker.ready may resolve while the active worker is
   // still transitioning through "activating"; wait for the actual state.
   await page.waitForFunction(async()=>{
-   const registration=await navigator.serviceWorker.ready;
-   return registration.active?.state==="activated";
-  },null,{timeout:20000});
+   const registrations=await navigator.serviceWorker.getRegistrations();
+   const registration=registrations.find(item=>item.scope.endsWith("/markets/"));
+   const active=registration?.active;
+   if(active?.state!=="activated") {
+    window.__marketsWorkerActivatedAt=0;
+    return false;
+   }
+   if(!window.__marketsWorkerActivatedAt) window.__marketsWorkerActivatedAt=performance.now();
+   return performance.now()-window.__marketsWorkerActivatedAt>=500;
+  },null,{timeout:30000});
   const workerState=await page.evaluate(async()=>{
-   const registration=await navigator.serviceWorker.ready;
-   return {state:registration.active?.state||"missing",scope:registration.scope||null};
+   const registrations=await navigator.serviceWorker.getRegistrations();
+   const registration=registrations.find(item=>item.scope.endsWith("/markets/"));
+   return {state:registration?.active?.state||"missing",scope:registration?.scope||null};
   });
-  assert.equal(workerState.state,"activated","service worker must be active before controlled reload");
+  assert.equal(workerState.state,"activated","service worker must remain active before controlled reload");
   assert.ok(workerState.scope.endsWith("/markets/"),"Markets service worker scope must not capture Crypto or production routes");
   console.log(JSON.stringify({pwaWorker:workerState.state,scope:workerState.scope}));
   // Wait for the activated registration before reloading into its controlled scope.
