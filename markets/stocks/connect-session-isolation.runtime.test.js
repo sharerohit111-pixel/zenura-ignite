@@ -103,3 +103,39 @@ test("late authenticated response after logout cannot restore signed-in UI", asy
   assert.equal(h.elements.get("connection-title").textContent, "SIGN IN REQUIRED");
   assert.equal(h.window.lastAuthEvent.detail.userId, null);
 });
+
+
+test("LIMIT retry browser storage is isolated by authenticated user namespace", () => {
+  const workspacePath = path.join(__dirname, "order-workspace.js");
+  const workspace = fs.readFileSync(workspacePath, "utf8");
+  const match = workspace.match(/function limitStorageKey\(uid\) \{ return ([^;]+); \}/);
+  assert.ok(match, "LIMIT retry storage key helper must exist");
+  const keyFor = vm.runInNewContext("(uid) => " + match[1]);
+  const storage = new Map();
+  const localStorage = {
+    getItem(key) { return storage.has(key) ? storage.get(key) : null; },
+    setItem(key, value) { storage.set(key, String(value)); },
+    removeItem(key) { storage.delete(key); }
+  };
+  const keyA = keyFor("user-A"), keyB = keyFor("user-B");
+  assert.notEqual(keyA, keyB, "different authenticated users must never share a retry key");
+  localStorage.setItem(keyA, JSON.stringify({ key: "retry-A", fingerprint: "order-A" }));
+  localStorage.setItem(keyB, JSON.stringify({ key: "retry-B", fingerprint: "order-B" }));
+  assert.equal(JSON.parse(localStorage.getItem(keyA)).key, "retry-A");
+  assert.equal(JSON.parse(localStorage.getItem(keyB)).key, "retry-B");
+  localStorage.removeItem(keyA);
+  assert.equal(localStorage.getItem(keyA), null);
+  assert.equal(JSON.parse(localStorage.getItem(keyB)).key, "retry-B",
+    "clearing User A retry state must not clear User B state");
+});
+
+test("orders and balance responses are guarded before and after fetch by request sequence and user ID", () => {
+  const workspace = fs.readFileSync(path.join(__dirname, "order-workspace.js"), "utf8");
+  const balances = workspace.slice(workspace.indexOf("async function loadBalances()"), workspace.indexOf("async function loadOrders("));
+  const orders = workspace.slice(workspace.indexOf("async function loadOrders("), workspace.indexOf("async function cancelOrder("));
+  assert.match(balances, /const connector = window\.ZENURA_MARKET_CONNECTOR, uid = connector\?\.getUserId\?\.\(\), seq = \+\+balanceRequest/);
+  assert.match(balances, /if \(seq !== balanceRequest \|\| connector\.getUserId\(\) !== uid\) return;/);
+  assert.match(orders, /const connector = window\.ZENURA_MARKET_CONNECTOR, uid = connector\?\.getUserId\?\.\(\), seq = \+\+requestSeq/);
+  assert.match(orders, /if \(seq !== requestSeq \|\| connector\.getUserId\(\) !== uid\) return;/);
+  assert.match(orders, /currentOrders = append \? currentOrders\.concat\(incoming\) : incoming/);
+});
