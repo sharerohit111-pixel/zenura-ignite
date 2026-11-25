@@ -41,7 +41,20 @@ function syncDemoProjection(source,snapshot){
    store.cancel(order.orderId,fact.at);
   }
  }
- return store.snapshot();
+ const projected=store.snapshot();
+ if(source!=="DERIVATIVES")return projected;
+ const marks=new Map((snapshot.positions||[]).map(position=>[
+  [position.instrumentKey,position.product||"DELIVERY"].join("|"),position
+ ]));
+ return {...projected,positions:projected.positions.map(position=>{
+  const mark=marks.get([position.instrumentKey,position.product||"DELIVERY"].join("|"));
+  if(!mark)return position;
+  const totalPnlPaise=position.realizedPnlPaise+mark.unrealizedPnlPaise;
+  if(!Number.isSafeInteger(totalPnlPaise))throw new Error("DEMO_PNL_OUT_OF_RANGE");
+  return {...position,markPricePaise:mark.markPricePaise,
+   unrealizedPnlPaise:mark.unrealizedPnlPaise,totalPnlPaise,
+   markSource:mark.markSource||"SYNTHETIC_FIXTURE"};
+ })};
 }
 function appendUnifiedDemoSummary(container,screen){
  const snap=getStore().snapshot(),host=document.createElement("section");
