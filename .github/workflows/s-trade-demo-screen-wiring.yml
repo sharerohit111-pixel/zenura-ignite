@@ -12,6 +12,9 @@ on:
       - "markets/stocks/demo-*.mjs"
       - "market-gateway/test/paper-demo-unified-ledger-panel.test.mjs"
       - "markets/service-worker.js"
+      - "markets/manifest.webmanifest"
+      - "markets/pwa-register.js"
+      - "market-gateway/test/pwa-offline-closure.test.mjs"
       - "market-gateway/lib/equity-demo-execution-engine.js"
       - "market-gateway/mock/fixtures/*.json"
       - "market-gateway/test/paper-demo-adapter.test.mjs"
@@ -82,7 +85,7 @@ jobs:
           console.log('Parsed all four canonical screen fixtures.');
           NODE
       - name: Run adapter, event-ledger and screen integration tests
-        run: node --test market-gateway/test/paper-demo-adapter.test.mjs market-gateway/test/paper-demo-event-ledger.test.mjs market-gateway/test/paper-demo-dashboard.test.mjs market-gateway/test/paper-demo-equity-integration.test.mjs market-gateway/test/paper-demo-equity-ledger-bridge.test.mjs market-gateway/test/paper-demo-derivative-integration.test.mjs market-gateway/test/paper-demo-derivative-ledger-bridge.test.mjs market-gateway/test/paper-demo-shared-ledger-session.test.mjs market-gateway/test/paper-demo-unified-ledger-panel.test.mjs market-gateway/test/demo-chart-data.test.mjs market-gateway/test/demo-watchlist-persistence.test.mjs
+        run: node --test market-gateway/test/paper-demo-adapter.test.mjs market-gateway/test/paper-demo-event-ledger.test.mjs market-gateway/test/paper-demo-dashboard.test.mjs market-gateway/test/paper-demo-equity-integration.test.mjs market-gateway/test/paper-demo-equity-ledger-bridge.test.mjs market-gateway/test/paper-demo-derivative-integration.test.mjs market-gateway/test/paper-demo-derivative-ledger-bridge.test.mjs market-gateway/test/paper-demo-shared-ledger-session.test.mjs market-gateway/test/paper-demo-unified-ledger-panel.test.mjs market-gateway/test/demo-chart-data.test.mjs market-gateway/test/demo-watchlist-persistence.test.mjs market-gateway/test/pwa-offline-closure.test.mjs
       - name: Install Chromium browser QA dependencies
         run: |
           npm install --prefix "$RUNNER_TEMP/zenura-playwright" playwright@1.61.1 axe-core@4.10.3 --ignore-scripts --no-audit --no-fund
