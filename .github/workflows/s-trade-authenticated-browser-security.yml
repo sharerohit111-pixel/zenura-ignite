@@ -1,0 +1,32 @@
+name: S-TRADE Authenticated Browser Security
+on:
+  pull_request:
+    paths:
+      - "markets/stocks/**"
+      - "market-gateway/test/authenticated-workspace-browser-security.mjs"
+      - ".github/workflows/s-trade-authenticated-browser-security.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: s-trade-authenticated-browser-security-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  chromium-csp-xss:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install pinned Playwright
+        run: |
+          npm init -y
+          npm install --no-save --ignore-scripts playwright@1.56.1
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Run authenticated workspace browser security tests
+        run: node --test market-gateway/test/authenticated-workspace-browser-security.mjs
