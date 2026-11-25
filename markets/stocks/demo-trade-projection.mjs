@@ -11,24 +11,34 @@ function getStore(){
 }
 
 function syncDemoProjection(source,snapshot){
- const store=getStore(),orders=source==="EQUITY"?(snapshot.orders||[]):(snapshot.orders||[]);
- for(const order of [...orders].reverse()){
+ const store=getStore(),orders=snapshot.orders||[],facts=[];
+ for(const order of orders){
   const assetClass=source==="EQUITY"?"EQUITY":order.assetClass;
   if(!["EQUITY","FUTURE","OPTION"].includes(assetClass))continue;
-  store.submit({orderId:order.orderId,assetClass,side:order.side,orderType:order.orderType,
-   product:order.product||"DELIVERY",instrumentKey:order.instrumentKey,quantity:order.quantity,
-   limitPricePaise:order.limitPricePaise||undefined,idempotencyKey:cleanKey(order.orderId),
-   createdAt:time(order.createdAt)});
-  if(order.status==="REJECTED"){
-   store.reject(order.orderId,order.rejectionReason||"Rejected by deterministic Demo simulator",time(order.updatedAt||order.createdAt));
-  }
-  const fills=source==="EQUITY"?(snapshot.fills||[]).filter(f=>f.orderId===order.orderId):(order.fills||[]);
-  for(const fill of fills){
-   store.recordFill({orderId:order.orderId,fillId:fill.fillId,quantity:fill.quantity,
-    pricePaise:fill.pricePaise,filledAt:time(fill.filledAt||fill.executedAt)});
-  }
-  if(order.status==="CANCELLED"){
-   store.cancel(order.orderId,time(order.updatedAt));
+  facts.push({type:"ORDER",at:time(order.createdAt),order,assetClass});
+  const fills=source==="EQUITY"?(snapshot.fills||[]).filter(fill=>fill.orderId===order.orderId):(order.fills||[]);
+  for(const fill of fills)facts.push({type:"FILL",at:time(fill.filledAt||fill.executedAt),order,fill,assetClass});
+  if(order.status==="REJECTED")facts.push({type:"REJECT",at:time(order.updatedAt||order.createdAt),order});
+  if(order.status==="CANCELLED")facts.push({type:"CANCEL",at:time(order.updatedAt),order});
+ }
+ const priority={ORDER:0,FILL:1,REJECT:2,CANCEL:2};
+ facts.sort((a,b)=>Date.parse(a.at)-Date.parse(b.at)||priority[a.type]-priority[b.type]||
+  String(a.order.orderId).localeCompare(String(b.order.orderId))||
+  String(a.fill?.fillId||"").localeCompare(String(b.fill?.fillId||"")));
+ for(const fact of facts){
+  const order=fact.order;
+  if(fact.type==="ORDER"){
+   store.submit({orderId:order.orderId,assetClass:fact.assetClass,side:order.side,orderType:order.orderType,
+    product:order.product||"DELIVERY",instrumentKey:order.instrumentKey,quantity:order.quantity,
+    limitPricePaise:order.limitPricePaise||undefined,idempotencyKey:cleanKey(order.orderId),
+    createdAt:time(order.createdAt)});
+  }else if(fact.type==="FILL"){
+   store.recordFill({orderId:order.orderId,fillId:fact.fill.fillId,quantity:fact.fill.quantity,
+    pricePaise:fact.fill.pricePaise,filledAt:fact.at});
+  }else if(fact.type==="REJECT"){
+   store.reject(order.orderId,order.rejectionReason||"Rejected by deterministic Demo simulator",fact.at);
+  }else if(fact.type==="CANCEL"){
+   store.cancel(order.orderId,fact.at);
   }
  }
  return store.snapshot();
