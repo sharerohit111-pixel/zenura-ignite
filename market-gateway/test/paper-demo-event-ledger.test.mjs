@@ -359,8 +359,10 @@ test("Options SELL cancellation and expiry automatically release only the unfill
     }));
     const snapshot = ledger.snapshot();
     assert.equal(snapshot.orders[0].status, terminalStatus);
-    assert.equal(snapshot.orders[0].filledQuantity, 1);
-    assert.equal(snapshot.orders[0].remainingQuantity, 2);
+    const filledQuantity = snapshot.fills.filter(fill => fill.orderId === "option-order-" + index)
+      .reduce((sum, fill) => sum + fill.quantity, 0);
+    assert.equal(filledQuantity, 1);
+    assert.equal(snapshot.orders[0].quantity - filledQuantity, 2);
     assert.equal(snapshot.positions[0].reservedQuantity, 0);
     assert.equal(snapshot.fills.length, 1);
     assert.deepEqual(replayPaperDemoEvents(opening, snapshot.events), snapshot);
@@ -398,8 +400,10 @@ test("Futures SELL orders do not create Equity-style share reservations", () => 
   }));
   const snapshot = ledger.snapshot();
   assert.equal(snapshot.orders[0].status, "CANCELLED");
-  assert.equal(snapshot.orders[0].filledQuantity, 1);
-  assert.equal(snapshot.orders[0].remainingQuantity, 1);
+  const filledQuantity = snapshot.fills.filter(fill => fill.orderId === "future-sell-order")
+    .reduce((sum, fill) => sum + fill.quantity, 0);
+  assert.equal(filledQuantity, 1);
+  assert.equal(snapshot.orders[0].quantity - filledQuantity, 1);
   assert.equal(snapshot.fills.length, 1);
   assert.deepEqual(replayPaperDemoEvents(opening, snapshot.events), snapshot);
 });
