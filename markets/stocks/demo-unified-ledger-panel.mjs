@@ -5,24 +5,43 @@ let dataPromise = null;
 export const EQUITY_MARK_MAX_AGE_MS = 60_000;
 export const DERIVATIVE_MARK_MAX_AGE_MS = 15_000;
 export const EQUITY_MARK_MAX_FUTURE_SKEW_MS = 5_000;
+export const DERIVATIVE_EXPIRY_CUTOFF_HOUR_IST = 15;
+export const DERIVATIVE_EXPIRY_CUTOFF_MINUTE_IST = 30;
+
+export function portfolioDerivativeExpiryCutoff(expiryDate) {
+  if (typeof expiryDate !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(expiryDate)) return null;
+  const [year, month, day] = expiryDate.split("-").map(Number);
+  const calendarDate = new Date(Date.UTC(year, month - 1, day));
+  if (calendarDate.getUTCFullYear() !== year || calendarDate.getUTCMonth() !== month - 1 ||
+      calendarDate.getUTCDate() !== day) return null;
+  const clock = String(DERIVATIVE_EXPIRY_CUTOFF_HOUR_IST).padStart(2, "0") + ":" +
+    String(DERIVATIVE_EXPIRY_CUTOFF_MINUTE_IST).padStart(2, "0") + ":00+05:30";
+  const cutoff = Date.parse(expiryDate + "T" + clock);
+  return Number.isFinite(cutoff) ? cutoff : null;
+}
 
 export function createPortfolioMark(pricePaise, timestamp, {
   explicitStale = false, envelopeStale = false, now = Date.now(),
-  maxAgeMs, maxFutureSkewMs = 0
+  maxAgeMs, maxFutureSkewMs = 0, expiryDate = null, requiresExpiry = false
 } = {}) {
   const time = typeof timestamp === "number" ? timestamp : Date.parse(timestamp);
   const priceValid = Number.isSafeInteger(pricePaise) && pricePaise > 0;
   const timeValid = Number.isFinite(time) && time > 0 && Number.isFinite(now) &&
     Number.isFinite(maxAgeMs) && maxAgeMs >= 0 && Number.isFinite(maxFutureSkewMs) && maxFutureSkewMs >= 0;
   const ageMs = timeValid ? now - time : null;
+  const expiryCutoff = requiresExpiry ? portfolioDerivativeExpiryCutoff(expiryDate) : null;
+  const expiryValid = !requiresExpiry || expiryCutoff !== null;
   const stale = explicitStale === true || envelopeStale === true || !priceValid || !timeValid ||
+    !expiryValid || (requiresExpiry && now >= expiryCutoff) ||
     ageMs > maxAgeMs || ageMs < -maxFutureSkewMs;
   return {
     pricePaise: priceValid ? pricePaise : null,
     timestamp: timeValid ? time : null,
     stale,
     maxAgeMs: Number.isFinite(maxAgeMs) && maxAgeMs >= 0 ? maxAgeMs : null,
-    maxFutureSkewMs: Number.isFinite(maxFutureSkewMs) && maxFutureSkewMs >= 0 ? maxFutureSkewMs : null
+    maxFutureSkewMs: Number.isFinite(maxFutureSkewMs) && maxFutureSkewMs >= 0 ? maxFutureSkewMs : null,
+    expiryDate,
+    requiresExpiry
   };
 }
 
@@ -34,7 +53,12 @@ export function isUsablePortfolioMark(mark, now = Date.now()) {
       !Number.isFinite(mark.maxAgeMs) || mark.maxAgeMs < 0 ||
       !Number.isFinite(mark.maxFutureSkewMs) || mark.maxFutureSkewMs < 0) return false;
   const ageMs = now - mark.timestamp;
-  return ageMs <= mark.maxAgeMs && ageMs >= -mark.maxFutureSkewMs;
+  if (ageMs > mark.maxAgeMs || ageMs < -mark.maxFutureSkewMs) return false;
+  if (mark.requiresExpiry === true) {
+    const expiryCutoff = portfolioDerivativeExpiryCutoff(mark.expiryDate);
+    if (expiryCutoff === null || now >= expiryCutoff) return false;
+  }
+  return true;
 }
 
 export function calculateAggregateUnrealized(positions, marks, now = Date.now()) {
@@ -81,7 +105,10 @@ export function schedulePortfolioMarkExpiryRefresh({
     let nextExpiry = null;
     for (const mark of marks?.values?.() ?? []) {
       if (!isUsablePortfolioMark(mark, currentTime)) continue;
-      const expiry = mark.timestamp + mark.maxAgeMs + 1;
+      const ageExpiry = mark.timestamp + mark.maxAgeMs + 1;
+      const contractExpiry = mark.requiresExpiry === true
+        ? portfolioDerivativeExpiryCutoff(mark.expiryDate) : null;
+      const expiry = contractExpiry === null ? ageExpiry : Math.min(ageExpiry, contractExpiry);
       nextExpiry = nextExpiry === null ? expiry : Math.min(nextExpiry, expiry);
     }
     if (nextExpiry !== null) {
@@ -142,6 +169,8 @@ async function getData() {
       blockedFundsPaise:accountEnvelope.data.blockedFundsPaise
     });
     const marks=new Map();
+    const contractsByKey = new Map((derivativeEnvelope.data.contracts ?? [])
+      .map(contract => [contract.instrumentKey, contract]));
     marks.set(equityEnvelope.data.instrument.instrumentKey,
       createPortfolioMark(equityEnvelope.data.instrument.markPricePaise,equityEnvelope.asOf,{
         explicitStale:equityEnvelope.meta?.stale===true,
@@ -155,7 +184,9 @@ async function getData() {
       marks.set(quote.instrumentKey,createPortfolioMark(midpoint,quote.timestamp,{
         explicitStale:quote.stale===true,
         envelopeStale:derivativeEnvelope.meta?.stale===true,
-        maxAgeMs:DERIVATIVE_MARK_MAX_AGE_MS
+        maxAgeMs:DERIVATIVE_MARK_MAX_AGE_MS,
+        expiryDate:contractsByKey.get(quote.instrumentKey)?.expiry ?? null,
+        requiresExpiry:true
       }));
     }
     const symbols=new Map();
@@ -201,12 +232,14 @@ export async function appendUnifiedLedgerSummary(container, screen) {
       const renderPortfolio = now => {
         const rows=positions.map(position=>{
           const mark=marks.get(position.instrumentKey);
-          const valid=isUsablePortfolioMark(mark,now);
+          const valid=isUsablePortfolioMark(mark,now) &&
+            Number.isSafeInteger(position.averagePricePaise) &&
+            Number.isSafeInteger((mark.pricePaise-position.averagePricePaise)*position.quantity);
           const unrealized=valid?(mark.pricePaise-position.averagePricePaise)*position.quantity:null;
           return [
             position.assetClass,symbols.get(position.instrumentKey)||position.symbol||position.instrumentKey,
             position.product,position.quantity,money(position.averagePricePaise),
-            valid?money(mark.pricePaise):"Unavailable (missing/stale)",money(position.costBasisPaise),
+            valid?money(mark.pricePaise):"Unavailable (missing/stale/expired)",money(position.costBasisPaise),
             portfolioMarketValueDisplay(position,mark,now),money(position.realizedPnlPaise),valid?money(unrealized):"Unavailable"
           ];
         });

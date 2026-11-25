@@ -289,3 +289,55 @@ test("Portfolio expiry controller disposes its timer after the screen is removed
   assert.equal(timers.size, 0);
   assert.equal(listeners.has("visibilitychange"), false);
 });
+
+
+test("Futures and Options marks expire at the Indian exchange expiry-session cutoff", async () => {
+  const {
+    createPortfolioMark, isUsablePortfolioMark, portfolioDerivativeExpiryCutoff,
+    calculateAggregateUnrealized, portfolioMarketValueDisplay
+  } = await import("../../markets/stocks/demo-unified-ledger-panel.mjs?contract-expiry");
+  const expiryDate = "2026-11-26";
+  const cutoff = portfolioDerivativeExpiryCutoff(expiryDate);
+  assert.equal(cutoff, Date.parse("2026-11-26T15:30:00+05:30"));
+  const beforeCutoff = cutoff - 1;
+  const mark = createPortfolioMark(15000, beforeCutoff, {
+    now: beforeCutoff, maxAgeMs: 15_000, expiryDate, requiresExpiry: true
+  });
+  assert.equal(isUsablePortfolioMark(mark, beforeCutoff), true);
+  assert.equal(isUsablePortfolioMark(mark, cutoff - 1), true);
+  assert.equal(isUsablePortfolioMark(mark, cutoff), false);
+  assert.equal(isUsablePortfolioMark(mark, cutoff + 60_000), false);
+  assert.equal(portfolioMarketValueDisplay({ assetClass: "OPTION", quantity: 25 }, mark, cutoff), "—");
+  assert.equal(isUsablePortfolioMark(createPortfolioMark(15000, beforeCutoff, {
+    now: beforeCutoff, maxAgeMs: 15_000, requiresExpiry: true
+  }), beforeCutoff), false);
+  assert.equal(isUsablePortfolioMark(createPortfolioMark(15000, beforeCutoff, {
+    now: beforeCutoff, maxAgeMs: 15_000, expiryDate: "2026-02-30", requiresExpiry: true
+  }), beforeCutoff), false);
+
+  const positions = [{ instrumentKey: "OPT-EXP", quantity: 25, averagePricePaise: 14000 }];
+  const marks = new Map([["OPT-EXP", mark]]);
+  assert.deepEqual(calculateAggregateUnrealized(positions, marks, beforeCutoff),
+    { complete: true, value: 25000 });
+  assert.deepEqual(calculateAggregateUnrealized(positions, marks, cutoff),
+    { complete: false, value: null });
+});
+
+test("expiry-aware Portfolio refresh schedules the earlier of quote staleness and contract expiry", async () => {
+  const { createPortfolioMark, schedulePortfolioMarkExpiryRefresh, portfolioDerivativeExpiryCutoff } =
+    await import("../../markets/stocks/demo-unified-ledger-panel.mjs?contract-expiry-schedule");
+  const cutoff = portfolioDerivativeExpiryCutoff("2026-11-26");
+  let now = cutoff - 10_000;
+  const timers = new Map();
+  const doc = { addEventListener() {}, removeEventListener() {} };
+  const mark = createPortfolioMark(100, now, {
+    now, maxAgeMs: 60_000, expiryDate: "2026-11-26", requiresExpiry: true
+  });
+  schedulePortfolioMarkExpiryRefresh({
+    section: { isConnected: true }, marks: new Map([["FUT", mark]]), doc,
+    now: () => now, render: () => {},
+    setTimer: (callback, delay) => { timers.set(1, { callback, delay }); return 1; },
+    clearTimer: id => timers.delete(id)
+  });
+  assert.equal([...timers.values()][0].delay, 10_000);
+});
