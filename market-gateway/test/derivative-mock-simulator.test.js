@@ -260,3 +260,60 @@ test("F&O derivative position arithmetic rejects unsafe fill value without retur
   assert.equal(bounded.snapshot().positions.length,0);
   assert.equal(bounded.snapshot().orders.length,1);
 });
+
+
+test("rejects stale and future-dated synthetic quotes at construction", () => {
+  assert.throws(() => createDerivativeMockSimulator(fixture, { now: now + 15001 }), /stale|invalid deterministic derivative quote/i);
+  const futureDated = structuredClone(fixture);
+  futureDated.data.quotes[0].timestamp = new Date(now + 1).toISOString();
+  assert.throws(() => createDerivativeMockSimulator(futureDated, { now }), /invalid deterministic derivative quote/i);
+});
+
+test("rechecks quote freshness at execution time and never fills a stale LIMIT order", () => {
+  let clock = now;
+  const simulator = createDerivativeMockSimulator(fixture, { now: () => clock });
+  const instrument = future();
+  const order = simulator.submit({
+    instrumentKey: instrument.instrumentKey, side: "BUY", orderType: "LIMIT",
+    lots: 1, limitPricePaise: 2500100
+  });
+  clock = now + 15001;
+  assert.throws(() => simulator.processLimitFills(), /stale or future-dated derivative quote/i);
+  const current = simulator.snapshot();
+  assert.equal(current.orders[0].status, "PENDING");
+  assert.equal(current.orders[0].filledQuantity, 0);
+  assert.equal(current.positions.length, 0);
+  assert.equal(order.status, "PENDING");
+  assert.equal(current.mode, "MOCK");
+});
+
+test("expires pending derivative LIMIT orders and marks open positions non-valuatable after contract expiry", () => {
+  let clock = now;
+  const simulator = createDerivativeMockSimulator(fixture, { now: () => clock });
+  const instrument = future();
+  simulator.submit({ instrumentKey: instrument.instrumentKey, side: "BUY", orderType: "MARKET", lots: 1 });
+  const pending = simulator.submit({
+    instrumentKey: instrument.instrumentKey, side: "BUY", orderType: "LIMIT",
+    lots: 1, limitPricePaise: 2500100
+  });
+  clock = Date.parse("2026-12-31T10:00:00.000Z");
+  const result = simulator.processLimitFills();
+  assert.equal(result.expired, 1);
+  assert.equal(simulator.snapshot().orders.find(item => item.orderId === pending.orderId).status, "EXPIRED");
+  assert.equal(simulator.snapshot().positions[0].valuationStatus, "EXPIRED");
+});
+
+test("rejects contract keys whose exchange, underlying, expiry, strike or CE/PE identity disagrees", () => {
+  for (const mutate of [
+    item => { item.instrumentKey = item.instrumentKey.replace("|NSE|", "|BSE|"); },
+    item => { item.instrumentKey = item.instrumentKey.replace("|MOCKNIFTY|", "|MOCKBANK|"); },
+    item => { item.instrumentKey = item.instrumentKey.replace("|2026-12-31", "|2027-01-28"); },
+    item => { item.instrumentKey = item.instrumentKey.replace("|25000|CE|", "|25100|CE|"); },
+    item => { item.instrumentKey = item.instrumentKey.replace("|CE|", "|PE|"); }
+  ]) {
+    const invalid = structuredClone(fixture);
+    const target = invalid.data.contracts.find(item => item.assetClass === "OPTION" && item.expiry === "2026-12-31");
+    mutate(target);
+    assert.throws(() => createDerivativeMockSimulator(invalid, { now }), /identity does not match/i);
+  }
+});
