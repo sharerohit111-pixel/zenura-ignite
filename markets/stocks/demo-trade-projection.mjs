@@ -1,6 +1,20 @@
 "use strict";
 let projection=null;
-const cleanKey=value=>("src_"+String(value).replace(/[^A-Za-z0-9_-]/g,"_")).slice(0,80);
+function cleanKey(source,value){
+ const input=String(source)+"|"+String(value);
+ let a=2166136261,b=0x9e3779b9;
+ for(let i=0;i<input.length;i++){const c=input.charCodeAt(i);a=Math.imul(a^c,16777619)>>>0;b=Math.imul(b^c,2246822519)>>>0;}
+ return "src_"+String(source).toLowerCase()+"_"+a.toString(36)+b.toString(36);
+}
+const canonicalStatus=value=>{
+ const status=String(value||"").toUpperCase();
+ if(["ACCEPTED","OPEN","NEW","PENDING"].includes(status))return "PENDING";
+ if(["PARTIALLY_FILLED","PARTIAL_FILLED","PARTIAL"].includes(status))return "PARTIALLY_FILLED";
+ if(["FILLED","COMPLETE","COMPLETED"].includes(status))return "FILLED";
+ if(["REJECTED","FAILED"].includes(status))return "REJECTED";
+ if(["CANCELLED","CANCELED"].includes(status))return "CANCELLED";
+ return status;
+};
 const time=value=>typeof value==="string"&&Number.isFinite(Date.parse(value))?value:new Date(0).toISOString();
 function getStore(){
  if(projection)return projection;
@@ -18,8 +32,8 @@ function syncDemoProjection(source,snapshot){
   facts.push({type:"ORDER",at:time(order.createdAt),order,assetClass});
   const fills=source==="EQUITY"?(snapshot.fills||[]).filter(fill=>fill.orderId===order.orderId):(order.fills||[]);
   for(const fill of fills)facts.push({type:"FILL",at:time(fill.filledAt||fill.executedAt),order,fill,assetClass});
-  if(order.status==="REJECTED")facts.push({type:"REJECT",at:time(order.updatedAt||order.createdAt),order});
-  if(order.status==="CANCELLED")facts.push({type:"CANCEL",at:time(order.updatedAt),order});
+  if(canonicalStatus(order.status)==="REJECTED")facts.push({type:"REJECT",at:time(order.updatedAt||order.createdAt),order});
+  if(canonicalStatus(order.status)==="CANCELLED")facts.push({type:"CANCEL",at:time(order.updatedAt),order});
  }
  const priority={ORDER:0,FILL:1,REJECT:2,CANCEL:2};
  facts.sort((a,b)=>Date.parse(a.at)-Date.parse(b.at)||priority[a.type]-priority[b.type]||
@@ -30,7 +44,7 @@ function syncDemoProjection(source,snapshot){
   if(fact.type==="ORDER"){
    store.submit({orderId:order.orderId,assetClass:fact.assetClass,side:order.side,orderType:order.orderType,
     product:order.product||"DELIVERY",instrumentKey:order.instrumentKey,quantity:order.quantity,
-    limitPricePaise:order.limitPricePaise||undefined,idempotencyKey:cleanKey(order.orderId),
+    limitPricePaise:order.limitPricePaise||undefined,idempotencyKey:cleanKey(source,order.orderId),
     createdAt:time(order.createdAt)});
   }else if(fact.type==="FILL"){
    store.recordFill({orderId:order.orderId,fillId:fact.fill.fillId,quantity:fact.fill.quantity,
