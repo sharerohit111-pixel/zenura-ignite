@@ -23,7 +23,7 @@ export function buildDemoPortfolioView(snapshot, instruments, asOf) {
     const signedQuantity = position.assetClass === "FUTURE" ? quantity : Math.abs(quantity);
     const markIsValid = instrument && instrument.simulated === true && instrument.stale === false &&
       Number.isSafeInteger(instrument.lastPricePaise) && instrument.lastPricePaise > 0 &&
-      Number.isFinite(Date.parse(instrument.timestamp)) && Date.parse(instrument.timestamp) <= referenceTime;
+      Number.isFinite(Date.parse(instrument.timestamp)) && Date.parse(instrument.timestamp) <= referenceTime &&\n      referenceTime - Date.parse(instrument.timestamp) <= 86400000;
     const markPricePaise = markIsValid ? instrument.lastPricePaise : null;
     const unrealized = markPricePaise === null ? null :
       (markPricePaise - averagePricePaise) * signedQuantity;
@@ -43,7 +43,7 @@ export function buildDemoPortfolioView(snapshot, instruments, asOf) {
       costBasisPaise: position.costBasisPaise
     });
   });
-  const holdings = positions.filter(position =>
+  const totalPnlPaise = realizedPnlPaise + unrealizedPnlPaise;\n  if (valuationComplete && !Number.isSafeInteger(totalPnlPaise)) throw new TypeError("DEMO_PORTFOLIO_TOTAL_OUT_OF_RANGE");\n  const holdings = positions.filter(position =>
     position.assetClass === "EQUITY" && position.product === "DELIVERY" && position.quantity > 0
   );
   return Object.freeze({
@@ -53,7 +53,7 @@ export function buildDemoPortfolioView(snapshot, instruments, asOf) {
     orders: snapshot.orders, trades: snapshot.trades,
     realizedPnlPaise,
     unrealizedPnlPaise: valuationComplete ? unrealizedPnlPaise : null,
-    totalPnlPaise: valuationComplete ? realizedPnlPaise + unrealizedPnlPaise : null,
+    totalPnlPaise: valuationComplete ? totalPnlPaise : null,
     valuationComplete,
     ledgerReconciled: false,
     reconciliationStatus: "not_reconciled"
@@ -136,7 +136,7 @@ function enhancePortfolioScreen() {
   content.dataset.portfolioEnhanced = screen;
   viewModelPromise ||= loadFixtures();
   viewModelPromise.then(model => {
-    if (content.dataset.portfolioEnhanced !== screen || !content.contains(existing)) return;
+    if (!content.contains(existing) || enhancedHost !== existing || enhancedScreen !== screen) return;
     const view = buildDemoPortfolioView(getDemoProjectionSnapshot(), model.market.instruments, model.asOf);
     renderPortfolio(existing, screen, view);
   }).catch(error => {
