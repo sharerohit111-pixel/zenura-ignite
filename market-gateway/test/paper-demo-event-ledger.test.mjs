@@ -412,7 +412,7 @@ test("partial SELL fill cancellation releases only the unfilled share reservatio
     eventId: "evt-sell-cancel", idempotencyKey: "idem-sell-cancel", sourceEventId: "source-sell-cancel",
     type: "ORDER_UPDATED", occurredAt: "2026-11-25T09:30:03+05:30",
     deltas: { cashDeltaPaise: 0, blockedDeltaPaise: 0 },
-    payload: { ...event().payload, side: "SELL", quantity: 3, status: "CANCELLED", reservedQuantityDelta: -2 }
+    payload: { ...event().payload, side: "SELL", quantity: 3, status: "CANCELLED" }
   }));
   const snapshot = ledger.snapshot();
   assert.equal(snapshot.orders[0].status, "CANCELLED");
@@ -421,4 +421,12 @@ test("partial SELL fill cancellation releases only the unfilled share reservatio
   assert.equal(snapshot.positions[0].reservedQuantity, 0);
   assert.equal(snapshot.fills.length, 1);
   assert.deepEqual(replayPaperDemoEvents(opening, snapshot.events), snapshot);
+});
+
+
+test("event timestamps reject impossible calendar and clock values", () => {
+  const ledger = createPaperDemoEventLedger(opening);
+  assert.throws(() => ledger.append(event({ occurredAt: "2026-02-30T09:30:00+05:30" })), /INVALID_EVENT_TIMESTAMP/);
+  assert.throws(() => ledger.append(event({ occurredAt: "2026-11-25T24:00:00+05:30" })), /INVALID_EVENT_TIMESTAMP/);
+  assert.equal(ledger.snapshot().events.length, 0);
 });
