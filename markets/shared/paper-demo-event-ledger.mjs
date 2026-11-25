@@ -27,7 +27,19 @@ function positionKey(assetClass, instrumentKey, product) {
   return assetClass + "|" + instrumentKey + "|" + product;
 }
 function timestampMs(value) {
-  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$/.test(value)) fail("INVALID_EVENT_TIMESTAMP");
+  if (typeof value !== "string") fail("INVALID_EVENT_TIMESTAMP");
+  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d{1,3})?(Z|[+-](\d{2}):(\d{2}))$/.exec(value);
+  if (!match) fail("INVALID_EVENT_TIMESTAMP");
+  const [, yearText, monthText, dayText, hourText, minuteText, secondText, zone, offsetHourText, offsetMinuteText] = match;
+  const year = Number(yearText), month = Number(monthText), day = Number(dayText);
+  const hour = Number(hourText), minute = Number(minuteText), second = Number(secondText);
+  const leap = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+  const daysInMonth = [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  if (month < 1 || month > 12 || day < 1 || day > daysInMonth[month - 1] ||
+      hour > 23 || minute > 59 || second > 59 ||
+      (zone !== "Z" && (Number(offsetHourText) > 23 || Number(offsetMinuteText) > 59))) {
+    fail("INVALID_EVENT_TIMESTAMP");
+  }
   const parsed = Date.parse(value);
   if (!Number.isFinite(parsed)) fail("INVALID_EVENT_TIMESTAMP");
   return parsed;
@@ -163,7 +175,19 @@ function apply(projection, event) {
       }
       Object.assign(existing, next);
     } else projection.orders.push(next);
-    const reservationDelta = p.reservedQuantityDelta ?? (event.type === "ORDER_ACCEPTED" && p.side === "SELL" ? p.quantity : 0);
+    const autoReleaseOnTerminalSell = existing && p.side === "SELL" && p.assetClass !== "FUTURE" &&
+      ["CANCELLED", "EXPIRED"].includes(p.status)
+      ? -(existing.quantity - projection.fills.filter(fill => fill.orderId === p.orderId)
+        .reduce((sum, fill) => sum + fill.quantity, 0))
+      : 0;
+    if (autoReleaseOnTerminalSell !== 0 && p.reservedQuantityDelta !== undefined &&
+        p.reservedQuantityDelta !== autoReleaseOnTerminalSell) {
+      fail("SELL_RESERVATION_RELEASE_MISMATCH");
+    }
+    const reservationDelta = autoReleaseOnTerminalSell !== 0
+      ? autoReleaseOnTerminalSell
+      : (p.reservedQuantityDelta ??
+        (event.type === "ORDER_ACCEPTED" && p.side === "SELL" && p.assetClass !== "FUTURE" ? p.quantity : 0));
     if (reservationDelta !== 0) {
       const key = positionKey(p.assetClass, p.instrumentKey, product);
       const position = projection.positions.find(x => x.key === key);
