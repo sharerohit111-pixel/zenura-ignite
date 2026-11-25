@@ -1,5 +1,6 @@
 name: S-TRADE Demo Screen Wiring Tests
 # Keep manifest, registration, and offline precache-closure changes under this regression gate.
+# The PWA closure test intentionally parses the empty root shell entry as well.
 
 on:
   pull_request:
