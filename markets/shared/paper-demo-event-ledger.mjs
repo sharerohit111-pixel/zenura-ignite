@@ -120,10 +120,21 @@ function apply(projection, event) {
     if ((event.type === "ORDER_ACCEPTED" || event.type === "ORDER_REJECTED") && existing) fail("DUPLICATE_ORDER_ID");
     if (event.type === "ORDER_UPDATED" && !existing) fail("ORDER_UPDATE_WITHOUT_ACCEPTANCE");
     const product = productOf(p);
-    const next = { ...p, product, engine: event.engine, lastSequence: event.sequence };
+    const next = { ...p, product, engine: event.engine, lastSequence: event.sequence,
+      reservedQuantity: existing ? existing.reservedQuantity : (p.side === "SELL" && event.type === "ORDER_ACCEPTED" ? p.quantity : 0) };
     if (existing) {
       for (const field of ["assetClass", "instrumentKey", "side", "orderType", "quantity", "product"]) {
         if (existing[field] !== next[field]) fail("ORDER_IDENTITY_MUTATION");
+      }
+      if (["CANCELLED", "REJECTED", "EXPIRED", "FILLED"].includes(existing.status)) fail("TERMINAL_ORDER_REOPEN");
+      const requestedReservationDelta = p.reservedQuantityDelta ?? 0;
+      if (p.side === "SELL") {
+        const terminal = ["CANCELLED", "REJECTED", "EXPIRED"].includes(p.status);
+        const expectedRelease = terminal ? -existing.reservedQuantity : 0;
+        if (requestedReservationDelta !== expectedRelease) fail("SELL_RESERVATION_RELEASE_MISMATCH");
+        next.reservedQuantity = existing.reservedQuantity + requestedReservationDelta;
+      } else if (requestedReservationDelta !== 0) {
+        fail("BUY_SHARE_RESERVATION_FORBIDDEN");
       }
       Object.assign(existing, next);
     } else projection.orders.push(next);
@@ -156,8 +167,9 @@ function apply(projection, event) {
     if (!Number.isSafeInteger(alreadyFilled + p.quantity) || alreadyFilled + p.quantity > order.quantity) fail("FILL_QUANTITY_EXCEEDS_ORDER");
     if (p.side === "SELL" && p.assetClass !== "FUTURE") {
       const position = projection.positions.find(x => x.key === positionKey(p.assetClass, p.instrumentKey, productOf(p)));
-      if (!position || position.reservedQuantity < p.quantity) fail("DEMO_SHARE_RESERVATION_INVARIANT");
+      if (!position || position.reservedQuantity < p.quantity || order.reservedQuantity < p.quantity) fail("DEMO_SHARE_RESERVATION_INVARIANT");
       position.reservedQuantity -= p.quantity;
+      order.reservedQuantity -= p.quantity;
     }
     projection.fills.push({ ...p, product: productOf(p), engine: event.engine, sequence: event.sequence, occurredAt: event.occurredAt });
   }
