@@ -185,13 +185,15 @@ const axePath=require.resolve("axe-core/axe.min.js");
   const demoPage=controlledPage;
   await demoPage.waitForFunction(()=>document.querySelector("#demo-status")?.textContent.includes("4 canonical fixtures validated"),null,{timeout:10000});
   const cached=await demoPage.evaluate(async()=>{
-   const cache=await caches.open("zenura-markets-shell-v5");
+   const cache=await caches.open("zenura-markets-shell-v6");
    const paths=["market","account","equity","derivatives"].map(name=>new URL("../../market-gateway/mock/fixtures/"+name+".json",location.href).href);
    const found=[];
    for(const url of paths)found.push({url,found:!!(await cache.match(url))});
+   const watchlistModule = new URL("./demo-watchlist-persistence.mjs", location.href).href;
+   found.push({url:watchlistModule,found:!!(await cache.match(watchlistModule))});
    return found;
   });
-  assert.ok(cached.every(x=>x.found),"all four canonical fixture JSON files must be precached");
+  assert.ok(cached.every(x=>x.found),"all four canonical fixtures and private watchlist module must be precached");
   console.log("PWA: validating offline cached fixtures");
   await pwa.setOffline(true);
   await demoPage.reload({waitUntil:"domcontentloaded",timeout:15000});
