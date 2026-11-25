@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import http from "node:http";
 import path from "node:path";
 import { readFile } from "node:fs/promises";
-import { createReadStream } from "node:fs";
 import { test } from "node:test";
 import { chromium } from "playwright";
 
@@ -32,7 +31,8 @@ test("authenticated workspace CSP and auth DOM resist browser injection", async 
   await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
   const address = server.address();
   const browser = await chromium.launch({ headless: true });
-  const page = await browser.newPage();
+  const context = await browser.newContext({ serviceWorkers: "block" });
+  const page = await context.newPage();
   const violations = [];
   const pageErrors = [];
   const failedRequests = [];
@@ -136,6 +136,7 @@ test("authenticated workspace CSP and auth DOM resist browser injection", async 
       "CSP-blocked unauthorized origins must not reach the network");
     console.log(JSON.stringify({ browser: "Chromium", cspViolations: violations, pageErrors, failedRequests }));
   } finally {
+    await context.close();
     await browser.close();
     await new Promise(resolve => server.close(resolve));
   }
