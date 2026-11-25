@@ -9,12 +9,14 @@ export const DERIVATIVE_EXPIRY_CUTOFF_HOUR_IST = 15;
 export const DERIVATIVE_EXPIRY_CUTOFF_MINUTE_IST = 30;
 
 export function portfolioDerivativeExpiryCutoff(expiryDate) {
-  if (typeof expiryDate !== "string" || !/^\\d{4}-\\d{2}-\\d{2}$/.test(expiryDate)) return null;
+  if (typeof expiryDate !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(expiryDate)) return null;
   const [year, month, day] = expiryDate.split("-").map(Number);
   const calendarDate = new Date(Date.UTC(year, month - 1, day));
   if (calendarDate.getUTCFullYear() !== year || calendarDate.getUTCMonth() !== month - 1 ||
       calendarDate.getUTCDate() !== day) return null;
-  const cutoff = Date.parse(expiryDate + "T15:30:00+05:30");
+  const clock = String(DERIVATIVE_EXPIRY_CUTOFF_HOUR_IST).padStart(2, "0") + ":" +
+    String(DERIVATIVE_EXPIRY_CUTOFF_MINUTE_IST).padStart(2, "0") + ":00+05:30";
+  const cutoff = Date.parse(expiryDate + "T" + clock);
   return Number.isFinite(cutoff) ? cutoff : null;
 }
 
@@ -56,7 +58,7 @@ export function isUsablePortfolioMark(mark, now = Date.now()) {
     const expiryCutoff = portfolioDerivativeExpiryCutoff(mark.expiryDate);
     if (expiryCutoff === null || now >= expiryCutoff) return false;
   }
-  return mark.requiresExpiry !== true || mark.requiresExpiry === false;
+  return true;
 }
 
 export function calculateAggregateUnrealized(positions, marks, now = Date.now()) {
