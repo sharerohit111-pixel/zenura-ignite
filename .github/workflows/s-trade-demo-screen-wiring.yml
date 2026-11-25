@@ -29,6 +29,7 @@ on:
     branches:
       - feature/s-trade-round2-demo-screen-wiring-2026-11-24
       - feature/s-trade-round3-equity-demo-screen-integration-2026-11-24
+      - feature/s-trade-chat42-dashboard-watchlist-closure-2026-11-25
     paths:
       - "markets/shared/paper-demo-adapter.mjs"
       - "markets/shared/paper-demo-event-ledger.mjs"
@@ -47,6 +48,8 @@ on:
       - "markets/stocks/index.html"
       - "markets/stocks/demo-browser-smoke.cjs"
       - "market-gateway/test/paper-demo-dashboard.test.mjs"
+      - "market-gateway/test/demo-watchlist-persistence.test.mjs"
+      - "markets/language-toggle.js"
       - ".github/workflows/s-trade-demo-screen-wiring.yml"
 
 permissions:
