@@ -281,3 +281,83 @@ test("order status transitions reject terminal-state reopening and preserve part
   })), /INVALID_ORDER_STATUS_TRANSITION/);
   assert.equal(filled.snapshot().orders[0].status, "FILLED");
 });
+
+
+test("new orders must start PENDING; rejected orders are terminal from creation", () => {
+  for (const status of ["PARTIALLY_FILLED", "FILLED", "CANCELLED", "EXPIRED"]) {
+    const ledger = createPaperDemoEventLedger(opening);
+    assert.throws(() => ledger.append(event({ payload: { ...event().payload, status } })), /INVALID_INITIAL_ORDER_STATUS/);
+    assert.equal(ledger.snapshot().events.length, 0);
+  }
+  const rejected = createPaperDemoEventLedger(opening);
+  const result = rejected.append(event({
+    type: "ORDER_REJECTED",
+    payload: { ...event().payload, status: "REJECTED" },
+    deltas: { cashDeltaPaise: 0, blockedDeltaPaise: 0 }
+  }));
+  assert.equal(result.snapshot.orders[0].status, "REJECTED");
+  assert.throws(() => rejected.append(event({
+    eventId: "evt-rejected-reopen", idempotencyKey: "idem-rejected-reopen", sourceEventId: "reopen-rejected",
+    type: "ORDER_UPDATED", occurredAt: "2026-11-25T09:30:01+05:30",
+    deltas: { cashDeltaPaise: 0, blockedDeltaPaise: 0 },
+    payload: { ...event().payload, status: "PENDING" }
+  })), /INVALID_ORDER_STATUS_TRANSITION/);
+});
+
+test("all terminal order states reject subsequent fills", () => {
+  for (const terminal of ["FILLED", "CANCELLED", "EXPIRED", "REJECTED"]) {
+    const ledger = createPaperDemoEventLedger(opening);
+    const accepted = event();
+    if (terminal === "REJECTED") {
+      ledger.append(event({ type: "ORDER_REJECTED", payload: { ...accepted.payload, status: "REJECTED" },
+        deltas: { cashDeltaPaise: 0, blockedDeltaPaise: 0 } }));
+    } else {
+      ledger.append(accepted);
+      ledger.append(event({
+        eventId: "evt-terminal", idempotencyKey: "idem-terminal", sourceEventId: "terminal-" + terminal,
+        type: "ORDER_UPDATED", occurredAt: "2026-11-25T09:30:01+05:30",
+        deltas: { cashDeltaPaise: 0, blockedDeltaPaise: 0 },
+        payload: { ...accepted.payload, status: terminal }
+      }));
+    }
+    assert.throws(() => ledger.append(event({
+      eventId: "evt-after-terminal", idempotencyKey: "idem-after-terminal", sourceEventId: "fill-after-" + terminal,
+      type: "FILL_RECORDED", occurredAt: terminal === "REJECTED" ? "2026-11-25T09:30:01+05:30" : "2026-11-25T09:30:02+05:30",
+      deltas: { cashDeltaPaise: -125050, blockedDeltaPaise: 0 },
+      payload: { fillId: "fill-after-terminal", orderId: "order-1", assetClass: "EQUITY",
+        instrumentKey: "MOCK|NSE|EQ|0001", side: "BUY", quantity: 1, pricePaise: 125050 }
+    })), /FILL_ORDER_MISMATCH/);
+  }
+});
+
+test("event timestamps must be valid calendar times and strictly increase", () => {
+  const invalid = createPaperDemoEventLedger(opening);
+  assert.throws(() => invalid.append(event({ occurredAt: "2026-02-30T09:30:00+05:30" })), /INVALID_EVENT_TIMESTAMP/);
+  assert.equal(invalid.snapshot().events.length, 0);
+  const ledger = createPaperDemoEventLedger(opening);
+  ledger.append(event());
+  assert.throws(() => ledger.append(event({
+    eventId: "evt-equal-time", idempotencyKey: "idem-equal-time", sourceEventId: "equal-time",
+    type: "ORDER_UPDATED", payload: { ...event().payload, status: "PARTIALLY_FILLED" }
+  })), /DEMO_EVENT_TIME_ORDER_MISMATCH/);
+  assert.equal(ledger.snapshot().events.length, 1);
+});
+
+test("replay also rejects terminal order reopening", () => {
+  const ledger = createPaperDemoEventLedger(opening);
+  ledger.append(event());
+  ledger.append(event({
+    eventId: "evt-cancelled", idempotencyKey: "idem-cancelled", sourceEventId: "cancel-order",
+    type: "ORDER_UPDATED", occurredAt: "2026-11-25T09:30:01+05:30",
+    deltas: { cashDeltaPaise: 0, blockedDeltaPaise: 0 },
+    payload: { ...event().payload, status: "CANCELLED" }
+  }));
+  const history = ledger.snapshot().events;
+  const reopen = {
+    ...history[1], eventId: "evt-replay-reopen", idempotencyKey: "idem-replay-reopen",
+    sourceEventId: "replay-reopen", sequence: 3,
+    occurredAt: "2026-11-25T09:30:02+05:30",
+    payload: { ...history[1].payload, status: "PENDING" }
+  };
+  assert.throws(() => replayPaperDemoEvents(opening, [...history, reopen]), /INVALID_ORDER_STATUS_TRANSITION/);
+});
