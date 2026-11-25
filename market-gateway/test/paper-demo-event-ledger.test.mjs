@@ -411,3 +411,81 @@ test("POSITION_CHANGED cannot bypass per-order share reservation ownership", () 
   })), /UNAUTHORIZED_POSITION_RESERVATION_MOVEMENT/);
   assert.equal(ledger.snapshot().positions.length, 0);
 });
+
+
+test("timestamps reject impossible dates, invalid clock fields and out-of-range timezone fields", () => {
+  const invalid = [
+    "2026-02-30T09:30:00+05:30", "2025-02-29T09:30:00+05:30",
+    "2026-13-01T09:30:00+05:30", "2026-00-10T09:30:00+05:30",
+    "2026-11-25T24:00:00+05:30", "2026-11-25T09:60:00+05:30",
+    "2026-11-25T09:30:60+05:30", "2026-11-25T09:30:00+24:00",
+    "2026-11-25T09:30:00+05:60", "2026-11-25T09:30:00"
+  ];
+  for (const occurredAt of invalid) {
+    const ledger = createPaperDemoEventLedger(opening);
+    assert.throws(() => ledger.append(event({ occurredAt })), /INVALID_EVENT_TIMESTAMP/, occurredAt);
+    assert.equal(ledger.snapshot().events.length, 0, occurredAt);
+  }
+  const leapDay = createPaperDemoEventLedger(opening);
+  assert.equal(leapDay.append(event({ occurredAt: "2024-02-29T09:30:00Z" })).accepted, true);
+});
+
+test("recorded fills remain immutable in snapshots and duplicate fill IDs are rejected", () => {
+  const ledger = createPaperDemoEventLedger(opening);
+  ledger.append(event());
+  const fill = {
+    eventId: "evt-fill-1", idempotencyKey: "idem-fill-1", sourceEventId: "source-fill-1",
+    accountId: opening.accountId, sessionId: opening.sessionId,
+    occurredAt: "2026-11-25T09:30:01+05:30", engine: "EQUITY", type: "FILL_RECORDED",
+    deltas: { cashDeltaPaise: -125050, blockedDeltaPaise: -10000 },
+    payload: { fillId: "immutable-fill-1", orderId: "order-1", assetClass: "EQUITY",
+      instrumentKey: "MOCK|NSE|EQ|0001", side: "BUY", quantity: 1, pricePaise: 125050, grossPaise: 125050 }
+  };
+  ledger.append(fill);
+  const snapshot = ledger.snapshot();
+  assert.ok(Object.isFrozen(snapshot.fills[0]));
+  assert.ok(Object.isFrozen(snapshot.events[1]));
+  assert.throws(() => { snapshot.fills[0].quantity = 99; }, TypeError);
+  assert.equal(ledger.snapshot().fills[0].quantity, 1);
+  assert.throws(() => ledger.append({
+    ...fill,
+    eventId: "evt-fill-2", idempotencyKey: "idem-fill-2", sourceEventId: "source-fill-2",
+    occurredAt: "2026-11-25T09:30:02+05:30",
+    deltas: { cashDeltaPaise: -125050, blockedDeltaPaise: 0 }
+  }), /DUPLICATE_FILL_ID/);
+  assert.equal(ledger.snapshot().fills.length, 1);
+  assert.equal(ledger.snapshot().events.length, 2);
+});
+
+test("fill IDs are unique across Equity, Futures and Options in the shared account ledger", () => {
+  const ledger = createPaperDemoEventLedger(opening);
+  const appendOrder = (engine, assetClass, instrumentKey, orderId, occurredAt) => ledger.append(event({
+    eventId: "evt-" + orderId, idempotencyKey: "idem-" + orderId, sourceEventId: "source-" + orderId,
+    engine, type: "ORDER_ACCEPTED", occurredAt,
+    deltas: { cashDeltaPaise: 0, blockedDeltaPaise: 0 },
+    payload: { orderId, assetClass, instrumentKey, side: "BUY", orderType: "MARKET", quantity: 1, status: "PENDING" }
+  }));
+  const appendFill = (engine, assetClass, instrumentKey, orderId, eventId, fillId, occurredAt) => ledger.append(event({
+    eventId, idempotencyKey: "idem-" + eventId, sourceEventId: "source-" + eventId,
+    engine, type: "FILL_RECORDED", occurredAt,
+    deltas: { cashDeltaPaise: engine === "EQUITY" ? -10000 : 0, blockedDeltaPaise: 0 },
+    payload: { fillId, orderId, assetClass, instrumentKey, side: "BUY", quantity: 1, pricePaise: 10000, grossPaise: 10000 }
+  }));
+  const equityKey = "MOCK|NSE|EQ|0001";
+  const futureKey = "MOCK|NSE|FUT|NIFTY-2026-11";
+  const optionKey = "MOCK|NSE|OPT|NIFTY-2026-11-26000-CE";
+  appendOrder("EQUITY", "EQUITY", equityKey, "equity-order", "2026-11-25T09:30:00+05:30");
+  appendFill("EQUITY", "EQUITY", equityKey, "equity-order", "equity-fill-event", "shared-fill-id", "2026-11-25T09:30:01+05:30");
+  appendOrder("FUTURES", "FUTURE", futureKey, "future-order", "2026-11-25T09:30:02+05:30");
+  appendFill("FUTURES", "FUTURE", futureKey, "future-order", "future-fill-event", "future-fill-id", "2026-11-25T09:30:03+05:30");
+  appendOrder("OPTIONS", "OPTION", optionKey, "option-order", "2026-11-25T09:30:04+05:30");
+  assert.throws(() => appendFill("OPTIONS", "OPTION", optionKey, "option-order",
+    "option-fill-event", "shared-fill-id", "2026-11-25T09:30:05+05:30"), /DUPLICATE_FILL_ID/);
+  const snapshot = ledger.snapshot();
+  assert.equal(snapshot.fills.length, 2);
+  assert.deepEqual(snapshot.fills.map(fill => fill.engine), ["EQUITY", "FUTURES"]);
+  assert.equal(snapshot.events.length, 5);
+  assert.equal(snapshot.orders.length, 3);
+  assert.equal(snapshot.account.cashBalancePaise, opening.cashBalancePaise - 10000);
+  assert.equal(snapshot.account.ledgerReconciled, false);
+});
