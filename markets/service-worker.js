@@ -2,7 +2,7 @@
 const BASE=new URL("./",self.registration.scope);
 const CACHE_NAME="zenura-markets-shell-v3";
 const SHELL=[
- "", "index.html","portal.css","pwa-register.js","language-toggle.js","language-toggle.js",
+ "", "index.html","portal.css","pwa-register.js","language-toggle.js",
  "stocks/","stocks/index.html","stocks/demo.html","stocks/demo.css","stocks/demo.js","stocks/demo-derivative-panel.mjs","stocks/derivative-mock-simulator.js","shared/paper-demo-adapter.mjs","../market-gateway/lib/derivative-position.js","../market-gateway/mock/fixtures/derivatives.json","stocks/stocks.css","stocks/order-workspace.css","stocks/chart-theme.css",
  "stocks/sse-parser.js","stocks/live-quote.js","stocks/reconnect-policy.js","stocks/paper-order-retry-policy.js",
  "stocks/chart-indicators.js","stocks/chart-engine.js","stocks/stocks.js","stocks/order-workspace.js","stocks/chart-theme.js",
