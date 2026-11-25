@@ -98,7 +98,7 @@ jobs:
           const deploy = fs.readFileSync('.github/workflows/deploy-firebase-functions.yml', 'utf8');
           if (firebase.functions?.find(item => item.source === 'functions')?.runtime !== 'nodejs22') throw new Error('firebase.json must use nodejs22');
           if (pkg.engines?.node !== '22') throw new Error('functions/package.json must require Node 22');
-          if (!/node-version:\\s*["']22["']/.test(deploy)) throw new Error('Firebase deploy workflow must use Node 22');
+          if (!/node-version:\s*["']22["']/.test(deploy)) throw new Error('Firebase deploy workflow must use Node 22');
           console.log('Firebase runtime, package engine and deploy workflow all target Node 22.');
           NODE
           npm install --prefix functions --ignore-scripts --no-audit --no-fund
