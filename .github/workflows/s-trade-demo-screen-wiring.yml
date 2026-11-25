@@ -13,6 +13,8 @@ on:
       - "markets/service-worker.js"
       - "markets/stocks/demo-chart-data.mjs"
       - "markets/stocks/demo-chart-panel.mjs"
+      - "markets/stocks/demo-equity-panel.mjs"
+      - "markets/stocks/demo-derivative-panel.mjs"
       - "markets/stocks/demo-watchlist-persistence.mjs"
       - "markets/stocks/demo-watchlist-state.mjs"
       - "market-gateway/test/demo-watchlist-state.test.mjs"
@@ -71,7 +73,7 @@ jobs:
       - name: Check Demo browser smoke syntax
         run: node --check markets/stocks/demo-browser-smoke.cjs
       - name: Check Demo screen module syntax
-        run: node --check markets/stocks/demo.js && node --check markets/stocks/demo-chart-data.mjs && node --check markets/stocks/demo-chart-panel.mjs && node --check markets/stocks/demo-watchlist-persistence.mjs && node --check markets/stocks/demo-watchlist-state.mjs
+        run: node --check markets/stocks/demo.js && node --check markets/stocks/demo-chart-data.mjs && node --check markets/stocks/demo-chart-panel.mjs && node --check markets/stocks/demo-equity-panel.mjs && node --check markets/stocks/demo-derivative-panel.mjs && node --check markets/stocks/demo-watchlist-persistence.mjs && node --check markets/stocks/demo-watchlist-state.mjs
       - name: Validate shared fixtures
         run: |
           node - <<'NODE'
