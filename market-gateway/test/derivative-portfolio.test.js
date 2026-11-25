@@ -5,7 +5,7 @@ const {calculateDerivativePortfolio}=require("../lib/derivative-portfolio");
 const now=1_800_000_000_000;
 const pos=(overrides={})=>({instrumentKey:"NSE_FO|NIFTY26NOV25000CE",instrumentType:"CE",expiry:"2027-12-30",netQuantity:25,averagePricePaise:5000,...overrides});
 const quote=(overrides={})=>({instrumentKey:"NSE_FO|NIFTY26NOV25000CE",pricePaise:7000,observedAtMs:now-1000,...overrides});
-const margin=(overrides={})=>({instrumentKey:"NSE_FO|NIFTY26NOV25000CE",requiredMarginPaise:150000,observedAtMs:now-1000,source:"broker_margin_api",...overrides});
+const margin=(overrides={})=>({instrumentKey:"NSE_FO|NIFTY26NOV25000CE",requiredMarginPaise:150000,observedAtMs:now-1000,source:"upstox_v2_charges_margin",...overrides});
 test("values long option market value and unrealized P&L",()=>{
  const r=calculateDerivativePortfolio({positions:[pos()],quotes:[quote()],now});
  assert.equal(r.marketValuePaise,175000);assert.equal(r.positions[0].marketValuePaise,175000);assert.equal(r.unrealizedPnlPaise,50000);assert.equal(r.reservedMarginPaise,0);
@@ -75,4 +75,13 @@ test("requires explicit valid expiry and rejects quote contract metadata mismatc
  assert.throws(()=>calculateDerivativePortfolio({positions:[missing],quotes:[quote()],now}),/requires a valid contract expiry/);
  assert.throws(()=>calculateDerivativePortfolio({positions:[pos()],quotes:[quote({expiry:"2027-12-31"})],now}),/identity does not match/);
  assert.throws(()=>calculateDerivativePortfolio({positions:[pos()],quotes:[quote({optionType:"PE"})],now}),/identity does not match/);
+});
+
+
+test("rejects margin snapshots without the exact normalized Upstox provenance",()=>{
+ const p=pos({instrumentType:"FUT"});
+ for(const source of [undefined,"broker_margin_api","user_input","MOCK","upstox_v3_margin"]){
+  const m=margin({instrumentKey:p.instrumentKey,source});
+  assert.throws(()=>calculateDerivativePortfolio({positions:[p],quotes:[quote({instrumentKey:p.instrumentKey})],marginSnapshots:[m],now}),/unverified derivative margin snapshot provenance/);
+ }
 });
