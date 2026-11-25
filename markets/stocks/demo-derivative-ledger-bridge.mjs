@@ -84,7 +84,11 @@ export function createDerivativeDemoLedgerBridge({
     }
     const changedKeys = new Set([...oldPositions.keys(), ...newPositions.keys()]);
     for (const key of changedKeys) {
-      const old = oldPositions.get(key) || { netQuantity: 0, averagePricePaise: 0, assetClass: key.split("|")[0], instrumentKey: key.split("|")[1], product: "DELIVERY" };
+      const firstSeparator = key.indexOf("|"), lastSeparator = key.lastIndexOf("|");
+      const assetClass = key.slice(0, firstSeparator);
+      const instrumentKey = key.slice(firstSeparator + 1, lastSeparator);
+      const product = key.slice(lastSeparator + 1);
+      const old = oldPositions.get(key) || { netQuantity: 0, averagePricePaise: 0, assetClass, instrumentKey, product };
       const next = newPositions.get(key) || { ...old, netQuantity: 0, averagePricePaise: 0 };
       if (old.netQuantity === next.netQuantity && old.averagePricePaise === next.averagePricePaise) continue;
       const engine = next.assetClass === "FUTURE" ? "FUTURES" : "OPTIONS";
