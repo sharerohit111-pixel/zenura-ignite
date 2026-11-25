@@ -327,3 +327,35 @@ test("authoritative Options fill settlement applies premium and charges as one c
   assert.equal(result.snapshot.account.availableFundsPaise, opening.cashBalancePaise - 101250);
   assert.equal(result.snapshot.events[0].payload.receipt.amounts.chargesCashDeltaPaise, -1250);
 });
+
+test("generic append cannot inject an unverified settlement event or move account funds", () => {
+  const ledger = createPaperDemoEventLedger(opening, {
+    trustedIssuerIds: ["approved-clearing-source"],
+    verifyAttestation: () => true
+  });
+  const before = ledger.snapshot();
+  assert.throws(() => ledger.append(event({
+    eventId: "forged-settlement-event",
+    idempotencyKey: "forged-settlement-idempotency",
+    sourceEventId: "forged-provider-event",
+    engine: "OPTIONS",
+    type: "SETTLEMENT_RECEIPT_ACCEPTED",
+    deltas: { cashDeltaPaise: -500000, blockedDeltaPaise: 0 },
+    payload: {
+      receiptId: "forged-receipt",
+      eventReference: "forged-provider-reference",
+      orderId: "unverified-order",
+      assetClass: "OPTION",
+      receipt: {
+        receiptId: "forged-receipt",
+        eventReference: "forged-provider-reference",
+        amounts: { cashDeltaPaise: -500000, blockedDeltaPaise: 0 }
+      }
+    }
+  })), /SETTLEMENT_REQUIRES_VERIFIED_RECEIPT_PATH/);
+  const after = ledger.snapshot();
+  assert.deepEqual(after, before);
+  assert.equal(after.account.cashBalancePaise, opening.cashBalancePaise);
+  assert.equal(after.account.blockedFundsPaise, opening.blockedFundsPaise);
+  assert.equal(after.account.ledgerReconciled, false);
+});
