@@ -63,13 +63,19 @@ const axePath=require.resolve("axe-core/axe.min.js");
   let workerState;
   try{
    await page.waitForFunction(()=>("serviceWorker" in navigator),null,{timeout:5000});
-   await page.waitForFunction(async()=>{
-    const registration=await navigator.serviceWorker.getRegistration("/markets/");
-    return registration?.active?.state==="activated";
-   },null,{timeout:15000});
    workerState=await page.evaluate(async()=>{
-    const registration=await navigator.serviceWorker.getRegistration("/markets/");
-    return {state:registration?.active?.state||null,scope:registration?.scope||null};
+    const registration=await navigator.serviceWorker.ready;
+    const worker=registration.active;
+    if(!worker)return {state:null,scope:registration.scope};
+    if(worker.state!=="activated")await new Promise((resolve,reject)=>{
+     const timeout=setTimeout(()=>{worker.removeEventListener("statechange",onState);reject(new Error("PWA worker activation timed out in state "+worker.state));},15000);
+     const onState=()=>{
+      if(worker.state==="activated"){clearTimeout(timeout);worker.removeEventListener("statechange",onState);resolve();}
+      else if(worker.state==="redundant"){clearTimeout(timeout);worker.removeEventListener("statechange",onState);reject(new Error("PWA worker became redundant"));}
+     };
+     worker.addEventListener("statechange",onState);onState();
+    });
+    return {state:worker.state,scope:registration.scope};
    });
   }catch(error){
    const state=await page.evaluate(async()=>({controller:!!navigator.serviceWorker.controller,registrations:(await navigator.serviceWorker.getRegistrations()).map(r=>({scope:r.scope,installing:r.installing?.state||null,waiting:r.waiting?.state||null,active:r.active?.state||null}))}));
