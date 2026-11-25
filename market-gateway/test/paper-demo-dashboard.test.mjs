@@ -37,7 +37,7 @@ test("Demo screens disclose synthetic data and isolate local Equity execution fr
  assert.match(js,/renderInstrumentCatalog\(catalog\)/);
  assert.match(js,/renderOptionsCatalog\(catalog\)/);
  assert.match(js,/renderMarketDashboard\(content\)/);
- assert.match(js,/renderDemoWatchlists\(content\)/);
+ assert.match(js,/mountPrivateWatchlists(content, { model, el, field, selectControl, money })/);
  assert.match(js,/wrap\.tabIndex=0/);
  assert.match(js,/Scrollable data table/);
  assert.match(js,/Scrollable demo watchlist/);
