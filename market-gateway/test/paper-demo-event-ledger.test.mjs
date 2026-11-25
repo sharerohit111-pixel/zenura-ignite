@@ -588,3 +588,42 @@ test("terminal SELL release cannot be suppressed or changed by an explicit reser
   assert.equal(ledger.snapshot().orders[0].status, "CANCELLED");
   assert.deepEqual(replayPaperDemoEvents(opening, ledger.snapshot().events), ledger.snapshot());
 });
+
+
+test("order share reservations are lifecycle-derived and cannot be overridden on acceptance or updates", () => {
+  const ledger = createPaperDemoEventLedger(opening);
+  ledger.append(event({
+    type: "POSITION_CHANGED", sourceEventId: "seed-derived-reservation", idempotencyKey: "seed-derived-reservation",
+    deltas: { cashDeltaPaise: 0, blockedDeltaPaise: 0 },
+    payload: { assetClass: "EQUITY", instrumentKey: "MOCK|NSE|EQ|0001", product: "DELIVERY",
+      quantityDelta: 5, costBasisDeltaPaise: 500000, realizedPnlDeltaPaise: 0 }
+  }));
+  const sellPayload = { ...event().payload, side: "SELL", quantity: 3, status: "PENDING" };
+  assert.throws(() => ledger.append(event({
+    eventId: "evt-derived-reservation-bypass", idempotencyKey: "idem-derived-reservation-bypass",
+    sourceEventId: "source-derived-reservation-bypass", type: "ORDER_ACCEPTED",
+    occurredAt: "2026-11-25T09:30:01+05:30",
+    deltas: { cashDeltaPaise: 0, blockedDeltaPaise: 0 },
+    payload: { ...sellPayload, reservedQuantityDelta: 0 }
+  })), /DEMO_ORDER_RESERVATION_DELTA_MISMATCH/);
+  assert.equal(ledger.snapshot().orders.length, 0);
+  assert.equal(ledger.snapshot().positions[0].reservedQuantity, 0);
+  ledger.append(event({
+    eventId: "evt-derived-reservation-accepted", idempotencyKey: "idem-derived-reservation-accepted",
+    sourceEventId: "source-derived-reservation-accepted", type: "ORDER_ACCEPTED",
+    occurredAt: "2026-11-25T09:30:02+05:30",
+    deltas: { cashDeltaPaise: 0, blockedDeltaPaise: 0 },
+    payload: sellPayload
+  }));
+  assert.equal(ledger.snapshot().positions[0].reservedQuantity, 3);
+  assert.throws(() => ledger.append(event({
+    eventId: "evt-derived-reservation-update-bypass", idempotencyKey: "idem-derived-reservation-update-bypass",
+    sourceEventId: "source-derived-reservation-update-bypass", type: "ORDER_UPDATED",
+    occurredAt: "2026-11-25T09:30:03+05:30",
+    deltas: { cashDeltaPaise: 0, blockedDeltaPaise: 0 },
+    payload: { ...sellPayload, reservedQuantityDelta: -1 }
+  })), /DEMO_ORDER_RESERVATION_DELTA_MISMATCH/);
+  assert.equal(ledger.snapshot().orders[0].status, "PENDING");
+  assert.equal(ledger.snapshot().positions[0].reservedQuantity, 3);
+  assert.deepEqual(replayPaperDemoEvents(opening, ledger.snapshot().events), ledger.snapshot());
+});
