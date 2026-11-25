@@ -83,7 +83,9 @@ test("PWA shell serves explicitly cached root-level Demo assets offline and reje
   assert.ok(sw.includes("!url.pathname.startsWith(BASE.pathname)&&!shellAsset"));
   assert.ok(sw.includes('if(request.mode==="navigate"){'));
   assert.ok(sw.includes("if(!shellAsset)return;"), "non-allowlisted navigation must never enter the offline cache");
-  assert.ok(sw.includes('url.pathname.endsWith(".webmanifest")'));
+  assert.ok(sw.includes('"manifest.webmanifest"'), "manifest is explicitly precached in the shell allowlist");
+  assert.ok(sw.includes("if(shellAsset){"), "only explicit shell assets may be cached");
+  assert.ok(!sw.includes("request.destination"), "dynamic subresources must not be cached implicitly");
   assert.ok(sw.includes('"../market-gateway/lib/derivative-position.js"'));
   assert.ok(sw.includes('"../market-gateway/mock/fixtures/derivatives.json"'));
 });

@@ -37,13 +37,22 @@ test("Demo screens disclose synthetic data and isolate local Equity execution fr
  assert.match(js,/renderInstrumentCatalog\(catalog\)/);
  assert.match(js,/renderOptionsCatalog\(catalog\)/);
  assert.match(js,/renderMarketDashboard\(content\)/);
- assert.match(js,/renderDemoWatchlists\(content\)/);
+ assert.ok(js.includes("mountPrivateWatchlists(content, { model, el, field, selectControl, money })"));
  assert.match(js,/wrap\.tabIndex=0/);
  assert.match(js,/Scrollable data table/);
- assert.match(js,/Scrollable demo watchlist/);
- assert.match(js,/Move .* up/);
- assert.match(js,/current-page memory only/);
- assert.match(js,/list\.length>=50/);
+ const privateWatchlists=await read("demo-watchlist-persistence.mjs");
+ assert.match(privateWatchlists,/paper_watchlists/);
+ assert.match(privateWatchlists,/signInWithPassword/);
+ assert.match(privateWatchlists,/onConflict: "user_id,name"/);
+ assert.match(privateWatchlists,/sort\.value === "symbol-asc"/);
+ assert.match(privateWatchlists,/length >= 50/);
+ assert.match(privateWatchlists,/controller\.reset\(nextUid\)/);
+ assert.match(privateWatchlists,/request !== requestVersion/);
+ const worker=await read("../service-worker.js");
+ assert.match(worker,/zenura-markets-shell-v11/);
+ assert.ok(worker.includes("shared/paper-demo-event-ledger.mjs"));
+ assert.ok(worker.includes("stocks/demo-watchlist-persistence.mjs"));
+ assert.match(worker,/stocks\/demo-watchlist-persistence\.mjs/);
  assert.match(js,/searchPaperDemoInstruments/);
  assert.match(js,/getPaperDemoExpiries/);
  assert.match(js,/getPaperDemoOptionChain/);
@@ -88,7 +97,7 @@ test("responsive demo assets are included in the Markets PWA shell",async()=>{
  const sw=await readFile(new URL("../../markets/service-worker.js",import.meta.url),"utf8");
  assert.match(css,/@media\(max-width:900px\)/);
  assert.match(css,/@media\(max-width:520px\)/);
- assert.match(sw,/zenura-markets-shell-v9/);
+ assert.match(sw,/zenura-markets-shell-v11/);
  for(const asset of ["stocks/demo.html","stocks/demo.css","stocks/demo.js","stocks/demo-chart-panel.mjs","stocks/demo-chart-data.mjs","shared/paper-demo-adapter.mjs"])assert.ok(sw.includes(asset));
 });
 
