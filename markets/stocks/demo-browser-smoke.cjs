@@ -60,18 +60,13 @@ const axePath=require.resolve("axe-core/axe.min.js");
   console.log("PWA: opening market shell");
   await page.goto("http://127.0.0.1:4173/markets/",{waitUntil:"domcontentloaded",timeout:30000});
   await page.waitForLoadState("load",{timeout:10000});
-  try{
-   await page.waitForFunction(async()=>{
-    const registrations=await navigator.serviceWorker.getRegistrations();
-    return registrations.some(registration=>registration.active?.state==="activated");
-   },null,{timeout:20000});
-  }catch(error){
-   const state=await page.evaluate(async()=>({controller:!!navigator.serviceWorker.controller,registrations:(await navigator.serviceWorker.getRegistrations()).map(r=>({scope:r.scope,installing:r.installing?.state||null,waiting:r.waiting?.state||null,active:r.active?.state||null}))}));
-   throw new Error("PWA service worker did not activate: "+JSON.stringify(state)+"; console: "+pwaConsole.join(" | ")+"; "+error.message);
-  }
   console.log("PWA: waiting for service worker activation");
-  await page.waitForFunction(async()=>{ const registration=await navigator.serviceWorker.getRegistration(); return registration?.active?.state==="activated"; },null,{timeout:10000});
-  const workerState=await page.evaluate(async()=>{ const registration=await navigator.serviceWorker.getRegistration(); return {state:registration?.active?.state||"missing",scope:registration?.scope||null}; });
+  const workerHandle=await page.waitForFunction(async()=>{
+   const registrations=await navigator.serviceWorker.getRegistrations();
+   const registration=registrations.find(item=>item.scope.endsWith("/markets/")&&item.active?.state==="activated");
+   return registration?{state:registration.active.state,scope:registration.scope}:false;
+  },null,{timeout:30000});
+  const workerState=await workerHandle.jsonValue();
   assert.equal(workerState.state,"activated","service worker must finish activation");
   assert.ok(workerState.scope.endsWith("/markets/"),"service worker scope must be limited to /markets/");
   console.log(JSON.stringify({pwaWorker:workerState.state,scope:workerState.scope}));
