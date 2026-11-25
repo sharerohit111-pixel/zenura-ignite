@@ -59,6 +59,12 @@ function validateEvent(input, identity, expectedSequence) {
         !SIDES.has(p.side) || !integer(p.quantity) || p.quantity < 1 ||
         !integer(p.pricePaise) || p.pricePaise < 1 ||
         !PRODUCTS.has(productOf(p))) fail("INVALID_FILL_EVENT");
+    const calculatedGrossPaise = p.quantity * p.pricePaise;
+    if (!Number.isSafeInteger(calculatedGrossPaise) ||
+        (p.grossPaise !== undefined && p.grossPaise !== calculatedGrossPaise) ||
+        (p.grossValuePaise !== undefined && p.grossValuePaise !== calculatedGrossPaise)) {
+      fail("INVALID_FILL_GROSS_VALUE");
+    }
     if (input.engine === "EQUITY" && p.assetClass !== "EQUITY") fail("ENGINE_ASSET_MISMATCH");
     if (input.engine === "FUTURES" && p.assetClass !== "FUTURE") fail("ENGINE_ASSET_MISMATCH");
     if (input.engine === "OPTIONS" && p.assetClass !== "OPTION") fail("ENGINE_ASSET_MISMATCH");
