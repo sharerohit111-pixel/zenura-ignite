@@ -13,6 +13,32 @@ function event(overrides = {}) {
     ...overrides
   };
 }
+
+function seedFuturesOrder(ledger, orderId, side = "BUY") {
+  ledger.append(event({
+    eventId: "seed-" + orderId, idempotencyKey: "idem-" + orderId,
+    sourceEventId: "source-" + orderId, occurredAt: "2026-11-25T09:29:00+05:30",
+    engine: "FUTURES", type: "ORDER_ACCEPTED",
+    deltas: { cashDeltaPaise: 0, blockedDeltaPaise: 0 },
+    payload: { orderId, assetClass: "FUTURE", instrumentKey: "MOCK|NSE|FUT|NIFTY-2026-11", side, orderType: "LIMIT", quantity: 1, status: "PENDING" }
+  }));
+}
+function seedOptionsFill(ledger, orderId, fillId, side = "BUY") {
+  ledger.append(event({
+    eventId: "seed-" + orderId, idempotencyKey: "idem-" + orderId,
+    sourceEventId: "source-" + orderId, occurredAt: "2026-11-25T09:29:00+05:30",
+    engine: "OPTIONS", type: "ORDER_ACCEPTED",
+    deltas: { cashDeltaPaise: 0, blockedDeltaPaise: 0 },
+    payload: { orderId, assetClass: "OPTION", instrumentKey: "MOCK|NSE|OPT|NIFTY-26000-CE", side, orderType: "LIMIT", quantity: 1, status: "PENDING" }
+  }));
+  ledger.append(event({
+    eventId: "fill-" + fillId, idempotencyKey: "idem-fill-" + fillId,
+    sourceEventId: "source-fill-" + fillId, occurredAt: "2026-11-25T09:29:30+05:30",
+    engine: "OPTIONS", type: "FILL_RECORDED",
+    deltas: { cashDeltaPaise: 0, blockedDeltaPaise: 0 },
+    payload: { fillId, orderId, assetClass: "OPTION", instrumentKey: "MOCK|NSE|OPT|NIFTY-26000-CE", side, quantity: 1, pricePaise: 100000 }
+  }));
+}
 test("opening snapshot derives available cash and never claims reconciliation", () => {
   const snapshot = createPaperDemoEventLedger(opening).snapshot();
   assert.equal(snapshot.account.cashBalancePaise, 100000000);
@@ -232,21 +258,22 @@ test("authoritative Futures settlement appends one immutable canonical event and
     amounts: { marginPaise: 25000, cashDeltaPaise: 0, blockedDeltaPaise: 25000 },
     attestation: { keyId: "test-key-1", signature: "cryptographically-verified-test-signature" }
   };
+  seedFuturesOrder(ledger, receipt.orderId, "BUY");
   const scope = { orderId: receipt.orderId, assetClass: "FUTURE", side: "BUY" };
   const first = ledger.appendSettlementReceipt(receipt, scope);
   assert.equal(first.accepted, true);
-  assert.equal(first.snapshot.events.length, 1);
-  assert.equal(first.snapshot.events[0].type, "SETTLEMENT_RECEIPT_ACCEPTED");
-  assert.equal(first.snapshot.events[0].engine, "FUTURES");
+  assert.equal(first.snapshot.events.length, 2);
+  assert.equal(first.snapshot.events[1].type, "SETTLEMENT_RECEIPT_ACCEPTED");
+  assert.equal(first.snapshot.events[1].engine, "FUTURES");
   assert.equal(first.snapshot.account.cashBalancePaise, opening.cashBalancePaise);
   assert.equal(first.snapshot.account.blockedFundsPaise, 25000);
   assert.equal(first.snapshot.account.ledgerReconciled, false);
-  assert.equal(Object.isFrozen(first.snapshot.events[0].payload.receipt.amounts), true);
+  assert.equal(Object.isFrozen(first.snapshot.events[1].payload.receipt.amounts), true);
 
   const duplicate = ledger.appendSettlementReceipt(receipt, scope);
   assert.equal(duplicate.accepted, false);
   assert.equal(duplicate.duplicate, true);
-  assert.equal(duplicate.snapshot.events.length, 1);
+  assert.equal(duplicate.snapshot.events.length, 2);
   assert.throws(() => ledger.appendSettlementReceipt({
     ...receipt, amounts: { ...receipt.amounts, blockedDeltaPaise: 24000 }
   }, scope), /SETTLEMENT_RECEIPT_REPLAY_MISMATCH/);
@@ -271,11 +298,14 @@ test("canonical settlement append rejects reused provider event references and u
     amounts: { marginPaise: 25000, cashDeltaPaise: 0, blockedDeltaPaise: 25000 },
     attestation: { keyId: "test-key-1", signature: "cryptographically-verified-test-signature" }
   };
+  seedFuturesOrder(ledger, receipt.orderId, "BUY");
   ledger.appendSettlementReceipt(receipt, { orderId: receipt.orderId, assetClass: "FUTURE", side: "BUY" });
   assert.throws(() => ledger.appendSettlementReceipt({
     ...receipt, receiptId: "settle-future-003"
   }, { orderId: receipt.orderId, assetClass: "FUTURE", side: "BUY" }), /SETTLEMENT_EVENT_REPLAY/);
-  assert.throws(() => createPaperDemoEventLedger(opening).appendSettlementReceipt(
+  const noTrustLedger = createPaperDemoEventLedger(opening);
+  seedFuturesOrder(noTrustLedger, receipt.orderId, "BUY");
+  assert.throws(() => noTrustLedger.appendSettlementReceipt(
     receipt, { orderId: receipt.orderId, assetClass: "FUTURE", side: "BUY" }
   ), /SETTLEMENT_ATTESTATION_VERIFIER_REQUIRED/);
 });
@@ -294,10 +324,11 @@ test("canonical ledger rejects a settlement receipt whose account/session scope 
     amounts: { marginPaise: 25000, cashDeltaPaise: 0, blockedDeltaPaise: 25000 },
     attestation: { keyId: "test-key-1", signature: "cryptographically-verified-test-signature" }
   };
+  seedFuturesOrder(ledger, receipt.orderId, "BUY");
   assert.throws(() => ledger.appendSettlementReceipt(
     receipt, { orderId: receipt.orderId, assetClass: "FUTURE", side: "BUY" }
   ), /SETTLEMENT_RECEIPT_SCOPE_MISMATCH/);
-  assert.equal(ledger.snapshot().events.length, 0);
+  assert.equal(ledger.snapshot().events.length, 1);
 });
 
 test("authoritative Options fill settlement applies premium and charges as one canonical cash event", () => {
@@ -317,6 +348,7 @@ test("authoritative Options fill settlement applies premium and charges as one c
     amounts: { premiumCashDeltaPaise: -100000, chargesCashDeltaPaise: -1250, cashDeltaPaise: -101250, blockedDeltaPaise: 0 },
     attestation: { keyId: "test-key-1", signature: "cryptographically-verified-test-signature" }
   };
+  seedOptionsFill(ledger, receipt.orderId, receipt.fillId, "BUY");
   const result = ledger.appendSettlementReceipt(receipt, {
     orderId: receipt.orderId, fillId: receipt.fillId, assetClass: "OPTION", side: "BUY"
   });
@@ -325,7 +357,7 @@ test("authoritative Options fill settlement applies premium and charges as one c
   assert.equal(result.snapshot.account.cashBalancePaise, opening.cashBalancePaise - 101250);
   assert.equal(result.snapshot.account.blockedFundsPaise, opening.blockedFundsPaise);
   assert.equal(result.snapshot.account.availableFundsPaise, opening.cashBalancePaise - 101250);
-  assert.equal(result.snapshot.events[0].payload.receipt.amounts.chargesCashDeltaPaise, -1250);
+  assert.equal(result.snapshot.events[2].payload.receipt.amounts.chargesCashDeltaPaise, -1250);
 });
 
 test("generic append cannot inject an unverified settlement event or move account funds", () => {
@@ -358,4 +390,65 @@ test("generic append cannot inject an unverified settlement event or move accoun
   assert.equal(after.account.cashBalancePaise, opening.cashBalancePaise);
   assert.equal(after.account.blockedFundsPaise, opening.blockedFundsPaise);
   assert.equal(after.account.ledgerReconciled, false);
+});
+
+test("Futures margin release cannot exceed the outstanding verified reservation for its order", () => {
+  const trust = {
+    trustedIssuerIds: ["approved-clearing-source"],
+    verifyAttestation: receipt => receipt.attestation.signature === "cryptographically-verified-test-signature"
+  };
+  const ledger = createPaperDemoEventLedger(opening, trust);
+  const base = {
+    schemaVersion: "1.0.0", kind: "FUTURES_MARGIN_RESERVATION", action: "RESERVE",
+    receiptId: "future-reserve-release-1", eventReference: "future-provider-reserve-1",
+    accountId: opening.accountId, sessionId: opening.sessionId, orderId: "future-reserve-release-order",
+    assetClass: "FUTURE", side: "BUY", currency: "INR",
+    issuerId: "approved-clearing-source", sourceReference: "future-source-1",
+    policyVersion: "margin-policy-test-v1", issuedAt: "2026-11-25T09:30:00+05:30",
+    amounts: { marginPaise: 25000, cashDeltaPaise: 0, blockedDeltaPaise: 25000 },
+    attestation: { keyId: "test-key-1", signature: "cryptographically-verified-test-signature" }
+  };
+  seedFuturesOrder(ledger, base.orderId, "BUY");
+  ledger.appendSettlementReceipt(base, { orderId: base.orderId, assetClass: "FUTURE", side: "BUY" });
+  const release = {
+    ...base, action: "RELEASE", receiptId: "future-release-too-large",
+    eventReference: "future-provider-release-too-large",
+    sourceReference: "future-source-release-too-large",
+    issuedAt: "2026-11-25T09:31:00+05:30",
+    amounts: { marginPaise: 30000, cashDeltaPaise: 0, blockedDeltaPaise: -30000 }
+  };
+  assert.throws(() => ledger.appendSettlementReceipt(release, {
+    orderId: base.orderId, assetClass: "FUTURE", side: "BUY"
+  }), /FUTURES_MARGIN_RELEASE_EXCEEDS_OUTSTANDING_RESERVATION/);
+  assert.equal(ledger.snapshot().account.blockedFundsPaise, 25000);
+  assert.equal(ledger.snapshot().events.length, 2);
+});
+
+test("Options settlement rejects orphan fills, mismatched order ownership and wrong premium direction", () => {
+  const trust = {
+    trustedIssuerIds: ["approved-clearing-source"],
+    verifyAttestation: () => true
+  };
+  const ledger = createPaperDemoEventLedger(opening, trust);
+  const receipt = {
+    schemaVersion: "1.0.0", kind: "OPTIONS_FILL_SETTLEMENT", action: "SETTLE",
+    receiptId: "option-bound-fill-1", eventReference: "option-provider-fill-1",
+    fillId: "option-bound-fill-id", accountId: opening.accountId,
+    sessionId: opening.sessionId, orderId: "option-bound-order",
+    assetClass: "OPTION", side: "BUY", currency: "INR",
+    issuerId: "approved-clearing-source", sourceReference: "option-source-1",
+    policyVersion: "options-policy-test-v1", issuedAt: "2026-11-25T09:30:00+05:30",
+    amounts: { premiumCashDeltaPaise: -100000, chargesCashDeltaPaise: -100, cashDeltaPaise: -100100, blockedDeltaPaise: 0 },
+    attestation: { keyId: "test-key-1", signature: "verified-test-signature" }
+  };
+  seedOptionsFill(ledger, receipt.orderId, receipt.fillId, "BUY");
+  assert.throws(() => ledger.appendSettlementReceipt({
+    ...receipt, fillId: "orphan-fill"
+  }, { orderId: receipt.orderId, fillId: "orphan-fill", assetClass: "OPTION", side: "BUY" }),
+  /SETTLEMENT_FILL_NOT_FOUND_OR_MISMATCH/);
+  assert.throws(() => ledger.appendSettlementReceipt({
+    ...receipt, amounts: { ...receipt.amounts, premiumCashDeltaPaise: 100000, cashDeltaPaise: 99900 }
+  }, { orderId: receipt.orderId, fillId: receipt.fillId, assetClass: "OPTION", side: "BUY" }),
+  /OPTIONS_PREMIUM_DIRECTION_MISMATCH/);
+  assert.equal(ledger.snapshot().account.cashBalancePaise, opening.cashBalancePaise);
 });

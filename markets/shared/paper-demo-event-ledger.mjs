@@ -236,6 +236,38 @@ export function createPaperDemoEventLedger(opening, settlementTrust = {}) {
       }
       return { accepted: false, duplicate: true, event: existing, snapshot: snapshot() };
     }
+    const order = projection.orders.find(item => item.orderId === orderId);
+    if (!order || order.accountId && order.accountId !== identity.accountId ||
+        order.engine !== (assetClass === "FUTURE" ? "FUTURES" : "OPTIONS") ||
+        order.assetClass !== assetClass || order.side !== side) {
+      fail("SETTLEMENT_ORDER_NOT_FOUND_OR_MISMATCH");
+    }
+    if (assetClass === "OPTION") {
+      const fill = projection.fills.find(item => item.fillId === fillId);
+      if (!fill || fill.orderId !== orderId || fill.engine !== "OPTIONS" ||
+          fill.assetClass !== "OPTION" || fill.side !== side ||
+          fill.instrumentKey !== order.instrumentKey) {
+        fail("SETTLEMENT_FILL_NOT_FOUND_OR_MISMATCH");
+      }
+      const premiumDelta = receipt?.amounts?.premiumCashDeltaPaise;
+      if (!integer(premiumDelta) ||
+          (side === "BUY" && premiumDelta >= 0) ||
+          (side === "SELL" && premiumDelta <= 0)) {
+        fail("OPTIONS_PREMIUM_DIRECTION_MISMATCH");
+      }
+    } else {
+      if (fillId !== undefined && fillId !== null) fail("FUTURES_SETTLEMENT_MUST_NOT_REFERENCE_OPTION_FILL");
+      if (!["RESERVE", "RELEASE"].includes(receipt?.action)) fail("INVALID_FUTURES_MARGIN_RECEIPT");
+      const priorForOrder = projection.events
+        .filter(event => event.type === "SETTLEMENT_RECEIPT_ACCEPTED" &&
+          event.payload.assetClass === "FUTURE" && event.payload.orderId === orderId)
+        .reduce((sum, event) => sum + event.payload.receipt.amounts.blockedDeltaPaise, 0);
+      const delta = receipt?.amounts?.blockedDeltaPaise;
+      if (!integer(delta) || (receipt.action === "RELEASE" && (-delta > priorForOrder)) ||
+          (receipt.action === "RELEASE" && priorForOrder <= 0)) {
+        fail("FUTURES_MARGIN_RELEASE_EXCEEDS_OUTSTANDING_RESERVATION");
+      }
+    }
     const settlementEvents = projection.events.filter(event => event.type === "SETTLEMENT_RECEIPT_ACCEPTED");
     const validated = validateAuthoritativeDemoSettlementReceipt(receipt, {
       accountId: identity.accountId, sessionId: identity.sessionId, orderId,
