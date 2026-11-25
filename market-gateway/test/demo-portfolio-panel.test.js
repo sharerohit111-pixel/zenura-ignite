@@ -7,7 +7,8 @@ test("portfolio uses canonical marks and shared signed position projection", asy
   const snapshot = { mode:"DEMO", simulationOnly:true, orders:[], trades:[], positions:[
     {assetClass:"EQUITY",product:"DELIVERY",instrumentKey:"MOCK|NSE|EQ|1",quantity:10,averagePricePaise:10000,costBasisPaise:100000,realizedPnlPaise:500},
     {assetClass:"FUTURE",product:"INTRADAY",instrumentKey:"MOCK|NSE|FUT|1",quantity:-2,averagePricePaise:20000,costBasisPaise:40000,realizedPnlPaise:1000},
-    {assetClass:"OPTION",product:"DELIVERY",instrumentKey:"MOCK|NSE|OPT|1",quantity:5,averagePricePaise:5000,costBasisPaise:25000,realizedPnlPaise:-200}
+    {assetClass:"OPTION",product:"DELIVERY",instrumentKey:"MOCK|NSE|OPT|1",quantity:5,averagePricePaise:5000,costBasisPaise:25000,realizedPnlPaise:-200},
+    {assetClass:"EQUITY",product:"INTRADAY",instrumentKey:"MOCK|NSE|EQ|CLOSED",quantity:0,averagePricePaise:0,costBasisPaise:0,realizedPnlPaise:300}
   ]};
   const instruments = [
     {instrumentKey:"MOCK|NSE|EQ|1",symbol:"MOCKEQ",exchange:"NSE",assetClass:"EQUITY",lastPricePaise:11000,timestamp:"2026-11-25T09:30:00Z",simulated:true,stale:false},
@@ -17,9 +18,9 @@ test("portfolio uses canonical marks and shared signed position projection", asy
   const view = build(snapshot,instruments,"2026-11-25T09:31:00Z");
   assert.equal(view.positions.length,3);
   assert.equal(view.holdings.length,1);
-  assert.equal(view.realizedPnlPaise,1300);
+  assert.equal(view.realizedPnlPaise,1600);
   assert.equal(view.unrealizedPnlPaise,17000);
-  assert.equal(view.totalPnlPaise,18300);
+  assert.equal(view.totalPnlPaise,18600);
   assert.equal(view.positions.find(p=>p.assetClass==="FUTURE").unrealizedPnlPaise,2000);
   assert.equal(view.ledgerReconciled,false);
 });
