@@ -145,7 +145,7 @@ test("officially bound option positions and enriched quote metadata pass portfol
  const [p]=buildLongOptionPortfolioPositions([optionRow()],[optionMaster()]);
  const enrichedQuote=quote({instrumentKey:p.instrumentKey,expiry:p.expiry,instrumentType:p.instrumentType,optionType:p.optionType,strikePaise:p.strikePaise});
  const result=calculateDerivativePortfolio({positions:[p],quotes:[enrichedQuote],now});
- assert.equal(result.positions[0].valuationStatus,undefined);
+ assert.equal(result.valuationStatus,"fresh");
  assert.equal(result.marketValuePaise,175000);
  assert.equal(result.unrealizedPnlPaise,50000);
  assert.equal(result.positions[0].marketPricePaise,7000);
