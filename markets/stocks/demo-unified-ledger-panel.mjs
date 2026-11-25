@@ -142,7 +142,6 @@ export async function appendUnifiedLedgerSummary(container, screen) {
         const mark=marks.get(position.instrumentKey);
         const valid=isUsablePortfolioMark(mark);
         const unrealized=valid?(mark.pricePaise-position.averagePricePaise)*position.quantity:null;
-        const markValue=valid?mark.pricePaise*position.quantity:null;
         return [
           position.assetClass,symbols.get(position.instrumentKey)||position.symbol||position.instrumentKey,
           position.product,position.quantity,money(position.averagePricePaise),
