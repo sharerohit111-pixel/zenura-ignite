@@ -99,7 +99,7 @@ export async function mountEquityDemo(container){
    const q=Number(quantity.value);if(!Number.isSafeInteger(q)||q<1||q>1000000)throw new Error("Enter a valid whole-share quantity.");
    const request={instrumentKey:engine.snapshot().valuation.instrumentKey,side:side.value,orderType:type.value,product:product.value,quantity:q,idempotencyKey:"equity-demo-"+String(++orderSequence).padStart(8,"0")};
    if(type.value==="LIMIT"){request.limitPricePaise=parsePrice(limit.value);if(!request.limitPricePaise)throw new Error("Enter a valid LIMIT price in rupees.");}
-   const order=ledgerBridge.submitOrder(request).order;activeOrderId=order.orderId;status.textContent="Order accepted · "+order.orderId+" · canonical ledger events: "+ledgerBridge.snapshot().events.length+". Manual MOCK fill only.";paint();
+   const order=ledgerBridge.submitOrder(request).order;activeOrderId=order.orderId;status.textContent="Order accepted · "+order.orderId+" · canonical ledger events: "+ledgerBridge.snapshot().events.length+". Use a manual fill action to simulate execution (MOCK only).";paint();
   }catch(error){status.textContent=error.message||"Demo order rejected.";}
  });
  match.addEventListener("click",()=>{
