@@ -57,7 +57,8 @@ export async function appendUnifiedLedgerSummary(container, screen) {
   try {
     const {session,marks,symbols}=await getData();
     const snapshot=session.ledger.snapshot();
-    const positions=snapshot.positions.filter(position=>position.quantity!==0 &&
+    const supportedAssets=new Set(["EQUITY","FUTURE","OPTION"]);
+    const positions=snapshot.positions.filter(position=>supportedAssets.has(position.assetClass)&&position.quantity!==0 &&
       (screen!=="holdings" || (position.assetClass==="EQUITY" && position.product==="DELIVERY")));
     if(screen==="trades") {
       const rows=snapshot.fills.slice().sort((a,b)=>a.sequence-b.sequence).map(fill=>[
