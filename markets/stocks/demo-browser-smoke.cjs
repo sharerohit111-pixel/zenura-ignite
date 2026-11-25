@@ -22,8 +22,8 @@ const axePath=require.resolve("axe-core/axe.min.js");
    assert.equal(await page.locator("#screen-nav button[data-screen]").count(),15,viewport.name+" screen count");
    for(const name of ["home","market","watchlists","charts","equity","futures","options","orders","trades","portfolio","positions","holdings","account","profile","settings"]){
     await page.locator('#screen-nav button[data-screen="'+name+'"]').click();
-    await page.locator("#screen-content > .screen-title h2").waitFor();
-    assert.ok(await page.locator("#screen-content > .screen-title h2").isVisible(),viewport.name+" "+name+" heading");
+    await page.locator("#screen-content h2").waitFor();
+    assert.ok(await page.locator("#screen-content h2").isVisible(),viewport.name+" "+name+" heading");
     const overflow=await page.evaluate(()=>document.documentElement.scrollWidth>window.innerWidth+1);
     assert.equal(overflow,false,viewport.name+" horizontal document overflow on "+name);
    }
