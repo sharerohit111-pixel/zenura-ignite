@@ -1,10 +1,10 @@
 "use strict";
 const MAX_QUOTE_AGE_MS=15_000,MAX_MARGIN_AGE_MS=30_000;
 function expiryCutoff(expiry){
- if(typeof expiry!=="string"||!/^\\d{4}-\\d{2}-\\d{2}$/.test(expiry))return NaN;
+ if(typeof expiry!=="string"||!/^\d{4}-\d{2}-\d{2}$/.test(expiry))return NaN;
  const parts=expiry.split("-").map(Number);
  const date=new Date(Date.UTC(parts[0],parts[1]-1,parts[2],10,0,0,0));
- return date.toISOString().slice(0,10)===expiry?date.getTime():NaN;
+ return Number.isFinite(date.getTime())&&date.toISOString().slice(0,10)===expiry?date.getTime():NaN;
 }
 function calculateDerivativePortfolio({positions,quotes,marginSnapshots=[],now=Date.now(),maxQuoteAgeMs=MAX_QUOTE_AGE_MS,maxMarginAgeMs=MAX_MARGIN_AGE_MS}){
  const fail=message=>{throw Object.assign(new Error(message),{status:409});};
