@@ -78,3 +78,39 @@ test("receipt validation does not derive margin, premium, fees or exchange charg
   assert.equal("calculatedMarginPaise" in result.receipt, false);
   assert.equal("calculatedChargesPaise" in result.receipt, false);
 });
+
+test("rejects duplicate receipt IDs and event references from the canonical replay index", () => {
+  const receipt = futureReceipt();
+  assert.throws(() => validate(receipt, {
+    ...context, consumedReceiptIds: [receipt.receiptId]
+  }), /SETTLEMENT_RECEIPT_REPLAY/);
+  assert.throws(() => validate(receipt, {
+    ...context, consumedEventReferences: new Set([receipt.eventReference])
+  }), /SETTLEMENT_EVENT_REPLAY/);
+});
+test("fails closed when the supplied canonical replay index has an invalid shape", () => {
+  assert.throws(() => validate(futureReceipt(), {
+    ...context, consumedReceiptIds: { has: () => false }
+  }), /SETTLEMENT_REPLAY_INDEX_INVALID/);
+});
+test("deep-freezes nested receipt objects so validated accounting facts cannot be mutated", () => {
+  const result = validate(futureReceipt(), context);
+  assert.equal(Object.isFrozen(result), true);
+  assert.equal(Object.isFrozen(result.receipt), true);
+  assert.equal(Object.isFrozen(result.receipt.amounts), true);
+  assert.equal(Object.isFrozen(result.receipt.attestation), true);
+  assert.throws(() => { result.receipt.amounts.blockedDeltaPaise = 1; }, TypeError);
+});
+test("rejects malformed Options fill identifiers", () => {
+  const receipt = {
+    ...futureReceipt({
+      kind: "OPTIONS_FILL_SETTLEMENT", action: "SETTLE", assetClass: "OPTION",
+      fillId: "bad fill id",
+      amounts: { premiumCashDeltaPaise: -1000, chargesCashDeltaPaise: -10, cashDeltaPaise: -1010, blockedDeltaPaise: 0 }
+    }),
+    assetClass: "OPTION"
+  };
+  assert.throws(() => validate(receipt, {
+    ...context, assetClass: "OPTION", fillId: "bad fill id"
+  }), /INVALID_OPTIONS_SETTLEMENT_RECEIPT/);
+});
