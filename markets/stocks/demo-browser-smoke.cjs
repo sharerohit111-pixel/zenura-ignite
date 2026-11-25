@@ -54,8 +54,19 @@ const axePath=require.resolve("axe-core/axe.min.js");
   await page.waitForLoadState("load",{timeout:10000});
   await page.waitForFunction(async()=>{
    const registrations=await navigator.serviceWorker.getRegistrations();
+   return registrations.some(registration=>registration.installing||registration.waiting||registration.active);
+  },null,{timeout:10000});
+  await page.waitForFunction(async()=>{
+   const registrations=await navigator.serviceWorker.getRegistrations();
    return registrations.some(registration=>registration.active?.state==="activated");
-  },null,{timeout:20000});
+  },null,{timeout:20000}).catch(async error=>{
+   const diagnostics=await page.evaluate(async()=>({
+    controller:!!navigator.serviceWorker.controller,
+    registrations:(await navigator.serviceWorker.getRegistrations()).map(registration=>({scope:registration.scope,installing:registration.installing?.state||null,waiting:registration.waiting?.state||null,active:registration.active?.state||null}))
+   }));
+   console.error("PWA registration diagnostics:",JSON.stringify(diagnostics));
+   throw error;
+  });
   console.log("PWA: waiting for service worker activation");
   const workerState=await page.evaluate(async()=>{
    const registrations=await navigator.serviceWorker.getRegistrations();
@@ -76,7 +87,7 @@ const axePath=require.resolve("axe-core/axe.min.js");
   const demoPage=controlledPage;
   await demoPage.waitForFunction(()=>document.querySelector("#demo-status")?.textContent.includes("4 canonical fixtures validated"),null,{timeout:10000});
   const cached=await demoPage.evaluate(async()=>{
-   const cache=await caches.open("zenura-markets-shell-v7");
+   const cache=await caches.open("zenura-markets-shell-v8");
    const paths=["market","account","equity","derivatives"].map(name=>new URL("../../market-gateway/mock/fixtures/"+name+".json",location.href).href);
    const found=[];
    for(const url of paths)found.push({url,found:!!(await cache.match(url))});
