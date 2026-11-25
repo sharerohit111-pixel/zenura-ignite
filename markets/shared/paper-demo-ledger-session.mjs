@@ -17,7 +17,7 @@ export function createPaperDemoLedgerSession({ accountId, cashBalancePaise, bloc
   const ledger = createPaperDemoEventLedger({ accountId, sessionId, cashBalancePaise, blockedFundsPaise });
   let lastTimestamp = -Infinity;
   return Object.freeze({
-    accountId, sessionId, ledger,
+    accountId, sessionId, ledger, openingCashBalancePaise: cashBalancePaise, openingBlockedFundsPaise: blockedFundsPaise,
     nextTimestamp: () => {
       lastTimestamp = Math.max(Date.now(), lastTimestamp + 1);
       return lastTimestamp;
@@ -29,8 +29,8 @@ let sharedSession = null;
 export function getSharedPaperDemoLedgerSession(opening) {
   if (!sharedSession) sharedSession = createPaperDemoLedgerSession(opening);
   else if (sharedSession.accountId !== opening.accountId ||
-      sharedSession.ledger.snapshot().account.openingCashPaise !== opening.cashBalancePaise ||
-      sharedSession.ledger.snapshot().account.blockedFundsPaise !== opening.blockedFundsPaise) {
+      sharedSession.openingCashBalancePaise !== opening.cashBalancePaise ||
+      sharedSession.openingBlockedFundsPaise !== opening.blockedFundsPaise) {
     throw new TypeError("DEMO_LEDGER_SESSION_SCOPE_MISMATCH");
   }
   return sharedSession;
