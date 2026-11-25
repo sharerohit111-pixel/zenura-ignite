@@ -11,6 +11,8 @@ const nav=document.getElementById("screen-nav");
 const screens=["home","market","watchlists","charts","equity","futures","options","orders","trades","portfolio","positions","holdings","account","profile","settings"];
 const titles={home:"Home Overview",market:"Market Snapshot",watchlists:"Watchlists",charts:"Charts & Depth",equity:"Equity Paper Trading",futures:"Futures Paper Trading",options:"Options Paper Trading",orders:"Orders",trades:"Trade History",portfolio:"Portfolio",positions:"Positions",holdings:"Holdings",account:"Virtual Wallet",profile:"Demo Profile",settings:"Settings"};
 let model=null;
+let watchlistCleanup=null;
+let renderGeneration=0;
 const el=(tag,cls,text)=>{const n=document.createElement(tag);if(cls)n.className=cls;if(text!==undefined)n.textContent=String(text);return n;};
 const money=paise=>"₹"+(Number(paise||0)/100).toLocaleString("en-IN",{minimumFractionDigits:2,maximumFractionDigits:2});
 const card=(label,value,detail)=>{const c=el("article","card");c.append(el("h3","",label),el("div","metric",value),el("div","sub",detail||""));return c;};
@@ -111,6 +113,8 @@ function renderMarketDashboard(host){
 }
 function orderRows(orders){return orders.map(o=>{const instrument=model.market.instruments.find(item=>item.instrumentKey===o.instrumentKey);return [o.orderId,o.assetClass,instrument?.symbol||o.instrumentKey,o.side,o.orderType,o.quantity??o.lots,o.status,money(o.averagePricePaise??o.limitPricePaise??0),money(o.chargesPaise??0)];});}
 function render(name){
+ const generation=++renderGeneration;
+ if(watchlistCleanup){watchlistCleanup();watchlistCleanup=null;}
  const a=model.account,equity=model.positions.find(x=>x.assetClass==="EQUITY"),orders=model.orders;
  content.replaceChildren(header(name,"Illustrative values from one validated, versioned Mock JSON view model. Not live exchange data."));
  if(name==="home"){
@@ -124,7 +128,10 @@ function render(name){
   return;
  }
  if(name==="watchlists"){
-  mountPrivateWatchlists(content, { model, el, field, selectControl, money });
+  mountPrivateWatchlists(content, { model, el, field, selectControl, money }).then(cleanup=>{
+   if(generation===renderGeneration)watchlistCleanup=cleanup;
+   else cleanup?.();
+  }).catch(error=>content.append(notice("Private watchlist unavailable: "+(error?.message||"Please retry."))));
   return;
  }
  if(name==="charts"){
