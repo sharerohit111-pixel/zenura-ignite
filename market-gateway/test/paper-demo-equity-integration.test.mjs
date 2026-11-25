@@ -64,7 +64,7 @@ test("PWA caches the simulator and synthetic fixtures; production gateway stays 
     read("market-gateway/server.js"),
     read(".github/workflows/s-trade-fo-demo-ui-integration.yml")
   ]);
-  assert.match(sw, /zenura-markets-shell-v9/);
+  assert.match(sw, /zenura-markets-shell-v10/);
   assert.match(sw, /stocks\/demo-equity-panel\.mjs/);
   assert.match(sw, /stocks\/demo-chart-panel\.mjs/);
   assert.match(sw, /stocks\/demo-chart-data\.mjs/);
@@ -74,7 +74,7 @@ test("PWA caches the simulator and synthetic fixtures; production gateway stays 
   assert.match(sw, /fixtures\/derivatives\.json/);
   assert.match(sw, /fixtures\/equity-execution\.json/);
   assert.match(sw, /SHELL\.includes\(url\.toString\(\)\)/);
-  assert.match(sw, /if\(shellAsset\|\|/);
+  assert.match(sw, /if\(shellAsset\)\{/);
   assert.match(sw, /!url\.pathname\.startsWith\(BASE\.pathname\)&&!shellAsset/);
   const productionBoundary = /paper-demo-adapter|derivative-mock-simulator|paper-mock-fixtures|equity-demo-execution-engine|demo-(equity|chart|derivative)-panel|market-gateway\/mock\/fixtures|equity-execution\.json/;
   assert.doesNotMatch(supabaseGateway, productionBoundary);

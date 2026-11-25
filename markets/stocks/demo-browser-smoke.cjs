@@ -164,18 +164,35 @@ const axePath=require.resolve("axe-core/axe.min.js");
   const demoPage=controlledPage;
   await demoPage.waitForFunction(()=>document.querySelector("#demo-status")?.textContent.includes("4 canonical fixtures validated"),null,{timeout:10000});
   const cached=await demoPage.evaluate(async()=>{
-   const cache=await caches.open("zenura-markets-shell-v9");
+   const cache=await caches.open("zenura-markets-shell-v10");
    const paths=["market","account","equity","derivatives"].map(name=>new URL("../../market-gateway/mock/fixtures/"+name+".json",location.href).href);
    const found=[];
    for(const url of paths)found.push({url,found:!!(await cache.match(url))});
-   return found;
+   return {found,keys:(await cache.keys()).map(request=>request.url)};
   });
-  assert.ok(cached.every(x=>x.found),"all four canonical fixture JSON files must be precached");
+  console.log("PWA fixture cache diagnostics: "+JSON.stringify(cached));
+  assert.ok(cached.found.every(x=>x.found),"all four canonical fixture JSON files must be precached");
   console.log("PWA: validating offline cached fixtures");
   await pwa.setOffline(true);
   await demoPage.reload({waitUntil:"domcontentloaded",timeout:15000});
   await demoPage.waitForFunction(()=>document.querySelector("#demo-status")?.textContent.includes("4 canonical fixtures validated"),null,{timeout:10000});
-  console.log(JSON.stringify({pwa:"offline demo fixture load PASS",cachedFixtures:cached.length}));
+  const offlineScreens=["home","market","watchlists","charts","equity","futures","options","orders","trades","portfolio","positions","holdings","account","profile","settings"];
+  for(const name of offlineScreens){
+   await demoPage.locator('#screen-nav button[data-screen="'+name+'"]').click();
+   await demoPage.locator("#screen-content > .screen-title h2").waitFor();
+   assert.ok(await demoPage.locator("#screen-content > .screen-title h2").isVisible(),"offline screen must render: "+name);
+   const overflow=await demoPage.evaluate(()=>document.documentElement.scrollWidth>window.innerWidth+1);
+   assert.equal(overflow,false,"offline horizontal overflow on "+name);
+  }
+  const cachePolicy=await demoPage.evaluate(async()=>{
+   const cache=await caches.open("zenura-markets-shell-v10");
+   const keys=(await cache.keys()).map(request=>request.url);
+   const privateSegments=["api","auth","account","profile","wallet","orders","positions","holdings"];
+   const privateLike=keys.filter(url=>new URL(url).pathname.split("/").some(segment=>privateSegments.includes(segment.toLowerCase())));
+   return {keys:keys.length,privateLike};
+  });
+  assert.deepEqual(cachePolicy.privateLike,[],"private account API/navigation paths must never enter the static shell cache");
+  console.log(JSON.stringify({pwa:"offline all 15 demo screens PASS",screens:offlineScreens.length,cachedFixtures:cached.found.length,cachePolicy}));
   await pwa.close();
  }finally{
   await browser.close();
