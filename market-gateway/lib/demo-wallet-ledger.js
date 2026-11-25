@@ -146,17 +146,28 @@ function createDemoWalletLedger({ accountId, openingCashPaise, openingEvidenceRe
     const duplicate = (items, key) => items.length !== new Set(items.map(x => x[key])).size;
     const duplicateSourceIds = duplicate(sourceOrders, "orderId") || duplicate(sourceFills, "fillId") ||
       duplicate(sourceReservations, "reservationId");
-    const ledgerOrderIds = new Set(current.events.filter(x => x.orderId).map(x => x.orderId));
-    const ledgerFillIds = new Set(current.settledFillIds);
+    const ledgerOrderFacts = current.events.filter(x => x.orderId);
+    const ledgerFillFacts = current.events.filter(x => x.type === "CASH_MOVEMENT");
+    const ledgerOrderById = new Map();
+    for (const fact of ledgerOrderFacts) {
+      const prior = ledgerOrderById.get(fact.orderId);
+      if (prior && prior !== fact.assetClass) ledgerOrderById.set(fact.orderId, null);
+      else ledgerOrderById.set(fact.orderId, fact.assetClass);
+    }
+    const ledgerFillById = new Map(ledgerFillFacts.map(x => [x.fillId, x]));
     const ledgerReservationIds = new Set(current.reservations.map(x => x.reservationId));
-    const allOrdersReferenced = [...orderIds].every(id => ledgerOrderIds.has(id));
-    const allFillsSettled = [...fillIds].every(id => ledgerFillIds.has(id)) &&
-      [...ledgerFillIds].every(id => fillIds.has(id));
+    const allOrdersReferenced = sourceOrders.every(source =>
+      ASSETS.has(source.assetClass) && ledgerOrderById.get(source.orderId) === source.assetClass);
+    const allFillsSettled = sourceFills.every(source => {
+      const settlement = ledgerFillById.get(source.fillId);
+      return settlement && settlement.orderId === source.orderId && settlement.assetClass === source.assetClass;
+    }) && ledgerFillFacts.length === sourceFills.length;
     const reservationsMatch = reservationIds.size === ledgerReservationIds.size &&
       [...reservationIds].every(id => ledgerReservationIds.has(id)) &&
       sourceReservations.every(source => current.reservations.some(local =>
         local.reservationId === source.reservationId && local.orderId === source.orderId &&
-        local.amountPaise === source.amountPaise && local.assetClass === source.assetClass));
+        local.amountPaise === source.amountPaise && local.assetClass === source.assetClass &&
+        ASSETS.has(source.assetClass) && orderIds.has(source.orderId)));
 
     const evidenceRefs = ["accountSnapshotRef", "ordersSnapshotRef", "fillsSnapshotRef",
       "reservationsSnapshotRef", "eventHistoryRef", "atomicSnapshotAttestationRef"];
@@ -164,7 +175,7 @@ function createDemoWalletLedger({ accountId, openingCashPaise, openingEvidenceRe
     const blockers = [];
     if (!arithmeticMatches) blockers.push("Account cash, blocked and available balances do not match the ledger.");
     if (duplicateSourceIds) blockers.push("Source order, fill or reservation identifiers are duplicated.");
-    if (!allOrdersReferenced) blockers.push("One or more source orders have no canonical wallet ledger reference.");
+    if (!allOrdersReferenced) blockers.push("One or more source orders have no matching asset-scoped canonical wallet ledger reference.");
     if (!allFillsSettled) blockers.push("Source fills and exactly-once cash settlement receipts do not match.");
     if (!reservationsMatch) blockers.push("Active source reservations do not exactly match ledger reservations.");
     if (!evidenceComplete) blockers.push("Required independent snapshot and atomic-consistency evidence references are incomplete.");
