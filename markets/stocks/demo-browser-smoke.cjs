@@ -15,10 +15,12 @@ const axePath=require.resolve("axe-core/axe.min.js");
   for(const viewport of [{width:1440,height:900,name:"desktop"},{width:390,height:844,name:"android-mobile"},{width:360,height:800,name:"small-mobile"}]){
    const context=await browser.newContext({viewport:{width:viewport.width,height:viewport.height},isMobile:viewport.width<500,hasTouch:viewport.width<500,serviceWorkers:"allow"});
    const page=await context.newPage();
-   const pageErrors=[];
+   const pageErrors=[],pageConsole=[];
    page.on("pageerror",error=>pageErrors.push(error.message));
+   page.on("console",message=>{if(message.type()==="error")pageConsole.push(message.text());});
    await page.goto("http://127.0.0.1:4173/markets/stocks/demo.html",{waitUntil:"domcontentloaded",timeout:30000});
-   await page.waitForFunction(()=>document.querySelector("#demo-status")?.textContent.includes("4 canonical fixtures validated"),null,{timeout:10000});
+   try{await page.waitForFunction(()=>document.querySelector("#demo-status")?.textContent.includes("4 canonical fixtures validated"),null,{timeout:10000});}
+   catch(error){const diagnostic=await page.locator("#demo-status").textContent().catch(()=>" (missing status)");throw new Error("Demo fixture bootstrap failed: status="+diagnostic+"; pageErrors="+pageErrors.join(" | ")+"; console="+pageConsole.join(" | ")+"; "+error.message);}
    assert.equal(await page.locator("#screen-nav button[data-screen]").count(),15,viewport.name+" screen count");
    for(const name of ["home","market","watchlists","charts","equity","futures","options","orders","trades","portfolio","positions","holdings","account","profile","settings"]){
     await page.locator('#screen-nav button[data-screen="'+name+'"]').click();
