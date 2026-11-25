@@ -34,7 +34,7 @@ export function createEquityDemoLedgerBridge({ engine, accountId, sessionId, led
       openingProjection.account.blockedFundsPaise !== initial.account.blockedFundsPaise) {
     throw new TypeError("EQUITY_SHARED_LEDGER_OPENING_MISMATCH");
   }
-  let eventSequence = 0, lastTimestamp = -Infinity;
+  let eventSequence = ledger.snapshot().events.filter(event => event.engine === "EQUITY").length, lastTimestamp = -Infinity;
   const submitted = new Map(), executions = new Map(), cancellations = new Map(), rejections = new Map();
 
   function append(type, payload, deltas, sourceKey) {
