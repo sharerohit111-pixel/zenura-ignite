@@ -148,3 +148,12 @@ test("malformed non-ISO timestamps fail closed before mutating lifecycle state",
  assert.equal(s.snapshot().orders[0].status,"PENDING");
  assert.equal(s.exportEvents().length,1);
 });
+
+test("event schema version and allowed event types are required for replay",()=>{
+ const s=createDemoTradeHistoryStore({env:{NODE_ENV:"test"}});
+ s.submit(base());
+ const log=s.exportEvents();
+ assert.equal(log[0].schemaVersion,1);
+ assert.throws(()=>s.replay(log.map(e=>({...e,schemaVersion:2}))),/INVALID_DEMO_EVENT_SCHEMA/);
+ assert.throws(()=>s.replay(log.map(e=>({...e,type:"UNRECOGNIZED"}))),/INVALID_DEMO_EVENT_SCHEMA/);
+});
