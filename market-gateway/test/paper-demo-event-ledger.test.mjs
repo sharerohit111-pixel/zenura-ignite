@@ -252,7 +252,7 @@ test("order status transitions reject terminal-state reopening and preserve part
   const ledger = createPaperDemoEventLedger(opening);
   ledger.append(event());
   const update = (status, suffix) => ledger.append(event({
-    eventId: "evt-" + suffix, idempotencyKey: "idem-" + suffix, sourceEventId: "status-" + suffix,
+    eventId: "evt-status-" + suffix, idempotencyKey: "idem-status-" + suffix, sourceEventId: "status-" + suffix,
     type: "ORDER_UPDATED", occurredAt: "2026-11-25T09:30:0" + (Number(suffix) + 1) + "+05:30",
     deltas: { cashDeltaPaise: 0, blockedDeltaPaise: 0 },
     payload: { ...event().payload, status }
