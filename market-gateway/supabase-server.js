@@ -22,6 +22,7 @@ const {createPaperOptionLimitWorker}=require("./lib/paper-option-limit-worker");
 const {loadVerifiedExchangeSession}=require("./lib/exchange-session-calendar");
 const {buildPortfolioValuation}=require("./lib/paper-portfolio-valuation");
 const {calculateDerivativePortfolio}=require("./lib/derivative-portfolio");
+const {buildLongOptionPortfolioPositions,validateFuturesPortfolioContracts}=require("./lib/derivative-portfolio-input");
 const {validateDerivativeContract,normalizeTickSizePaise}=require("./lib/derivative-contract");
 const {validateOptionLimitOrder,evaluateOptionLimitQuote}=require("./lib/option-limit-policy");
 const {parseMarginPreviewInput}=require("./lib/margin-preview-input");
@@ -822,8 +823,10 @@ app.get("/paper/derivatives/portfolio",async(req,res)=>{
     ]);
     if(accountError||!account)return res.status(404).json({error:"Indian paper account has not been initialized."});
     if(positionError)throw Object.assign(new Error("Derivative positions could not be loaded."),{status:503});
-    const positions=(rows||[]).map(p=>({instrumentKey:p.instrument_key,instrumentType:p.instrument_type,netQuantity:p.net_quantity,averagePricePaise:p.average_price_paise,costBasisPaise:p.cost_basis_paise}));
-    if(!positions.length)return res.set("Cache-Control","private, no-store").json({positions:[],cashPaise:account.cash_paise,marketValuePaise:0,unrealizedPnlPaise:0,reservedMarginPaise:0,realizedPnlPaise:account.realized_pnl_paise||0,valuationStatus:"no_open_positions",simulationOnly:true,includesEntryCharges:true,excludesEstimatedExitCharges:true});
+    if(!rows?.length)return res.set("Cache-Control","private, no-store").json({positions:[],cashPaise:account.cash_paise,marketValuePaise:0,unrealizedPnlPaise:0,reservedMarginPaise:0,realizedPnlPaise:account.realized_pnl_paise||0,valuationStatus:"no_open_positions",simulationOnly:true,includesEntryCharges:true,excludesEstimatedExitCharges:true});
+    if(!instrumentCache.length||Date.now()-instrumentCacheUpdatedAt>6*60*60*1000)await refreshInstrumentCache();
+    const positions=buildLongOptionPortfolioPositions(rows,instrumentCache);
+    if(positions.length>50)throw Object.assign(new Error("More than 50 open derivative positions; valuation stopped."),{status:409});
     const {token}=await getUpstoxAccessToken(user.id),keys=positions.map(p=>p.instrumentKey);
     const upstream=await fetchProvider("https://api.upstox.com/v3/market-quote/quotes?"+new URLSearchParams({instrument_key:keys.join(",")}),{headers:{Authorization:"Bearer "+token,Accept:"application/json"}});
     const payload=await readProviderJson(upstream);
@@ -832,7 +835,8 @@ app.get("/paper/derivatives/portfolio",async(req,res)=>{
     for(const p of positions){
       const entry=Object.values(payload?.data||{}).find(x=>x?.instrument_token===p.instrumentKey);
       const q=normalizeProviderQuote(entry,p.instrumentKey,{maxAgeMs:15000});
-      quotes.push({instrumentKey:p.instrumentKey,pricePaise:q.pricePaise,observedAtMs:q.tradeTimeMs});
+      quotes.push({instrumentKey:p.instrumentKey,pricePaise:q.pricePaise,observedAtMs:q.tradeTimeMs,
+        expiry:p.expiry,instrumentType:p.instrumentType,optionType:p.optionType,strikePaise:p.strikePaise});
     }
     const valuation=calculateDerivativePortfolio({positions,quotes,now:Date.now()});
     res.set("Cache-Control","private, no-store").json({...valuation,cashPaise:account.cash_paise,realizedPnlPaise:account.realized_pnl_paise||0,simulationOnly:true,includesEntryCharges:true,excludesEstimatedExitCharges:true});
@@ -1058,22 +1062,33 @@ app.get("/paper/futures/portfolio",async(req,res)=>{
     if(positionError)throw Object.assign(new Error("Futures positions could not be loaded."),{status:503});
     const positions=rows||[];
     if(!positions.length)return res.set("Cache-Control","private, no-store").json({positions:[],cashPaise:account.cash_paise,marketValuePaise:0,unrealizedPnlPaise:0,reservedMarginPaise:account.reserved_margin_paise||0,realizedPnlPaise:account.realized_pnl_paise||0,valuationStatus:"no_open_positions",marginStatus:"none",simulationOnly:true});
+    if(!instrumentCache.length||Date.now()-instrumentCacheUpdatedAt>6*60*60*1000)await refreshInstrumentCache();
+    const contractByKey=validateFuturesPortfolioContracts(positions,instrumentCache);
     const {token}=await getUpstoxAccessToken(user.id);
     const keys=positions.map(p=>p.instrument_key);
     const quoteResponse=await fetchProvider("https://api.upstox.com/v3/market-quote/quotes?"+new URLSearchParams({instrument_key:keys.join(",")}),{headers:{Authorization:"Bearer "+token,Accept:"application/json"}});
     const quotePayload=await readProviderJson(quoteResponse);
     if(!quoteResponse.ok)throw upstoxHttpError(quoteResponse);
     const entries=Object.values(quotePayload?.data||{}),now=Date.now();
-    let unrealizedPnlPaise=0,stalePositions=0;
+    let unrealizedPnlPaise=0,stalePositions=0,expiredPositions=0;
     const valued=positions.map(p=>{
+      const contract=contractByKey.get(p.instrument_key);
+      const common={instrumentKey:p.instrument_key,tradingSymbol:p.trading_symbol,exchange:p.exchange,expiry:p.expiry,product:p.product,netQuantity:p.net_quantity,averagePricePaise:p.average_price_paise,marginReservedPaise:p.reserved_margin_paise};
+      if(now>=contract.expiryCutoffMs){
+        expiredPositions++;
+        return {...common,marketPricePaise:null,unrealizedPnlPaise:null,valuationStatus:"expired"};
+      }
       const entry=entries.find(x=>x?.instrument_token===p.instrument_key);
       let q=null;try{q=normalizeProviderQuote(entry,p.instrument_key,{now,maxAgeMs:15000});}catch(_){}
-      if(!q){stalePositions++;return {instrumentKey:p.instrument_key,tradingSymbol:p.trading_symbol,netQuantity:p.net_quantity,averagePricePaise:p.average_price_paise,marketPricePaise:null,unrealizedPnlPaise:null,marginReservedPaise:p.reserved_margin_paise,valuationStatus:"stale_or_unavailable"};}
+      if(!q){stalePositions++;return {...common,marketPricePaise:null,unrealizedPnlPaise:null,valuationStatus:"stale_or_unavailable"};}
       const pnl=(q.pricePaise-p.average_price_paise)*p.net_quantity;
+      if(!Number.isSafeInteger(pnl))throw Object.assign(new Error("Futures portfolio P&L exceeds safe calculation limits."),{status:409});
       unrealizedPnlPaise+=pnl;
-      return {instrumentKey:p.instrument_key,tradingSymbol:p.trading_symbol,exchange:p.exchange,expiry:p.expiry,product:p.product,netQuantity:p.net_quantity,averagePricePaise:p.average_price_paise,marketPricePaise:q.pricePaise,unrealizedPnlPaise:pnl,marginReservedPaise:p.reserved_margin_paise,quoteAgeMs:q.quoteAgeMs,valuationStatus:"fresh"};
+      if(!Number.isSafeInteger(unrealizedPnlPaise))throw Object.assign(new Error("Futures portfolio totals exceed safe calculation limits."),{status:409});
+      return {...common,marketPricePaise:q.pricePaise,unrealizedPnlPaise:pnl,quoteAgeMs:q.quoteAgeMs,valuationStatus:"fresh"};
     });
-    res.set("Cache-Control","private, no-store").json({positions:valued,cashPaise:account.cash_paise,marketValuePaise:0,unrealizedPnlPaise:stalePositions?null:unrealizedPnlPaise,reservedMarginPaise:account.reserved_margin_paise||0,realizedPnlPaise:account.realized_pnl_paise||0,equityPaise:stalePositions?null:account.cash_paise+unrealizedPnlPaise,valuationStatus:stalePositions?"partial_stale":"fresh",stalePositions,marginStatus:"entry_estimate",simulationOnly:true});
+    const unavailablePositions=stalePositions+expiredPositions;
+    res.set("Cache-Control","private, no-store").json({positions:valued,cashPaise:account.cash_paise,marketValuePaise:0,unrealizedPnlPaise:unavailablePositions?null:unrealizedPnlPaise,reservedMarginPaise:account.reserved_margin_paise||0,realizedPnlPaise:account.realized_pnl_paise||0,equityPaise:unavailablePositions?null:account.cash_paise+unrealizedPnlPaise,valuationStatus:expiredPositions?"expired_or_partial_unavailable":stalePositions?"partial_stale":"fresh",stalePositions,expiredPositions,marginStatus:"entry_estimate",simulationOnly:true});
   }catch(error){sendError(res,error,"Futures portfolio could not be loaded.");}
 });
 
