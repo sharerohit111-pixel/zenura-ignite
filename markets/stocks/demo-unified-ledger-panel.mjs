@@ -1,6 +1,42 @@
 import { getSharedPaperDemoLedgerSession } from "../shared/paper-demo-ledger-session.mjs";
 
 let dataPromise = null;
+
+export const EQUITY_MARK_MAX_AGE_MS = 60_000;
+export const DERIVATIVE_MARK_MAX_AGE_MS = 15_000;
+export const EQUITY_MARK_MAX_FUTURE_SKEW_MS = 5_000;
+
+export function createPortfolioMark(pricePaise, timestamp, {
+  explicitStale = false, envelopeStale = false, now = Date.now(),
+  maxAgeMs, maxFutureSkewMs = 0
+} = {}) {
+  const time = typeof timestamp === "number" ? timestamp : Date.parse(timestamp);
+  const priceValid = Number.isSafeInteger(pricePaise) && pricePaise > 0;
+  const timeValid = Number.isFinite(time) && time > 0 && Number.isFinite(now) &&
+    Number.isFinite(maxAgeMs) && maxAgeMs >= 0 && Number.isFinite(maxFutureSkewMs) && maxFutureSkewMs >= 0;
+  const ageMs = timeValid ? now - time : null;
+  const stale = explicitStale === true || envelopeStale === true || !priceValid || !timeValid ||
+    ageMs > maxAgeMs || ageMs < -maxFutureSkewMs;
+  return { pricePaise: priceValid ? pricePaise : null, timestamp: timeValid ? time : null, stale };
+}
+
+export function isUsablePortfolioMark(mark) {
+  return Boolean(mark && Number.isSafeInteger(mark.pricePaise) && mark.pricePaise > 0 &&
+    mark.stale === false && Number.isFinite(mark.timestamp));
+}
+
+export function calculateAggregateUnrealized(positions, marks) {
+  let value = 0;
+  for (const position of positions) {
+    const mark = marks.get(position.instrumentKey);
+    if (!isUsablePortfolioMark(mark) || !Number.isSafeInteger(position.quantity) ||
+        !Number.isSafeInteger(position.averagePricePaise)) return { complete: false, value: null };
+    const pnl = (mark.pricePaise - position.averagePricePaise) * position.quantity;
+    if (!Number.isSafeInteger(pnl) || !Number.isSafeInteger(value + pnl)) return { complete: false, value: null };
+    value += pnl;
+  }
+  return { complete: true, value };
+}
 const money = value => Number.isSafeInteger(value)
   ? "₹" + (value / 100).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
   : "—";
@@ -34,20 +70,21 @@ async function getData() {
       blockedFundsPaise:accountEnvelope.data.blockedFundsPaise
     });
     const marks=new Map();
-    const validMark=(price,timestamp,stale=false,envelopeStale=false) => {
-      const time=Date.parse(timestamp);
-      return {pricePaise:Number.isSafeInteger(price)&&price>0?price:null,
-        timestamp:Number.isFinite(time)?time:null,
-        stale:stale===true||envelopeStale===true||!Number.isFinite(time)||time>Date.now()};
-    };
     marks.set(equityEnvelope.data.instrument.instrumentKey,
-      validMark(equityEnvelope.data.instrument.markPricePaise,equityEnvelope.asOf,
-        equityEnvelope.meta?.stale===true,equityEnvelope.meta?.stale===true));
+      createPortfolioMark(equityEnvelope.data.instrument.markPricePaise,equityEnvelope.asOf,{
+        explicitStale:equityEnvelope.meta?.stale===true,
+        envelopeStale:equityEnvelope.meta?.stale===true,
+        maxAgeMs:EQUITY_MARK_MAX_AGE_MS,
+        maxFutureSkewMs:EQUITY_MARK_MAX_FUTURE_SKEW_MS
+      }));
     for(const quote of derivativeEnvelope.data.quotes) {
       const midpoint=Number.isSafeInteger(quote.bidPricePaise)&&Number.isSafeInteger(quote.askPricePaise)
         ? Math.round((quote.bidPricePaise+quote.askPricePaise)/2) : null;
-      marks.set(quote.instrumentKey,validMark(midpoint,quote.timestamp,
-        quote.stale===true,derivativeEnvelope.meta?.stale===true));
+      marks.set(quote.instrumentKey,createPortfolioMark(midpoint,quote.timestamp,{
+        explicitStale:quote.stale===true,
+        envelopeStale:derivativeEnvelope.meta?.stale===true,
+        maxAgeMs:DERIVATIVE_MARK_MAX_AGE_MS
+      }));
     }
     const symbols=new Map();
     for(const contract of derivativeEnvelope.data.contracts) symbols.set(contract.instrumentKey,contract.symbol);
@@ -89,16 +126,11 @@ export async function appendUnifiedLedgerSummary(container, screen) {
       table(host,["ORDER ID","ASSET","INSTRUMENT","PRODUCT","SIDE","TYPE","QTY","FILLED / REMAINING","AVG FILL","STATUS"],rows,
         "No shared Demo orders yet.");
     } else {
-      let allMarksValid=true;
-      let aggregateUnrealized=0;
       const rows=positions.map(position=>{
         const mark=marks.get(position.instrumentKey);
-        const valid=mark && Number.isSafeInteger(mark.pricePaise) && mark.pricePaise>0 &&
-          mark.stale===false && Number.isFinite(mark.timestamp) && mark.timestamp<=Date.now();
+        const valid=isUsablePortfolioMark(mark);
         const unrealized=valid?(mark.pricePaise-position.averagePricePaise)*position.quantity:null;
         const markValue=valid?mark.pricePaise*position.quantity:null;
-        if(valid) aggregateUnrealized+=unrealized;
-        else allMarksValid=false;
         return [
           position.assetClass,symbols.get(position.instrumentKey)||position.symbol||position.instrumentKey,
           position.product,position.quantity,money(position.averagePricePaise),
@@ -108,8 +140,9 @@ export async function appendUnifiedLedgerSummary(container, screen) {
       });
       table(host,["ASSET","INSTRUMENT","PRODUCT","NET QTY","AVG PRICE","MOCK MARK","COST BASIS","MARK VALUE","REALIZED P&L","UNREALIZED P&L"],rows,
         screen==="holdings"?"No Equity Delivery holdings yet.":"No shared Demo positions yet.");
+      const aggregate=calculateAggregateUnrealized(positions,marks);
       host.append(el("p","demo-eq-disclaimer","Aggregate unrealized P&L: "+
-        (allMarksValid?money(aggregateUnrealized):"Unavailable (one or more marks missing/stale)")+
+        (aggregate.complete?money(aggregate.value):"Unavailable (one or more marks missing/stale)")+
         " · Aggregate realized P&L: "+money(positions.reduce((sum,p)=>sum+p.realizedPnlPaise,0))));
     }
     const totals=el("div","demo-eq-disclaimer",
