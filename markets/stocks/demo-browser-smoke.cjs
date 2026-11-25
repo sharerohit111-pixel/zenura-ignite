@@ -15,10 +15,17 @@ const axePath=require.resolve("axe-core/axe.min.js");
   for(const viewport of [{width:1440,height:900,name:"desktop"},{width:390,height:844,name:"android-mobile"},{width:360,height:800,name:"small-mobile"}]){
    const context=await browser.newContext({viewport:{width:viewport.width,height:viewport.height},isMobile:viewport.width<500,hasTouch:viewport.width<500,serviceWorkers:"allow"});
    const page=await context.newPage();
-   const pageErrors=[];
+   const pageErrors=[],consoleErrors=[],failedRequests=[];
    page.on("pageerror",error=>pageErrors.push(error.message));
+   page.on("console",message=>{if(message.type()==="error")consoleErrors.push(message.text());});
+   page.on("requestfailed",request=>failedRequests.push({url:request.url(),error:request.failure()?.errorText||"request failed"}));
    await page.goto("http://127.0.0.1:4173/markets/stocks/demo.html",{waitUntil:"domcontentloaded",timeout:30000});
-   await page.waitForFunction(()=>document.querySelector("#demo-status")?.textContent.includes("4 canonical fixtures validated"),null,{timeout:10000});
+   try{
+    await page.waitForFunction(()=>document.querySelector("#demo-status")?.textContent.includes("4 canonical fixtures validated"),null,{timeout:10000});
+   }catch(error){
+    const diagnostic=await page.evaluate(()=>({status:document.querySelector("#demo-status")?.textContent||"missing",readyState:document.readyState,fixtureFetches:performance.getEntriesByType("resource").filter(x=>x.name.includes("/market-gateway/mock/fixtures/")).map(x=>({url:x.name,duration:Math.round(x.duration),transferSize:x.transferSize}))}));
+    throw new Error("Demo fixture readiness failed: "+JSON.stringify({diagnostic,pageErrors,consoleErrors,failedRequests})+"; "+error.message);
+   }
    assert.equal(await page.locator("#screen-nav button[data-screen]").count(),15,viewport.name+" screen count");
    for(const name of ["home","market","watchlists","charts","equity","futures","options","orders","trades","portfolio","positions","holdings","account","profile","settings"]){
     await page.locator('#screen-nav button[data-screen="'+name+'"]').click();
