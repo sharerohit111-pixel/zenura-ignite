@@ -73,3 +73,24 @@ test("Demo controls retain native labels, mobile breakpoints and PWA shell cover
   assert.match(sw, /stocks\/derivative-mock-simulator\.js/);
   assert.match(sw, /mock\/fixtures\/derivatives\.json/);
 });
+
+test("PWA shell serves explicitly cached root-level Demo assets offline and rejects private navigations", async () => {
+  const sw = await read("markets/service-worker.js");
+  assert.ok(sw.includes("const shellAsset=SHELL.includes(url.toString())"));
+  assert.ok(sw.includes("!url.pathname.startsWith(BASE.pathname)&&!shellAsset"));
+  assert.ok(sw.includes("if(request.mode===\\"navigate\\"){"));
+  assert.ok(sw.includes("if(!shellAsset)return;"), "non-allowlisted navigation must never enter the offline cache");
+  assert.ok(sw.includes('url.pathname.endsWith(".webmanifest")'));
+  assert.ok(sw.includes('"../market-gateway/lib/derivative-position.js"'));
+  assert.ok(sw.includes('"../market-gateway/mock/fixtures/derivatives.json"'));
+});
+
+test("PWA shell cache manifest contains no duplicate request URLs", async () => {
+  const sw = await read("markets/service-worker.js");
+  const match = sw.match(/const SHELL=\\[([\\s\\S]*?)\\]\\.map\\(path=>new URL\\(path,BASE\\)\\.toString\\(\\);/);
+  assert.ok(match, "service-worker shell manifest must remain statically auditable");
+  const paths = [...match[1].matchAll(/"([^"]*)"/g)].map(entry => entry[1]);
+  assert.ok(paths.length > 0, "PWA shell must include assets");
+  assert.equal(new Set(paths).size, paths.length, "cache.addAll must not receive duplicate asset URLs");
+});
+
