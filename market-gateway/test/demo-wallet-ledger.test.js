@@ -82,8 +82,8 @@ test("audit checks source orders, fills, reservations and balance arithmetic but
   const result = ledger.audit({
     accountSnapshot: { accountId: "mock-account-user-a", cashBalancePaise: 99750000,
       blockedFundsPaise: 0, availableFundsPaise: 99750000 },
-    sourceOrders: [{ orderId: "order-1" }],
-    sourceFills: [{ fillId: "fill-1" }],
+    sourceOrders: [{ orderId: "order-1", assetClass: "EQUITY" }],
+    sourceFills: [{ fillId: "fill-1", orderId: "order-1", assetClass: "EQUITY" }],
     sourceReservations: [],
     evidence: { accountSnapshotRef: "a", ordersSnapshotRef: "o", fillsSnapshotRef: "f",
       reservationsSnapshotRef: "r", eventHistoryRef: "h", atomicSnapshotAttestationRef: "atomic" }
@@ -113,4 +113,21 @@ test("supports explicit Equity, Futures and Options reservation provenance witho
   assert.equal(ledger.snapshot().blockedFundsPaise, 3000);
   assert.equal(ledger.snapshot().reservations.length, 3);
   assert.equal(ledger.snapshot().ledgerReconciled, false);
+});
+
+test("audit rejects cross-asset source substitution and missing settlement receipts", () => {
+  const ledger = create();
+  ledger.append(event());
+  const base = {
+    accountSnapshot: { accountId: "mock-account-user-a", cashBalancePaise: 99750000,
+      blockedFundsPaise: 0, availableFundsPaise: 99750000 },
+    sourceOrders: [{ orderId: "order-1", assetClass: "FUTURE" }],
+    sourceFills: [{ fillId: "fill-1", orderId: "order-1", assetClass: "FUTURE" }],
+    sourceReservations: [],
+    evidence: {}
+  };
+  const result = ledger.audit(base);
+  assert.equal(result.allOrdersReferenced, false);
+  assert.equal(result.allFillsSettled, false);
+  assert.equal(result.ledgerReconciled, false);
 });
