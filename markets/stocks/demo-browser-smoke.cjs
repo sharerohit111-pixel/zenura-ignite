@@ -18,7 +18,7 @@ const axePath=require.resolve("axe-core/axe.min.js");
    const pageErrors=[];
    page.on("pageerror",error=>pageErrors.push(error.message));
    await page.goto("http://127.0.0.1:4173/markets/stocks/demo.html",{waitUntil:"domcontentloaded",timeout:30000});
-   await page.waitForFunction(()=>document.querySelector("#demo-status")?.textContent.includes("4 canonical fixtures validated"),null,{timeout:10000});
+   try{await page.waitForFunction(()=>document.querySelector("#demo-status")?.textContent.includes("4 canonical fixtures validated"),null,{timeout:10000});}catch(error){const diagnostic=await page.locator("#demo-status").textContent().catch(()=>"<missing #demo-status>");throw new Error(viewport.name+" fixture boot failed: "+diagnostic+"; page errors: "+pageErrors.join(" | ")+"; "+error.message);}
    assert.equal(await page.locator("#screen-nav button[data-screen]").count(),15,viewport.name+" screen count");
    for(const name of ["home","market","watchlists","charts","equity","futures","options","orders","trades","portfolio","positions","holdings","account","profile","settings"]){
     await page.locator('#screen-nav button[data-screen="'+name+'"]').click();
@@ -55,8 +55,10 @@ const axePath=require.resolve("axe-core/axe.min.js");
   await page.waitForLoadState("load",{timeout:10000});
   try{
    await page.waitForFunction(async()=>{
-    const registrations=await navigator.serviceWorker.getRegistrations();
-    return registrations.some(registration=>registration.active?.state==="activated");
+    try{
+     const registration=await navigator.serviceWorker.ready;
+     return registration.active?.state==="activated";
+    }catch(_){return false;}
    },null,{timeout:20000});
   }catch(error){
    const state=await page.evaluate(async()=>({controller:!!navigator.serviceWorker.controller,registrations:(await navigator.serviceWorker.getRegistrations()).map(r=>({scope:r.scope,installing:r.installing?.state||null,waiting:r.waiting?.state||null,active:r.active?.state||null}))}));
@@ -64,9 +66,8 @@ const axePath=require.resolve("axe-core/axe.min.js");
   }
   console.log("PWA: waiting for service worker activation");
   const workerState=await page.evaluate(async()=>{
-   const registrations=await navigator.serviceWorker.getRegistrations();
-   const registration=registrations.find(item=>item.active?.state==="activated");
-   return {state:registration?.active?.state||"missing",scope:registration?.scope||null};
+   const registration=await navigator.serviceWorker.ready;
+   return {state:registration.active?.state||"missing",scope:registration.scope};
   });
   assert.equal(workerState.state,"activated","service worker must be active before controlled reload");
   console.log(JSON.stringify({pwaWorker:workerState.state,scope:workerState.scope}));

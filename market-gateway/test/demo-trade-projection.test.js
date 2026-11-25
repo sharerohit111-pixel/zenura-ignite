@@ -30,7 +30,31 @@ test("Equity and Futures events share one idempotent projection",async()=>{
  assert.equal(rejectedProjection.orders.find(o=>o.orderId==="MOCK-FO-000002").status,"REJECTED");
  assert.equal(rejectedProjection.orders.find(o=>o.orderId==="MOCK-FO-000002").rejectionReason,"Insufficient deterministic depth");
  const combined=sync("DERIVATIVES",derivatives);
- assert.equal(combined.orders.length,3);assert.equal(combined.trades.length,2);
+ assert.equal(combined.orders.length,4);assert.equal(combined.trades.length,4);
  assert.equal(combined.positions.find(p=>p.assetClass==="FUTURE").quantity,-2);
+ const replayed=sync("DERIVATIVES",derivatives);
+ assert.equal(replayed.orders.length,combined.orders.length);
+ assert.equal(replayed.trades.length,combined.trades.length);
+ assert.deepEqual(replayed.positions,combined.positions);
  assert.deepEqual(history.createDemoTradeHistoryStore({env:{NODE_ENV:"test"}}).replay([]),{mode:"DEMO",provider:"DUMMY_JSON",simulationOnly:true,orders:[],openOrders:[],trades:[],positions:[],events:[]});
+});
+
+test("accepted/open aliases normalize to pending and cancelled spelling aliases stay canonical",async()=>{
+ if(!sync){({syncDemoProjection:sync}=await import("../../markets/stocks/demo-trade-projection.mjs"));}
+ const input={orders:[
+  {orderId:"ALIAS-EQ-ACCEPTED-001",side:"BUY",orderType:"MARKET",product:"DELIVERY",instrumentKey:"MOCK|NSE|EQ|0002",quantity:1,status:"ACCEPTED",createdAt:"2026-11-25T09:20:00.000Z",updatedAt:"2026-11-25T09:20:00.000Z"},
+  {orderId:"ALIAS-EQ-CANCELLED-001",side:"BUY",orderType:"LIMIT",product:"DELIVERY",instrumentKey:"MOCK|NSE|EQ|0003",quantity:1,limitPricePaise:10000,status:"CANCELED",createdAt:"2026-11-25T09:21:00.000Z",updatedAt:"2026-11-25T09:21:01.000Z"}
+ ],fills:[]};
+ const result=sync("EQUITY",input);
+ assert.equal(result.orders.find(x=>x.orderId==="ALIAS-EQ-ACCEPTED-001").status,"PENDING");
+ assert.equal(result.orders.find(x=>x.orderId==="ALIAS-EQ-CANCELLED-001").status,"CANCELLED");
+});
+
+
+test("projection rejects malformed source timestamps instead of coercing them to the Unix epoch",async()=>{
+ if(!sync){({syncDemoProjection:sync}=await import("../../markets/stocks/demo-trade-projection.mjs"));}
+ const invalidOrder={orders:[{orderId:"BAD-TIME-ORDER-001",side:"BUY",orderType:"MARKET",product:"DELIVERY",instrumentKey:"MOCK|NSE|EQ|0099",quantity:1,status:"ACCEPTED",createdAt:"not-a-date",updatedAt:"not-a-date"}],fills:[]};
+ assert.throws(()=>sync("EQUITY",invalidOrder),/INVALID_DEMO_EVENT_TIMESTAMP/);
+ const invalidFill={orders:[{orderId:"BAD-TIME-FILL-001",side:"BUY",orderType:"MARKET",product:"DELIVERY",instrumentKey:"MOCK|NSE|EQ|0098",quantity:1,status:"FILLED",createdAt:"2026-11-25T09:30:00.000Z",updatedAt:"2026-11-25T09:30:01.000Z"}],fills:[{fillId:"bad-time-fill-001",orderId:"BAD-TIME-FILL-001",quantity:1,pricePaise:10000,filledAt:"not-a-date"}]};
+ assert.throws(()=>sync("EQUITY",invalidFill),/INVALID_DEMO_EVENT_TIMESTAMP/);
 });

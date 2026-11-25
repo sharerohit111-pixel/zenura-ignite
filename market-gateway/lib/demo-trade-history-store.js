@@ -1,5 +1,6 @@
 "use strict";
 
+(function(){
 const OPEN = new Set(["PENDING", "PARTIALLY_FILLED"]);
 const TERMINAL = new Set(["FILLED", "CANCELLED", "REJECTED", "EXPIRED"]);
 const ASSETS = new Set(["EQUITY", "FUTURE", "OPTION"]);
@@ -98,7 +99,9 @@ function createDemoTradeHistoryStore(options = {}) {
     return {cancelled:true,duplicate:false,order:clone(order)};
   }
   function snapshot() {
-    const orderList = [...orders.values()].map(clone), tradeList = [...fills.values()].map(clone), positions = new Map();
+    const orderList = [...orders.values()].map(clone).sort((a,b)=>Date.parse(a.createdAt)-Date.parse(b.createdAt)||a.orderId.localeCompare(b.orderId));
+    const tradeList = [...fills.values()].map(clone).sort((a,b)=>Date.parse(a.filledAt)-Date.parse(b.filledAt)||a.fillId.localeCompare(b.fillId));
+    const positions = new Map();
     for (const trade of tradeList) {
       const key = keyOf(trade.assetClass,trade.product,trade.instrumentKey);
       const p = positions.get(key) || {assetClass:trade.assetClass,product:trade.product,instrumentKey:trade.instrumentKey,
@@ -148,3 +151,5 @@ function createDemoTradeHistoryStore(options = {}) {
 const api = {createDemoTradeHistoryStore};
 if (typeof module === "object" && module.exports) module.exports = api;
 if (typeof window !== "undefined") window.ZenuraDemoTradeHistory = api;
+
+})();
