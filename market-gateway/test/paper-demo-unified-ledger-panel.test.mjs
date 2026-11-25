@@ -64,9 +64,9 @@ test("aggregate unrealized P&L is withheld when any open position lacks a fresh 
     ["EQ1", createPortfolioMark(120, now, { now, maxAgeMs: 60_000 })],
     ["FUT1", createPortfolioMark(550, now, { now, maxAgeMs: 15_000 })]
   ]);
-  assert.deepEqual(calculateAggregateUnrealized(positions, marks), { complete: true, value: 300 });
+  assert.deepEqual(calculateAggregateUnrealized(positions, marks, now), { complete: true, value: 300 });
   marks.set("FUT1", createPortfolioMark(550, now - 15_001, { now, maxAgeMs: 15_000 }));
-  assert.deepEqual(calculateAggregateUnrealized(positions, marks), { complete: false, value: null });
+  assert.deepEqual(calculateAggregateUnrealized(positions, marks, now), { complete: false, value: null });
   marks.delete("FUT1");
   assert.deepEqual(calculateAggregateUnrealized(positions, marks), { complete: false, value: null });
 });
@@ -76,8 +76,8 @@ test("Futures notional is not presented as ordinary portfolio market value", asy
   const now = 1_800_000_000_000;
   const fresh = createPortfolioMark(2500000, now, { now, maxAgeMs: 15000 });
   assert.equal(portfolioMarketValueDisplay({ assetClass: "FUTURE", quantity: 25 }, fresh), "Not applicable (Futures MTM)");
-  assert.equal(portfolioMarketValueDisplay({ assetClass: "OPTION", quantity: 25 }, fresh), "₹6,25,000.00");
-  assert.equal(portfolioMarketValueDisplay({ assetClass: "EQUITY", quantity: 10 }, null), "—");
+  assert.equal(portfolioMarketValueDisplay({ assetClass: "OPTION", quantity: 25 }, fresh, now), "₹6,25,000.00");
+  assert.equal(portfolioMarketValueDisplay({ assetClass: "EQUITY", quantity: 10 }, null, now), "—");
 });
 
 test("account realized P&L includes closed positions no longer present in open positions", async () => {
@@ -199,7 +199,7 @@ test("cached Equity and derivative marks expire against advancing runtime time",
     ["EQ-EXPIRY", equity],
     ["FUT-EXPIRY", derivative]
   ]);
-  assert.deepEqual(calculateAggregateUnrealized(positions, marks, now), { complete: true, value: 0 });
+  assert.deepEqual(calculateAggregateUnrealized(positions, marks, now), { complete: true, value: 5000 });
   assert.deepEqual(calculateAggregateUnrealized(positions, marks, now + DERIVATIVE_MARK_MAX_AGE_MS + 1),
     { complete: false, value: null });
   assert.deepEqual(calculateAggregateUnrealized(positions, marks, now + EQUITY_MARK_MAX_AGE_MS + 1),
@@ -213,6 +213,6 @@ test("runtime mark validation rejects newly future-dated timestamps beyond allow
   const mark = createPortfolioMark(100, now + EQUITY_MARK_MAX_FUTURE_SKEW_MS,
     { now, maxAgeMs: 60_000, maxFutureSkewMs: EQUITY_MARK_MAX_FUTURE_SKEW_MS });
   assert.equal(isUsablePortfolioMark(mark, now), true);
-  assert.equal(isUsablePortfolioMark(mark, now - 1), true);
+  assert.equal(isUsablePortfolioMark(mark, now - 1), false);
   assert.equal(isUsablePortfolioMark(mark, now - 1_001), false);
 });
