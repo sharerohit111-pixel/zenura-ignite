@@ -399,3 +399,22 @@ test("BUY orders and unrelated SELL updates cannot manipulate share reservations
   assert.equal(ledger.snapshot().positions[0].reservedQuantity, 2);
   assert.equal(ledger.snapshot().orders[0].reservedQuantity, 2);
 });
+
+
+test("POSITION_CHANGED cannot bypass per-order share reservation ownership", () => {
+  const ledger = createPaperDemoEventLedger(opening);
+  ledger.append(event({
+    type: "POSITION_CHANGED", sourceEventId: "position-reservation-seed", idempotencyKey: "position-reservation-seed",
+    deltas: { cashDeltaPaise: 0, blockedDeltaPaise: 0 },
+    payload: { assetClass: "EQUITY", instrumentKey: "MOCK|NSE|EQ|0001", product: "DELIVERY",
+      quantityDelta: 5, costBasisDeltaPaise: 500000, realizedPnlDeltaPaise: 0, reservedQuantityDelta: 1 }
+  }));
+  assert.equal(ledger.snapshot().events.length, 0);
+  assert.throws(() => ledger.append(event({
+    type: "POSITION_CHANGED", sourceEventId: "position-reservation-bypass", idempotencyKey: "position-reservation-bypass",
+    deltas: { cashDeltaPaise: 0, blockedDeltaPaise: 0 },
+    payload: { assetClass: "EQUITY", instrumentKey: "MOCK|NSE|EQ|0001", product: "DELIVERY",
+      quantityDelta: 5, costBasisDeltaPaise: 500000, realizedPnlDeltaPaise: 0, reservedQuantityDelta: 1 }
+  })), /UNAUTHORIZED_POSITION_RESERVATION_MOVEMENT/);
+  assert.equal(ledger.snapshot().positions.length, 0);
+});
