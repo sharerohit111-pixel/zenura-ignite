@@ -70,8 +70,9 @@ function renderOptionsCatalog(host){
   refreshStrikes();
  }
  function refreshStrikes(){
-  const chain=getPaperDemoOptionChain(model,{underlying:underlying.value,expiry:expiry.value,exchange:exchange.value});
   const previous=strike.value;strike.replaceChildren();const all=el("option","","All strikes");all.value="";strike.append(all);
+  if(!expiry.value)return;
+  const chain=getPaperDemoOptionChain(model,{underlying:underlying.value,expiry:expiry.value,exchange:exchange.value});
   chain.forEach(row=>{const o=el("option","",money(row.strikePaise));o.value=String(row.strikePaise);strike.append(o);});
   if([...strike.options].some(x=>x.value===previous))strike.value=previous;
  }

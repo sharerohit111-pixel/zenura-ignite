@@ -130,3 +130,34 @@ test("catalog rejects duplicate derivative identities and missing derivative quo
  const missing=await allFixtures();missing.derivatives.data.quotes.pop();
  assert.throws(()=>createPaperDemoViewModel(missing,{enabled:true}),/MOCK_DERIVATIVE_CATALOG_REQUIRED/);
 });
+
+test("catalog rejects derivative keys whose exchange, type, underlying, strike, side or expiry disagree", async () => {
+  const mutations = [
+    c => { c.instrumentKey = c.instrumentKey.replace("|NSE|", "|BSE|"); },
+    c => { c.instrumentKey = c.instrumentKey.replace("|OPT|", "|FUT|"); },
+    c => { c.instrumentKey = c.instrumentKey.replace("|MOCKNIFTY|", "|MOCKBANK|"); },
+    c => { c.instrumentKey = c.instrumentKey.replace("|25000|", "|25100|"); },
+    c => { c.instrumentKey = c.instrumentKey.replace("|CE|", "|PE|"); },
+    c => { c.instrumentKey = c.instrumentKey.replace("|2026-11-26", "|2026-12-31"); }
+  ];
+  for (const mutate of mutations) {
+    const fixtures = await allFixtures();
+    const option = fixtures.derivatives.data.contracts.find(item => item.assetClass === "OPTION" && item.optionType === "CE");
+    mutate(option);
+    assert.throws(() => createPaperDemoViewModel(fixtures,{enabled:true}), /MOCK_DERIVATIVE_INSTRUMENT_IDENTITY_MISMATCH/);
+  }
+  const wrongFuture = await allFixtures();
+  wrongFuture.derivatives.data.contracts.find(item => item.assetClass === "FUTURE").instrumentKey =
+    "MOCK|NSE|OPT|MOCKNIFTY|25000|CE|2026-12-31";
+  assert.throws(() => createPaperDemoViewModel(wrongFuture,{enabled:true}), /MOCK_DERIVATIVE_INSTRUMENT_IDENTITY_MISMATCH/);
+});
+
+test("catalog rejects malformed market keys and Equity snapshots that point to an index", async () => {
+  const malformed = await allFixtures();
+  malformed.market.data.quotes[0].instrumentKey = "MOCK|NSE|EQ|bad";
+  assert.throws(() => createPaperDemoViewModel(malformed,{enabled:true}), /MOCK_MARKET_INSTRUMENT_IDENTITY_MISMATCH/);
+  const wrongEquity = await allFixtures();
+  wrongEquity.equity.data.instrumentKey = "MOCK|NSE|INDEX|0003";
+  wrongEquity.equity.data.symbol = "MOCKNIFTY50";
+  assert.throws(() => createPaperDemoViewModel(wrongEquity,{enabled:true}), /MOCK_EQUITY_INSTRUMENT_MISMATCH/);
+});
