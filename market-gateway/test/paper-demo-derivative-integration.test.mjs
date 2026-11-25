@@ -10,7 +10,7 @@ test("Futures and Options Demo screens mount the shared local simulator", async 
   const html = await read("markets/stocks/demo.html");
   const panel = await read("markets/stocks/demo-derivative-panel.mjs");
   assert.match(js, /mountDerivativeDemo\(content,name\)/);
-  assert.match(js, /appendDerivativeSummary\(content,name\)/);
+  assert.match(js, /appendUnifiedLedgerSummary\(content,name\)/);
   assert.match(panel, /CANONICAL FUTURES & OPTIONS POSITIONS/);
   assert.match(panel, /CANONICAL FUTURES & OPTIONS FILLS/);
   assert.match(js, /from "\.\/demo-derivative-panel\.mjs"/);
