@@ -96,7 +96,7 @@ function apply(projection, event) {
   projection.account.cashBalancePaise = cash;
   projection.account.blockedFundsPaise = blocked;
   projection.account.availableFundsPaise = available;
-  if (event.type === "ORDER_ACCEPTED" || event.type === "ORDER_UPDATED") {
+  if (event.type === "ORDER_ACCEPTED" || event.type === "ORDER_UPDATED" || event.type === "ORDER_REJECTED") {
     const p = event.payload, existing = projection.orders.find(x => x.orderId === p.orderId);
     if ((event.type === "ORDER_ACCEPTED" || event.type === "ORDER_REJECTED") && existing) fail("DUPLICATE_ORDER_ID");
     if (event.type === "ORDER_UPDATED" && !existing) fail("ORDER_UPDATE_WITHOUT_ACCEPTANCE");
