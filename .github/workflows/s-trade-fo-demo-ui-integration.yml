@@ -13,6 +13,7 @@ on:
       - "markets/stocks/derivative-mock-simulator.js"
       - "markets/shared/paper-demo-adapter.mjs"
       - "markets/service-worker.js"
+      - "markets/language-toggle.js"
       - "market-gateway/package.json"
       - ".github/workflows/s-trade-fo-demo-ui-integration.yml"
   push:
@@ -29,6 +30,7 @@ on:
       - "markets/stocks/derivative-mock-simulator.js"
       - "markets/shared/paper-demo-adapter.mjs"
       - "markets/service-worker.js"
+      - "markets/language-toggle.js"
       - "market-gateway/package.json"
       - ".github/workflows/s-trade-fo-demo-ui-integration.yml"
 permissions:
@@ -52,7 +54,7 @@ jobs:
       - name: Run full gateway regression suite
         run: npm test --prefix market-gateway
       - name: Check gateway and browser module syntax
-        run: npm run check --prefix market-gateway
+        run: npm run check --prefix market-gateway && node --check markets/language-toggle.js
       - name: Guard production gateway isolation
         run: |
           if grep -R -E "paper-demo-adapter|derivative-mock-simulator|paper-mock-fixtures|equity-demo-execution-engine|demo-(equity|chart|derivative)-panel|market-gateway/mock/fixtures|equity-execution.json" market-gateway/supabase-server.js market-gateway/server.js; then
