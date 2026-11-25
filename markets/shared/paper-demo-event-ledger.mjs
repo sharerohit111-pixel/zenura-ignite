@@ -192,7 +192,10 @@ export function createPaperDemoEventLedger(opening, settlementTrust = {}) {
   const projection = initialProjection(opening);
   const eventIds = new Map(), sourceEvents = new Map(), idempotency = new Map();
   let lastTimestamp = -Infinity;
-  function append(input) {
+  function appendInternal(input, allowVerifiedSettlement = false) {
+    if (input?.type === "SETTLEMENT_RECEIPT_ACCEPTED" && !allowVerifiedSettlement) {
+      fail("SETTLEMENT_REQUIRES_VERIFIED_RECEIPT_PATH");
+    }
     const candidate = { ...input, sequence: projection.events.length + 1 };
     const event = validateEvent(candidate, identity, projection.events.length + 1);
     const fingerprint = JSON.stringify({ ...event, sequence: undefined });
@@ -220,6 +223,9 @@ export function createPaperDemoEventLedger(opening, settlementTrust = {}) {
     }
     return { accepted: true, duplicate: false, event, snapshot: snapshot() };
   }
+  function append(input) {
+    return appendInternal(input, false);
+  }
   function appendSettlementReceipt(receipt, { orderId, fillId, side, assetClass } = {}) {
     const existing = projection.events.find(event =>
       event.type === "SETTLEMENT_RECEIPT_ACCEPTED" &&
@@ -240,7 +246,7 @@ export function createPaperDemoEventLedger(opening, settlementTrust = {}) {
       consumedEventReferences: settlementEvents.map(event => event.payload.eventReference)
     }).receipt;
     const engine = assetClass === "FUTURE" ? "FUTURES" : "OPTIONS";
-    return append({
+    return appendInternal({
       eventId: validated.receiptId,
       idempotencyKey: validated.receiptId,
       sourceEventId: validated.eventReference,
@@ -258,7 +264,7 @@ export function createPaperDemoEventLedger(opening, settlementTrust = {}) {
         assetClass: validated.assetClass,
         receipt: validated
       }
-    });
+    }, true);
   }
   function snapshot() { return freeze(clone(projection)); }
   return Object.freeze({ append, appendSettlementReceipt, snapshot });
