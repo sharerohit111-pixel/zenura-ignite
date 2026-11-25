@@ -110,7 +110,7 @@ test("rejects long-option positions whose official master identity, expiry, exch
   {row:optionRow({expiry:null})},
   {row:optionRow({net_quantity:-25})}
  ];
- for(const item of cases)assert.throws(()=>buildLongOptionPortfolioPositions([item.row||optionRow()],[item.master||optionMaster()]),/Stored long-option|official option strike/);
+ for(const item of cases)assert.throws(()=>buildLongOptionPortfolioPositions([item.row||optionRow()],[item.master||optionMaster()]),/Stored option|official option strike/);
 });
 
 test("rejects duplicate option positions and duplicate official master keys",()=>{
