@@ -137,21 +137,18 @@ const axePath=require.resolve("axe-core/axe.min.js");
   console.log("PWA: opening market shell");
   await page.goto("http://127.0.0.1:4173/markets/",{waitUntil:"domcontentloaded",timeout:30000});
   await page.waitForLoadState("load",{timeout:10000});
-  await page.waitForFunction(async()=>{
-   const registrations=await navigator.serviceWorker.getRegistrations();
-   return registrations.some(registration=>registration.active?.state==="activated");
-  },null,{timeout:20000});
-  console.log("PWA: waiting for service worker activation");
-  // navigator.serviceWorker.ready may resolve while the active worker is
-  // still transitioning through "activating"; wait for the actual state.
-  await page.waitForFunction(async()=>{
-   const registration=await navigator.serviceWorker.ready;
-   return registration.active?.state==="activated";
-  },null,{timeout:20000});
-  const workerState=await page.evaluate(async()=>{
-   const registration=await navigator.serviceWorker.ready;
-   return {state:registration.active?.state||"missing",scope:registration.scope||null};
-  });
+  console.log("PWA: waiting for the Markets-scoped service worker activation");
+  // Resolve the exact /markets/ registration. navigator.serviceWorker.ready
+  // can refer to a different scope when more than one registration exists.
+  const marketsScope=new URL("/markets/",location.origin).href;
+  await page.waitForFunction(async(scope)=>{
+   const registration=await navigator.serviceWorker.getRegistration(scope);
+   return registration?.active?.state==="activated" && !registration.installing;
+  },marketsScope,{timeout:30000});
+  const workerState=await page.evaluate(async(scope)=>{
+   const registration=await navigator.serviceWorker.getRegistration(scope);
+   return {state:registration?.active?.state||"missing",scope:registration?.scope||null};
+  },marketsScope);
   assert.equal(workerState.state,"activated","service worker must be active before controlled reload");
   assert.ok(workerState.scope.endsWith("/markets/"),"Markets service worker scope must not capture Crypto or production routes");
   console.log(JSON.stringify({pwaWorker:workerState.state,scope:workerState.scope}));
