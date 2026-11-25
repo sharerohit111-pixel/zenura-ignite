@@ -125,6 +125,22 @@ test("fill quantity cannot exceed the accepted order quantity", () => {
 });
 
 
+test("fill gross value must equal quantity times execution price when supplied", () => {
+  const ledger = createPaperDemoEventLedger(opening);
+  ledger.append(event());
+  assert.throws(() => ledger.append(event({
+    eventId: "evt-2", idempotencyKey: "idem-2", sourceEventId: "fill-gross-mismatch",
+    type: "FILL_RECORDED", occurredAt: "2026-11-25T09:30:01+05:30",
+    deltas: { cashDeltaPaise: -125050, blockedDeltaPaise: -10000 },
+    payload: {
+      fillId: "fill-gross-1", orderId: "order-1", assetClass: "EQUITY",
+      instrumentKey: "MOCK|NSE|EQ|0001", side: "BUY", quantity: 1,
+      pricePaise: 125050, grossPaise: 125049
+    }
+  })), /INVALID_FILL_GROSS_VALUE/);
+  assert.equal(ledger.snapshot().events.length, 1);
+});
+
 test("product-aware positions keep Delivery and Intraday cost basis separate", () => {
   const ledger = createPaperDemoEventLedger(opening);
   ledger.append(event({
