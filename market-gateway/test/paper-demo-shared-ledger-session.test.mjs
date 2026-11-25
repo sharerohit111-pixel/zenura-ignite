@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 import { readFile } from "node:fs/promises";
-import { createPaperDemoLedgerSession } from "../../markets/shared/paper-demo-ledger-session.mjs";
+import { createPaperDemoLedgerSession, getSharedPaperDemoLedgerSession } from "../../markets/shared/paper-demo-ledger-session.mjs";
 import { replayPaperDemoEvents } from "../../markets/shared/paper-demo-event-ledger.mjs";
 import { createEquityDemoLedgerBridge } from "../../markets/stocks/demo-equity-ledger-bridge.mjs";
 import { createDerivativeDemoLedgerBridge } from "../../markets/stocks/demo-derivative-ledger-bridge.mjs";
@@ -85,4 +85,20 @@ test("shared Demo ledger session rejects a different account or opening balance"
     accountId: "live-session-test", cashBalancePaise: 10000, blockedFundsPaise: 0
   }), /INVALID_SHARED_DEMO_LEDGER_SESSION/);
   assert.equal(session.ledger.snapshot().account.accountId, "mock-session-test");
+});
+
+
+test("module shared session is stable for one account and fails closed on account or opening-balance switches", () => {
+  const opening = { accountId: "mock-global-session-test", cashBalancePaise: 50000, blockedFundsPaise: 5000 };
+  const first = getSharedPaperDemoLedgerSession(opening);
+  const repeated = getSharedPaperDemoLedgerSession(opening);
+  assert.equal(repeated, first);
+  assert.equal(repeated.sessionId, first.sessionId);
+  assert.throws(() => getSharedPaperDemoLedgerSession({
+    ...opening, accountId: "mock-other-global-session"
+  }), /DEMO_LEDGER_SESSION_SCOPE_MISMATCH/);
+  assert.throws(() => getSharedPaperDemoLedgerSession({
+    ...opening, cashBalancePaise: 60000
+  }), /DEMO_LEDGER_SESSION_SCOPE_MISMATCH/);
+  assert.equal(getSharedPaperDemoLedgerSession(opening), first);
 });
