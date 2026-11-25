@@ -6,17 +6,17 @@ This follow-up adds a browser-time WCAG text contrast measurement to the existin
 
 ## Automated contrast gate
 
-For each of the 15 screens at the existing desktop (1440×900), Android-sized (390×844) and small-mobile (360×800) browser viewports, the smoke test now:
+For each of the 15 screens, in both English and Hindi, at the existing desktop (1440×900), Android-sized (390×844) and small-mobile (360×800) browser viewports, the smoke test now:
 
 - visits the screen and enumerates visible leaf text nodes;
 - reads computed foreground and nearest opaque computed background colors;
-- composites transparent foreground/background colors against the discovered background;
+- composites semi-transparent computed background layers from outer ancestors toward the text node, and accounts for computed ancestor opacity on the foreground;
 - computes WCAG relative luminance and contrast ratio;
 - applies 4.5:1 for normal text and 3:1 for large text (24px, or bold 18.66px);
 - fails the browser smoke if a measured text node is below its threshold;
 - emits per-screen measured-node counts and minimum observed ratio in CI JSON output.
 
-This is a practical computed-color audit, not a complete visual contrast certification. It does not fully model gradients, background images, blend modes, text rendered inside canvas/SVG, disabled-control exceptions, or opacity applied to an ancestor. Chart graphics and non-text UI component contrast require separate review. Any reported failure must be triaged against a rendered screenshot before changing the palette.
+This is a practical computed-color audit, not a complete visual contrast certification. It does not fully model gradients, background images, blend modes, all group-opacity compositing interactions, text rendered inside canvas/SVG, or disabled-control exceptions. Chart graphics and non-text UI component contrast require separate review. Any reported failure must be triaged against a rendered screenshot before changing the palette.
 
 ## Existing automated coverage retained
 
