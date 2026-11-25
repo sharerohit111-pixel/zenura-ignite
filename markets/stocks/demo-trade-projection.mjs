@@ -21,14 +21,11 @@ function syncDemoProjection(source,snapshot){
    createdAt:time(order.createdAt)});
   if(order.status==="REJECTED"){
    store.reject(order.orderId,order.rejectionReason||"Rejected by deterministic Demo simulator",time(order.updatedAt||order.createdAt));
-   rejected.add(order.orderId);
   }
   const fills=source==="EQUITY"?(snapshot.fills||[]).filter(f=>f.orderId===order.orderId):(order.fills||[]);
   for(const fill of fills){
-   if(seenFills.has(fill.fillId))continue;
    store.recordFill({orderId:order.orderId,fillId:fill.fillId,quantity:fill.quantity,
     pricePaise:fill.pricePaise,filledAt:time(fill.filledAt||fill.executedAt)});
-   seenFills.add(fill.fillId);
   }
   if(order.status==="CANCELLED"){
    store.cancel(order.orderId,time(order.updatedAt));
