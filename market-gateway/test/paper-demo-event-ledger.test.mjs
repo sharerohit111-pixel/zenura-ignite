@@ -452,3 +452,69 @@ test("Options settlement rejects orphan fills, mismatched order ownership and wr
   /OPTIONS_PREMIUM_DIRECTION_MISMATCH/);
   assert.equal(ledger.snapshot().account.cashBalancePaise, opening.cashBalancePaise);
 });
+
+
+test("Options fill can be settled only once even when a provider sends a new receipt ID", () => {
+  const trust = {
+    trustedIssuerIds: ["approved-clearing-source"],
+    verifyAttestation: () => true
+  };
+  const ledger = createPaperDemoEventLedger(opening, trust);
+  const orderId = "option-once-order";
+  const fillId = "option-once-fill";
+  seedOptionsFill(ledger, orderId, fillId, "BUY");
+  const receipt = {
+    schemaVersion: "1.0.0", kind: "OPTIONS_FILL_SETTLEMENT", action: "SETTLE",
+    receiptId: "option-once-receipt-1", eventReference: "option-once-event-1",
+    fillId, accountId: opening.accountId, sessionId: opening.sessionId, orderId,
+    assetClass: "OPTION", side: "BUY", currency: "INR",
+    issuerId: "approved-clearing-source", sourceReference: "option-once-source-1",
+    policyVersion: "options-policy-test-v1", issuedAt: "2026-11-25T09:30:00+05:30",
+    amounts: { premiumCashDeltaPaise: -100000, chargesCashDeltaPaise: -100, cashDeltaPaise: -100100, blockedDeltaPaise: 0 },
+    attestation: { keyId: "test-key-1", signature: "verified-test-signature" }
+  };
+  const first = ledger.appendSettlementReceipt(receipt, {
+    orderId, fillId, assetClass: "OPTION", side: "BUY"
+  });
+  assert.equal(first.accepted, true);
+  const before = ledger.snapshot();
+  assert.throws(() => ledger.appendSettlementReceipt({
+    ...receipt,
+    receiptId: "option-once-receipt-2",
+    eventReference: "option-once-event-2",
+    sourceReference: "option-once-source-2"
+  }, { orderId, fillId, assetClass: "OPTION", side: "BUY" }), /OPTIONS_FILL_ALREADY_SETTLED/);
+  assert.deepEqual(ledger.snapshot(), before);
+});
+
+test("Futures reservation cannot be added after an order reaches a terminal state", () => {
+  const trust = {
+    trustedIssuerIds: ["approved-clearing-source"],
+    verifyAttestation: () => true
+  };
+  const ledger = createPaperDemoEventLedger(opening, trust);
+  const orderId = "future-terminal-reserve-order";
+  seedFuturesOrder(ledger, orderId, "BUY");
+  ledger.append(event({
+    eventId: "terminal-" + orderId, idempotencyKey: "terminal-idem-" + orderId,
+    sourceEventId: "terminal-source-" + orderId, occurredAt: "2026-11-25T09:30:00+05:30",
+    engine: "FUTURES", type: "ORDER_UPDATED",
+    deltas: { cashDeltaPaise: 0, blockedDeltaPaise: 0 },
+    payload: { orderId, assetClass: "FUTURE", instrumentKey: "MOCK|NSE|FUT|NIFTY-2026-11", side: "BUY", orderType: "LIMIT", quantity: 1, status: "CANCELLED" }
+  }));
+  const receipt = {
+    schemaVersion: "1.0.0", kind: "FUTURES_MARGIN_RESERVATION", action: "RESERVE",
+    receiptId: "future-terminal-reserve-receipt", eventReference: "future-terminal-reserve-event",
+    accountId: opening.accountId, sessionId: opening.sessionId, orderId,
+    assetClass: "FUTURE", side: "BUY", currency: "INR",
+    issuerId: "approved-clearing-source", sourceReference: "future-terminal-reserve-source",
+    policyVersion: "margin-policy-test-v1", issuedAt: "2026-11-25T09:31:00+05:30",
+    amounts: { marginPaise: 25000, cashDeltaPaise: 0, blockedDeltaPaise: 25000 },
+    attestation: { keyId: "test-key-1", signature: "verified-test-signature" }
+  };
+  const before = ledger.snapshot();
+  assert.throws(() => ledger.appendSettlementReceipt(receipt, {
+    orderId, assetClass: "FUTURE", side: "BUY"
+  }), /FUTURES_RESERVATION_ON_TERMINAL_ORDER/);
+  assert.deepEqual(ledger.snapshot(), before);
+});
