@@ -80,8 +80,8 @@ function validateEvent(input, identity, expectedSequence) {
     validateIdentity(p.eventReference, "SETTLEMENT_EVENT_REFERENCE");
     validateIdentity(p.orderId, "SETTLEMENT_ORDER_ID");
     if (!["FUTURE", "OPTION"].includes(p.assetClass) ||
-        (input.engine === "FUTURES" && p.assetClass !== "FUTURE") ||
-        (input.engine === "OPTIONS" && p.assetClass !== "OPTION") ||
+        (p.assetClass === "FUTURE" && input.engine !== "FUTURES") ||
+        (p.assetClass === "OPTION" && input.engine !== "OPTIONS") ||
         !object(p.receipt) || p.receipt.receiptId !== p.receiptId ||
         p.receipt.eventReference !== p.eventReference ||
         !object(p.receipt.amounts) ||
