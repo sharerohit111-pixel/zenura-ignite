@@ -1,0 +1,33 @@
+name: Chat 56 temporary lockfile generation
+on:
+  pull_request:
+    paths:
+      - "functions/package.json"
+      - "market-gateway/package.json"
+      - ".github/workflows/chat56-lockfile-artifact.yml"
+permissions:
+  contents: read
+actions: read
+jobs:
+  generate-lockfiles:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        directory: [functions, market-gateway]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: ${{ matrix.directory }}/package.json
+      - name: Resolve deterministic npm lockfile
+        working-directory: ${{ matrix.directory }}
+        run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+      - uses: actions/upload-artifact@v4
+        with:
+          name: chat56-lockfile-${{ matrix.directory }}
+          path: ${{ matrix.directory }}/package-lock.json
+          if-no-files-found: error
+          retention-days: 1
