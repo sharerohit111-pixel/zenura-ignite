@@ -37,16 +37,11 @@ function parsePrice(value){
  const parts=text.split("."),paise=Number(parts[0])*100+Number(((parts[1]||"")+"00").slice(0,2));
  return Number.isSafeInteger(paise)&&paise>0?paise:null;
 }
-function fillRows(snapshot){return snapshot.fills.map(fill=>[fill.fillId,fill.side,fill.product,fill.quantity,money(fill.pricePaise),money(fill.grossValuePaise),money(fill.realizedPnlPaise),fill.filledAt]);}
-function orderRows(snapshot){return snapshot.orders.map(order=>[order.orderId,order.side,order.product,order.orderType,order.quantity,order.filledQuantity+" / "+order.remainingQuantity,order.limitPricePaise?money(order.limitPricePaise):"—",money(order.averagePricePaise),order.status]);}
+function fillRows(snapshot){return snapshot.fills.filter(fill=>fill.assetClass==="EQUITY").map(fill=>[fill.fillId,fill.side,fill.product,fill.quantity,money(fill.pricePaise),money(fill.grossPaise??fill.grossValuePaise),money(fill.realizedPnlPaise),fill.executedAt??fill.filledAt]);}
+function orderRows(snapshot){return snapshot.orders.filter(order=>order.assetClass==="EQUITY").map(order=>[order.orderId,order.side,order.product,order.orderType,order.quantity,(order.filledQuantity??0)+" / "+(order.remainingQuantity??order.quantity),order.limitPricePaise?money(order.limitPricePaise):"—",money(order.averageFillPricePaise??order.averagePricePaise),order.status]);}
 function positionRows(snapshot,product){
- const account=snapshot.account,key=snapshot.valuation.instrumentKey,rows=[];
- for(const p of ["DELIVERY","INTRADAY"]){
-  if(product&&product!==p)continue;
-  const item=(p==="DELIVERY"?account.positions:account.intradayPositions)[key];
-  if(item)rows.push([snapshot.valuation.instrumentKey,p,item.quantity,item.reservedQuantity||0,money(item.averagePricePaise),money(item.costBasisPaise)]);
- }
- return rows;
+ return snapshot.positions.filter(item=>item.assetClass==="EQUITY"&&item.quantity!==0&&(!product||item.product===product))
+  .map(item=>[item.instrumentKey,item.product,item.quantity,item.reservedQuantity||0,money(item.averagePricePaise),money(item.costBasisPaise)]);
 }
 export async function mountEquityDemo(container){
  const panel=el("section","demo-eq-panel");
@@ -77,7 +72,7 @@ export async function mountEquityDemo(container){
  let activeOrderId="";
  function paint(){
   if(!engine)return;
-  const s=engine.snapshot(),a=s.account;
+  const s=engine.snapshot(),ledgerSnapshot=ledgerBridge.snapshot(),a=ledgerSnapshot.account;
   stats.replaceChildren(
    stat("Cash balance",money(a.cashBalancePaise)),
    stat("Blocked funds",money(a.blockedFundsPaise)),
@@ -85,10 +80,9 @@ export async function mountEquityDemo(container){
    stat("Realized P&L",money(a.realizedPnlPaise)),
    stat("Unrealized P&L",money(s.valuation.unrealizedPnlPaise))
   );
-  table(positions,["INSTRUMENT","PRODUCT","QTY","RESERVED","AVG PRICE","COST BASIS"],positionRows(s), "No Equity positions yet.");
-  table(orders,["ORDER ID","SIDE","PRODUCT","TYPE","QTY","FILLED / REMAINING","LIMIT","AVG FILL","STATUS"],orderRows(s),"No Equity orders yet.");
-  table(fills,["FILL ID","SIDE","PRODUCT","QTY","PRICE","GROSS VALUE","REALIZED P&L","EXECUTED AT"],fillRows(s),"No immutable fill receipts yet.");
-  const ledgerSnapshot=ledgerBridge?.snapshot();
+  table(positions,["INSTRUMENT","PRODUCT","QTY","RESERVED","AVG PRICE","COST BASIS"],positionRows(ledgerSnapshot), "No Equity positions yet.");
+  table(orders,["ORDER ID","SIDE","PRODUCT","TYPE","QTY","FILLED / REMAINING","LIMIT","AVG FILL","STATUS"],orderRows(ledgerSnapshot),"No Equity orders yet.");
+  table(fills,["FILL ID","SIDE","PRODUCT","QTY","PRICE","GROSS VALUE","REALIZED P&L","EXECUTED AT"],fillRows(ledgerSnapshot),"No immutable fill receipts yet.");
   table(events,["SEQ","EVENT","SOURCE ID","TIME"],(ledgerSnapshot?.events||[]).map(event=>[event.sequence,event.type,event.sourceEventId,event.occurredAt]),"No canonical events yet.");
   const active=s.orders.filter(x=>["PENDING","PARTIALLY_FILLED"].includes(x.status));
   if(!active.some(x=>x.orderId===activeOrderId))activeOrderId=active.at(-1)?.orderId||"";
@@ -124,11 +118,11 @@ export async function mountEquityDemo(container){
 }
 export async function appendEquitySummary(container,screen){
  const section=el("section","demo-eq-summary");
- section.append(el("h3","demo-eq-subhead",screen==="trades"?"LOCAL EQUITY FILL RECEIPTS":screen==="holdings"?"LOCAL DELIVERY HOLDINGS":screen==="positions"?"LOCAL EQUITY POSITIONS":"LOCAL EQUITY DEMO ORDERS"));
- section.append(el("p","demo-eq-disclaimer","Browser-memory DEMO DATA only. This isolated Equity simulator is not reconciled with the Wallet or cross-asset ledger."));
+ section.append(el("h3","demo-eq-subhead",screen==="trades"?"CANONICAL EQUITY FILL RECEIPTS":screen==="holdings"?"CANONICAL DELIVERY HOLDINGS":screen==="positions"?"CANONICAL EQUITY POSITIONS":"CANONICAL EQUITY DEMO ORDERS"));
+ section.append(el("p","demo-eq-disclaimer","Shared account-scoped canonical browser-memory DEMO ledger. MOCK only; wallet reconciliation remains false."));
  const host=el("div");section.append(host);container.append(section);
  try{
-  const e=await getEngine(),s=e.snapshot();
+  await getEngine();const s=ledgerBridge.snapshot();
   if(screen==="trades")table(host,["FILL ID","SIDE","PRODUCT","QTY","PRICE","GROSS VALUE","REALIZED P&L","EXECUTED AT"],fillRows(s),"No Equity fill receipts.");
   else if(screen==="positions"||screen==="portfolio")table(host,["INSTRUMENT","PRODUCT","QTY","RESERVED","AVG PRICE","COST BASIS"],positionRows(s),"No Equity positions.");
   else if(screen==="holdings")table(host,["INSTRUMENT","DELIVERY QTY","AVG PRICE","COST BASIS"],positionRows(s,"DELIVERY").map(row=>[row[0],row[2],row[4],row[5]]),"No Delivery holdings.");
