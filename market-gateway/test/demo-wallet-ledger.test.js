@@ -136,6 +136,33 @@ test("audit rejects matching fill IDs when cash amount or BUY/SELL direction is 
   assert.equal(directionResult.ledgerReconciled, false);
 });
 
+
+test("audit refuses Futures gross-notional cash settlement without an approved settlement receipt", () => {
+  const ledger = create();
+  ledger.append(event({ assetClass: "FUTURE", cashDeltaPaise: -250000 }));
+  const result = ledger.audit({
+    accountSnapshot: {
+      accountId: "mock-account-user-a",
+      cashBalancePaise: ledger.snapshot().cashPaise,
+      blockedFundsPaise: 0,
+      availableFundsPaise: ledger.snapshot().cashPaise
+    },
+    sourceOrders: [{ orderId: "order-1", assetClass: "FUTURE" }],
+    sourceFills: [{
+      fillId: "fill-1", orderId: "order-1", assetClass: "FUTURE",
+      side: "BUY", quantity: 2, pricePaise: 125000, grossValuePaise: 250000
+    }],
+    sourceReservations: [],
+    evidence: {
+      accountSnapshotRef: "a", ordersSnapshotRef: "o", fillsSnapshotRef: "f",
+      reservationsSnapshotRef: "r", eventHistoryRef: "h", atomicSnapshotAttestationRef: "atomic"
+    }
+  });
+  assert.equal(result.allFillsSettled, true);
+  assert.equal(result.settlementAmountsMatch, false);
+  assert.equal(result.ledgerReconciled, false);
+});
+
 test("rejects a fill cash debit that would make cash negative", () => {
   const ledger = createDemoWalletLedger({ accountId: "mock-small", openingCashPaise: 10,
     openingEvidenceRef: "fixture:small", env: { NODE_ENV: "test" } });
