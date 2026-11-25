@@ -72,7 +72,10 @@ const axePath=require.resolve("axe-core/axe.min.js");
    throw new Error("PWA service worker did not activate: "+JSON.stringify(state)+"; console: "+pwaConsole.join(" | ")+"; "+error.message);
   }
   console.log("PWA: waiting for service worker activation");
-  assert.ok(workerState&&workerState.state==="activated","service worker must be active before controlled reload");
+  if(!workerState||workerState.state!=="activated"){
+   const registrations=await page.evaluate(async()=>({controller:!!navigator.serviceWorker.controller,items:(await navigator.serviceWorker.getRegistrations()).map(r=>({scope:r.scope,installing:r.installing?.state||null,waiting:r.waiting?.state||null,active:r.active?.state||null}))}));
+   throw new Error("PWA_WORKER_NOT_ACTIVATED: "+JSON.stringify({workerState,registrations,pwaConsole}));
+  }
   assert.equal(workerState.scope,"http://127.0.0.1:4173/markets/","service worker scope must be limited to the market app");
   console.log(JSON.stringify({pwaWorker:workerState.state,scope:workerState.scope}));
   // clients.claim() in the activate handler controls existing same-scope clients.
