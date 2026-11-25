@@ -48,6 +48,9 @@ test("Demo screens disclose synthetic data and isolate local Equity execution fr
  assert.match(privateWatchlists,/length >= 50/);
  assert.match(privateWatchlists,/controller\.reset\(nextUid\)/);
  assert.match(privateWatchlists,/request !== requestVersion/);
+ const worker=await read("../service-worker.js");
+ assert.match(worker,/zenura-markets-shell-v6/);
+ assert.match(worker,/stocks\/demo-watchlist-persistence\.mjs/);
  assert.match(js,/searchPaperDemoInstruments/);
  assert.match(js,/getPaperDemoExpiries/);
  assert.match(js,/getPaperDemoOptionChain/);
