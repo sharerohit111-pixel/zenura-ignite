@@ -1,5 +1,8 @@
 name: S-TRADE Authenticated Browser Security
 on:
+  push:
+    branches:
+      - "security/chat58-safe-auth-dom-2026-11-25"
   pull_request:
     paths:
       - "markets/stocks/**"
