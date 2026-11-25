@@ -25,6 +25,7 @@ const axePath=require.resolve("axe-core/axe.min.js");
    const firstNav=page.locator("#screen-nav button[data-screen=\"home\"]");await firstNav.focus();
    assert.equal(await page.evaluate(()=>document.activeElement?.dataset.screen),"home",viewport.name+" keyboard focus reaches navigation");
    await page.keyboard.press("Tab");assert.equal(await page.evaluate(()=>document.activeElement?.dataset.screen),"market",viewport.name+" Tab moves through screen navigation");
+   const contrastReports=[];
    for(const name of ["home","market","watchlists","charts","equity","futures","options","orders","trades","portfolio","positions","holdings","account","profile","settings"]){
     await page.locator('#screen-nav button[data-screen="'+name+'"]').click();
     await page.locator("#screen-content > .screen-title h2").waitFor();
@@ -63,6 +64,7 @@ const axePath=require.resolve("axe-core/axe.min.js");
     });
     assert.ok(contrast.textNodes>0,viewport.name+" "+name+" contrast scan found visible text");
     assert.equal(contrast.failures.length,0,viewport.name+" "+name+" WCAG text contrast failures: "+JSON.stringify(contrast.failures));
+    contrastReports.push({screen:name,textNodes:contrast.textNodes,minimumRatio:contrast.minimumRatio});
    }
    if(viewport.name==="desktop"){
     await page.locator('#screen-nav button[data-screen="watchlists"]').click();
@@ -108,7 +110,7 @@ const axePath=require.resolve("axe-core/axe.min.js");
    assert.ok(perf.transferBytes<5*1024*1024,viewport.name+" transfer budget");
    assert.deepEqual(pageErrors,[],viewport.name+" browser errors");
    assert.deepEqual(consoleErrors,[],viewport.name+" console errors");
-   console.log(JSON.stringify({viewport:viewport.name,screens:15,perScreenAxe:true,keyboardNavigation:true,axeSeriousCritical:0,consoleErrors:0,...perf}));
+   console.log(JSON.stringify({viewport:viewport.name,screens:15,perScreenAxe:true,keyboardNavigation:true,axeSeriousCritical:0,contrastScreens:contrastReports.length,contrastTextNodes:contrastReports.reduce((sum,item)=>sum+item.textNodes,0),minimumObservedTextContrast:Math.min(...contrastReports.map(item=>item.minimumRatio)),contrastReports,consoleErrors:0,...perf}));
    await context.close();
   }
 
