@@ -34,7 +34,8 @@ function timestampMs(value) {
   if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$/.test(value)) fail("INVALID_EVENT_TIMESTAMP");
   const [datePart, timePart] = value.split("T");
   const [year, month, day] = datePart.split("-").map(Number);
-  const [clock, zone] = [timePart.slice(0, 8), timePart.slice(-6)];
+  const clock = timePart.slice(0, 8);
+  const zone = timePart.endsWith("Z") ? "Z" : timePart.slice(-6);
   const [hour, minute, second] = clock.split(":").map(Number);
   const daysInMonth = month >= 1 && month <= 12 ? new Date(Date.UTC(year, month, 0)).getUTCDate() : 0;
   if (day < 1 || day > daysInMonth || hour > 23 || minute > 59 || second > 59) fail("INVALID_EVENT_TIMESTAMP");
