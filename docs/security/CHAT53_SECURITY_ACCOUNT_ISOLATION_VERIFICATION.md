@@ -55,3 +55,11 @@ This record covers S-TRADE only. No production migration, deployment, merge, liv
 ## Release decision
 
 **NOT RELEASE READY.** The available evidence supports candidate-level Watchlist regression and disposable-PostgreSQL RLS checks, but does not establish a canonical-head, hosted two-account security PASS. Keep `ledgerReconciled=false`. No merge or deployment is authorized by this audit record.
+
+
+## Follow-up: root Firebase configuration ownership
+
+- Exact canonical SHA `6082d19ece570921a3d7b07d0d97042edc1a27c2`: `markets/stocks/index.html` loads `markets/stocks/supabase-client.js` and `markets/stocks/email-auth.js`. The Supabase client uses Supabase Auth (persisted session, refresh and PKCE); the email-auth module explicitly states Firebase is not used for this app.
+- The same canonical tree shows root `firebase-client.js` imports root `firebase-config.js`. Root `admin.js` imports `ADMIN_EMAIL` and `isFirebaseConfigured` from that config and dynamically loads `firebase-client.js` for the separate website admin workflows. Therefore the root config is shared by the broader ZENURA site/admin surface; it is not an S-TRADE Firebase auth dependency.
+- No Firebase config value, API key, secret or fingerprint is reproduced. No config file was modified. The public Firebase web config still needs Firebase Console verification of API restrictions and HTTP referrer restrictions. Treat Gitleaks as a scan failure until its finding is dispositioned with evidence; do not suppress the rule or remove shared config as a shortcut.
+- Crypto config and code remain untouched. The Crypto reference to its own config remains out of scope.
