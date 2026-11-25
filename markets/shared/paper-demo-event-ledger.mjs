@@ -263,15 +263,27 @@ export function createPaperDemoEventLedger(opening, settlementTrust = {}) {
   function snapshot() { return freeze(clone(projection)); }
   return Object.freeze({ append, appendSettlementReceipt, snapshot });
 }
-export function replayPaperDemoEvents(opening, events) {
+export function replayPaperDemoEvents(opening, events, settlementTrust = {}) {
   if (!Array.isArray(events)) fail("DEMO_EVENT_ARRAY_REQUIRED");
-  const ledger = createPaperDemoEventLedger(opening);
+  const ledger = createPaperDemoEventLedger(opening, settlementTrust);
   const ordered = [...events].sort((a, b) => a.sequence - b.sequence);
   ordered.forEach((event, index) => {
     if (event.sequence !== index + 1) fail("DEMO_EVENT_SEQUENCE_MISMATCH");
-    const { sequence, ...input } = event;
-    const result = ledger.append(input);
-    if (!result.accepted) fail("DUPLICATE_EVENT_IN_REPLAY");
+    if (event.type === "SETTLEMENT_RECEIPT_ACCEPTED") {
+      const receipt = event.payload?.receipt;
+      const result = ledger.appendSettlementReceipt(receipt, {
+        orderId: event.payload.orderId,
+        assetClass: event.payload.assetClass,
+        side: receipt?.side,
+        fillId: receipt?.fillId
+      });
+      if (!result.accepted || result.event.sequence !== index + 1) fail("INVALID_SETTLEMENT_EVENT_IN_REPLAY");
+      if (JSON.stringify(result.event) !== JSON.stringify(event)) fail("SETTLEMENT_EVENT_REPLAY_MISMATCH");
+    } else {
+      const { sequence, ...input } = event;
+      const result = ledger.append(input);
+      if (!result.accepted) fail("DUPLICATE_EVENT_IN_REPLAY");
+    }
   });
   return ledger.snapshot();
 }
