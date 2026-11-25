@@ -8,17 +8,36 @@ on:
       - "markets/stocks/demo.css"
       - "markets/stocks/demo.js"
       - "markets/stocks/index.html"
+      - "markets/stocks/account-settings.js"
+      - "markets/stocks/account-settings.css"
+      - "markets/stocks/account-settings.test.js"
+      - "markets/stocks/email-auth.js"
+      - "markets/stocks/email-auth.test.js"
+      - "markets/service-worker.js"
+      - "market-gateway/lib/paper-wallet.js"
+      - "market-gateway/test/paper-wallet.test.js"
+      - "markets/language-toggle.js"
       - "market-gateway/test/paper-demo-dashboard.test.mjs"
       - ".github/workflows/s-trade-demo-screen-wiring.yml"
   push:
     branches:
       - feature/s-trade-round2-demo-screen-wiring-2026-11-24
+      - feature/s-trade-account-demo-ux-integration-2026-11-24
     paths:
       - "markets/shared/paper-demo-adapter.mjs"
       - "markets/stocks/demo.html"
       - "markets/stocks/demo.css"
       - "markets/stocks/demo.js"
       - "markets/stocks/index.html"
+      - "markets/stocks/account-settings.js"
+      - "markets/stocks/account-settings.css"
+      - "markets/stocks/account-settings.test.js"
+      - "markets/stocks/email-auth.js"
+      - "markets/stocks/email-auth.test.js"
+      - "markets/service-worker.js"
+      - "markets/language-toggle.js"
+      - "market-gateway/lib/paper-wallet.js"
+      - "market-gateway/test/paper-wallet.test.js"
       - "market-gateway/test/paper-demo-dashboard.test.mjs"
       - ".github/workflows/s-trade-demo-screen-wiring.yml"
 
@@ -34,7 +53,9 @@ jobs:
         with:
           node-version: "22"
       - name: Check browser module syntax
-        run: node --check markets/shared/paper-demo-adapter.mjs && node --check markets/stocks/demo.js
+        run: node --check markets/shared/paper-demo-adapter.mjs && node --check markets/stocks/demo.js && node --input-type=module --check < markets/stocks/account-settings.js && node --input-type=module --check < markets/stocks/email-auth.js && node --check markets/language-toggle.js
+      - name: Test account isolation and session switching
+        run: node --test markets/stocks/account-settings.test.js market-gateway/test/paper-wallet.test.js markets/stocks/email-auth.test.js
       - name: Validate shared fixtures
         run: |
           node - <<'NODE'

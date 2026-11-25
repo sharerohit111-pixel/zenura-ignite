@@ -35,6 +35,8 @@ if (card && connectButton) {
   const create = form.querySelector("#email-create");
   const signOutButton = form.querySelector("#email-sign-out");
   let creating = false;
+  let authSequence = 0;
+  const isCurrent = sequence => sequence === authSequence;
   create.addEventListener("click", () => {
     creating = !creating;
     password.autocomplete = creating ? "new-password" : "current-password";
@@ -48,6 +50,7 @@ if (card && connectButton) {
   form.addEventListener("submit", async event => {
     event.preventDefault();
     if (!form.reportValidity()) return;
+    const sequence = authSequence;
     signIn.disabled = true;
     create.disabled = true;
     message.textContent = creating ? "Creating your account securely…" : "Signing in securely…";
@@ -59,6 +62,7 @@ if (card && connectButton) {
           options: { emailRedirectTo: location.origin + location.pathname }
         });
         if (error) throw error;
+        if (!isCurrent(sequence)) return;
         message.textContent = data.session
           ? "Account created and signed in. You can now connect Upstox."
           : "Account created. Check your email to confirm the address, then sign in.";
@@ -68,9 +72,11 @@ if (card && connectButton) {
           password: password.value
         });
         if (error) throw error;
+        if (!isCurrent(sequence)) return;
         message.textContent = "Signed in securely with Supabase.";
       }
     } catch (error) {
+      if (!isCurrent(sequence)) return;
       const messages = {
         "Invalid login credentials": "Email or password is incorrect.",
         "Email not confirmed": "Verify your email address, then sign in again.",
@@ -80,17 +86,29 @@ if (card && connectButton) {
       };
       message.textContent = messages[error?.message] || error?.message || "Authentication failed. Please retry.";
     } finally {
-      signIn.disabled = false;
-      create.disabled = false;
+      if (isCurrent(sequence)) {
+        signIn.disabled = false;
+        create.disabled = false;
+      }
     }
   });
   signOutButton.addEventListener("click", async () => {
+    const sequence = authSequence;
     signOutButton.disabled = true;
-    const { error } = await supabase.auth.signOut();
-    message.textContent = error?.message || "Signed out.";
-    signOutButton.disabled = false;
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (isCurrent(sequence)) message.textContent = error?.message || "Signed out.";
+    } catch (error) {
+      if (isCurrent(sequence)) message.textContent = error?.message || "Sign out failed.";
+    } finally {
+      if (isCurrent(sequence)) signOutButton.disabled = false;
+    }
   });
   supabase.auth.onAuthStateChange((_event, session) => {
+    authSequence++;
+    signIn.disabled = false;
+    create.disabled = false;
+    signOutButton.disabled = false;
     if (session?.user) {
       message.textContent = "Signed in as " + (session.user.email || "your account") + " using Supabase Auth.";
       email.hidden = true;
