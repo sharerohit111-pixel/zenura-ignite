@@ -21,6 +21,7 @@ test("Equity and Futures events share one idempotent projection",async()=>{
  ]};
  const interleavedProjection=sync("EQUITY",interleaved);
  const equityPosition=interleavedProjection.positions.find(p=>p.assetClass==="EQUITY");
+ console.log("TRADE_DEBUG",interleavedProjection.trades.map(t=>({id:t.fillId,side:t.side,quantity:t.quantity,filledAt:t.filledAt})),equityPosition);
  assert.equal(equityPosition.quantity,3);
  assert.equal(equityPosition.costBasisPaise,365000);
  assert.equal(equityPosition.realizedPnlPaise,5000);
