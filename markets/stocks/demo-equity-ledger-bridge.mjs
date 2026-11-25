@@ -56,7 +56,10 @@ export function createEquityDemoLedgerBridge({ engine, accountId, sessionId, led
     return {
       orderId: order.orderId, assetClass: "EQUITY", instrumentKey: order.instrumentKey,
       product: order.product, side: order.side, orderType: order.orderType,
-      quantity: order.quantity, status: order.status
+      quantity: order.quantity, status: order.status, symbol: order.symbol,
+      filledQuantity: order.filledQuantity, remainingQuantity: order.remainingQuantity,
+      limitPricePaise: order.limitPricePaise, averagePricePaise: order.averagePricePaise,
+      grossValuePaise: order.grossValuePaise, reservedCashPaise: order.reservedCashPaise
     };
   }
   function submitOrder(request) {
@@ -108,7 +111,8 @@ export function createEquityDemoLedgerBridge({ engine, accountId, sessionId, led
     append("FILL_RECORDED", {
       fillId: fill.fillId, orderId: fill.orderId, assetClass: "EQUITY",
       instrumentKey: fill.instrumentKey, product: fill.product, side: fill.side,
-      quantity: fill.quantity, pricePaise: fill.pricePaise
+      quantity: fill.quantity, pricePaise: fill.pricePaise, orderType: result.order.orderType,
+      grossPaise: fill.grossValuePaise, executedAt: fill.filledAt, symbol: fill.symbol
     }, {
       cashDeltaPaise: safeDelta(after.account.cashBalancePaise, before.account.cashBalancePaise),
       blockedDeltaPaise: safeDelta(after.account.blockedFundsPaise, before.account.blockedFundsPaise)
@@ -119,7 +123,7 @@ export function createEquityDemoLedgerBridge({ engine, accountId, sessionId, led
       assetClass: "EQUITY", instrumentKey: fill.instrumentKey, product: fill.product,
       quantityDelta: safeDelta(newPosition.quantity, oldPosition.quantity),
       costBasisDeltaPaise: safeDelta(newPosition.costBasisPaise, oldPosition.costBasisPaise),
-      realizedPnlDeltaPaise: fill.realizedPnlPaise
+      realizedPnlDeltaPaise: fill.realizedPnlPaise, symbol: fill.symbol
     }, { cashDeltaPaise: 0, blockedDeltaPaise: 0 }, "position-" + fill.fillId);
     append("ORDER_UPDATED", orderPayload(result.order), {
       cashDeltaPaise: 0, blockedDeltaPaise: 0
