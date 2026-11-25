@@ -50,9 +50,9 @@ export function calculateAggregateUnrealized(positions, marks, now = Date.now())
   return { complete: true, value };
 }
 
-export function portfolioMarketValueDisplay(position, mark) {
+export function portfolioMarketValueDisplay(position, mark, now = Date.now()) {
   if (position?.assetClass === "FUTURE") return "Not applicable (Futures MTM)";
-  if (!isUsablePortfolioMark(mark) || !Number.isSafeInteger(position?.quantity)) return "—";
+  if (!isUsablePortfolioMark(mark, now) || !Number.isSafeInteger(position?.quantity)) return "—";
   const value = mark.pricePaise * position.quantity;
   return Number.isSafeInteger(value) ? money(value) : "—";
 }
