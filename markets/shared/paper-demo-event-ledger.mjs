@@ -55,6 +55,9 @@ function validateEvent(input, identity, expectedSequence) {
         !ORDER_STATUSES.has(p.status) || (input.type === "ORDER_REJECTED" && p.status !== "REJECTED") || (input.type !== "ORDER_REJECTED" && p.status === "REJECTED") || !integer(p.quantity) || p.quantity < 1 ||
         !PRODUCTS.has(productOf(p)) ||
         (p.reservedQuantityDelta !== undefined && !integer(p.reservedQuantityDelta))) fail("INVALID_ORDER_EVENT");
+    if (input.type === "ORDER_REJECTED" && (p.reservedQuantityDelta ?? 0) !== 0) {
+      fail("UNAUTHORIZED_REJECTION_SHARE_RESERVATION");
+    }
     if (input.engine === "EQUITY" && p.assetClass !== "EQUITY") fail("ENGINE_ASSET_MISMATCH");
     if (input.engine === "FUTURES" && p.assetClass !== "FUTURE") fail("ENGINE_ASSET_MISMATCH");
     if (input.engine === "OPTIONS" && p.assetClass !== "OPTION") fail("ENGINE_ASSET_MISMATCH");
