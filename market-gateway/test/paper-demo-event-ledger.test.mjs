@@ -430,3 +430,51 @@ test("event timestamps reject impossible calendar and clock values", () => {
   assert.throws(() => ledger.append(event({ occurredAt: "2026-11-25T24:00:00+05:30" })), /INVALID_EVENT_TIMESTAMP/);
   assert.equal(ledger.snapshot().events.length, 0);
 });
+
+
+test("Options SELL cancellation and expiry release only unfilled contract reservations", () => {
+  for (const [index, terminalStatus] of ["CANCELLED", "EXPIRED"].entries()) {
+    const ledger = createPaperDemoEventLedger(opening);
+    const instrumentKey = "MOCK|NSE|OPT|NIFTY-26000-CE";
+    ledger.append(event({
+      engine: "OPTIONS", type: "POSITION_CHANGED",
+      eventId: "evt-option-position-" + index, idempotencyKey: "idem-option-position-" + index,
+      sourceEventId: "source-option-position-" + index,
+      deltas: { cashDeltaPaise: 0, blockedDeltaPaise: 0 },
+      payload: { assetClass: "OPTION", instrumentKey, quantityDelta: 5, costBasisDeltaPaise: 50000, realizedPnlDeltaPaise: 0 }
+    }));
+    ledger.append(event({
+      engine: "OPTIONS", eventId: "evt-option-accepted-" + index,
+      idempotencyKey: "idem-option-accepted-" + index, sourceEventId: "source-option-accepted-" + index,
+      occurredAt: "2026-11-25T09:30:01+05:30",
+      deltas: { cashDeltaPaise: 0, blockedDeltaPaise: 0 },
+      payload: { ...event().payload, orderId: "option-order-" + index, assetClass: "OPTION",
+        instrumentKey, side: "SELL", quantity: 3, status: "PENDING" }
+    }));
+    assert.equal(ledger.snapshot().positions[0].reservedQuantity, 3);
+    ledger.append(event({
+      engine: "OPTIONS", type: "FILL_RECORDED",
+      eventId: "evt-option-fill-" + index, idempotencyKey: "idem-option-fill-" + index,
+      sourceEventId: "source-option-fill-" + index, occurredAt: "2026-11-25T09:30:02+05:30",
+      deltas: { cashDeltaPaise: 0, blockedDeltaPaise: 0 },
+      payload: { fillId: "option-fill-" + index, orderId: "option-order-" + index,
+        assetClass: "OPTION", instrumentKey, side: "SELL", quantity: 1, pricePaise: 10000 }
+    }));
+    assert.equal(ledger.snapshot().positions[0].reservedQuantity, 2);
+    ledger.append(event({
+      engine: "OPTIONS", type: "ORDER_UPDATED",
+      eventId: "evt-option-terminal-" + index, idempotencyKey: "idem-option-terminal-" + index,
+      sourceEventId: "source-option-terminal-" + index, occurredAt: "2026-11-25T09:30:03+05:30",
+      deltas: { cashDeltaPaise: 0, blockedDeltaPaise: 0 },
+      payload: { ...event().payload, orderId: "option-order-" + index, assetClass: "OPTION",
+        instrumentKey, side: "SELL", quantity: 3, status: terminalStatus }
+    }));
+    const snapshot = ledger.snapshot();
+    assert.equal(snapshot.orders[0].status, terminalStatus);
+    assert.equal(snapshot.orders[0].filledQuantity, 1);
+    assert.equal(snapshot.orders[0].remainingQuantity, 2);
+    assert.equal(snapshot.positions[0].reservedQuantity, 0);
+    assert.equal(snapshot.fills.length, 1);
+    assert.deepEqual(replayPaperDemoEvents(opening, snapshot.events), snapshot);
+  }
+});
