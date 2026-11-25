@@ -1,3 +1,4 @@
+import { getSharedPaperDemoLedgerSession } from "../shared/paper-demo-ledger-session.mjs";
 import { createDerivativeDemoLedgerBridge } from "./demo-derivative-ledger-bridge.mjs";
 let fixturePromise=null,simulator=null,ledgerBridge=null,requestSequence=0;
 const el=(tag,cls,value)=>{const n=document.createElement(tag);if(cls)n.className=cls;if(value!==undefined)n.textContent=String(value);return n;};
@@ -5,12 +6,24 @@ const money=value=>Number.isSafeInteger(value)?"₹"+(value/100).toLocaleString(
 const add=(select,value,label)=>{const o=document.createElement("option");o.value=value;o.textContent=label;select.append(o);};
 async function getSimulator(){
  if(simulator)return simulator;
- if(!fixturePromise)fixturePromise=fetch(new URL("../../market-gateway/mock/fixtures/derivatives.json",import.meta.url),{method:"GET",credentials:"omit",cache:"no-store",headers:{Accept:"application/json"}}).then(r=>{if(!r.ok)throw new Error("DEMO_DERIVATIVES_FIXTURE_UNAVAILABLE");return r.json();});
- const fixture=await fixturePromise;
+ if(!fixturePromise)fixturePromise=Promise.all([
+  fetch(new URL("../../market-gateway/mock/fixtures/derivatives.json",import.meta.url),{method:"GET",credentials:"omit",cache:"no-store",headers:{Accept:"application/json"}}),
+  fetch(new URL("../../market-gateway/mock/fixtures/account.json",import.meta.url),{method:"GET",credentials:"omit",cache:"no-store",headers:{Accept:"application/json"}})
+ ]).then(async([derivativesResponse,accountResponse])=>{
+  if(!derivativesResponse.ok||!accountResponse.ok)throw new Error("DEMO_SHARED_FIXTURE_UNAVAILABLE");
+  const [derivativesEnvelope,accountEnvelope]=await Promise.all([derivativesResponse.json(),accountResponse.json()]);
+  if(accountEnvelope?.mode!=="MOCK"||accountEnvelope?.simulated!==true||accountEnvelope?.meta?.source!=="SYNTHETIC_FIXTURE")throw new Error("INVALID_SHARED_DEMO_ACCOUNT_FIXTURE");
+  return {derivativesEnvelope,accountEnvelope};
+ });
+ const {derivativesEnvelope:fixture,accountEnvelope}=await fixturePromise;
  if(!window.ZENURA_DERIVATIVE_MOCK?.createDerivativeMockSimulator)throw new Error("DEMO_DERIVATIVE_SIMULATOR_UNAVAILABLE");
  simulator=window.ZENURA_DERIVATIVE_MOCK.createDerivativeMockSimulator(fixture);
- const sessionToken=window.crypto?.randomUUID?.()||("fo-"+Date.now()+"-"+Math.random().toString(36).slice(2));
- ledgerBridge=createDerivativeDemoLedgerBridge({simulator,accountId:"mock-fo-account",sessionId:"demo-"+sessionToken});
+ const sharedSession=getSharedPaperDemoLedgerSession({
+  accountId:accountEnvelope.data.accountId,
+  cashBalancePaise:accountEnvelope.data.cashBalancePaise,
+  blockedFundsPaise:accountEnvelope.data.blockedFundsPaise
+ });
+ ledgerBridge=createDerivativeDemoLedgerBridge({simulator,...sharedSession});
  return simulator;
 }
 function renderTable(host,headers,rows,empty){
