@@ -54,7 +54,7 @@ export function createDerivativeDemoLedgerBridge({
       side: order.side, orderType: order.orderType, quantity: order.quantity,
       status, symbol: order.symbol, expiry: order.expiry, optionType: order.optionType,
       strikePaise: order.strikePaise, lots: order.lots, lotSize: order.lotSize,
-      filledQuantity: order.filledQuantity, remainingQuantity: order.remainingQuantity,
+      limitPricePaise: order.limitPricePaise, filledQuantity: order.filledQuantity, remainingQuantity: order.remainingQuantity,
       averageFillPricePaise: order.averageFillPricePaise, ...extra
     };
   }
@@ -80,7 +80,7 @@ export function createDerivativeDemoLedgerBridge({
       append(engine, "FILL_RECORDED", {
         fillId: fill.fillId, orderId: order.orderId, assetClass: order.assetClass,
         instrumentKey: order.instrumentKey, product: order.assetClass === "FUTURE" ? order.product : "DELIVERY",
-        side: order.side, quantity: fill.quantity, pricePaise: fill.pricePaise,
+        side: order.side, orderType: order.orderType, quantity: fill.quantity, pricePaise: fill.pricePaise, grossPaise: fill.grossPaise, executedAt: fill.executedAt,
         symbol: order.symbol, expiry: order.expiry, optionType: order.optionType, strikePaise: order.strikePaise,
         realizedPnlPaise: fill.realizedPnlPaise || 0
       }, "fill-" + fill.fillId);
