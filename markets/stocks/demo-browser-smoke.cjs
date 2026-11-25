@@ -134,8 +134,17 @@ const axePath=require.resolve("axe-core/axe.min.js");
   // Keep the PWA fixture smoke in explicit test mode, never an implicit development default.
   await pwa.addInitScript(()=>{window.ZENURA_RUNTIME_ENV="test";});
   const page=await pwa.newPage();
-  console.log("PWA: opening market shell");
+  // Seed a previous shell cache before allowing the v10 registration to install.
+  await page.route("**/pwa-register.js",route=>route.fulfill({status:200,contentType:"application/javascript",body:""}));
+  console.log("PWA: opening market shell with stale v9 cache seeded");
   await page.goto("http://127.0.0.1:4173/markets/",{waitUntil:"domcontentloaded",timeout:30000});
+  await page.waitForLoadState("load",{timeout:10000});
+  await page.evaluate(async()=>{
+   const stale=await caches.open("zenura-markets-shell-v9");
+   await stale.put(new URL("__stale-cache-probe",location.href).toString(),new Response("stale"));
+  });
+  await page.unroute("**/pwa-register.js");
+  await page.reload({waitUntil:"domcontentloaded",timeout:30000});
   await page.waitForLoadState("load",{timeout:10000});
   await page.waitForFunction(async()=>{
    const registrations=await navigator.serviceWorker.getRegistrations();
@@ -154,7 +163,13 @@ const axePath=require.resolve("axe-core/axe.min.js");
   });
   assert.equal(workerState.state,"activated","service worker must be active before controlled reload");
   assert.ok(workerState.scope.endsWith("/markets/"),"Markets service worker scope must not capture Crypto or production routes");
-  console.log(JSON.stringify({pwaWorker:workerState.state,scope:workerState.scope}));
+  const cacheUpgrade=await page.evaluate(async()=>{
+   const keys=await caches.keys();
+   return {v10:keys.includes("zenura-markets-shell-v10"),staleV9:keys.includes("zenura-markets-shell-v9")};
+  });
+  assert.equal(cacheUpgrade.v10,true,"new v10 shell cache must be installed");
+  assert.equal(cacheUpgrade.staleV9,false,"activation must remove stale v9 shell cache");
+  console.log(JSON.stringify({pwaWorker:workerState.state,scope:workerState.scope,cacheUpgrade}));
   // Wait for the activated registration before reloading into its controlled scope.
   console.log("PWA: reloading under active service worker");
   await page.reload({waitUntil:"domcontentloaded",timeout:30000});
