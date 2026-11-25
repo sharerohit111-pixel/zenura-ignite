@@ -1,0 +1,410 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://zenuraignite.com/schemas/paper-trading-domain.schema.json",
+  "title": "S-TRADE shared Indian Market Paper Trading domain contracts",
+  "$defs": {
+    "paise": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "signedPaise": {
+      "type": "integer"
+    },
+    "quantity": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 1000000
+    },
+    "exchange": {
+      "enum": [
+        "NSE",
+        "BSE"
+      ]
+    },
+    "side": {
+      "enum": [
+        "BUY",
+        "SELL"
+      ]
+    },
+    "orderType": {
+      "enum": [
+        "MARKET",
+        "LIMIT"
+      ]
+    },
+    "orderStatus": {
+      "enum": [
+        "PENDING",
+        "PARTIALLY_FILLED",
+        "FILLED",
+        "CANCELLED",
+        "REJECTED",
+        "EXPIRED"
+      ]
+    },
+    "product": {
+      "enum": [
+        "INTRADAY",
+        "DELIVERY"
+      ]
+    },
+    "instrument": {
+      "type": "object",
+      "required": [
+        "instrumentKey",
+        "exchange",
+        "symbol",
+        "assetClass"
+      ],
+      "properties": {
+        "instrumentKey": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "exchange": {
+          "$ref": "#/$defs/exchange"
+        },
+        "symbol": {
+          "type": "string",
+          "minLength": 1
+        },
+        "assetClass": {
+          "enum": [
+            "EQUITY",
+            "FUTURE",
+            "OPTION",
+            "INDEX"
+          ]
+        },
+        "expiry": {
+          "type": "string",
+          "format": "date"
+        },
+        "strikePaise": {
+          "$ref": "#/$defs/paise"
+        },
+        "optionType": {
+          "enum": [
+            "CE",
+            "PE"
+          ]
+        },
+        "lotSize": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "tickSizePaise": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "quote": {
+      "type": "object",
+      "required": [
+        "instrumentKey",
+        "lastPricePaise",
+        "provider",
+        "timestamp",
+        "stale"
+      ],
+      "properties": {
+        "instrumentKey": {
+          "type": "string",
+          "minLength": 1
+        },
+        "lastPricePaise": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "changePaise": {
+          "$ref": "#/$defs/signedPaise"
+        },
+        "volume": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "provider": {
+          "const": "MOCK"
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "stale": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "order": {
+      "type": "object",
+      "required": [
+        "orderId",
+        "side",
+        "orderType",
+        "status"
+      ],
+      "anyOf": [
+        {
+          "required": [
+            "quantity"
+          ]
+        },
+        {
+          "required": [
+            "lots"
+          ]
+        }
+      ],
+      "properties": {
+        "orderId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "side": {
+          "$ref": "#/$defs/side"
+        },
+        "orderType": {
+          "$ref": "#/$defs/orderType"
+        },
+        "product": {
+          "$ref": "#/$defs/product"
+        },
+        "quantity": {
+          "$ref": "#/$defs/quantity"
+        },
+        "lots": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10000
+        },
+        "limitPricePaise": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "averagePricePaise": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "chargesPaise": {
+          "$ref": "#/$defs/paise"
+        },
+        "status": {
+          "$ref": "#/$defs/orderStatus"
+        }
+      },
+      "additionalProperties": false
+    },
+    "position": {
+      "type": "object",
+      "required": [
+        "quantity",
+        "averagePricePaise"
+      ],
+      "properties": {
+        "quantity": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "averagePricePaise": {
+          "$ref": "#/$defs/paise"
+        },
+        "investedValuePaise": {
+          "$ref": "#/$defs/paise"
+        },
+        "realizedPnlPaise": {
+          "$ref": "#/$defs/signedPaise"
+        },
+        "unrealizedPnlPaise": {
+          "$ref": "#/$defs/signedPaise"
+        }
+      },
+      "additionalProperties": false
+    },
+    "account": {
+      "type": "object",
+      "required": [
+        "accountId",
+        "currency",
+        "startingCapitalPaise",
+        "cashBalancePaise",
+        "blockedFundsPaise",
+        "availableFundsPaise",
+        "ledgerReconciled"
+      ],
+      "properties": {
+        "accountId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "currency": {
+          "const": "INR"
+        },
+        "startingCapitalPaise": {
+          "$ref": "#/$defs/paise"
+        },
+        "cashBalancePaise": {
+          "$ref": "#/$defs/paise"
+        },
+        "blockedFundsPaise": {
+          "$ref": "#/$defs/paise"
+        },
+        "availableFundsPaise": {
+          "$ref": "#/$defs/paise"
+        },
+        "realizedPnlPaise": {
+          "$ref": "#/$defs/signedPaise"
+        },
+        "unrealizedPnlPaise": {
+          "$ref": "#/$defs/signedPaise"
+        },
+        "ledgerReconciled": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "derivativeInstrument": {
+      "type": "object",
+      "required": [
+        "instrumentKey",
+        "exchange",
+        "symbol",
+        "assetClass",
+        "expiry",
+        "lotSize",
+        "tickSizePaise"
+      ],
+      "properties": {
+        "instrumentKey": {
+          "type": "string",
+          "pattern": "^MOCK\\|"
+        },
+        "exchange": {
+          "$ref": "#/$defs/exchange"
+        },
+        "symbol": {
+          "type": "string",
+          "pattern": "^MOCK"
+        },
+        "assetClass": {
+          "enum": [
+            "FUTURE",
+            "OPTION"
+          ]
+        },
+        "underlying": {
+          "type": "string",
+          "pattern": "^MOCK"
+        },
+        "expiry": {
+          "type": "string",
+          "format": "date"
+        },
+        "lotSize": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "tickSizePaise": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "optionType": {
+          "enum": [
+            "CE",
+            "PE"
+          ]
+        },
+        "strikePaise": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "assetClass": {
+                "const": "OPTION"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "underlying",
+              "optionType",
+              "strikePaise"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "assetClass": {
+                "const": "FUTURE"
+              }
+            }
+          },
+          "then": {
+            "not": {
+              "required": [
+                "optionType"
+              ]
+            }
+          }
+        }
+      ],
+      "additionalProperties": false
+    },
+    "derivativeQuote": {
+      "type": "object",
+      "required": [
+        "instrumentKey",
+        "bidPricePaise",
+        "askPricePaise",
+        "bidQuantity",
+        "askQuantity",
+        "provider",
+        "timestamp",
+        "stale"
+      ],
+      "properties": {
+        "instrumentKey": {
+          "type": "string",
+          "pattern": "^MOCK\\|"
+        },
+        "bidPricePaise": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "askPricePaise": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "bidQuantity": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "askQuantity": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "provider": {
+          "const": "MOCK"
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "stale": {
+          "const": false
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

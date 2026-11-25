@@ -1,0 +1,1818 @@
+name: Paper Trading Supabase SQL smoke test
+
+on:
+  pull_request:
+    paths:
+      - "supabase/migrations/**"
+      - ".github/workflows/paper-trading-supabase-migrations.yml"
+      - ".github/workflows/deploy-supabase-market-gateway.yml"
+      - "functions/**"
+      - "firebase.json"
+      - ".github/workflows/deploy-firebase-functions.yml"
+      - "markets/**"
+      - "markets/stocks/**"
+      - "market-gateway/supabase-server.js"
+      - "market-gateway/Dockerfile"
+      - "market-gateway/package.json"
+      - "market-gateway/README.md"
+      - "market-gateway/DEPLOYMENT.md"
+      - "market-gateway/MARKET-DATA-COMPLIANCE.md"
+      - "market-gateway/test/supabase-deployment.test.js"
+      - "market-gateway/lib/paper-limit-worker.js"
+      - "market-gateway/lib/paper-intraday-limit-worker.js"
+      - "market-gateway/test/paper-intraday-limit-worker.test.js"
+      - "market-gateway/lib/exchange-session-calendar.js"
+      - "market-gateway/test/exchange-session-calendar.test.js"
+      - "market-gateway/test/exchange-session-import.test.js"
+      - "market-gateway/test/intraday-limit-policy.test.js"
+      - "market-gateway/test/paper-limit-worker.test.js"
+      - "market-gateway/lib/intraday-limit-policy.js"
+      - "market-gateway/test/intraday-limit-policy.test.js"
+      - "market-gateway/lib/protective-order-worker.js"
+      - "market-gateway/test/protective-order-worker.test.js"
+      - "market-gateway/test/paper-limit-worker.test.js"
+      - "market-gateway/paper-limit-worker.js"
+      - "market-gateway/lib/bse-equity-fee-master.js"
+      - "market-gateway/test/bse-equity-fee-master.test.js"
+      - "market-gateway/scripts/import-bse-scrip-master.js"
+      - "market-gateway/lib/exchange-session-import.js"
+      - "market-gateway/test/exchange-session-import.test.js"
+      - "market-gateway/scripts/import-exchange-sessions.js"
+      - "market-gateway/test/trading-charges.test.js"
+      - "market-gateway/test/derivative-order-transaction.test.js"
+      - "market-gateway/test/derivative-contract.test.js"
+      - "market-gateway/lib/derivative-limit-quote-policy.js"
+      - "market-gateway/test/derivative-limit-quote-policy.test.js"
+      - "market-gateway/lib/upstox-executable-quote.js"
+      - "market-gateway/test/upstox-executable-quote.test.js"
+      - "supabase/tests/**"
+      - "supabase/tests/protective_order_cancel.sql"
+      - "market-gateway/lib/**"
+      - "market-gateway/test/**"
+      - "market-gateway/supabase-server.js"
+      - "supabase/**"
+  push:
+    branches:
+      - integration/supabase-native-auth-professional-launch-2026-11-22
+
+  workflow_dispatch:
+
+concurrency:
+  group: paper-trading-supabase-migrations-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  postgres-migration-smoke:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: paper_trading_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d paper_trading_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      PGHOST: localhost
+      PGPORT: 5432
+      PGUSER: postgres
+      PGPASSWORD: postgres
+      PGDATABASE: paper_trading_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Verify Firebase Functions Node 22 runtime and dependency compatibility
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+          const firebase = JSON.parse(fs.readFileSync('firebase.json', 'utf8'));
+          const pkg = JSON.parse(fs.readFileSync('functions/package.json', 'utf8'));
+          const deploy = fs.readFileSync('.github/workflows/deploy-firebase-functions.yml', 'utf8');
+          if (firebase.functions?.find(item => item.source === 'functions')?.runtime !== 'nodejs22') throw new Error('firebase.json must use nodejs22');
+          if (pkg.engines?.node !== '22') throw new Error('functions/package.json must require Node 22');
+          if (!/node-version:\s*["']22["']/.test(deploy)) throw new Error('Firebase deploy workflow must use Node 22');
+          console.log('Firebase runtime, package engine and deploy workflow all target Node 22.');
+          NODE
+          npm install --prefix functions --ignore-scripts --no-audit --no-fund
+          npm audit --prefix functions --omit=dev
+          node --check functions/index.js
+          node --check functions/kirana.js
+          node --check functions/kirana-ledger.js
+      - name: Check native Supabase Auth browser modules
+        run: |
+          node --input-type=module --check < markets/stocks/supabase-client.js
+          node --input-type=module --check < markets/stocks/connect.js
+          node --input-type=module --check < markets/stocks/email-auth.js
+          node --check markets/stocks/stocks.js
+          node --check markets/language-toggle.js
+          if grep -Eiq 'firebase-client|firebase-auth|firebase-functions' markets/stocks/supabase-client.js markets/stocks/connect.js markets/stocks/email-auth.js; then
+            echo "Firebase authentication dependency remains in the new market app."
+            exit 1
+          fi
+      - name: Check installable market PWA and service worker
+        run: node --check markets/service-worker.js
+      - name: Run account and session isolation regression tests
+        run: node --test markets/stocks/connect-session-isolation.test.js
+      - name: Validate manual Supabase gateway deployment workflow YAML
+        run: ruby -e 'require "yaml"; YAML.load_file(".github/workflows/deploy-supabase-market-gateway.yml")'
+      - name: Check professional chart engine and indicator calculations
+        run: |
+          node --check markets/stocks/chart-engine.js
+          node --check markets/stocks/chart-indicators.js
+          node --test markets/stocks/chart-indicators.test.js
+      - name: Verify Supabase-only Cloud Run entrypoint and production dependency boundary
+        run: node --test market-gateway/test/supabase-deployment.test.js
+      - name: Check Indian-market Intraday LIMIT session and expiry policy
+        run: |
+          node --check market-gateway/lib/intraday-limit-policy.js
+          node --test market-gateway/test/intraday-limit-policy.test.js
+      - name: Check Supabase LIMIT worker eligibility and cursor safety
+        run: |
+          node --check market-gateway/paper-limit-worker.js
+          node --test market-gateway/test/paper-limit-worker.test.js
+          node --check market-gateway/lib/protective-order-worker.js
+          node --test market-gateway/test/protective-order-worker.test.js
+          node --check market-gateway/lib/paper-protective-worker.js
+          node --test market-gateway/test/paper-protective-worker.test.js
+      - name: Build production gateway image and verify Firebase is absent
+        run: |
+          set -euo pipefail
+          docker build --pull -f market-gateway/Dockerfile -t zenura-market-gateway:ci .
+          docker run --rm --entrypoint node zenura-market-gateway:ci -e '
+            const p=require("./package.json");
+            if(p.main!=="supabase-server.js") throw new Error("Wrong default gateway entrypoint");
+            for(const name of ["firebase-admin","@google-cloud/firestore"]) {
+              try { require.resolve(name); throw new Error("Legacy Firebase package leaked into production image: "+name); }
+              catch(error) { if(error.message.startsWith("Legacy Firebase package")) throw error; }
+            }
+          '
+      - name: Check Supabase-native gateway and token security
+        run: |
+          node --check market-gateway/lib/supabase-runtime.js
+          node --check market-gateway/supabase-server.js
+          node --check market-gateway/lib/upstox-token-crypto.js
+          node --test market-gateway/test/supabase-runtime.test.js market-gateway/test/upstox-token-crypto.test.js
+      - name: Build Supabase-native Cloud Run container from repository root
+        run: docker build --pull -f market-gateway/Dockerfile -t zenura-market-gateway:ci .
+      - name: Run Existing transaction reference charge-calculation boundary tests
+        run: node --test market-gateway/test/trading-charges.test.js
+      - name: Run Existing transaction reference option transaction tests
+        run: node --test market-gateway/test/derivative-order-transaction.test.js
+      - name: Run Existing transaction reference derivative contract validation tests
+        run: node --test market-gateway/test/derivative-contract.test.js
+      - name: Run complete market-gateway regression suite
+        run: |
+          npm install --prefix market-gateway --no-audit --no-fund --package-lock=false
+          npm test --prefix market-gateway
+      - name: Prepare minimal Supabase-compatible auth roles
+        run: |
+          psql -v ON_ERROR_STOP=1 <<'SQL'
+          CREATE ROLE anon NOLOGIN;
+          CREATE ROLE authenticated NOLOGIN;
+          CREATE ROLE service_role NOLOGIN BYPASSRLS;
+          CREATE SCHEMA auth;
+          -- Minimal Supabase Auth fixture: application users are native auth.users rows.
+          CREATE TABLE auth.users (id uuid PRIMARY KEY);
+          CREATE FUNCTION auth.uid()
+          RETURNS uuid
+          LANGUAGE sql
+          STABLE
+          AS $uid$
+            SELECT NULLIF(COALESCE(
+              current_setting('request.jwt.claim.sub', true),
+              (NULLIF(current_setting('request.jwt.claims', true), '')::jsonb ->> 'sub')
+            ), '')::uuid
+          $uid$;
+          GRANT USAGE ON SCHEMA auth TO authenticated, service_role;
+          GRANT EXECUTE ON FUNCTION auth.uid() TO authenticated, service_role;
+          CREATE FUNCTION public.rls_auto_enable()
+          RETURNS event_trigger
+          LANGUAGE plpgsql
+          SECURITY DEFINER
+          SET search_path = pg_catalog
+          AS $fixture$
+          BEGIN
+            RETURN;
+          END
+          $fixture$;
+          GRANT EXECUTE ON FUNCTION public.rls_auto_enable() TO PUBLIC;
+          SQL
+      - name: Apply ordered draft migrations to disposable PostgreSQL
+        run: |
+          set -euo pipefail
+          for migration in supabase/migrations/*.sql; do
+            echo "Applying $migration"
+            psql -v ON_ERROR_STOP=1 -f "$migration"
+          done
+      - name: Verify least-privilege Supabase market gateway service-role grants
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/market_gateway_service_role_grants.sql
+      - name: Verify distributed per-user API rate-limit budgets and RPC isolation
+        run: |
+          node --check market-gateway/lib/api-rate-limit.js
+          node --check market-gateway/test/api-rate-limit.test.js
+          node --test market-gateway/test/api-rate-limit.test.js
+          psql -v ON_ERROR_STOP=1 -f supabase/tests/paper_api_rate_limits.sql
+      - name: Exercise concurrent distributed API rate-limit requests
+        run: bash supabase/tests/paper_api_rate_limit_concurrency.sh
+      - name: Reconcile Indian-market Futures ledger cash, charges, realized P&L and margin
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/futures_market_order_accounting.sql
+      - name: Exercise atomic Futures LIMIT submit, reservation, cancel and expiry
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/futures_limit_submit_release.sql
+      - name: Exercise atomic Futures LIMIT partial fills and settlement conservation
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/futures_limit_atomic_fill.sql
+      - name: Exercise concurrent Futures LIMIT fill, cancel and duplicate execution races
+        run: bash supabase/tests/futures_limit_fill_cancel_race.sh
+      - name: Reconcile Indian-market long Options ledger cash, charges and realized P&L
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/long_option_ledger_reconciliation.sql
+      - name: Exercise atomic NSE Options LIMIT submit, cash/close reservation, cancel and expiry
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/options_limit_submit_release.sql
+      - name: Exercise atomic NSE Options LIMIT partial/full fill accounting and reservation settlement
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/options_limit_atomic_fill.sql
+      - name: Exercise concurrent NSE Options LIMIT fill, cancel and duplicate execution races
+        run: bash supabase/tests/options_limit_fill_cancel_race.sh
+      - name: Verify F&O LIMIT schema remains fail-closed until lifecycle release
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/derivative_limit_schema_guard.sql
+      - name: Verify isolated NSE Options LIMIT schema, RLS and MARKET SELL reservation guard
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/options_limit_schema.sql
+      - name: Verify long Options coexist with reserved Futures margin
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/option_buy_with_futures_margin.sql
+      - name: Exercise BSE scrip master import and group-specific fee rules
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/bse_equity_fee_master.sql
+      - name: Exercise verified NSE and BSE session calendar imports
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/exchange_session_import.sql
+      - name: Verify Supabase market worker single-writer lease and expiry
+        run: |
+          psql -v ON_ERROR_STOP=1 <<'SQL'
+          DO $worker_lease$
+          DECLARE
+            v_now bigint:=floor(extract(epoch from clock_timestamp())*1000)::bigint;
+            v_a uuid:='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+            v_b uuid:='bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+            v_result boolean;
+          BEGIN
+            SELECT public.acquire_paper_market_worker_lease('paper_limit_orders',v_a,v_now,240000) INTO v_result;
+            IF v_result IS NOT TRUE THEN RAISE EXCEPTION 'First worker lease was not acquired'; END IF;
+            SELECT public.acquire_paper_market_worker_lease('paper_limit_orders',v_b,v_now+1000,240000) INTO v_result;
+            IF v_result IS NOT FALSE THEN RAISE EXCEPTION 'Concurrent worker lease was unexpectedly acquired'; END IF;
+            SELECT public.release_paper_market_worker_lease('paper_limit_orders',v_a,v_now+2000) INTO v_result;
+            IF v_result IS NOT TRUE THEN RAISE EXCEPTION 'Worker lease was not released'; END IF;
+            SELECT public.acquire_paper_market_worker_lease('paper_limit_orders',v_b,v_now+3000,120000) INTO v_result;
+            IF v_result IS NOT TRUE THEN RAISE EXCEPTION 'Next worker did not acquire released lease'; END IF;
+            SELECT public.acquire_paper_market_worker_lease('paper_limit_orders',v_a,v_now+244000,120000) INTO v_result;
+            IF v_result IS NOT TRUE THEN RAISE EXCEPTION 'Expired worker lease was not recoverable'; END IF;
+            PERFORM public.release_paper_market_worker_lease('paper_limit_orders',v_a,v_now+245000);
+            SELECT public.acquire_paper_market_worker_lease('paper_protective_orders',v_a,v_now+246000,240000) INTO v_result;
+            IF v_result IS NOT TRUE THEN RAISE EXCEPTION 'Protective worker lease was not acquired'; END IF;
+            SELECT public.acquire_paper_market_worker_lease('paper_protective_orders',v_b,v_now+247000,240000) INTO v_result;
+            IF v_result IS NOT FALSE THEN RAISE EXCEPTION 'Second protective worker acquired the same lease'; END IF;
+            SELECT public.acquire_paper_market_worker_lease('paper_limit_orders',v_b,v_now+248000,240000) INTO v_result;
+            IF v_result IS NOT TRUE THEN RAISE EXCEPTION 'Independent LIMIT lease was blocked by protective worker'; END IF;
+            PERFORM public.release_paper_market_worker_lease('paper_protective_orders',v_a,v_now+249000);
+            PERFORM public.release_paper_market_worker_lease('paper_limit_orders',v_b,v_now+249000);
+          END
+          $worker_lease$;
+          SQL
+      - name: Reject non-finite option strike prices
+        run: |
+          psql -v ON_ERROR_STOP=1 <<'SQL'
+          DO $strike_guard$
+          DECLARE
+            v_strike numeric;
+            v_rejected boolean;
+          BEGIN
+            FOREACH v_strike IN ARRAY ARRAY[
+              'NaN'::numeric, 'Infinity'::numeric, '-Infinity'::numeric
+            ] LOOP
+              v_rejected := false;
+              BEGIN
+                PERFORM public.execute_paper_long_option_order(
+                  '22222222-2222-4222-8222-222222222222',
+                  repeat('a',64),
+                  'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+                  repeat('b',64),
+                  'NSE_FO|STRIKE_TEST','STRIKE_TEST','NSE','NSE_FO','CE',
+                  current_date+5,v_strike,25,5,1,'BUY',100,
+                  floor(extract(epoch from clock_timestamp())*1000)::bigint,
+                  floor(extract(epoch from clock_timestamp())*1000)::bigint
+                );
+              EXCEPTION WHEN SQLSTATE '22023' THEN
+                v_rejected := true;
+              END;
+              IF NOT v_rejected THEN
+                RAISE EXCEPTION 'Non-finite option strike was accepted: %', v_strike;
+              END IF;
+            END LOOP;
+          END
+          $strike_guard$;
+          SQL
+      - name: Exercise account initialization and account read isolation
+        run: |
+          psql -v ON_ERROR_STOP=1 <<'SQL'
+          INSERT INTO auth.users(id) VALUES
+            ('11111111-1111-4111-8111-111111111111'),
+            ('22222222-2222-4222-8222-222222222222'),
+            ('33333333-3333-4333-8333-333333333333'),
+            ('44444444-4444-4444-8444-444444444444'),
+            ('55555555-5555-4555-8555-555555555555'),
+            ('66666666-6666-4666-8666-666666666666'),
+            ('77777777-7777-4777-8777-777777777777'),
+            ('88888888-8888-4888-8888-888888888888'),
+            ('99999999-9999-4999-8999-999999999999'),
+            ('12121212-1212-4212-8212-121212121212');
+          SET ROLE service_role;
+          SELECT public.initialize_paper_trading_account('11111111-1111-4111-8111-111111111111');
+          SELECT public.initialize_paper_trading_account('22222222-2222-4222-8222-222222222222');
+          RESET ROLE;
+          UPDATE public.paper_accounts
+             SET cash_paise=76543210, reserved_cash_paise=100
+           WHERE user_id='11111111-1111-4111-8111-111111111111';
+          SET ROLE service_role;
+          SELECT public.initialize_paper_trading_account('11111111-1111-4111-8111-111111111111');
+          RESET ROLE;
+          DO $account_retry_checks$
+          BEGIN
+            IF (SELECT cash_paise FROM public.paper_accounts
+                WHERE user_id='11111111-1111-4111-8111-111111111111') <> 76543210 THEN
+              RAISE EXCEPTION 'Account retry reset an existing cash balance';
+            END IF;
+            IF (SELECT reserved_cash_paise FROM public.paper_accounts
+                WHERE user_id='11111111-1111-4111-8111-111111111111') <> 100 THEN
+              RAISE EXCEPTION 'Account retry reset an existing reservation';
+            END IF;
+            IF (SELECT cash_paise FROM public.paper_accounts
+                WHERE user_id='22222222-2222-4222-8222-222222222222') <> 100000000 THEN
+              RAISE EXCEPTION 'New account did not receive the expected 10 lakh virtual capital';
+            END IF;
+          END
+          $account_retry_checks$;
+          SET ROLE authenticated;
+          SELECT set_config('request.jwt.claims','{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated"}',false);
+          DO $$
+          BEGIN
+            IF (SELECT count(*) FROM public.paper_accounts) <> 1 THEN
+              RAISE EXCEPTION 'Authenticated user can see another user account or cannot see own account';
+            END IF;
+          END
+          $$;
+          RESET ROLE;
+          SQL
+      - name: Verify Intraday LIMIT worker lease registration and single-writer isolation
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/intraday_limit_worker_lease.sql
+      - name: Exercise Intraday LIMIT reservation, cancellation and session expiry
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/intraday_limit_reservations.sql
+      - name: Exercise concurrent Intraday LIMIT fill versus cancel row-lock races
+        run: bash supabase/tests/intraday_limit_fill_cancel_race.sh
+      - name: Verify authenticated table grants and RLS watchlist isolation
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/rls_permissions.sql
+      - name: Exercise fee-inclusive atomic NSE equity MARKET settlement
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/equity_market_fee_settlement.sql
+      - name: Exercise MARKET idempotency and LIMIT reservation lifecycle
+        run: |
+          psql -v ON_ERROR_STOP=1 <<'SQL'
+          DO $$
+          DECLARE
+            v_result jsonb;
+            v_cash bigint;
+            v_reserved bigint;
+            v_qty integer;
+            v_replay boolean;
+          BEGIN
+            -- MARKET BUY: 10 shares at ₹100; retry must not debit twice.
+            v_result := public.execute_paper_market_order(
+              '22222222-2222-4222-8222-222222222222',
+              repeat('a',64),
+              '33333333-3333-4333-8333-333333333333',
+              repeat('b',64),'NSE_EQ|TEST001','TEST001','NSE',
+              'BUY','DELIVERY',10,10000,floor(extract(epoch from clock_timestamp())*1000)::bigint,0
+            );
+            IF v_result->>'status' <> 'FILLED'
+               OR (v_result->>'cash_paise')::bigint <> 99897521 THEN
+              RAISE EXCEPTION 'MARKET BUY did not debit gross plus estimated charges';
+            END IF;
+            v_result := public.execute_paper_market_order(
+              '22222222-2222-4222-8222-222222222222',
+              repeat('a',64),
+              '33333333-3333-4333-8333-333333333333',
+              repeat('b',64),'NSE_EQ|TEST001','TEST001','NSE',
+              'BUY','DELIVERY',10,10000,floor(extract(epoch from clock_timestamp())*1000)::bigint,0
+            );
+            IF (v_result->>'idempotent_replay')::boolean IS NOT TRUE THEN
+              RAISE EXCEPTION 'MARKET retry was not idempotent';
+            END IF;
+            SELECT cash_paise INTO v_cash FROM public.paper_accounts
+             WHERE user_id='22222222-2222-4222-8222-222222222222';
+            IF v_cash <> 99897521 THEN
+              RAISE EXCEPTION 'MARKET idempotent retry debited cash more than once';
+            END IF;
+            -- Same key with a different fingerprint must fail.
+            BEGIN
+              PERFORM public.execute_paper_market_order(
+                '22222222-2222-4222-8222-222222222222',
+                repeat('c',64),
+                '33333333-3333-4333-8333-333333333333',
+                repeat('d',64),'NSE_EQ|TEST001','TEST001','NSE',
+                'BUY','DELIVERY',10,10000,floor(extract(epoch from clock_timestamp())*1000)::bigint,0
+              );
+              RAISE EXCEPTION 'Changed MARKET fingerprint was unexpectedly accepted';
+            EXCEPTION WHEN unique_violation THEN
+              NULL;
+            END;
+            -- SELL half the position: ₹10,000 gross spread; charges reduce net realized P&L, five shares remain.
+            v_result := public.execute_paper_market_order(
+              '22222222-2222-4222-8222-222222222222',
+              repeat('e',64),
+              '44444444-4444-4444-8444-444444444444',
+              repeat('f',64),'NSE_EQ|TEST001','TEST001','NSE',
+              'SELL','DELIVERY',5,12000,floor(extract(epoch from clock_timestamp())*1000)::bigint,0
+            );
+            SELECT quantity INTO v_qty FROM public.paper_equity_positions
+             WHERE user_id='22222222-2222-4222-8222-222222222222'
+               AND product='DELIVERY' AND instrument_key='NSE_EQ|TEST001';
+            IF v_qty <> 5 OR (v_result->>'order_realized_pnl_paise')::bigint <> 3978 THEN
+              RAISE EXCEPTION 'MARKET SELL net realized P&L or position is incorrect';
+            END IF;
+            BEGIN
+              PERFORM public.submit_paper_limit_order(
+                '22222222-2222-4222-8222-222222222222',repeat('9',64),
+                '99999999-9999-4999-8999-999999999999',repeat('a',64),
+                'BSE_EQ|LIMIT_BSE_BLOCK','LIMIT_BSE_BLOCK','BSE','BUY',1,10000
+              );
+              RAISE EXCEPTION 'BSE Delivery LIMIT was accepted without scrip-group fee inputs';
+            EXCEPTION WHEN SQLSTATE '22023' THEN NULL;
+            END;
+            -- Reject a LIMIT SELL whose minimum charges exceed gross proceeds.
+            BEGIN
+              PERFORM public.submit_paper_limit_order(
+                '22222222-2222-4222-8222-222222222222',repeat('b',64),
+                'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',repeat('c',64),
+                'NSE_EQ|TEST001','TEST001','NSE','SELL',1,1
+              );
+              RAISE EXCEPTION 'Tiny Delivery LIMIT SELL with negative net proceeds was accepted';
+            EXCEPTION WHEN SQLSTATE '22003' THEN
+              NULL;
+            END;
+            IF EXISTS(SELECT 1 FROM public.paper_orders
+              WHERE order_id='eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee') THEN
+              RAISE EXCEPTION 'Rejected tiny Delivery LIMIT SELL left a persisted order row';
+            END IF;
+            -- LIMIT BUY reservation then cancellation must release all reserved cash.
+            v_result := public.submit_paper_limit_order(
+              '22222222-2222-4222-8222-222222222222',
+              repeat('1',64),
+              '55555555-5555-4555-8555-555555555555',
+              repeat('2',64),'NSE_EQ|TEST002','TEST002','NSE',
+              'BUY',2,20000
+            );
+            SELECT reserved_cash_paise INTO v_reserved FROM public.paper_accounts
+             WHERE user_id='22222222-2222-4222-8222-222222222222';
+            IF v_reserved <> 42407 THEN
+              RAISE EXCEPTION 'LIMIT BUY did not reserve expected cash';
+            END IF;
+            PERFORM public.cancel_paper_limit_order(
+              '22222222-2222-4222-8222-222222222222',repeat('1',64)
+            );
+            SELECT reserved_cash_paise INTO v_reserved FROM public.paper_accounts
+             WHERE user_id='22222222-2222-4222-8222-222222222222';
+            IF v_reserved <> 0 THEN
+              RAISE EXCEPTION 'LIMIT BUY cancellation did not release reservation';
+            END IF;
+            -- LIMIT BUY fill at a better price releases reservation and debits actual fill.
+            PERFORM public.submit_paper_limit_order(
+              '22222222-2222-4222-8222-222222222222',
+              repeat('3',64),
+              '66666666-6666-4666-8666-666666666666',
+              repeat('4',64),'NSE_EQ|TEST003','TEST003','NSE',
+              'BUY',2,30000
+            );
+            v_result := public.execute_paper_limit_fill(
+              repeat('3',64),29000,floor(extract(epoch from clock_timestamp())*1000)::bigint,0,floor(extract(epoch from clock_timestamp())*1000)::bigint
+            );
+            SELECT reserved_cash_paise,cash_paise INTO v_reserved,v_cash
+              FROM public.paper_accounts
+             WHERE user_id='22222222-2222-4222-8222-222222222222';
+            IF v_result->>'status' <> 'FILLED' OR v_reserved <> 0 OR v_cash <> 99892310
+               OR (v_result->>'charges_paise')::bigint <> 2429
+               OR (v_result->>'cash_delta_paise')::bigint <> -60429 THEN
+              RAISE EXCEPTION 'LIMIT BUY fill cash or reservation result is incorrect after fee-inclusive MARKET basis';
+            END IF;
+            -- LIMIT SELL must reserve shares, reject stale quotes, and release on cancel.
+            PERFORM public.submit_paper_limit_order(
+              '22222222-2222-4222-8222-222222222222',
+              repeat('5',64),
+              '77777777-7777-4777-8777-777777777777',
+              repeat('6',64),'NSE_EQ|TEST001','TEST001','NSE',
+              'SELL',2,12500
+            );
+            SELECT quantity,reserved_quantity INTO v_qty,v_reserved
+              FROM public.paper_equity_positions
+             WHERE user_id='22222222-2222-4222-8222-222222222222'
+               AND product='DELIVERY' AND instrument_key='NSE_EQ|TEST001';
+            IF v_qty <> 5 OR v_reserved <> 2 THEN
+              RAISE EXCEPTION 'LIMIT SELL did not reserve the expected shares';
+            END IF;
+            BEGIN
+              PERFORM public.execute_paper_limit_fill(repeat('5',64),13000,floor(extract(epoch from clock_timestamp())*1000)::bigint-15001,15001,floor(extract(epoch from clock_timestamp())*1000)::bigint);
+              RAISE EXCEPTION 'Stale LIMIT quote was unexpectedly accepted';
+            EXCEPTION WHEN SQLSTATE '22023' THEN
+              NULL;
+            END;
+            PERFORM public.cancel_paper_limit_order(
+              '22222222-2222-4222-8222-222222222222',repeat('5',64)
+            );
+            SELECT quantity,reserved_quantity INTO v_qty,v_reserved
+              FROM public.paper_equity_positions
+             WHERE user_id='22222222-2222-4222-8222-222222222222'
+               AND product='DELIVERY' AND instrument_key='NSE_EQ|TEST001';
+            IF v_qty <> 5 OR v_reserved <> 0 THEN
+              RAISE EXCEPTION 'LIMIT SELL cancellation did not release reserved shares';
+            END IF;
+            -- A second LIMIT SELL fills at a better price and realizes allocated gain.
+            PERFORM public.submit_paper_limit_order(
+              '22222222-2222-4222-8222-222222222222',
+              repeat('7',64),
+              '88888888-8888-4888-8888-888888888888',
+              repeat('8',64),'NSE_EQ|TEST001','TEST001','NSE',
+              'SELL',2,12500
+            );
+            v_result := public.execute_paper_limit_fill(repeat('7',64),13000,floor(extract(epoch from clock_timestamp())*1000)::bigint,0,floor(extract(epoch from clock_timestamp())*1000)::bigint);
+            SELECT quantity,reserved_quantity INTO v_qty,v_reserved
+              FROM public.paper_equity_positions
+             WHERE user_id='22222222-2222-4222-8222-222222222222'
+               AND product='DELIVERY' AND instrument_key='NSE_EQ|TEST001';
+            SELECT cash_paise INTO v_cash FROM public.paper_accounts
+             WHERE user_id='22222222-2222-4222-8222-222222222222';
+            IF v_result->>'status' <> 'FILLED' OR v_qty <> 3 OR v_reserved <> 0
+               OR v_cash <> 99913563
+               OR (v_result->>'charges_paise')::bigint <> 4747
+               OR (v_result->>'cash_delta_paise')::bigint <> 21253
+               OR (v_result->>'realized_pnl_paise')::bigint <> 757 THEN
+              RAISE EXCEPTION 'LIMIT SELL fill position, cash, reservation or fee-inclusive basis P&L is incorrect';
+            END IF;
+          END
+          $$;
+          RESET ROLE;
+          SQL
+      - name: Reject stale, future and caller-age-mismatched MARKET quotes
+        run: |
+          psql -v ON_ERROR_STOP=1 <<'SQL'
+          DO $$
+          DECLARE
+            v_now bigint := floor(extract(epoch from clock_timestamp())*1000)::bigint;
+          BEGIN
+            BEGIN
+              PERFORM public.execute_paper_market_order(
+                '22222222-2222-4222-8222-222222222222',repeat('a',64),
+                '12121212-1212-4212-8212-121212121212',repeat('b',64),
+                'NSE_EQ|FUTURE','FUTURE','NSE','BUY','DELIVERY',1,10000,v_now+10000,0
+              );
+              RAISE EXCEPTION 'Future MARKET quote was accepted';
+            EXCEPTION WHEN SQLSTATE '22023' THEN NULL;
+            END;
+            BEGIN
+              PERFORM public.execute_paper_market_order(
+                '22222222-2222-4222-8222-222222222222',repeat('c',64),
+                '13131313-1313-4313-8313-131313131313',repeat('d',64),
+                'NSE_EQ|STALE','STALE','NSE','BUY','DELIVERY',1,10000,v_now-16000,16000
+              );
+              RAISE EXCEPTION 'Stale MARKET quote was accepted';
+            EXCEPTION WHEN SQLSTATE '22023' THEN NULL;
+            END;
+            BEGIN
+              PERFORM public.execute_paper_market_order(
+                '22222222-2222-4222-8222-222222222222',repeat('e',64),
+                '14141414-1414-4414-8414-141414141414',repeat('f',64),
+                'NSE_EQ|AGE','AGE','NSE','BUY','DELIVERY',1,10000,v_now,9000
+              );
+              RAISE EXCEPTION 'Caller-supplied MARKET quote age mismatch was accepted';
+            EXCEPTION WHEN SQLSTATE '22023' THEN NULL;
+            END;
+          END
+          $$;
+          SQL
+      - name: Exercise concurrent duplicate MARKET requests
+        run: |
+          set -euo pipefail
+          psql -v ON_ERROR_STOP=1 <<'SQL'
+          SET ROLE service_role;
+          SELECT public.initialize_paper_trading_account('33333333-3333-4333-8333-333333333333');
+          RESET ROLE;
+          SQL
+          run_duplicate() {
+            psql -v ON_ERROR_STOP=1 <<'SQL'
+          SET ROLE service_role;
+          SELECT public.execute_paper_market_order(
+            '33333333-3333-4333-8333-333333333333',repeat('d',64),
+            '15151515-1515-4515-8515-151515151515',repeat('e',64),
+            'NSE_EQ|RACE','RACE','NSE','BUY','DELIVERY',10,10000,
+            floor(extract(epoch from clock_timestamp())*1000)::bigint,0
+          );
+          RESET ROLE;
+          SQL
+          }
+          run_duplicate & pid1=$!
+          run_duplicate & pid2=$!
+          wait "$pid1"
+          wait "$pid2"
+          psql -v ON_ERROR_STOP=1 <<'SQL'
+          DO $$
+          BEGIN
+            IF (SELECT count(*) FROM public.paper_orders
+                WHERE user_id='33333333-3333-4333-8333-333333333333'
+                  AND idempotency_key='15151515-1515-4515-8515-151515151515') <> 1 THEN
+              RAISE EXCEPTION 'Concurrent duplicate MARKET requests created more than one order';
+            END IF;
+            IF (SELECT cash_paise FROM public.paper_accounts
+                WHERE user_id='33333333-3333-4333-8333-333333333333') <> 99897521 THEN
+              RAISE EXCEPTION 'Concurrent duplicate MARKET requests debited cash more than once';
+            END IF;
+          END
+          $$;
+          SQL
+      - name: Exercise concurrent LIMIT duplicate submit and fill-cancel race
+        run: |
+          set -euo pipefail
+          psql -v ON_ERROR_STOP=1 <<'SQL'
+          SET ROLE service_role;
+          SELECT public.initialize_paper_trading_account('44444444-4444-4444-8444-444444444444');
+          RESET ROLE;
+          SQL
+          run_submit() {
+            psql -v ON_ERROR_STOP=1 <<'SQL'
+          SET ROLE service_role;
+          SELECT public.submit_paper_limit_order(
+            '44444444-4444-4444-8444-444444444444',repeat('8',64),
+            '17171717-1717-4717-8717-171717171717',repeat('2',64),
+            'NSE_EQ|LIMITRACE','LIMITRACE','NSE','BUY',5,10000
+          );
+          RESET ROLE;
+          SQL
+          }
+          run_submit & pid1=$!
+          run_submit & pid2=$!
+          wait "$pid1"
+          wait "$pid2"
+          psql -v ON_ERROR_STOP=1 <<'SQL'
+          DO $$
+          BEGIN
+            IF (SELECT count(*) FROM public.paper_orders
+                WHERE user_id='44444444-4444-4444-8444-444444444444'
+                  AND idempotency_key='17171717-1717-4717-8717-171717171717') <> 1
+               OR (SELECT reserved_cash_paise FROM public.paper_accounts
+                WHERE user_id='44444444-4444-4444-8444-444444444444') <> 52420 THEN
+              RAISE EXCEPTION 'Concurrent LIMIT duplicate submit created duplicate reservation/order';
+            END IF;
+            BEGIN
+              PERFORM public.submit_paper_limit_order(
+                '44444444-4444-4444-8444-444444444444',repeat('8',64),
+                '17171717-1717-4717-8717-171717171717',repeat('3',64),
+                'NSE_EQ|LIMITRACE','LIMITRACE','NSE','BUY',5,10000
+              );
+              RAISE EXCEPTION 'LIMIT idempotency key accepted a changed fingerprint';
+            EXCEPTION WHEN unique_violation THEN NULL;
+            END;
+          END
+          $$;
+          SQL
+          run_fill() {
+            psql -v ON_ERROR_STOP=1 <<'SQL'
+          SET ROLE service_role;
+          DO $$
+          BEGIN
+            BEGIN
+              PERFORM public.execute_paper_limit_fill(
+                repeat('8',64),10000,
+                floor(extract(epoch from clock_timestamp())*1000)::bigint,0,
+                floor(extract(epoch from clock_timestamp())*1000)::bigint
+              );
+            EXCEPTION WHEN check_violation THEN NULL;
+            END;
+          END
+          $$;
+          RESET ROLE;
+          SQL
+          }
+          run_cancel() {
+            psql -v ON_ERROR_STOP=1 <<'SQL'
+          SET ROLE service_role;
+          DO $$
+          BEGIN
+            BEGIN
+              PERFORM public.cancel_paper_limit_order(
+                '44444444-4444-4444-8444-444444444444',repeat('8',64)
+              );
+            EXCEPTION WHEN check_violation THEN NULL;
+            END;
+          END
+          $$;
+          RESET ROLE;
+          SQL
+          }
+          run_fill & pid3=$!
+          run_cancel & pid4=$!
+          wait "$pid3"
+          wait "$pid4"
+          psql -v ON_ERROR_STOP=1 <<'SQL'
+          DO $$
+          DECLARE
+            v_status text;
+            v_cash bigint;
+            v_reserved bigint;
+          BEGIN
+            SELECT status INTO v_status FROM public.paper_orders
+             WHERE order_id=repeat('8',64);
+            SELECT cash_paise,reserved_cash_paise INTO v_cash,v_reserved
+             FROM public.paper_accounts
+             WHERE user_id='44444444-4444-4444-8444-444444444444';
+            IF v_status NOT IN ('FILLED','CANCELLED') OR v_reserved<>0 THEN
+              RAISE EXCEPTION 'LIMIT fill/cancel race left a non-terminal order or leaked reservation';
+            END IF;
+            IF (v_status='FILLED' AND v_cash<>99947580)
+               OR (v_status='CANCELLED' AND v_cash<>100000000) THEN
+              RAISE EXCEPTION 'LIMIT fill/cancel race produced inconsistent cash';
+            END IF;
+          END
+          $$;
+          SQL
+      - name: Reject null LIMIT side before any reservation or order write
+        run: |
+          psql -v ON_ERROR_STOP=1 <<'SQL'
+          DO $$
+          BEGIN
+            BEGIN
+              PERFORM public.submit_paper_limit_order(
+                '22222222-2222-4222-8222-222222222222',
+                repeat('0',64),'16161616-1616-4616-8616-161616161616',
+                repeat('b',64),'NSE_EQ|NULLSIDE','NULLSIDE','NSE',NULL,1,10000
+              );
+              RAISE EXCEPTION 'NULL LIMIT side was accepted';
+            EXCEPTION WHEN SQLSTATE '22023' THEN NULL;
+            END;
+            IF EXISTS (SELECT 1 FROM public.paper_orders WHERE order_id=repeat('0',64)) THEN
+              RAISE EXCEPTION 'Rejected NULL LIMIT side left an order row behind';
+            END IF;
+          END
+          $$;
+          SQL
+      - name: Exercise long option transactions
+        run: |
+          psql -v ON_ERROR_STOP=1 <<'SQL'
+          DO $$
+          DECLARE
+            v_result jsonb;
+            v_cash bigint;
+            v_qty bigint;
+            v_basis bigint;
+            v_avg bigint;
+            v_realized bigint;
+          BEGIN
+            -- The preceding step leaves ₹99,913,563 cash after fee-inclusive LIMIT SELL settlement.
+            -- Long CE BUY: 2 lots × 25, ₹12.85 premium. Fee-inclusive cost basis.
+            v_result := public.execute_paper_long_option_order(
+              '22222222-2222-4222-8222-222222222222',
+              repeat('9',64),'99999999-9999-4999-8999-999999999999',
+              repeat('a',64),'NSE_FO|TESTCE','TESTCE','NSE','NSE_FO','CE',
+              current_date + 10,22000,25,5,2,'BUY',1285,floor(extract(epoch from clock_timestamp())*1000)::bigint,floor(extract(epoch from clock_timestamp())*1000)::bigint
+            );
+            SELECT cash_paise INTO v_cash FROM public.paper_accounts
+             WHERE user_id='22222222-2222-4222-8222-222222222222';
+            SELECT net_quantity,cost_basis_paise,average_price_paise
+              INTO v_qty,v_basis,v_avg FROM public.paper_derivative_positions
+             WHERE user_id='22222222-2222-4222-8222-222222222222'
+               AND instrument_key='NSE_FO|TESTCE';
+            IF v_qty <> 50 OR v_basis <> 66639 OR v_avg <> 1333
+               OR v_cash <> 99846924
+               OR (v_result->>'idempotent_replay')::boolean IS NOT FALSE THEN
+              RAISE EXCEPTION 'Long CE BUY mismatch: qty %, basis %, average %, cash %, result %',v_qty,v_basis,v_avg,v_cash,v_result;
+            END IF;
+            IF (SELECT strike_price FROM public.paper_derivative_orders WHERE order_id=repeat('9',64)) <> 22000 THEN
+              RAISE EXCEPTION 'Option strike price was not preserved in immutable derivative order history';
+            END IF;
+            -- Retry must not execute or charge a second time.
+            v_result := public.execute_paper_long_option_order(
+              '22222222-2222-4222-8222-222222222222',
+              repeat('9',64),'99999999-9999-4999-8999-999999999999',
+              repeat('a',64),'NSE_FO|TESTCE','TESTCE','NSE','NSE_FO','CE',
+              current_date + 10,22000,25,5,2,'BUY',1285,floor(extract(epoch from clock_timestamp())*1000)::bigint,floor(extract(epoch from clock_timestamp())*1000)::bigint
+            );
+            IF (v_result->>'idempotent_replay')::boolean IS NOT TRUE THEN
+              RAISE EXCEPTION 'Long option retry was not idempotent';
+            END IF;
+            -- Partial close one lot; remaining cost basis is conserved.
+            v_result := public.execute_paper_long_option_order(
+              '22222222-2222-4222-8222-222222222222',
+              repeat('b',64),'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+              repeat('c',64),'NSE_FO|TESTCE','TESTCE','NSE','NSE_FO','CE',
+              current_date + 10,22000,25,5,1,'SELL',1500,floor(extract(epoch from clock_timestamp())*1000)::bigint,floor(extract(epoch from clock_timestamp())*1000)::bigint
+            );
+            SELECT net_quantity,cost_basis_paise,average_price_paise
+              INTO v_qty,v_basis,v_avg FROM public.paper_derivative_positions
+             WHERE user_id='22222222-2222-4222-8222-222222222222'
+               AND instrument_key='NSE_FO|TESTCE';
+            SELECT cash_paise,realized_pnl_paise INTO v_cash,v_realized
+              FROM public.paper_accounts
+             WHERE user_id='22222222-2222-4222-8222-222222222222';
+            IF v_qty <> 25 OR v_basis <> 33319 OR v_avg <> 1333
+               OR (v_result->>'realized_pnl_paise')::bigint <> 6484
+               OR v_cash <> 99881993 OR v_realized <> 6484 THEN
+              RAISE EXCEPTION 'Long option partial close mismatch: qty=%, basis=%, avg=%, account_realized=%, cash=%, account_realized=%', v_qty,v_basis,v_avg,(v_result->>'realized_pnl_paise'),v_cash,v_realized;
+            END IF;
+            -- Full close at a one-paise premium: charges exceed turnover, so net credit is negative.
+            v_result := public.execute_paper_long_option_order(
+              '22222222-2222-4222-8222-222222222222',
+              repeat('f',64),'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+              repeat('d',64),'NSE_FO|TESTCE','TESTCE','NSE','NSE_FO','CE',
+              current_date + 10,22000,25,1,1,'SELL',1,floor(extract(epoch from clock_timestamp())*1000)::bigint,floor(extract(epoch from clock_timestamp())*1000)::bigint
+            );
+            IF (v_result->'order'->>'net_credit_paise')::bigint >= 0
+               OR EXISTS (SELECT 1 FROM public.paper_derivative_positions
+                 WHERE user_id='22222222-2222-4222-8222-222222222222'
+                   AND instrument_key='NSE_FO|TESTCE') THEN
+              RAISE EXCEPTION 'Tiny-premium full close did not preserve negative net credit or remove the position';
+            END IF;
+            -- Stale provider quotes must be rejected before account mutation.
+            BEGIN
+              PERFORM public.execute_paper_long_option_order(
+                '22222222-2222-4222-8222-222222222222',
+                repeat('d',64),'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+                repeat('e',64),'NSE_FO|TESTPE','TESTPE','NSE','NSE_FO','PE',
+                current_date + 10,22000,25,5,1,'BUY',1285,floor(extract(epoch from clock_timestamp())*1000)::bigint-16001,floor(extract(epoch from clock_timestamp())*1000)::bigint
+              );
+              RAISE EXCEPTION 'Stale long-option quote was unexpectedly accepted';
+            EXCEPTION WHEN SQLSTATE '22023' THEN
+              NULL;
+            END;
+          END
+          $$;
+          SQL
+      - name: Verify repeated partial-close basis against Firebase BigInt vectors
+        run: |
+          set -euo pipefail
+          psql -v ON_ERROR_STOP=1 <<'SQL'
+          SET ROLE service_role;
+          SELECT public.initialize_paper_trading_account('88888888-8888-4888-8888-888888888888');
+          RESET ROLE;
+          DO $parity$
+          DECLARE
+            v_result jsonb;
+            v_qty bigint;
+            v_basis bigint;
+            v_avg bigint;
+          BEGIN
+            -- Firebase BigInt reference: buy 75 units with fee-inclusive basis 98,778 paise.
+            PERFORM public.execute_paper_long_option_order(
+              '88888888-8888-4888-8888-888888888888','a1b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4',
+              '31313131-3131-4131-8131-313131313131',repeat('2',64),
+              'NSE_FO|REPEAT','REPEAT','NSE','NSE_FO','CE',
+              current_date+10,22000,25,5,3,'BUY',1285,
+              floor(extract(epoch from clock_timestamp())*1000)::bigint,
+              floor(extract(epoch from clock_timestamp())*1000)::bigint
+            );
+            SELECT net_quantity,cost_basis_paise,average_price_paise
+              INTO v_qty,v_basis,v_avg FROM public.paper_derivative_positions
+             WHERE user_id='88888888-8888-4888-8888-888888888888'
+               AND instrument_key='NSE_FO|REPEAT';
+            IF v_qty<>75 OR v_basis<>98778 OR v_avg<>1317 THEN
+              RAISE EXCEPTION 'Initial repeated-close reference position mismatch: qty %, basis %, avg %',v_qty,v_basis,v_avg;
+            END IF;
+            -- First partial close: 98,778 × 25 / 75 rounds to 32,926 paise.
+            v_result:=public.execute_paper_long_option_order(
+              '88888888-8888-4888-8888-888888888888','b1c2d3e4b1c2d3e4b1c2d3e4b1c2d3e4b1c2d3e4b1c2d3e4b1c2d3e4b1c2d3e4',
+              '32323232-3232-4232-8232-323232323232',repeat('4',64),
+              'NSE_FO|REPEAT','REPEAT','NSE','NSE_FO','CE',
+              current_date+10,22000,25,5,1,'SELL',1500,
+              floor(extract(epoch from clock_timestamp())*1000)::bigint,
+              floor(extract(epoch from clock_timestamp())*1000)::bigint
+            );
+            IF (v_result->'order'->>'realized_pnl_paise')::bigint<>2143 THEN
+              RAISE EXCEPTION 'First partial-close realized P&L diverges from Firebase BigInt vector';
+            END IF;
+            SELECT net_quantity,cost_basis_paise,average_price_paise
+              INTO v_qty,v_basis,v_avg FROM public.paper_derivative_positions
+             WHERE user_id='88888888-8888-4888-8888-888888888888'
+               AND instrument_key='NSE_FO|REPEAT';
+            IF v_qty<>50 OR v_basis<>65852 OR v_avg<>1317 THEN
+              RAISE EXCEPTION 'First partial-close remainder mismatch: qty %, basis %, avg %',v_qty,v_basis,v_avg;
+            END IF;
+            -- Repeated partial close: half of 65,852 rounds to 32,926 paise.
+            v_result:=public.execute_paper_long_option_order(
+              '88888888-8888-4888-8888-888888888888','c1d2e3f4c1d2e3f4c1d2e3f4c1d2e3f4c1d2e3f4c1d2e3f4c1d2e3f4c1d2e3f4',
+              '33333333-3333-4333-8333-333333333333',repeat('6',64),
+              'NSE_FO|REPEAT','REPEAT','NSE','NSE_FO','CE',
+              current_date+10,22000,25,5,1,'SELL',1500,
+              floor(extract(epoch from clock_timestamp())*1000)::bigint,
+              floor(extract(epoch from clock_timestamp())*1000)::bigint
+            );
+            IF (v_result->'order'->>'realized_pnl_paise')::bigint<>2143 THEN
+              RAISE EXCEPTION 'Second partial-close realized P&L diverges from Firebase BigInt vector';
+            END IF;
+            SELECT net_quantity,cost_basis_paise,average_price_paise
+              INTO v_qty,v_basis,v_avg FROM public.paper_derivative_positions
+             WHERE user_id='88888888-8888-4888-8888-888888888888'
+               AND instrument_key='NSE_FO|REPEAT';
+            IF v_qty<>25 OR v_basis<>32926 OR v_avg<>1317 THEN
+              RAISE EXCEPTION 'Second partial-close remainder mismatch: qty %, basis %, avg %',v_qty,v_basis,v_avg;
+            END IF;
+            -- Final close must consume the exact remaining basis without rounding drift.
+            v_result:=public.execute_paper_long_option_order(
+              '88888888-8888-4888-8888-888888888888','d1e2f3a4d1e2f3a4d1e2f3a4d1e2f3a4d1e2f3a4d1e2f3a4d1e2f3a4d1e2f3a4',
+              '34343434-3434-4434-8434-343434343434',repeat('8',64),
+              'NSE_FO|REPEAT','REPEAT','NSE','NSE_FO','CE',
+              current_date+10,22000,25,5,1,'SELL',1500,
+              floor(extract(epoch from clock_timestamp())*1000)::bigint,
+              floor(extract(epoch from clock_timestamp())*1000)::bigint
+            );
+            IF (v_result->'order'->>'realized_pnl_paise')::bigint<>2143
+               OR EXISTS (SELECT 1 FROM public.paper_derivative_positions
+                 WHERE user_id='88888888-8888-4888-8888-888888888888'
+                   AND instrument_key='NSE_FO|REPEAT') THEN
+              RAISE EXCEPTION 'Final close failed to consume the remaining fee-inclusive basis exactly';
+            END IF;
+          END
+          $parity$;
+          SQL
+      - name: Verify add-on BUY, insufficient cash rollback and 50-position cap
+        run: |
+          set -euo pipefail
+          psql -v ON_ERROR_STOP=1 <<'SQL'
+          SET ROLE service_role;
+          SELECT public.initialize_paper_trading_account('99999999-9999-4999-8999-999999999999');
+          RESET ROLE;
+          DO $parity$
+          DECLARE
+            v_now bigint := floor(extract(epoch from clock_timestamp())*1000)::bigint;
+            v_first jsonb;
+            v_second jsonb;
+            v_third jsonb;
+            v_basis bigint;
+            v_cash bigint;
+            v_qty bigint;
+            v_count bigint;
+            v_debit bigint;
+          BEGIN
+            -- Two independent BUY fills on the same contract must accumulate basis and quantity.
+            v_first:=public.execute_paper_long_option_order(
+              '99999999-9999-4999-8999-999999999999',repeat('1',64),
+              '41414141-4141-4141-8141-414141414141',repeat('a',64),
+              'NSE_FO|ADDON','ADDON','NSE','NSE_FO','CE',
+              current_date+10,22000,25,5,1,'BUY',1285,v_now,v_now
+            );
+            v_second:=public.execute_paper_long_option_order(
+              '99999999-9999-4999-8999-999999999999',repeat('2',64),
+              '42424242-4242-4242-8242-424242424242',repeat('b',64),
+              'NSE_FO|ADDON','ADDON','NSE','NSE_FO','CE',
+              current_date+10,22000,25,5,1,'BUY',1285,v_now,v_now
+            );
+            SELECT net_quantity,cost_basis_paise INTO v_qty,v_basis
+              FROM public.paper_derivative_positions
+             WHERE user_id='99999999-9999-4999-8999-999999999999'
+               AND instrument_key='NSE_FO|ADDON';
+            v_debit:=(v_first->'order'->>'total_debit_paise')::bigint
+                    +(v_second->'order'->>'total_debit_paise')::bigint;
+            SELECT cash_paise INTO v_cash FROM public.paper_accounts
+             WHERE user_id='99999999-9999-4999-8999-999999999999';
+            IF v_qty<>50 OR v_basis<>v_debit OR v_cash<>100000000-v_debit THEN
+              RAISE EXCEPTION 'Add-on BUY did not conserve fee-inclusive basis, quantity and cash';
+            END IF;
+            -- Insufficient unreserved cash must roll back both order and position writes.
+            UPDATE public.paper_accounts SET cash_paise=10000,reserved_cash_paise=0
+             WHERE user_id='99999999-9999-4999-8999-999999999999';
+            BEGIN
+              PERFORM public.execute_paper_long_option_order(
+                '99999999-9999-4999-8999-999999999999',repeat('3',64),
+                '43434343-4343-4343-8343-434343434343',repeat('c',64),
+                'NSE_FO|POOR','POOR','NSE','NSE_FO','CE',
+                current_date+10,22000,25,5,1,'BUY',1285,v_now,v_now
+              );
+              RAISE EXCEPTION 'Insufficient-cash option BUY was unexpectedly accepted';
+            EXCEPTION WHEN SQLSTATE '23514' THEN
+              NULL;
+            END;
+            SELECT cash_paise INTO v_cash FROM public.paper_accounts
+             WHERE user_id='99999999-9999-4999-8999-999999999999';
+            IF v_cash<>10000 OR EXISTS(
+              SELECT 1 FROM public.paper_derivative_orders
+               WHERE order_id=repeat('3',64)
+            ) OR EXISTS(
+              SELECT 1 FROM public.paper_derivative_positions
+               WHERE user_id='99999999-9999-4999-8999-999999999999'
+                 AND instrument_key='NSE_FO|POOR'
+            ) THEN
+              RAISE EXCEPTION 'Insufficient-cash rejection left partial database writes';
+            END IF;
+            -- Restore test cash, then reach exactly 50 open instruments.
+            UPDATE public.paper_accounts SET cash_paise=100000000,reserved_cash_paise=0
+             WHERE user_id='99999999-9999-4999-8999-999999999999';
+            INSERT INTO public.paper_derivative_positions(
+              user_id,instrument_key,trading_symbol,segment,exchange,instrument_type,
+              expiry,lot_size,net_quantity,average_price_paise,cost_basis_paise
+            )
+            SELECT '99999999-9999-4999-8999-999999999999',
+                   'NSE_FO|CAP'||g,'CAP'||g,'NSE_FO','NSE','CE',
+                   current_date+10,25,25,100,2500
+              FROM generate_series(1,49) AS g;
+            SELECT count(*) INTO v_count FROM public.paper_derivative_positions
+             WHERE user_id='99999999-9999-4999-8999-999999999999' AND net_quantity>0;
+            IF v_count<>50 THEN RAISE EXCEPTION 'Position-cap fixture did not create 50 open positions'; END IF;
+            BEGIN
+              PERFORM public.execute_paper_long_option_order(
+                '99999999-9999-4999-8999-999999999999',repeat('4',64),
+                '44444444-4444-4444-8444-444444444444',repeat('d',64),
+                'NSE_FO|CAP51','CAP51','NSE','NSE_FO','CE',
+                current_date+10,22000,25,5,1,'BUY',1285,v_now,v_now
+              );
+              RAISE EXCEPTION '51st distinct derivative position was unexpectedly accepted';
+            EXCEPTION WHEN SQLSTATE '23514' THEN
+              NULL;
+            END;
+            IF (SELECT count(*) FROM public.paper_derivative_positions
+                WHERE user_id='99999999-9999-4999-8999-999999999999' AND net_quantity>0)<>50
+               OR EXISTS(SELECT 1 FROM public.paper_derivative_orders WHERE order_id=repeat('4',64)) THEN
+              RAISE EXCEPTION 'Position-cap rejection left a partial order or position';
+            END IF;
+            -- Add-on BUY to an existing key remains valid while already at the 50-position cap.
+            v_third:=public.execute_paper_long_option_order(
+              '99999999-9999-4999-8999-999999999999',repeat('5',64),
+              '45454545-4545-4545-8545-454545454545',repeat('e',64),
+              'NSE_FO|ADDON','ADDON','NSE','NSE_FO','CE',
+              current_date+10,22000,25,5,1,'BUY',1285,v_now,v_now
+            );
+            SELECT net_quantity INTO v_qty FROM public.paper_derivative_positions
+             WHERE user_id='99999999-9999-4999-8999-999999999999'
+               AND instrument_key='NSE_FO|ADDON';
+            IF v_qty<>75 OR (SELECT count(*) FROM public.paper_derivative_positions
+                WHERE user_id='99999999-9999-4999-8999-999999999999' AND net_quantity>0)<>50 THEN
+              RAISE EXCEPTION 'Add-on BUY was incorrectly blocked at the 50-position limit';
+            END IF;
+          END
+          $parity$;
+          SQL
+      - name: Verify SQL charges and rounding against Firebase golden vectors
+        run: |
+          set -euo pipefail
+          psql -v ON_ERROR_STOP=1 <<'SQL'
+          SET ROLE service_role;
+          SELECT public.initialize_paper_trading_account('66666666-6666-4666-8666-666666666666');
+          SELECT public.initialize_paper_trading_account('77777777-7777-4777-8777-777777777777');
+          RESET ROLE;
+          DO $$
+          DECLARE
+            v_buy jsonb;
+            v_sell jsonb;
+            v_bse jsonb;
+            v_breakdown jsonb;
+            v_option_function text;
+          BEGIN
+            v_option_function:=pg_get_functiondef('public.execute_paper_long_option_order(uuid,text,uuid,text,text,text,text,text,text,date,numeric,integer,integer,integer,text,bigint,bigint,bigint)'::regprocedure);
+            IF position('v_exchange_rate:=0.0003552;' in v_option_function)=0
+               OR position('v_ipft_rate:=0.000000001;' in v_option_function)=0
+               OR position('v_ipft_rate:=0.000005;' in v_option_function)>0 THEN
+              RAISE EXCEPTION 'SQL option charges do not match the NSE transaction/IPFT schedule';
+            END IF;
+            -- Matches trading-charges.test.js: NSE BUY, gross 81,250 paise.
+            v_buy:=public.execute_paper_long_option_order(
+              '66666666-6666-4666-8666-666666666666',repeat('a',64),
+              '23232323-2323-4323-8323-232323232323',repeat('b',64),
+              'NSE_FO|GOLDEN','GOLDEN','NSE','NSE_FO','CE',
+              current_date+10,22000,25,5,1,'BUY',3250,
+              floor(extract(epoch from clock_timestamp())*1000)::bigint,
+              floor(extract(epoch from clock_timestamp())*1000)::bigint
+            );
+            v_breakdown:=v_buy->'order'->'charges_breakdown';
+            IF (v_breakdown->>'exchangeTransactionPaise')::bigint<>29
+               OR (v_breakdown->>'ipftPaise')::bigint<>0
+               OR (v_breakdown->>'sebiPaise')::bigint<>0
+               OR (v_breakdown->>'stampDutyPaise')::bigint<>2
+               OR (v_breakdown->>'gstPaise')::bigint<>365
+               OR (v_breakdown->>'totalChargesPaise')::bigint<>2396
+               OR (v_breakdown->>'totalDebitPaise')::bigint<>83646 THEN
+              RAISE EXCEPTION 'NSE BUY charge vector diverges from Firebase JS golden values: %',v_breakdown;
+            END IF;
+            -- Matches trading-charges.test.js: BSE BUY, gross 100,000 paise.
+            v_bse:=public.execute_paper_long_option_order(
+              '77777777-7777-4777-8777-777777777777',repeat('c',64),
+              '24242424-2424-4424-8424-242424242424',repeat('d',64),
+              'BSE_FO|GOLDEN','GOLDEN','BSE','BSE_FO','PE',
+              current_date+10,22000,25,5,1,'BUY',4000,
+              floor(extract(epoch from clock_timestamp())*1000)::bigint,
+              floor(extract(epoch from clock_timestamp())*1000)::bigint
+            );
+            v_breakdown:=v_bse->'order'->'charges_breakdown';
+            IF (v_breakdown->>'exchangeTransactionPaise')::bigint<>33
+               OR (v_breakdown->>'totalChargesPaise')::bigint<>2402
+               OR (v_breakdown->>'gstPaise')::bigint<>366
+               OR (v_breakdown->>'totalDebitPaise')::bigint<>102402 THEN
+              RAISE EXCEPTION 'BSE BUY charge vector diverges from Firebase JS golden values: %',v_breakdown;
+            END IF;
+            -- Seed one contract so the SELL vector exercises the real close path.
+            PERFORM public.execute_paper_long_option_order(
+              '66666666-6666-4666-8666-666666666666','e1f2a3b4e1f2a3b4e1f2a3b4e1f2a3b4e1f2a3b4e1f2a3b4e1f2a3b4e1f2a3b4',
+              '26262626-2626-4626-8626-262626262626',repeat('2',64),
+              'NSE_FO|TINY','TINY','NSE','NSE_FO','CE',
+              current_date+10,22000,1,1,1,'BUY',1000,
+              floor(extract(epoch from clock_timestamp())*1000)::bigint,
+              floor(extract(epoch from clock_timestamp())*1000)::bigint
+            );
+            -- Tiny-premium close: gross 100 paise, fixed charges exceed proceeds.
+            v_sell:=public.execute_paper_long_option_order(
+              '66666666-6666-4666-8666-666666666666','f1a2b3c4f1a2b3c4f1a2b3c4f1a2b3c4f1a2b3c4f1a2b3c4f1a2b3c4f1a2b3c4',
+              '25252525-2525-4525-8525-252525252525',repeat('f',64),
+              'NSE_FO|TINY','TINY','NSE','NSE_FO','CE',
+              current_date+10,22000,1,1,1,'SELL',100,
+              floor(extract(epoch from clock_timestamp())*1000)::bigint,
+              floor(extract(epoch from clock_timestamp())*1000)::bigint
+            );
+            v_breakdown:=v_sell->'order'->'charges_breakdown';
+            IF (v_breakdown->>'grossPaise')::bigint<>100
+               OR (v_breakdown->>'netCreditPaise')::bigint>=0
+               OR (v_breakdown->>'stampDutyPaise')::bigint<>0
+               OR (v_breakdown->>'totalChargesPaise')::bigint<=100 THEN
+              RAISE EXCEPTION 'Tiny-premium negative-net-credit vector mismatch: %',v_breakdown;
+            END IF;
+          END
+          $$;
+          SQL
+      - name: Exercise concurrent duplicate Options requests
+        run: |
+          set -euo pipefail
+          psql -v ON_ERROR_STOP=1 <<'SQL'
+          SET ROLE service_role;
+          SELECT public.initialize_paper_trading_account('55555555-5555-4555-8555-555555555555');
+          RESET ROLE;
+          SQL
+          run_option() {
+            psql -v ON_ERROR_STOP=1 <<'SQL'
+          SET ROLE service_role;
+          SELECT public.execute_paper_long_option_order(
+            '55555555-5555-4555-8555-555555555555',
+            '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef','18181818-1818-4818-8818-181818181818',
+            repeat('d',64),'NSE_FO|RACEOPT','RACEOPT','NSE','NSE_FO','CE',
+            current_date+10,22000,25,5,1,'BUY',1285,
+            floor(extract(epoch from clock_timestamp())*1000)::bigint,
+            floor(extract(epoch from clock_timestamp())*1000)::bigint
+          );
+          RESET ROLE;
+          SQL
+          }
+          run_option & pid1=$!
+          run_option & pid2=$!
+          wait "$pid1"
+          wait "$pid2"
+          psql -v ON_ERROR_STOP=1 <<'SQL'
+          DO $$
+          DECLARE
+            v_gross bigint;
+            v_charges bigint;
+            v_cash bigint;
+          BEGIN
+            IF (SELECT count(*) FROM public.paper_derivative_orders
+                WHERE user_id='55555555-5555-4555-8555-555555555555'
+                  AND idempotency_key='18181818-1818-4818-8818-181818181818') <> 1
+               OR (SELECT net_quantity FROM public.paper_derivative_positions
+                WHERE user_id='55555555-5555-4555-8555-555555555555'
+                  AND instrument_key='NSE_FO|RACEOPT') <> 25 THEN
+              RAISE EXCEPTION 'Concurrent duplicate Options requests created duplicate order or position quantity';
+            END IF;
+            SELECT gross_paise,charges_paise INTO v_gross,v_charges
+              FROM public.paper_derivative_orders
+             WHERE user_id='55555555-5555-4555-8555-555555555555'
+               AND idempotency_key='18181818-1818-4818-8818-181818181818';
+            SELECT cash_paise INTO v_cash FROM public.paper_accounts
+             WHERE user_id='55555555-5555-4555-8555-555555555555';
+            IF v_cash <> 100000000-v_gross-v_charges THEN
+              RAISE EXCEPTION 'Concurrent duplicate Options requests charged the account more than once';
+            END IF;
+            BEGIN
+              PERFORM public.execute_paper_long_option_order(
+                '55555555-5555-4555-8555-555555555555',
+                repeat('c',64),'18181818-1818-4818-8818-181818181818',
+                repeat('e',64),'NSE_FO|RACEOPT','RACEOPT','NSE','NSE_FO','CE',
+                current_date+10,22000,25,5,1,'BUY',1285,
+                floor(extract(epoch from clock_timestamp())*1000)::bigint,
+                floor(extract(epoch from clock_timestamp())*1000)::bigint
+              );
+              RAISE EXCEPTION 'Options idempotency key accepted a changed fingerprint';
+            EXCEPTION WHEN unique_violation THEN NULL;
+            END;
+          END
+          $$;
+          SQL
+      - name: Exercise futures long, close, reverse, margin and idempotency accounting
+        run: |
+          psql -v ON_ERROR_STOP=1 <<'SQL'
+          DO $futures$
+          DECLARE
+            v_result jsonb;
+            v_now bigint;
+            v_qty integer;
+            v_margin bigint;
+            v_cash bigint;
+            v_realized bigint;
+          BEGIN
+            INSERT INTO auth.users(id) VALUES ('abcdefab-cdef-4abc-8def-abcdefabcdef') ON CONFLICT(id) DO NOTHING;
+            PERFORM public.initialize_paper_trading_account('abcdefab-cdef-4abc-8def-abcdefabcdef');
+            v_now := floor(extract(epoch from clock_timestamp())*1000)::bigint;
+            v_result := public.execute_paper_futures_market_order(
+              'abcdefab-cdef-4abc-8def-abcdefabcdef',repeat('a',64),
+              'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',repeat('b',64),
+              'NSE_FO|FUT_TEST','FUT_TEST','NSE','NSE_FO',current_date+5,
+              25,5,'BUY','DELIVERY',50,10000,200000,1000,v_now,v_now
+            );
+            IF v_result->>'idempotent_replay' <> 'false'
+               OR (v_result->>'cash_paise')::bigint <> 99999000
+               OR (v_result->>'reserved_margin_paise')::bigint <> 200000 THEN
+              RAISE EXCEPTION 'Futures opening BUY accounting mismatch: %',v_result::text;
+            END IF;
+            v_result := public.execute_paper_futures_market_order(
+              'abcdefab-cdef-4abc-8def-abcdefabcdef',repeat('a',64),
+              'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',repeat('b',64),
+              'NSE_FO|FUT_TEST','FUT_TEST','NSE','NSE_FO',current_date+5,
+              25,5,'BUY','DELIVERY',50,10000,200000,1000,v_now,v_now
+            );
+            IF v_result->>'idempotent_replay' <> 'true' THEN
+              RAISE EXCEPTION 'Duplicate futures BUY was not idempotent';
+            END IF;
+            v_now := floor(extract(epoch from clock_timestamp())*1000)::bigint;
+            PERFORM public.execute_paper_futures_market_order(
+              'abcdefab-cdef-4abc-8def-abcdefabcdef',repeat('c',64),
+              'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',repeat('d',64),
+              'NSE_FO|FUT_TEST','FUT_TEST','NSE','NSE_FO',current_date+5,
+              25,5,'SELL','DELIVERY',25,12000,0,1000,v_now,v_now
+            );
+            SELECT net_quantity,reserved_margin_paise,realized_pnl_paise
+              INTO v_qty,v_margin,v_realized
+              FROM public.paper_futures_positions
+             WHERE user_id='abcdefab-cdef-4abc-8def-abcdefabcdef'
+               AND instrument_key='NSE_FO|FUT_TEST';
+            IF v_qty<>25 OR v_margin<>100000 OR v_realized<>50000 THEN
+              RAISE EXCEPTION 'Partial futures close did not release proportional margin or realize P&L';
+            END IF;
+            v_now := floor(extract(epoch from clock_timestamp())*1000)::bigint;
+            PERFORM public.execute_paper_futures_market_order(
+              'abcdefab-cdef-4abc-8def-abcdefabcdef',repeat('e',64),
+              'cccccccc-cccc-4ccc-8ccc-cccccccccccc',repeat('f',64),
+              'NSE_FO|FUT_TEST','FUT_TEST','NSE','NSE_FO',current_date+5,
+              25,5,'SELL','DELIVERY',50,9000,100000,1000,v_now,v_now
+            );
+            SELECT net_quantity,reserved_margin_paise,average_price_paise
+              INTO v_qty,v_margin,v_realized
+              FROM public.paper_futures_positions
+             WHERE user_id='abcdefab-cdef-4abc-8def-abcdefabcdef'
+               AND instrument_key='NSE_FO|FUT_TEST';
+            IF v_qty<>-25 OR v_margin<>100000 OR v_realized<>9000 THEN
+              RAISE EXCEPTION 'Futures position reversal did not open the remaining short quantity';
+            END IF;
+            SELECT cash_paise INTO v_cash FROM public.paper_accounts
+             WHERE user_id='abcdefab-cdef-4abc-8def-abcdefabcdef';
+            IF v_cash<>100022000 THEN
+              RAISE EXCEPTION 'Futures realized P&L and charges produced an incorrect cash balance: %',v_cash;
+            END IF;
+            v_now := floor(extract(epoch from clock_timestamp())*1000)::bigint;
+            BEGIN
+              PERFORM public.execute_paper_futures_market_order(
+                'abcdefab-cdef-4abc-8def-abcdefabcdef',repeat('1',64),
+                'dddddddd-dddd-4ddd-8ddd-dddddddddddd',repeat('2',64),
+                'NSE_FO|FUT_TEST','FUT_TEST','NSE','NSE_FO',current_date+5,
+                25,5,'BUY','DELIVERY',26,10000,100000,0,v_now,v_now
+              );
+              RAISE EXCEPTION 'Non-lot-multiple futures quantity was accepted';
+            EXCEPTION WHEN SQLSTATE '22023' THEN NULL;
+            END;
+          END
+          $futures$;
+          SQL
+      - name: Exercise futures full close, reversal, margin rejection and idempotent accounting
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/futures_market_order_accounting.sql
+      - name: Verify long-option BUY coexists with reserved futures margin
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/option_buy_with_futures_margin.sql
+      - name: Exercise Supabase Upstox OAuth replay, generation and stream lease controls
+        run: |
+          psql -v ON_ERROR_STOP=1 <<'SQL'
+          DO $upstox$
+          DECLARE
+            v_now bigint := floor(extract(epoch from clock_timestamp())*1000)::bigint;
+            v_generation bigint;
+            v_state jsonb;
+            v_saved boolean;
+            v_lease_a uuid := 'aaaaaaaa-1111-4111-8111-111111111111';
+            v_lease_b uuid := 'bbbbbbbb-2222-4222-8222-222222222222';
+          BEGIN
+            v_generation := public.begin_upstox_oauth(
+              '44444444-4444-4444-8444-444444444444',repeat('a',64),
+              clock_timestamp()+interval '5 minutes',v_now
+            );
+            IF v_generation<>0 THEN RAISE EXCEPTION 'Initial OAuth connection generation must be zero'; END IF;
+            v_state := public.consume_upstox_oauth_state(repeat('a',64),v_now);
+            IF v_state->>'user_id'<>'44444444-4444-4444-8444-444444444444'
+               OR (v_state->>'connection_generation')::bigint<>0 THEN
+              RAISE EXCEPTION 'OAuth state did not return the expected user and generation';
+            END IF;
+            IF public.consume_upstox_oauth_state(repeat('a',64),v_now) IS NOT NULL THEN
+              RAISE EXCEPTION 'OAuth state replay was accepted';
+            END IF;
+            v_saved := public.save_upstox_connection(
+              '44444444-4444-4444-8444-444444444444',0,
+              '{"v":1,"iv":"a","tag":"b","data":"c"}'::jsonb,'Bearer',
+              clock_timestamp()+interval '1 hour',clock_timestamp(),ARRAY['market_quotes'],v_now
+            );
+            IF NOT v_saved THEN RAISE EXCEPTION 'Current OAuth generation could not save connection'; END IF;
+            v_generation := public.disconnect_upstox_connection('44444444-4444-4444-8444-444444444444',v_now+1);
+            IF v_generation<>1 OR EXISTS(SELECT 1 FROM public.upstox_connections WHERE user_id='44444444-4444-4444-8444-444444444444') THEN
+              RAISE EXCEPTION 'Disconnect did not revoke connection and advance generation';
+            END IF;
+            v_saved := public.save_upstox_connection(
+              '44444444-4444-4444-8444-444444444444',0,
+              '{"v":1,"iv":"a","tag":"b","data":"c"}'::jsonb,'Bearer',
+              clock_timestamp()+interval '1 hour',clock_timestamp(),ARRAY['market_quotes'],v_now+2
+            );
+            IF v_saved THEN RAISE EXCEPTION 'Stale OAuth callback overwrote a disconnected connection'; END IF;
+            v_generation := public.begin_upstox_oauth(
+              '44444444-4444-4444-8444-444444444444',repeat('b',64),
+              clock_timestamp()+interval '5 minutes',v_now+3
+            );
+            IF v_generation<>1 THEN RAISE EXCEPTION 'New OAuth flow did not use current connection generation'; END IF;
+            PERFORM public.consume_upstox_oauth_state(repeat('b',64),v_now+3);
+            v_saved := public.save_upstox_connection(
+              '44444444-4444-4444-8444-444444444444',1,
+              '{"v":1,"iv":"a","tag":"b","data":"c"}'::jsonb,'Bearer',
+              clock_timestamp()+interval '1 hour',clock_timestamp(),ARRAY['market_quotes'],v_now+3
+            );
+            IF NOT v_saved THEN RAISE EXCEPTION 'Fresh OAuth callback failed after reconnect'; END IF;
+            IF NOT public.acquire_paper_market_stream_lease('44444444-4444-4444-8444-444444444444',v_lease_a,v_now,30000) THEN
+              RAISE EXCEPTION 'First market stream lease was not acquired';
+            END IF;
+            IF public.acquire_paper_market_stream_lease('44444444-4444-4444-8444-444444444444',v_lease_b,v_now,30000) THEN
+              RAISE EXCEPTION 'Second concurrent market stream lease was accepted';
+            END IF;
+            IF NOT public.renew_paper_market_stream_lease('44444444-4444-4444-8444-444444444444',v_lease_a,v_now+1000,30000) THEN
+              RAISE EXCEPTION 'Active market stream lease could not be renewed';
+            END IF;
+            IF NOT public.release_paper_market_stream_lease('44444444-4444-4444-8444-444444444444',v_lease_a,v_now+2000) THEN
+              RAISE EXCEPTION 'Active market stream lease could not be released';
+            END IF;
+            IF NOT public.acquire_paper_market_stream_lease('44444444-4444-4444-8444-444444444444',v_lease_b,v_now+2001,30000) THEN
+              RAISE EXCEPTION 'Released market stream lease could not be reacquired';
+            END IF;
+            IF NOT public.consume_paper_margin_preview_slot('44444444-4444-4444-8444-444444444444',v_now,5000)
+               OR public.consume_paper_margin_preview_slot('44444444-4444-4444-8444-444444444444',v_now+100,5000)
+               OR NOT public.consume_paper_margin_preview_slot('44444444-4444-4444-8444-444444444444',v_now+5100,5000) THEN
+              RAISE EXCEPTION 'Margin preview rate limiting did not enforce the cooldown';
+            END IF;
+          END
+          $upstox$;
+          SQL
+      - name: Reject future and off-tick Options quotes
+        run: |
+          psql -v ON_ERROR_STOP=1 <<'SQL'
+          DO $$
+          DECLARE
+            v_now bigint := floor(extract(epoch from clock_timestamp())*1000)::bigint;
+          BEGIN
+            BEGIN
+              PERFORM public.execute_paper_long_option_order(
+                '22222222-2222-4222-8222-222222222222',repeat('7',64),
+                '19191919-1919-4919-8919-191919191919',repeat('a',64),
+                'NSE_FO|FUTURE','FUTURE','NSE','NSE_FO','PE',
+                current_date+10,22000,25,5,1,'BUY',1285,v_now+10000,v_now
+              );
+              RAISE EXCEPTION 'Future Options quote was accepted';
+            EXCEPTION WHEN SQLSTATE '22023' THEN NULL;
+            END;
+            BEGIN
+              PERFORM public.execute_paper_long_option_order(
+                '22222222-2222-4222-8222-222222222222',repeat('8',64),
+                '20202020-2020-4020-8020-202020202020',repeat('b',64),
+                'NSE_FO|OFFTICK','OFFTICK','NSE','NSE_FO','CE',
+                current_date+10,22000,25,5,1,'BUY',1286,v_now,v_now
+              );
+              RAISE EXCEPTION 'Off-tick Options price was accepted';
+            EXCEPTION WHEN SQLSTATE '22023' THEN NULL;
+            END;
+            BEGIN
+              PERFORM public.execute_paper_long_option_order(
+                '22222222-2222-4222-8222-222222222222',repeat('9',64),
+                '21212121-2121-4121-8121-212121212121',repeat('c',64),
+                'NSE_FO|EXPIRED','EXPIRED','NSE','NSE_FO','PE',
+                current_date-1,22000,25,5,1,'BUY',1285,v_now,v_now
+              );
+              RAISE EXCEPTION 'Expired Options contract was accepted';
+            EXCEPTION WHEN SQLSTATE '22023' THEN NULL;
+            END;
+          END
+          $$;
+          SQL
+      - name: Verify SQL option contract and quote-age boundaries
+        run: |
+          set -euo pipefail
+          psql -v ON_ERROR_STOP=1 <<'SQL'
+          DO $freshness$
+          BEGIN
+            IF NOT public._paper_quote_age_is_fresh(1000,15999) THEN
+              RAISE EXCEPTION '14,999ms quote must be accepted';
+            END IF;
+            IF NOT public._paper_quote_age_is_fresh(1000,16000) THEN
+              RAISE EXCEPTION '15,000ms quote must be accepted';
+            END IF;
+            IF public._paper_quote_age_is_fresh(1000,16001) THEN
+              RAISE EXCEPTION '15,001ms quote must be rejected';
+            END IF;
+            IF public._paper_quote_age_is_fresh(1001,1000) THEN
+              RAISE EXCEPTION 'Future quote must be rejected';
+            END IF;
+            IF public._paper_quote_age_is_fresh(NULL,1000)
+               OR public._paper_quote_age_is_fresh(1000,NULL) THEN
+              RAISE EXCEPTION 'Null quote clock values must be rejected';
+            END IF;
+          END;
+          $freshness$;
+          SET ROLE service_role;
+          SELECT public.initialize_paper_trading_account('12121212-1212-4212-8212-121212121212');
+          RESET ROLE;
+          DO $contract$
+          DECLARE
+            v_now bigint := floor(extract(epoch from clock_timestamp())*1000)::bigint;
+            v_result jsonb;
+          BEGIN
+            -- Both CE and PE are accepted for matching NSE_FO identity.
+            v_result:=public.execute_paper_long_option_order(
+              '12121212-1212-4212-8212-121212121212','abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789',
+              '51515151-5151-4151-8151-515151515151',repeat('a',64),
+              'NSE_FO|PARITYCE','PARITYCE','NSE','NSE_FO','CE',
+              current_date+10,22000,25,5,1,'BUY',1285,v_now-14000,v_now
+            );
+            v_result:=public.execute_paper_long_option_order(
+              '12121212-1212-4212-8212-121212121212','fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210',
+              '52525252-5252-4252-8252-525252525252',repeat('b',64),
+              'NSE_FO|PARITYPE','PARITYPE','NSE','NSE_FO','PE',
+              current_date+10,22000,25,5,1,'BUY',1285,v_now-14000,v_now
+            );
+            -- A quote safely older than 15 seconds must fail.
+            BEGIN
+              PERFORM public.execute_paper_long_option_order(
+                '12121212-1212-4212-8212-121212121212','0123abcd4567ef890123abcd4567ef890123abcd4567ef890123abcd4567ef89',
+                '53535353-5353-4353-8353-535353535353',repeat('c',64),
+                'NSE_FO|STALE16','STALE16','NSE','NSE_FO','CE',
+                current_date+10,22000,25,5,1,'BUY',1285,v_now-16000,v_now
+              );
+              RAISE EXCEPTION '16-second-old Options quote was unexpectedly accepted';
+            EXCEPTION WHEN SQLSTATE '22023' THEN NULL;
+            END;
+            -- Exchange and segment must agree.
+            BEGIN
+              PERFORM public.execute_paper_long_option_order(
+                '12121212-1212-4212-8212-121212121212','89ef6745cdab230189ef6745cdab230189ef6745cdab230189ef6745cdab2301',
+                '54545454-5454-4454-8454-545454545454',repeat('d',64),
+                'NSE_FO|BADVENUE','BADVENUE','BSE','NSE_FO','CE',
+                current_date+10,22000,25,5,1,'BUY',1285,v_now,v_now
+              );
+              RAISE EXCEPTION 'Mismatched exchange/segment was unexpectedly accepted';
+            EXCEPTION WHEN SQLSTATE '22023' THEN NULL;
+            END;
+            -- Tick size must be positive and execution price must be tick-aligned.
+            BEGIN
+              PERFORM public.execute_paper_long_option_order(
+                '12121212-1212-4212-8212-121212121212','13579bdf2468ace013579bdf2468ace013579bdf2468ace013579bdf2468ace0',
+                '55555555-5555-4555-8555-555555555555',repeat('e',64),
+                'NSE_FO|BADTICK','BADTICK','NSE','NSE_FO','CE',
+                current_date+10,22000,25,0,1,'BUY',1285,v_now,v_now
+              );
+              RAISE EXCEPTION 'Zero tick size was unexpectedly accepted';
+            EXCEPTION WHEN SQLSTATE '22023' THEN NULL;
+            END;
+            BEGIN
+              PERFORM public.execute_paper_long_option_order(
+                '12121212-1212-4212-8212-121212121212','02468ace13579bdf02468ace13579bdf02468ace13579bdf02468ace13579bdf',
+                '56565656-5656-4656-8656-565656565656',repeat('f',64),
+                'NSE_FO|OFFTICK2','OFFTICK2','NSE','NSE_FO','CE',
+                current_date+10,22000,25,5,1,'BUY',1286,v_now,v_now
+              );
+              RAISE EXCEPTION 'Off-tick option price was unexpectedly accepted';
+            EXCEPTION WHEN SQLSTATE '22023' THEN NULL;
+            END;
+            -- The database rejects a caller clock outside the +/-2s tolerance.
+            BEGIN
+              PERFORM public.execute_paper_long_option_order(
+                '12121212-1212-4212-8212-121212121212','55aa66bb77cc88dd55aa66bb77cc88dd55aa66bb77cc88dd55aa66bb77cc88dd',
+                '57575757-5757-4757-8757-575757575757',repeat('1',64),
+                'NSE_FO|CLOCKSKEW','CLOCKSKEW','NSE','NSE_FO','CE',
+                current_date+10,22000,25,5,1,'BUY',1285,v_now-1000,v_now-2001
+              );
+              RAISE EXCEPTION 'Caller clock skew above two seconds was unexpectedly accepted';
+            EXCEPTION WHEN SQLSTATE '22023' THEN NULL;
+            END;
+            -- Expired contracts must fail independent of quote freshness.
+            BEGIN
+              PERFORM public.execute_paper_long_option_order(
+                '12121212-1212-4212-8212-121212121212','aa55bb66cc77dd88aa55bb66cc77dd88aa55bb66cc77dd88aa55bb66cc77dd88',
+                '58585858-5858-4858-8858-585858585858',repeat('2',64),
+                'NSE_FO|EXPIRED2','EXPIRED2','NSE','NSE_FO','PE',
+                current_date-1,22000,25,5,1,'BUY',1285,v_now,v_now
+              );
+              RAISE EXCEPTION 'Expired option contract was unexpectedly accepted';
+            EXCEPTION WHEN SQLSTATE '22023' THEN NULL;
+            END;
+          END
+          $contract$;
+          SQL
+      - name: Verify RLS and privileged RPC boundaries
+        run: |
+          psql -v ON_ERROR_STOP=1 <<'SQL'
+          DO $$
+          DECLARE
+            t text;
+            protected_tables text[] := ARRAY[
+              'paper_accounts','paper_equity_positions',
+              'paper_derivative_positions','paper_orders','paper_derivative_orders',
+              'paper_watchlists','upstox_connections','upstox_oauth_states',
+              'upstox_connection_controls','paper_market_stream_leases',
+              'paper_market_worker_state','paper_margin_preview_limits',
+              'paper_futures_positions','paper_futures_orders','paper_protective_orders',
+              'paper_chart_drawings','paper_chart_templates','paper_chart_preferences'
+            ];
+          BEGIN
+            FOREACH t IN ARRAY protected_tables LOOP
+              IF NOT (SELECT relrowsecurity FROM pg_class WHERE oid=to_regclass('public.'||t)) THEN
+                RAISE EXCEPTION 'RLS is disabled on %',t;
+              END IF;
+            END LOOP;
+            IF EXISTS (
+              SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+              WHERE n.nspname='public'
+                AND p.proname IN (
+                  'current_paper_user_id','execute_paper_market_order','submit_paper_limit_order',
+                  'execute_paper_limit_fill','cancel_paper_limit_order',
+                  'initialize_paper_trading_account','execute_paper_long_option_order'
+                )
+                AND COALESCE(array_to_string(p.proconfig,','),'') NOT LIKE '%search_path=""%'
+            ) THEN
+              RAISE EXCEPTION 'A privileged trading RPC does not pin an empty search_path';
+            END IF;
+            IF (SELECT count(*) FROM pg_policies
+                WHERE schemaname='public'
+                  AND cmd='SELECT'
+                  AND tablename IN ('paper_accounts','paper_equity_positions',
+                    'paper_derivative_positions','paper_orders',
+                    'paper_derivative_orders','paper_watchlists')
+                  AND qual LIKE '%auth.uid()%') <> 6 THEN
+              RAISE EXCEPTION 'Expected six user-scoped SELECT policies were not found';
+            END IF;
+            IF has_function_privilege('anon','public.rls_auto_enable()','EXECUTE')
+               OR has_function_privilege('authenticated','public.rls_auto_enable()','EXECUTE')
+               OR has_function_privilege('service_role','public.rls_auto_enable()','EXECUTE') THEN
+              RAISE EXCEPTION 'RLS auto-enable event-trigger function remains directly executable by API roles';
+            END IF;
+            IF NOT has_function_privilege('postgres','public.rls_auto_enable()','EXECUTE') THEN
+              RAISE EXCEPTION 'RLS auto-enable function owner execution was unexpectedly revoked';
+            END IF;
+            IF has_table_privilege('authenticated','public.paper_accounts','INSERT')
+               OR has_table_privilege('authenticated','public.paper_accounts','UPDATE')
+               OR has_table_privilege('authenticated','public.paper_accounts','DELETE')
+               OR has_table_privilege('anon','public.paper_accounts','SELECT') THEN
+              RAISE EXCEPTION 'Unexpected browser-role privilege on protected account data';
+            END IF;
+            IF has_function_privilege('authenticated',
+              'public.execute_paper_market_order(uuid,text,uuid,text,text,text,text,text,text,integer,bigint,bigint,bigint)','EXECUTE')
+               OR has_function_privilege('anon',
+              'public.execute_paper_market_order(uuid,text,uuid,text,text,text,text,text,text,integer,bigint,bigint,bigint)','EXECUTE')
+               OR NOT has_function_privilege('service_role',
+              'public.execute_paper_market_order(uuid,text,uuid,text,text,text,text,text,text,integer,bigint,bigint,bigint)','EXECUTE') THEN
+              RAISE EXCEPTION 'MARKET RPC execution grants are not server-only';
+            END IF;
+          END
+          $$;
+          SQL
+      - name: Verify tenant isolation across account, positions, orders and watchlists
+        run: |
+          psql -v ON_ERROR_STOP=1 <<'SQL'
+          INSERT INTO public.paper_derivative_positions(
+            user_id,instrument_key,trading_symbol,segment,exchange,instrument_type,
+            expiry,lot_size,net_quantity,average_price_paise,cost_basis_paise
+          ) VALUES (
+            '22222222-2222-4222-8222-222222222222','NSE_FO|RLS','RLS','NSE_FO','NSE',
+            'CE',current_date+5,25,25,100,2500
+          ) ON CONFLICT (user_id,instrument_key) DO NOTHING;
+          INSERT INTO public.paper_watchlists(user_id,name,instrument_keys)
+          VALUES ('22222222-2222-4222-8222-222222222222','NIFTY',ARRAY['NSE_EQ|TEST001'])
+          ON CONFLICT (user_id,name) DO NOTHING;
+          SET ROLE authenticated;
+          SELECT set_config('request.jwt.claims','{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated"}',false);
+          DO $$
+          BEGIN
+            IF (SELECT count(*) FROM public.paper_accounts) <> 1
+               OR (SELECT count(*) FROM public.paper_equity_positions) <> 0
+               OR (SELECT count(*) FROM public.paper_derivative_positions) <> 0
+               OR (SELECT count(*) FROM public.paper_orders) <> 0
+               OR (SELECT count(*) FROM public.paper_derivative_orders) <> 0
+               OR (SELECT count(*) FROM public.paper_watchlists) <> 0 THEN
+              RAISE EXCEPTION 'User one can read another tenant row or cannot read own account';
+            END IF;
+            BEGIN
+              INSERT INTO public.paper_watchlists(user_id,name,instrument_keys)
+              VALUES ('22222222-2222-4222-8222-222222222222','Banking',ARRAY['NSE_EQ|TEST002']);
+              RAISE EXCEPTION 'Cross-tenant watchlist insert unexpectedly succeeded';
+            EXCEPTION WHEN insufficient_privilege THEN NULL;
+            END;
+          END
+          $$;
+          SELECT set_config('request.jwt.claims','{"sub":"22222222-2222-4222-8222-222222222222","role":"authenticated"}',false);
+          DO $$
+          BEGIN
+            IF (SELECT count(*) FROM public.paper_accounts) <> 1
+               OR (SELECT count(*) FROM public.paper_equity_positions) = 0
+               OR (SELECT count(*) FROM public.paper_derivative_positions) = 0
+               OR (SELECT count(*) FROM public.paper_orders) = 0
+               OR (SELECT count(*) FROM public.paper_derivative_orders) = 0
+               OR (SELECT count(*) FROM public.paper_watchlists) = 0 THEN
+              RAISE EXCEPTION 'User two own-row counts: accounts %, equity %, derivatives %, orders %, derivative_orders %, watchlists %',
+                (SELECT count(*) FROM public.paper_accounts),
+                (SELECT count(*) FROM public.paper_equity_positions),
+                (SELECT count(*) FROM public.paper_derivative_positions),
+                (SELECT count(*) FROM public.paper_orders),
+                (SELECT count(*) FROM public.paper_derivative_orders),
+                (SELECT count(*) FROM public.paper_watchlists);
+            END IF;
+          END
+          $$;
+          RESET ROLE;
+          SQL
+      - name: Verify equity protective fill RPC is server-only and schema-complete
+        run: |
+          psql -v ON_ERROR_STOP=1 <<'SQL'
+          DO $protective_rpc$
+          BEGIN
+            IF to_regprocedure('public.execute_paper_equity_protective_fill(uuid,text,text,bigint,bigint,bigint)') IS NULL THEN
+              RAISE EXCEPTION 'Equity protective fill RPC is missing';
+            END IF;
+            IF has_function_privilege('anon',
+                 'public.execute_paper_equity_protective_fill(uuid,text,text,bigint,bigint,bigint)','EXECUTE')
+               OR has_function_privilege('authenticated',
+                 'public.execute_paper_equity_protective_fill(uuid,text,text,bigint,bigint,bigint)','EXECUTE')
+               OR NOT has_function_privilege('service_role',
+                 'public.execute_paper_equity_protective_fill(uuid,text,text,bigint,bigint,bigint)','EXECUTE') THEN
+              RAISE EXCEPTION 'Equity protective fill RPC is not restricted to service_role';
+            END IF;
+            IF NOT (SELECT relrowsecurity FROM pg_class WHERE oid=to_regclass('public.paper_protective_orders')) THEN
+              RAISE EXCEPTION 'Protective order RLS is disabled';
+            END IF;
+            IF NOT EXISTS (
+              SELECT 1 FROM information_schema.columns
+              WHERE table_schema='public' AND table_name='paper_protective_orders'
+                AND column_name='execution_order_id'
+            ) OR NOT EXISTS (
+              SELECT 1 FROM pg_indexes
+              WHERE schemaname='public' AND indexname='paper_protective_orders_execution_order_idx'
+            ) THEN
+              RAISE EXCEPTION 'Protective execution idempotency schema is incomplete';
+            END IF;
+            IF COALESCE(array_to_string((
+              SELECT proconfig FROM pg_proc
+              WHERE oid=to_regprocedure('public.execute_paper_equity_protective_fill(uuid,text,text,bigint,bigint,bigint)')
+            ),','),'') NOT LIKE '%search_path=""%' THEN
+              RAISE EXCEPTION 'Protective fill RPC must pin an empty search_path';
+            END IF;
+          END
+          $protective_rpc$;
+          UPDATE public.paper_accounts
+             SET starting_cash_paise=100000000,cash_paise=100000000,
+                 reserved_cash_paise=0,reserved_margin_paise=0,
+                 realized_pnl_paise=0,delivery_realized_pnl_paise=0,
+                 intraday_realized_pnl_paise=0,version=1
+           WHERE user_id='12121212-1212-4212-8212-121212121212';
+          INSERT INTO public.paper_equity_positions(
+            user_id,product,instrument_key,trading_symbol,exchange,quantity,
+            average_price_paise,cost_basis_paise,reserved_quantity
+          ) VALUES (
+            '12121212-1212-4212-8212-121212121212','DELIVERY',
+            'NSE_EQ|PROTECTIVE_CI','PROTECTIVE_CI','NSE',10,8000,80000,4
+          );
+          INSERT INTO public.paper_protective_orders(
+            order_id,user_id,asset_class,instrument_key,product,side,
+            trigger_type,trigger_direction,trigger_price_paise,quantity,status
+          ) VALUES (
+            'abababab-abab-4bab-8bab-abababababab',
+            '12121212-1212-4212-8212-121212121212','EQUITY',
+            'NSE_EQ|PROTECTIVE_CI','DELIVERY','SELL',
+            'STOP_LOSS','AT_OR_BELOW',10000,4,'ACTIVE'
+          );
+          SET ROLE service_role;
+          DO $protective_fill$
+          DECLARE
+            v_now bigint:=floor(extract(epoch from clock_timestamp())*1000)::bigint;
+            v_result jsonb;
+            v_execution_id text:=md5(gen_random_uuid()::text)||md5(gen_random_uuid()::text);
+          BEGIN
+            v_result:=public.execute_paper_equity_protective_fill(
+              'abababab-abab-4bab-8bab-abababababab',
+              v_execution_id,repeat('b',64),9000,v_now,v_now
+            );
+            IF v_result->>'status'<>'FILLED'
+               OR (v_result->>'realized_pnl_paise')::bigint<>4000 THEN
+              RAISE EXCEPTION 'Equity protective fill did not calculate expected realized P&L';
+            END IF;
+            v_result:=public.execute_paper_equity_protective_fill(
+              'abababab-abab-4bab-8bab-abababababab',
+              v_execution_id,repeat('b',64),9000,v_now,v_now
+            );
+            IF (v_result->>'idempotent_replay')::boolean IS NOT TRUE THEN
+              RAISE EXCEPTION 'Equity protective retry was not idempotent';
+            END IF;
+            BEGIN
+              PERFORM public.execute_paper_equity_protective_fill(
+                'abababab-abab-4bab-8bab-abababababab',
+                v_execution_id,repeat('c',64),9000,v_now,v_now
+              );
+              RAISE EXCEPTION 'Protective retry accepted a different request fingerprint';
+            EXCEPTION WHEN unique_violation THEN
+              NULL;
+            END;
+          END
+          $protective_fill$;
+          RESET ROLE;
+          DO $protective_fill_assertions$
+          DECLARE
+            v_execution_id text;
+          BEGIN
+            SELECT execution_order_id INTO v_execution_id
+              FROM public.paper_protective_orders
+             WHERE order_id='abababab-abab-4bab-8bab-abababababab';
+            IF (SELECT quantity FROM public.paper_equity_positions
+                WHERE user_id='12121212-1212-4212-8212-121212121212'
+                  AND product='DELIVERY' AND instrument_key='NSE_EQ|PROTECTIVE_CI')<>6 THEN
+              RAISE EXCEPTION 'Equity protective fill did not reduce position exactly once';
+            END IF;
+            IF (SELECT cash_paise FROM public.paper_accounts
+                WHERE user_id='12121212-1212-4212-8212-121212121212')<>100036000
+               OR (SELECT realized_pnl_paise FROM public.paper_accounts
+                WHERE user_id='12121212-1212-4212-8212-121212121212')<>4000
+               OR (SELECT delivery_realized_pnl_paise FROM public.paper_accounts
+                WHERE user_id='12121212-1212-4212-8212-121212121212')<>4000 THEN
+              RAISE EXCEPTION 'Equity protective fill did not update account cash and realized P&L exactly once';
+            END IF;
+            IF (SELECT cost_basis_paise FROM public.paper_equity_positions
+                WHERE user_id='12121212-1212-4212-8212-121212121212'
+                  AND product='DELIVERY' AND instrument_key='NSE_EQ|PROTECTIVE_CI')<>48000 THEN
+              RAISE EXCEPTION 'Equity protective fill did not preserve remaining position cost basis';
+            END IF;
+            IF (SELECT count(*) FROM public.paper_orders
+                WHERE order_id=v_execution_id AND status='FILLED')<>1 THEN
+              RAISE EXCEPTION 'Equity protective fill did not create one canonical filled order';
+            END IF;
+          END
+          $protective_fill_assertions$;
+          SQL
+      - name: Verify owner-bound protective cancellation and idempotent replay
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/protective_order_cancel.sql
+      - name: Verify MARKET and LIMIT sells cannot consume protective-reserved shares
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/protective_reservation_sell_guard.sql
+      - name: Exercise concurrent protective fill versus cancel row-lock races
+        run: bash supabase/tests/protective_fill_cancel_race.sh
+      - name: Verify expected schema and RPC registration
+        run: |
+          psql -v ON_ERROR_STOP=1 <<'SQL'
+          DO $$
+          DECLARE
+            expected_tables text[] := ARRAY[
+              'paper_accounts','paper_equity_positions',
+              'paper_derivative_positions','paper_orders','paper_derivative_orders',
+              'paper_watchlists','upstox_connections','upstox_oauth_states',
+              'upstox_connection_controls','paper_market_stream_leases',
+              'paper_market_worker_state','paper_margin_preview_limits',
+              'paper_futures_positions','paper_futures_orders','paper_protective_orders',
+              'paper_chart_drawings','paper_chart_templates','paper_chart_preferences'
+            ];
+            table_name text;
+          BEGIN
+            FOREACH table_name IN ARRAY expected_tables LOOP
+              IF to_regclass('public.' || table_name) IS NULL THEN
+                RAISE EXCEPTION 'Missing expected table: %', table_name;
+              END IF;
+            END LOOP;
+            IF (SELECT count(*) FROM pg_tables
+                WHERE schemaname='public' AND tablename = ANY(expected_tables)) <> 18 THEN
+              RAISE EXCEPTION 'Unexpected public table count for migration schema';
+            END IF;
+            IF to_regprocedure('public.execute_paper_market_order(uuid,text,uuid,text,text,text,text,text,text,integer,bigint,bigint,bigint)') IS NULL
+              OR to_regprocedure('public.submit_paper_limit_order(uuid,text,uuid,text,text,text,text,text,integer,bigint)') IS NULL
+              OR to_regprocedure('public.execute_paper_limit_fill(text,bigint,bigint,bigint,bigint)') IS NULL
+              OR to_regprocedure('public.cancel_paper_limit_order(uuid,text)') IS NULL
+              OR to_regprocedure('public.initialize_paper_trading_account(uuid)') IS NULL
+              OR to_regprocedure('public.execute_paper_futures_market_order(uuid,text,uuid,text,text,text,text,text,date,integer,integer,text,text,integer,bigint,bigint,bigint,bigint,bigint)') IS NULL
+              OR to_regprocedure('public.execute_paper_futures_limit_fill(text,text,integer,integer,bigint,bigint,bigint,integer,integer,bigint,bigint,bigint)') IS NULL
+              OR to_regprocedure('public.execute_paper_long_option_order(uuid,text,uuid,text,text,text,text,text,text,date,numeric,integer,integer,integer,text,bigint,bigint,bigint)') IS NULL THEN
+              RAISE EXCEPTION 'One or more expected trading RPC functions are missing';
+            END IF;
+          END
+          $$;
+          SQL
+
+
+
+
+

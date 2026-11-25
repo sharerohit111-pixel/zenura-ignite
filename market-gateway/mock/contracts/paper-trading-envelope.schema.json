@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://zenuraignite.com/schemas/paper-trading-envelope.schema.json",
+  "title": "S-TRADE Paper Trading shared envelope",
+  "type": "object",
+  "required": ["schemaVersion", "mode", "simulated", "requestId", "asOf", "data"],
+  "properties": {
+    "schemaVersion": { "const": "1.0.0" },
+    "mode": { "enum": ["MOCK", "PAPER"] },
+    "simulated": { "const": true },
+    "requestId": { "type": "string", "minLength": 1 },
+    "asOf": { "type": "string", "format": "date-time" },
+    "data": { "type": "object" },
+    "meta": {
+      "type": "object",
+      "properties": {
+        "source": { "enum": ["SYNTHETIC_FIXTURE", "PAPER_LEDGER"] },
+        "stale": { "type": "boolean" },
+        "cursor": { "type": ["string", "null"] }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

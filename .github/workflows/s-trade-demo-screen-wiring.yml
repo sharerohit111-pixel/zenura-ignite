@@ -1,0 +1,106 @@
+name: S-TRADE Demo Screen Wiring Tests
+
+on:
+  pull_request:
+    paths:
+      - "markets/shared/paper-demo-adapter.mjs"
+      - "markets/shared/paper-demo-event-ledger.mjs"
+      - "markets/shared/paper-demo-ledger-session.mjs"
+      - "markets/stocks/demo.html"
+      - "markets/stocks/demo.css"
+      - "markets/stocks/demo.js"
+      - "markets/stocks/demo-*.mjs"
+      - "market-gateway/test/paper-demo-unified-ledger-panel.test.mjs"
+      - "markets/service-worker.js"
+      - "market-gateway/lib/equity-demo-execution-engine.js"
+      - "market-gateway/mock/fixtures/*.json"
+      - "market-gateway/test/paper-demo-adapter.test.mjs"
+      - "market-gateway/test/paper-demo-event-ledger.test.mjs"
+      - "market-gateway/test/paper-demo-equity-integration.test.mjs"
+      - "market-gateway/test/paper-demo-equity-ledger-bridge.test.mjs"
+      - "market-gateway/test/paper-demo-derivative-ledger-bridge.test.mjs"
+      - "market-gateway/test/paper-demo-shared-ledger-session.test.mjs"
+      - "markets/stocks/demo-derivative-ledger-bridge.mjs"
+      - "markets/stocks/demo-equity-ledger-bridge.mjs"
+      - "market-gateway/test/paper-demo-derivative-integration.test.mjs"
+      - "market-gateway/test/derivative-mock-simulator.test.js"
+      - "markets/stocks/index.html"
+      - "market-gateway/test/paper-demo-dashboard.test.mjs"
+      - "markets/stocks/demo-browser-smoke.cjs"
+      - "markets/stocks/demo-chart-data.mjs"
+      - "markets/stocks/demo-chart-panel.mjs"
+      - "market-gateway/test/demo-chart-data.test.mjs"
+      - "market-gateway/test/demo-watchlist-persistence.test.mjs"
+      - "markets/language-toggle.js"
+      - ".github/workflows/s-trade-demo-screen-wiring.yml"
+  push:
+    branches:
+      - feature/s-trade-round2-demo-screen-wiring-2026-11-24
+      - feature/s-trade-round3-equity-demo-screen-integration-2026-11-24
+      - feature/s-trade-chat42-dashboard-watchlist-closure-latest-2026-11-25
+    paths:
+      - "markets/shared/paper-demo-adapter.mjs"
+      - "markets/shared/paper-demo-event-ledger.mjs"
+      - "markets/stocks/demo-*.mjs"
+      - "markets/service-worker.js"
+      - "market-gateway/lib/equity-demo-execution-engine.js"
+      - "market-gateway/mock/fixtures/*.json"
+      - "market-gateway/test/paper-demo-adapter.test.mjs"
+      - "market-gateway/test/paper-demo-event-ledger.test.mjs"
+      - "market-gateway/test/paper-demo-equity-integration.test.mjs"
+      - "market-gateway/test/paper-demo-derivative-integration.test.mjs"
+      - "market-gateway/test/derivative-mock-simulator.test.js"
+      - "markets/stocks/demo.html"
+      - "markets/stocks/demo.css"
+      - "markets/stocks/demo.js"
+      - "markets/stocks/index.html"
+      - "markets/stocks/demo-browser-smoke.cjs"
+      - "market-gateway/test/paper-demo-dashboard.test.mjs"
+      - "market-gateway/test/demo-watchlist-persistence.test.mjs"
+      - "markets/language-toggle.js"
+      - ".github/workflows/s-trade-demo-screen-wiring.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  demo-screen-wiring:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Check browser module syntax
+        run: node --check markets/shared/paper-demo-adapter.mjs && node --check markets/shared/paper-demo-event-ledger.mjs && node --check markets/shared/paper-demo-ledger-session.mjs && node --check markets/stocks/demo.js && node --check markets/stocks/demo-watchlist-persistence.mjs && node --check markets/stocks/demo-derivative-panel.mjs && node --check markets/stocks/demo-unified-ledger-panel.mjs && node --check markets/stocks/demo-derivative-ledger-bridge.mjs && node --check markets/stocks/derivative-mock-simulator.js && node --check markets/stocks/demo-chart-data.mjs && node --check markets/stocks/demo-chart-panel.mjs
+      - name: Validate shared fixtures
+        run: |
+          node - <<'NODE'
+          const fs=require('node:fs');
+          for(const name of ['market','account','equity','derivatives']) JSON.parse(fs.readFileSync('market-gateway/mock/fixtures/'+name+'.json','utf8'));
+          console.log('Parsed all four canonical screen fixtures.');
+          NODE
+      - name: Run adapter, event-ledger and screen integration tests
+        run: node --test market-gateway/test/paper-demo-adapter.test.mjs market-gateway/test/paper-demo-event-ledger.test.mjs market-gateway/test/paper-demo-dashboard.test.mjs market-gateway/test/paper-demo-equity-integration.test.mjs market-gateway/test/paper-demo-equity-ledger-bridge.test.mjs market-gateway/test/paper-demo-derivative-integration.test.mjs market-gateway/test/paper-demo-derivative-ledger-bridge.test.mjs market-gateway/test/paper-demo-shared-ledger-session.test.mjs market-gateway/test/paper-demo-unified-ledger-panel.test.mjs market-gateway/test/demo-chart-data.test.mjs market-gateway/test/demo-watchlist-persistence.test.mjs
+      - name: Install Chromium browser QA dependencies
+        run: |
+          npm install --prefix "$RUNNER_TEMP/zenura-playwright" playwright@1.61.1 axe-core@4.10.3 --ignore-scripts --no-audit --no-fund
+          "$RUNNER_TEMP/zenura-playwright/node_modules/.bin/playwright" install --with-deps chromium
+      - name: Run desktop, mobile, accessibility, performance and offline PWA smoke
+        timeout-minutes: 12
+        run: |
+          python3 -m http.server 4173 --bind 127.0.0.1 > "$RUNNER_TEMP/zenura-static-server.log" 2>&1 &
+          echo $! > "$RUNNER_TEMP/zenura-static-server.pid"
+          for attempt in $(seq 1 30); do
+            if curl --silent --fail http://127.0.0.1:4173/markets/stocks/demo.html >/dev/null; then break; fi
+            sleep 1
+          done
+          curl --silent --fail http://127.0.0.1:4173/markets/stocks/demo.html >/dev/null
+          NODE_PATH="$RUNNER_TEMP/zenura-playwright/node_modules" node markets/stocks/demo-browser-smoke.cjs
+      - name: Guard production gateway isolation
+        run: |
+          if grep -R -E "paper-demo-adapter|paper-demo-event-ledger|paper-demo-ledger-session|demo-equity-ledger-bridge|demo-derivative-ledger-bridge|demo-unified-ledger-panel|derivative-mock-simulator|paper-mock-fixtures|equity-demo-execution-engine|demo-(equity|chart|derivative)-panel|market-gateway/mock/fixtures|equity-execution.json" market-gateway/supabase-server.js market-gateway/server.js; then
+            echo "Browser Demo modules and synthetic fixtures must remain outside production gateway routes."
+            exit 1
+          fi

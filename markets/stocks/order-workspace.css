@@ -1,0 +1,39 @@
+/* Isolated Paper Trading workspace styles. */
+.paper-ticket-controls{display:grid;gap:12px;margin:14px 0}
+.paper-order-type{display:grid;grid-template-columns:1fr 1fr;gap:7px;padding:5px;border:1px solid #29435c;border-radius:11px;background:#081624}
+.paper-order-type button{min-height:40px;border:1px solid transparent;border-radius:8px;background:transparent;color:#91a7bb;font-size:11px;font-weight:900;letter-spacing:.7px;cursor:pointer}
+.paper-order-type button.active{border-color:#287e70;background:#123c37;color:#70e8c8;box-shadow:0 0 18px #1bb58b1c}
+.paper-order-type button:focus-visible,.paper-order-tabs button:focus-visible,.paper-language-toggle:focus-visible{outline:2px solid #70e8c8;outline-offset:2px}
+.paper-ticket-field{display:grid;gap:7px;color:#91a7bb;font-size:10px;font-weight:700}
+.paper-ticket-field input{box-sizing:border-box;width:100%;min-height:43px;padding:11px 12px;border:1px solid rgba(120,160,200,.3);border-radius:9px;background:rgba(3,12,25,.72);color:#eaf3fa;font:inherit;font-size:14px;font-weight:600;font-variant-numeric:tabular-nums}
+.paper-ticket-field input:disabled{opacity:.45}
+.paper-ticket-field input[readonly]{color:#9bb2c5;background:#0b1a29}
+.paper-ticket-estimate{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:11px 12px;border:1px solid #203b54;border-radius:10px;background:#0a1928;color:#8fa8bc;font-size:10px}
+.paper-ticket-estimate b{color:#eaf3fa;font-size:14px;font-variant-numeric:tabular-nums}
+#limit-api-notice{padding:10px 11px;border:1px solid #287e70;border-radius:9px;background:#102d2b;color:#8af0d2;font-size:10px;line-height:1.55}
+.paper-limit-blocked{opacity:.65;filter:saturate(.5)}
+.paper-order-book{margin-top:15px}
+.paper-order-book .panel-head{gap:12px;flex-wrap:wrap}
+.paper-order-tabs{display:flex;gap:6px;flex-wrap:wrap;margin:14px 0 8px}
+.paper-order-tabs button{border:1px solid #29435c;border-radius:8px;background:#0b1a2a;color:#91a7bb;padding:9px 10px;font-size:9px;font-weight:800;cursor:pointer}
+.paper-order-tabs button.active{border-color:#287e70;background:#123c37;color:#70e8c8}
+.paper-order-workspace-status{min-height:20px;color:#91a7bb;font-size:10px;line-height:1.5}
+.paper-order-workspace-status[data-state="error"]{color:#ff9b9f}
+.paper-order-workspace-status[data-state="success"]{color:#70e8c8}
+.paper-order-workspace-status[data-state="warning"]{color:#f0c47c}
+.paper-order-workspace-status[data-state="loading"]{color:#9bc8ed}
+.paper-balance-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px;margin:13px 0}
+.paper-balance-grid>div{display:grid;gap:6px;min-width:0;padding:12px;border:1px solid #203b54;border-radius:10px;background:#0a1928}
+.paper-balance-grid small{color:#829bb0;font-size:8px;letter-spacing:.6px}
+.paper-balance-grid b{color:#eaf3fa;font-size:clamp(11px,1.4vw,15px);overflow-wrap:anywhere}
+.paper-cancel-button{padding:7px 10px;border:1px solid #8a5558;border-radius:7px;background:#321f28;color:#ffb5b7;font-size:9px;font-weight:900;white-space:nowrap;cursor:pointer}
+.paper-cancel-button:disabled{opacity:.5;cursor:wait}
+#paper-orders-workspace-more{margin:12px auto;display:block}
+#paper-orders-workspace-more[hidden]{display:none}
+.paper-language-toggle{position:fixed;right:max(14px,env(safe-area-inset-right));bottom:max(14px,env(safe-area-inset-bottom));z-index:30;min-width:62px;min-height:44px;padding:10px 14px;border:1px solid #3b927f;border-radius:999px;background:rgba(9,35,43,.94);color:#8af0d2;font-size:11px;font-weight:900;box-shadow:0 8px 30px #0008;backdrop-filter:blur(12px);cursor:pointer}
+@media(max-width:760px){.paper-balance-grid{grid-template-columns:1fr 1fr}.paper-ticket-estimate{align-items:flex-start;flex-direction:column}.paper-order-tabs button{flex:1 1 calc(50% - 6px)}}
+@media(max-width:420px){.paper-order-tabs button{font-size:8px;padding:9px 6px}.paper-balance-grid b{font-size:12px}}
+
+/* Keyboard visibility and comfortable touch targets across the full Paper Trading page. */
+.stocks-page button:focus-visible,.stocks-page a:focus-visible,.stocks-page input:focus-visible,.stocks-page select:focus-visible{outline:2px solid #70e8c8;outline-offset:3px}
+@media(pointer:coarse){.stocks-page button{min-height:44px}}

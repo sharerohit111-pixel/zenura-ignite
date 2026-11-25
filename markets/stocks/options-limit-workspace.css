@@ -1,0 +1,15 @@
+/* Isolated NSE long-options LIMIT ticket; hidden behind server feature flags. */
+.options-limit-fields{display:grid;grid-template-columns:minmax(180px,1.3fr) minmax(140px,1fr) minmax(110px,.7fr) minmax(130px,.8fr);gap:12px;align-items:end;margin:14px 0}
+.options-limit-fields label{display:grid;gap:7px;color:#91a7bb;font-size:10px;font-weight:800;letter-spacing:.25px}
+.options-limit-fields input,.options-limit-fields select{box-sizing:border-box;width:100%;min-height:43px;padding:10px 12px;border:1px solid rgba(120,160,200,.3);border-radius:9px;background:rgba(3,12,25,.78);color:#eaf3fa;font:inherit;font-size:13px;font-weight:600}
+.options-limit-fields input:disabled,.options-limit-fields select:disabled{opacity:.45}
+.options-limit-fields button{min-height:42px;border:1px solid #29435c;border-radius:9px;background:#102238;color:#c8d8e6;padding:9px 12px;font-size:10px;font-weight:900;letter-spacing:.5px;cursor:pointer}
+.options-limit-fields button:disabled{opacity:.42;cursor:not-allowed}
+.options-limit-actions{display:flex;gap:7px;flex-wrap:wrap;grid-column:1/-1}
+.options-limit-actions #options-limit-buy{border-color:#1d806b;background:#123c37;color:#75e7c8}
+.options-limit-actions #options-limit-sell{border-color:#a14d5a;background:#3c202b;color:#ff9eaa}
+.options-limit-orders-wrap{width:100%;overflow-x:auto;margin-top:10px}
+.options-limit-orders-wrap .paper-table{min-width:950px}
+#options-limit-status[data-state="error"]{color:#ff9b9f}
+#options-limit-status[data-state="success"]{color:#70e8c8}
+@media(max-width:760px){.options-limit-fields{grid-template-columns:1fr 1fr}.options-limit-fields label:first-child,.options-limit-fields label:nth-child(3),.options-limit-actions{grid-column:1/-1}}

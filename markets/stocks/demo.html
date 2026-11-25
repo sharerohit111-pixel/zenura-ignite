@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#07111f">
+<title>ZENURA IGNITE · S-TRADE Demo</title>
+<link rel="stylesheet" href="./demo.css">
+</head>
+<body>
+<main class="demo-shell">
+<header class="demo-header">
+  <a class="brand" href="./"><span class="brand-mark">Z✦</span><span><b>ZENURA <i>IGNITE</i></b><small>S-TRADE · INDIAN MARKET</small></span></a>
+  <span class="demo-chip">DEMO DATA · SYNTHETIC FIXTURES</span>
+</header>
+<section class="demo-intro">
+  <p class="eyebrow">PAPER TRADING · ISOLATED PREVIEW</p>
+  <h1>Explore the <em>market terminal</em></h1>
+  <p>Shared Mock JSON fixtures only. No exchange feed, broker connection, account sign-in or real order execution.</p>
+  <div class="demo-status" id="demo-status" role="status" aria-live="polite">Loading validated synthetic fixtures…</div>
+</section>
+<nav class="screen-nav" id="screen-nav" aria-label="Demo screens">
+  <button data-screen="home" class="active">Home</button><button data-screen="market">Market</button>
+  <button data-screen="watchlists">Watchlist</button><button data-screen="charts">Charts / Depth</button>
+  <button data-screen="equity">Equity</button><button data-screen="futures">Futures</button>
+  <button data-screen="options">Options</button><button data-screen="orders">Orders</button>
+  <button data-screen="trades">Trade History</button><button data-screen="portfolio">Portfolio</button>
+  <button data-screen="positions">Positions</button><button data-screen="holdings">Holdings</button>
+  <button data-screen="account">Wallet</button><button data-screen="profile">Profile</button>
+  <button data-screen="settings">Settings</button>
+</nav>
+<section class="screen-content" id="screen-content" aria-live="polite">
+  <div class="loading">Loading synthetic market snapshot…</div>
+</section>
+<footer>Powered by ZENURA IGNITE Technologies · Paper simulation only · Crypto remains separate</footer>
+</main>
+<button type="button" id="paper-language-toggle" class="paper-language-toggle" aria-label="Switch to Hindi">हिन्दी</button>
+<script src="../language-toggle.js"></script>
+<script src="../../market-gateway/lib/derivative-position.js"></script>
+<script src="./derivative-mock-simulator.js"></script>
+<script src="../../market-gateway/lib/equity-demo-execution-engine.js"></script>
+<script type="module" src="./demo.js"></script>
+</body>
+</html>
