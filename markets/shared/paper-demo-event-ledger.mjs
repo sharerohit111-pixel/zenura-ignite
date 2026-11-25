@@ -32,6 +32,17 @@ function positionKey(assetClass, instrumentKey, product) {
 }
 function timestampMs(value) {
   if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$/.test(value)) fail("INVALID_EVENT_TIMESTAMP");
+  const [datePart, timePart] = value.split("T");
+  const [year, month, day] = datePart.split("-").map(Number);
+  const clock = timePart.slice(0, 8);
+  const zone = timePart.endsWith("Z") ? "Z" : timePart.slice(-6);
+  const [hour, minute, second] = clock.split(":").map(Number);
+  const daysInMonth = month >= 1 && month <= 12 ? new Date(Date.UTC(year, month, 0)).getUTCDate() : 0;
+  if (day < 1 || day > daysInMonth || hour > 23 || minute > 59 || second > 59) fail("INVALID_EVENT_TIMESTAMP");
+  if (zone !== undefined && zone !== "Z") {
+    const offsetHour = Number(zone.slice(1, 3)), offsetMinute = Number(zone.slice(4, 6));
+    if (offsetHour > 23 || offsetMinute > 59) fail("INVALID_EVENT_TIMESTAMP");
+  }
   const parsed = Date.parse(value);
   if (!Number.isFinite(parsed)) fail("INVALID_EVENT_TIMESTAMP");
   return parsed;
@@ -62,6 +73,7 @@ function validateEvent(input, identity, expectedSequence) {
     if (input.engine === "EQUITY" && p.assetClass !== "EQUITY") fail("ENGINE_ASSET_MISMATCH");
     if (input.engine === "FUTURES" && p.assetClass !== "FUTURE") fail("ENGINE_ASSET_MISMATCH");
     if (input.engine === "OPTIONS" && p.assetClass !== "OPTION") fail("ENGINE_ASSET_MISMATCH");
+    if (input.type === "ORDER_ACCEPTED" && p.status !== "PENDING") fail("INVALID_INITIAL_ORDER_STATUS");
   }
   if (input.type === "FILL_RECORDED") {
     validateIdentity(p.fillId, "FILL_ID");
@@ -193,7 +205,7 @@ export function createPaperDemoEventLedger(opening) {
     const sourceKey = event.engine + "|" + event.sourceEventId;
     if (sourceEvents.has(sourceKey)) fail("DUPLICATE_SOURCE_EVENT");
     const time = timestampMs(event.occurredAt);
-    if (time < lastTimestamp) fail("DEMO_EVENT_TIME_ORDER_MISMATCH");
+    if (time <= lastTimestamp) fail("DEMO_EVENT_TIME_ORDER_MISMATCH");
     const before = clone(projection);
     try {
       apply(projection, event);
