@@ -43,6 +43,7 @@ test("15-screen Demo mounts the existing canonical Equity engine without a dupli
   assert.match(panel, /credentials:"omit"/);
 });
 
+// Assertions follow the current UI copy; isolation checks remain behavioral/structural.
 test("Equity order, trade, positions and holdings projections remain visibly separate from Wallet", async () => {
   const [js, panel] = await Promise.all([
     read("markets/stocks/demo.js"),
