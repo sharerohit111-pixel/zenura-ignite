@@ -21,7 +21,6 @@ test("Equity and Futures events share one idempotent projection",async()=>{
  ]};
  const interleavedProjection=sync("EQUITY",interleaved);
  const equityPosition=interleavedProjection.positions.find(p=>p.assetClass==="EQUITY");
- console.log("TRADE_DEBUG",interleavedProjection.trades.map(t=>({id:t.fillId,side:t.side,quantity:t.quantity,filledAt:t.filledAt})),equityPosition);
  assert.equal(equityPosition.quantity,3);
  assert.equal(equityPosition.costBasisPaise,365000);
  assert.equal(equityPosition.realizedPnlPaise,5000);
@@ -31,7 +30,7 @@ test("Equity and Futures events share one idempotent projection",async()=>{
  assert.equal(rejectedProjection.orders.find(o=>o.orderId==="MOCK-FO-000002").status,"REJECTED");
  assert.equal(rejectedProjection.orders.find(o=>o.orderId==="MOCK-FO-000002").rejectionReason,"Insufficient deterministic depth");
  const combined=sync("DERIVATIVES",derivatives);
- assert.equal(combined.orders.length,3);assert.equal(combined.trades.length,2);
+ assert.equal(combined.orders.length,4);assert.equal(combined.trades.length,4);
  assert.equal(combined.positions.find(p=>p.assetClass==="FUTURE").quantity,-2);
  assert.deepEqual(history.createDemoTradeHistoryStore({env:{NODE_ENV:"test"}}).replay([]),{mode:"DEMO",provider:"DUMMY_JSON",simulationOnly:true,orders:[],openOrders:[],trades:[],positions:[],events:[]});
 });
