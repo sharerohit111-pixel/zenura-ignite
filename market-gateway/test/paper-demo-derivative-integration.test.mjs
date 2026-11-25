@@ -12,7 +12,7 @@ test("Futures and Options Demo screens mount the shared local simulator", async 
   assert.match(js, /mountDerivativeDemo\(content,name\)/);
   assert.match(js, /appendUnifiedDemoSummary\(content,name\)/);
   assert.match(panel, /syncDemoProjection\("DERIVATIVES",s\)/);
-  assert.match(panel, /projection\.trades\.filter/);\n  assert.match(panel, /appendUnifiedDemoSummary\(container,screen\)/);
+  assert.match(panel, /projection\.trades\.filter/); assert.match(panel, /appendUnifiedDemoSummary\(container,screen\)/);
   assert.match(js, /from "\.\/demo-derivative-panel\.mjs"/);
   assert.match(html, /derivative-position\.js/);
   assert.match(html, /derivative-mock-simulator\.js/);
