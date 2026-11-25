@@ -5,6 +5,16 @@ const identity = (value, code) => {
   if (typeof value !== "string" || !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(value)) fail(code);
 };
 const clone = value => JSON.parse(JSON.stringify(value));
+const deepFreeze = value => {
+  if (value && typeof value === "object" && !Object.isFrozen(value)) {
+    Object.freeze(value);
+    for (const child of Object.values(value)) deepFreeze(child);
+  }
+  return value;
+};
+const contains = (collection, value) => collection instanceof Set
+  ? collection.has(value)
+  : Array.isArray(collection) && collection.includes(value);
 
 /**
  * Validate a provider-attested Demo F&O accounting fact.
@@ -14,13 +24,18 @@ const clone = value => JSON.parse(JSON.stringify(value));
  */
 export function validateAuthoritativeDemoSettlementReceipt(
   receipt,
-  { accountId, sessionId, orderId, fillId, assetClass, side, trustedIssuerIds, verifyAttestation } = {}
+  { accountId, sessionId, orderId, fillId, assetClass, side, trustedIssuerIds, verifyAttestation, consumedReceiptIds = [], consumedEventReferences = [] } = {}
 ) {
   if (!object(receipt)) fail("SETTLEMENT_RECEIPT_REQUIRED");
   if (typeof verifyAttestation !== "function") fail("SETTLEMENT_ATTESTATION_VERIFIER_REQUIRED");
   if (!Array.isArray(trustedIssuerIds) || trustedIssuerIds.length === 0 ||
       trustedIssuerIds.some(value => typeof value !== "string" || value.trim() === "")) {
     fail("SETTLEMENT_TRUSTED_ISSUER_ALLOWLIST_REQUIRED");
+  }
+  for (const collection of [consumedReceiptIds, consumedEventReferences]) {
+    if (!(collection instanceof Set) && !Array.isArray(collection)) {
+      fail("SETTLEMENT_REPLAY_INDEX_INVALID");
+    }
   }
   for (const [value, code] of [
     [accountId, "EXPECTED_ACCOUNT_REQUIRED"], [sessionId, "EXPECTED_SESSION_REQUIRED"],
@@ -36,6 +51,8 @@ export function validateAuthoritativeDemoSettlementReceipt(
   }
   identity(receipt.receiptId, "INVALID_SETTLEMENT_RECEIPT_ID");
   identity(receipt.eventReference, "INVALID_SETTLEMENT_EVENT_REFERENCE");
+  if (contains(consumedReceiptIds, receipt.receiptId)) fail("SETTLEMENT_RECEIPT_REPLAY");
+  if (contains(consumedEventReferences, receipt.eventReference)) fail("SETTLEMENT_EVENT_REPLAY");
   identity(receipt.issuerId, "INVALID_SETTLEMENT_ISSUER");
   identity(receipt.sourceReference, "INVALID_SETTLEMENT_SOURCE_REFERENCE");
   identity(receipt.policyVersion, "INVALID_SETTLEMENT_POLICY_VERSION");
@@ -72,6 +89,7 @@ export function validateAuthoritativeDemoSettlementReceipt(
   } else {
     if (receipt.kind !== "OPTIONS_FILL_SETTLEMENT" || receipt.action !== "SETTLE" ||
         typeof fillId !== "string" || receipt.fillId !== fillId ||
+        (typeof fillId === "string" && !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(fillId)) ||
         !safeInteger(amounts.premiumCashDeltaPaise) ||
         !safeInteger(amounts.chargesCashDeltaPaise)) {
       fail("INVALID_OPTIONS_SETTLEMENT_RECEIPT");
@@ -82,5 +100,5 @@ export function validateAuthoritativeDemoSettlementReceipt(
       fail("OPTIONS_SETTLEMENT_COMPONENTS_DO_NOT_RECONCILE");
     }
   }
-  return Object.freeze({ accepted: true, receipt: Object.freeze(clone(receipt)) });
+  return Object.freeze({ accepted: true, receipt: deepFreeze(clone(receipt)) });
 }
