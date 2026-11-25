@@ -78,7 +78,7 @@ test("PWA shell serves explicitly cached root-level Demo assets offline and reje
   const sw = await read("markets/service-worker.js");
   assert.ok(sw.includes("const shellAsset=SHELL.includes(url.toString())"));
   assert.ok(sw.includes("!url.pathname.startsWith(BASE.pathname)&&!shellAsset"));
-  assert.ok(sw.includes("if(request.mode===\\"navigate\\"){"));
+  assert.ok(sw.includes('if(request.mode==="navigate"){'));
   assert.ok(sw.includes("if(!shellAsset)return;"), "non-allowlisted navigation must never enter the offline cache");
   assert.ok(sw.includes('url.pathname.endsWith(".webmanifest")'));
   assert.ok(sw.includes('"../market-gateway/lib/derivative-position.js"'));
