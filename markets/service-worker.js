@@ -46,7 +46,7 @@ self.addEventListener("fetch",event=>{
   })());
   return;
  }
- if(shellAsset||["style","script","image","font"].includes(request.destination)||url.pathname.endsWith(".webmanifest")){
+ if(shellAsset){
   event.respondWith((async()=>{
    const cache=await caches.open(CACHE_NAME),cached=await cache.match(request);
    const network=fetch(request).then(response=>{
