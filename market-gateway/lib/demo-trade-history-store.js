@@ -76,6 +76,17 @@ function createDemoTradeHistoryStore(options = {}) {
     fills.set(receipt.fillId,receipt); events.push({type:"FILL_RECORDED",trade:clone(receipt)});
     return {duplicate:false,order:clone(order),trade:clone(receipt)};
   }
+  function reject(orderId, reason, rejectedAt) {
+    const order = orders.get(orderId);
+    if (!order) fail("DEMO_ORDER_NOT_FOUND");
+    if (typeof reason !== "string" || !reason || reason.length > 240 ||
+        typeof rejectedAt !== "string" || !Number.isFinite(Date.parse(rejectedAt))) fail("INVALID_DEMO_REJECTION");
+    if (order.status === "REJECTED") return {rejected:true,duplicate:true,order:clone(order)};
+    if (order.filledQuantity > 0 || order.status === "FILLED" || TERMINAL.has(order.status)) fail("DEMO_ORDER_ALREADY_TERMINAL");
+    order.status = "REJECTED"; order.rejectionReason = reason; order.updatedAt = rejectedAt;
+    events.push({type:"ORDER_REJECTED",orderId,reason,rejectedAt});
+    return {rejected:true,duplicate:false,order:clone(order)};
+  }
   function cancel(orderId, cancelledAt) {
     const order = orders.get(orderId);
     if (!order) fail("DEMO_ORDER_NOT_FOUND");
@@ -125,13 +136,14 @@ function createDemoTradeHistoryStore(options = {}) {
     const replayed = createDemoTradeHistoryStore(options);
     for (const event of log) {
       if (event.type === "ORDER_ACCEPTED") replayed.submit({...event.order,createdAt:event.order.createdAt});
+      else if (event.type === "ORDER_REJECTED") replayed.reject(event.orderId,event.reason,event.rejectedAt);
       else if (event.type === "FILL_RECORDED") replayed.recordFill({...event.trade});
       else if (event.type === "ORDER_CANCELLED") replayed.cancel(event.orderId,event.cancelledAt);
       else fail("UNKNOWN_DEMO_EVENT");
     }
     return replayed.snapshot();
   }
-  return Object.freeze({submit,recordFill,cancel,snapshot,replay,exportEvents:()=>clone(events)});
+  return Object.freeze({submit,recordFill,reject,cancel,snapshot,replay,exportEvents:()=>clone(events)});
 }
 const api = {createDemoTradeHistoryStore};
 if (typeof module === "object" && module.exports) module.exports = api;
