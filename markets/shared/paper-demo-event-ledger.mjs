@@ -30,6 +30,37 @@ function productOf(payload) {
 function positionKey(assetClass, instrumentKey, product) {
   return assetClass + "|" + instrumentKey + "|" + product;
 }
+function orderFillTotals(projection, order) {
+  const fills = projection.fills.filter(fill => fill.orderId === order.orderId);
+  const filledQuantity = fills.reduce((sum, fill) => sum + fill.quantity, 0);
+  let grossPaise = 0;
+  for (const fill of fills) {
+    const gross = fill.grossPaise ?? fill.quantity * fill.pricePaise;
+    if (!integer(gross) || gross < 0 || !integer(grossPaise + gross)) fail("DEMO_FILL_TOTAL_OUT_OF_RANGE");
+    grossPaise += gross;
+  }
+  if (!integer(filledQuantity) || filledQuantity > order.quantity) fail("FILL_QUANTITY_EXCEEDS_ORDER");
+  return { filledQuantity, remainingQuantity: order.quantity - filledQuantity,
+    averageFillPricePaise: filledQuantity ? Math.round(grossPaise / filledQuantity) : 0 };
+}
+function validateOrderStatus(status, quantity, filledQuantity) {
+  if (!integer(filledQuantity) || filledQuantity < 0 || filledQuantity > quantity) fail("DEMO_ORDER_FILL_QUANTITY_MISMATCH");
+  if (status === "PENDING" && filledQuantity !== 0) fail("DEMO_ORDER_STATUS_FILL_MISMATCH");
+  if (status === "PARTIALLY_FILLED" && (filledQuantity === 0 || filledQuantity >= quantity)) fail("DEMO_ORDER_STATUS_FILL_MISMATCH");
+  if (status === "FILLED" && filledQuantity !== quantity) fail("DEMO_ORDER_STATUS_FILL_MISMATCH");
+  if (["CANCELLED", "EXPIRED", "REJECTED"].includes(status) && filledQuantity >= quantity) fail("DEMO_ORDER_STATUS_FILL_MISMATCH");
+}
+function validateOrderTransition(previous, next) {
+  const allowed = {
+    PENDING: new Set(["PENDING", "PARTIALLY_FILLED", "FILLED", "CANCELLED", "EXPIRED"]),
+    PARTIALLY_FILLED: new Set(["PARTIALLY_FILLED", "FILLED", "CANCELLED", "EXPIRED"]),
+    FILLED: new Set(["FILLED"]),
+    CANCELLED: new Set(["CANCELLED"]),
+    REJECTED: new Set(["REJECTED"]),
+    EXPIRED: new Set(["EXPIRED"])
+  };
+  if (!allowed[previous]?.has(next)) fail("INVALID_ORDER_STATUS_TRANSITION");
+}
 function timestampMs(value) {
   if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$/.test(value)) fail("INVALID_EVENT_TIMESTAMP");
   const parsed = Date.parse(value);
@@ -111,14 +142,26 @@ function apply(projection, event) {
     const p = event.payload, existing = projection.orders.find(x => x.orderId === p.orderId);
     if ((event.type === "ORDER_ACCEPTED" || event.type === "ORDER_REJECTED") && existing) fail("DUPLICATE_ORDER_ID");
     if (event.type === "ORDER_UPDATED" && !existing) fail("ORDER_UPDATE_WITHOUT_ACCEPTANCE");
-    if (event.type === "ORDER_UPDATED" && !ORDER_STATUS_TRANSITIONS[existing.status]?.has(p.status)) fail("INVALID_ORDER_STATUS_TRANSITION");
     const product = productOf(p);
     const next = { ...p, product, engine: event.engine, lastSequence: event.sequence };
+    if (event.type === "ORDER_ACCEPTED") {
+      if (p.status !== "PENDING") fail("DEMO_ORDER_INITIAL_STATUS_INVALID");
+      Object.assign(next, { filledQuantity: 0, remainingQuantity: p.quantity, averageFillPricePaise: 0 });
+      validateOrderStatus(next.status, next.quantity, 0);
+    } else if (event.type === "ORDER_REJECTED") {
+      Object.assign(next, { filledQuantity: 0, remainingQuantity: p.quantity, averageFillPricePaise: 0 });
+      validateOrderStatus(next.status, next.quantity, 0);
+    }
     if (existing) {
       for (const field of ["assetClass", "instrumentKey", "side", "orderType", "quantity", "product"]) {
         if (existing[field] !== next[field]) fail("ORDER_IDENTITY_MUTATION");
       }
-      Object.assign(existing, next);
+      const totals = orderFillTotals(projection, existing);
+      if (p.filledQuantity !== undefined && p.filledQuantity !== totals.filledQuantity) fail("DEMO_ORDER_FILL_QUANTITY_MISMATCH");
+      if (p.remainingQuantity !== undefined && p.remainingQuantity !== totals.remainingQuantity) fail("DEMO_ORDER_REMAINING_QUANTITY_MISMATCH");
+      validateOrderTransition(existing.status, p.status);
+      validateOrderStatus(p.status, existing.quantity, totals.filledQuantity);
+      Object.assign(existing, next, totals);
     } else projection.orders.push(next);
     const reservationDelta = p.reservedQuantityDelta ?? (event.type === "ORDER_ACCEPTED" && p.side === "SELL" ? p.quantity : 0);
     if (reservationDelta !== 0) {
@@ -142,7 +185,14 @@ function apply(projection, event) {
       if (!position || position.reservedQuantity < p.quantity) fail("DEMO_SHARE_RESERVATION_INVARIANT");
       position.reservedQuantity -= p.quantity;
     }
-    projection.fills.push({ ...p, product: productOf(p), engine: event.engine, sequence: event.sequence, occurredAt: event.occurredAt });
+    const grossPaise = p.grossPaise ?? p.quantity * p.pricePaise;
+    if (!integer(grossPaise) || grossPaise < 0 || grossPaise !== p.quantity * p.pricePaise) fail("DEMO_FILL_GROSS_MISMATCH");
+    projection.fills.push({ ...p, grossPaise, product: productOf(p), engine: event.engine, sequence: event.sequence, occurredAt: event.occurredAt });
+    const totals = orderFillTotals(projection, order);
+    const nextStatus = totals.remainingQuantity === 0 ? "FILLED" : "PARTIALLY_FILLED";
+    validateOrderTransition(order.status, nextStatus);
+    validateOrderStatus(nextStatus, order.quantity, totals.filledQuantity);
+    Object.assign(order, totals, { status: nextStatus, lastSequence: event.sequence });
   }
   if (event.type === "POSITION_CHANGED") {
     const p = event.payload, product = productOf(p), key = positionKey(p.assetClass, p.instrumentKey, product);
