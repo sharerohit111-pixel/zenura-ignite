@@ -36,6 +36,7 @@ test("authenticated workspace CSP and auth DOM resist browser injection", async 
   const violations = [];
   const pageErrors = [];
   const failedRequests = [];
+  const responses = [];
   await page.addInitScript(() => {
     window.__cspViolations = [];
     document.addEventListener("securitypolicyviolation", event => {
@@ -47,6 +48,7 @@ test("authenticated workspace CSP and auth DOM resist browser injection", async 
   });
   page.on("pageerror", error => pageErrors.push(error.message));
   page.on("requestfailed", request => failedRequests.push({ url: request.url(), error: request.failure()?.errorText }));
+  page.on("response", response => responses.push({ url: response.url(), status: response.status() }));
   await page.route("https://esm.sh/@supabase/supabase-js@2.119.2", route => route.fulfill({
     status: 200,
     contentType: "text/javascript",
@@ -137,9 +139,11 @@ test("authenticated workspace CSP and auth DOM resist browser injection", async 
       assert.ok(directives.has(directive), `expected CSP violation for ${directive}; got ${[...directives].join(", ")}`);
     }
     assert.deepEqual(pageErrors, [], "workspace should not throw uncaught browser exceptions");
-    assert.equal(failedRequests.some(item => item.url.includes("evil.invalid")), false,
-      "CSP-blocked unauthorized origins must not reach the network");
-    console.log(JSON.stringify({ browser: "Chromium", cspViolations: violations, pageErrors, failedRequests }));
+    assert.equal(responses.some(item => item.url.includes("evil.invalid")), false,
+      "CSP-blocked unauthorized origins must not receive a network response");
+    assert.ok(failedRequests.some(item => item.url.includes("evil.invalid")),
+      "browser should report attempted unauthorized requests as blocked/failed");
+    console.log(JSON.stringify({ browser: "Chromium", cspViolations: violations, pageErrors, failedRequests, unauthorizedResponses: responses.filter(item => item.url.includes("evil.invalid")) }));
   } finally {
     await context.close();
     await browser.close();
