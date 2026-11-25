@@ -122,6 +122,8 @@ fi
 wait "$CANCEL_PID"
 
 psql -v ON_ERROR_STOP=1 -v exec_fill="$EXEC_FILL" -v exec_cancel="$EXEC_CANCEL" <<'SQL'
+SELECT set_config('test.exec_fill', :'exec_fill', false);
+SELECT set_config('test.exec_cancel', :'exec_cancel', false);
 DO $race_assertions$
 BEGIN
   IF (SELECT status FROM public.paper_protective_orders
@@ -132,10 +134,10 @@ BEGIN
       WHERE order_id='d2d2d2d2-d2d2-42d2-82d2-d2d2d2d2d2d2')<>'CANCELLED' THEN
     RAISE EXCEPTION 'Cancel-first race did not finish CANCELLED';
   END IF;
-  IF NOT EXISTS(SELECT 1 FROM public.paper_orders WHERE order_id=:'exec_fill' AND status='FILLED') THEN
+  IF NOT EXISTS(SELECT 1 FROM public.paper_orders WHERE order_id=current_setting('test.exec_fill') AND status='FILLED') THEN
     RAISE EXCEPTION 'Fill-first race did not create the canonical paper order';
   END IF;
-  IF EXISTS(SELECT 1 FROM public.paper_orders WHERE order_id=:'exec_cancel') THEN
+  IF EXISTS(SELECT 1 FROM public.paper_orders WHERE order_id=current_setting('test.exec_cancel')) THEN
     RAISE EXCEPTION 'Cancel-first race created an execution order';
   END IF;
 END
