@@ -1,0 +1,127 @@
+import { createPaperDemoEventLedger } from "../shared/paper-demo-event-ledger.mjs";
+
+const safeDelta = (after, before) => {
+  const value = after - before;
+  if (!Number.isSafeInteger(value)) throw new TypeError("EQUITY_LEDGER_DELTA_OUT_OF_RANGE");
+  return value;
+};
+const positionFor = (snapshot, product, instrumentKey) => {
+  const map = product === "INTRADAY" ? snapshot.account.intradayPositions : snapshot.account.positions;
+  return map?.[instrumentKey] || { quantity: 0, costBasisPaise: 0, reservedQuantity: 0 };
+};
+
+export function createEquityDemoLedgerBridge({ engine, accountId, sessionId, clock = () => Date.now() } = {}) {
+  if (!engine || typeof engine.snapshot !== "function" || typeof engine.submitOrder !== "function" ||
+      typeof engine.matchNext !== "function" || typeof engine.cancelOrder !== "function") {
+    throw new TypeError("EQUITY_DEMO_ENGINE_REQUIRED");
+  }
+  if (typeof accountId !== "string" || !accountId.startsWith("mock-") ||
+      typeof sessionId !== "string" || !sessionId.startsWith("demo-")) {
+    throw new TypeError("EQUITY_DEMO_SCOPE_REQUIRED");
+  }
+  const initial = engine.snapshot();
+  if (initial.mode !== "MOCK" || initial.simulated !== true || initial.source !== "SYNTHETIC_FIXTURE") {
+    throw new TypeError("EQUITY_DEMO_ENGINE_NOT_SYNTHETIC");
+  }
+  const ledger = createPaperDemoEventLedger({
+    accountId, sessionId,
+    cashBalancePaise: initial.account.cashBalancePaise,
+    blockedFundsPaise: initial.account.blockedFundsPaise
+  });
+  let eventSequence = 0, lastTimestamp = -Infinity;
+  const submitted = new Map(), executions = new Map(), cancellations = new Map();
+
+  function append(type, payload, deltas, sourceKey) {
+    const time = Math.max(Number(clock()), lastTimestamp + 1);
+    if (!Number.isFinite(time)) throw new TypeError("INVALID_EQUITY_LEDGER_CLOCK");
+    lastTimestamp = time;
+    eventSequence += 1;
+    const id = String(eventSequence).padStart(8, "0");
+    return ledger.append({
+      eventId: "eq-ledger-" + id,
+      idempotencyKey: "eq-idem-" + id,
+      sourceEventId: "equity-" + sourceKey,
+      accountId, sessionId,
+      occurredAt: new Date(time).toISOString(),
+      engine: "EQUITY", type, payload, deltas
+    });
+  }
+  function orderPayload(order) {
+    return {
+      orderId: order.orderId, assetClass: "EQUITY", instrumentKey: order.instrumentKey,
+      product: order.product, side: order.side, orderType: order.orderType,
+      quantity: order.quantity, status: order.status
+    };
+  }
+  function submitOrder(request) {
+    const order = engine.submitOrder(request);
+    if (submitted.has(order.orderId)) return { order, snapshot: ledger.snapshot() };
+    const after = engine.snapshot();
+    const before = {
+      cashBalancePaise: initial.account.cashBalancePaise,
+      blockedFundsPaise: initial.account.blockedFundsPaise
+    };
+    // For subsequent submissions, derive the pre-submit account state by reversing this order's reservation.
+    const reserve = order.side === "BUY" ? order.reservedCashPaise : 0;
+    const blockedDeltaPaise = order.side === "BUY" ? reserve : 0;
+    append("ORDER_ACCEPTED", orderPayload(order), {
+      cashDeltaPaise: 0, blockedDeltaPaise
+    }, "order-" + order.orderId);
+    submitted.set(order.orderId, true);
+    return { order, snapshot: ledger.snapshot(), engineSnapshot: after, openingSnapshot: before };
+  }
+  function matchNext(orderId, options = {}) {
+    const executionId = options.executionId || "equity-exec-" + (executions.size + 1);
+    if (executions.has(executionId)) return executions.get(executionId);
+    const before = engine.snapshot();
+    const result = engine.matchNext(orderId, { ...options, executionId });
+    if (!result.matched) return result;
+    const after = engine.snapshot(), fill = result.fill;
+    append("FILL_RECORDED", {
+      fillId: fill.fillId, orderId: fill.orderId, assetClass: "EQUITY",
+      instrumentKey: fill.instrumentKey, product: fill.product, side: fill.side,
+      quantity: fill.quantity, pricePaise: fill.pricePaise
+    }, {
+      cashDeltaPaise: safeDelta(after.account.cashBalancePaise, before.account.cashBalancePaise),
+      blockedDeltaPaise: safeDelta(after.account.blockedFundsPaise, before.account.blockedFundsPaise)
+    }, "fill-" + fill.fillId);
+    const oldPosition = positionFor(before, fill.product, fill.instrumentKey);
+    const newPosition = positionFor(after, fill.product, fill.instrumentKey);
+    append("POSITION_CHANGED", {
+      assetClass: "EQUITY", instrumentKey: fill.instrumentKey, product: fill.product,
+      quantityDelta: safeDelta(newPosition.quantity, oldPosition.quantity),
+      costBasisDeltaPaise: safeDelta(newPosition.costBasisPaise, oldPosition.costBasisPaise),
+      realizedPnlDeltaPaise: fill.realizedPnlPaise
+    }, { cashDeltaPaise: 0, blockedDeltaPaise: 0 }, "position-" + fill.fillId);
+    append("ORDER_UPDATED", orderPayload(result.order), {
+      cashDeltaPaise: 0, blockedDeltaPaise: 0
+    }, "order-update-" + fill.fillId);
+    const bridged = { ...result, snapshot: ledger.snapshot() };
+    executions.set(executionId, bridged);
+    return bridged;
+  }
+  function cancelOrder(orderId) {
+    if (cancellations.has(orderId)) return cancellations.get(orderId);
+    const before = engine.snapshot();
+    const result = engine.cancelOrder(orderId);
+    if (!result.cancelled) return result;
+    const after = engine.snapshot();
+    append("ORDER_UPDATED", {
+      ...orderPayload(result.order),
+      reservedQuantityDelta: result.releasedShareQuantity ? -result.releasedShareQuantity : 0
+    }, {
+      cashDeltaPaise: safeDelta(after.account.cashBalancePaise, before.account.cashBalancePaise),
+      blockedDeltaPaise: safeDelta(after.account.blockedFundsPaise, before.account.blockedFundsPaise)
+    }, "cancel-" + orderId);
+    const bridged = { ...result, snapshot: ledger.snapshot() };
+    cancellations.set(orderId, bridged);
+    return bridged;
+  }
+  return Object.freeze({
+    submitOrder, matchNext, cancelOrder,
+    snapshot: () => ledger.snapshot(),
+    engineSnapshot: () => engine.snapshot(),
+    getOrder: id => engine.getOrder(id),
+    getFillReceipts: id => engine.getFillReceipts(id)
+  });
+}
