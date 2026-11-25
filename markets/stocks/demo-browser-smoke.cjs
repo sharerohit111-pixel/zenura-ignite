@@ -187,7 +187,8 @@ const axePath=require.resolve("axe-core/axe.min.js");
   const cachePolicy=await demoPage.evaluate(async()=>{
    const cache=await caches.open("zenura-markets-shell-v10");
    const keys=(await cache.keys()).map(request=>request.url);
-   const privateSegments=["api","auth","account","profile","wallet","orders","positions","holdings"];\n   const privateLike=keys.filter(url=>new URL(url).pathname.split("/").some(segment=>privateSegments.includes(segment.toLowerCase())));
+   const privateSegments=["api","auth","account","profile","wallet","orders","positions","holdings"];
+   const privateLike=keys.filter(url=>new URL(url).pathname.split("/").some(segment=>privateSegments.includes(segment.toLowerCase())));
    return {keys:keys.length,privateLike};
   });
   assert.deepEqual(cachePolicy.privateLike,[],"private account API/navigation paths must never enter the static shell cache");
