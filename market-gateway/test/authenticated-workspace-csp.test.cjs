@@ -14,7 +14,7 @@ test("authenticated Paper Trading workspace declares one CSP meta policy", () =>
 
 test("CSP fails closed for object, base URL, framing and form destinations", () => {
   const directives = Object.fromEntries(match[1].split(";").map(part => {
-    const [name, ...values] = part.trim().split(/\\s+/);
+    const [name, ...values] = part.trim().split(/\s+/);
     return [name, values];
   }));
   for (const name of ["default-src", "script-src", "style-src", "img-src", "font-src", "connect-src", "object-src", "base-uri", "form-action", "frame-src"]) {
@@ -30,7 +30,7 @@ test("CSP fails closed for object, base URL, framing and form destinations", () 
 
 test("CSP permits only the required authenticated workspace script and API origins", () => {
   const directives = Object.fromEntries(match[1].split(";").map(part => {
-    const [name, ...values] = part.trim().split(/\\s+/);
+    const [name, ...values] = part.trim().split(/\s+/);
     return [name, values];
   }));
   assert.deepEqual(directives["script-src"], ["'self'", "https://esm.sh"]);
