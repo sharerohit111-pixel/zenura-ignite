@@ -263,3 +263,68 @@ test("product-aware cost basis cannot become negative or outlive a flat position
   })), /DEMO_POSITION_INVARIANT/);
   assert.equal(ledger.snapshot().events.length, 0);
 });
+
+
+test("non-fill events cannot debit or credit wallet cash", () => {
+  const ledger = createPaperDemoEventLedger(opening);
+  assert.throws(() => ledger.append(event({
+    type: "POSITION_CHANGED",
+    deltas: { cashDeltaPaise: 1, blockedDeltaPaise: 0 },
+    payload: { assetClass: "EQUITY", instrumentKey: "MOCK|NSE|EQ|0001",
+      quantityDelta: 0, realizedPnlDeltaPaise: 0 }
+  })), /NON_FILL_CASH_MOVEMENT_FORBIDDEN/);
+  assert.throws(() => ledger.append(event({
+    eventId: "evt-2", idempotencyKey: "idem-2", sourceEventId: "reservation-event",
+    type: "RESERVATION_CHANGED",
+    deltas: { cashDeltaPaise: -1, blockedDeltaPaise: 0 },
+    payload: {}
+  })), /NON_FILL_CASH_MOVEMENT_FORBIDDEN/);
+  assert.equal(ledger.snapshot().account.cashBalancePaise, opening.cashBalancePaise);
+  assert.equal(ledger.snapshot().events.length, 0);
+});
+
+test("non-order projection events cannot mutate blocked wallet funds", () => {
+  const ledger = createPaperDemoEventLedger(opening);
+  assert.throws(() => ledger.append(event({
+    type: "POSITION_CHANGED",
+    deltas: { cashDeltaPaise: 0, blockedDeltaPaise: 100 },
+    payload: { assetClass: "EQUITY", instrumentKey: "MOCK|NSE|EQ|0001",
+      quantityDelta: 0, realizedPnlDeltaPaise: 0 }
+  })), /NON_ORDER_RESERVATION_MOVEMENT_FORBIDDEN/);
+  assert.throws(() => ledger.append(event({
+    eventId: "evt-2", idempotencyKey: "idem-2", sourceEventId: "reservation-event",
+    type: "RESERVATION_CHANGED",
+    deltas: { cashDeltaPaise: 0, blockedDeltaPaise: -100 },
+    payload: {}
+  })), /NON_ORDER_RESERVATION_MOVEMENT_FORBIDDEN/);
+  assert.equal(ledger.snapshot().account.blockedFundsPaise, opening.blockedFundsPaise);
+  assert.equal(ledger.snapshot().events.length, 0);
+});
+
+test("fills cannot increase blocked reservations", () => {
+  const ledger = createPaperDemoEventLedger(opening);
+  ledger.append(event());
+  assert.throws(() => ledger.append(event({
+    eventId: "evt-2", idempotencyKey: "fill-positive-block", sourceEventId: "fill-positive-block",
+    type: "FILL_RECORDED", occurredAt: "2026-11-25T09:30:01+05:30",
+    deltas: { cashDeltaPaise: -125050, blockedDeltaPaise: 1 },
+    payload: { fillId: "fill-positive-block", orderId: "order-1", assetClass: "EQUITY",
+      instrumentKey: "MOCK|NSE|EQ|0001", side: "BUY", quantity: 1, pricePaise: 125050 }
+  })), /FILL_CANNOT_INCREASE_RESERVATION/);
+  assert.equal(ledger.snapshot().events.length, 1);
+  assert.equal(ledger.snapshot().account.cashBalancePaise, opening.cashBalancePaise);
+});
+
+test("order acceptance cannot release funds and rejection cannot create a reservation", () => {
+  const ledger = createPaperDemoEventLedger(opening);
+  assert.throws(() => ledger.append(event({
+    deltas: { cashDeltaPaise: 0, blockedDeltaPaise: -1 }
+  })), /ORDER_ACCEPTANCE_CANNOT_RELEASE_RESERVATION/);
+  assert.throws(() => ledger.append(event({
+    eventId: "evt-2", idempotencyKey: "idem-2", sourceEventId: "rejected-order",
+    type: "ORDER_REJECTED",
+    deltas: { cashDeltaPaise: 0, blockedDeltaPaise: 1 },
+    payload: { ...event().payload, orderId: "rejected-order", status: "REJECTED" }
+  })), /ORDER_REJECTION_CANNOT_INCREASE_RESERVATION/);
+  assert.equal(ledger.snapshot().events.length, 0);
+});
