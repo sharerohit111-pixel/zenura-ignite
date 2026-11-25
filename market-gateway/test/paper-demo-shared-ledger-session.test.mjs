@@ -44,11 +44,13 @@ test("Equity, Futures and Options bridges append to one account-scoped ordered l
     side: "BUY", orderType: "MARKET", lots: 1,
     idempotencyKey: "shared-option-0001"
   });
-  equity.submitOrder({
+  const equityOrder = equity.submitOrder({
     instrumentKey: equityFixture.data.instrument.instrumentKey,
     side: "BUY", orderType: "MARKET", product: "DELIVERY",
     quantity: 1, idempotencyKey: "shared-equity-0001"
   });
+  const equityFill = equity.matchNext(equityOrder.order.orderId);
+  assert.equal(equityFill.matched, true);
 
   const snapshot = shared.ledger.snapshot();
   assert.equal(equity.snapshot().events.length, derivatives.snapshot().events.length);
