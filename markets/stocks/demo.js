@@ -1,4 +1,4 @@
-import { appendUnifiedDemoSummary } from "./demo-trade-projection.mjs";
+import { appendUnifiedDemoSummary, getDemoProjectionSnapshot } from "./demo-trade-projection.mjs";
 import { createPaperDemoViewModel, searchPaperDemoInstruments, getPaperDemoExpiries, getPaperDemoOptionChain } from "../shared/paper-demo-adapter.mjs";
 import { mountDerivativeDemo, appendDerivativeSummary } from "./demo-derivative-panel.mjs";
 import { mountDemoChart } from "./demo-chart-panel.mjs";
@@ -160,12 +160,11 @@ function renderDemoWatchlists(host){
  addButton.addEventListener("click",()=>{const list=demoWatchlists[listSelect.value],key=instrumentSelect.value;if(!key||list.length>=50||list.includes(key))return;list.push(key);renderRows();});
  renderRows();
 }
-function orderRows(orders){return orders.map(o=>[o.orderId,o.assetClass,o.instrumentKey,o.side,o.orderType,o.quantity??o.lots,o.status,money(o.averagePricePaise??o.limitPricePaise??0),money(o.chargesPaise??0)]);}
 function render(name){
- const a=model.account,equity=model.positions.find(x=>x.assetClass==="EQUITY"),orders=model.orders;
+ const a=model.account,history=getDemoProjectionSnapshot();
  content.replaceChildren(header(name,"Illustrative values from one validated, versioned Mock JSON view model. Not live exchange data."));
  if(name==="home"){
-  content.append(grid(card("Virtual starting capital",money(a.startingCapitalPaise),"₹10,00,000 synthetic account"),card("Available funds",money(a.availableFundsPaise),"Fixture snapshot"),card("Instruments",String(model.market.instruments.length),"NSE/BSE MOCK symbols"),card("Sample orders",String(orders.length),"Read-only records")));
+  content.append(grid(card("Virtual starting capital",money(a.startingCapitalPaise),"₹10,00,000 synthetic account"),card("Available funds",money(a.availableFundsPaise),"Fixture snapshot"),card("Instruments",String(model.market.instruments.length),"NSE/BSE MOCK symbols"),card("Demo orders",String(history.orders.length),"Canonical event projection")));
   content.append(el("h3","","Synthetic market snapshot"),table(["SYMBOL","EXCHANGE","ASSET","SAMPLE PRICE","CHANGE","VOLUME","AS OF"],quoteRows()));
   return;
  }
@@ -189,10 +188,8 @@ function render(name){
  }
  if(name==="futures"||name==="options"){
   const x=name==="futures"?model.derivatives.futures:model.derivatives.options;
-  const order=orders.find(o=>o.assetClass===(name==="futures"?"FUTURE":"OPTION"));
-  content.append(grid(card("Available contracts",String(model.market.instruments.filter(i=>i.assetClass===(name==="futures"?"FUTURE":"OPTION")).length),"NSE + BSE MOCK catalog"),card("Sample contract",x.symbol||x.underlying,"Order receipt fixture"),card("Expiry choices",String(getPaperDemoExpiries(model,{underlying:name==="futures"?"MOCKNIFTY":x.underlying,assetClass:name==="futures"?"FUTURE":"OPTION"}).length),"Deterministic fixture dates"),card("Order record",order?.status||"—","Read-only sample")));
+  content.append(grid(card("Available contracts",String(model.market.instruments.filter(i=>i.assetClass===(name==="futures"?"FUTURE":"OPTION")).length),"NSE + BSE MOCK catalog"),card("Sample contract",x.symbol||x.underlying,"Order receipt fixture"),card("Expiry choices",String(getPaperDemoExpiries(model,{underlying:name==="futures"?"MOCKNIFTY":x.underlying,assetClass:name==="futures"?"FUTURE":"OPTION"}).length),"Deterministic fixture dates"),card("Demo orders",String(history.orders.filter(o=>o.assetClass===(name==="futures"?"FUTURE":"OPTION")).length),"Canonical event projection")));
   const catalog=el("section","catalog-panel");content.append(catalog);if(name==="futures")renderFuturesCatalog(catalog);else renderOptionsCatalog(catalog);
-  content.append(table(["ORDER ID","INSTRUMENT","SIDE","TYPE","SIZE","STATUS","AVG / LIMIT"],orderRows(order?[order]:[])));
   content.append(notice("Contracts, strikes and quotes are synthetic MOCK fixtures. The local simulator below is browser-memory only; no production order API or broker connection is called."));
   mountDerivativeDemo(content,name);
   return;
