@@ -45,7 +45,7 @@ test("partial fills followed by cancellation retain receipts and executed positi
   assert.equal(cancelled.order.status,"CANCELLED");assert.equal(cancelled.order.filledQuantity,2);
   assert.equal(cancelled.order.remainingQuantity,3);assert.equal(s.trades.length,1);
   assert.equal(s.openOrders.length,0);assert.equal(s.positions[0].quantity,2);
-  assert.equal(store.cancel(order.orderId,"2026-11-24T09:30:03+05:30").duplicate,true);
+  assert.equal(store.cancel(order.orderId,"2026-11-24T09:30:02+05:30").duplicate,true);
 });
 
 test("sell fills close long positions and compute deterministic realized P&L",()=>{
