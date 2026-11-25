@@ -7,7 +7,7 @@ function fakeSupabase(seed = {}) {
   const rows = new Map(Object.entries(seed));
   const calls = [];
   return {
-    rows, calls,
+    auth: {}, rows, calls,
     from(table) {
       assert.equal(table, "paper_watchlists");
       let uid = null;
