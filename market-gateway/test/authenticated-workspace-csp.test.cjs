@@ -5,7 +5,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 
 const html = fs.readFileSync(path.join(__dirname, "../../markets/stocks/index.html"), "utf8");
-const match = html.match(/<meta\\s+http-equiv="Content-Security-Policy"\\s+content="([^"]+)"\\s*>/i);
+const match = html.match(/<meta\s+http-equiv="Content-Security-Policy"\s+content="([^"]+)"\s*>/i);
 
 test("authenticated Paper Trading workspace declares one CSP meta policy", () => {
   assert.ok(match, "CSP meta policy must be present on the authenticated workspace");
