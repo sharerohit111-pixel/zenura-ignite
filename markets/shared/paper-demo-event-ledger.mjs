@@ -1,6 +1,6 @@
 const VERSION = "1.1.0";
 const ENGINES = new Set(["EQUITY", "FUTURES", "OPTIONS"]);
-const EVENT_TYPES = new Set(["ORDER_ACCEPTED", "ORDER_UPDATED", "FILL_RECORDED", "RESERVATION_CHANGED", "POSITION_CHANGED"]);
+const EVENT_TYPES = new Set(["ORDER_ACCEPTED", "ORDER_UPDATED", "ORDER_REJECTED", "FILL_RECORDED", "RESERVATION_CHANGED", "POSITION_CHANGED"]);
 const ORDER_STATUSES = new Set(["PENDING", "PARTIALLY_FILLED", "FILLED", "CANCELLED", "REJECTED", "EXPIRED"]);
 const SIDES = new Set(["BUY", "SELL"]);
 const ORDER_TYPES = new Set(["MARKET", "LIMIT"]);
@@ -41,11 +41,11 @@ function validateEvent(input, identity, expectedSequence) {
   }
   const p = input.payload;
   if (!object(p)) fail("INVALID_EVENT_PAYLOAD");
-  if (input.type === "ORDER_ACCEPTED" || input.type === "ORDER_UPDATED") {
+  if (input.type === "ORDER_ACCEPTED" || input.type === "ORDER_UPDATED" || input.type === "ORDER_REJECTED") {
     validateIdentity(p.orderId, "ORDER_ID");
     if (!ASSETS.has(p.assetClass) || !p.instrumentKey?.startsWith("MOCK|") ||
         !SIDES.has(p.side) || !ORDER_TYPES.has(p.orderType) ||
-        !ORDER_STATUSES.has(p.status) || !integer(p.quantity) || p.quantity < 1 ||
+        !ORDER_STATUSES.has(p.status) || (input.type === "ORDER_REJECTED" && p.status !== "REJECTED") || (input.type !== "ORDER_REJECTED" && p.status === "REJECTED") || !integer(p.quantity) || p.quantity < 1 ||
         !PRODUCTS.has(productOf(p)) ||
         (p.reservedQuantityDelta !== undefined && !integer(p.reservedQuantityDelta))) fail("INVALID_ORDER_EVENT");
     if (input.engine === "EQUITY" && p.assetClass !== "EQUITY") fail("ENGINE_ASSET_MISMATCH");
@@ -98,7 +98,7 @@ function apply(projection, event) {
   projection.account.availableFundsPaise = available;
   if (event.type === "ORDER_ACCEPTED" || event.type === "ORDER_UPDATED") {
     const p = event.payload, existing = projection.orders.find(x => x.orderId === p.orderId);
-    if (event.type === "ORDER_ACCEPTED" && existing) fail("DUPLICATE_ORDER_ID");
+    if ((event.type === "ORDER_ACCEPTED" || event.type === "ORDER_REJECTED") && existing) fail("DUPLICATE_ORDER_ID");
     if (event.type === "ORDER_UPDATED" && !existing) fail("ORDER_UPDATE_WITHOUT_ACCEPTANCE");
     const product = productOf(p);
     const next = { ...p, product, engine: event.engine, lastSequence: event.sequence };
