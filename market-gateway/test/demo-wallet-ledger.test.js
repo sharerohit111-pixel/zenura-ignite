@@ -83,7 +83,8 @@ test("audit checks source orders, fills, reservations and balance arithmetic but
     accountSnapshot: { accountId: "mock-account-user-a", cashBalancePaise: 99750000,
       blockedFundsPaise: 0, availableFundsPaise: 99750000 },
     sourceOrders: [{ orderId: "order-1", assetClass: "EQUITY" }],
-    sourceFills: [{ fillId: "fill-1", orderId: "order-1", assetClass: "EQUITY" }],
+    sourceFills: [{ fillId: "fill-1", orderId: "order-1", assetClass: "EQUITY",
+      side: "BUY", quantity: 2, pricePaise: 125000, grossValuePaise: 250000 }],
     sourceReservations: [],
     evidence: { accountSnapshotRef: "a", ordersSnapshotRef: "o", fillsSnapshotRef: "f",
       reservationsSnapshotRef: "r", eventHistoryRef: "h", atomicSnapshotAttestationRef: "atomic" }
@@ -91,10 +92,48 @@ test("audit checks source orders, fills, reservations and balance arithmetic but
   assert.equal(result.arithmeticMatches, true);
   assert.equal(result.allOrdersReferenced, true);
   assert.equal(result.allFillsSettled, true);
+  assert.equal(result.settlementAmountsMatch, true);
   assert.equal(result.reservationsMatch, true);
   assert.equal(result.evidenceComplete, true);
   assert.equal(result.ledgerReconciled, false);
   assert.ok(result.reconciliationBlockers.some(x => x.includes("cannot independently verify")));
+});
+
+
+test("audit rejects matching fill IDs when cash amount or BUY/SELL direction is wrong", () => {
+  const sourceFill = {
+    fillId: "fill-1", orderId: "order-1", assetClass: "EQUITY",
+    side: "BUY", quantity: 2, pricePaise: 125000, grossValuePaise: 250000
+  };
+  const audit = ledger => ledger.audit({
+    accountSnapshot: {
+      accountId: "mock-account-user-a",
+      cashBalancePaise: ledger.snapshot().cashPaise,
+      blockedFundsPaise: ledger.snapshot().blockedFundsPaise,
+      availableFundsPaise: ledger.snapshot().availableCashPaise
+    },
+    sourceOrders: [{ orderId: "order-1", assetClass: "EQUITY" }],
+    sourceFills: [sourceFill],
+    sourceReservations: [],
+    evidence: {
+      accountSnapshotRef: "a", ordersSnapshotRef: "o", fillsSnapshotRef: "f",
+      reservationsSnapshotRef: "r", eventHistoryRef: "h", atomicSnapshotAttestationRef: "atomic"
+    }
+  });
+
+  const wrongAmount = create();
+  wrongAmount.append(event({ cashDeltaPaise: -249999 }));
+  const amountResult = audit(wrongAmount);
+  assert.equal(amountResult.allFillsSettled, true);
+  assert.equal(amountResult.settlementAmountsMatch, false);
+  assert.equal(amountResult.ledgerReconciled, false);
+
+  const wrongDirection = create();
+  wrongDirection.append(event({ cashDeltaPaise: 250000 }));
+  const directionResult = audit(wrongDirection);
+  assert.equal(directionResult.allFillsSettled, true);
+  assert.equal(directionResult.settlementAmountsMatch, false);
+  assert.equal(directionResult.ledgerReconciled, false);
 });
 
 test("rejects a fill cash debit that would make cash negative", () => {
@@ -122,7 +161,8 @@ test("audit rejects cross-asset source substitution and missing settlement recei
     accountSnapshot: { accountId: "mock-account-user-a", cashBalancePaise: 99750000,
       blockedFundsPaise: 0, availableFundsPaise: 99750000 },
     sourceOrders: [{ orderId: "order-1", assetClass: "FUTURE" }],
-    sourceFills: [{ fillId: "fill-1", orderId: "order-1", assetClass: "FUTURE" }],
+    sourceFills: [{ fillId: "fill-1", orderId: "order-1", assetClass: "FUTURE",
+      side: "BUY", quantity: 2, pricePaise: 125000, grossValuePaise: 250000 }],
     sourceReservations: [],
     evidence: {}
   };
