@@ -165,7 +165,7 @@ test("canonical 15-screen Demo mounts the shared Equity engine and responsive pa
   assert.match(panel,/submitOrder/);
   assert.match(panel,/matchNext/);
   assert.match(panel,/cancelOrder/);
-  assert.match(panel,/not reconciled with the Wallet/);
+  assert.match(panel,/wallet reconciliation remains false/);
   assert.match(css,/@media\(max-width:900px\)/);
   assert.match(css,/@media\(max-width:520px\)/);
 });
