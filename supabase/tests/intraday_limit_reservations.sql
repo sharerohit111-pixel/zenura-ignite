@@ -208,7 +208,9 @@ BEGIN
 END
 $intraday_limit_checks$;
 
-DELETE FROM public.paper_orders WHERE order_id IN (repeat('a',64),repeat('c',64),repeat('e',64),repeat('1',64),repeat('3',64),repeat('5',64));
+-- Do not delete fixture orders: the Equity cash ledger is append-only and has
+-- restrictive order foreign keys. Keep immutable audit history in disposable CI;
+-- the fixed IDs are unique to this test and each workflow run uses a fresh database.
 DELETE FROM public.paper_equity_positions
  WHERE user_id='22222222-2222-4222-8222-222222222222'
    AND product='INTRADAY' AND instrument_key IN ('NSE_EQ|INTRA_LIMIT_CI','NSE_EQ|INTRA_FILL_BUY','NSE_EQ|INTRA_STALE_CI');
