@@ -32,6 +32,8 @@ on:
       - "markets/stocks/account-settings.js"
       - "markets/stocks/account-settings.css"
       - "markets/stocks/account-settings.test.js"
+      - "markets/stocks/email-auth.js"
+      - "markets/stocks/email-auth.test.js"
       - "markets/service-worker.js"
       - "markets/language-toggle.js"
       - "market-gateway/lib/paper-wallet.js"
