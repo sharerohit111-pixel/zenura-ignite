@@ -59,6 +59,14 @@ function validateEvent(input, identity, expectedSequence) {
         !SIDES.has(p.side) || !integer(p.quantity) || p.quantity < 1 ||
         !integer(p.pricePaise) || p.pricePaise < 1 ||
         !PRODUCTS.has(productOf(p))) fail("INVALID_FILL_EVENT");
+    // When the execution engine supplies gross value, enforce the arithmetic
+    // identity in integer paise. Do not infer margin, premium charges or fees.
+    if (p.grossPaise !== undefined &&
+        (!integer(p.grossPaise) || p.grossPaise < 1 ||
+         !Number.isSafeInteger(p.quantity * p.pricePaise) ||
+         p.grossPaise !== p.quantity * p.pricePaise)) {
+      fail("INVALID_FILL_GROSS_VALUE");
+    }
     if (input.engine === "EQUITY" && p.assetClass !== "EQUITY") fail("ENGINE_ASSET_MISMATCH");
     if (input.engine === "FUTURES" && p.assetClass !== "FUTURE") fail("ENGINE_ASSET_MISMATCH");
     if (input.engine === "OPTIONS" && p.assetClass !== "OPTION") fail("ENGINE_ASSET_MISMATCH");
