@@ -208,8 +208,8 @@ export function createPaperDemoEventLedger(opening) {
 export function replayPaperDemoEvents(opening, events) {
   if (!Array.isArray(events)) fail("DEMO_EVENT_ARRAY_REQUIRED");
   const ledger = createPaperDemoEventLedger(opening);
-  const ordered = [...events].sort((a, b) => a.sequence - b.sequence);
-  ordered.forEach((event, index) => {
+  events.forEach((event, index) => {
+    if (!object(event)) fail("INVALID_EVENT");
     if (event.sequence !== index + 1) fail("DEMO_EVENT_SEQUENCE_MISMATCH");
     const { sequence, ...input } = event;
     const result = ledger.append(input);

@@ -29,6 +29,8 @@ test("PWA precaches the unified panel and retains the single shared ledger sessi
   const panel = await read("markets/stocks/demo-unified-ledger-panel.mjs");
   assert.match(sw, /stocks\/demo-unified-ledger-panel\.mjs/);
   assert.match(sw, /shared\/paper-demo-ledger-session\.mjs/);
+  assert.match(sw, /shared\/paper-demo-event-ledger\.mjs/);
+  assert.match(sw, /zenura-markets-shell-v10/);
   assert.match(panel, /market-gateway\/mock\/fixtures\/account\.json/);
   assert.match(panel, /market-gateway\/mock\/fixtures\/derivatives\.json/);
 });
