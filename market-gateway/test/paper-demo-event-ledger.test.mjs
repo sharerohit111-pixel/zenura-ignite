@@ -383,3 +383,42 @@ test("a rejected initial order is terminal and duplicate rejection identity is r
     deltas: { cashDeltaPaise: 0, blockedDeltaPaise: 0 }
   })), /DUPLICATE_ORDER_ID/);
 });
+
+
+test("partial SELL fill cancellation releases only the unfilled share reservation and replays exactly", () => {
+  const ledger = createPaperDemoEventLedger(opening);
+  ledger.append(event({
+    type: "POSITION_CHANGED", sourceEventId: "seed-sell-position", idempotencyKey: "seed-sell-position",
+    deltas: { cashDeltaPaise: 0, blockedDeltaPaise: 0 },
+    payload: { assetClass: "EQUITY", instrumentKey: "MOCK|NSE|EQ|0001", product: "DELIVERY",
+      quantityDelta: 5, costBasisDeltaPaise: 500000, realizedPnlDeltaPaise: 0 }
+  }));
+  ledger.append(event({
+    eventId: "evt-sell-accepted", idempotencyKey: "idem-sell-accepted", sourceEventId: "source-sell-accepted",
+    occurredAt: "2026-11-25T09:30:01+05:30",
+    deltas: { cashDeltaPaise: 0, blockedDeltaPaise: 0 },
+    payload: { ...event().payload, side: "SELL", quantity: 3, status: "PENDING" }
+  }));
+  assert.equal(ledger.snapshot().positions[0].reservedQuantity, 3);
+  ledger.append(event({
+    eventId: "evt-sell-fill", idempotencyKey: "idem-sell-fill", sourceEventId: "source-sell-fill",
+    type: "FILL_RECORDED", occurredAt: "2026-11-25T09:30:02+05:30",
+    deltas: { cashDeltaPaise: 0, blockedDeltaPaise: 0 },
+    payload: { fillId: "fill-sell-1", orderId: "order-1", assetClass: "EQUITY",
+      instrumentKey: "MOCK|NSE|EQ|0001", side: "SELL", quantity: 1, pricePaise: 100000 }
+  }));
+  assert.equal(ledger.snapshot().positions[0].reservedQuantity, 2);
+  ledger.append(event({
+    eventId: "evt-sell-cancel", idempotencyKey: "idem-sell-cancel", sourceEventId: "source-sell-cancel",
+    type: "ORDER_UPDATED", occurredAt: "2026-11-25T09:30:03+05:30",
+    deltas: { cashDeltaPaise: 0, blockedDeltaPaise: 0 },
+    payload: { ...event().payload, side: "SELL", quantity: 3, status: "CANCELLED", reservedQuantityDelta: -2 }
+  }));
+  const snapshot = ledger.snapshot();
+  assert.equal(snapshot.orders[0].status, "CANCELLED");
+  assert.equal(snapshot.orders[0].filledQuantity, 1);
+  assert.equal(snapshot.orders[0].remainingQuantity, 2);
+  assert.equal(snapshot.positions[0].reservedQuantity, 0);
+  assert.equal(snapshot.fills.length, 1);
+  assert.deepEqual(replayPaperDemoEvents(opening, snapshot.events), snapshot);
+});
