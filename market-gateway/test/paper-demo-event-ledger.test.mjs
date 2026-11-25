@@ -220,7 +220,7 @@ test("product-aware cost basis cannot become negative or outlive a flat position
 test("canonical events carry the supported schema version and reject unknown versions", () => {
   const ledger = createPaperDemoEventLedger(opening);
   const accepted = ledger.append(event());
-  assert.equal(accepted.event.schemaVersion, "1.1.0");
+  assert.equal(accepted.event.schemaVersion, "1.2.0");
   assert.throws(() => ledger.append(event({
     eventId: "evt-2", idempotencyKey: "idem-2", sourceEventId: "future-schema",
     occurredAt: "2026-11-25T09:30:01+05:30", schemaVersion: "2.0.0"
