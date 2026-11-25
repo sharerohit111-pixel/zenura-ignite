@@ -141,14 +141,16 @@ const axePath=require.resolve("axe-core/axe.min.js");
   // Resolve the exact /markets/ registration. navigator.serviceWorker.ready
   // can refer to a different scope when more than one registration exists.
   const marketsScope=new URL("/markets/",page.url()).href;
-  await page.waitForFunction(async(scope)=>{
-   const registration=await navigator.serviceWorker.getRegistration(scope);
+  await page.waitForFunction(async()=>{
+   const registrations=await navigator.serviceWorker.getRegistrations();
+   const registration=registrations.find(item=>item.scope.endsWith("/markets/"));
    return registration?.active?.state==="activated" && !registration.installing;
-  },marketsScope,{timeout:30000});
-  const workerState=await page.evaluate(async(scope)=>{
-   const registration=await navigator.serviceWorker.getRegistration(scope);
+  },null,{timeout:30000});
+  const workerState=await page.evaluate(async()=>{
+   const registrations=await navigator.serviceWorker.getRegistrations();
+   const registration=registrations.find(item=>item.scope.endsWith("/markets/"));
    return {state:registration?.active?.state||"missing",scope:registration?.scope||null};
-  },marketsScope);
+  });
   assert.equal(workerState.state,"activated","service worker must be active before controlled reload");
   assert.ok(workerState.scope.endsWith("/markets/"),"Markets service worker scope must not capture Crypto or production routes");
   console.log(JSON.stringify({pwaWorker:workerState.state,scope:workerState.scope}));
