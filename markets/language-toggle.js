@@ -102,7 +102,17 @@
     "LOTS / QTY":"लॉट / मात्रा", "LIMIT":"लिमिट", "FILLED / REMAINING":"भरे / शेष", "AVG FILL":"औसत फिल", "FILL RECEIPTS":"फिल रसीदें", "STATUS":"स्थिति", "ACTION":"कार्रवाई", "CANCEL":"रद्द करें",
     "DEMO DATA · MOCK":"डेमो डेटा · मॉक", "Browser-memory DEMO DATA only. These records are not part of the account fixture, cash ledger or production portfolio.":"केवल ब्राउज़र-मेमोरी डेमो डेटा। ये रिकॉर्ड खाता फिक्स्चर, कैश लेजर या प्रोडक्शन पोर्टफोलियो का हिस्सा नहीं हैं।",
     "LOCAL FUTURES & OPTIONS POSITIONS":"लोकल फ्यूचर्स और ऑप्शंस पोज़िशन", "LOCAL FUTURES & OPTIONS FILLS":"लोकल फ्यूचर्स और ऑप्शंस फिल", "LOCAL FUTURES & OPTIONS ORDERS":"लोकल फ्यूचर्स और ऑप्शंस ऑर्डर",
-    "No local Futures/Options demo positions.":"कोई लोकल फ्यूचर्स/ऑप्शंस डेमो पोज़िशन नहीं।", "No local Futures/Options demo fills.":"कोई लोकल फ्यूचर्स/ऑप्शंस डेमो फिल नहीं।", "No local Futures/Options demo orders.":"कोई लोकल फ्यूचर्स/ऑप्शंस डेमो ऑर्डर नहीं।"
+    "No local Futures/Options demo positions.":"कोई लोकल फ्यूचर्स/ऑप्शंस डेमो पोज़िशन नहीं।", "No local Futures/Options demo fills.":"कोई लोकल फ्यूचर्स/ऑप्शंस डेमो फिल नहीं।", "No local Futures/Options demo orders.":"कोई लोकल फ्यूचर्स/ऑप्शंस डेमो ऑर्डर नहीं।",
+    "Private Watchlists":"निजी वॉचलिस्ट","Sign in with your ZENURA Supabase account. Lists are private to your authenticated account.":"अपने ZENURA Supabase खाते से साइन इन करें। सूचियाँ केवल आपके खाते के लिए निजी हैं।",
+    "Email":"ईमेल","Password":"पासवर्ड","SIGN IN":"साइन इन","CREATE ACCOUNT":"खाता बनाएँ","SIGN OUT":"साइन आउट",
+    "Checking sign-in status…":"साइन-इन स्थिति जाँची जा रही है…","Sign in to access private watchlists. Your demo data stays separate.":"निजी वॉचलिस्ट देखने के लिए साइन इन करें। आपका डेमो डेटा अलग रहेगा।",
+    "Filter":"फ़िल्टर","Sort":"क्रमबद्ध करें","Manual order":"मैनुअल क्रम","Symbol A–Z":"सिंबल A–Z","Symbol Z–A":"सिंबल Z–A","Price high–low":"भाव अधिक–कम","Price low–high":"भाव कम–अधिक",
+    "Add from canonical MOCK catalog":"कैनोनिकल MOCK सूची से जोड़ें","ADD MOCK":"MOCK जोड़ें","MOCK PRICE":"MOCK भाव","ORDER":"क्रम","REMOVE":"हटाएँ",
+    "Private watchlist instruments":"निजी वॉचलिस्ट इंस्ट्रूमेंट","This private watchlist is empty. Add a MOCK instrument to begin.":"यह निजी वॉचलिस्ट खाली है। शुरू करने के लिए MOCK इंस्ट्रूमेंट जोड़ें।",
+    "No instruments match this filter.":"इस फ़िल्टर से कोई इंस्ट्रूमेंट नहीं मिला।","Unavailable saved key":"अनुपलब्ध सेव की गई कुंजी",
+    "Sign in to load private watchlists.":"निजी वॉचलिस्ट लोड करने के लिए साइन इन करें।","Loading private watchlist…":"निजी वॉचलिस्ट लोड हो रही है…","Private watchlist loaded.":"निजी वॉचलिस्ट लोड हो गई।",
+    "Saved securely to your private Supabase watchlist.":"आपकी निजी Supabase वॉचलिस्ट में सुरक्षित सेव हुआ।","Signed out. Private list data cleared from this screen.":"साइन आउट हो गया। निजी सूची का डेटा इस स्क्रीन से साफ़ कर दिया गया।",
+    "Account changed. Loading private watchlists…":"खाता बदला। निजी वॉचलिस्ट लोड हो रही हैं…","Account created. Confirm your email, then sign in.":"खाता बन गया। ईमेल की पुष्टि करें, फिर साइन इन करें।","Account created and signed in.":"खाता बन गया और साइन इन हो गया।"
   });
   const textState=new WeakMap(),attrState=new WeakMap();
   const originalTitle=document.title;
@@ -167,16 +177,6 @@
       if(record.type==="characterData")applyText(record.target);
       else for(const node of record.addedNodes)visit(node);
     }
-    ,"Private Watchlists":"निजी वॉचलिस्ट","Sign in with your ZENURA Supabase account. Lists are private to your authenticated account.":"अपने ZENURA Supabase खाते से साइन इन करें। सूचियाँ केवल आपके खाते के लिए निजी हैं।",
-    "Email":"ईमेल","Password":"पासवर्ड","SIGN IN":"साइन इन","CREATE ACCOUNT":"खाता बनाएँ","SIGN OUT":"साइन आउट",
-    "Checking sign-in status…":"साइन-इन स्थिति जाँची जा रही है…","Sign in to access private watchlists. Your demo data stays separate.":"निजी वॉचलिस्ट देखने के लिए साइन इन करें। आपका डेमो डेटा अलग रहेगा।",
-    "Filter":"फ़िल्टर","Sort":"क्रमबद्ध करें","Manual order":"मैनुअल क्रम","Symbol A–Z":"सिंबल A–Z","Symbol Z–A":"सिंबल Z–A","Price high–low":"भाव अधिक–कम","Price low–high":"भाव कम–अधिक",
-    "Add from canonical MOCK catalog":"कैनोनिकल MOCK सूची से जोड़ें","ADD MOCK":"MOCK जोड़ें","MOCK PRICE":"MOCK भाव","ORDER":"क्रम","REMOVE":"हटाएँ",
-    "Private watchlist instruments":"निजी वॉचलिस्ट इंस्ट्रूमेंट","This private watchlist is empty. Add a MOCK instrument to begin.":"यह निजी वॉचलिस्ट खाली है। शुरू करने के लिए MOCK इंस्ट्रूमेंट जोड़ें।",
-    "No instruments match this filter.":"इस फ़िल्टर से कोई इंस्ट्रूमेंट नहीं मिला।","Unavailable saved key":"अनुपलब्ध सेव की गई कुंजी",
-    "Sign in to load private watchlists.":"निजी वॉचलिस्ट लोड करने के लिए साइन इन करें।","Loading private watchlist…":"निजी वॉचलिस्ट लोड हो रही है…","Private watchlist loaded.":"निजी वॉचलिस्ट लोड हो गई।",
-    "Saved securely to your private Supabase watchlist.":"आपकी निजी Supabase वॉचलिस्ट में सुरक्षित सेव हुआ।","Signed out. Private list data cleared from this screen.":"साइन आउट हो गया। निजी सूची का डेटा इस स्क्रीन से साफ़ कर दिया गया।",
-    "Account changed. Loading private watchlists…":"खाता बदला। निजी वॉचलिस्ट लोड हो रही हैं…","Account created. Confirm your email, then sign in.":"खाता बन गया। ईमेल की पुष्टि करें, फिर साइन इन करें।","Account created and signed in.":"खाता बन गया और साइन इन हो गया।"
   });
   observer.observe(document.body,{subtree:true,childList:true,characterData:true});
 })();
