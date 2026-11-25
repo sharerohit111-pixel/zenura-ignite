@@ -1,5 +1,8 @@
 "use strict";
 
+// Isolate classic-script lexical bindings from adjacent Demo engines.
+(() => {
+
 const EVENT_SCHEMA_VERSION = 1;
 const EVENT_TYPES = new Set(["ORDER_ACCEPTED", "FILL_RECORDED", "ORDER_REJECTED", "ORDER_CANCELLED"]);
 const OPEN = new Set(["PENDING", "PARTIALLY_FILLED"]);
@@ -165,3 +168,5 @@ function createDemoTradeHistoryStore(options = {}) {
 const api={createDemoTradeHistoryStore};
 if(typeof module==="object"&&module.exports)module.exports=api;
 if(typeof window!=="undefined")window.ZenuraDemoTradeHistory=api;
+
+})();
