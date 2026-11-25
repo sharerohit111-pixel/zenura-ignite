@@ -52,7 +52,10 @@ export function createDerivativeDemoLedgerBridge({
       orderId: order.orderId, assetClass: order.assetClass, instrumentKey: order.instrumentKey,
       product: order.assetClass === "FUTURE" ? order.product : "DELIVERY",
       side: order.side, orderType: order.orderType, quantity: order.quantity,
-      status, ...extra
+      status, symbol: order.symbol, expiry: order.expiry, optionType: order.optionType,
+      strikePaise: order.strikePaise, lots: order.lots, lotSize: order.lotSize,
+      filledQuantity: order.filledQuantity, remainingQuantity: order.remainingQuantity,
+      averageFillPricePaise: order.averageFillPricePaise, ...extra
     };
   }
   function snapshot() { assertHealthy(); return ledger.snapshot(); }
@@ -77,7 +80,9 @@ export function createDerivativeDemoLedgerBridge({
       append(engine, "FILL_RECORDED", {
         fillId: fill.fillId, orderId: order.orderId, assetClass: order.assetClass,
         instrumentKey: order.instrumentKey, product: order.assetClass === "FUTURE" ? order.product : "DELIVERY",
-        side: order.side, quantity: fill.quantity, pricePaise: fill.pricePaise
+        side: order.side, quantity: fill.quantity, pricePaise: fill.pricePaise,
+        symbol: order.symbol, expiry: order.expiry, optionType: order.optionType, strikePaise: order.strikePaise,
+        realizedPnlPaise: fill.realizedPnlPaise || 0
       }, "fill-" + fill.fillId);
       const key = keyOf({ ...order, netQuantity: 0 });
       realizedByKey.set(key, (realizedByKey.get(key) || 0) + (fill.realizedPnlPaise || 0));
@@ -97,7 +102,8 @@ export function createDerivativeDemoLedgerBridge({
         product: next.assetClass === "FUTURE" ? next.product : "DELIVERY",
         quantityDelta: safe(next.netQuantity - old.netQuantity),
         costBasisDeltaPaise: safe(costOf(next) - costOf(old)),
-        reservedQuantityDelta: 0,
+        reservedQuantityDelta: 0, symbol: next.symbol, expiry: next.expiry,
+        optionType: next.optionType, strikePaise: next.strikePaise,
         realizedPnlDeltaPaise: safe(realizedByKey.get(key) || 0)
       }, "position-" + key + "-" + after.orders.map(order => order.fills.length).join("-"));
     }
