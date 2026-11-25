@@ -54,7 +54,7 @@ export async function mountDerivativeDemo(container,screen){
  }
  function paint(){
   const s=ledgerBridge.snapshot();
-  renderTable(positions,["CONTRACT","TYPE","EXPIRY","PRODUCT","NET QTY","AVG PRICE","RESERVED CLOSE","AVAILABLE CLOSE"],s.positions.map(x=>[x.symbol||x.instrumentKey,x.assetClass==="OPTION"?x.optionType:"FUT",x.expiry,x.product,x.quantity,money(x.averagePricePaise),x.reservedQuantity,x.assetClass==="OPTION"?x.quantity-x.reservedQuantity:"—"]),"No open demo positions.");
+  renderTable(positions,["CONTRACT","TYPE","EXPIRY","PRODUCT","NET QTY","AVG PRICE","RESERVED CLOSE","AVAILABLE CLOSE"],s.positions.filter(x=>x.quantity!==0).map(x=>[x.symbol||x.instrumentKey,x.assetClass==="OPTION"?x.optionType:"FUT",x.expiry,x.product,x.quantity,money(x.averagePricePaise),x.reservedQuantity,x.assetClass==="OPTION"?x.quantity-x.reservedQuantity:"—"]),"No open demo positions.");
   const wrap=el("div","table-wrap demo-fo-table-wrap"),t=el("table"),head=el("thead"),hr=el("tr"),body=el("tbody");
   ["ORDER ID","CONTRACT","SIDE","TYPE","LOTS / QTY","LIMIT","FILLED / REMAINING","AVG FILL","FILL RECEIPTS","STATUS","ACTION"].forEach(x=>hr.append(el("th","",x)));
   head.append(hr);
@@ -105,7 +105,7 @@ export async function appendDerivativeSummary(container, screen) {
     if (screen === "positions" || screen === "portfolio") {
       renderTable(host,
         ["CONTRACT","ASSET","EXPIRY","PRODUCT","NET QTY","AVG PRICE","RESERVED CLOSE"],
-        snapshot.positions.map(x => [x.symbol || x.instrumentKey,x.assetClass === "OPTION" ? x.optionType : "FUT",x.expiry,x.product,x.quantity,money(x.averagePricePaise),x.reservedQuantity]),
+        snapshot.positions.filter(x => x.quantity !== 0).map(x => [x.symbol || x.instrumentKey,x.assetClass === "OPTION" ? x.optionType : "FUT",x.expiry,x.product,x.quantity,money(x.averagePricePaise),x.reservedQuantity]),
         "No canonical Futures/Options demo positions.");
     } else if (screen === "trades") {
       const rows = snapshot.fills.map(fill => [
