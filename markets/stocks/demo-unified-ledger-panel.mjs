@@ -141,25 +141,28 @@ export async function appendWalletSummary(container) {
       order.orderType, order.quantity, order.filledQuantity + " / " + order.remainingQuantity,
       order.averageFillPricePaise ? money(order.averageFillPricePaise) : "—", order.status
     ]);
-    host.append(el("h3", "demo-eq-subhead", "ORDERS"),
-      table(host, ["ORDER ID","ASSET","INSTRUMENT","SIDE","TYPE","QTY","FILLED / REMAINING","AVG FILL","STATUS"], orderRows,
-        "No canonical Demo orders yet."));
+    const orderTable = el("div");
+    table(orderTable, ["ORDER ID","ASSET","INSTRUMENT","SIDE","TYPE","QTY","FILLED / REMAINING","AVG FILL","STATUS"], orderRows,
+      "No canonical Demo orders yet.");
+    host.append(el("h3", "demo-eq-subhead", "ORDERS"), orderTable);
     const fillRows = wallet.fills.map(fill => [
       fill.fillId, fill.assetClass, fill.symbol || fill.instrumentKey, fill.side,
       fill.quantity, money(fill.pricePaise), money(fill.quantity * fill.pricePaise),
       fill.occurredAt || fill.executedAt
     ]);
-    host.append(el("h3", "demo-eq-subhead", "FILL RECEIPTS"),
-      table(host, ["FILL ID","ASSET","INSTRUMENT","SIDE","QTY","PRICE","GROSS","TIME"], fillRows,
-        "No canonical Demo fills yet."));
+    const fillTable = el("div");
+    table(fillTable, ["FILL ID","ASSET","INSTRUMENT","SIDE","QTY","PRICE","GROSS","TIME"], fillRows,
+      "No canonical Demo fills yet.");
+    host.append(el("h3", "demo-eq-subhead", "FILL RECEIPTS"), fillTable);
     const positionRows = wallet.positions.filter(position => position.quantity !== 0).map(position => [
       position.assetClass, position.symbol || position.instrumentKey, position.product,
       position.quantity, money(position.averagePricePaise), money(position.costBasisPaise),
       money(position.realizedPnlPaise), position.reservedQuantity
     ]);
-    host.append(el("h3", "demo-eq-subhead", "POSITIONS"),
-      table(host, ["ASSET","INSTRUMENT","PRODUCT","NET QTY","AVG PRICE","COST BASIS","REALIZED P&L","RESERVED"], positionRows,
-        "No canonical Demo positions yet."));
+    const positionTable = el("div");
+    table(positionTable, ["ASSET","INSTRUMENT","PRODUCT","NET QTY","AVG PRICE","COST BASIS","REALIZED P&L","RESERVED"], positionRows,
+      "No canonical Demo positions yet.");
+    host.append(el("h3", "demo-eq-subhead", "POSITIONS"), positionTable);
     host.append(el("p", "demo-eq-disclaimer",
       "Events: " + wallet.eventCount + " · Last sequence: " + wallet.lastSequence +
       " · Reconciled: false (intentionally fail-closed). Unrealized P&L is not valued here."));
