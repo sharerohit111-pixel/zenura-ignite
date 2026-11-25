@@ -205,7 +205,7 @@ export async function mountPrivateWatchlists(host, { model, el, field, selectCon
       controller.reset(nextUid);
       email.hidden = true; password.hidden = true; signIn.hidden = true; signUp.hidden = true; signOut.hidden = false; controls.hidden = false;
       authStatus.textContent = "Account changed. Loading private watchlists…";
-      void loadList(listSelect.value);
+      queueMicrotask(() => { if (currentUid === nextUid) void loadList(listSelect.value); });
     });
     authSubscription = listener?.data?.subscription;
   } catch (error) {
