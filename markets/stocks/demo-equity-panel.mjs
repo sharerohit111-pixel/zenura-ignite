@@ -1,4 +1,4 @@
-import { syncDemoProjection } from "./demo-trade-projection.mjs";
+import { syncDemoProjection, appendUnifiedDemoSummary } from "./demo-trade-projection.mjs";
 let fixturePromise=null,enginePromise=null,engine=null,orderSequence=0;
 const el=(tag,cls,value)=>{const node=document.createElement(tag);if(cls)node.className=cls;if(value!==undefined)node.textContent=String(value);return node;};
 const money=paise=>Number.isSafeInteger(paise)?"₹"+(paise/100).toLocaleString("en-IN",{minimumFractionDigits:2,maximumFractionDigits:2}):"—";
@@ -70,7 +70,7 @@ export async function mountEquityDemo(container){
  let activeOrderId="";
  function paint(){
   if(!engine)return;
-  const s=engine.snapshot(),a=s.account;syncDemoProjection("EQUITY",s);
+  const s=engine.snapshot(),a=s.account,projection=syncDemoProjection("EQUITY",s);
   stats.replaceChildren(
    stat("Cash balance",money(a.cashBalancePaise)),
    stat("Blocked funds",money(a.blockedFundsPaise)),
@@ -78,9 +78,12 @@ export async function mountEquityDemo(container){
    stat("Realized P&L",money(a.realizedPnlPaise)),
    stat("Unrealized P&L",money(s.valuation.unrealizedPnlPaise))
   );
-  table(positions,["INSTRUMENT","PRODUCT","QTY","RESERVED","AVG PRICE","COST BASIS"],positionRows(s), "No Equity positions yet.");
-  table(orders,["ORDER ID","SIDE","PRODUCT","TYPE","QTY","FILLED / REMAINING","LIMIT","AVG FILL","STATUS"],orderRows(s),"No Equity orders yet.");
-  table(fills,["FILL ID","SIDE","PRODUCT","QTY","PRICE","GROSS VALUE","REALIZED P&L","EXECUTED AT"],fillRows(s),"No immutable fill receipts yet.");
+  const equityPositions=projection.positions.filter(x=>x.assetClass==="EQUITY");
+  table(positions,["INSTRUMENT","PRODUCT","NET QTY","AVG PRICE","COST BASIS","REALIZED P&L"],equityPositions.map(x=>[x.instrumentKey,x.product,x.quantity,money(x.averagePricePaise),money(x.costBasisPaise),money(x.realizedPnlPaise)]),"No Equity positions yet.");
+  const equityOrders=projection.orders.filter(x=>x.assetClass==="EQUITY");
+  table(orders,["ORDER ID","SIDE","PRODUCT","TYPE","QTY","FILLED / REMAINING","LIMIT","AVG FILL","STATUS"],equityOrders.map(x=>[x.orderId,x.side,x.product,x.orderType,x.quantity,x.filledQuantity+" / "+x.remainingQuantity,x.limitPricePaise?money(x.limitPricePaise):"—",x.averagePricePaise?money(x.averagePricePaise):"—",x.status]),"No Equity orders yet.");
+  const equityTrades=projection.trades.filter(x=>x.assetClass==="EQUITY");
+  table(fills,["FILL ID","SIDE","PRODUCT","QTY","PRICE","GROSS VALUE","EXECUTED AT"],equityTrades.map(x=>[x.fillId,x.side,x.product,x.quantity,money(x.pricePaise),money(x.grossValuePaise),x.filledAt]),"No immutable fill receipts yet.");
   const active=s.orders.filter(x=>["PENDING","PARTIALLY_FILLED"].includes(x.status));
   if(!active.some(x=>x.orderId===activeOrderId))activeOrderId=active.at(-1)?.orderId||"";
   activeOrderSelect.replaceChildren();active.forEach(order=>add(activeOrderSelect,order.orderId,order.orderId+" · "+order.status+" · "+order.remainingQuantity+" remaining"));
@@ -114,15 +117,5 @@ export async function mountEquityDemo(container){
  getEngine().then(()=>{status.textContent="Canonical Equity simulator ready · MOCKALPHA · synthetic book only.";paint();}).catch(error=>{status.textContent="Equity Demo unavailable · "+(error.message||"fixture validation failed")+". No live fallback.";submit.disabled=match.disabled=matchAll.disabled=cancel.disabled=true;});
 }
 export async function appendEquitySummary(container,screen){
- const section=el("section","demo-eq-summary");
- section.append(el("h3","demo-eq-subhead",screen==="trades"?"LOCAL EQUITY FILL RECEIPTS":screen==="holdings"?"LOCAL DELIVERY HOLDINGS":screen==="positions"?"LOCAL EQUITY POSITIONS":"LOCAL EQUITY DEMO ORDERS"));
- section.append(el("p","demo-eq-disclaimer","Browser-memory DEMO DATA only. This isolated Equity simulator is not reconciled with the Wallet or cross-asset ledger."));
- const host=el("div");section.append(host);container.append(section);
- try{
-  const e=await getEngine(),s=e.snapshot();
-  if(screen==="trades")table(host,["FILL ID","SIDE","PRODUCT","QTY","PRICE","GROSS VALUE","REALIZED P&L","EXECUTED AT"],fillRows(s),"No Equity fill receipts.");
-  else if(screen==="positions"||screen==="portfolio")table(host,["INSTRUMENT","PRODUCT","QTY","RESERVED","AVG PRICE","COST BASIS"],positionRows(s),"No Equity positions.");
-  else if(screen==="holdings")table(host,["INSTRUMENT","DELIVERY QTY","AVG PRICE","COST BASIS"],positionRows(s,"DELIVERY").map(row=>[row[0],row[2],row[4],row[5]]),"No Delivery holdings.");
-  else table(host,["ORDER ID","SIDE","PRODUCT","TYPE","QTY","FILLED / REMAINING","LIMIT","AVG FILL","STATUS"],orderRows(s),"No Equity orders.");
- }catch(error){host.append(el("p","demo-eq-status","Local Equity Demo records unavailable · "+(error.message||"fixture error")));}
+ appendUnifiedDemoSummary(container,screen);
 }
