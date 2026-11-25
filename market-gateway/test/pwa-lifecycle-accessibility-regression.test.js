@@ -30,7 +30,7 @@ test("install precache is a unique static allowlist without authenticated payloa
  const sw=read("markets/service-worker.js");
  const block=sw.match(/const SHELL=\[([\s\S]*?)\]\.map/);
  assert.ok(block);
- const entries=[...block[1].matchAll(/"([^"]+)"/g)].map(match=>match[1]);
+ const entries=[...block[1].matchAll(/"([^"]*)"/g)].map(match=>match[1]);
  assert.ok(entries.length>0);
  assert.equal(new Set(entries).size,entries.length);
  for(const entry of entries)assert.doesNotMatch(entry,/([?&](token|access_token|session)=|\/api\/|\/auth\/|\/private\/)/i);
