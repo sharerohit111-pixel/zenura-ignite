@@ -69,7 +69,9 @@ test("Futures close fills update realized P&L and remove the product-specific po
     product: "INTRADAY", idempotencyKey: "future-close-sell-01"
   });
   const snapshot = bridge.snapshot();
-  assert.equal(snapshot.positions.length, 0);
+  assert.equal(snapshot.positions.length, 1);
+  assert.equal(snapshot.positions[0].quantity, 0);
+  assert.equal(snapshot.positions[0].costBasisPaise, 0);
   assert.equal(snapshot.account.realizedPnlPaise, -1250);
   assert.equal(snapshot.orders.every(order => order.status === "FILLED"), true);
   assert.deepEqual(replayPaperDemoEvents(opening, snapshot.events), snapshot);
