@@ -1,0 +1,34 @@
+name: S-TRADE Demo Wallet Ledger Tests
+
+on:
+  pull_request:
+    paths:
+      - "market-gateway/lib/demo-wallet-ledger.js"
+      - "market-gateway/lib/demo-wallet-trade-history-adapter.js"
+      - "market-gateway/test/demo-wallet-ledger.test.js"
+      - "market-gateway/test/demo-wallet-trade-history-adapter.test.js"
+      - "market-gateway/package.json"
+      - ".github/workflows/s-trade-demo-wallet-ledger.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  demo-wallet-ledger:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Check wallet ledger syntax
+        run: node --check market-gateway/lib/demo-wallet-ledger.js && node --check market-gateway/lib/demo-wallet-trade-history-adapter.js
+      - name: Run focused wallet ledger accounting tests
+        run: node --test market-gateway/test/demo-wallet-ledger.test.js market-gateway/test/demo-wallet-trade-history-adapter.test.js
+      - name: Verify production entrypoints do not import the browser Demo wallet
+        run: |
+          if grep -R "demo-wallet-ledger" market-gateway/server.js market-gateway/supabase-server.js; then
+            echo "Synthetic Demo wallet must remain isolated from production gateway entrypoints."
+            exit 1
+          fi

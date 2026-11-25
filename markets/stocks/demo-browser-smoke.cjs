@@ -15,10 +15,13 @@ const axePath=require.resolve("axe-core/axe.min.js");
   for(const viewport of [{width:1440,height:900,name:"desktop"},{width:390,height:844,name:"android-mobile"},{width:360,height:800,name:"small-mobile"}]){
    const context=await browser.newContext({viewport:{width:viewport.width,height:viewport.height},isMobile:viewport.width<500,hasTouch:viewport.width<500,serviceWorkers:"allow"});
    const page=await context.newPage();
-   const pageErrors=[];
+   const pageErrors=[],browserConsole=[],failedRequests=[];
    page.on("pageerror",error=>pageErrors.push(error.message));
+   page.on("console",message=>{if(message.type()==="error")browserConsole.push(message.text());});
+   page.on("requestfailed",request=>failedRequests.push({url:request.url(),error:request.failure()?.errorText||"unknown"}));
    await page.goto("http://127.0.0.1:4173/markets/stocks/demo.html",{waitUntil:"domcontentloaded",timeout:30000});
-   await page.waitForFunction(()=>document.querySelector("#demo-status")?.textContent.includes("4 canonical fixtures validated"),null,{timeout:10000});
+   try{await page.waitForFunction(()=>document.querySelector("#demo-status")?.textContent.includes("4 canonical fixtures validated"),null,{timeout:10000});}
+   catch(error){const diagnostic=await page.locator("#demo-status").textContent().catch(()=>"<missing>");throw new Error("Demo fixture boot failed on "+viewport.name+"; status="+diagnostic+"; pageErrors="+JSON.stringify(pageErrors)+"; console="+JSON.stringify(browserConsole)+"; failedRequests="+JSON.stringify(failedRequests)+"; "+error.message);}
    assert.equal(await page.locator("#screen-nav button[data-screen]").count(),15,viewport.name+" screen count");
    for(const name of ["home","market","watchlists","charts","equity","futures","options","orders","trades","portfolio","positions","holdings","account","profile","settings"]){
     await page.locator('#screen-nav button[data-screen="'+name+'"]').click();
@@ -47,8 +50,9 @@ const axePath=require.resolve("axe-core/axe.min.js");
 
   const pwa=await browser.newContext({viewport:{width:390,height:844},serviceWorkers:"allow"});
   const page=await pwa.newPage();
-  const pwaConsole=[];
+  const pwaConsole=[],pwaErrors=[];
   page.on("console",message=>pwaConsole.push(message.type()+": "+message.text()));
+  page.on("pageerror",error=>pwaErrors.push(error.message));
   page.on("pageerror",error=>pwaConsole.push("pageerror: "+error.message));
   console.log("PWA: opening market shell");
   await page.goto("http://127.0.0.1:4173/markets/",{waitUntil:"domcontentloaded",timeout:30000});
@@ -63,10 +67,10 @@ const axePath=require.resolve("axe-core/axe.min.js");
    throw new Error("PWA service worker did not activate: "+JSON.stringify(state)+"; console: "+pwaConsole.join(" | ")+"; "+error.message);
   }
   console.log("PWA: waiting for service worker activation");
+  await page.waitForFunction(async()=>{const registration=await navigator.serviceWorker.ready;return registration.active?.state==="activated";},null,{timeout:10000});
   const workerState=await page.evaluate(async()=>{
-   const registrations=await navigator.serviceWorker.getRegistrations();
-   const registration=registrations.find(item=>item.active?.state==="activated");
-   return {state:registration?.active?.state||"missing",scope:registration?.scope||null};
+   const registration=await navigator.serviceWorker.ready;
+   return {state:registration.active?.state||"missing",scope:registration.scope||null};
   });
   assert.equal(workerState.state,"activated","service worker must be active before controlled reload");
   console.log(JSON.stringify({pwaWorker:workerState.state,scope:workerState.scope}));
