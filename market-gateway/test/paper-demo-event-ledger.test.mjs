@@ -478,3 +478,40 @@ test("Options SELL cancellation and expiry release only unfilled contract reserv
     assert.deepEqual(replayPaperDemoEvents(opening, snapshot.events), snapshot);
   }
 });
+
+
+test("Futures SELL orders do not create Equity-style share reservations", () => {
+  const ledger = createPaperDemoEventLedger(opening);
+  const instrumentKey = "MOCK|NSE|FUT|NIFTY-2026-11";
+  ledger.append(event({
+    engine: "FUTURES", eventId: "evt-future-sell-accepted",
+    idempotencyKey: "idem-future-sell-accepted", sourceEventId: "source-future-sell-accepted",
+    deltas: { cashDeltaPaise: 0, blockedDeltaPaise: 0 },
+    payload: { ...event().payload, orderId: "future-sell-order", assetClass: "FUTURE",
+      instrumentKey, side: "SELL", quantity: 2, status: "PENDING" }
+  }));
+  assert.equal(ledger.snapshot().orders[0].status, "PENDING");
+  assert.equal(ledger.snapshot().positions.length, 0);
+  ledger.append(event({
+    engine: "FUTURES", type: "FILL_RECORDED", eventId: "evt-future-sell-fill",
+    idempotencyKey: "idem-future-sell-fill", sourceEventId: "source-future-sell-fill",
+    occurredAt: "2026-11-25T09:30:01+05:30",
+    deltas: { cashDeltaPaise: 0, blockedDeltaPaise: 0 },
+    payload: { fillId: "future-sell-fill", orderId: "future-sell-order",
+      assetClass: "FUTURE", instrumentKey, side: "SELL", quantity: 1, pricePaise: 10000 }
+  }));
+  ledger.append(event({
+    engine: "FUTURES", type: "ORDER_UPDATED", eventId: "evt-future-sell-cancel",
+    idempotencyKey: "idem-future-sell-cancel", sourceEventId: "source-future-sell-cancel",
+    occurredAt: "2026-11-25T09:30:02+05:30",
+    deltas: { cashDeltaPaise: 0, blockedDeltaPaise: 0 },
+    payload: { ...event().payload, orderId: "future-sell-order", assetClass: "FUTURE",
+      instrumentKey, side: "SELL", quantity: 2, status: "CANCELLED" }
+  }));
+  const snapshot = ledger.snapshot();
+  assert.equal(snapshot.orders[0].status, "CANCELLED");
+  assert.equal(snapshot.orders[0].filledQuantity, 1);
+  assert.equal(snapshot.orders[0].remainingQuantity, 1);
+  assert.equal(snapshot.fills.length, 1);
+  assert.deepEqual(replayPaperDemoEvents(opening, snapshot.events), snapshot);
+});
