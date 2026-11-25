@@ -38,6 +38,21 @@ const axePath=require.resolve("axe-core/axe.min.js");
     const overflow=await page.evaluate(()=>document.documentElement.scrollWidth>window.innerWidth+1);
     assert.equal(overflow,false,viewport.name+" horizontal document overflow on "+name);
    }
+   // Exercise chart interactions on desktop and both mobile viewports.
+   await page.locator('#screen-nav button[data-screen="charts"]').click();
+   assert.ok(await page.locator(".demo-badge").textContent().then(value=>value.includes("MOCK")&&value.includes("DEMO DATA")&&value.includes("NOT LIVE")),"chart MOCK / DEMO DATA identity");
+   assert.ok((await page.locator("#demo-depth-status").textContent()).includes("3 bid / 3 ask levels"),"canonical matching instrument exposes fixture depth");
+   const chartInstrument=page.locator("#demo-instrument");
+   await chartInstrument.selectOption({index:1});
+   assert.ok((await page.locator("#demo-depth-status").textContent()).includes("Depth unavailable"),"unmatched instrument must not inherit another instrument's depth");
+   await chartInstrument.selectOption({index:0});
+   assert.ok((await page.locator("#demo-depth-status").textContent()).includes("3 bid / 3 ask levels"),"fixture depth returns only for its exact instrument");
+   await page.locator('[data-demo-timeframe="1m"]').click();
+   assert.ok(await page.locator('[data-demo-timeframe="1m"]').evaluate(node=>node.classList.contains("active")),"chart timeframe control");
+   await page.locator('[data-demo-chart-type="LINE"]').click();
+   assert.ok(await page.locator('[data-demo-chart-type="LINE"]').evaluate(node=>node.classList.contains("active")),"chart style control");
+   assert.equal(await page.locator("#demo-chart-svg").getAttribute("aria-label"),"Synthetic candlestick or line chart with volume","chart accessible description");
+
    if(viewport.name==="desktop"){
     // Watchlist add / reorder / remove must mutate only the session Demo list.
     await page.locator('#screen-nav button[data-screen="watchlists"]').click();
@@ -51,13 +66,6 @@ const axePath=require.resolve("axe-core/axe.min.js");
     if(await moveDown.count()) await moveDown.click();
     await page.getByRole("button",{name:"REMOVE"}).first().click();
     assert.equal(await watchRows.count(),countAfterAdd-1,"watchlist remove should remove one row");
-
-    // Chart controls must switch timeframe and rendering style.
-    await page.locator('#screen-nav button[data-screen="charts"]').click();
-    await page.locator('[data-demo-timeframe="1m"]').click();
-    assert.ok(await page.locator('[data-demo-timeframe="1m"]').evaluate(node=>node.classList.contains("active")),"chart timeframe control");
-    await page.locator('[data-demo-chart-type="LINE"]').click();
-    assert.ok(await page.locator('[data-demo-chart-type="LINE"]').evaluate(node=>node.classList.contains("active")),"chart style control");
 
     // Option chain filters and paired CE/PE rows must render from canonical MOCK catalog.
     await page.locator('#screen-nav button[data-screen="options"]').click();
