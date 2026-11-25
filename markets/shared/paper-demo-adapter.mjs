@@ -31,7 +31,7 @@ function assertMarketInstrumentIdentity(instrumentKey, exchange, segment) {
   if (parts.length !== 4 || parts[0] !== "MOCK" ||
       !["NSE", "BSE"].includes(parts[1]) || parts[1] !== exchange ||
       !["EQ", "INDEX"].includes(parts[2]) || parts[2] !== segment ||
-      !/^\\d{4,}$/.test(parts[3])) fail("MOCK_MARKET_INSTRUMENT_IDENTITY_MISMATCH");
+      !/^\d{4,}$/.test(parts[3])) fail("MOCK_MARKET_INSTRUMENT_IDENTITY_MISMATCH");
 }
 function assertDerivativeInstrumentIdentity(contract) {
   const parts = contract.instrumentKey.split("|");
