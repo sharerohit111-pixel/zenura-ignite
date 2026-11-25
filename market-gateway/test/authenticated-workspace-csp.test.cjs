@@ -39,6 +39,20 @@ test("CSP permits only the required authenticated workspace script and API origi
   }
 });
 
+test("CSP blocks inline styles and auth UI uses a same-origin stylesheet", () => {
+  const directives = Object.fromEntries(match[1].split(";").map(part => {
+    const [name, ...values] = part.trim().split(/\\s+/);
+    return [name, values];
+  }));
+  assert.deepEqual(directives["style-src"], ["'self'"]);
+  assert.ok(!match[1].includes("'unsafe-inline'"), "inline styles must not be enabled");
+  const authScript = fs.readFileSync(path.join(__dirname, "../../markets/stocks/email-auth.js"), "utf8");
+  const authStyles = fs.readFileSync(path.join(__dirname, "../../markets/stocks/email-auth.css"), "utf8");
+  assert.match(authScript, /stylesheet\\.href = ["']\\.\\/email-auth\\.css["']/);
+  assert.doesNotMatch(authScript, /createElement\\(["']style["']\\)/);
+  assert.ok(authStyles.includes(".email-auth"), "same-origin auth stylesheet must exist");
+});
+
 test("meta CSP is not misrepresented as clickjacking protection", () => {
   const directives = Object.fromEntries(match[1].split(";").map(part => {
     const [name, ...values] = part.trim().split(/\s+/);
