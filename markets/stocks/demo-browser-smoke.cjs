@@ -137,17 +137,12 @@ const axePath=require.resolve("axe-core/axe.min.js");
   console.log("PWA: opening market shell");
   await page.goto("http://127.0.0.1:4173/markets/",{waitUntil:"domcontentloaded",timeout:30000});
   await page.waitForLoadState("load",{timeout:10000});
-  await page.waitForFunction(async()=>{
-   const registrations=await navigator.serviceWorker.getRegistrations();
-   return registrations.some(registration=>registration.active?.state==="activated");
-  },null,{timeout:20000});
   console.log("PWA: waiting for service worker activation");
-  // navigator.serviceWorker.ready may resolve while the active worker is
-  // still transitioning through "activating"; wait for the actual state.
+  // Await the registration for this page's scope; unrelated registrations
+  // must not satisfy the Markets-shell readiness assertion.
   await page.waitForFunction(async()=>{
-   const registrations=await navigator.serviceWorker.getRegistrations();
-   const registration=registrations.find(item=>item.scope.endsWith("/markets/"));
-   const active=registration?.active;
+   const registration=await navigator.serviceWorker.ready;
+   const active=registration.active;
    if(active?.state!=="activated") {
     window.__marketsWorkerActivatedAt=0;
     return false;
@@ -156,9 +151,8 @@ const axePath=require.resolve("axe-core/axe.min.js");
    return performance.now()-window.__marketsWorkerActivatedAt>=500;
   },null,{timeout:30000});
   const workerState=await page.evaluate(async()=>{
-   const registrations=await navigator.serviceWorker.getRegistrations();
-   const registration=registrations.find(item=>item.scope.endsWith("/markets/"));
-   return {state:registration?.active?.state||"missing",scope:registration?.scope||null};
+   const registration=await navigator.serviceWorker.ready;
+   return {state:registration.active?.state||"missing",scope:registration.scope||null};
   });
   assert.equal(workerState.state,"activated","service worker must remain active before controlled reload");
   assert.ok(workerState.scope.endsWith("/markets/"),"Markets service worker scope must not capture Crypto or production routes");
