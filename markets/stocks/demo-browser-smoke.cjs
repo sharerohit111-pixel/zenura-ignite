@@ -63,9 +63,13 @@ const axePath=require.resolve("axe-core/axe.min.js");
   let workerState;
   try{
    await page.waitForFunction(()=>("serviceWorker" in navigator),null,{timeout:5000});
+   await page.waitForFunction(async()=>{
+    const registration=await navigator.serviceWorker.getRegistration("/markets/");
+    return registration?.active?.state==="activated";
+   },null,{timeout:15000});
    workerState=await page.evaluate(async()=>{
-    const registration=await navigator.serviceWorker.ready;
-    return {state:registration.active?.state||null,scope:registration.scope};
+    const registration=await navigator.serviceWorker.getRegistration("/markets/");
+    return {state:registration?.active?.state||null,scope:registration?.scope||null};
    });
   }catch(error){
    const state=await page.evaluate(async()=>({controller:!!navigator.serviceWorker.controller,registrations:(await navigator.serviceWorker.getRegistrations()).map(r=>({scope:r.scope,installing:r.installing?.state||null,waiting:r.waiting?.state||null,active:r.active?.state||null}))}));
