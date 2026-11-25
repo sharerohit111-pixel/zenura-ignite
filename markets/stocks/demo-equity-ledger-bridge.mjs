@@ -10,7 +10,7 @@ const positionFor = (snapshot, product, instrumentKey) => {
   return map?.[instrumentKey] || { quantity: 0, costBasisPaise: 0, reservedQuantity: 0 };
 };
 
-export function createEquityDemoLedgerBridge({ engine, accountId, sessionId, clock = () => Date.now() } = {}) {
+export function createEquityDemoLedgerBridge({ engine, accountId, sessionId, ledger: sharedLedger, nextTimestamp, clock = () => Date.now() } = {}) {
   if (!engine || typeof engine.snapshot !== "function" || typeof engine.submitOrder !== "function" ||
       typeof engine.matchNext !== "function" || typeof engine.cancelOrder !== "function") {
     throw new TypeError("EQUITY_DEMO_ENGINE_REQUIRED");
@@ -23,16 +23,22 @@ export function createEquityDemoLedgerBridge({ engine, accountId, sessionId, clo
   if (initial.mode !== "MOCK" || initial.simulated !== true || initial.source !== "SYNTHETIC_FIXTURE") {
     throw new TypeError("EQUITY_DEMO_ENGINE_NOT_SYNTHETIC");
   }
-  const ledger = createPaperDemoEventLedger({
+  const ledger = sharedLedger || createPaperDemoEventLedger({
     accountId, sessionId,
     cashBalancePaise: initial.account.cashBalancePaise,
     blockedFundsPaise: initial.account.blockedFundsPaise
   });
+  const openingProjection = ledger.snapshot();
+  if (openingProjection.account.accountId !== accountId || openingProjection.account.sessionId !== sessionId ||
+      openingProjection.account.cashBalancePaise !== initial.account.cashBalancePaise ||
+      openingProjection.account.blockedFundsPaise !== initial.account.blockedFundsPaise) {
+    throw new TypeError("EQUITY_SHARED_LEDGER_OPENING_MISMATCH");
+  }
   let eventSequence = 0, lastTimestamp = -Infinity;
   const submitted = new Map(), executions = new Map(), cancellations = new Map(), rejections = new Map();
 
   function append(type, payload, deltas, sourceKey) {
-    const time = Math.max(Number(clock()), lastTimestamp + 1);
+    const time = nextTimestamp ? Number(nextTimestamp()) : Math.max(Number(clock()), lastTimestamp + 1);
     if (!Number.isFinite(time)) throw new TypeError("INVALID_EQUITY_LEDGER_CLOCK");
     lastTimestamp = time;
     eventSequence += 1;
