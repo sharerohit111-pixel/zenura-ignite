@@ -28,7 +28,7 @@ test("Demo screens disclose synthetic data and isolate local Equity execution fr
  assert.match(js,/local Equity\/F&O simulation only/);
  assert.match(js,/Order execution","Local simulation only/);
  assert.doesNotMatch(js,/order actions disabled/);
- assert.match(js,/appendWalletSummary\\(content\\)/);
+ assert.match(js,/appendWalletSummary\(content\)/);
  const walletPanel=await read("demo-unified-ledger-panel.mjs");
  assert.match(walletPanel,/ledgerReconciled/);
  assert.match(walletPanel,/projectPaperDemoWallet/);
