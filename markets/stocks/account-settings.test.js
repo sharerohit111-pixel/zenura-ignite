@@ -58,7 +58,7 @@ test("local UI cannot create a mock identity and private profile writes are guar
   assert.match(source, /if \(authEventSeen\) return/);
 });
 
-function createAccountSessionHarness() {
+function createAccountSessionHarness(options = {}) {
  const elements=new Map();
  class Element {
   constructor(id=""){this.id=id;this.listeners={};this.hidden=false;this.disabled=false;this.value="";this.textContent="";this.children=[];}
@@ -76,7 +76,7 @@ function createAccountSessionHarness() {
  const auth={
   onAuthStateChange(fn){listener=fn;},
   async getSession(){return {data:{session:currentSession},error:null};},
-  getUser(){userCalls++;if(userCalls===1){firstStartedResolve();return firstUser;}return Promise.resolve({data:{user:{id:"user-2",email:"two@example.test",user_metadata:{display_name:"Second User"}}},error:null});}
+  getUser(){userCalls++;if(options.delayFirstProfile && userCalls===1){firstStartedResolve();return firstUser;}const user=currentSession?.user;if(!user)return Promise.resolve({data:{user:null},error:null});return Promise.resolve({data:{user:{...user,email:user.id==="user-1"?"one@example.test":"two@example.test",user_metadata:{display_name:user.id==="user-1"?"First User":"Second User"}}},error:null});}
  };
  const supabase={auth};
  const document={
@@ -85,7 +85,8 @@ function createAccountSessionHarness() {
   createElement(){return new Element();},
   querySelector(){return {content:"https://gateway.example"};}
  };
- const fetch=async(_url,opts)=>({ok:true,json:async()=>({startingCashPaise:100000000,cashPaise:20000,reservedCashPaise:1000,reservedMarginPaise:0,availableCashPaise:19000,ledgerReconciled:false,tokenUsed:opts.headers.Authorization})});
+ const defaultFetch=async(_url,opts)=>({ok:true,json:async()=>({startingCashPaise:100000000,cashPaise:20000,reservedCashPaise:1000,reservedMarginPaise:0,availableCashPaise:19000,ledgerReconciled:false,tokenUsed:opts.headers.Authorization})});
+ const fetch=options.fetch || defaultFetch;
  const vm=require("node:vm");
  vm.runInNewContext(source.replace('import { supabase } from "./supabase-client.js";',"const {supabase}=globalThis.__test;"),{
   document,fetch,queueMicrotask,AbortSignal:{timeout:()=>({})},Intl,globalThis:{__test:{supabase}},console
@@ -123,4 +124,41 @@ test("OTP completion messages are ignored after the active auth sequence changes
   assert.ok(source.includes('const sequence = authSequence;'));
   assert.ok(source.includes('if (sequence === authSequence) await syncAuth(data.session);'));
   assert.ok(source.includes('if (sequence === authSequence) status.textContent = error.message || "OTP verification failed.";'));
+});
+
+
+test("a delayed User A wallet response cannot overwrite User B after an account switch", async()=>{
+ let releaseA,startedA;
+ const userAStarted=new Promise(resolve=>{startedA=resolve;});
+ const userAWallet=new Promise(resolve=>{releaseA=resolve;});
+ const h=createAccountSessionHarness({fetch:async(_url,opts)=>{
+   if(opts.headers.Authorization==="Bearer token-user-1"){startedA();return userAWallet;}
+   return {ok:true,json:async()=>({startingCashPaise:100000000,cashPaise:44000,reservedCashPaise:4000,reservedMarginPaise:0,availableCashPaise:40000})};
+ }});
+ await new Promise(r=>setTimeout(r,0));
+ h.switchFirst();
+ await userAStarted;
+ h.switchUser();
+ await new Promise(r=>setTimeout(r,10));
+ assert.equal(h.elements.get("s-trade-display-name").value,"Second User");
+ assert.equal(h.elements.get("s-trade-wallet-cash").textContent,"₹440.00");
+ releaseA({ok:true,json:async()=>({startingCashPaise:100000000,cashPaise:11000,reservedCashPaise:1000,reservedMarginPaise:0,availableCashPaise:10000})});
+ await new Promise(r=>setTimeout(r,10));
+ assert.equal(h.elements.get("s-trade-display-name").value,"Second User");
+ assert.equal(h.elements.get("s-trade-wallet-cash").textContent,"₹440.00");
+ assert.equal(h.elements.get("s-trade-session-info").textContent,"Signed in as two@example.test");
+});
+
+test("sign-out clears profile and wallet fields before another user can be rendered", async()=>{
+ const h=createAccountSessionHarness();
+ await new Promise(r=>setTimeout(r,0));
+ h.switchUser();
+ await new Promise(r=>setTimeout(r,10));
+ assert.equal(h.elements.get("s-trade-display-name").value,"Second User");
+ h.switchOut();
+ await new Promise(r=>setTimeout(r,0));
+ assert.equal(h.elements.get("s-trade-display-name").value,"");
+ assert.equal(h.elements.get("s-trade-session-info").textContent,"");
+ assert.equal(h.elements.get("s-trade-wallet-cash").textContent,"—");
+ assert.equal(h.elements.get("s-trade-account-private").hidden,true);
 });
