@@ -76,7 +76,7 @@ async function scanTextContrast(page){
     contrastReports.push({screen:name,textNodes:contrast.textNodes,minimumRatio:contrast.minimumRatio,language:"en"});
    }
    // Repeat contrast checks in Hindi; viewport emulation is not physical-device accessibility testing.
-   const languageToggle=page.locator("#language-toggle");
+   const languageToggle=page.locator("#paper-language-toggle");
    await languageToggle.click();
    assert.equal(await page.locator("html").getAttribute("lang"),"hi",viewport.name+" Hindi language metadata");
    for(const name of ["home","market","watchlists","charts","equity","futures","options","orders","trades","portfolio","positions","holdings","account","profile","settings"]){
