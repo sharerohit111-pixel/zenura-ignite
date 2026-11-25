@@ -66,10 +66,10 @@ function appendUnifiedDemoSummary(container,screen){
  disclaimer.textContent="One append-only DEMO event projection shared by Equity, Futures and Options. Synthetic records only; Wallet and production execution remain separate.";
  host.append(disclaimer);
  const rows=screen==="trades"?snap.trades.map(x=>[x.fillId,x.assetClass,x.instrumentKey,x.side,x.quantity,x.pricePaise,x.grossValuePaise,x.filledAt]):
-  screen==="positions"||screen==="portfolio"||screen==="holdings"?snap.positions.filter(x=>screen!=="holdings"||(x.assetClass==="EQUITY"&&x.product==="DELIVERY")).map(x=>[x.assetClass,x.instrumentKey,x.product,x.quantity,x.averagePricePaise,x.costBasisPaise,x.realizedPnlPaise]):
+  screen==="positions"||screen==="portfolio"||screen==="holdings"?snap.positions.filter(x=>screen!=="holdings"||(x.assetClass==="EQUITY"&&x.product==="DELIVERY")).map(x=>[x.assetClass,x.instrumentKey,x.product,x.quantity,x.averagePricePaise,x.markPricePaise,x.costBasisPaise,x.realizedPnlPaise,x.unrealizedPnlPaise,x.totalPnlPaise]):
   snap.orders.map(x=>[x.orderId,x.assetClass,x.instrumentKey,x.side,x.orderType,x.quantity,x.filledQuantity+"/"+x.remainingQuantity,x.status]);
  const headers=screen==="trades"?["FILL ID","ASSET","INSTRUMENT","SIDE","QTY","PRICE (PAISE)","GROSS (PAISE)","FILLED AT"]:
-  screen==="positions"||screen==="portfolio"||screen==="holdings"?["ASSET","INSTRUMENT","PRODUCT","NET QTY","AVG (PAISE)","COST (PAISE)","REALIZED P&L (PAISE)"]:
+  screen==="positions"||screen==="portfolio"||screen==="holdings"?["ASSET","INSTRUMENT","PRODUCT","NET QTY","AVG (PAISE)","MARK (PAISE)","COST (PAISE)","REALIZED P&L (PAISE)","UNREALIZED P&L (PAISE)","TOTAL P&L (PAISE)"]:
   ["ORDER ID","ASSET","INSTRUMENT","SIDE","TYPE","QTY","FILLED / REMAINING","STATUS"];
  const wrap=document.createElement("div");wrap.className="table-wrap";const table=document.createElement("table"),thead=document.createElement("thead"),trh=document.createElement("tr"),tbody=document.createElement("tbody");
  for(const h of headers){const th=document.createElement("th");th.textContent=h;trh.append(th);}thead.append(trh);
