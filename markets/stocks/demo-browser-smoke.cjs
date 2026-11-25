@@ -62,18 +62,20 @@ const axePath=require.resolve("axe-core/axe.min.js");
   await page.waitForLoadState("load",{timeout:10000});
   let workerState;
   try{
-   const workerHandle=await page.waitForFunction(async()=>{
-    const registrations=await navigator.serviceWorker.getRegistrations();
-    const registration=registrations.find(item=>item.active?.state==="activated");
-    return registration?{state:registration.active.state,scope:registration.scope}:null;
+   await page.waitForFunction(async()=>{
+    const registration=await navigator.serviceWorker.getRegistration(new URL("./",location.href).pathname);
+    return Boolean(registration?.active&&registration.active.state==="activated");
    },null,{timeout:20000});
-   workerState=await workerHandle.jsonValue();
+   workerState=await page.evaluate(async()=>{
+    const registration=await navigator.serviceWorker.getRegistration(new URL("./",location.href).pathname);
+    return registration?.active?{state:registration.active.state,scope:registration.scope}:null;
+   });
   }catch(error){
    const state=await page.evaluate(async()=>({controller:!!navigator.serviceWorker.controller,registrations:(await navigator.serviceWorker.getRegistrations()).map(r=>({scope:r.scope,installing:r.installing?.state||null,waiting:r.waiting?.state||null,active:r.active?.state||null}))}));
    throw new Error("PWA service worker did not activate: "+JSON.stringify(state)+"; console: "+pwaConsole.join(" | ")+"; "+error.message);
   }
   console.log("PWA: waiting for service worker activation");
-  assert.equal(workerState.state,"activated","service worker must be active before controlled reload");
+  assert.ok(workerState&&workerState.state==="activated","service worker must be active before controlled reload");
   console.log(JSON.stringify({pwaWorker:workerState.state,scope:workerState.scope}));
   // clients.claim() in the activate handler controls existing same-scope clients.
   // Open a fresh same-scope tab rather than forcing a navigation reload race.
