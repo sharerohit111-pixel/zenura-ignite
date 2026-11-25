@@ -154,7 +154,7 @@ test("catalog rejects derivative keys whose exchange, type, underlying, strike, 
 
 test("catalog rejects malformed market keys and Equity snapshots that point to an index", async () => {
   const malformed = await allFixtures();
-  malformed.market.data.quotes[0].instrumentKey = "MOCK|NSE|INDEX|0001";
+  malformed.market.data.quotes[0].instrumentKey = "MOCK|NSE|EQ|bad";
   assert.throws(() => createPaperDemoViewModel(malformed,{enabled:true}), /MOCK_MARKET_INSTRUMENT_IDENTITY_MISMATCH/);
   const wrongEquity = await allFixtures();
   wrongEquity.equity.data.instrumentKey = "MOCK|NSE|INDEX|0003";
