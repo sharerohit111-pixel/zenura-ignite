@@ -1,0 +1,42 @@
+# Exact Gitleaks fingerprints reviewed as non-secret test fixtures, deterministic
+# idempotency/storage identifiers, Supabase publishable client keys, or Secret
+# Manager resource names. These are individual findings only; no rule or path
+# is broadly excluded. New values/lines/commits continue to be scanned.
+2c206036fd15dfb8e2cbaff0c80704b9f5498949:market-gateway/test/equity-demo-execution-engine.test.js:generic-api-key:178
+2c206036fd15dfb8e2cbaff0c80704b9f5498949:market-gateway/test/equity-demo-execution-engine.test.js:generic-api-key:190
+ef11db31872081250a2deb3b9ee6a31654be9e5b:markets/stocks/email-auth.test.js:generic-api-key:97
+a65b99714b1b5568fc58b985d3b338697755ea42:market-gateway/test/equity-dummy-engine.test.js:generic-api-key:47
+27e76af7effe9fd8d30c55438d13f6a08bd0c932:markets/stocks/equity-dummy-engine.test.js:generic-api-key:45
+26846f1df947cca298992ee1a14d4d1b67cbd56f:supabase/tests/market_worker_least_privilege_and_fencing.sql:generic-api-key:72
+b7a55aea3c0a4713afd3ed53ed7cff5ecc736740:markets/stocks/stocks.js:generic-api-key:265
+31f364c78c83fdcbf0e3a58d4598b230b8e3e899:crypto-gateway/test/server.test.js:generic-api-key:68
+31f364c78c83fdcbf0e3a58d4598b230b8e3e899:crypto-gateway/test/server.test.js:generic-api-key:69
+31f364c78c83fdcbf0e3a58d4598b230b8e3e899:crypto-gateway/test/server.test.js:generic-api-key:72
+94a6261febbb2ff98e274a768fbdec80c6f66ebc:crypto-gateway/test/input-hardening.test.js:generic-api-key:11
+1566c6155a230e906fc19a7c00a5c428ec82e6c1:crypto-gateway/test/server.test.js:generic-api-key:6
+1566c6155a230e906fc19a7c00a5c428ec82e6c1:crypto-gateway/test/server.test.js:generic-api-key:10
+1566c6155a230e906fc19a7c00a5c428ec82e6c1:crypto-gateway/test/server.test.js:generic-api-key:13
+1566c6155a230e906fc19a7c00a5c428ec82e6c1:crypto-gateway/test/server.test.js:generic-api-key:16
+cb1127ae65d7c80ce0f5a9369de08ebf6f614617:crypto/supabase-client.js:generic-api-key:5
+1a5eb680b8fe673a923c51c9331038f5519e8262:.github/workflows/deploy-supabase-market-gateway.yml:generic-api-key:108
+e139716e012e62c937c71e768e7de98ce6e85759:markets/stocks/supabase-client.js:generic-api-key:4
+f5ac3fd2882ff4f045a3f76f53ee4de35397afa1:market-gateway/test/derivative-order-transaction.test.js:generic-api-key:9
+f5ac3fd2882ff4f045a3f76f53ee4de35397afa1:market-gateway/test/paper-order-firestore-emulator.test.js:generic-api-key:189
+f5ac3fd2882ff4f045a3f76f53ee4de35397afa1:market-gateway/test/paper-order-firestore-emulator.test.js:203
+f5ac3fd2882ff4f045a3f76f53ee4de35397afa1:market-gateway/test/paper-order-firestore-emulator.test.js:204
+f5ac3fd2882ff4f045a3f76f53ee4de35397afa1:market-gateway/test/paper-order-firestore-emulator.test.js:247
+f5ac3fd2882ff4f045a3f76f53ee4de35397afa1:market-gateway/test/paper-order-firestore-emulator.test.js:248
+f5ac3fd2882ff4f045a3f76f53ee4de35397afa1:markets/stocks/paper-order-retry-policy.test.js:9
+f5ac3fd2882ff4f045a3f76f53ee4de35397afa1:markets/stocks/paper-order-retry-policy.test.js:34
+f5ac3fd2882ff4f045a3f76f53ee4de35397afa1:markets/stocks/paper-order-retry-policy.test.js:37
+f5ac3fd2882ff4f045a3f76f53ee4de35397afa1:markets/stocks/stocks.js:230
+91e47b06a7bd000a0930bd959a7e17f66e46b330:markets/stocks/paper-order-retry-policy.test.js:33
+91e47b06a7bd000a0930bd959a7e17f66e46b330:markets/stocks/paper-order-retry-policy.test.js:36
+cfeda960d9b111df40a68073d5ede851930f9564:markets/stocks/paper-order-retry-policy.test.js:8
+81f0d1d7e9601ba57aaf7b545b2a3e98286b398c:markets/stocks/stocks.js:208
+dac74c6eea72b2f1f6ddbecfcdd82290a6e9bfda:market-gateway/test/paper-order-firestore-emulator.test.js:148
+dac74c6eea72b2f1f6ddbecfcdd82290a6e9bfda:market-gateway/test/paper-order-firestore-emulator.test.js:162
+dac74c6eea72b2f1f6ddbecfcdd82290a6e9bfda:market-gateway/test/paper-order-firestore-emulator.test.js:163
+66e4592b46918b836e9a6ea10fe4aec921548398:market-gateway/test/paper-order-firestore-emulator.test.js:206
+66e4592b46918b836e9a6ea10fe4aec921548398:market-gateway/test/paper-order-firestore-emulator.test.js:207
+a91027051258889fc19849e794b0360364f4a53d:market-gateway/test/derivative-order-transaction.test.js:9
