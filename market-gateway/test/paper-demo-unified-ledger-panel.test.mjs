@@ -22,6 +22,10 @@ test("Trade History, Orders, Portfolio, Positions and Holdings route through one
   assert.match(panel, /realizedPnlPaise/);
   assert.match(panel, /unrealized/);
   assert.match(panel, /ledgerReconciled/);
+  assert.match(js, /appendWalletSummary\(content\)/);
+  assert.match(panel, /projectPaperDemoWallet/);
+  assert.match(panel, /CANONICAL VIRTUAL WALLET/);
+  assert.match(panel, /No fixture-balance fallback is shown/);
 });
 
 test("PWA precaches the unified panel and retains the single shared ledger session", async () => {
