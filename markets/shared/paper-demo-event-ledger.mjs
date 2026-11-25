@@ -141,6 +141,9 @@ function apply(projection, event) {
         PENDING: new Set(["PARTIALLY_FILLED", "FILLED", "CANCELLED", "EXPIRED"]),
         PARTIALLY_FILLED: new Set(["PARTIALLY_FILLED", "FILLED", "CANCELLED", "EXPIRED"])
       };
+      for (const field of ["assetClass", "instrumentKey", "side", "orderType", "quantity", "product"]) {
+        if (existing[field] !== (field === "product" ? productOf(p) : p[field])) fail("ORDER_IDENTITY_MUTATION");
+      }
       if (terminal.has(existing.status)) fail("ORDER_TERMINAL_STATE_IMMUTABLE");
       if (!transitions[existing.status]?.has(p.status)) fail("INVALID_ORDER_STATUS_TRANSITION");
       const filledQuantity = projection.fills.filter(fill => fill.orderId === p.orderId)

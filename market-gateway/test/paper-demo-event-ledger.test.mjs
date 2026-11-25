@@ -27,12 +27,12 @@ test("cross-engine events share one ordered immutable event stream", () => {
     eventId: "evt-2", idempotencyKey: "idem-2", sourceEventId: "futures-order-1",
     engine: "FUTURES", type: "ORDER_ACCEPTED", occurredAt: "2026-11-25T09:30:01+05:30",
     payload: { orderId: "future-1", assetClass: "FUTURE", instrumentKey: "MOCK|NSE|FUT|NIFTY-2026-11", side: "BUY", orderType: "MARKET", quantity: 1, status: "PENDING" },
-    deltas: { cashDeltaPaise: 0, blockedDeltaPaise: 20000 }
+    deltas: { cashDeltaPaise: 0, blockedDeltaPaise: 0 }
   }));
   const snapshot = ledger.snapshot();
   assert.deepEqual(snapshot.events.map(x => [x.sequence, x.engine]), [[1, "EQUITY"], [2, "FUTURES"]]);
-  assert.equal(snapshot.account.blockedFundsPaise, 30000);
-  assert.equal(snapshot.account.availableFundsPaise, 99970000);
+  assert.equal(snapshot.account.blockedFundsPaise, 10000);
+  assert.equal(snapshot.account.availableFundsPaise, 99990000);
   assert.ok(Object.isFrozen(snapshot.events[0]));
   assert.ok(Object.isFrozen(snapshot.events));
 });
@@ -239,7 +239,7 @@ test("schema 1.2.0, strict timestamps and original replay order are enforced", (
   assert.equal(ledger.snapshot().events[0].schemaVersion, "1.2.0");
   assert.throws(() => ledger.append(event({ eventId: "evt-2", idempotencyKey: "idem-2", sourceEventId: "bad-time", occurredAt: "2026-11-25T09:30:01" })), /INVALID_EVENT_TIMESTAMP/);
   assert.throws(() => ledger.append(event({ eventId: "evt-2", idempotencyKey: "idem-2", sourceEventId: "old-time", occurredAt: "2026-11-25T09:30:00+05:30" })), /DEMO_EVENT_TIME_ORDER_MISMATCH/);
-  const later = ledger.append(event({ eventId: "evt-2", idempotencyKey: "idem-2", sourceEventId: "later", occurredAt: "2026-11-25T09:30:01+05:30" }));
+  const later = ledger.append(event({ eventId: "evt-2", idempotencyKey: "idem-2", sourceEventId: "later", occurredAt: "2026-11-25T09:30:01+05:30", type: "RESERVATION_CHANGED", payload: {} }));
   assert.throws(() => replayPaperDemoEvents(opening, [later.event, ...ledger.snapshot().events]), /DEMO_EVENT_SEQUENCE_MISMATCH/);
 });
 
