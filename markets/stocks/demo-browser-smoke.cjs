@@ -85,11 +85,17 @@ const axePath=require.resolve("axe-core/axe.min.js");
 
     // Futures and Options MARKET order entry must accept a local synthetic order.
     await page.locator('#screen-nav button[data-screen="futures"]').click();
-    await page.waitForFunction(()=>document.querySelector(".demo-fo-status")?.textContent.includes("MOCK quote selected"));
+    await page.waitForFunction(()=>{const status=document.querySelector(".demo-fo-status")?.textContent||"";return status&&!status.includes("Loading deterministic");});
+    const futureStatus=await page.locator(".demo-fo-status").textContent();
+    console.log("Futures Demo status:",futureStatus);
+    assert.ok(futureStatus.includes("MOCK quote selected"),futureStatus);
     await page.getByRole("button",{name:"BUY",exact:true}).last().click();
     assert.ok((await page.locator(".demo-fo-status").textContent()).includes("DEMO receipt"),"Futures order entry");
     await page.locator('#screen-nav button[data-screen="options"]').click();
-    await page.waitForFunction(()=>document.querySelector(".demo-fo-status")?.textContent.includes("MOCK quote selected"));
+    await page.waitForFunction(()=>{const status=document.querySelector(".demo-fo-status")?.textContent||"";return status&&!status.includes("Loading deterministic");});
+    const optionsStatus=await page.locator(".demo-fo-status").textContent();
+    console.log("Options Demo status:",optionsStatus);
+    assert.ok(optionsStatus.includes("MOCK quote selected"),optionsStatus);
     await page.getByRole("button",{name:"BUY",exact:true}).last().click();
     assert.ok((await page.locator(".demo-fo-status").textContent()).includes("DEMO receipt"),"Options order entry");
    }
