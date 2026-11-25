@@ -160,7 +160,10 @@ test("LIMIT BUY and SELL use the correct executable side and reject off-tick pri
 
 test("expired contracts, real instruments and production-mode fixtures fail closed", () => {
   const expiredAt = Date.parse("2026-12-31T15:30:00+05:30");
-  assert.throws(() => createDerivativeMockSimulator(fixture, { now: expiredAt, maxQuoteAgeMs: Number.MAX_SAFE_INTEGER }).submit({
+  let clock = now;
+  const expiredSimulator = createDerivativeMockSimulator(fixture, { now: () => clock });
+  clock = expiredAt;
+  assert.throws(() => expiredSimulator.submit({
     instrumentKey: future().instrumentKey, side: "BUY", orderType: "MARKET", lots: 1
   }), /Expired/);
   const real = JSON.parse(JSON.stringify(fixture));
