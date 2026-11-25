@@ -106,6 +106,9 @@ if (card && connectButton) {
   });
   supabase.auth.onAuthStateChange((_event, session) => {
     authSequence++;
+    signIn.disabled = false;
+    create.disabled = false;
+    signOutButton.disabled = false;
     if (session?.user) {
       message.textContent = "Signed in as " + (session.user.email || "your account") + " using Supabase Auth.";
       email.hidden = true;
