@@ -7,11 +7,16 @@ on:
       - "markets/stocks/demo.html"
       - "markets/stocks/demo.css"
       - "markets/stocks/demo.js"
-      - "markets/stocks/index.html"
-      - "market-gateway/test/paper-demo-dashboard.test.mjs"
+      - "markets/stocks/demo-*.mjs"
       - "markets/stocks/demo-browser-smoke.cjs"
-      - "markets/stocks/demo-chart-data.mjs"
-      - "markets/stocks/demo-chart-panel.mjs"
+      - "markets/stocks/index.html"
+      - "markets/service-worker.js"
+      - "market-gateway/lib/demo-trade-history-store.js"
+      - "market-gateway/test/demo-trade-history-store.test.js"
+      - "market-gateway/test/demo-trade-projection.test.js"
+      - "market-gateway/test/paper-demo-dashboard.test.mjs"
+      - "market-gateway/test/paper-demo-equity-integration.test.mjs"
+      - "market-gateway/test/paper-demo-derivative-integration.test.mjs"
       - "market-gateway/test/demo-chart-data.test.mjs"
       - ".github/workflows/s-trade-demo-screen-wiring.yml"
   push:
@@ -22,7 +27,13 @@ on:
       - "markets/stocks/demo.html"
       - "markets/stocks/demo.css"
       - "markets/stocks/demo.js"
+      - "markets/stocks/demo-*.mjs"
+      - "markets/stocks/demo-browser-smoke.cjs"
       - "markets/stocks/index.html"
+      - "markets/service-worker.js"
+      - "market-gateway/lib/demo-trade-history-store.js"
+      - "market-gateway/test/demo-trade-history-store.test.js"
+      - "market-gateway/test/demo-trade-projection.test.js"
       - "market-gateway/test/paper-demo-dashboard.test.mjs"
       - ".github/workflows/s-trade-demo-screen-wiring.yml"
 
@@ -39,7 +50,7 @@ jobs:
         with:
           node-version: "22"
       - name: Check browser module syntax
-        run: node --check markets/shared/paper-demo-adapter.mjs && node --check markets/stocks/demo.js && node --check markets/stocks/demo-chart-data.mjs && node --check markets/stocks/demo-chart-panel.mjs
+        run: node --check markets/shared/paper-demo-adapter.mjs && node --check markets/stocks/demo.js && node --check markets/stocks/demo-trade-projection.mjs && node --check markets/stocks/demo-chart-data.mjs && node --check markets/stocks/demo-chart-panel.mjs
       - name: Validate shared fixtures
         run: |
           node - <<'NODE'
@@ -47,9 +58,8 @@ jobs:
           for(const name of ['market','account','equity','derivatives']) JSON.parse(fs.readFileSync('market-gateway/mock/fixtures/'+name+'.json','utf8'));
           console.log('Parsed all four canonical screen fixtures.');
           NODE
-      - name: Run adapter and screen integration tests
-        run: node --test market-gateway/test/paper-demo-adapter.test.mjs market-gateway/test/paper-demo-dashboard.test.mjs market-gateway/test/demo-chart-data.test.mjs
-      # Chart model, panel, and regression tests are included in this exact-head gate.
+      - name: Run adapter, screen and unified projection tests
+        run: node --test market-gateway/test/paper-demo-adapter.test.mjs market-gateway/test/paper-demo-dashboard.test.mjs market-gateway/test/demo-chart-data.test.mjs market-gateway/test/paper-demo-equity-integration.test.mjs market-gateway/test/paper-demo-derivative-integration.test.mjs market-gateway/test/demo-trade-projection.test.js market-gateway/test/demo-trade-history-store.test.js
       - name: Install Chromium browser QA dependencies
         run: |
           npm install --prefix "$RUNNER_TEMP/zenura-playwright" playwright@1.61.1 axe-core@4.10.3 --ignore-scripts --no-audit --no-fund
@@ -68,6 +78,6 @@ jobs:
       - name: Guard production gateway isolation
         run: |
           if grep -R "paper-demo-adapter" market-gateway/supabase-server.js market-gateway/server.js; then
-            echo "Browser demo adapter must not be imported into production gateway routes."
+            echo "Browser demo adapter must not be imported into production gateway."
             exit 1
           fi
