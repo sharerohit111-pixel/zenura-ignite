@@ -14,6 +14,7 @@ on:
       - "market-gateway/lib/demo-trade-history-store.js"
       - "market-gateway/test/demo-trade-history-store.test.js"
       - "market-gateway/test/demo-trade-projection.test.js"
+      - "market-gateway/test/options-demo-event-integration.test.mjs"
       - "market-gateway/test/paper-demo-dashboard.test.mjs"
       - "market-gateway/test/paper-demo-equity-integration.test.mjs"
       - "market-gateway/test/paper-demo-derivative-integration.test.mjs"
