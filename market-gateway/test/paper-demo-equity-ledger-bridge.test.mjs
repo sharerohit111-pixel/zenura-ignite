@@ -96,3 +96,21 @@ test("bridge refuses a non-MOCK engine scope and does not touch production paths
     engine: bridge, accountId: "live-account-1", sessionId: "demo-session-x"
   }), /EQUITY_DEMO_SCOPE_REQUIRED/);
 });
+
+
+test("valid but unaffordable BUY requests produce one rejected order event without reserving cash", async () => {
+  const { bridge, instrumentKey, account } = await setup({ startingCapitalPaise: 1000, cashBalancePaise: 1000 });
+  const request = {
+    instrumentKey, side: "BUY", orderType: "MARKET", product: "DELIVERY",
+    quantity: 1, idempotencyKey: "equity-reject-0001"
+  };
+  assert.throws(() => bridge.submitOrder(request), /INSUFFICIENT_DEMO_CASH/);
+  assert.throws(() => bridge.submitOrder(request), /INSUFFICIENT_DEMO_CASH/);
+  const snapshot = bridge.snapshot();
+  assert.equal(snapshot.orders.length, 1);
+  assert.equal(snapshot.orders[0].status, "REJECTED");
+  assert.equal(snapshot.events.filter(event => event.type === "ORDER_REJECTED").length, 1);
+  assert.equal(snapshot.account.cashBalancePaise, account.cashBalancePaise);
+  assert.equal(snapshot.account.blockedFundsPaise, 0);
+  assert.equal(snapshot.account.ledgerReconciled, false);
+});
