@@ -1,5 +1,6 @@
 "use strict";
 let projection=null;
+let latestDerivativeMarks=new Map();
 const cleanKey=value=>("src_"+String(value).replace(/[^A-Za-z0-9_-]/g,"_")).slice(0,80);
 const time=value=>typeof value==="string"&&Number.isFinite(Date.parse(value))?value:new Date(0).toISOString();
 function getStore(){
@@ -41,13 +42,14 @@ function syncDemoProjection(source,snapshot){
    store.cancel(order.orderId,fact.at);
   }
  }
- const projected=store.snapshot();
- if(source!=="DERIVATIVES")return projected;
- const marks=new Map((snapshot.positions||[]).map(position=>[
+ if(source==="DERIVATIVES")latestDerivativeMarks=new Map((snapshot.positions||[]).map(position=>[
   [position.instrumentKey,position.product||"DELIVERY"].join("|"),position
  ]));
+ return getDemoProjectionSnapshot();
+}
+function enrichDerivativeMarks(projected){
  return {...projected,positions:projected.positions.map(position=>{
-  const mark=marks.get([position.instrumentKey,position.product||"DELIVERY"].join("|"));
+  const mark=latestDerivativeMarks.get([position.instrumentKey,position.product||"DELIVERY"].join("|"));
   if(!mark)return position;
   const totalPnlPaise=position.realizedPnlPaise+mark.unrealizedPnlPaise;
   if(!Number.isSafeInteger(totalPnlPaise))throw new Error("DEMO_PNL_OUT_OF_RANGE");
@@ -57,7 +59,7 @@ function syncDemoProjection(source,snapshot){
  })};
 }
 function appendUnifiedDemoSummary(container,screen){
- const snap=getStore().snapshot(),host=document.createElement("section");
+ const snap=getDemoProjectionSnapshot(),host=document.createElement("section");
  host.className="demo-unified-history";
  const title=document.createElement("h3");
  title.textContent=screen==="trades"?"CANONICAL TRADE RECEIPTS":screen==="positions"||screen==="portfolio"?"CANONICAL POSITIONS":screen==="holdings"?"CANONICAL DELIVERY HOLDINGS":"CANONICAL DEMO ORDERS";
@@ -77,5 +79,5 @@ function appendUnifiedDemoSummary(container,screen){
  if(!rows.length){const tr=document.createElement("tr"),td=document.createElement("td");td.colSpan=headers.length;td.textContent="No canonical DEMO records yet.";tr.append(td);tbody.append(tr);}
  table.append(thead,tbody);wrap.append(table);host.append(wrap);container.append(host);
 }
-export function getDemoProjectionSnapshot(){return getStore().snapshot();}
+export function getDemoProjectionSnapshot(){return enrichDerivativeMarks(getStore().snapshot());}
 export {syncDemoProjection,appendUnifiedDemoSummary};
