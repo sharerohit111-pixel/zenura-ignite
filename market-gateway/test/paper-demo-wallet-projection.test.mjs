@@ -66,6 +66,9 @@ test("wallet is a read-only projection of canonical account, order, fill and pos
   assert.equal(wallet.account.blockedFundsPaise, 0);
   assert.equal(wallet.account.availableFundsPaise, 99749900);
   assert.equal(wallet.orders[0].status, "FILLED");
+  assert.equal(wallet.orders[0].filledQuantity, 2);
+  assert.equal(wallet.orders[0].remainingQuantity, 0);
+  assert.equal(wallet.orders[0].averageFillPricePaise, 125050);
   assert.equal(wallet.fills[0].fillId, "fill-1");
   assert.equal(wallet.positions[0].quantity, 2);
   assert.equal(wallet.eventCount, 3);
