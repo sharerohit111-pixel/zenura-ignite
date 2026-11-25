@@ -12,6 +12,10 @@ on:
       - "markets/stocks/demo-*.mjs"
       - "market-gateway/test/paper-demo-unified-ledger-panel.test.mjs"
       - "markets/service-worker.js"
+      - "markets/manifest.webmanifest"
+      - "markets/pwa-register.js"
+      - "market-gateway/test/pwa-offline-closure.test.mjs"
+      - "market-gateway/test/pwa-lifecycle-accessibility-regression.test.js"
       - "market-gateway/lib/equity-demo-execution-engine.js"
       - "market-gateway/mock/fixtures/*.json"
       - "market-gateway/test/paper-demo-adapter.test.mjs"
@@ -27,6 +31,7 @@ on:
       - "markets/stocks/index.html"
       - "market-gateway/test/paper-demo-dashboard.test.mjs"
       - "markets/stocks/demo-browser-smoke.cjs"
+      - "markets/stocks/pwa-keyboard-reconnect-qa.cjs"
       - "markets/stocks/demo-chart-data.mjs"
       - "markets/stocks/demo-chart-panel.mjs"
       - "market-gateway/test/demo-chart-data.test.mjs"
@@ -43,6 +48,10 @@ on:
       - "markets/shared/paper-demo-event-ledger.mjs"
       - "markets/stocks/demo-*.mjs"
       - "markets/service-worker.js"
+      - "markets/manifest.webmanifest"
+      - "markets/pwa-register.js"
+      - "market-gateway/test/pwa-offline-closure.test.mjs"
+      - "market-gateway/test/pwa-lifecycle-accessibility-regression.test.js"
       - "market-gateway/lib/equity-demo-execution-engine.js"
       - "market-gateway/mock/fixtures/*.json"
       - "market-gateway/test/paper-demo-adapter.test.mjs"
@@ -82,7 +91,7 @@ jobs:
           console.log('Parsed all four canonical screen fixtures.');
           NODE
       - name: Run adapter, event-ledger and screen integration tests
-        run: node --test market-gateway/test/paper-demo-adapter.test.mjs market-gateway/test/paper-demo-event-ledger.test.mjs market-gateway/test/paper-demo-dashboard.test.mjs market-gateway/test/paper-demo-equity-integration.test.mjs market-gateway/test/paper-demo-equity-ledger-bridge.test.mjs market-gateway/test/paper-demo-derivative-integration.test.mjs market-gateway/test/paper-demo-derivative-ledger-bridge.test.mjs market-gateway/test/paper-demo-shared-ledger-session.test.mjs market-gateway/test/paper-demo-unified-ledger-panel.test.mjs market-gateway/test/demo-chart-data.test.mjs market-gateway/test/demo-watchlist-persistence.test.mjs
+        run: node --test market-gateway/test/paper-demo-adapter.test.mjs market-gateway/test/paper-demo-event-ledger.test.mjs market-gateway/test/paper-demo-dashboard.test.mjs market-gateway/test/paper-demo-equity-integration.test.mjs market-gateway/test/paper-demo-equity-ledger-bridge.test.mjs market-gateway/test/paper-demo-derivative-integration.test.mjs market-gateway/test/paper-demo-derivative-ledger-bridge.test.mjs market-gateway/test/paper-demo-shared-ledger-session.test.mjs market-gateway/test/paper-demo-unified-ledger-panel.test.mjs market-gateway/test/demo-chart-data.test.mjs market-gateway/test/demo-watchlist-persistence.test.mjs market-gateway/test/pwa-offline-closure.test.mjs market-gateway/test/pwa-lifecycle-accessibility-regression.test.js
       - name: Install Chromium browser QA dependencies
         run: |
           npm install --prefix "$RUNNER_TEMP/zenura-playwright" playwright@1.61.1 axe-core@4.10.3 --ignore-scripts --no-audit --no-fund
@@ -98,6 +107,7 @@ jobs:
           done
           curl --silent --fail http://127.0.0.1:4173/markets/stocks/demo.html >/dev/null
           NODE_PATH="$RUNNER_TEMP/zenura-playwright/node_modules" node markets/stocks/demo-browser-smoke.cjs
+          NODE_PATH="$RUNNER_TEMP/zenura-playwright/node_modules" node markets/stocks/pwa-keyboard-reconnect-qa.cjs
       - name: Guard production gateway isolation
         run: |
           if grep -R -E "paper-demo-adapter|paper-demo-event-ledger|paper-demo-ledger-session|demo-equity-ledger-bridge|demo-derivative-ledger-bridge|demo-unified-ledger-panel|derivative-mock-simulator|paper-mock-fixtures|equity-demo-execution-engine|demo-(equity|chart|derivative)-panel|market-gateway/mock/fixtures|equity-execution.json" market-gateway/supabase-server.js market-gateway/server.js; then
