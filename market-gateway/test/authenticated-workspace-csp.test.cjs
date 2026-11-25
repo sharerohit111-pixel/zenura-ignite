@@ -41,7 +41,7 @@ test("CSP permits only the required authenticated workspace script and API origi
 
 test("meta CSP is not misrepresented as clickjacking protection", () => {
   const directives = Object.fromEntries(match[1].split(";").map(part => {
-    const [name, ...values] = part.trim().split(/\\s+/);
+    const [name, ...values] = part.trim().split(/\s+/);
     return [name, values];
   }));
   // frame-ancestors is ignored in meta CSP. GitHub Pages cannot emit custom
