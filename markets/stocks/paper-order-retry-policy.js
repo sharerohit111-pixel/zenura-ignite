@@ -1,3 +1,4 @@
+(function () {
 "use strict";
 
 const UUID_PATTERN=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -71,3 +72,4 @@ function clearPendingPaperOrder(storage,storageKey){
 const policy={userScopedStorageKey,canRetryPendingPaperOrder,readPendingPaperOrder,inspectLegacyPendingPaperOrder,writePendingPaperOrder,clearPendingPaperOrder};
 if(typeof window!=="undefined")window.ZenuraPaperOrderRetryPolicy=policy;
 if(typeof module!=="undefined"&&module.exports)module.exports=policy;
+})();
