@@ -14,6 +14,26 @@ const axePath=require.resolve("axe-core/axe.min.js");
  try{
   for(const viewport of [{width:1440,height:900,name:"desktop"},{width:390,height:844,name:"android-mobile"},{width:360,height:800,name:"small-mobile"}]){
    const context=await browser.newContext({viewport:{width:viewport.width,height:viewport.height},isMobile:viewport.width<500,hasTouch:viewport.width<500,serviceWorkers:"allow"});
+   // Isolated Supabase Auth/DB test double: deterministic tenant isolation, no real credentials or network writes.
+   await context.route("https://esm.sh/@supabase/supabase-js@2.119.2",route=>route.fulfill({status:200,contentType:"application/javascript",body:`
+     export function createClient(){
+       let session=null;const listeners=new Set();const rows=new Map();
+       const notify=()=>listeners.forEach(fn=>fn("SIGNED_IN",session));
+       return {
+         auth:{
+           getSession:async()=>({data:{session},error:null}),
+           onAuthStateChange(fn){listeners.add(fn);return {data:{subscription:{unsubscribe:()=>listeners.delete(fn)}}};},
+           signInWithPassword:async({email})=>{session={user:{id:email.startsWith("b")?"user-b":"user-a",email}};notify();return {error:null};},
+           signUp:async({email})=>{session={user:{id:email.startsWith("b")?"user-b":"user-a",email}};notify();return {data:{session},error:null};},
+           signOut:async()=>{session=null;listeners.forEach(fn=>fn("SIGNED_OUT",null));return {error:null};}
+         },
+         from(table){if(table!=="paper_watchlists")throw new Error("unexpected table");return {
+           select(){return {eq:async(_column,uid)=>({data:[...(rows.get(uid)?.values()||[])].map(x=>({...x,instrument_keys:[...x.instrument_keys]})),error:null})};},
+           upsert:async(value)=>{const owner=rows.get(value.user_id)||new Map();owner.set(value.name,{...value,instrument_keys:[...value.instrument_keys]});rows.set(value.user_id,owner);return {error:null};}
+         };}
+       };
+     }`}));
+
    // Browser QA explicitly opts into the local simulator; production remains fail-closed by default.
    await context.addInitScript(()=>{window.ZENURA_RUNTIME_ENV="test";});
    const page=await context.newPage();
@@ -55,18 +75,35 @@ const axePath=require.resolve("axe-core/axe.min.js");
    assert.equal(await page.locator("#demo-chart-svg").getAttribute("aria-label"),"Synthetic candlestick or line chart with volume","chart accessible description");
 
    if(viewport.name==="desktop"){
-    // Watchlist add / reorder / remove must mutate only the session Demo list.
+    // Private Watchlist uses a deterministic isolated Supabase test double, not real accounts.
     await page.locator('#screen-nav button[data-screen="watchlists"]').click();
-    const candidate=page.locator("#demo-watchlist-instrument option:not([disabled])").last();
-    await page.locator("#demo-watchlist-instrument").selectOption(await candidate.getAttribute("value"));
-    await page.getByRole("button",{name:"ADD TO WATCHLIST"}).click();
+    await page.locator('input[aria-label="Email address"]').fill("a@example.test");
+    await page.locator('input[aria-label="Password"]').fill("test-password-123");
+    await page.getByRole("button",{name:"SIGN IN"}).click();
+    await page.getByText("Private watchlist loaded.").waitFor({timeout:5000});
+    const candidate=page.locator("#private-watchlist-instrument option:not([disabled])").last();
+    const firstKey=await candidate.getAttribute("value");
+    await page.locator("#private-watchlist-instrument").selectOption(firstKey);
+    await page.getByRole("button",{name:"ADD MOCK"}).click();
     const watchRows=page.locator(".catalog-results tbody tr");
-    const countAfterAdd=await watchRows.count();
-    assert.ok(countAfterAdd>0,"watchlist add should create a row");
-    const moveDown=page.getByRole("button",{name:/Move .* down/}).first();
-    if(await moveDown.count()) await moveDown.click();
+    await page.getByText("Saved securely to your private Supabase watchlist.").waitFor({timeout:5000});
+    assert.equal(await watchRows.count(),1,"private watchlist add should create one row");
+    const firstSymbol=await watchRows.first().locator("td").first().textContent();
+    await page.getByRole("button",{name:"SIGN OUT"}).click();
+    await page.locator('input[aria-label="Email address"]').fill("b@example.test");
+    await page.locator('input[aria-label="Password"]').fill("test-password-123");
+    await page.getByRole("button",{name:"SIGN IN"}).click();
+    await page.getByText("Private watchlist loaded.").waitFor({timeout:5000});
+    assert.equal(await page.locator(".catalog-results tbody tr td.empty").count(),1,"user B must not see user A watchlist");
+    await page.getByRole("button",{name:"SIGN OUT"}).click();
+    await page.locator('input[aria-label="Email address"]').fill("a@example.test");
+    await page.locator('input[aria-label="Password"]').fill("test-password-123");
+    await page.getByRole("button",{name:"SIGN IN"}).click();
+    await page.getByText("Private watchlist loaded.").waitFor({timeout:5000});
+    assert.equal(await watchRows.count(),1,"user A list must persist after switching back");
+    assert.equal(await watchRows.first().locator("td").first().textContent(),firstSymbol,"user A's private instrument should remain isolated");
     await page.getByRole("button",{name:"REMOVE"}).first().click();
-    assert.equal(await watchRows.count(),countAfterAdd-1,"watchlist remove should remove one row");
+    assert.equal(await watchRows.locator("td.empty").count(),1,"private watchlist remove should clear the row");
 
     // Option chain filters and paired CE/PE rows must render from canonical MOCK catalog.
     await page.locator('#screen-nav button[data-screen="options"]').click();
@@ -164,13 +201,15 @@ const axePath=require.resolve("axe-core/axe.min.js");
   const demoPage=controlledPage;
   await demoPage.waitForFunction(()=>document.querySelector("#demo-status")?.textContent.includes("4 canonical fixtures validated"),null,{timeout:10000});
   const cached=await demoPage.evaluate(async()=>{
-   const cache=await caches.open("zenura-markets-shell-v9");
+   const cache=await caches.open("zenura-markets-shell-v10");
    const paths=["market","account","equity","derivatives"].map(name=>new URL("../../market-gateway/mock/fixtures/"+name+".json",location.href).href);
    const found=[];
    for(const url of paths)found.push({url,found:!!(await cache.match(url))});
+   const watchlistModule=new URL("./demo-watchlist-persistence.mjs",location.href).href;
+   found.push({url:watchlistModule,found:!!(await cache.match(watchlistModule))});
    return found;
   });
-  assert.ok(cached.every(x=>x.found),"all four canonical fixture JSON files must be precached");
+  assert.ok(cached.every(x=>x.found),"all four canonical fixtures and private watchlist module must be precached");
   console.log("PWA: validating offline cached fixtures");
   await pwa.setOffline(true);
   await demoPage.reload({waitUntil:"domcontentloaded",timeout:15000});
