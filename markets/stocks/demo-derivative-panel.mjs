@@ -1,3 +1,4 @@
+import { syncDemoProjection, appendUnifiedDemoSummary } from "./demo-trade-projection.mjs";
 let fixturePromise=null,simulator=null;
 const el=(tag,cls,value)=>{const n=document.createElement(tag);if(cls)n.className=cls;if(value!==undefined)n.textContent=String(value);return n;};
 const money=value=>Number.isSafeInteger(value)?"₹"+(value/100).toLocaleString("en-IN",{minimumFractionDigits:2,maximumFractionDigits:2}):"—";
@@ -49,17 +50,29 @@ export async function mountDerivativeDemo(container,screen){
   strike.replaceChildren();opts.filter(x=>x.expiry===expiry.value&&x.optionType===optionType.value).map(x=>x.strikePaise).filter((x,i,a)=>a.indexOf(x)===i).sort((a,b)=>a-b).forEach(x=>add(strike,String(x),money(x)));if([...strike.options].some(x=>x.value===oldStrike))strike.value=oldStrike;
  }
  function paint(){
-  const s=engine.snapshot();
-  renderTable(positions,["CONTRACT","TYPE","EXPIRY","NET QTY","AVG PRICE","RESERVED CLOSE","AVAILABLE CLOSE"],s.positions.map(x=>[x.symbol,x.assetClass==="OPTION"?x.optionType:"FUT",x.expiry,x.netQuantity,money(x.averagePricePaise),x.reservedCloseQuantity,x.availableCloseQuantity]),"No open demo positions.");
+  const s=engine.snapshot(),projection=syncDemoProjection("DERIVATIVES",s);
+  const derivativePositions=projection.positions.filter(x=>x.assetClass==="FUTURE"||x.assetClass==="OPTION");
+  renderTable(positions,["INSTRUMENT","ASSET","PRODUCT","NET QTY","AVG PRICE","COST BASIS","REALIZED P&L"],
+   derivativePositions.map(x=>[x.instrumentKey,x.assetClass,x.product,x.quantity,money(x.averagePricePaise),money(x.costBasisPaise),money(x.realizedPnlPaise)]),
+   "No open demo positions.");
+  const contractsByKey=new Map(engine.contracts().map(x=>[x.instrumentKey,x]));
+  const engineOrders=new Map(s.orders.map(x=>[x.orderId,x]));
+  const derivativeOrders=projection.orders.filter(x=>x.assetClass==="FUTURE"||x.assetClass==="OPTION");
   const wrap=el("div","table-wrap demo-fo-table-wrap"),t=el("table"),head=el("thead"),hr=el("tr"),body=el("tbody");
-  ["ORDER ID","CONTRACT","SIDE","TYPE","LOTS / QTY","LIMIT","FILLED / REMAINING","AVG FILL","FILL RECEIPTS","STATUS","ACTION"].forEach(x=>hr.append(el("th","",x)));
+  ["ORDER ID","CONTRACT","ASSET","SIDE","TYPE","QTY","LIMIT","FILLED / REMAINING","AVG FILL","FILL RECEIPTS","STATUS","ACTION"].forEach(x=>hr.append(el("th","",x)));
   head.append(hr);
-  if(!s.orders.length){const tr=el("tr"),td=el("td","empty","No demo orders yet.");td.colSpan=11;tr.append(td);body.append(tr);}
-  s.orders.forEach(order=>{
+  if(!derivativeOrders.length){const tr=el("tr"),td=el("td","empty","No demo orders yet.");td.colSpan=12;tr.append(td);body.append(tr);}
+  derivativeOrders.forEach(order=>{
+   const sourceOrder=engineOrders.get(order.orderId),contract=contractsByKey.get(order.instrumentKey);
+   const receipts=projection.trades.filter(fill=>fill.orderId===order.orderId);
    const tr=el("tr");
-   [order.orderId,order.symbol,order.side,order.orderType,order.lots+" ("+order.quantity+")",order.limitPricePaise?money(order.limitPricePaise):"—",order.filledQuantity+" / "+order.remainingQuantity,order.averageFillPricePaise?money(order.averageFillPricePaise):"—",order.fills.map(f=>f.quantity+" @ "+money(f.pricePaise)).join(" · ")||"—",order.status].forEach(x=>tr.append(el("td","",x)));
+   [order.orderId,contract?.symbol||order.instrumentKey,order.assetClass,order.side,order.orderType,order.quantity,
+    order.limitPricePaise?money(order.limitPricePaise):"—",order.filledQuantity+" / "+order.remainingQuantity,
+    order.averagePricePaise?money(order.averagePricePaise):"—",
+    receipts.map(fill=>fill.fillId+" · "+fill.quantity+" @ "+money(fill.pricePaise)).join(" | ")||"—",order.status
+   ].forEach(x=>tr.append(el("td","",x)));
    const action=el("td");
-   if(["PENDING","PARTIALLY_FILLED"].includes(order.status)){
+   if(sourceOrder&&["PENDING","PARTIALLY_FILLED"].includes(sourceOrder.status)){
     const cancel=el("button","demo-fo-button secondary","CANCEL");
     cancel.addEventListener("click",()=>{try{engine.cancel(order.orderId);status.textContent="DEMO order "+order.orderId+" cancelled; unfilled remainder released.";paint();}catch(error){status.textContent=error.message||"Cancellation failed.";}});action.append(cancel);
    }else action.textContent="—";
@@ -83,36 +96,6 @@ export async function mountDerivativeDemo(container,screen){
  }catch(e){status.textContent="Demo unavailable · "+(e.message||"fixture validation failed")+". No live fallback.";buy.disabled=true;sell.disabled=true;match.disabled=true;refresh.disabled=true;}
 }
 
-export async function appendDerivativeSummary(container, screen) {
-  const section = el("section", "demo-fo-summary");
-  section.append(el("h3", "demo-fo-subhead",
-    screen === "positions" || screen === "portfolio" ? "LOCAL FUTURES & OPTIONS POSITIONS" :
-    screen === "trades" ? "LOCAL FUTURES & OPTIONS FILLS" : "LOCAL FUTURES & OPTIONS ORDERS"));
-  section.append(el("p", "demo-fo-disclaimer",
-    "Browser-memory DEMO DATA only. These records are not part of the account fixture, cash ledger or production portfolio."));
-  const host = el("div");
-  section.append(host);
-  container.append(section);
-  try {
-    const engine = await getSimulator();
-    const snapshot = engine.snapshot();
-    if (screen === "positions" || screen === "portfolio") {
-      renderTable(host,
-        ["CONTRACT","ASSET","EXPIRY","NET QTY","AVG PRICE","RESERVED CLOSE","AVAILABLE CLOSE"],
-        snapshot.positions.map(x => [x.symbol,x.assetClass === "OPTION" ? x.optionType : "FUT",x.expiry,x.netQuantity,money(x.averagePricePaise),x.reservedCloseQuantity,x.availableCloseQuantity]),
-        "No local Futures/Options demo positions.");
-    } else if (screen === "trades") {
-      const rows = snapshot.orders.flatMap(order => order.fills.map(fill => [
-        fill.fillId,order.symbol,order.side,order.orderType,fill.quantity,money(fill.pricePaise),money(fill.grossPaise),fill.executedAt
-      ]));
-      renderTable(host,["FILL ID","CONTRACT","SIDE","ORDER TYPE","QTY","FILL PRICE","GROSS VALUE","EXECUTED AT"],rows,"No local Futures/Options demo fills.");
-    } else {
-      renderTable(host,
-        ["ORDER ID","CONTRACT","SIDE","TYPE","QTY","FILLED / REMAINING","AVG FILL","STATUS"],
-        snapshot.orders.map(x => [x.orderId,x.symbol,x.side,x.orderType,x.quantity,x.filledQuantity+" / "+x.remainingQuantity,x.averageFillPricePaise?money(x.averageFillPricePaise):"—",x.status]),
-        "No local Futures/Options demo orders.");
-    }
-  } catch (error) {
-    host.append(el("p","demo-fo-status","Local derivative Demo records unavailable · "+(error.message || "fixture error")));
-  }
+export async function appendDerivativeSummary(container,screen){
+ appendUnifiedDemoSummary(container,screen);
 }

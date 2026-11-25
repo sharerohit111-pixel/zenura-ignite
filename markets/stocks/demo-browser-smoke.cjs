@@ -106,13 +106,21 @@ const axePath=require.resolve("axe-core/axe.min.js");
   // Keep the PWA fixture smoke in explicit test mode, never an implicit development default.
   await pwa.addInitScript(()=>{window.ZENURA_RUNTIME_ENV="test";});
   const page=await pwa.newPage();
+  const pwaConsole=[];
+  page.on("console",message=>pwaConsole.push(message.type()+": "+message.text()));
+  page.on("pageerror",error=>pwaConsole.push("pageerror: "+error.message));
   console.log("PWA: opening market shell");
   await page.goto("http://127.0.0.1:4173/markets/",{waitUntil:"domcontentloaded",timeout:30000});
   await page.waitForLoadState("load",{timeout:10000});
-  await page.waitForFunction(async()=>{
-   const registrations=await navigator.serviceWorker.getRegistrations();
-   return registrations.some(registration=>registration.active?.state==="activated");
-  },null,{timeout:20000});
+  try{
+   await page.waitForFunction(async()=>{
+    const registrations=await navigator.serviceWorker.getRegistrations();
+    return registrations.some(registration=>registration.active?.state==="activated");
+   },null,{timeout:20000});
+  }catch(error){
+   const state=await page.evaluate(async()=>({controller:!!navigator.serviceWorker.controller,registrations:(await navigator.serviceWorker.getRegistrations()).map(r=>({scope:r.scope,installing:r.installing?.state||null,waiting:r.waiting?.state||null,active:r.active?.state||null}))}));
+   throw new Error("PWA service worker did not activate: "+JSON.stringify(state)+"; console: "+pwaConsole.join(" | ")+"; "+error.message);
+  }
   console.log("PWA: waiting for service worker activation");
   // navigator.serviceWorker.ready may resolve while the active worker is
   // still transitioning through "activating"; wait for the actual state.
@@ -139,7 +147,7 @@ const axePath=require.resolve("axe-core/axe.min.js");
   const demoPage=controlledPage;
   await demoPage.waitForFunction(()=>document.querySelector("#demo-status")?.textContent.includes("4 canonical fixtures validated"),null,{timeout:10000});
   const cached=await demoPage.evaluate(async()=>{
-   const cache=await caches.open("zenura-markets-shell-v5");
+   const cache=await caches.open("zenura-markets-shell-v6");
    const paths=["market","account","equity","derivatives"].map(name=>new URL("../../market-gateway/mock/fixtures/"+name+".json",location.href).href);
    const found=[];
    for(const url of paths)found.push({url,found:!!(await cache.match(url))});
