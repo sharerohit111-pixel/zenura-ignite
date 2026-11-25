@@ -6,6 +6,9 @@ on:
       - "supabase/migrations/**"
       - ".github/workflows/paper-trading-supabase-migrations.yml"
       - ".github/workflows/deploy-supabase-market-gateway.yml"
+      - "functions/**"
+      - "firebase.json"
+      - ".github/workflows/deploy-firebase-functions.yml"
       - "markets/**"
       - "markets/stocks/**"
       - "market-gateway/supabase-server.js"
@@ -86,6 +89,23 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
+      - name: Verify Firebase Functions Node 22 runtime and dependency compatibility
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+          const firebase = JSON.parse(fs.readFileSync('firebase.json', 'utf8'));
+          const pkg = JSON.parse(fs.readFileSync('functions/package.json', 'utf8'));
+          const deploy = fs.readFileSync('.github/workflows/deploy-firebase-functions.yml', 'utf8');
+          if (firebase.functions?.find(item => item.source === 'functions')?.runtime !== 'nodejs22') throw new Error('firebase.json must use nodejs22');
+          if (pkg.engines?.node !== '22') throw new Error('functions/package.json must require Node 22');
+          if (!/node-version:\\s*["']22["']/.test(deploy)) throw new Error('Firebase deploy workflow must use Node 22');
+          console.log('Firebase runtime, package engine and deploy workflow all target Node 22.');
+          NODE
+          npm install --prefix functions --ignore-scripts --no-audit --no-fund
+          npm audit --prefix functions --omit=dev
+          node --check functions/index.js
+          node --check functions/kirana.js
+          node --check functions/kirana-ledger.js
       - name: Check native Supabase Auth browser modules
         run: |
           node --input-type=module --check < markets/stocks/supabase-client.js
