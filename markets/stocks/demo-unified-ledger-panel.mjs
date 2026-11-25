@@ -37,6 +37,18 @@ export function calculateAggregateUnrealized(positions, marks) {
   }
   return { complete: true, value };
 }
+
+export function portfolioMarketValueDisplay(position, mark) {
+  if (position?.assetClass === "FUTURE") return "Not applicable (Futures MTM)";
+  if (!isUsablePortfolioMark(mark) || !Number.isSafeInteger(position?.quantity)) return "—";
+  const value = mark.pricePaise * position.quantity;
+  return Number.isSafeInteger(value) ? money(value) : "—";
+}
+
+export function accountRealizedPnlPaise(snapshot) {
+  const value = snapshot?.account?.realizedPnlPaise;
+  return Number.isSafeInteger(value) ? value : null;
+}
 const money = value => Number.isSafeInteger(value)
   ? "₹" + (value / 100).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
   : "—";
@@ -135,7 +147,7 @@ export async function appendUnifiedLedgerSummary(container, screen) {
           position.assetClass,symbols.get(position.instrumentKey)||position.symbol||position.instrumentKey,
           position.product,position.quantity,money(position.averagePricePaise),
           valid?money(mark.pricePaise):"Unavailable (missing/stale)",money(position.costBasisPaise),
-          valid?money(markValue):"—",money(position.realizedPnlPaise),valid?money(unrealized):"Unavailable"
+          portfolioMarketValueDisplay(position,mark),money(position.realizedPnlPaise),valid?money(unrealized):"Unavailable"
         ];
       });
       table(host,["ASSET","INSTRUMENT","PRODUCT","NET QTY","AVG PRICE","MOCK MARK","COST BASIS","MARK VALUE","REALIZED P&L","UNREALIZED P&L"],rows,
@@ -143,7 +155,7 @@ export async function appendUnifiedLedgerSummary(container, screen) {
       const aggregate=calculateAggregateUnrealized(positions,marks);
       host.append(el("p","demo-eq-disclaimer","Aggregate unrealized P&L: "+
         (aggregate.complete?money(aggregate.value):"Unavailable (one or more marks missing/stale)")+
-        " · Aggregate realized P&L: "+money(positions.reduce((sum,p)=>sum+p.realizedPnlPaise,0))));
+        " · Account realized P&L: "+money(accountRealizedPnlPaise(snapshot))));
     }
     const totals=el("div","demo-eq-disclaimer",
       "Ledger events: "+snapshot.events.length+" · Account cash: "+money(snapshot.account.cashBalancePaise)+
