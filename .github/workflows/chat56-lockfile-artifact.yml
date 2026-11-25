@@ -7,7 +7,7 @@ on:
       - ".github/workflows/chat56-lockfile-artifact.yml"
 permissions:
   contents: read
-actions: read
+  actions: read
 jobs:
   generate-lockfiles:
     runs-on: ubuntu-latest
