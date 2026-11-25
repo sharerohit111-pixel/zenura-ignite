@@ -98,6 +98,21 @@ const axePath=require.resolve("axe-core/axe.min.js");
     assert.ok(optionsStatus.includes("MOCK quote selected"),optionsStatus);
     await page.getByRole("button",{name:"BUY",exact:true}).last().click();
     assert.ok((await page.locator(".demo-fo-status").textContent()).includes("DEMO receipt"),"Options order entry");
+    // Wallet snapshot is fixture-only and must remain visibly unreconciled; never merge it with the local simulator ledger.
+    await page.locator('#screen-nav button[data-screen="account"]').click();
+    const walletText=await page.locator("#screen-content").innerText();
+    assert.ok(walletText.includes("Starting capital") && walletText.includes("₹10,00,000.00"),"Wallet starting virtual capital fixture");
+    assert.ok(walletText.includes("Cash balance") && walletText.includes("Blocked funds") && walletText.includes("Available funds"),"Wallet cash and reservation fields");
+    assert.ok(walletText.includes("Ledger reconciliation: false."),"Wallet must remain explicitly unreconciled");
+
+    // Unified Orders must project the filled Equity, Futures and Options orders from the same event ledger.
+    await page.locator('#screen-nav button[data-screen="orders"]').click();
+    await page.locator(".demo-unified-ledger").waitFor();
+    const orderRows=await page.locator(".demo-unified-table-wrap tbody tr").allTextContents();
+    assert.ok(orderRows.some(row=>row.includes("EQUITY") && row.includes("FILLED")),"Unified Orders includes filled Equity order");
+    assert.ok(orderRows.some(row=>row.includes("FUTURE") && row.includes("FILLED")),"Unified Orders includes filled Futures order");
+    assert.ok(orderRows.some(row=>row.includes("OPTION") && row.includes("FILLED")),"Unified Orders includes filled Options order");
+
     // Unified Trade History and Portfolio must project all three asset classes from the same ledger.
     await page.locator('#screen-nav button[data-screen="trades"]').click();
     await page.locator(".demo-unified-ledger").waitFor();
