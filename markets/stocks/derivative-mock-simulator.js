@@ -141,9 +141,10 @@
       return result;
     }
     function appendFill(order, quantity, pricePaise) {
-      const positionTransition = updatePosition(order, quantity, pricePaise);
       const grossPaise = quantity * pricePaise;
       if (!Number.isSafeInteger(grossPaise)) fail("Demo fill value exceeds safe integer limits.");
+      // Validate all fill arithmetic before mutating the position projection.
+      const positionTransition = updatePosition(order, quantity, pricePaise);
       order.fills.push({
         fillId: order.orderId + "-F" + String(order.fills.length + 1).padStart(3, "0"),
         quantity,
