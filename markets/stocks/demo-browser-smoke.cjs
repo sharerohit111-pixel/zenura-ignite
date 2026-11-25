@@ -18,7 +18,9 @@ const axePath=require.resolve("axe-core/axe.min.js");
    const pageErrors=[];
    page.on("pageerror",error=>pageErrors.push(error.message));
    await page.goto("http://127.0.0.1:4173/markets/stocks/demo.html",{waitUntil:"domcontentloaded",timeout:30000});
-   await page.waitForFunction(()=>document.querySelector("#demo-status")?.textContent.includes("4 canonical fixtures validated"),null,{timeout:10000});
+   await page.waitForFunction(()=>{const value=document.querySelector("#demo-status")?.textContent||"";return value.includes("4 canonical fixtures validated")||value.startsWith("Demo unavailable:");},null,{timeout:15000});
+   const initialStatus=await page.locator("#demo-status").textContent();
+   assert.match(initialStatus,/4 canonical fixtures validated/,viewport.name+" initial fixture load; status="+initialStatus+"; browserErrors="+pageErrors.join(" | "));
    assert.equal(await page.locator("#screen-nav button[data-screen]").count(),15,viewport.name+" screen count");
    for(const name of ["home","market","watchlists","charts","equity","futures","options","orders","trades","portfolio","positions","holdings","account","profile","settings"]){
     await page.locator('#screen-nav button[data-screen="'+name+'"]').click();
