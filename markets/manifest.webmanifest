@@ -2,18 +2,36 @@
   "id": "./",
   "name": "ZENURA IGNITE – Paper Trading",
   "short_name": "ZENURA IGNITE",
-  "description": "Professional Indian stock market and cryptocurrency paper trading terminal.",
+  "description": "Installable Indian-market paper trading workspace for equities, futures and options.",
   "lang": "en-IN",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
-  "display_override": ["standalone", "minimal-ui"],
+  "display_override": [
+    "standalone",
+    "minimal-ui"
+  ],
   "orientation": "any",
   "background_color": "#07111f",
   "theme_color": "#07111f",
-  "categories": ["finance", "education", "utilities"],
-  "icons": [{"src":"../crypto/icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any"}],
+  "categories": [
+    "finance",
+    "education",
+    "utilities"
+  ],
+  "icons": [
+    {
+      "src": "../crypto/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ],
   "shortcuts": [
-    {"name":"Paper Trading","short_name":"Trading","url":"/markets/stocks/"}
+    {
+      "name": "Paper Trading",
+      "short_name": "Trading",
+      "url": "./stocks/"
+    }
   ]
 }
