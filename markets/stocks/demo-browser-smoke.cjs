@@ -61,18 +61,14 @@ const axePath=require.resolve("axe-core/axe.min.js");
   await page.goto("http://127.0.0.1:4173/markets/",{waitUntil:"domcontentloaded",timeout:30000});
   await page.waitForLoadState("load",{timeout:10000});
   console.log("PWA: waiting for service worker activation");
-  await page.waitForFunction(async()=>{
-   const registrations=await navigator.serviceWorker.getRegistrations();
-   return registrations.some(item=>item.scope.endsWith("/markets/")&&item.active?.state==="activated");
-  },null,{timeout:30000});
-  const workerState=await page.evaluate(async()=>{
+  const workerScopeHandle=await page.waitForFunction(async()=>{
    const registrations=await navigator.serviceWorker.getRegistrations();
    const registration=registrations.find(item=>item.scope.endsWith("/markets/")&&item.active?.state==="activated");
-   return {state:registration?.active?.state||"missing",scope:registration?.scope||null};
-  });
-  assert.equal(workerState.state,"activated","service worker must finish activation");
-  assert.ok(workerState.scope.endsWith("/markets/"),"service worker scope must be limited to /markets/");
-  console.log(JSON.stringify({pwaWorker:workerState.state,scope:workerState.scope}));
+   return registration?registration.scope:false;
+  },null,{timeout:30000});
+  const workerScope=await workerScopeHandle.jsonValue();
+  assert.ok(typeof workerScope==="string"&&workerScope.endsWith("/markets/"),"an activated service worker must own the /markets/ scope");
+  console.log(JSON.stringify({pwaWorker:"activated",scope:workerScope}));
   // clients.claim() in the activate handler controls existing same-scope clients.
   // Open a fresh same-scope tab rather than forcing a navigation reload race.
   const controlledPage=await pwa.newPage();
