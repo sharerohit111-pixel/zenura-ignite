@@ -291,3 +291,28 @@ test("order statuses require matching real fill quantities and terminal states c
   ledger.append(status("FILLED", 2, { filledQuantity: 2, remainingQuantity: 0 }));
   assert.throws(() => ledger.append(status("PENDING", 3)), /ORDER_TERMINAL_STATE_IMMUTABLE/);
 });
+
+
+test("event timestamps reject impossible calendar dates and invalid clock or offset fields", () => {
+  const ledger = createPaperDemoEventLedger(opening);
+  for (const occurredAt of [
+    "2026-02-30T09:30:00+05:30",
+    "2025-02-29T09:30:00+05:30",
+    "2026-13-01T09:30:00+05:30",
+    "2026-11-25T24:00:00+05:30",
+    "2026-11-25T09:60:00+05:30",
+    "2026-11-25T09:30:60+05:30",
+    "2026-11-25T09:30:00+24:00",
+    "2026-11-25T09:30:00+05:60"
+  ]) {
+    assert.throws(() => ledger.append(event({ occurredAt })), /INVALID_EVENT_TIMESTAMP/);
+  }
+  assert.equal(ledger.snapshot().events.length, 0);
+});
+
+test("event timestamp validation accepts leap days and rejects non-leap February 29", () => {
+  const ledger = createPaperDemoEventLedger(opening);
+  assert.equal(ledger.append(event({ occurredAt: "2024-02-29T09:30:00+05:30" })).accepted, true);
+  const other = createPaperDemoEventLedger(opening);
+  assert.throws(() => other.append(event({ occurredAt: "2023-02-29T09:30:00+05:30" })), /INVALID_EVENT_TIMESTAMP/);
+});
