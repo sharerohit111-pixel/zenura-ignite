@@ -43,8 +43,8 @@ export async function mountDerivativeDemo(container,screen){
  const actions=el("div","demo-fo-actions"),buy=el("button","demo-fo-button","BUY"),sell=el("button","demo-fo-button","SELL");
  const match=el("button","demo-fo-button secondary","SIMULATE LIMIT MATCH"),refresh=el("button","demo-fo-button secondary","RESET DEMO DEPTH");
  actions.append(buy,sell,match,refresh);panel.append(actions);
- const status=el("p","demo-fo-status","Loading deterministic derivatives fixture…"),positions=el("div"),orders=el("div");
- panel.append(status,el("h3","demo-fo-subhead","OPEN DEMO POSITIONS"),positions,el("h3","demo-fo-subhead","DEMO ORDER RECEIPTS"),orders);container.append(panel);
+ const status=el("p","demo-fo-status","Loading deterministic derivatives fixture…"),positions=el("div"),orders=el("div"),events=el("div");
+ panel.append(status,el("h3","demo-fo-subhead","OPEN DEMO POSITIONS"),positions,el("h3","demo-fo-subhead","DEMO ORDER RECEIPTS"),orders,el("h3","demo-fo-subhead","CANONICAL EVENT LEDGER"),events);container.append(panel);
  let engine,contracts=[];
  const selected=()=>screen==="futures"?contracts.find(x=>x.instrumentKey===contract.value):contracts.find(x=>x.underlying===contract.value&&x.expiry===expiry.value&&x.optionType===optionType.value&&x.strikePaise===Number(strike.value));
  function filters(){
