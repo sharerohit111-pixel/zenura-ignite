@@ -35,6 +35,7 @@ test("15-screen Demo mounts the existing canonical Equity engine without a dupli
   assert.match(js, /mountEquityDemo\(content\)/);
   assert.match(js, /appendEquitySummary\(content,name\)/);
   assert.match(panel, /createEquityDemoExecutionEngine/);
+  assert.match(panel, /createEquityDemoLedgerBridge/);
   assert.match(panel, /submitOrder/);
   assert.match(panel, /matchNext/);
   assert.match(panel, /cancelOrder/);
@@ -63,7 +64,7 @@ test("PWA caches the simulator and synthetic fixtures; production gateway stays 
     read("market-gateway/server.js"),
     read(".github/workflows/s-trade-fo-demo-ui-integration.yml")
   ]);
-  assert.match(sw, /zenura-markets-shell-v5/);
+  assert.match(sw, /zenura-markets-shell-v6/);
   assert.match(sw, /stocks\/demo-equity-panel\.mjs/);
   assert.match(sw, /stocks\/demo-chart-panel\.mjs/);
   assert.match(sw, /stocks\/demo-chart-data\.mjs/);
