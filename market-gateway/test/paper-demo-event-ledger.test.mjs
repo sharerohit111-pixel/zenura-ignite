@@ -385,18 +385,18 @@ test("a rejected initial order is terminal and duplicate rejection identity is r
 });
 
 
-test("event timestamps reject impossible calendar values and equal-time events", () => {
+test("event timestamps reject impossible calendar values while sequence orders equal-time events", () => {
   const invalid = createPaperDemoEventLedger(opening);
   assert.throws(() => invalid.append(event({ occurredAt: "2026-02-30T09:30:00+05:30" })), /INVALID_EVENT_TIMESTAMP/);
   assert.throws(() => invalid.append(event({ occurredAt: "2026-11-25T24:00:00+05:30" })), /INVALID_EVENT_TIMESTAMP/);
   assert.equal(invalid.snapshot().events.length, 0);
   const ledger = createPaperDemoEventLedger(opening);
   ledger.append(event());
-  assert.throws(() => ledger.append(event({
+  ledger.append(event({
     eventId: "evt-equal-time", idempotencyKey: "idem-equal-time", sourceEventId: "equal-time",
     type: "ORDER_UPDATED", payload: { ...event().payload, status: "PENDING" }
-  })), /DEMO_EVENT_TIME_ORDER_MISMATCH/);
-  assert.equal(ledger.snapshot().events.length, 1);
+  }));
+  assert.deepEqual(ledger.snapshot().events.map(item => item.sequence), [1, 2]);
 });
 
 test("partial SELL fill followed by cancellation releases only the unfilled share reservation", () => {
