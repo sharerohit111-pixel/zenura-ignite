@@ -170,7 +170,7 @@ function apply(projection, event) {
     const autoReleaseOnTerminalSell = existing && p.side === "SELL" && p.assetClass !== "FUTURE" &&
       ["CANCELLED", "EXPIRED"].includes(p.status) ? -existing.remainingQuantity : 0;
     const reservationDelta = p.reservedQuantityDelta ??
-      (event.type === "ORDER_ACCEPTED" && p.side === "SELL" ? p.quantity : autoReleaseOnTerminalSell);
+      (event.type === "ORDER_ACCEPTED" && p.side === "SELL" && p.assetClass !== "FUTURE" ? p.quantity : autoReleaseOnTerminalSell);
     if (reservationDelta !== 0) {
       const key = positionKey(p.assetClass, p.instrumentKey, product);
       const position = projection.positions.find(x => x.key === key);
