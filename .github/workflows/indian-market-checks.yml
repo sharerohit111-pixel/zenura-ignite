@@ -167,6 +167,19 @@ jobs:
           node -e "const r=require('node:fs').readFileSync('storage.rules','utf8'); for (const token of ['isZenuraAdmin()', 'request.resource.contentType.matches(\'image/.*\')', '10 * 1024 * 1024', '100 * 1024 * 1024']) if (!r.includes(token)) throw new Error('Storage rules missing required media restriction: '+token)"
           test -s digital-products-data.js
           test -s products.css
+      - name: Verify Firebase Functions Node runtime alignment
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+          const firebase = JSON.parse(fs.readFileSync('firebase.json', 'utf8'));
+          const pkg = JSON.parse(fs.readFileSync('functions/package.json', 'utf8'));
+          const deploy = fs.readFileSync('.github/workflows/deploy-firebase-functions.yml', 'utf8');
+          const runtime = firebase.functions?.find(item => item.source === 'functions')?.runtime;
+          if (runtime !== 'nodejs22') throw new Error('Firebase Functions runtime must be nodejs22.');
+          if (pkg.engines?.node !== '22') throw new Error('functions/package.json must require Node 22.');
+          if (!/node-version:\s*["']22["']/.test(deploy)) throw new Error('Firebase deploy workflow must use Node 22.');
+          console.log('Firebase Functions runtime, package engine and deployment workflow are aligned on Node 22.');
+          NODE
       - name: Guard Firebase deployment scope
         run: |
           node -e "
