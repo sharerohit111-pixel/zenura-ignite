@@ -243,6 +243,11 @@ export function createPaperDemoEventLedger(opening, settlementTrust = {}) {
       fail("SETTLEMENT_ORDER_NOT_FOUND_OR_MISMATCH");
     }
     if (assetClass === "OPTION") {
+      const alreadySettled = projection.events.some(event =>
+        event.type === "SETTLEMENT_RECEIPT_ACCEPTED" &&
+        event.payload.assetClass === "OPTION" &&
+        event.payload.receipt?.fillId === fillId);
+      if (alreadySettled) fail("OPTIONS_FILL_ALREADY_SETTLED");
       const fill = projection.fills.find(item => item.fillId === fillId);
       if (!fill || fill.orderId !== orderId || fill.engine !== "OPTIONS" ||
           fill.assetClass !== "OPTION" || fill.side !== side ||
@@ -258,6 +263,10 @@ export function createPaperDemoEventLedger(opening, settlementTrust = {}) {
     } else {
       if (fillId !== undefined && fillId !== null) fail("FUTURES_SETTLEMENT_MUST_NOT_REFERENCE_OPTION_FILL");
       if (!["RESERVE", "RELEASE"].includes(receipt?.action)) fail("INVALID_FUTURES_MARGIN_RECEIPT");
+      if (receipt.action === "RESERVE" &&
+          ["CANCELLED", "REJECTED", "EXPIRED", "FILLED"].includes(order.status)) {
+        fail("FUTURES_RESERVATION_ON_TERMINAL_ORDER");
+      }
       const priorForOrder = projection.events
         .filter(event => event.type === "SETTLEMENT_RECEIPT_ACCEPTED" &&
           event.payload.assetClass === "FUTURE" && event.payload.orderId === orderId)
