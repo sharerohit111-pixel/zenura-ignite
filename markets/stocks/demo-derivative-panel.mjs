@@ -52,8 +52,8 @@ export async function mountDerivativeDemo(container,screen){
  function paint(){
   const s=engine.snapshot(),projection=syncDemoProjection("DERIVATIVES",s);
   const derivativePositions=projection.positions.filter(x=>x.assetClass==="FUTURE"||x.assetClass==="OPTION");
-  renderTable(positions,["INSTRUMENT","ASSET","PRODUCT","NET QTY","AVG PRICE","COST BASIS","REALIZED P&L"],
-   derivativePositions.map(x=>[x.instrumentKey,x.assetClass,x.product,x.quantity,money(x.averagePricePaise),money(x.costBasisPaise),money(x.realizedPnlPaise)]),
+  renderTable(positions,["INSTRUMENT","ASSET","PRODUCT","NET QTY","AVG PRICE","MARK","COST BASIS","REALIZED P&L","UNREALIZED P&L","TOTAL P&L"],
+   derivativePositions.map(x=>[x.instrumentKey,x.assetClass,x.product,x.quantity,money(x.averagePricePaise),money(x.markPricePaise),money(x.costBasisPaise),money(x.realizedPnlPaise),money(x.unrealizedPnlPaise),money(x.totalPnlPaise)]),
    "No open demo positions.");
   const contractsByKey=new Map(engine.contracts().map(x=>[x.instrumentKey,x]));
   const engineOrders=new Map(s.orders.map(x=>[x.orderId,x]));
