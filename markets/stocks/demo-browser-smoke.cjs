@@ -92,6 +92,7 @@ const axePath=require.resolve("axe-core/axe.min.js");
   await page.goto("http://127.0.0.1:4173/markets/",{waitUntil:"domcontentloaded",timeout:30000});
   await page.waitForLoadState("load",{timeout:10000});
   console.log("PWA: waiting for service worker activation");
+  await page.waitForFunction(async()=>{const registration=await navigator.serviceWorker.ready;return registration.active?.state==="activated";},null,{timeout:20000});
   // navigator.serviceWorker.ready returns the registration that actually
   // controls this origin; avoid racing repeated getRegistrations() snapshots
   // while Chromium transitions installing -> activated.
