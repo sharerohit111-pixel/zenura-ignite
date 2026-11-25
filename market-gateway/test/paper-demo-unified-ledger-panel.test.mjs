@@ -216,3 +216,76 @@ test("runtime mark validation rejects newly future-dated timestamps beyond allow
   assert.equal(isUsablePortfolioMark(mark, now - 1), false);
   assert.equal(isUsablePortfolioMark(mark, now - 1_001), false);
 });
+
+
+test("Portfolio UI refreshes exactly when cached marks expire and revalidates on tab visibility", async () => {
+  const {
+    createPortfolioMark, schedulePortfolioMarkExpiryRefresh,
+    isUsablePortfolioMark
+  } = await import("../../markets/stocks/demo-unified-ledger-panel.mjs?expiry-ui-controller");
+  let now = 10_000;
+  let timerId = 0;
+  const timers = new Map();
+  const listeners = new Map();
+  const doc = {
+    visibilityState: "visible",
+    addEventListener: (name, callback) => listeners.set(name, callback),
+    removeEventListener: name => listeners.delete(name)
+  };
+  const section = { isConnected: true };
+  const mark = createPortfolioMark(100, now, { now, maxAgeMs: 1_000 });
+  const marks = new Map([["EQ", mark]]);
+  const renders = [];
+  const controller = schedulePortfolioMarkExpiryRefresh({
+    section, marks, doc, now: () => now,
+    render: time => renders.push({ time, usable: isUsablePortfolioMark(mark, time) }),
+    setTimer: (callback, delay) => {
+      const id = ++timerId;
+      timers.set(id, { callback, delay });
+      return id;
+    },
+    clearTimer: id => timers.delete(id)
+  });
+  assert.equal(timers.size, 1);
+  assert.equal([...timers.values()][0].delay, 1_001);
+  now += 1_001;
+  const due = [...timers.entries()][0];
+  timers.delete(due[0]);
+  due[1].callback();
+  assert.deepEqual(renders, [{ time: 11_001, usable: false }]);
+  assert.equal(timers.size, 0);
+
+  now = 12_000;
+  listeners.get("visibilitychange")?.();
+  assert.deepEqual(renders[1], { time: 12_000, usable: false });
+  controller();
+  assert.equal(listeners.has("visibilitychange"), false);
+  assert.equal(timers.size, 0);
+});
+
+test("Portfolio expiry controller disposes its timer after the screen is removed", async () => {
+  const { createPortfolioMark, schedulePortfolioMarkExpiryRefresh } =
+    await import("../../markets/stocks/demo-unified-ledger-panel.mjs?expiry-ui-disposal");
+  let now = 20_000;
+  const timers = new Map();
+  const listeners = new Map();
+  let nextId = 0;
+  const doc = {
+    visibilityState: "visible",
+    addEventListener: (name, callback) => listeners.set(name, callback),
+    removeEventListener: name => listeners.delete(name)
+  };
+  const section = { isConnected: true };
+  const mark = createPortfolioMark(100, now, { now, maxAgeMs: 5_000 });
+  schedulePortfolioMarkExpiryRefresh({
+    section, marks: new Map([["EQ", mark]]), doc, now: () => now,
+    render: () => assert.fail("removed portfolio screen must not rerender"),
+    setTimer: callback => { const id = ++nextId; timers.set(id, callback); return id; },
+    clearTimer: id => timers.delete(id)
+  });
+  const callback = [...timers.values()][0];
+  section.isConnected = false;
+  callback();
+  assert.equal(timers.size, 0);
+  assert.equal(listeners.has("visibilitychange"), false);
+});
