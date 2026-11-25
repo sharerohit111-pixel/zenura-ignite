@@ -50,7 +50,7 @@ test("fill must refer to an accepted order from the same engine and instrument",
   const ledger = createPaperDemoEventLedger(opening);
   assert.throws(() => ledger.append(event({
     type: "FILL_RECORDED", payload: { fillId: "fill-1", orderId: "missing", assetClass: "EQUITY", instrumentKey: "MOCK|NSE|EQ|0001", side: "BUY", quantity: 1, pricePaise: 125050 },
-    deltas: { cashDeltaPaise: -125050, blockedDeltaPaise: -10000 }
+    deltas: { cashDeltaPaise: 0, blockedDeltaPaise: 0 }
   })), /FILL_ORDER_MISMATCH/);
   assert.equal(ledger.snapshot().events.length, 0);
   assert.equal(ledger.snapshot().account.cashBalancePaise, opening.cashBalancePaise);
@@ -63,7 +63,7 @@ test("cash and reservation invariants reject negative cash, negative blocks and 
 });
 test("positions aggregate by asset class and MOCK instrument; realized P&L is projected", () => {
   const ledger = createPaperDemoEventLedger(opening);
-  ledger.append(event({ type: "POSITION_CHANGED", deltas: { cashDeltaPaise: 0, blockedDeltaPaise: 0 },
+  ledger.append(event({ engine: "OPTIONS", type: "POSITION_CHANGED", deltas: { cashDeltaPaise: 0, blockedDeltaPaise: 0 },
     payload: { assetClass: "OPTION", instrumentKey: "MOCK|NSE|OPT|NIFTY-CE-26000", quantityDelta: 50, realizedPnlDeltaPaise: 1250 } }));
   const snapshot = ledger.snapshot();
   assert.equal(snapshot.positions[0].quantity, 50);
