@@ -1,0 +1,39 @@
+name: Firebase Functions Node 22 compatibility
+on:
+  pull_request:
+    paths:
+      - "functions/**"
+      - "firebase.json"
+      - ".github/workflows/deploy-firebase-functions.yml"
+      - ".github/workflows/firebase-node22-compat.yml"
+permissions:
+  contents: read
+jobs:
+  node22-compatibility:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Verify runtime alignment
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+          const firebase = JSON.parse(fs.readFileSync('firebase.json', 'utf8'));
+          const pkg = JSON.parse(fs.readFileSync('functions/package.json', 'utf8'));
+          const deploy = fs.readFileSync('.github/workflows/deploy-firebase-functions.yml', 'utf8');
+          if (firebase.functions?.find(item => item.source === 'functions')?.runtime !== 'nodejs22') throw new Error('firebase.json must use nodejs22');
+          if (pkg.engines?.node !== '22') throw new Error('functions/package.json must require Node 22');
+          if (!/node-version:\s*["']22["']/.test(deploy)) throw new Error('deploy workflow must use Node 22');
+          console.log('Firebase runtime, package engine and deploy workflow all target Node 22.');
+          NODE
+      - name: Install Functions dependencies without lifecycle scripts
+        working-directory: functions
+        run: npm install --ignore-scripts --no-audit --no-fund
+      - name: Audit Functions production dependencies
+        working-directory: functions
+        run: npm audit --omit=dev
+      - name: Validate Functions JavaScript syntax
+        working-directory: functions
+        run: node --check index.js && node --check kirana.js && node --check kirana-ledger.js
