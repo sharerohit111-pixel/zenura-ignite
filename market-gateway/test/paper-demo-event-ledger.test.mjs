@@ -131,7 +131,7 @@ test("Equity fill cash movement must equal exact gross value and correct BUY/SEL
   ledger.append(event());
   const buy = {
     eventId: "evt-2", idempotencyKey: "fill-buy-1", sourceEventId: "equity-fill-buy-1",
-    accountId: opening.accountId, sessionId: opening.sessionId,
+    accountId: opening.accountId, sessionId: opening.sessionId, engine: "EQUITY",
     occurredAt: "2026-11-25T09:30:01+05:30", type: "FILL_RECORDED",
     deltas: { cashDeltaPaise: -125050, blockedDeltaPaise: -10000 },
     payload: { fillId: "fill-buy-1", orderId: "order-1", assetClass: "EQUITY",
