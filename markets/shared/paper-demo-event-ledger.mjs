@@ -1,10 +1,11 @@
-const VERSION = "1.0.0";
+const VERSION = "1.1.0";
 const ENGINES = new Set(["EQUITY", "FUTURES", "OPTIONS"]);
-const EVENT_TYPES = new Set(["ORDER_ACCEPTED", "ORDER_UPDATED", "FILL_RECORDED", "RESERVATION_CHANGED", "POSITION_CHANGED"]);
+const EVENT_TYPES = new Set(["ORDER_ACCEPTED", "ORDER_UPDATED", "ORDER_REJECTED", "FILL_RECORDED", "RESERVATION_CHANGED", "POSITION_CHANGED"]);
 const ORDER_STATUSES = new Set(["PENDING", "PARTIALLY_FILLED", "FILLED", "CANCELLED", "REJECTED", "EXPIRED"]);
 const SIDES = new Set(["BUY", "SELL"]);
 const ORDER_TYPES = new Set(["MARKET", "LIMIT"]);
 const ASSETS = new Set(["EQUITY", "FUTURE", "OPTION"]);
+const PRODUCTS = new Set(["DELIVERY", "INTRADAY"]);
 const fail = code => { throw new TypeError(code); };
 const object = value => value !== null && typeof value === "object" && !Array.isArray(value);
 const integer = value => Number.isSafeInteger(value);
@@ -18,6 +19,12 @@ const freeze = value => {
 };
 function validateIdentity(value, name) {
   if (typeof value !== "string" || !/^[a-zA-Z0-9][a-zA-Z0-9._:-]{0,127}$/.test(value)) fail("INVALID_" + name);
+}
+function productOf(payload) {
+  return payload.product === undefined ? "DELIVERY" : payload.product;
+}
+function positionKey(assetClass, instrumentKey, product) {
+  return assetClass + "|" + instrumentKey + "|" + product;
 }
 function validateEvent(input, identity, expectedSequence) {
   if (!object(input)) fail("INVALID_EVENT");
@@ -34,11 +41,13 @@ function validateEvent(input, identity, expectedSequence) {
   }
   const p = input.payload;
   if (!object(p)) fail("INVALID_EVENT_PAYLOAD");
-  if (input.type === "ORDER_ACCEPTED" || input.type === "ORDER_UPDATED") {
+  if (input.type === "ORDER_ACCEPTED" || input.type === "ORDER_UPDATED" || input.type === "ORDER_REJECTED") {
     validateIdentity(p.orderId, "ORDER_ID");
     if (!ASSETS.has(p.assetClass) || !p.instrumentKey?.startsWith("MOCK|") ||
         !SIDES.has(p.side) || !ORDER_TYPES.has(p.orderType) ||
-        !ORDER_STATUSES.has(p.status) || !integer(p.quantity) || p.quantity < 1) fail("INVALID_ORDER_EVENT");
+        !ORDER_STATUSES.has(p.status) || (input.type === "ORDER_REJECTED" && p.status !== "REJECTED") || (input.type !== "ORDER_REJECTED" && p.status === "REJECTED") || !integer(p.quantity) || p.quantity < 1 ||
+        !PRODUCTS.has(productOf(p)) ||
+        (p.reservedQuantityDelta !== undefined && !integer(p.reservedQuantityDelta))) fail("INVALID_ORDER_EVENT");
     if (input.engine === "EQUITY" && p.assetClass !== "EQUITY") fail("ENGINE_ASSET_MISMATCH");
     if (input.engine === "FUTURES" && p.assetClass !== "FUTURE") fail("ENGINE_ASSET_MISMATCH");
     if (input.engine === "OPTIONS" && p.assetClass !== "OPTION") fail("ENGINE_ASSET_MISMATCH");
@@ -48,14 +57,23 @@ function validateEvent(input, identity, expectedSequence) {
     validateIdentity(p.orderId, "ORDER_ID");
     if (!ASSETS.has(p.assetClass) || !p.instrumentKey?.startsWith("MOCK|") ||
         !SIDES.has(p.side) || !integer(p.quantity) || p.quantity < 1 ||
-        !integer(p.pricePaise) || p.pricePaise < 1) fail("INVALID_FILL_EVENT");
+        !integer(p.pricePaise) || p.pricePaise < 1 ||
+        !PRODUCTS.has(productOf(p))) fail("INVALID_FILL_EVENT");
+    const calculatedGrossPaise = p.quantity * p.pricePaise;
+    if (!Number.isSafeInteger(calculatedGrossPaise) ||
+        (p.grossPaise !== undefined && p.grossPaise !== calculatedGrossPaise) ||
+        (p.grossValuePaise !== undefined && p.grossValuePaise !== calculatedGrossPaise)) {
+      fail("INVALID_FILL_GROSS_VALUE");
+    }
     if (input.engine === "EQUITY" && p.assetClass !== "EQUITY") fail("ENGINE_ASSET_MISMATCH");
     if (input.engine === "FUTURES" && p.assetClass !== "FUTURE") fail("ENGINE_ASSET_MISMATCH");
     if (input.engine === "OPTIONS" && p.assetClass !== "OPTION") fail("ENGINE_ASSET_MISMATCH");
   }
   if (input.type === "POSITION_CHANGED") {
     if (!ASSETS.has(p.assetClass) || !p.instrumentKey?.startsWith("MOCK|") ||
-        !integer(p.quantityDelta) || !integer(p.realizedPnlDeltaPaise)) fail("INVALID_POSITION_EVENT");
+        !integer(p.quantityDelta) || !integer(p.realizedPnlDeltaPaise) ||
+        !integer(p.costBasisDeltaPaise ?? 0) || !integer(p.reservedQuantityDelta ?? 0) ||
+        !PRODUCTS.has(productOf(p))) fail("INVALID_POSITION_EVENT");
     if (input.engine === "EQUITY" && p.assetClass !== "EQUITY") fail("ENGINE_ASSET_MISMATCH");
     if (input.engine === "FUTURES" && p.assetClass !== "FUTURE") fail("ENGINE_ASSET_MISMATCH");
     if (input.engine === "OPTIONS" && p.assetClass !== "OPTION") fail("ENGINE_ASSET_MISMATCH");
@@ -84,38 +102,62 @@ function apply(projection, event) {
   projection.account.cashBalancePaise = cash;
   projection.account.blockedFundsPaise = blocked;
   projection.account.availableFundsPaise = available;
-  if (event.type === "ORDER_ACCEPTED" || event.type === "ORDER_UPDATED") {
+  if (event.type === "ORDER_ACCEPTED" || event.type === "ORDER_UPDATED" || event.type === "ORDER_REJECTED") {
     const p = event.payload, existing = projection.orders.find(x => x.orderId === p.orderId);
-    if (event.type === "ORDER_ACCEPTED" && existing) fail("DUPLICATE_ORDER_ID");
+    if ((event.type === "ORDER_ACCEPTED" || event.type === "ORDER_REJECTED") && existing) fail("DUPLICATE_ORDER_ID");
     if (event.type === "ORDER_UPDATED" && !existing) fail("ORDER_UPDATE_WITHOUT_ACCEPTANCE");
-    const next = { ...p, engine: event.engine, lastSequence: event.sequence };
+    const product = productOf(p);
+    const next = { ...p, product, engine: event.engine, lastSequence: event.sequence };
     if (existing) {
-      for (const field of ["assetClass", "instrumentKey", "side", "orderType", "quantity"]) {
-        if (existing[field] !== p[field]) fail("ORDER_IDENTITY_MUTATION");
+      for (const field of ["assetClass", "instrumentKey", "side", "orderType", "quantity", "product"]) {
+        if (existing[field] !== next[field]) fail("ORDER_IDENTITY_MUTATION");
       }
       Object.assign(existing, next);
     } else projection.orders.push(next);
+    const reservationDelta = p.reservedQuantityDelta ?? (event.type === "ORDER_ACCEPTED" && p.side === "SELL" ? p.quantity : 0);
+    if (reservationDelta !== 0) {
+      const key = positionKey(p.assetClass, p.instrumentKey, product);
+      const position = projection.positions.find(x => x.key === key);
+      if (!position || (p.assetClass === "FUTURE") || position.quantity - position.reservedQuantity < reservationDelta) fail("DEMO_SHARE_RESERVATION_INVARIANT");
+      position.reservedQuantity += reservationDelta;
+      if (!integer(position.reservedQuantity) || position.reservedQuantity < 0 || position.reservedQuantity > position.quantity) fail("DEMO_SHARE_RESERVATION_INVARIANT");
+    }
   }
   if (event.type === "FILL_RECORDED") {
     if (projection.fills.some(x => x.fillId === event.payload.fillId)) fail("DUPLICATE_FILL_ID");
-    const order = projection.orders.find(x => x.orderId === event.payload.orderId);
-    if (!order || order.engine !== event.engine || order.instrumentKey !== event.payload.instrumentKey ||
-        order.assetClass !== event.payload.assetClass || order.side !== event.payload.side ||
+    const p = event.payload, order = projection.orders.find(x => x.orderId === p.orderId);
+    if (!order || order.engine !== event.engine || order.instrumentKey !== p.instrumentKey ||
+        order.assetClass !== p.assetClass || order.side !== p.side || order.product !== productOf(p) ||
         ["CANCELLED", "REJECTED", "EXPIRED", "FILLED"].includes(order.status)) fail("FILL_ORDER_MISMATCH");
-    const alreadyFilled = projection.fills.filter(x => x.orderId === event.payload.orderId).reduce((sum, x) => sum + x.quantity, 0);
-    if (!Number.isSafeInteger(alreadyFilled + event.payload.quantity) || alreadyFilled + event.payload.quantity > order.quantity) fail("FILL_QUANTITY_EXCEEDS_ORDER");
-    projection.fills.push({ ...event.payload, engine: event.engine, sequence: event.sequence, occurredAt: event.occurredAt });
+    const alreadyFilled = projection.fills.filter(x => x.orderId === p.orderId).reduce((sum, x) => sum + x.quantity, 0);
+    if (!Number.isSafeInteger(alreadyFilled + p.quantity) || alreadyFilled + p.quantity > order.quantity) fail("FILL_QUANTITY_EXCEEDS_ORDER");
+    if (p.side === "SELL" && p.assetClass !== "FUTURE") {
+      const position = projection.positions.find(x => x.key === positionKey(p.assetClass, p.instrumentKey, productOf(p)));
+      if (!position || position.reservedQuantity < p.quantity) fail("DEMO_SHARE_RESERVATION_INVARIANT");
+      position.reservedQuantity -= p.quantity;
+    }
+    projection.fills.push({ ...p, product: productOf(p), engine: event.engine, sequence: event.sequence, occurredAt: event.occurredAt });
   }
   if (event.type === "POSITION_CHANGED") {
-    const p = event.payload, key = p.assetClass + "|" + p.instrumentKey;
+    const p = event.payload, product = productOf(p), key = positionKey(p.assetClass, p.instrumentKey, product);
     let position = projection.positions.find(x => x.key === key);
     if (!position) {
-      position = { key, assetClass: p.assetClass, instrumentKey: p.instrumentKey, quantity: 0, realizedPnlPaise: 0 };
+      position = { key, assetClass: p.assetClass, instrumentKey: p.instrumentKey, product, symbol: p.symbol, expiry: p.expiry, optionType: p.optionType, strikePaise: p.strikePaise, quantity: 0, reservedQuantity: 0, costBasisPaise: 0, averagePricePaise: 0, realizedPnlPaise: 0 };
       projection.positions.push(position);
     }
-    position.quantity += p.quantityDelta;
-    position.realizedPnlPaise += p.realizedPnlDeltaPaise;
-    if (!Number.isSafeInteger(position.quantity) || !Number.isSafeInteger(position.realizedPnlPaise)) fail("DEMO_POSITION_INVARIANT");
+    const quantity = position.quantity + p.quantityDelta;
+    const costBasis = position.costBasisPaise + (p.costBasisDeltaPaise ?? 0);
+    const reserved = position.reservedQuantity + (p.reservedQuantityDelta ?? 0);
+    const realized = position.realizedPnlPaise + p.realizedPnlDeltaPaise;
+    if (![quantity, costBasis, reserved, realized].every(Number.isSafeInteger) ||
+        (p.assetClass !== "FUTURE" && quantity < 0) || costBasis < 0 || reserved < 0 || reserved > Math.max(0, quantity) ||
+        (quantity === 0 && costBasis !== 0) || (p.assetClass === "FUTURE" && reserved !== 0)) fail("DEMO_POSITION_INVARIANT");
+    for (const field of ["symbol", "expiry", "optionType", "strikePaise"]) if (p[field] !== undefined) position[field] = p[field];
+    position.quantity = quantity;
+    position.costBasisPaise = costBasis;
+    position.reservedQuantity = reserved;
+    position.averagePricePaise = quantity !== 0 ? Math.round(costBasis / Math.abs(quantity)) : 0;
+    position.realizedPnlPaise = realized;
   }
   projection.account.realizedPnlPaise += event.type === "POSITION_CHANGED" ? event.payload.realizedPnlDeltaPaise : 0;
   if (!Number.isSafeInteger(projection.account.realizedPnlPaise)) fail("DEMO_PNL_INVARIANT");
@@ -160,9 +202,7 @@ export function createPaperDemoEventLedger(opening) {
     }
     return { accepted: true, duplicate: false, event, snapshot: snapshot() };
   }
-  function snapshot() {
-    return freeze(clone(projection));
-  }
+  function snapshot() { return freeze(clone(projection)); }
   return Object.freeze({ append, snapshot });
 }
 export function replayPaperDemoEvents(opening, events) {

@@ -10,13 +10,16 @@ test("Futures and Options Demo screens mount the shared local simulator", async 
   const html = await read("markets/stocks/demo.html");
   const panel = await read("markets/stocks/demo-derivative-panel.mjs");
   assert.match(js, /mountDerivativeDemo\(content,name\)/);
-  assert.match(js, /appendDerivativeSummary\(content,name\)/);
-  assert.match(panel, /LOCAL FUTURES & OPTIONS POSITIONS/);
-  assert.match(panel, /LOCAL FUTURES & OPTIONS FILLS/);
+  assert.match(js, /appendUnifiedLedgerSummary\(content,name\)/);
+  assert.match(panel, /CANONICAL FUTURES & OPTIONS POSITIONS/);
+  assert.match(panel, /CANONICAL FUTURES & OPTIONS FILLS/);
   assert.match(js, /from "\.\/demo-derivative-panel\.mjs"/);
   assert.match(html, /derivative-position\.js/);
   assert.match(html, /derivative-mock-simulator\.js/);
   assert.match(panel, /createDerivativeMockSimulator/);
+  assert.match(panel, /createDerivativeDemoLedgerBridge/);
+  assert.match(panel, /getSharedPaperDemoLedgerSession/);
+  assert.ok(panel.includes("ledgerBridge.snapshot()"));
   const positionHelper=await read("market-gateway/lib/derivative-position.js");
   assert.match(positionHelper,/root\.ZENURA_DERIVATIVE_POSITION=api/);
   assert.match(positionHelper,/typeof module==="object"&&module\.exports/);
@@ -29,7 +32,7 @@ test("Demo execution is manual, synthetic and isolated from production routes", 
   assert.match(panel, /DEMO DATA · MOCK/);
   assert.match(panel, /credentials:"omit"/);
   assert.match(panel, /processLimitFills/);
-  assert.ok(panel.includes("engine.cancel"));
+  assert.ok(panel.includes("ledgerBridge.cancel"));
   assert.match(sw, /stocks\/demo-derivative-panel\.mjs/);
   assert.doesNotMatch(gateway, /derivative-mock-simulator|paper-demo-adapter|paper-mock-fixtures/);
 });

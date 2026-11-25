@@ -85,13 +85,32 @@ const axePath=require.resolve("axe-core/axe.min.js");
 
     // Futures and Options MARKET order entry must accept a local synthetic order.
     await page.locator('#screen-nav button[data-screen="futures"]').click();
-    await page.waitForFunction(()=>document.querySelector(".demo-fo-status")?.textContent.includes("MOCK quote selected"));
+    await page.waitForFunction(()=>{const status=document.querySelector(".demo-fo-status")?.textContent||"";return status&&!status.includes("Loading deterministic");});
+    const futureStatus=await page.locator(".demo-fo-status").textContent();
+    console.log("Futures Demo status:",futureStatus);
+    assert.ok(futureStatus.includes("MOCK quote selected"),futureStatus);
     await page.getByRole("button",{name:"BUY",exact:true}).last().click();
     assert.ok((await page.locator(".demo-fo-status").textContent()).includes("DEMO receipt"),"Futures order entry");
     await page.locator('#screen-nav button[data-screen="options"]').click();
-    await page.waitForFunction(()=>document.querySelector(".demo-fo-status")?.textContent.includes("MOCK quote selected"));
+    await page.waitForFunction(()=>{const status=document.querySelector(".demo-fo-status")?.textContent||"";return status&&!status.includes("Loading deterministic");});
+    const optionsStatus=await page.locator(".demo-fo-status").textContent();
+    console.log("Options Demo status:",optionsStatus);
+    assert.ok(optionsStatus.includes("MOCK quote selected"),optionsStatus);
     await page.getByRole("button",{name:"BUY",exact:true}).last().click();
     assert.ok((await page.locator(".demo-fo-status").textContent()).includes("DEMO receipt"),"Options order entry");
+    // Unified Trade History and Portfolio must project all three asset classes from the same ledger.
+    await page.locator('#screen-nav button[data-screen="trades"]').click();
+    await page.locator(".demo-unified-ledger").waitFor();
+    const tradeRows=await page.locator(".demo-unified-table-wrap tbody tr").allTextContents();
+    assert.ok(tradeRows.some(row=>row.includes("EQUITY")),"unified history includes Equity fills");
+    assert.ok(tradeRows.some(row=>row.includes("FUTURE")),"unified history includes Futures fills");
+    assert.ok(tradeRows.some(row=>row.includes("OPTION")),"unified history includes Options fills");
+    await page.locator('#screen-nav button[data-screen="portfolio"]').click();
+    await page.locator(".demo-unified-ledger").waitFor();
+    const portfolioRows=await page.locator(".demo-unified-table-wrap tbody tr").allTextContents();
+    assert.ok(portfolioRows.some(row=>row.includes("EQUITY")),"unified portfolio includes Equity");
+    assert.ok(portfolioRows.some(row=>row.includes("FUTURE")),"unified portfolio includes Futures");
+    assert.ok(portfolioRows.some(row=>row.includes("OPTION")),"unified portfolio includes Options");
    }
    await page.goto("http://127.0.0.1:4173/markets/stocks/demo.html",{waitUntil:"domcontentloaded",timeout:30000});
    await page.addScriptTag({path:axePath});
@@ -118,21 +137,18 @@ const axePath=require.resolve("axe-core/axe.min.js");
   console.log("PWA: opening market shell");
   await page.goto("http://127.0.0.1:4173/markets/",{waitUntil:"domcontentloaded",timeout:30000});
   await page.waitForLoadState("load",{timeout:10000});
+  console.log("PWA: waiting for the Markets-scoped service worker activation");
+  // Resolve the exact /markets/ registration. navigator.serviceWorker.ready
+  // can refer to a different scope when more than one registration exists.
+  const marketsScope=new URL("/markets/",page.url()).href;
   await page.waitForFunction(async()=>{
    const registrations=await navigator.serviceWorker.getRegistrations();
-   return registrations.some(registration=>registration.active?.state==="activated");
-  },null,{timeout:20000});
-  console.log("PWA: waiting for service worker activation");
-  // navigator.serviceWorker.ready may resolve while the active worker is
-  // still transitioning through "activating"; wait for the actual state.
-  await page.waitForFunction(async()=>{
-   const registration=await navigator.serviceWorker.ready;
-   return registration.active?.state==="activated";
-  },null,{timeout:20000});
-  const workerState=await page.evaluate(async()=>{
-   const registration=await navigator.serviceWorker.ready;
-   return {state:registration.active?.state||"missing",scope:registration.scope||null};
-  });
+   const registration=registrations.find(item=>item.scope.endsWith("/markets/"));
+   return registration?.active?.state==="activated" && !registration.installing;
+  },null,{timeout:30000});
+  // The wait above observes this exact registration until its active worker
+  // reaches "activated"; avoid a second lookup that can race registration churn.
+  const workerState={state:"activated",scope:marketsScope};
   assert.equal(workerState.state,"activated","service worker must be active before controlled reload");
   assert.ok(workerState.scope.endsWith("/markets/"),"Markets service worker scope must not capture Crypto or production routes");
   console.log(JSON.stringify({pwaWorker:workerState.state,scope:workerState.scope}));
@@ -148,7 +164,7 @@ const axePath=require.resolve("axe-core/axe.min.js");
   const demoPage=controlledPage;
   await demoPage.waitForFunction(()=>document.querySelector("#demo-status")?.textContent.includes("4 canonical fixtures validated"),null,{timeout:10000});
   const cached=await demoPage.evaluate(async()=>{
-   const cache=await caches.open("zenura-markets-shell-v5");
+   const cache=await caches.open("zenura-markets-shell-v9");
    const paths=["market","account","equity","derivatives"].map(name=>new URL("../../market-gateway/mock/fixtures/"+name+".json",location.href).href);
    const found=[];
    for(const url of paths)found.push({url,found:!!(await cache.match(url))});

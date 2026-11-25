@@ -33,8 +33,9 @@ test("15-screen Demo mounts the existing canonical Equity engine without a dupli
   assert.match(html, /equity-demo-execution-engine\.js/);
   assert.match(js, /from "\.\/demo-equity-panel\.mjs"/);
   assert.match(js, /mountEquityDemo\(content\)/);
-  assert.match(js, /appendEquitySummary\(content,name\)/);
+  assert.match(js, /appendUnifiedLedgerSummary\(content,name\)/);
   assert.match(panel, /createEquityDemoExecutionEngine/);
+  assert.match(panel, /createEquityDemoLedgerBridge/);
   assert.match(panel, /submitOrder/);
   assert.match(panel, /matchNext/);
   assert.match(panel, /cancelOrder/);
@@ -48,10 +49,10 @@ test("Equity order, trade, positions and holdings projections remain visibly sep
     read("markets/stocks/demo.js"),
     read("markets/stocks/demo-equity-panel.mjs")
   ]);
-  assert.match(js, /appendEquitySummary\(content,name\)/);
-  assert.match(panel, /LOCAL EQUITY FILL RECEIPTS/);
-  assert.match(panel, /LOCAL DELIVERY HOLDINGS/);
-  assert.match(panel, /not reconciled with the Wallet/);
+  assert.match(js, /appendUnifiedLedgerSummary\(content,name\)/);
+  assert.match(panel, /CANONICAL EQUITY FILL RECEIPTS/);
+  assert.match(panel, /CANONICAL DELIVERY HOLDINGS/);
+  assert.match(panel, /wallet reconciliation remains false/);
   assert.doesNotMatch(panel, /account\.ledgerReconciled\s*=\s*true/);
   assert.doesNotMatch(js, /appendEquitySummary\(content,"account"\)/);
 });
@@ -63,7 +64,7 @@ test("PWA caches the simulator and synthetic fixtures; production gateway stays 
     read("market-gateway/server.js"),
     read(".github/workflows/s-trade-fo-demo-ui-integration.yml")
   ]);
-  assert.match(sw, /zenura-markets-shell-v5/);
+  assert.match(sw, /zenura-markets-shell-v9/);
   assert.match(sw, /stocks\/demo-equity-panel\.mjs/);
   assert.match(sw, /stocks\/demo-chart-panel\.mjs/);
   assert.match(sw, /stocks\/demo-chart-data\.mjs/);

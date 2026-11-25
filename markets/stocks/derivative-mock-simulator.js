@@ -99,8 +99,9 @@
       if (!quote) fail("A deterministic DEMO DATA quote is unavailable for this contract.");
       return quote;
     }
-    function positionFor(key) {
-      return positions.get(key) || { netQuantity: 0, averagePricePaise: 0 };
+    function positionKey(key, product) { return key + "|PRODUCT|" + (product || "DELIVERY"); }
+    function positionFor(key, product) {
+      return positions.get(positionKey(key, product)) || { netQuantity: 0, averagePricePaise: 0 };
     }
     function reservedOptionSellQuantity(key) {
       return orders.filter(order => order.instrumentKey === key && order.assetClass === "OPTION" &&
@@ -108,12 +109,12 @@
         .reduce((sum, order) => sum + order.remainingQuantity, 0);
     }
     function availableOptionQuantity(key) {
-      return Math.max(0, positionFor(key).netQuantity - reservedOptionSellQuantity(key));
+      return Math.max(0, positionFor(key, "DELIVERY").netQuantity - reservedOptionSellQuantity(key));
     }
     function updatePosition(order, quantity, pricePaise) {
       const contract = contracts.get(order.instrumentKey);
       const instrumentType = contract.assetClass === "FUTURE" ? "FUT" : contract.optionType;
-      const current = positionFor(order.instrumentKey);
+      const current = positionFor(order.instrumentKey, order.product);
       if (contract.assetClass === "OPTION" && order.side === "SELL" &&
           (current.netQuantity <= 0 || quantity > current.netQuantity)) {
         fail("Options SELL is close-only and cannot open or reverse a short position.");
@@ -129,14 +130,14 @@
       if (contract.assetClass === "OPTION" && result.netQuantity < 0) {
         fail("Short CE/PE positions are disabled in this demo.");
       }
-      positions.set(order.instrumentKey, {
+      positions.set(positionKey(order.instrumentKey, order.product), {
         netQuantity: result.netQuantity,
         averagePricePaise: result.averagePricePaise
       });
       return result;
     }
     function appendFill(order, quantity, pricePaise) {
-      updatePosition(order, quantity, pricePaise);
+      const positionResult = updatePosition(order, quantity, pricePaise);
       const grossPaise = quantity * pricePaise;
       if (!Number.isSafeInteger(grossPaise)) fail("Demo fill value exceeds safe integer limits.");
       order.fills.push({
@@ -144,6 +145,7 @@
         quantity,
         pricePaise,
         grossPaise,
+        realizedPnlPaise: positionResult.realizedPnlPaise,
         executedAt: new Date(now).toISOString(),
         simulated: true
       });
@@ -269,11 +271,15 @@
 
     function snapshot() {
       const positionRows = [];
-      positions.forEach((position, key) => {
+      positions.forEach((position, compositeKey) => {
         if (position.netQuantity === 0) return;
+        const marker = compositeKey.lastIndexOf("|PRODUCT|");
+        const key = compositeKey.slice(0, marker);
+        const product = compositeKey.slice(marker + 9);
         const contract = contracts.get(key);
         positionRows.push({
           instrumentKey: key,
+          product: contract.assetClass === "FUTURE" ? product : "DELIVERY",
           symbol: contract.symbol,
           assetClass: contract.assetClass,
           optionType: contract.optionType || null,

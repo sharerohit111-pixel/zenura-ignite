@@ -159,13 +159,13 @@ test("canonical 15-screen Demo mounts the shared Equity engine and responsive pa
   assert.match(html,/equity-demo-execution-engine\.js/);
   assert.match(html,/DEMO DATA · SYNTHETIC FIXTURES/);
   assert.match(js,/mountEquityDemo\(content\)/);
-  assert.match(js,/appendEquitySummary\(content,name\)/);
+  assert.match(js,/appendUnifiedLedgerSummary\(content,name\)/);
   assert.ok(panel.includes("../../market-gateway/mock/fixtures/equity-execution.json"));
   assert.ok(panel.includes("../../market-gateway/mock/fixtures/account.json"));
   assert.match(panel,/submitOrder/);
   assert.match(panel,/matchNext/);
   assert.match(panel,/cancelOrder/);
-  assert.match(panel,/not reconciled with the Wallet/);
+  assert.match(panel,/wallet reconciliation remains false/);
   assert.match(css,/@media\(max-width:900px\)/);
   assert.match(css,/@media\(max-width:520px\)/);
 });
