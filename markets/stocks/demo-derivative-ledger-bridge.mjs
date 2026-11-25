@@ -9,7 +9,7 @@ const keyOf = position => position.assetClass + "|" + position.instrumentKey + "
 const costOf = position => safe(Math.abs(position.netQuantity) * position.averagePricePaise);
 
 export function createDerivativeDemoLedgerBridge({
-  simulator, accountId = "mock-fo-account", sessionId, clock = () => Date.now()
+  simulator, accountId = "mock-fo-account", sessionId, ledger: sharedLedger, nextTimestamp, clock = () => Date.now()
 } = {}) {
   if (!simulator || typeof simulator.snapshot !== "function" ||
       typeof simulator.submit !== "function" || typeof simulator.cancel !== "function" ||
@@ -24,9 +24,13 @@ export function createDerivativeDemoLedgerBridge({
   if (opening.mode !== "MOCK" || opening.simulated !== true) {
     throw new TypeError("DERIVATIVE_SIMULATOR_NOT_MOCK");
   }
-  const ledger = createPaperDemoEventLedger({
+  const ledger = sharedLedger || createPaperDemoEventLedger({
     accountId, sessionId, cashBalancePaise: 0, blockedFundsPaise: 0
   });
+  const openingProjection = ledger.snapshot();
+  if (openingProjection.account.accountId !== accountId || openingProjection.account.sessionId !== sessionId) {
+    throw new TypeError("DERIVATIVE_SHARED_LEDGER_SCOPE_MISMATCH");
+  }
   let sequence = 0, lastTime = -Infinity, poisoned = false;
   const requestKeys = new Map(), requestFingerprints = new Map();
 
@@ -34,7 +38,7 @@ export function createDerivativeDemoLedgerBridge({
     if (poisoned) throw new Error("DERIVATIVE_LEDGER_BRIDGE_HALTED_AFTER_PROJECTION_FAILURE");
   }
   function append(engine, type, payload, source) {
-    const now = Math.max(Number(clock()), lastTime + 1);
+    const now = nextTimestamp ? Number(nextTimestamp()) : Math.max(Number(clock()), lastTime + 1);
     if (!Number.isFinite(now)) throw new TypeError("INVALID_DERIVATIVE_LEDGER_CLOCK");
     lastTime = now;
     const id = String(++sequence).padStart(9, "0");
