@@ -291,3 +291,52 @@ test("order statuses require matching real fill quantities and terminal states c
   ledger.append(status("FILLED", 2, { filledQuantity: 2, remainingQuantity: 0 }));
   assert.throws(() => ledger.append(status("PENDING", 3)), /ORDER_TERMINAL_STATE_IMMUTABLE/);
 });
+
+
+test("timestamps reject impossible dates, invalid clock fields and out-of-range timezone fields", () => {
+  const invalid = [
+    "2026-02-30T09:30:00+05:30",
+    "2025-02-29T09:30:00+05:30",
+    "2026-13-01T09:30:00+05:30",
+    "2026-00-10T09:30:00+05:30",
+    "2026-11-25T24:00:00+05:30",
+    "2026-11-25T09:60:00+05:30",
+    "2026-11-25T09:30:60+05:30",
+    "2026-11-25T09:30:00+24:00",
+    "2026-11-25T09:30:00+05:60",
+    "2026-11-25T09:30:00"
+  ];
+  for (const occurredAt of invalid) {
+    const ledger = createPaperDemoEventLedger(opening);
+    assert.throws(() => ledger.append(event({ occurredAt })), /INVALID_EVENT_TIMESTAMP/, occurredAt);
+    assert.equal(ledger.snapshot().events.length, 0, occurredAt);
+  }
+  const leapDay = createPaperDemoEventLedger(opening);
+  assert.equal(leapDay.append(event({ occurredAt: "2024-02-29T09:30:00Z" })).accepted, true);
+});
+
+test("recorded fills remain immutable in snapshots and duplicate fill IDs are rejected", () => {
+  const ledger = createPaperDemoEventLedger(opening);
+  ledger.append(event());
+  const fill = {
+    eventId: "evt-fill-1", idempotencyKey: "idem-fill-1", sourceEventId: "source-fill-1",
+    accountId: opening.accountId, sessionId: opening.sessionId,
+    occurredAt: "2026-11-25T09:30:01+05:30", engine: "EQUITY", type: "FILL_RECORDED",
+    deltas: { cashDeltaPaise: -125050, blockedDeltaPaise: -10000 },
+    payload: { fillId: "immutable-fill-1", orderId: "order-1", assetClass: "EQUITY",
+      instrumentKey: "MOCK|NSE|EQ|0001", side: "BUY", quantity: 1, pricePaise: 125050, grossPaise: 125050 }
+  };
+  ledger.append(fill);
+  const snapshot = ledger.snapshot();
+  assert.ok(Object.isFrozen(snapshot.fills[0]));
+  assert.ok(Object.isFrozen(snapshot.events[1]));
+  assert.throws(() => { snapshot.fills[0].quantity = 99; }, TypeError);
+  assert.equal(ledger.snapshot().fills[0].quantity, 1);
+  assert.throws(() => ledger.append({
+    ...fill,
+    eventId: "evt-fill-2", idempotencyKey: "idem-fill-2", sourceEventId: "source-fill-2",
+    occurredAt: "2026-11-25T09:30:02+05:30"
+  }), /DUPLICATE_FILL_ID/);
+  assert.equal(ledger.snapshot().fills.length, 1);
+  assert.equal(ledger.snapshot().events.length, 2);
+});
