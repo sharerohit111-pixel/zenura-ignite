@@ -83,7 +83,6 @@ export function createPrivateWatchlistController({ supabase, catalogKeys }) {
 }
 
 export async function mountPrivateWatchlists(host, { model, el, field, selectControl, money }) {
-  host.replaceChildren();
   const panel = el("section", "catalog-panel");
   const title = el("h3", "", "Private Watchlists");
   const intro = el("p", "sub", "Sign in with your ZENURA Supabase account. Lists are private to your authenticated account.");
