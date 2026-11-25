@@ -103,13 +103,13 @@ const axePath=require.resolve("axe-core/axe.min.js");
     await page.locator('#screen-nav button[data-screen="trades"]').click();
     await page.locator(".demo-unified-ledger").waitFor();
     const tradeRows=await page.locator(".demo-unified-table-wrap tbody tr").allTextContents();
-    assert.ok(tradeRows.some(row=>row.includes("EQUITY")),"unified history includes Equity fills");
+    assert.equal(tradeRows.some(row=>row.includes("EQUITY")),false,"unreceipted Equity fills must not appear in unified history");
     assert.ok(tradeRows.some(row=>row.includes("FUTURE")),"unified history includes Futures fills");
     assert.ok(tradeRows.some(row=>row.includes("OPTION")),"unified history includes Options fills");
     await page.locator('#screen-nav button[data-screen="portfolio"]').click();
     await page.locator(".demo-unified-ledger").waitFor();
     const portfolioRows=await page.locator(".demo-unified-table-wrap tbody tr").allTextContents();
-    assert.ok(portfolioRows.some(row=>row.includes("EQUITY")),"unified portfolio includes Equity");
+    assert.equal(portfolioRows.some(row=>row.includes("EQUITY")),false,"unreceipted Equity positions must not appear in unified portfolio");
     assert.ok(portfolioRows.some(row=>row.includes("FUTURE")),"unified portfolio includes Futures");
     assert.ok(portfolioRows.some(row=>row.includes("OPTION")),"unified portfolio includes Options");
    }
