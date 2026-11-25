@@ -19,7 +19,8 @@ async function getEngine(){
 }
 function table(host,headers,rows,empty){
  const wrap=el("div","table-wrap demo-eq-table-wrap"),t=el("table"),head=el("thead"),hr=el("tr"),body=el("tbody");
- headers.forEach(x=>hr.append(el("th","",x)));head.append(hr);
+ wrap.tabIndex=0;wrap.setAttribute("role","region");wrap.setAttribute("aria-label","Equity demo table");
+ headers.forEach(x=>{const th=el("th","",x);th.scope="col";hr.append(th);});head.append(hr);
  if(!rows.length){const tr=el("tr"),td=el("td","empty",empty);td.colSpan=headers.length;tr.append(td);body.append(tr);}
  else rows.forEach(row=>{const tr=el("tr");row.forEach(value=>tr.append(el("td","",value??"—")));body.append(tr);});
  t.append(head,body);wrap.append(t);host.replaceChildren(wrap);
