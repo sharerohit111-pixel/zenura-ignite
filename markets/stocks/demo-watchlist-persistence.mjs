@@ -163,14 +163,17 @@ export async function mountPrivateWatchlists(host, { model, el, field, selectCon
       if (uid !== currentUid) return;
       authStatus.textContent = "Saved securely to your private Supabase watchlist.";
     } catch (error) {
-      authStatus.textContent = error?.message || "Save failed. Your saved list was not confirmed.";
-      try { await controller.load(listSelect.value); } catch (_) {}
+      if (uid === currentUid) {
+        authStatus.textContent = error?.message || "Save failed. Your saved list was not confirmed.";
+        try { await controller.load(listSelect.value); } catch (_) {}
+      }
     } finally {
       if (uid === currentUid) { setBusy(false); renderRows(); }
     }
   }
   async function loadList(name) {
     if (!controller || !currentUid) return;
+    const uid = currentUid;
     setBusy(true); listStatus.textContent = "Loading private watchlist…";
     try {
       controller.setActiveName(name);
@@ -180,10 +183,12 @@ export async function mountPrivateWatchlists(host, { model, el, field, selectCon
       authStatus.textContent = unknown ? unknown + " saved instrument key(s) are not in the current MOCK catalog; remove them individually if no longer needed." : "Private watchlist loaded.";
       renderRows();
     } catch (error) {
-      listStatus.textContent = "Could not load this private watchlist.";
-      authStatus.textContent = error?.message || "Load failed. Check your connection and retry.";
-      rowsHost.replaceChildren();
-    } finally { setBusy(false); }
+      if (uid === currentUid) {
+        listStatus.textContent = "Could not load this private watchlist.";
+        authStatus.textContent = error?.message || "Load failed. Check your connection and retry.";
+        rowsHost.replaceChildren();
+      }
+    } finally { if (uid === currentUid) setBusy(false); }
   }
   try {
     ({ supabase } = await import("./supabase-client.js"));
