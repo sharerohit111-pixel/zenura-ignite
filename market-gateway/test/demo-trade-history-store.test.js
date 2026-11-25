@@ -30,3 +30,13 @@ test("event replay is deterministic and production fails closed",()=>{
  assert.deepEqual(s.replay(s.exportEvents()),s.snapshot());
  assert.throws(()=>createDemoTradeHistoryStore({env:{NODE_ENV:"production"}}),/DEMO_HISTORY_DISABLED_IN_PRODUCTION/);
 });
+
+test("rejected orders remain visible and replay with their reason",()=>{
+ const s=createDemoTradeHistoryStore({env:{NODE_ENV:"test"}});
+ const o=s.submit(base({idempotencyKey:"reject-order-001"}));
+ s.reject(o.orderId,"Insufficient deterministic depth","2026-11-24T09:30:02+05:30");
+ assert.equal(s.snapshot().orders[0].status,"REJECTED");
+ assert.equal(s.snapshot().orders[0].rejectionReason,"Insufficient deterministic depth");
+ assert.deepEqual(s.replay(s.exportEvents()),s.snapshot());
+ assert.equal(s.reject(o.orderId,"Insufficient deterministic depth","2026-11-24T09:30:02+05:30").duplicate,true);
+});
