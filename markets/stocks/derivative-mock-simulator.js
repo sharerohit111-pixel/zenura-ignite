@@ -136,7 +136,7 @@
       return result;
     }
     function appendFill(order, quantity, pricePaise) {
-      updatePosition(order, quantity, pricePaise);
+      const positionResult = updatePosition(order, quantity, pricePaise);
       const grossPaise = quantity * pricePaise;
       if (!Number.isSafeInteger(grossPaise)) fail("Demo fill value exceeds safe integer limits.");
       order.fills.push({
@@ -144,6 +144,7 @@
         quantity,
         pricePaise,
         grossPaise,
+        realizedPnlPaise: positionResult.realizedPnlPaise,
         executedAt: new Date(now).toISOString(),
         simulated: true
       });
