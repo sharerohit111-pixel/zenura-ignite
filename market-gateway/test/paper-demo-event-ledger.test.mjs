@@ -389,3 +389,64 @@ test("generic append cannot inject an unverified settlement event or move accoun
   assert.equal(after.account.blockedFundsPaise, opening.blockedFundsPaise);
   assert.equal(after.account.ledgerReconciled, false);
 });
+
+test("Futures margin release cannot exceed the outstanding verified reservation for its order", () => {
+  const trust = {
+    trustedIssuerIds: ["approved-clearing-source"],
+    verifyAttestation: receipt => receipt.attestation.signature === "cryptographically-verified-test-signature"
+  };
+  const ledger = createPaperDemoEventLedger(opening, trust);
+  const base = {
+    schemaVersion: "1.0.0", kind: "FUTURES_MARGIN_RESERVATION",
+    receiptId: "future-reserve-release-1", eventReference: "future-provider-reserve-1",
+    accountId: opening.accountId, sessionId: opening.sessionId, orderId: "future-reserve-release-order",
+    assetClass: "FUTURE", side: "BUY", currency: "INR",
+    issuerId: "approved-clearing-source", sourceReference: "future-source-1",
+    policyVersion: "margin-policy-test-v1", issuedAt: "2026-11-25T09:30:00+05:30",
+    amounts: { marginPaise: 25000, cashDeltaPaise: 0, blockedDeltaPaise: 25000 },
+    attestation: { keyId: "test-key-1", signature: "cryptographically-verified-test-signature" }
+  };
+  seedFuturesOrder(ledger, base.orderId, "BUY");
+  ledger.appendSettlementReceipt(base, { orderId: base.orderId, assetClass: "FUTURE", side: "BUY" });
+  const release = {
+    ...base, action: "RELEASE", receiptId: "future-release-too-large",
+    eventReference: "future-provider-release-too-large",
+    sourceReference: "future-source-release-too-large",
+    issuedAt: "2026-11-25T09:31:00+05:30",
+    amounts: { marginPaise: 30000, cashDeltaPaise: 0, blockedDeltaPaise: -30000 }
+  };
+  assert.throws(() => ledger.appendSettlementReceipt(release, {
+    orderId: base.orderId, assetClass: "FUTURE", side: "BUY"
+  }), /FUTURES_MARGIN_RELEASE_EXCEEDS_OUTSTANDING_RESERVATION/);
+  assert.equal(ledger.snapshot().account.blockedFundsPaise, 25000);
+  assert.equal(ledger.snapshot().events.length, 2);
+});
+
+test("Options settlement rejects orphan fills, mismatched order ownership and wrong premium direction", () => {
+  const trust = {
+    trustedIssuerIds: ["approved-clearing-source"],
+    verifyAttestation: () => true
+  };
+  const ledger = createPaperDemoEventLedger(opening, trust);
+  const receipt = {
+    schemaVersion: "1.0.0", kind: "OPTIONS_FILL_SETTLEMENT", action: "SETTLE",
+    receiptId: "option-bound-fill-1", eventReference: "option-provider-fill-1",
+    fillId: "option-bound-fill-id", accountId: opening.accountId,
+    sessionId: opening.sessionId, orderId: "option-bound-order",
+    assetClass: "OPTION", side: "BUY", currency: "INR",
+    issuerId: "approved-clearing-source", sourceReference: "option-source-1",
+    policyVersion: "options-policy-test-v1", issuedAt: "2026-11-25T09:30:00+05:30",
+    amounts: { premiumCashDeltaPaise: -100000, chargesCashDeltaPaise: -100, cashDeltaPaise: -100100, blockedDeltaPaise: 0 },
+    attestation: { keyId: "test-key-1", signature: "verified-test-signature" }
+  };
+  seedOptionsFill(ledger, receipt.orderId, receipt.fillId, "BUY");
+  assert.throws(() => ledger.appendSettlementReceipt({
+    ...receipt, fillId: "orphan-fill"
+  }, { orderId: receipt.orderId, fillId: "orphan-fill", assetClass: "OPTION", side: "BUY" }),
+  /SETTLEMENT_FILL_NOT_FOUND_OR_MISMATCH/);
+  assert.throws(() => ledger.appendSettlementReceipt({
+    ...receipt, amounts: { ...receipt.amounts, premiumCashDeltaPaise: 100000, cashDeltaPaise: 99900 }
+  }, { orderId: receipt.orderId, fillId: receipt.fillId, assetClass: "OPTION", side: "BUY" }),
+  /OPTIONS_PREMIUM_DIRECTION_MISMATCH/);
+  assert.equal(ledger.snapshot().account.cashBalancePaise, opening.cashBalancePaise);
+});
