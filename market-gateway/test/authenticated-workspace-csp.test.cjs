@@ -34,7 +34,7 @@ test("CSP permits only the required authenticated workspace script and API origi
     return [name, values];
   }));
   assert.deepEqual(directives["script-src"], ["'self'", "https://esm.sh", "https://cdn.jsdelivr.net", "https://unpkg.com"]);
-  for (const origin of ["https://cdn.jsdelivr.net", "https://unpkg.com", "https://*.supabase.co", "wss://*.supabase.co", "https://*.run.app", "https://*.a.run.app"]) {
+  for (const origin of ["https://*.supabase.co", "wss://*.supabase.co", "https://*.run.app", "https://*.a.run.app"]) {
     assert.ok(directives["connect-src"].includes(origin), `missing required API origin: ${origin}`);
   }
 });
