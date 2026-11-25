@@ -176,3 +176,43 @@ test("Portfolio end-to-end renders fresh MOCK marks for Equity, Futures and Opti
     if (previous.document === undefined) delete globalThis.document; else globalThis.document = previous.document;
   }
 });
+
+
+test("cached Equity and derivative marks expire against advancing runtime time", async () => {
+  const {
+    createPortfolioMark, isUsablePortfolioMark, calculateAggregateUnrealized,
+    EQUITY_MARK_MAX_AGE_MS, DERIVATIVE_MARK_MAX_AGE_MS
+  } = await import("../../markets/stocks/demo-unified-ledger-panel.mjs?runtime-mark-expiry");
+  const now = 1_800_000_000_000;
+  const equity = createPortfolioMark(12500, now, { now, maxAgeMs: EQUITY_MARK_MAX_AGE_MS });
+  const derivative = createPortfolioMark(25000, now, { now, maxAgeMs: DERIVATIVE_MARK_MAX_AGE_MS });
+  assert.equal(isUsablePortfolioMark(equity, now), true);
+  assert.equal(isUsablePortfolioMark(equity, now + EQUITY_MARK_MAX_AGE_MS), true);
+  assert.equal(isUsablePortfolioMark(equity, now + EQUITY_MARK_MAX_AGE_MS + 1), false);
+  assert.equal(isUsablePortfolioMark(derivative, now + DERIVATIVE_MARK_MAX_AGE_MS), true);
+  assert.equal(isUsablePortfolioMark(derivative, now + DERIVATIVE_MARK_MAX_AGE_MS + 1), false);
+  const positions = [
+    { instrumentKey: "EQ-EXPIRY", quantity: 2, averagePricePaise: 10000 },
+    { instrumentKey: "FUT-EXPIRY", quantity: -1, averagePricePaise: 25000 }
+  ];
+  const marks = new Map([
+    ["EQ-EXPIRY", equity],
+    ["FUT-EXPIRY", derivative]
+  ]);
+  assert.deepEqual(calculateAggregateUnrealized(positions, marks, now), { complete: true, value: 0 });
+  assert.deepEqual(calculateAggregateUnrealized(positions, marks, now + DERIVATIVE_MARK_MAX_AGE_MS + 1),
+    { complete: false, value: null });
+  assert.deepEqual(calculateAggregateUnrealized(positions, marks, now + EQUITY_MARK_MAX_AGE_MS + 1),
+    { complete: false, value: null });
+});
+
+test("runtime mark validation rejects newly future-dated timestamps beyond allowed skew", async () => {
+  const { createPortfolioMark, isUsablePortfolioMark, EQUITY_MARK_MAX_FUTURE_SKEW_MS } =
+    await import("../../markets/stocks/demo-unified-ledger-panel.mjs?runtime-future-skew");
+  const now = 1_800_000_000_000;
+  const mark = createPortfolioMark(100, now + EQUITY_MARK_MAX_FUTURE_SKEW_MS,
+    { now, maxAgeMs: 60_000, maxFutureSkewMs: EQUITY_MARK_MAX_FUTURE_SKEW_MS });
+  assert.equal(isUsablePortfolioMark(mark, now), true);
+  assert.equal(isUsablePortfolioMark(mark, now - 1), true);
+  assert.equal(isUsablePortfolioMark(mark, now - 1_001), false);
+});
