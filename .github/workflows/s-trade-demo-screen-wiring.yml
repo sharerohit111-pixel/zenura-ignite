@@ -1,4 +1,5 @@
 name: S-TRADE Demo Screen Wiring Tests
+# Chat 60 unified QA bundle: PWA lifecycle, precache closure, keyboard and recovery.
 
 on:
   pull_request:
