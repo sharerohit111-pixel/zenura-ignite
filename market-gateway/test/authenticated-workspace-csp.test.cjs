@@ -12,7 +12,7 @@ test("authenticated Paper Trading workspace declares one CSP meta policy", () =>
   assert.equal((html.match(/http-equiv=["']Content-Security-Policy["']/gi) || []).length, 1);
 });
 
-test("CSP fails closed for object, base URL, framing and form destinations", () => {
+test("CSP blocks objects, base URL changes, child frames and external form destinations", () => {
   const directives = Object.fromEntries(match[1].split(";").map(part => {
     const [name, ...values] = part.trim().split(/\s+/);
     return [name, values];
@@ -37,4 +37,15 @@ test("CSP permits only the required authenticated workspace script and API origi
   for (const origin of ["https://*.supabase.co", "wss://*.supabase.co", "https://*.run.app", "https://*.a.run.app"]) {
     assert.ok(directives["connect-src"].includes(origin), `missing required API origin: ${origin}`);
   }
+});
+
+test("meta CSP is not misrepresented as clickjacking protection", () => {
+  const directives = Object.fromEntries(match[1].split(";").map(part => {
+    const [name, ...values] = part.trim().split(/\\s+/);
+    return [name, values];
+  }));
+  // frame-ancestors is ignored in meta CSP. GitHub Pages cannot emit custom
+  // response headers; clickjacking protection requires a header at a proxy/CDN
+  // or a hosting platform that supports response headers.
+  assert.equal(directives["frame-ancestors"], undefined);
 });
