@@ -31,7 +31,6 @@ function syncDemoWalletFromTradeHistory({ wallet, historySnapshot } = {}) {
 
   const prepared = [];
   for (const order of orders) {
-    if (order.assetClass === "FUTURE") fail("DEMO_WALLET_FUTURES_MARGIN_RECEIPT_REQUIRED");
     prepared.push({
       eventId: "wallet-order-ref-" + order.orderId,
       sourceEventId: order.orderId,
@@ -47,7 +46,10 @@ function syncDemoWalletFromTradeHistory({ wallet, historySnapshot } = {}) {
   for (const trade of trades) {
     if (!trade || typeof trade.fillId !== "string" || !trade.fillId ||
         typeof trade.orderId !== "string" || !byId.has(trade.orderId) ||
+        !Number.isSafeInteger(trade.quantity) || trade.quantity < 1 ||
+        !Number.isSafeInteger(trade.pricePaise) || trade.pricePaise < 1 ||
         !safe(trade.grossValuePaise) || trade.grossValuePaise < 1 ||
+        trade.quantity * trade.pricePaise !== trade.grossValuePaise ||
         typeof trade.filledAt !== "string" || !Number.isFinite(Date.parse(trade.filledAt))) {
       fail("DEMO_WALLET_INVALID_CANONICAL_FILL");
     }
