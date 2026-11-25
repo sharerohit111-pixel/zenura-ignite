@@ -276,7 +276,7 @@ jobs:
       - name: Run unit and Firestore emulator integration tests
         run: npx --yes firebase-tools@14 emulators:exec --only firestore --project demo-zenura-ignite "node --test functions/test/*.test.js market-gateway/test/*.test.js markets/stocks/*.test.js"
       - name: Build gateway Docker image
-        run: docker build --tag zenura-indian-market-gateway:ci market-gateway
+        run: docker build --file market-gateway/Dockerfile --tag zenura-indian-market-gateway:ci .
       - name: Verify gateway image runs as non-root
         run: |
           test "$(docker image inspect zenura-indian-market-gateway:ci --format '{{.Config.User}}')" = "node"
