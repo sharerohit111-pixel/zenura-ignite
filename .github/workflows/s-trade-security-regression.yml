@@ -1,6 +1,7 @@
 name: S-TRADE Dependency and Secret Regression
 
 on:
+  workflow_dispatch:
   pull_request:
     paths:
       - "market-gateway/package.json"
