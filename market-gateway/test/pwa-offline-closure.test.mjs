@@ -39,8 +39,7 @@ test("all static transitive imports from the 15-screen demo entrypoint are in th
    const target=resolve(dirname(resolve(root,path)),specifier);
    const rel=relative(root,target).split("\\").join("/");
    assert.ok(!rel.startsWith("../"),"demo import remains inside repository: "+rel);
-   const cachePath="/"+rel.replace(/^markets\//,"markets/");
-   assert.ok(shell.has(cachePath),"missing transitive shell precache entry: "+rel);
+   assert.ok(shell.has(rel),"missing transitive shell precache entry: "+rel);
    await walk(rel);
   }
  }
