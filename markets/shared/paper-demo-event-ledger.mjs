@@ -1,6 +1,8 @@
-const VERSION = "1.1.0";
+import { validateAuthoritativeDemoSettlementReceipt } from "./paper-demo-settlement-receipt.mjs";
+
+const VERSION = "1.2.0";
 const ENGINES = new Set(["EQUITY", "FUTURES", "OPTIONS"]);
-const EVENT_TYPES = new Set(["ORDER_ACCEPTED", "ORDER_UPDATED", "ORDER_REJECTED", "FILL_RECORDED", "RESERVATION_CHANGED", "POSITION_CHANGED"]);
+const EVENT_TYPES = new Set(["ORDER_ACCEPTED", "ORDER_UPDATED", "ORDER_REJECTED", "FILL_RECORDED", "RESERVATION_CHANGED", "POSITION_CHANGED", "SETTLEMENT_RECEIPT_ACCEPTED"]);
 const ORDER_STATUSES = new Set(["PENDING", "PARTIALLY_FILLED", "FILLED", "CANCELLED", "REJECTED", "EXPIRED"]);
 const SIDES = new Set(["BUY", "SELL"]);
 const ORDER_TYPES = new Set(["MARKET", "LIMIT"]);
@@ -73,6 +75,21 @@ function validateEvent(input, identity, expectedSequence) {
     if (input.engine === "OPTIONS" && p.assetClass !== "OPTION") fail("ENGINE_ASSET_MISMATCH");
   }
   if (input.type === "RESERVATION_CHANGED" && Object.keys(p).length !== 0) fail("INVALID_RESERVATION_EVENT");
+  if (input.type === "SETTLEMENT_RECEIPT_ACCEPTED") {
+    validateIdentity(p.receiptId, "SETTLEMENT_RECEIPT_ID");
+    validateIdentity(p.eventReference, "SETTLEMENT_EVENT_REFERENCE");
+    validateIdentity(p.orderId, "SETTLEMENT_ORDER_ID");
+    if (!["FUTURE", "OPTION"].includes(p.assetClass) ||
+        (p.assetClass === "FUTURE" && input.engine !== "FUTURES") ||
+        (p.assetClass === "OPTION" && input.engine !== "OPTIONS") ||
+        !object(p.receipt) || p.receipt.receiptId !== p.receiptId ||
+        p.receipt.eventReference !== p.eventReference ||
+        !object(p.receipt.amounts) ||
+        p.receipt.amounts.cashDeltaPaise !== input.deltas.cashDeltaPaise ||
+        p.receipt.amounts.blockedDeltaPaise !== input.deltas.blockedDeltaPaise) {
+      fail("INVALID_SETTLEMENT_LEDGER_EVENT");
+    }
+  }
   return freeze(clone(input));
 }
 function initialProjection(opening) {
@@ -132,6 +149,13 @@ function apply(projection, event) {
     }
     projection.fills.push({ ...p, product: productOf(p), engine: event.engine, sequence: event.sequence, occurredAt: event.occurredAt });
   }
+  if (event.type === "SETTLEMENT_RECEIPT_ACCEPTED") {
+    const duplicate = projection.events.some(x =>
+      x.type === "SETTLEMENT_RECEIPT_ACCEPTED" &&
+      (x.payload.receiptId === event.payload.receiptId ||
+       x.payload.eventReference === event.payload.eventReference));
+    if (duplicate) fail("DUPLICATE_SETTLEMENT_RECEIPT");
+  }
   if (event.type === "POSITION_CHANGED") {
     const p = event.payload, product = productOf(p), key = positionKey(p.assetClass, p.instrumentKey, product);
     let position = projection.positions.find(x => x.key === key);
@@ -157,7 +181,7 @@ function apply(projection, event) {
   if (!Number.isSafeInteger(projection.account.realizedPnlPaise)) fail("DEMO_PNL_INVARIANT");
   projection.events.push(event);
 }
-export function createPaperDemoEventLedger(opening) {
+export function createPaperDemoEventLedger(opening, settlementTrust = {}) {
   if (!object(opening)) fail("DEMO_OPENING_SNAPSHOT_REQUIRED");
   validateIdentity(opening.accountId, "ACCOUNT_ID");
   validateIdentity(opening.sessionId, "SESSION_ID");
@@ -196,18 +220,70 @@ export function createPaperDemoEventLedger(opening) {
     }
     return { accepted: true, duplicate: false, event, snapshot: snapshot() };
   }
+  function appendSettlementReceipt(receipt, { orderId, fillId, side, assetClass } = {}) {
+    const existing = projection.events.find(event =>
+      event.type === "SETTLEMENT_RECEIPT_ACCEPTED" &&
+      event.payload.receiptId === receipt?.receiptId);
+    if (existing) {
+      if (JSON.stringify(existing.payload.receipt) !== JSON.stringify(receipt)) {
+        fail("SETTLEMENT_RECEIPT_REPLAY_MISMATCH");
+      }
+      return { accepted: false, duplicate: true, event: existing, snapshot: snapshot() };
+    }
+    const settlementEvents = projection.events.filter(event => event.type === "SETTLEMENT_RECEIPT_ACCEPTED");
+    const validated = validateAuthoritativeDemoSettlementReceipt(receipt, {
+      accountId: identity.accountId, sessionId: identity.sessionId, orderId,
+      fillId, assetClass, side,
+      trustedIssuerIds: settlementTrust.trustedIssuerIds,
+      verifyAttestation: settlementTrust.verifyAttestation,
+      consumedReceiptIds: settlementEvents.map(event => event.payload.receiptId),
+      consumedEventReferences: settlementEvents.map(event => event.payload.eventReference)
+    }).receipt;
+    const engine = assetClass === "FUTURE" ? "FUTURES" : "OPTIONS";
+    return append({
+      eventId: validated.receiptId,
+      idempotencyKey: validated.receiptId,
+      sourceEventId: validated.eventReference,
+      accountId: identity.accountId, sessionId: identity.sessionId,
+      occurredAt: validated.issuedAt, engine,
+      type: "SETTLEMENT_RECEIPT_ACCEPTED",
+      deltas: {
+        cashDeltaPaise: validated.amounts.cashDeltaPaise,
+        blockedDeltaPaise: validated.amounts.blockedDeltaPaise
+      },
+      payload: {
+        receiptId: validated.receiptId,
+        eventReference: validated.eventReference,
+        orderId: validated.orderId,
+        assetClass: validated.assetClass,
+        receipt: validated
+      }
+    });
+  }
   function snapshot() { return freeze(clone(projection)); }
-  return Object.freeze({ append, snapshot });
+  return Object.freeze({ append, appendSettlementReceipt, snapshot });
 }
-export function replayPaperDemoEvents(opening, events) {
+export function replayPaperDemoEvents(opening, events, settlementTrust = {}) {
   if (!Array.isArray(events)) fail("DEMO_EVENT_ARRAY_REQUIRED");
-  const ledger = createPaperDemoEventLedger(opening);
+  const ledger = createPaperDemoEventLedger(opening, settlementTrust);
   const ordered = [...events].sort((a, b) => a.sequence - b.sequence);
   ordered.forEach((event, index) => {
     if (event.sequence !== index + 1) fail("DEMO_EVENT_SEQUENCE_MISMATCH");
-    const { sequence, ...input } = event;
-    const result = ledger.append(input);
-    if (!result.accepted) fail("DUPLICATE_EVENT_IN_REPLAY");
+    if (event.type === "SETTLEMENT_RECEIPT_ACCEPTED") {
+      const receipt = event.payload?.receipt;
+      const result = ledger.appendSettlementReceipt(receipt, {
+        orderId: event.payload.orderId,
+        assetClass: event.payload.assetClass,
+        side: receipt?.side,
+        fillId: receipt?.fillId
+      });
+      if (!result.accepted || result.event.sequence !== index + 1) fail("INVALID_SETTLEMENT_EVENT_IN_REPLAY");
+      if (JSON.stringify(result.event) !== JSON.stringify(event)) fail("SETTLEMENT_EVENT_REPLAY_MISMATCH");
+    } else {
+      const { sequence, ...input } = event;
+      const result = ledger.append(input);
+      if (!result.accepted) fail("DUPLICATE_EVENT_IN_REPLAY");
+    }
   });
   return ledger.snapshot();
 }
