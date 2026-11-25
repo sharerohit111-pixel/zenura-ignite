@@ -291,3 +291,23 @@ test("order statuses require matching real fill quantities and terminal states c
   ledger.append(status("FILLED", 2, { filledQuantity: 2, remainingQuantity: 0 }));
   assert.throws(() => ledger.append(status("PENDING", 3)), /ORDER_TERMINAL_STATE_IMMUTABLE/);
 });
+
+
+test("rejected SELL orders cannot reserve or release position shares", () => {
+  const ledger = createPaperDemoEventLedger(opening);
+  ledger.append(event({
+    type: "POSITION_CHANGED", sourceEventId: "seed-rejected-position", idempotencyKey: "seed-rejected-position",
+    deltas: { cashDeltaPaise: 0, blockedDeltaPaise: 0 },
+    payload: { assetClass: "EQUITY", instrumentKey: "MOCK|NSE|EQ|0001", product: "DELIVERY", quantityDelta: 5, costBasisDeltaPaise: 500000, realizedPnlDeltaPaise: 0 }
+  }));
+  const rejected = (delta, suffix) => event({
+    eventId: "rejected-" + suffix, idempotencyKey: "rejected-" + suffix, sourceEventId: "rejected-" + suffix,
+    type: "ORDER_REJECTED", occurredAt: "2026-11-25T09:30:0" + (suffix === "reserve" ? "1" : "2") + "+05:30",
+    deltas: { cashDeltaPaise: 0, blockedDeltaPaise: 0 },
+    payload: { orderId: "rejected-" + suffix, assetClass: "EQUITY", instrumentKey: "MOCK|NSE|EQ|0001", product: "DELIVERY", side: "SELL", orderType: "LIMIT", quantity: 2, status: "REJECTED", reservedQuantityDelta: delta }
+  });
+  assert.throws(() => ledger.append(rejected(2, "reserve")), /UNAUTHORIZED_REJECTION_SHARE_RESERVATION/);
+  assert.equal(ledger.snapshot().positions[0].reservedQuantity, 0);
+  assert.equal(ledger.append(rejected(0, "zero")).accepted, true);
+  assert.equal(ledger.snapshot().positions[0].reservedQuantity, 0);
+});
