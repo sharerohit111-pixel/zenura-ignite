@@ -31,7 +31,7 @@ export function createDerivativeDemoLedgerBridge({
   if (openingProjection.account.accountId !== accountId || openingProjection.account.sessionId !== sessionId) {
     throw new TypeError("DERIVATIVE_SHARED_LEDGER_SCOPE_MISMATCH");
   }
-  let sequence = 0, lastTime = -Infinity, poisoned = false;
+  let sequence = ledger.snapshot().events.filter(event => event.engine === "FUTURES" || event.engine === "OPTIONS").length, lastTime = -Infinity, poisoned = false;
   const requestKeys = new Map(), requestFingerprints = new Map();
 
   function assertHealthy() {
