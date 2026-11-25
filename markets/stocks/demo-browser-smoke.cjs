@@ -68,9 +68,8 @@ const axePath=require.resolve("axe-core/axe.min.js");
   }
   console.log("PWA: waiting for service worker activation");
   const workerState=await page.evaluate(async()=>{
-   const registrations=await navigator.serviceWorker.getRegistrations();
-   const registration=registrations.find(item=>item.active?.state==="activated");
-   return {state:registration?.active?.state||"missing",scope:registration?.scope||null};
+   const registration=await navigator.serviceWorker.ready;
+   return {state:registration.active?.state||"missing",scope:registration.scope||null};
   });
   assert.equal(workerState.state,"activated","service worker must be active before controlled reload");
   console.log(JSON.stringify({pwaWorker:workerState.state,scope:workerState.scope}));
