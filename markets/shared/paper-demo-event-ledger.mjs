@@ -58,7 +58,7 @@ function validateOrderTransition(previous, next) {
   if (!allowed[previous]?.has(next)) fail("INVALID_ORDER_STATUS_TRANSITION");
 }
 function timestampMs(value) {
-  if (typeof value !== "string" || !/^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,3})?(?:Z|[+-]\\d{2}:\\d{2})$/.test(value)) fail("INVALID_EVENT_TIMESTAMP");
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$/.test(value)) fail("INVALID_EVENT_TIMESTAMP");
   const [datePart, timePart] = value.split("T");
   const [year, month, day] = datePart.split("-").map(Number);
   const clock = timePart.slice(0, 8);
