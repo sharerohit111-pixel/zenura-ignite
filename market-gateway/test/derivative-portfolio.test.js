@@ -2,6 +2,7 @@
 const test=require("node:test");
 const assert=require("node:assert/strict");
 const {calculateDerivativePortfolio}=require("../lib/derivative-portfolio");
+const {buildLongOptionPortfolioPositions,validateFuturesPortfolioContracts,expiryCutoffMs}=require("../lib/derivative-portfolio-input");
 const now=1_800_000_000_000;
 const pos=(overrides={})=>({instrumentKey:"NSE_FO|NIFTY26NOV25000CE",instrumentType:"CE",expiry:"2027-12-30",netQuantity:25,averagePricePaise:5000,...overrides});
 const quote=(overrides={})=>({instrumentKey:"NSE_FO|NIFTY26NOV25000CE",pricePaise:7000,observedAtMs:now-1000,...overrides});
@@ -84,4 +85,57 @@ test("rejects margin snapshots without the exact normalized Upstox provenance",(
   const m=margin({instrumentKey:p.instrumentKey,source});
   assert.throws(()=>calculateDerivativePortfolio({positions:[p],quotes:[quote({instrumentKey:p.instrumentKey})],marginSnapshots:[m],now}),/unverified derivative margin snapshot provenance/);
  }
+});
+
+
+const optionMaster=(overrides={})=>({instrument_key:"NSE_FO|NIFTY26DEC25000CE",instrument_type:"CE",segment:"NSE_FO",exchange:"NSE",expiry:"2026-12-31",strike_price:25000,lot_size:25,...overrides});
+const optionRow=(overrides={})=>({instrument_key:"NSE_FO|NIFTY26DEC25000CE",instrument_type:"CE",segment:"NSE_FO",exchange:"NSE",expiry:"2026-12-31",lot_size:25,net_quantity:25,average_price_paise:5000,cost_basis_paise:125000,...overrides});
+
+test("binds long-option portfolio positions to the exact official contract, expiry, strike and lot size",()=>{
+ const [p]=buildLongOptionPortfolioPositions([optionRow()],[optionMaster()]);
+ assert.equal(p.expiry,"2026-12-31");
+ assert.equal(p.optionType,"CE");
+ assert.equal(p.strikePaise,2500000);
+ assert.equal(p.instrumentKey,optionMaster().instrument_key);
+});
+
+test("rejects long-option positions whose official master identity, expiry, exchange, type or lot size differs",()=>{
+ const cases=[
+  {row:optionRow({instrument_key:"NSE_FO|OTHER"})},
+  {master:optionMaster({instrument_type:"PE"})},
+  {master:optionMaster({expiry:"2027-01-28"})},
+  {master:optionMaster({exchange:"BSE",segment:"BSE_FO"})},
+  {master:optionMaster({lot_size:50})},
+  {master:optionMaster({strike_price:"invalid"})},
+  {row:optionRow({expiry:null})},
+  {row:optionRow({net_quantity:-25})}
+ ];
+ for(const item of cases)assert.throws(()=>buildLongOptionPortfolioPositions([item.row||optionRow()],[item.master||optionMaster()]),/Stored long-option|official option strike/);
+});
+
+test("rejects duplicate option positions and duplicate official master keys",()=>{
+ assert.throws(()=>buildLongOptionPortfolioPositions([optionRow(),optionRow()],[optionMaster()]),/malformed or duplicated/);
+ assert.throws(()=>buildLongOptionPortfolioPositions([optionRow()],[optionMaster(),optionMaster()]),/duplicate derivative contract identity/);
+});
+
+const futuresMaster=(overrides={})=>({instrument_key:"NSE_FO|NIFTY26DECFUT",instrument_type:"FUT",segment:"NSE_FO",exchange:"NSE",expiry:"2026-12-31",lot_size:25,...overrides});
+const futuresRow=(overrides={})=>({instrument_key:"NSE_FO|NIFTY26DECFUT",segment:"NSE_FO",exchange:"NSE",expiry:"2026-12-31",lot_size:25,net_quantity:25,average_price_paise:2500000,...overrides});
+
+test("binds futures portfolio positions to the official master and calculates the existing expiry cutoff",()=>{
+ const rows=[futuresRow()],map=validateFuturesPortfolioContracts(rows,[futuresMaster()]);
+ assert.equal(map.get(rows[0].instrument_key).expiry,"2026-12-31");
+ assert.equal(map.get(rows[0].instrument_key).expiryCutoffMs,Date.parse("2026-12-31T10:00:00.000Z"));
+ assert.equal(expiryCutoffMs("2026-12-31"),Date.parse("2026-12-31T10:00:00.000Z"));
+});
+
+test("rejects futures portfolio contract identity, expiry, lot-size and malformed-position mismatches",()=>{
+ const cases=[
+  {row:futuresRow({instrument_key:"NSE_FO|OTHER"})},
+  {master:futuresMaster({instrument_type:"CE"})},
+  {master:futuresMaster({expiry:"2027-01-28"})},
+  {master:futuresMaster({exchange:"BSE",segment:"BSE_FO"})},
+  {master:futuresMaster({lot_size:50})},
+  {row:futuresRow({net_quantity:0})}
+ ];
+ for(const item of cases)assert.throws(()=>validateFuturesPortfolioContracts([item.row||futuresRow()],[item.master||futuresMaster()]),/Stored Futures position/);
 });
