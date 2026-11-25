@@ -34,9 +34,20 @@ async function getData() {
       blockedFundsPaise:accountEnvelope.data.blockedFundsPaise
     });
     const marks=new Map();
-    marks.set(equityEnvelope.data.instrument.instrumentKey,equityEnvelope.data.instrument.markPricePaise);
+    const validMark=(price,timestamp,stale=false,envelopeStale=false) => {
+      const time=Date.parse(timestamp);
+      return {pricePaise:Number.isSafeInteger(price)&&price>0?price:null,
+        timestamp:Number.isFinite(time)?time:null,
+        stale:stale===true||envelopeStale===true||!Number.isFinite(time)||time>Date.now()};
+    };
+    marks.set(equityEnvelope.data.instrument.instrumentKey,
+      validMark(equityEnvelope.data.instrument.markPricePaise,equityEnvelope.asOf,
+        equityEnvelope.meta?.stale===true,equityEnvelope.meta?.stale===true));
     for(const quote of derivativeEnvelope.data.quotes) {
-      marks.set(quote.instrumentKey,Math.round((quote.bidPricePaise+quote.askPricePaise)/2));
+      const midpoint=Number.isSafeInteger(quote.bidPricePaise)&&Number.isSafeInteger(quote.askPricePaise)
+        ? Math.round((quote.bidPricePaise+quote.askPricePaise)/2) : null;
+      marks.set(quote.instrumentKey,validMark(midpoint,quote.timestamp,
+        quote.stale===true,derivativeEnvelope.meta?.stale===true));
     }
     const symbols=new Map();
     for(const contract of derivativeEnvelope.data.contracts) symbols.set(contract.instrumentKey,contract.symbol);
@@ -78,21 +89,28 @@ export async function appendUnifiedLedgerSummary(container, screen) {
       table(host,["ORDER ID","ASSET","INSTRUMENT","PRODUCT","SIDE","TYPE","QTY","FILLED / REMAINING","AVG FILL","STATUS"],rows,
         "No shared Demo orders yet.");
     } else {
+      let allMarksValid=true;
+      let aggregateUnrealized=0;
       const rows=positions.map(position=>{
         const mark=marks.get(position.instrumentKey);
-        const unrealized=Number.isSafeInteger(mark)
-          ? (mark-position.averagePricePaise)*position.quantity : null;
-        const markValue=Number.isSafeInteger(mark)?mark*position.quantity:null;
+        const valid=mark && Number.isSafeInteger(mark.pricePaise) && mark.pricePaise>0 &&
+          mark.stale===false && Number.isFinite(mark.timestamp) && mark.timestamp<=Date.now();
+        const unrealized=valid?(mark.pricePaise-position.averagePricePaise)*position.quantity:null;
+        const markValue=valid?mark.pricePaise*position.quantity:null;
+        if(valid) aggregateUnrealized+=unrealized;
+        else allMarksValid=false;
         return [
           position.assetClass,symbols.get(position.instrumentKey)||position.symbol||position.instrumentKey,
           position.product,position.quantity,money(position.averagePricePaise),
-          Number.isSafeInteger(mark)?money(mark):"—",money(position.costBasisPaise),
-          Number.isSafeInteger(markValue)?money(markValue):"—",money(position.realizedPnlPaise),
-          Number.isSafeInteger(unrealized)?money(unrealized):"—"
+          valid?money(mark.pricePaise):"Unavailable (missing/stale)",money(position.costBasisPaise),
+          valid?money(markValue):"—",money(position.realizedPnlPaise),valid?money(unrealized):"Unavailable"
         ];
       });
       table(host,["ASSET","INSTRUMENT","PRODUCT","NET QTY","AVG PRICE","MOCK MARK","COST BASIS","MARK VALUE","REALIZED P&L","UNREALIZED P&L"],rows,
         screen==="holdings"?"No Equity Delivery holdings yet.":"No shared Demo positions yet.");
+      host.append(el("p","demo-eq-disclaimer","Aggregate unrealized P&L: "+
+        (allMarksValid?money(aggregateUnrealized):"Unavailable (one or more marks missing/stale)")+
+        " · Aggregate realized P&L: "+money(positions.reduce((sum,p)=>sum+p.realizedPnlPaise,0))));
     }
     const totals=el("div","demo-eq-disclaimer",
       "Ledger events: "+snapshot.events.length+" · Account cash: "+money(snapshot.account.cashBalancePaise)+
