@@ -262,18 +262,18 @@ test("authoritative Futures settlement appends one immutable canonical event and
   const scope = { orderId: receipt.orderId, assetClass: "FUTURE", side: "BUY" };
   const first = ledger.appendSettlementReceipt(receipt, scope);
   assert.equal(first.accepted, true);
-  assert.equal(first.snapshot.events.length, 1);
-  assert.equal(first.snapshot.events[0].type, "SETTLEMENT_RECEIPT_ACCEPTED");
-  assert.equal(first.snapshot.events[0].engine, "FUTURES");
+  assert.equal(first.snapshot.events.length, 2);
+  assert.equal(first.snapshot.events[1].type, "SETTLEMENT_RECEIPT_ACCEPTED");
+  assert.equal(first.snapshot.events[1].engine, "FUTURES");
   assert.equal(first.snapshot.account.cashBalancePaise, opening.cashBalancePaise);
   assert.equal(first.snapshot.account.blockedFundsPaise, 25000);
   assert.equal(first.snapshot.account.ledgerReconciled, false);
-  assert.equal(Object.isFrozen(first.snapshot.events[0].payload.receipt.amounts), true);
+  assert.equal(Object.isFrozen(first.snapshot.events[1].payload.receipt.amounts), true);
 
   const duplicate = ledger.appendSettlementReceipt(receipt, scope);
   assert.equal(duplicate.accepted, false);
   assert.equal(duplicate.duplicate, true);
-  assert.equal(duplicate.snapshot.events.length, 1);
+  assert.equal(duplicate.snapshot.events.length, 2);
   assert.throws(() => ledger.appendSettlementReceipt({
     ...receipt, amounts: { ...receipt.amounts, blockedDeltaPaise: 24000 }
   }, scope), /SETTLEMENT_RECEIPT_REPLAY_MISMATCH/);
@@ -303,7 +303,9 @@ test("canonical settlement append rejects reused provider event references and u
   assert.throws(() => ledger.appendSettlementReceipt({
     ...receipt, receiptId: "settle-future-003"
   }, { orderId: receipt.orderId, assetClass: "FUTURE", side: "BUY" }), /SETTLEMENT_EVENT_REPLAY/);
-  assert.throws(() => createPaperDemoEventLedger(opening).appendSettlementReceipt(
+  const noTrustLedger = createPaperDemoEventLedger(opening);
+  seedFuturesOrder(noTrustLedger, receipt.orderId, "BUY");
+  assert.throws(() => noTrustLedger.appendSettlementReceipt(
     receipt, { orderId: receipt.orderId, assetClass: "FUTURE", side: "BUY" }
   ), /SETTLEMENT_ATTESTATION_VERIFIER_REQUIRED/);
 });
@@ -326,7 +328,7 @@ test("canonical ledger rejects a settlement receipt whose account/session scope 
   assert.throws(() => ledger.appendSettlementReceipt(
     receipt, { orderId: receipt.orderId, assetClass: "FUTURE", side: "BUY" }
   ), /SETTLEMENT_RECEIPT_SCOPE_MISMATCH/);
-  assert.equal(ledger.snapshot().events.length, 0);
+  assert.equal(ledger.snapshot().events.length, 1);
 });
 
 test("authoritative Options fill settlement applies premium and charges as one canonical cash event", () => {
@@ -355,7 +357,7 @@ test("authoritative Options fill settlement applies premium and charges as one c
   assert.equal(result.snapshot.account.cashBalancePaise, opening.cashBalancePaise - 101250);
   assert.equal(result.snapshot.account.blockedFundsPaise, opening.blockedFundsPaise);
   assert.equal(result.snapshot.account.availableFundsPaise, opening.cashBalancePaise - 101250);
-  assert.equal(result.snapshot.events[0].payload.receipt.amounts.chargesCashDeltaPaise, -1250);
+  assert.equal(result.snapshot.events[2].payload.receipt.amounts.chargesCashDeltaPaise, -1250);
 });
 
 test("generic append cannot inject an unverified settlement event or move account funds", () => {
@@ -397,7 +399,7 @@ test("Futures margin release cannot exceed the outstanding verified reservation 
   };
   const ledger = createPaperDemoEventLedger(opening, trust);
   const base = {
-    schemaVersion: "1.0.0", kind: "FUTURES_MARGIN_RESERVATION",
+    schemaVersion: "1.0.0", kind: "FUTURES_MARGIN_RESERVATION", action: "RESERVE",
     receiptId: "future-reserve-release-1", eventReference: "future-provider-reserve-1",
     accountId: opening.accountId, sessionId: opening.sessionId, orderId: "future-reserve-release-order",
     assetClass: "FUTURE", side: "BUY", currency: "INR",
