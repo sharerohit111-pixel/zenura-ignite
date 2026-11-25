@@ -28,7 +28,7 @@ test("Demo screens disclose synthetic data and isolate local Equity execution fr
  assert.match(js,/local Equity\/F&O simulation only/);
  assert.match(js,/Order execution","Local simulation only/);
  assert.doesNotMatch(js,/order actions disabled/);
- assert.match(js,/ledgerReconciled/);
+ assert.match(js,/getDemoProjectionSnapshot/);\n assert.doesNotMatch(js,/model\.orders|model\.positions|orderRows\(/);\n assert.match(js,/Canonical event projection/);\n assert.match(js,/ledgerReconciled/);
  assert.match(js,/mountEquityDemo\(content\)/);
  assert.match(js,/searchPaperDemoInstruments/);
  assert.match(js,/getPaperDemoExpiries/);
