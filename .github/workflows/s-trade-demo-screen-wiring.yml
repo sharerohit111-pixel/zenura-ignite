@@ -22,6 +22,8 @@ on:
       - "markets/stocks/demo-browser-smoke.cjs"
       - "markets/stocks/demo-chart-data.mjs"
       - "markets/stocks/demo-chart-panel.mjs"
+      - "markets/stocks/connect.js"
+      - "markets/stocks/connect-session-race.test.js"
       - "market-gateway/test/demo-chart-data.test.mjs"
       - ".github/workflows/s-trade-demo-screen-wiring.yml"
   push:
@@ -70,7 +72,7 @@ jobs:
           console.log('Parsed all four canonical screen fixtures.');
           NODE
       - name: Run adapter, event-ledger and screen integration tests
-        run: node --test market-gateway/test/paper-demo-adapter.test.mjs market-gateway/test/paper-demo-event-ledger.test.mjs market-gateway/test/paper-demo-dashboard.test.mjs market-gateway/test/paper-demo-equity-integration.test.mjs market-gateway/test/paper-demo-derivative-integration.test.mjs market-gateway/test/demo-chart-data.test.mjs
+        run: node --test markets/stocks/connect-session-race.test.js market-gateway/test/paper-demo-adapter.test.mjs market-gateway/test/paper-demo-event-ledger.test.mjs market-gateway/test/paper-demo-dashboard.test.mjs market-gateway/test/paper-demo-equity-integration.test.mjs market-gateway/test/paper-demo-derivative-integration.test.mjs market-gateway/test/demo-chart-data.test.mjs
       - name: Install Chromium browser QA dependencies
         run: |
           npm install --prefix "$RUNNER_TEMP/zenura-playwright" playwright@1.61.1 axe-core@4.10.3 --ignore-scripts --no-audit --no-fund

@@ -30,8 +30,8 @@ async function sessionSnapshot() {
   if (error) throw error;
   return data.session || null;
 }
-async function api(path, options = {}) {
-  const session = await sessionSnapshot();
+async function api(path, options = {}, sessionOverride = null) {
+  const session = sessionOverride || await sessionSnapshot();
   if (!session?.access_token) throw new Error("Sign in to continue.");
   if (!gateway) throw new Error("Market gateway URL is not configured yet.");
   const response = await fetch(gateway + path, {
@@ -58,16 +58,18 @@ let authStateSequence = 0;
 let currentSession = null;
 async function refreshStatus(sequence = authStateSequence) {
   const session = await sessionSnapshot().catch(() => null);
+  if (sequence !== authStateSequence) return;
   if (!session?.user) {
     setState("SIGN IN REQUIRED", "Create an account or sign in using Supabase below. No Firebase account is used.");
     return;
   }
   if (!gateway) {
+    if (sequence !== authStateSequence) return;
     setState("SUPABASE SIGNED IN", "Signed in securely. Configure the Supabase-native market gateway to connect Upstox.");
     return;
   }
   try {
-    const data = await api("/upstox/connection");
+    const data = await api("/upstox/connection", {}, session);
     if (sequence !== authStateSequence) return;
     if (data.connected) {
       const expiry = Number.isFinite(data.expiresAt)
@@ -83,35 +85,40 @@ async function refreshStatus(sequence = authStateSequence) {
   }
 }
 disconnectButton.addEventListener("click", async () => {
+  const sequence = authStateSequence;
   disconnectButton.disabled = true;
   try {
     setState("DISCONNECTING UPSTOX", "Ending this app's market-data connection…", false, true);
     await api("/upstox/connection", { method: "DELETE" });
-    await refreshStatus(authStateSequence);
+    if (sequence !== authStateSequence) return;
+    await refreshStatus(sequence);
   } catch (error) {
-    setState("DISCONNECT FAILED", explainError(error, error.payload), false, true);
+    if (sequence === authStateSequence) setState("DISCONNECT FAILED", explainError(error, error.payload), false, true);
   } finally {
     disconnectButton.disabled = false;
   }
 });
 button.addEventListener("click", async () => {
+  const sequence = authStateSequence;
   button.disabled = true;
   try {
     const session = await sessionSnapshot();
+    if (sequence !== authStateSequence) return;
     if (!session?.user) {
       setState("SIGN IN REQUIRED", "Create an account or sign in with Supabase below.");
       document.getElementById("market-email")?.focus();
       return;
     }
     setState("STARTING UPSTOX", "Preparing secure authorization…");
-    const result = await api("/upstox/oauth/start", { method: "POST", body: "{}" });
+    const result = await api("/upstox/oauth/start", { method: "POST", body: "{}" }, session);
+    if (sequence !== authStateSequence) return;
     const url = result.authorizationUrl;
     if (typeof url !== "string" || !url.startsWith("https://api.upstox.com/")) {
       throw new Error("The server did not return a valid Upstox authorization URL.");
     }
     window.location.assign(url);
   } catch (error) {
-    setState("CONNECTION NOT COMPLETED", explainError(error, error.payload), false, false);
+    if (sequence === authStateSequence) setState("CONNECTION NOT COMPLETED", explainError(error, error.payload), false, false);
   } finally {
     button.disabled = false;
   }
