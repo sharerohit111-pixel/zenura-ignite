@@ -627,3 +627,46 @@ test("order share reservations are lifecycle-derived and cannot be overridden on
   assert.equal(ledger.snapshot().positions[0].reservedQuantity, 3);
   assert.deepEqual(replayPaperDemoEvents(opening, ledger.snapshot().events), ledger.snapshot());
 });
+
+
+test("repeated terminal SELL updates never release the same remaining reservation twice", () => {
+  const ledger = createPaperDemoEventLedger(opening);
+  ledger.append(event({
+    type: "POSITION_CHANGED", sourceEventId: "seed-repeat-terminal", idempotencyKey: "seed-repeat-terminal",
+    deltas: { cashDeltaPaise: 0, blockedDeltaPaise: 0 },
+    payload: { assetClass: "EQUITY", instrumentKey: "MOCK|NSE|EQ|0001", product: "DELIVERY",
+      quantityDelta: 5, costBasisDeltaPaise: 500000, realizedPnlDeltaPaise: 0 }
+  }));
+  ledger.append(event({
+    eventId: "evt-repeat-sell-accepted", idempotencyKey: "idem-repeat-sell-accepted",
+    sourceEventId: "source-repeat-sell-accepted", occurredAt: "2026-11-25T09:30:01+05:30",
+    deltas: { cashDeltaPaise: 0, blockedDeltaPaise: 0 },
+    payload: { ...event().payload, side: "SELL", quantity: 3, status: "PENDING" }
+  }));
+  ledger.append(event({
+    eventId: "evt-repeat-sell-fill", idempotencyKey: "idem-repeat-sell-fill",
+    sourceEventId: "source-repeat-sell-fill", type: "FILL_RECORDED",
+    occurredAt: "2026-11-25T09:30:02+05:30",
+    deltas: { cashDeltaPaise: 0, blockedDeltaPaise: 0 },
+    payload: { fillId: "repeat-terminal-fill", orderId: "order-1", assetClass: "EQUITY",
+      instrumentKey: "MOCK|NSE|EQ|0001", product: "DELIVERY", side: "SELL", quantity: 1, pricePaise: 100000 }
+  }));
+  const terminal = (id, second) => ledger.append(event({
+    eventId: "evt-repeat-terminal-" + id, idempotencyKey: "idem-repeat-terminal-" + id,
+    sourceEventId: "source-repeat-terminal-" + id, type: "ORDER_UPDATED",
+    occurredAt: "2026-11-25T09:30:0" + second + "+05:30",
+    deltas: { cashDeltaPaise: 0, blockedDeltaPaise: 0 },
+    payload: { ...event().payload, side: "SELL", quantity: 3, status: "CANCELLED",
+      ...(id === "second" ? { reservedQuantityDelta: 0 } : {}) }
+  }));
+  terminal("first", 3);
+  assert.equal(ledger.snapshot().positions[0].reservedQuantity, 0);
+  terminal("second", 4);
+  const snapshot = ledger.snapshot();
+  assert.equal(snapshot.orders[0].status, "CANCELLED");
+  assert.equal(snapshot.orders[0].filledQuantity, 1);
+  assert.equal(snapshot.orders[0].remainingQuantity, 2);
+  assert.equal(snapshot.positions[0].reservedQuantity, 0);
+  assert.equal(snapshot.events.length, 5);
+  assert.deepEqual(replayPaperDemoEvents(opening, snapshot.events), snapshot);
+});
