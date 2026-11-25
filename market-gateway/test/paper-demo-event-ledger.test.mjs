@@ -311,3 +311,91 @@ test("rejected SELL orders cannot reserve or release position shares", () => {
   assert.equal(ledger.append(rejected(0, "zero")).accepted, true);
   assert.equal(ledger.snapshot().positions[0].reservedQuantity, 0);
 });
+
+
+test("SELL reservations are owned by their order and cancellation cannot release another order's shares", () => {
+  const ledger = createPaperDemoEventLedger(opening);
+  const base = (n, type, source, payload, deltas = { cashDeltaPaise:  0, blockedDeltaPaise: 0 }) => event({
+    eventId: "owned-" + n, idempotencyKey: "owned-idem-" + n, sourceEventId: source,
+    type, occurredAt: "2026-11-25T09:31:" + String(n).padStart(2, "0") + "+05:30",
+    deltas, payload
+  });
+  const instrumentKey = "MOCK|NSE|EQ|0001";
+  ledger.append(base(1, "POSITION_CHANGED", "owned-seed", {
+    assetClass: "EQUITY", instrumentKey, product: "DELIVERY",
+    quantityDelta: 5, costBasisDeltaPaise: 500000, realizedPnlDeltaPaise: 0
+  }));
+  const sell = (orderId, quantity) => ({
+    orderId, assetClass: "EQUITY", instrumentKey, product: "DELIVERY",
+    side: "SELL", orderType: "LIMIT", quantity, status: "PENDING"
+  });
+  ledger.append(base(2, "ORDER_ACCEPTED", "owned-sell-1", sell("sell-owned-1", 3)));
+  ledger.append(base(3, "ORDER_ACCEPTED", "owned-sell-2", sell("sell-owned-2", 2)));
+  assert.equal(ledger.snapshot().positions[0].reservedQuantity, 5);
+  const cancel = (n, orderId, quantity) => base(n, "ORDER_UPDATED", "owned-cancel-" + n, {
+    ...sell(orderId, quantity), status: "CANCELLED", reservedQuantityDelta: -quantity
+  });
+  ledger.append(cancel(4, "sell-owned-1", 3));
+  let snapshot = ledger.snapshot();
+  assert.equal(snapshot.positions[0].reservedQuantity, 2);
+  assert.equal(snapshot.orders.find(x => x.orderId === "sell-owned-1").reservedQuantity, 0);
+  assert.equal(snapshot.orders.find(x => x.orderId === "sell-owned-2").reservedQuantity, 2);
+  ledger.append(cancel(5, "sell-owned-2", 2));
+  snapshot = ledger.snapshot();
+  assert.equal(snapshot.positions[0].reservedQuantity, 0);
+});
+
+test("partial SELL fills reduce only that order reservation and cancellation releases only its remainder", () => {
+  const ledger = createPaperDemoEventLedger(opening);
+  const instrumentKey = "MOCK|NSE|EQ|0001";
+  const make = (n, type, source, payload, deltas = { cashDeltaPaise: 0, blockedDeltaPaise: 0 }) => event({
+    eventId: "partial-" + n, idempotencyKey: "partial-idem-" + n, sourceEventId: source,
+    type, occurredAt: "2026-11-25T09:32:" + String(n).padStart(2, "0") + "+05:30", deltas, payload
+  });
+  ledger.append(make(1, "POSITION_CHANGED", "partial-seed", {
+    assetClass: "EQUITY", instrumentKey, product: "DELIVERY",
+    quantityDelta: 5, costBasisDeltaPaise: 500000, realizedPnlDeltaPaise: 0
+  }));
+  const order = { orderId: "partial-sell", assetClass: "EQUITY", instrumentKey, product: "DELIVERY",
+    side: "SELL", orderType: "LIMIT", quantity: 4, status: "PENDING" };
+  ledger.append(make(2, "ORDER_ACCEPTED", "partial-accept", order));
+  ledger.append(make(3, "FILL_RECORDED", "partial-fill", {
+    fillId: "partial-fill-1", orderId: "partial-sell", assetClass: "EQUITY", instrumentKey,
+    product: "DELIVERY", side: "SELL", quantity: 1, pricePaise: 100000, grossPaise: 100000
+  }, { cashDeltaPaise: 100000, blockedDeltaPaise: 0 }));
+  let snapshot = ledger.snapshot();
+  assert.equal(snapshot.positions[0].reservedQuantity, 3);
+  assert.equal(snapshot.orders[0].reservedQuantity, 3);
+  ledger.append(make(4, "ORDER_UPDATED", "partial-cancel", {
+    ...order, status: "CANCELLED", reservedQuantityDelta: -3, filledQuantity: 1, remainingQuantity: 3
+  }));
+  snapshot = ledger.snapshot();
+  assert.equal(snapshot.positions[0].reservedQuantity, 0);
+  assert.equal(snapshot.orders[0].reservedQuantity, 0);
+  assert.equal(snapshot.orders[0].status, "CANCELLED");
+});
+
+test("BUY orders and unrelated SELL updates cannot manipulate share reservations", () => {
+  const ledger = createPaperDemoEventLedger(opening);
+  const instrumentKey = "MOCK|NSE|EQ|0001";
+  const make = (n, type, source, payload) => event({
+    eventId: "guard-" + n, idempotencyKey: "guard-idem-" + n, sourceEventId: source,
+    type, occurredAt: "2026-11-25T09:33:" + String(n).padStart(2, "0") + "+05:30",
+    deltas: { cashDeltaPaise: 0, blockedDeltaPaise: 0 }, payload
+  });
+  ledger.append(make(1, "POSITION_CHANGED", "guard-seed", {
+    assetClass: "EQUITY", instrumentKey, product: "DELIVERY",
+    quantityDelta: 5, costBasisDeltaPaise: 500000, realizedPnlDeltaPaise: 0
+  }));
+  const buy = { orderId: "guard-buy", assetClass: "EQUITY", instrumentKey, product: "DELIVERY",
+    side: "BUY", orderType: "LIMIT", quantity: 2, status: "PENDING", reservedQuantityDelta: 1 };
+  assert.throws(() => ledger.append(make(2, "ORDER_ACCEPTED", "guard-buy", buy)), /ORDER_ACCEPTED_RESERVATION_MISMATCH/);
+  const sell = { orderId: "guard-sell", assetClass: "EQUITY", instrumentKey, product: "DELIVERY",
+    side: "SELL", orderType: "LIMIT", quantity: 2, status: "PENDING" };
+  ledger.append(make(2, "ORDER_ACCEPTED", "guard-sell", sell));
+  assert.throws(() => ledger.append(make(3, "ORDER_UPDATED", "guard-wrong-release", {
+    ...sell, status: "CANCELLED", reservedQuantityDelta: -1
+  })), /ORDER_RESERVATION_RELEASE_MISMATCH/);
+  assert.equal(ledger.snapshot().positions[0].reservedQuantity, 2);
+  assert.equal(ledger.snapshot().orders[0].reservedQuantity, 2);
+});
