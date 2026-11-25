@@ -254,7 +254,7 @@ export function createPaperDemoEventLedger(opening) {
     const sourceKey = event.engine + "|" + event.sourceEventId;
     if (sourceEvents.has(sourceKey)) fail("DUPLICATE_SOURCE_EVENT");
     const time = timestampMs(event.occurredAt);
-    if (time <= lastTimestamp) fail("DEMO_EVENT_TIME_ORDER_MISMATCH");
+    if (time < lastTimestamp) fail("DEMO_EVENT_TIME_ORDER_MISMATCH");
     const before = clone(projection);
     try {
       apply(projection, event);
