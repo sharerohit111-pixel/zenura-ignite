@@ -50,6 +50,7 @@ const axePath=require.resolve("axe-core/axe.min.js");
    assert.equal(await toggle.getAttribute("aria-label"),"इंटरफ़ेस की भाषा हिंदी करें",viewport.name+" translated toggle accessibility label");
    await page.reload({waitUntil:"domcontentloaded",timeout:30000});
    await page.waitForFunction(()=>document.querySelector("#demo-status")?.textContent.includes("4 canonical fixtures validated"),null,{timeout:10000});
+   await page.addScriptTag({path:axePath});
    assert.equal(await page.locator("html").getAttribute("lang"),"hi",viewport.name+" language preference persists after reload");
    await page.locator("#language-toggle").click();assert.equal(await page.locator("html").getAttribute("lang"),"en",viewport.name+" English language metadata");
    await page.locator("#screen-nav button[data-screen=\"charts\"]").click();
