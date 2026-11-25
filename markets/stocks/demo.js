@@ -2,7 +2,7 @@ import { createPaperDemoViewModel, searchPaperDemoInstruments, getPaperDemoExpir
 import { mountDerivativeDemo } from "./demo-derivative-panel.mjs";
 import { mountDemoChart } from "./demo-chart-panel.mjs";
 import { mountEquityDemo } from "./demo-equity-panel.mjs";
-import { appendUnifiedLedgerSummary } from "./demo-unified-ledger-panel.mjs";
+import { appendUnifiedLedgerSummary, appendWalletSummary } from "./demo-unified-ledger-panel.mjs";
 
 "use strict";
 const status=document.getElementById("demo-status");
@@ -202,8 +202,7 @@ function render(name){
   return;
  }
  if(name==="account"){
-  content.append(grid(card("Starting capital",money(a.startingCapitalPaise),"₹10,00,000 virtual capital"),card("Cash balance",money(a.cashBalancePaise),"Fixture value"),card("Blocked funds",money(a.blockedFundsPaise),"Fixture value"),card("Available funds",money(a.availableFundsPaise),"Fixture value")));
-  content.append(notice("Ledger reconciliation: "+String(a.ledgerReconciled)+". This wallet snapshot is explicitly unreconciled and must not be treated as a unified cross-asset balance."));
+  appendWalletSummary(content);
   return;
  }
  if(name==="profile"){
