@@ -74,7 +74,7 @@ test("PWA caches the simulator and synthetic fixtures; production gateway stays 
   assert.match(sw, /fixtures\/derivatives\.json/);
   assert.match(sw, /fixtures\/equity-execution\.json/);
   assert.match(sw, /SHELL\.includes\(url\.toString\(\)\)/);
-  assert.match(sw, /if\(shellAsset\|\|/);
+  assert.match(sw, /if\(shellAsset\)\{/);
   assert.match(sw, /!url\.pathname\.startsWith\(BASE\.pathname\)&&!shellAsset/);
   const productionBoundary = /paper-demo-adapter|derivative-mock-simulator|paper-mock-fixtures|equity-demo-execution-engine|demo-(equity|chart|derivative)-panel|market-gateway\/mock\/fixtures|equity-execution\.json/;
   assert.doesNotMatch(supabaseGateway, productionBoundary);
