@@ -112,7 +112,7 @@ function apply(projection, event) {
     if (reservationDelta !== 0) {
       const key = positionKey(p.assetClass, p.instrumentKey, product);
       const position = projection.positions.find(x => x.key === key);
-      if (!position || position.quantity - position.reservedQuantity < reservationDelta) fail("DEMO_SHARE_RESERVATION_INVARIANT");
+      if (!position || (p.assetClass === "FUTURE") || position.quantity - position.reservedQuantity < reservationDelta) fail("DEMO_SHARE_RESERVATION_INVARIANT");
       position.reservedQuantity += reservationDelta;
       if (!integer(position.reservedQuantity) || position.reservedQuantity < 0 || position.reservedQuantity > position.quantity) fail("DEMO_SHARE_RESERVATION_INVARIANT");
     }
@@ -125,7 +125,7 @@ function apply(projection, event) {
         ["CANCELLED", "REJECTED", "EXPIRED", "FILLED"].includes(order.status)) fail("FILL_ORDER_MISMATCH");
     const alreadyFilled = projection.fills.filter(x => x.orderId === p.orderId).reduce((sum, x) => sum + x.quantity, 0);
     if (!Number.isSafeInteger(alreadyFilled + p.quantity) || alreadyFilled + p.quantity > order.quantity) fail("FILL_QUANTITY_EXCEEDS_ORDER");
-    if (p.side === "SELL") {
+    if (p.side === "SELL" && p.assetClass !== "FUTURE") {
       const position = projection.positions.find(x => x.key === positionKey(p.assetClass, p.instrumentKey, productOf(p)));
       if (!position || position.reservedQuantity < p.quantity) fail("DEMO_SHARE_RESERVATION_INVARIANT");
       position.reservedQuantity -= p.quantity;
@@ -144,12 +144,12 @@ function apply(projection, event) {
     const reserved = position.reservedQuantity + (p.reservedQuantityDelta ?? 0);
     const realized = position.realizedPnlPaise + p.realizedPnlDeltaPaise;
     if (![quantity, costBasis, reserved, realized].every(Number.isSafeInteger) ||
-        quantity < 0 || costBasis < 0 || reserved < 0 || reserved > quantity ||
-        (quantity === 0 && costBasis !== 0)) fail("DEMO_POSITION_INVARIANT");
+        (p.assetClass !== "FUTURE" && quantity < 0) || costBasis < 0 || reserved < 0 || reserved > Math.max(0, quantity) ||
+        (quantity === 0 && costBasis !== 0) || (p.assetClass === "FUTURE" && reserved !== 0)) fail("DEMO_POSITION_INVARIANT");
     position.quantity = quantity;
     position.costBasisPaise = costBasis;
     position.reservedQuantity = reserved;
-    position.averagePricePaise = quantity > 0 ? Math.round(costBasis / quantity) : 0;
+    position.averagePricePaise = quantity !== 0 ? Math.round(costBasis / Math.abs(quantity)) : 0;
     position.realizedPnlPaise = realized;
   }
   projection.account.realizedPnlPaise += event.type === "POSITION_CHANGED" ? event.payload.realizedPnlDeltaPaise : 0;
