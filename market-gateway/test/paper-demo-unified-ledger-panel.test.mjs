@@ -70,3 +70,22 @@ test("aggregate unrealized P&L is withheld when any open position lacks a fresh 
   marks.delete("FUT1");
   assert.deepEqual(calculateAggregateUnrealized(positions, marks), { complete: false, value: null });
 });
+
+test("Futures notional is not presented as ordinary portfolio market value", async () => {
+  const { portfolioMarketValueDisplay, createPortfolioMark } = await import("../../markets/stocks/demo-unified-ledger-panel.mjs");
+  const now = 1_800_000_000_000;
+  const fresh = createPortfolioMark(2500000, now, { now, maxAgeMs: 15000 });
+  assert.equal(portfolioMarketValueDisplay({ assetClass: "FUTURE", quantity: 25 }, fresh), "Not applicable (Futures MTM)");
+  assert.equal(portfolioMarketValueDisplay({ assetClass: "OPTION", quantity: 25 }, fresh), "₹6,25,000.00");
+  assert.equal(portfolioMarketValueDisplay({ assetClass: "EQUITY", quantity: 10 }, null), "—");
+});
+
+test("account realized P&L includes closed positions no longer present in open positions", async () => {
+  const { accountRealizedPnlPaise } = await import("../../markets/stocks/demo-unified-ledger-panel.mjs");
+  const snapshot = {
+    account: { realizedPnlPaise: 12500 },
+    positions: [{ quantity: 2, realizedPnlPaise: 500 }]
+  };
+  assert.equal(accountRealizedPnlPaise(snapshot), 12500);
+  assert.equal(accountRealizedPnlPaise({ account: { realizedPnlPaise: null } }), null);
+});
