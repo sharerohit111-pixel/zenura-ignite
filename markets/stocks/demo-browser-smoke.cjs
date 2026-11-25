@@ -18,7 +18,9 @@ const axePath=require.resolve("axe-core/axe.min.js");
    const pageErrors=[];
    page.on("pageerror",error=>pageErrors.push(error.message));
    await page.goto("http://127.0.0.1:4173/markets/stocks/demo.html",{waitUntil:"domcontentloaded",timeout:30000});
-   await page.waitForFunction(()=>document.querySelector("#demo-status")?.textContent.includes("4 canonical fixtures validated"),null,{timeout:10000});
+   await page.waitForFunction(()=>{const value=document.querySelector("#demo-status")?.textContent||"";return value.includes("4 canonical fixtures validated")||value.startsWith("Demo unavailable:");},null,{timeout:15000});
+   const initialStatus=await page.locator("#demo-status").textContent();
+   assert.match(initialStatus,/4 canonical fixtures validated/,viewport.name+" initial fixture load; status="+initialStatus+"; browserErrors="+pageErrors.join(" | "));
    assert.equal(await page.locator("#screen-nav button[data-screen]").count(),15,viewport.name+" screen count");
    for(const name of ["home","market","watchlists","charts","equity","futures","options","orders","trades","portfolio","positions","holdings","account","profile","settings"]){
     await page.locator('#screen-nav button[data-screen="'+name+'"]').click();
@@ -53,21 +55,21 @@ const axePath=require.resolve("axe-core/axe.min.js");
   console.log("PWA: opening market shell");
   await page.goto("http://127.0.0.1:4173/markets/",{waitUntil:"domcontentloaded",timeout:30000});
   await page.waitForLoadState("load",{timeout:10000});
+  console.log("PWA: waiting for service worker activation");
+  let workerState;
   try{
    await page.waitForFunction(async()=>{
-    const registrations=await navigator.serviceWorker.getRegistrations();
-    return registrations.some(registration=>registration.active?.state==="activated");
-   },null,{timeout:20000});
+    const registration=await navigator.serviceWorker.ready;
+    return registration.active?.state==="activated";
+   },null,{timeout:15000});
+   workerState=await page.evaluate(async()=>{
+    const registration=await navigator.serviceWorker.ready;
+    return {state:registration.active?.state||"missing",scope:registration.scope||null};
+   });
   }catch(error){
    const state=await page.evaluate(async()=>({controller:!!navigator.serviceWorker.controller,registrations:(await navigator.serviceWorker.getRegistrations()).map(r=>({scope:r.scope,installing:r.installing?.state||null,waiting:r.waiting?.state||null,active:r.active?.state||null}))}));
-   throw new Error("PWA service worker did not activate: "+JSON.stringify(state)+"; console: "+pwaConsole.join(" | ")+"; "+error.message);
+   throw new Error("PWA service worker did not become ready: "+JSON.stringify(state)+"; console: "+pwaConsole.join(" | ")+"; "+error.message);
   }
-  console.log("PWA: waiting for service worker activation");
-  const workerState=await page.evaluate(async()=>{
-   const registrations=await navigator.serviceWorker.getRegistrations();
-   const registration=registrations.find(item=>item.active?.state==="activated");
-   return {state:registration?.active?.state||"missing",scope:registration?.scope||null};
-  });
   assert.equal(workerState.state,"activated","service worker must be active before controlled reload");
   console.log(JSON.stringify({pwaWorker:workerState.state,scope:workerState.scope}));
   // clients.claim() in the activate handler controls existing same-scope clients.

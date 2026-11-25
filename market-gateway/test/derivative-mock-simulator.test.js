@@ -206,3 +206,43 @@ test("simulator rejects a non-synthetic Options underlying", () => {
   target.underlying = "NIFTY";
   assert.throws(() => createDerivativeMockSimulator(invalid, { now }), /invalid CE\/PE strike contract/);
 });
+
+test("default replay clock is anchored to the fixture snapshot", () => {
+  const simulator = createDerivativeMockSimulator(fixture);
+  assert.equal(Date.parse(simulator.snapshot().simulationTime), Date.parse(fixture.asOf));
+});
+
+test("Futures Intraday and Delivery positions are isolated with signed fixture-marked P&L", () => {
+  const simulator = create();
+  const instrument = future();
+  simulator.submit({ instrumentKey: instrument.instrumentKey, side: "BUY", orderType: "MARKET", lots: 1, product: "INTRADAY" });
+  simulator.submit({ instrumentKey: instrument.instrumentKey, side: "SELL", orderType: "MARKET", lots: 1, product: "DELIVERY" });
+  const positions = simulator.snapshot().positions;
+  assert.equal(positions.length, 2);
+  const intraday = positions.find(item => item.product === "INTRADAY");
+  const delivery = positions.find(item => item.product === "DELIVERY");
+  assert.equal(intraday.netQuantity, 25);
+  assert.equal(intraday.markPricePaise, 2500000);
+  assert.equal(intraday.unrealizedPnlPaise, -1250);
+  assert.equal(delivery.netQuantity, -25);
+  assert.equal(delivery.markPricePaise, 2500050);
+  assert.equal(delivery.unrealizedPnlPaise, -1250);
+  assert.equal(intraday.markSource, "SYNTHETIC_FIXTURE");
+});
+
+test("Futures partial LIMIT cancellation preserves executed lots and signed position", () => {
+  const simulator = create();
+  const instrument = future();
+  const order = simulator.submit({
+    instrumentKey: instrument.instrumentKey, side: "BUY", orderType: "LIMIT",
+    lots: 3, limitPricePaise: 2500100, product: "INTRADAY"
+  });
+  assert.equal(simulator.processLimitFills().partial, 1);
+  const cancelled = simulator.cancel(order.orderId);
+  assert.equal(cancelled.status, "CANCELLED");
+  assert.equal(cancelled.filledQuantity, 50);
+  assert.equal(cancelled.remainingQuantity, 25);
+  const position = simulator.snapshot().positions.find(item => item.product === "INTRADAY");
+  assert.equal(position.netQuantity, 50);
+  assert.equal(simulator.snapshot().orders[0].status, "CANCELLED");
+});

@@ -30,7 +30,23 @@ test("Equity and Futures events share one idempotent projection",async()=>{
  assert.equal(rejectedProjection.orders.find(o=>o.orderId==="MOCK-FO-000002").status,"REJECTED");
  assert.equal(rejectedProjection.orders.find(o=>o.orderId==="MOCK-FO-000002").rejectionReason,"Insufficient deterministic depth");
  const combined=sync("DERIVATIVES",derivatives);
- assert.equal(combined.orders.length,3);assert.equal(combined.trades.length,2);
+ assert.equal(combined.orders.length,4);assert.equal(combined.trades.length,4);
  assert.equal(combined.positions.find(p=>p.assetClass==="FUTURE").quantity,-2);
  assert.deepEqual(history.createDemoTradeHistoryStore({env:{NODE_ENV:"test"}}).replay([]),{mode:"DEMO",provider:"DUMMY_JSON",simulationOnly:true,orders:[],openOrders:[],trades:[],positions:[],events:[]});
+});
+
+test("shared event projection reconciles Futures realized and synthetic unrealized P&L by product",async()=>{
+ if(!sync){({syncDemoProjection:sync}=await import("../../markets/stocks/demo-trade-projection.mjs"));}
+ const key="MOCK|NSE|FUT|MOCKBANK|2026-12-31";
+ const snapshot={orders:[
+  {orderId:"MOCK-FO-PNL-BUY",assetClass:"FUTURE",side:"BUY",orderType:"MARKET",product:"INTRADAY",instrumentKey:key,quantity:50,filledQuantity:50,remainingQuantity:0,status:"FILLED",createdAt:"2026-11-25T10:00:00.000Z",updatedAt:"2026-11-25T10:00:01.000Z",fills:[{fillId:"mock-pnl-buy-fill",quantity:50,pricePaise:2500050,executedAt:"2026-11-25T10:00:01.000Z"}]},
+  {orderId:"MOCK-FO-PNL-SELL",assetClass:"FUTURE",side:"SELL",orderType:"MARKET",product:"INTRADAY",instrumentKey:key,quantity:25,filledQuantity:25,remainingQuantity:0,status:"FILLED",createdAt:"2026-11-25T10:00:02.000Z",updatedAt:"2026-11-25T10:00:03.000Z",fills:[{fillId:"mock-pnl-sell-fill",quantity:25,pricePaise:2500000,executedAt:"2026-11-25T10:00:03.000Z"}]}
+ ],positions:[{instrumentKey:key,product:"INTRADAY",markPricePaise:2500000,unrealizedPnlPaise:-1250,markSource:"SYNTHETIC_FIXTURE"}]};
+ const result=sync("DERIVATIVES",snapshot);
+ const position=result.positions.find(item=>item.instrumentKey===key&&item.product==="INTRADAY");
+ assert.equal(position.quantity,25);
+ assert.equal(position.realizedPnlPaise,-1250);
+ assert.equal(position.markPricePaise,2500000);
+ assert.equal(position.unrealizedPnlPaise,-1250);
+ assert.equal(position.totalPnlPaise,-2500);
 });

@@ -29,13 +29,16 @@
   function validateEnvelope(envelope) {
     if (!envelope || envelope.schemaVersion !== "1.0.0" || envelope.mode !== "MOCK" ||
         envelope.simulated !== true || !envelope.data || !Array.isArray(envelope.data.contracts) ||
-        !Array.isArray(envelope.data.quotes)) fail("A valid DEMO DATA derivatives fixture is required.");
+        !Array.isArray(envelope.data.quotes) || typeof envelope.asOf !== "string" ||
+        !Number.isFinite(Date.parse(envelope.asOf))) fail("A valid DEMO DATA derivatives fixture is required.");
     return envelope.data;
   }
 
   function createDerivativeMockSimulator(envelope, options) {
     const data = validateEnvelope(envelope);
-    const now = options && Number.isSafeInteger(options.now) ? options.now : Date.now();
+    // Static fixtures replay against their own snapshot clock by default. Tests may
+    // inject an explicit clock to exercise expiry deterministically.
+    const now = options && Number.isSafeInteger(options.now) ? options.now : Date.parse(envelope.asOf);
     const contracts = new Map();
     const quotes = new Map();
     const positions = new Map();
@@ -97,8 +100,10 @@
       if (!quote) fail("A deterministic DEMO DATA quote is unavailable for this contract.");
       return quote;
     }
-    function positionFor(key) {
-      return positions.get(key) || { netQuantity: 0, averagePricePaise: 0 };
+    function positionKey(key, product) { return key + "|" + product; }
+    function positionFor(key, product) {
+      const selectedProduct = product || "DELIVERY";
+      return positions.get(positionKey(key, selectedProduct)) || { netQuantity: 0, averagePricePaise: 0 };
     }
     function reservedOptionSellQuantity(key) {
       return orders.filter(order => order.instrumentKey === key && order.assetClass === "OPTION" &&
@@ -106,12 +111,12 @@
         .reduce((sum, order) => sum + order.remainingQuantity, 0);
     }
     function availableOptionQuantity(key) {
-      return Math.max(0, positionFor(key).netQuantity - reservedOptionSellQuantity(key));
+      return Math.max(0, positionFor(key, "DELIVERY").netQuantity - reservedOptionSellQuantity(key));
     }
     function updatePosition(order, quantity, pricePaise) {
       const contract = contracts.get(order.instrumentKey);
       const instrumentType = contract.assetClass === "FUTURE" ? "FUT" : contract.optionType;
-      const current = positionFor(order.instrumentKey);
+      const current = positionFor(order.instrumentKey, order.product);
       if (contract.assetClass === "OPTION" && order.side === "SELL" &&
           (current.netQuantity <= 0 || quantity > current.netQuantity)) {
         fail("Options SELL is close-only and cannot open or reverse a short position.");
@@ -127,21 +132,25 @@
       if (contract.assetClass === "OPTION" && result.netQuantity < 0) {
         fail("Short CE/PE positions are disabled in this demo.");
       }
-      positions.set(order.instrumentKey, {
+      positions.set(positionKey(order.instrumentKey, order.product), {
+        instrumentKey: order.instrumentKey,
+        product: order.product,
         netQuantity: result.netQuantity,
         averagePricePaise: result.averagePricePaise
       });
       return result;
     }
     function appendFill(order, quantity, pricePaise) {
-      updatePosition(order, quantity, pricePaise);
       const grossPaise = quantity * pricePaise;
       if (!Number.isSafeInteger(grossPaise)) fail("Demo fill value exceeds safe integer limits.");
+      // Validate all fill arithmetic before mutating the position projection.
+      const positionTransition = updatePosition(order, quantity, pricePaise);
       order.fills.push({
         fillId: order.orderId + "-F" + String(order.fills.length + 1).padStart(3, "0"),
         quantity,
         pricePaise,
         grossPaise,
+        realizedPnlPaise: positionTransition.realizedPnlPaise,
         executedAt: new Date(now).toISOString(),
         simulated: true
       });
@@ -262,11 +271,20 @@
 
     function snapshot() {
       const positionRows = [];
-      positions.forEach((position, key) => {
+      positions.forEach(position => {
         if (position.netQuantity === 0) return;
+        const key = position.instrumentKey;
         const contract = contracts.get(key);
+        const quote = quoteFor(key);
+        // Mark at the executable side used to close the position: bid for
+        // longs, ask for shorts. This is synthetic indicative P&L, not settlement.
+        const markPricePaise = position.netQuantity > 0
+          ? quote.base.bidPricePaise : quote.base.askPricePaise;
+        const unrealizedPnlPaise = (markPricePaise - position.averagePricePaise) * position.netQuantity;
+        if (!Number.isSafeInteger(unrealizedPnlPaise)) fail("Demo unrealized P&L exceeds safe integer limits.");
         positionRows.push({
           instrumentKey: key,
+          product: position.product,
           symbol: contract.symbol,
           assetClass: contract.assetClass,
           optionType: contract.optionType || null,
@@ -274,6 +292,9 @@
           expiry: contract.expiry,
           netQuantity: position.netQuantity,
           averagePricePaise: position.averagePricePaise,
+          markPricePaise,
+          unrealizedPnlPaise,
+          markSource: "SYNTHETIC_FIXTURE",
           reservedCloseQuantity: contract.assetClass === "OPTION" ? reservedOptionSellQuantity(key) : 0,
           availableCloseQuantity: contract.assetClass === "OPTION"
             ? availableOptionQuantity(key) : null
@@ -282,6 +303,7 @@
       return {
         mode: "MOCK",
         simulated: true,
+        simulationTime: new Date(now).toISOString(),
         positions: copy(positionRows),
         orders: copy(orders.map(({ fillValuePaise, ...order }) => order)),
         accountingNotice: "DEMO only: no cash ledger, charges, margin reservation, broker or exchange is changed."
