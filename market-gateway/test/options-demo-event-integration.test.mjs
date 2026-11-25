@@ -7,6 +7,7 @@ const require=createRequire(import.meta.url);
 const fixture=require("../mock/fixtures/derivatives.json");
 const {createDerivativeMockSimulator}=require("../../markets/stocks/derivative-mock-simulator.js");
 const history=require("../lib/demo-trade-history-store.js");
+global.window={ZenuraDemoTradeHistory:history};
 
 test("CE and PE demo fills flow once into canonical events, positions and realized P&L",async()=>{
   const now=Date.parse(fixture.asOf);
