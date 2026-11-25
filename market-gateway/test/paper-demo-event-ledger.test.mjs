@@ -215,3 +215,49 @@ test("product-aware cost basis cannot become negative or outlive a flat position
   })), /DEMO_POSITION_INVARIANT/);
   assert.equal(ledger.snapshot().events.length, 0);
 });
+
+
+test("terminal orders cannot be reopened or mutated by later status events", () => {
+  const ledger = createPaperDemoEventLedger(opening);
+  ledger.append(event());
+  ledger.append(event({
+    eventId: "evt-2", idempotencyKey: "idem-2", sourceEventId: "fill-1",
+    type: "FILL_RECORDED", occurredAt: "2026-11-25T09:30:01+05:30",
+    deltas: { cashDeltaPaise: -125050, blockedDeltaPaise: -10000 },
+    payload: { fillId: "fill-1", orderId: "order-1", assetClass: "EQUITY",
+      instrumentKey: "MOCK|NSE|EQ|0001", side: "BUY", quantity: 2, pricePaise: 125050 }
+  }));
+  ledger.append(event({
+    eventId: "evt-3", idempotencyKey: "idem-3", sourceEventId: "filled-1",
+    type: "ORDER_UPDATED", occurredAt: "2026-11-25T09:30:02+05:30",
+    deltas: { cashDeltaPaise: 0, blockedDeltaPaise: 0 },
+    payload: { ...event().payload, status: "FILLED" }
+  }));
+  assert.throws(() => ledger.append(event({
+    eventId: "evt-4", idempotencyKey: "idem-4", sourceEventId: "reopen-1",
+    type: "ORDER_UPDATED", occurredAt: "2026-11-25T09:30:03+05:30",
+    deltas: { cashDeltaPaise: 0, blockedDeltaPaise: 0 },
+    payload: { ...event().payload, status: "PENDING" }
+  })), /ORDER_TERMINAL_STATE_IMMUTABLE/);
+  assert.equal(ledger.snapshot().orders[0].status, "FILLED");
+  assert.equal(ledger.snapshot().events.length, 3);
+});
+
+test("pending orders cannot skip backwards from partial fill or transition to rejected", () => {
+  const ledger = createPaperDemoEventLedger(opening);
+  ledger.append(event());
+  ledger.append(event({
+    eventId: "evt-2", idempotencyKey: "idem-2", sourceEventId: "partial-1",
+    type: "ORDER_UPDATED", occurredAt: "2026-11-25T09:30:01+05:30",
+    deltas: { cashDeltaPaise: 0, blockedDeltaPaise: 0 },
+    payload: { ...event().payload, status: "PARTIALLY_FILLED" }
+  }));
+  assert.throws(() => ledger.append(event({
+    eventId: "evt-3", idempotencyKey: "idem-3", sourceEventId: "backwards-1",
+    type: "ORDER_UPDATED", occurredAt: "2026-11-25T09:30:02+05:30",
+    deltas: { cashDeltaPaise: 0, blockedDeltaPaise: 0 },
+    payload: { ...event().payload, status: "PENDING" }
+  })), /INVALID_ORDER_STATUS_TRANSITION/);
+  assert.equal(ledger.snapshot().orders[0].status, "PARTIALLY_FILLED");
+  assert.equal(ledger.snapshot().events.length, 2);
+});
