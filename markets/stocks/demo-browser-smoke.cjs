@@ -55,18 +55,19 @@ const axePath=require.resolve("axe-core/axe.min.js");
   console.log("PWA: opening market shell");
   await page.goto("http://127.0.0.1:4173/markets/",{waitUntil:"domcontentloaded",timeout:30000});
   await page.waitForLoadState("load",{timeout:10000});
-  try{
-   const workerHandle=await page.waitForFunction(async()=>{
-    const registration=(await navigator.serviceWorker.getRegistrations()).find(item=>item.active?.state==="activated");
-    return registration?{state:registration.active.state,scope:registration.scope}:false;
-   },null,{timeout:20000});
-   var workerState=await workerHandle.jsonValue();
-  }catch(error){
-   const state=await page.evaluate(async()=>({controller:!!navigator.serviceWorker.controller,registrations:(await navigator.serviceWorker.getRegistrations()).map(r=>({scope:r.scope,installing:r.installing?.state||null,waiting:r.waiting?.state||null,active:r.active?.state||null}))}));
-   throw new Error("PWA service worker did not activate: "+JSON.stringify(state)+"; console: "+pwaConsole.join(" | ")+"; "+error.message);
-  }
+  const workerState=await page.evaluate(async()=>{
+   const deadline=Date.now()+20000;
+   let registrations=[];
+   while(Date.now()<deadline){
+    registrations=await navigator.serviceWorker.getRegistrations();
+    const active=registrations.find(item=>item.active?.state==="activated");
+    if(active)return {state:active.active.state,scope:active.scope};
+    await new Promise(resolve=>setTimeout(resolve,100));
+   }
+   return {state:"missing",registrations:registrations.map(item=>({scope:item.scope,installing:item.installing?.state||null,waiting:item.waiting?.state||null,active:item.active?.state||null}))};
+  });
   console.log("PWA: waiting for service worker activation");
-  assert.equal(workerState.state,"activated","service worker must be active before controlled reload");
+  assert.equal(workerState.state,"activated","service worker activation state: "+JSON.stringify(workerState));
   console.log(JSON.stringify({pwaWorker:workerState.state,scope:workerState.scope}));
   // clients.claim() in the activate handler controls existing same-scope clients.
   // Open a fresh same-scope tab rather than forcing a navigation reload race.
