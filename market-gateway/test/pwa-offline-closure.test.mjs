@@ -28,7 +28,7 @@ test("all static transitive imports from the 15-screen demo entrypoint are in th
  const sw=await read("markets/service-worker.js");
  const block=sw.match(/const SHELL=\[([\s\S]*?)\]\.map/);
  assert.ok(block,"SHELL allowlist exists");
- const shell=new Set([...block[1].matchAll(/"([^"]+)"/g)].map(match=>new URL(match[1],"https://example.test/markets/").pathname));
+ const shell=new Set([...block[1].matchAll(/"([^"]*)"/g)].map(match=>new URL(match[1],"https://example.test/markets/").pathname));
  const visited=new Set();
  async function walk(path){
   if(visited.has(path))return;
