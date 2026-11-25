@@ -123,6 +123,16 @@ function apply(projection, event) {
     if (!order || order.engine !== event.engine || order.instrumentKey !== p.instrumentKey ||
         order.assetClass !== p.assetClass || order.side !== p.side || order.product !== productOf(p) ||
         ["CANCELLED", "REJECTED", "EXPIRED", "FILLED"].includes(order.status)) fail("FILL_ORDER_MISMATCH");
+    const grossPaise = p.quantity * p.pricePaise;
+    if (!Number.isSafeInteger(grossPaise) || grossPaise < 1) fail("FILL_GROSS_VALUE_OUT_OF_RANGE");
+    if (p.assetClass === "EQUITY") {
+      const expectedCashDelta = p.side === "BUY" ? -grossPaise : grossPaise;
+      if (event.deltas.cashDeltaPaise !== expectedCashDelta) fail("EQUITY_FILL_CASH_SETTLEMENT_MISMATCH");
+    } else if (event.deltas.cashDeltaPaise !== 0) {
+      // F&O notional is not a cash settlement. Until approved margin / premium
+      // receipts exist, derivative bridges must not invent wallet movements.
+      fail("DERIVATIVE_CASH_SETTLEMENT_RECEIPT_REQUIRED");
+    }
     const alreadyFilled = projection.fills.filter(x => x.orderId === p.orderId).reduce((sum, x) => sum + x.quantity, 0);
     if (!Number.isSafeInteger(alreadyFilled + p.quantity) || alreadyFilled + p.quantity > order.quantity) fail("FILL_QUANTITY_EXCEEDS_ORDER");
     if (p.side === "SELL" && p.assetClass !== "FUTURE") {
