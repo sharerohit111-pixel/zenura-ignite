@@ -39,18 +39,18 @@ test("Equity, Futures and Options bridges append to one account-scoped ordered l
     instrumentKey: future, side: "BUY", orderType: "MARKET", lots: 1,
     product: "INTRADAY", idempotencyKey: "shared-future-0001"
   });
-  equity.submitOrder({
+  assert.throws(() => equity.submitOrder({
     instrumentKey: equityFixture.data.instrument.instrumentKey,
     side: "BUY", orderType: "MARKET", product: "DELIVERY",
     quantity: 1, idempotencyKey: "shared-equity-0001"
-  });
+  }), /EQUITY_WALLET_RECEIPT_GATE_CLOSED/);
 
   const snapshot = shared.ledger.snapshot();
   assert.equal(equity.snapshot().events.length, derivatives.snapshot().events.length);
   assert.equal(equity.snapshot().account.sessionId, derivatives.snapshot().account.sessionId);
   assert.equal(snapshot.account.accountId, account.accountId);
   assert.ok(snapshot.events.some(event => event.engine === "FUTURES"));
-  assert.ok(snapshot.events.some(event => event.engine === "EQUITY"));
+  assert.equal(snapshot.events.some(event => event.engine === "EQUITY"), false);
   assert.ok(snapshot.events.every((event, index) => event.sequence === index + 1));
   assert.ok(snapshot.events.every((event, index, all) => index === 0 || Date.parse(event.occurredAt) >= Date.parse(all[index - 1].occurredAt)));
   assert.equal(snapshot.account.ledgerReconciled, false);
