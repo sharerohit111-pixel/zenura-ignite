@@ -100,4 +100,5 @@ test("Standalone Demo exposes the shared persistent Hindi/English language toggl
   assert.match(language, /"FUTURES · LOCAL PAPER SIMULATOR"/);
   assert.match(language, /"SIMULATE LIMIT MATCH"/);
   assert.match(language, /"DEMO ORDER RECEIPTS"/);
+  assert.doesNotThrow(() => new Function(language), "shared language-toggle script must remain valid JavaScript");
 });
