@@ -71,6 +71,15 @@ test("Demo controls retain native labels, mobile breakpoints and PWA shell cover
   assert.match(sw, /mock\/fixtures\/derivatives\.json/);
 });
 
+test("PWA shell serves explicitly cached root-level Demo assets offline", async () => {
+  const sw = await read("markets/service-worker.js");
+  assert.match(sw, /const shellAsset=SHELL\\.includes\\(url\\.href\\)/);
+  assert.match(sw, /!url\\.pathname\\.startsWith\\(BASE\\.pathname\\)&&!shellAsset/);
+  assert.match(sw, /url\\.pathname\\.endsWith\\("\\.webmanifest"\\)\\|\\|shellAsset/);
+  assert.match(sw, /market-gateway\\/lib\\/derivative-position\\.js/);
+  assert.match(sw, /market-gateway\\/mock\\/fixtures\\/derivatives\\.json/);
+});
+
 test("PWA shell cache manifest contains no duplicate request URLs", async () => {
   const sw = await read("markets/service-worker.js");
   const match = sw.match(/const SHELL=\[([\s\S]*?)\]\.map\(path=>new URL\(path,BASE\)\.toString\(\)\);/);
