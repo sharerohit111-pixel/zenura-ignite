@@ -1,4 +1,7 @@
-"use strict";\n\n(function(){\n/*
+"use strict";
+
+(function(){
+/*
  * Test/demo-only deterministic cash-equity execution simulator.
  * This module is deliberately not imported by supabase-server.js or any live route.
  * All prices and displayed liquidity are synthetic; fees/taxes are not modelled.
@@ -188,4 +191,5 @@ function createEquityDemoExecutionEngine({fixture,account,env=(typeof process!==
 }
 const api={createEquityDemoExecutionEngine,validateEquityDemoFixture:validateFixture};
 if(typeof module!=="undefined"&&module.exports)module.exports=api;
-if(typeof window!=="undefined")window.ZenuraEquityDemoEngine=api;\n})();\n
+if(typeof window!=="undefined")window.ZenuraEquityDemoEngine=api;
+})();
