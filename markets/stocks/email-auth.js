@@ -8,24 +8,55 @@ if (card && connectButton) {
   stylesheet.rel = "stylesheet";
   stylesheet.href = "./email-auth.css";
   document.head.append(stylesheet);
+
+  // Build the auth form with DOM APIs; never parse HTML strings in this security-sensitive UI.
   const form = document.createElement("form");
   form.className = "email-auth";
-  form.innerHTML = `
-    <small id="email-auth-message">Create a new Supabase account or sign in. Firebase is not used for this app.</small>
-    <input id="market-email" type="email" autocomplete="username" placeholder="Email address" required maxlength="254">
-    <input id="market-password" type="password" autocomplete="current-password" placeholder="Password (minimum 8 characters)" required minlength="8" maxlength="128">
-    <div class="email-auth-actions">
-      <button type="submit" id="email-sign-in">SIGN IN</button>
-      <button type="button" id="email-create">CREATE ACCOUNT</button>
-      <button type="button" id="email-sign-out" hidden>SIGN OUT</button>
-    </div>`;
+
+  const message = document.createElement("small");
+  message.id = "email-auth-message";
+  message.textContent = "Create a new Supabase account or sign in. Firebase is not used for this app.";
+
+  const email = document.createElement("input");
+  email.id = "market-email";
+  email.type = "email";
+  email.autocomplete = "username";
+  email.placeholder = "Email address";
+  email.required = true;
+  email.maxLength = 254;
+
+  const password = document.createElement("input");
+  password.id = "market-password";
+  password.type = "password";
+  password.autocomplete = "current-password";
+  password.placeholder = "Password (minimum 8 characters)";
+  password.required = true;
+  password.minLength = 8;
+  password.maxLength = 128;
+
+  const actions = document.createElement("div");
+  actions.className = "email-auth-actions";
+
+  const signIn = document.createElement("button");
+  signIn.type = "submit";
+  signIn.id = "email-sign-in";
+  signIn.textContent = "SIGN IN";
+
+  const create = document.createElement("button");
+  create.type = "button";
+  create.id = "email-create";
+  create.textContent = "CREATE ACCOUNT";
+
+  const signOutButton = document.createElement("button");
+  signOutButton.type = "button";
+  signOutButton.id = "email-sign-out";
+  signOutButton.textContent = "SIGN OUT";
+  signOutButton.hidden = true;
+
+  actions.append(signIn, create, signOutButton);
+  form.append(message, email, password, actions);
   card.append(form);
-  const email = form.querySelector("#market-email");
-  const password = form.querySelector("#market-password");
-  const message = form.querySelector("#email-auth-message");
-  const signIn = form.querySelector("#email-sign-in");
-  const create = form.querySelector("#email-create");
-  const signOutButton = form.querySelector("#email-sign-out");
+
   let creating = false;
   create.addEventListener("click", () => {
     creating = !creating;
