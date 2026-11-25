@@ -100,6 +100,15 @@ function apply(projection, event) {
     const p = event.payload, existing = projection.orders.find(x => x.orderId === p.orderId);
     if ((event.type === "ORDER_ACCEPTED" || event.type === "ORDER_REJECTED") && existing) fail("DUPLICATE_ORDER_ID");
     if (event.type === "ORDER_UPDATED" && !existing) fail("ORDER_UPDATE_WITHOUT_ACCEPTANCE");
+    if (event.type === "ORDER_UPDATED" && existing) {
+      const terminal = new Set(["FILLED", "CANCELLED", "REJECTED", "EXPIRED"]);
+      const allowed = {
+        PENDING: new Set(["PENDING", "PARTIALLY_FILLED", "FILLED", "CANCELLED", "EXPIRED"]),
+        PARTIALLY_FILLED: new Set(["PARTIALLY_FILLED", "FILLED", "CANCELLED", "EXPIRED"])
+      };
+      if (terminal.has(existing.status)) fail("ORDER_TERMINAL_STATE_IMMUTABLE");
+      if (!allowed[existing.status]?.has(p.status)) fail("INVALID_ORDER_STATUS_TRANSITION");
+    }
     const product = productOf(p);
     const next = { ...p, product, engine: event.engine, lastSequence: event.sequence };
     if (existing) {
