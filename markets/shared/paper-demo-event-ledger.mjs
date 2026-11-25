@@ -159,21 +159,37 @@ function apply(projection, event) {
       if (p.remainingQuantity !== undefined && p.remainingQuantity !== p.quantity - filledQuantity) fail("ORDER_REMAINING_QUANTITY_MISMATCH");
     }
     const product = productOf(p);
-    const next = { ...p, product, engine: event.engine, lastSequence: event.sequence };
+    const reservationDelta = p.reservedQuantityDelta ?? (event.type === "ORDER_ACCEPTED" && p.side === "SELL" ? p.quantity : 0);
+    if (event.type === "ORDER_ACCEPTED") {
+      const expectedReservation = p.side === "SELL" && p.assetClass !== "FUTURE" ? p.quantity : 0;
+      if (reservationDelta !== expectedReservation) fail("ORDER_ACCEPTED_RESERVATION_MISMATCH");
+    } else if (p.side !== "SELL" && reservationDelta !== 0) {
+      fail("UNAUTHORIZED_ORDER_RESERVATION_CHANGE");
+    }
+    if (event.type === "ORDER_UPDATED") {
+      const expectedRelease = (p.status === "CANCELLED" || p.status === "EXPIRED") ? -(existing.reservedQuantity ?? 0) : 0;
+      if (reservationDelta !== expectedRelease) fail("ORDER_RESERVATION_RELEASE_MISMATCH");
+    }
+    const nextReserved = existing
+      ? (existing.reservedQuantity ?? 0) + reservationDelta
+      : reservationDelta;
+    if (!integer(nextReserved) || nextReserved < 0 || nextReserved > p.quantity) fail("DEMO_SHARE_RESERVATION_INVARIANT");
+    const next = { ...p, product, engine: event.engine, lastSequence: event.sequence, reservedQuantity: nextReserved };
     if (existing) {
       for (const field of ["assetClass", "instrumentKey", "side", "orderType", "quantity", "product"]) {
         if (existing[field] !== next[field]) fail("ORDER_IDENTITY_MUTATION");
       }
-      Object.assign(existing, next);
-    } else projection.orders.push(next);
-    const reservationDelta = p.reservedQuantityDelta ?? (event.type === "ORDER_ACCEPTED" && p.side === "SELL" ? p.quantity : 0);
+    }
     if (reservationDelta !== 0) {
       const key = positionKey(p.assetClass, p.instrumentKey, product);
       const position = projection.positions.find(x => x.key === key);
-      if (!position || (p.assetClass === "FUTURE") || position.quantity - position.reservedQuantity < reservationDelta) fail("DEMO_SHARE_RESERVATION_INVARIANT");
+      if (!position || p.assetClass === "FUTURE" || (reservationDelta > 0 && position.quantity - position.reservedQuantity < reservationDelta) ||
+          position.reservedQuantity + reservationDelta < 0) fail("DEMO_SHARE_RESERVATION_INVARIANT");
       position.reservedQuantity += reservationDelta;
       if (!integer(position.reservedQuantity) || position.reservedQuantity < 0 || position.reservedQuantity > position.quantity) fail("DEMO_SHARE_RESERVATION_INVARIANT");
     }
+    if (existing) Object.assign(existing, next);
+    else projection.orders.push(next);
   }
   if (event.type === "FILL_RECORDED") {
     if (projection.fills.some(x => x.fillId === event.payload.fillId)) fail("DUPLICATE_FILL_ID");
@@ -185,8 +201,10 @@ function apply(projection, event) {
     if (!Number.isSafeInteger(alreadyFilled + p.quantity) || alreadyFilled + p.quantity > order.quantity) fail("FILL_QUANTITY_EXCEEDS_ORDER");
     if (p.side === "SELL" && p.assetClass !== "FUTURE") {
       const position = projection.positions.find(x => x.key === positionKey(p.assetClass, p.instrumentKey, productOf(p)));
-      if (!position || position.reservedQuantity < p.quantity) fail("DEMO_SHARE_RESERVATION_INVARIANT");
+      if (!position || position.reservedQuantity < p.quantity ||
+          !integer(order.reservedQuantity) || order.reservedQuantity < p.quantity) fail("DEMO_SHARE_RESERVATION_INVARIANT");
       position.reservedQuantity -= p.quantity;
+      order.reservedQuantity -= p.quantity;
     }
     projection.fills.push({ ...p, product: productOf(p), engine: event.engine, sequence: event.sequence, occurredAt: event.occurredAt });
   }
