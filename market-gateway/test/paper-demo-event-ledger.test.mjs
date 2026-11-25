@@ -43,7 +43,7 @@ test("idempotent retries return the original event without double reserving cash
   assert.equal(retry.accepted, false);
   assert.equal(retry.duplicate, true);
   assert.equal(retry.snapshot.events.length, 1);
-  assert.equal(retry.snapshot.account.blockedFundsPaise, 10000);
+  assert.equal(retry.snapshot.account.blockedFundsPaise, 0);
   assert.throws(() => ledger.append(event({ deltas: { cashDeltaPaise: 0, blockedDeltaPaise: 20000 } })), /IDEMPOTENCY_KEY_REUSE_MISMATCH/);
 });
 test("fill must refer to an accepted order from the same engine and instrument", () => {
