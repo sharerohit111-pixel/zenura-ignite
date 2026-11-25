@@ -1,3 +1,4 @@
+(function () {
 "use strict";
 
 function nextReconnectDelay(attempt) {
@@ -31,3 +32,4 @@ function shouldRetryFeedStatus(status) {
 const policy = {nextReconnectDelay, jitteredReconnectDelay, shouldRetryFeedStatus, shouldReconnectAfterFeedError};
 if (typeof window !== "undefined") window.ZenuraReconnectPolicy = policy;
 if (typeof module !== "undefined" && module.exports) module.exports = policy;
+})();
