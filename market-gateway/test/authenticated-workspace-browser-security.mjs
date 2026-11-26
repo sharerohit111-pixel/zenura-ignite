@@ -78,6 +78,8 @@ test("authenticated workspace CSP and auth DOM resist browser injection", async 
       assert.ok(!csp.includes(forbidden), `CSP must not contain ${forbidden}`);
     }
     assert.match(csp, /script-src[^;]*https:\/\/esm\.sh/);
+    assert.match(csp, /script-src[^;]*https:\/\/cdn\.jsdelivr\.net/);
+    assert.match(csp, /script-src[^;]*https:\/\/unpkg\.com/);
     assert.match(csp, /connect-src[^;]*https:\/\/atvbjibhunvzpmfagagm\.supabase\.co/);
     assert.match(csp, /object-src\s+'none'/);
     assert.match(csp, /frame-src\s+'none'/);
