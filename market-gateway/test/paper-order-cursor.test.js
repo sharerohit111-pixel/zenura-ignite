@@ -37,9 +37,11 @@ test("rejects malformed, non-canonical, oversized and tampered cursors", () => {
   }
 });
 
-test("rejects invalid timestamps, order IDs and unexpected cursor fields", () => {
+test("rejects invalid timestamps, impossible calendar dates, order IDs and extra fields", () => {
   const invalid = [
     { createdAt: "not-a-date", orderId: "a".repeat(64) },
+    { createdAt: "2026-02-31T16:11:32Z", orderId: "a".repeat(64) },
+    { createdAt: "2025-02-29T16:11:32Z", orderId: "a".repeat(64) },
     { createdAt: order.created_at, orderId: "not-an-order-id" },
     { createdAt: order.created_at, orderId: "a".repeat(64), userId: "other-user" }
   ];
@@ -47,6 +49,14 @@ test("rejects invalid timestamps, order IDs and unexpected cursor fields", () =>
     const encoded = Buffer.from(JSON.stringify(payload)).toString("base64url");
     assert.throws(() => decodePaperOrderCursor(encoded), { status: 400 });
   }
+});
+
+test("accepts a real leap-day timestamp", () => {
+  const encoded = Buffer.from(JSON.stringify({
+    createdAt: "2024-02-29T16:11:32Z",
+    orderId: "a".repeat(64)
+  })).toString("base64url");
+  assert.equal(decodePaperOrderCursor(encoded).createdAt, "2024-02-29T16:11:32Z");
 });
 
 test("paper order history endpoint applies owner-scoped stable keyset pagination", () => {
