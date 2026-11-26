@@ -1,4 +1,5 @@
 name: Gitleaks Full-History Secret Scan
+# Re-scan on PR synchronization so the merge candidate includes the latest base snapshot.
 
 on:
   pull_request:
