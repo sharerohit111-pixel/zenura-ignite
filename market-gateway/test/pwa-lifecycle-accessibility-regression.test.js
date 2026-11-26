@@ -6,14 +6,23 @@ const path=require("node:path");
 const root=path.resolve(__dirname,"../..");
 const read=relative=>fs.readFileSync(path.join(root,relative),"utf8");
 
-test("Markets PWA manifest remains installable and scoped away from Crypto",()=>{
+test("Markets PWA manifest provides scoped standalone install metadata and dedicated icon sizes",()=>{
  const manifest=JSON.parse(read("markets/manifest.webmanifest"));
  assert.equal(manifest.scope,"./");
  assert.equal(manifest.start_url,"./");
  assert.equal(manifest.display,"standalone");
  assert.ok(manifest.name && manifest.short_name);
- assert.ok(Array.isArray(manifest.icons) && manifest.icons.length>0);
- for(const icon of manifest.icons)assert.ok(icon.src && icon.sizes && icon.type);
+ assert.ok(Array.isArray(manifest.icons) && manifest.icons.length>=2);
+ const icon192=manifest.icons.find(icon=>icon.sizes==="192x192");
+ const icon512=manifest.icons.find(icon=>icon.sizes==="512x512"&&icon.purpose==="any");
+ const maskable=manifest.icons.find(icon=>icon.sizes==="512x512"&&icon.purpose==="maskable");
+ assert.ok(icon192&&icon512&&maskable,"192px, 512px and maskable icon declarations are required");
+ for(const icon of [icon192,icon512,maskable]){
+  assert.ok(icon.src&&icon.type==="image/svg+xml");
+  const pathOnDisk=path.resolve(root,"markets",icon.src.replace(/^\.\//,""));
+  assert.ok(pathOnDisk.startsWith(path.resolve(root,"markets")+path.sep));
+  assert.ok(fs.existsSync(pathOnDisk),"manifest icon must exist: "+icon.src);
+ }
 });
 
 test("service worker cache generation is explicit and activation removes stale Markets generations",()=>{
@@ -34,13 +43,15 @@ test("install precache is a unique static allowlist without authenticated payloa
  assert.ok(entries.length>0);
  assert.equal(new Set(entries).size,entries.length);
  for(const entry of entries)assert.doesNotMatch(entry,/([?&](token|access_token|session)=|\/api\/|\/auth\/|\/private\/)/i);
+ assert.ok(entries.includes("icons/icon-192.svg"));
+ assert.ok(entries.includes("icons/icon-512.svg"));
 });
 
 test("fetch handler fails closed for authorization, token URLs and non-allowlisted navigation",()=>{
  const sw=read("markets/service-worker.js");
- assert.match(sw,/request\.method!==\"GET\"\|\|request\.headers\.has\(\"authorization\"\)/);
- assert.match(sw,/url\.searchParams\.has\(\"token\"\)/);
- assert.match(sw,/if\(request\.mode===\"navigate\"\)\{[\s\S]*?if\(!shellAsset\)return;/);
+ assert.match(sw,/request\.method!=="GET"\|\|request\.headers\.has\("authorization"\)/);
+ assert.match(sw,/url\.searchParams\.has\("token"\)/);
+ assert.match(sw,/if\(request\.mode==="navigate"\)\{[\s\S]*?if\(!shellAsset\)return;/);
  assert.match(sw,/Only explicitly listed static shell documents may be cached/);
  assert.match(sw,/if\(shellAsset\)\{/);
 });
