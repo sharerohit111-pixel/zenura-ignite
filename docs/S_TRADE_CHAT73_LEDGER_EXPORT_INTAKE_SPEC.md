@@ -64,7 +64,7 @@ One row per actual persisted fill. If fills are currently embedded in order rows
 Required fields:
 - `source_system`, `source_table`, `source_row_id`
 - `opaque_account_id`, `charge_id`, `source_transaction_id`, `order_id`, `fill_id` (nullable as appropriate)
-- `asset_class`, `charge_code`, `charge_name`, `amount_paise`, `currency)
+- `asset_class`, `charge_code`, `charge_name`, `amount_paise`, `currency`
 - `calculation_version`, `rate_or_rule_reference`, `recorded_at_utc`
 - `reversal_of_charge_id` (nullable), `idempotency_key`
 
