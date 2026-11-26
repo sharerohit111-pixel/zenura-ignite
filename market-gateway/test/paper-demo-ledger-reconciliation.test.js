@@ -93,3 +93,27 @@ test("rejects terminal FILLED order states without full fill quantity", () => {
   ];
   assert.throws(() => reconcileDemoEventStream({ opening, events }), /ORDER_STATUS_FILL_QUANTITY_MISMATCH|FINAL_FILLED_ORDER_QUANTITY_MISMATCH/);
 });
+
+test("rejects timestamps outside the canonical ISO-8601 event format", () => {
+  const events = [make({ occurredAt: "November 26, 2026 09:30" })];
+  assert.throws(() => reconcileDemoEventStream({ opening, events }), /INVALID_EVENT_TIMESTAMP/);
+});
+
+test("rejects invalid Demo product and non-MOCK position metadata", () => {
+  const invalidOrder = [make({ payload: { ...make().payload, product: "MARGIN" } })];
+  assert.throws(() => reconcileDemoEventStream({ opening, events: invalidOrder }), /INVALID_ORDER_FACT/);
+  const invalidPosition = [make({ type: "POSITION_CHANGED", payload: {
+    assetClass: "EQUITY", instrumentKey: "NSE|EQ|ABC", product: "DELIVERY",
+    quantityDelta: 1, costBasisDeltaPaise: 10000, realizedPnlDeltaPaise: 0
+  } })];
+  assert.throws(() => reconcileDemoEventStream({ opening, events: invalidPosition }), /INVALID_POSITION_FACT/);
+});
+
+test("rejects position events that attempt to mutate share reservations", () => {
+  const events = [make({ type: "POSITION_CHANGED", payload: {
+    assetClass: "EQUITY", instrumentKey: "MOCK|NSE|EQ|ABC", product: "DELIVERY",
+    quantityDelta: 1, costBasisDeltaPaise: 10000, realizedPnlDeltaPaise: 0,
+    reservedQuantityDelta: 1
+  } })];
+  assert.throws(() => reconcileDemoEventStream({ opening, events }), /INVALID_POSITION_FACT/);
+});
