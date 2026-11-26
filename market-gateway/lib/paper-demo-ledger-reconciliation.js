@@ -7,6 +7,7 @@ const VERSION = "1.2.0";
 const TYPES = new Set(["ORDER_ACCEPTED", "ORDER_UPDATED", "ORDER_REJECTED", "FILL_RECORDED", "RESERVATION_CHANGED", "POSITION_CHANGED"]);
 const ENGINES = new Set(["EQUITY", "FUTURES", "OPTIONS"]);
 const ASSETS = new Set(["EQUITY", "FUTURE", "OPTION"]);
+const PRODUCTS = new Set(["DELIVERY", "INTRADAY"]);
 const TERMINAL = new Set(["FILLED", "CANCELLED", "REJECTED", "EXPIRED"]);
 const integer = Number.isSafeInteger;
 const fail = (code) => { throw new TypeError(code); };
@@ -45,6 +46,10 @@ function reconcileDemoEventStream({ opening, events, provenance = null } = {}) {
         typeof e.sourceEventId !== "string" || !e.sourceEventId ||
         !object(e.deltas) || !integer(e.deltas.cashDeltaPaise) ||
         !integer(e.deltas.blockedDeltaPaise) || !object(e.payload)) fail("INVALID_EVENT_ENVELOPE:" + (i + 1));
+    if (typeof e.occurredAt !== "string" ||
+        !/^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,3})?(?:Z|[+-]\\d{2}:\\d{2})$/.test(e.occurredAt)) {
+      fail("INVALID_EVENT_TIMESTAMP:" + (i + 1));
+    }
     const time = Date.parse(e.occurredAt);
     if (!Number.isFinite(time) || time <= previousTime) fail("EVENT_TIME_ORDER_INVALID:" + (i + 1));
     previousTime = time;
@@ -66,7 +71,9 @@ function reconcileDemoEventStream({ opening, events, provenance = null } = {}) {
           typeof p.instrumentKey !== "string" || !p.instrumentKey.startsWith("MOCK|") ||
           !["BUY", "SELL"].includes(p.side) || !["MARKET", "LIMIT"].includes(p.orderType) ||
           !["PENDING", "PARTIALLY_FILLED", "FILLED", "CANCELLED", "REJECTED", "EXPIRED"].includes(p.status) ||
-          !integer(p.quantity) || p.quantity < 1) fail("INVALID_ORDER_FACT:" + (i + 1));
+          !integer(p.quantity) || p.quantity < 1 ||
+          !PRODUCTS.has(p.product || "DELIVERY") ||
+          (p.reservedQuantityDelta !== undefined && !integer(p.reservedQuantityDelta))) fail("INVALID_ORDER_FACT:" + (i + 1));
       if ((e.engine === "EQUITY" && p.assetClass !== "EQUITY") ||
           (e.engine === "FUTURES" && p.assetClass !== "FUTURE") ||
           (e.engine === "OPTIONS" && p.assetClass !== "OPTION")) fail("ORDER_ENGINE_ASSET_MISMATCH:" + (i + 1));
@@ -75,7 +82,7 @@ function reconcileDemoEventStream({ opening, events, provenance = null } = {}) {
         if (existing) fail("DUPLICATE_ORDER_ID:" + (i + 1));
         if (e.type === "ORDER_ACCEPTED" && p.status !== "PENDING") fail("INVALID_INITIAL_ORDER_STATUS:" + (i + 1));
         if (e.type === "ORDER_REJECTED" && p.status !== "REJECTED") fail("INVALID_REJECTION_STATUS:" + (i + 1));
-        if (e.type === "ORDER_REJECTED" && p.status !== "REJECTED") fail("INVALID_REJECTION_STATUS:" + (i + 1));
+        if (e.type === "ORDER_REJECTED" && (p.reservedQuantityDelta ?? 0) !== 0) fail("INVALID_REJECTION_RESERVATION:" + (i + 1));
       } else {
         if (!existing) fail("ORDER_UPDATE_WITHOUT_ACCEPTANCE:" + (i + 1));
         if (TERMINAL.has(existing.status)) fail("TERMINAL_ORDER_REOPENED:" + (i + 1));
@@ -95,7 +102,7 @@ function reconcileDemoEventStream({ opening, events, provenance = null } = {}) {
     } else if (e.type === "FILL_RECORDED") {
       if (typeof p.fillId !== "string" || !p.fillId || fills.has(p.fillId) ||
           typeof p.orderId !== "string" || !ASSETS.has(p.assetClass) ||
-          typeof p.instrumentKey !== "string" || !integer(p.quantity) || p.quantity < 1 ||
+          typeof p.instrumentKey !== "string" || !p.instrumentKey.startsWith("MOCK|") || !integer(p.quantity) || p.quantity < 1 ||
           !integer(p.pricePaise) || p.pricePaise < 1) fail("INVALID_OR_DUPLICATE_FILL:" + (i + 1));
       const gross = p.quantity * p.pricePaise;
       if (!integer(gross) || (p.grossPaise !== undefined && p.grossPaise !== gross) ||
@@ -120,7 +127,9 @@ function reconcileDemoEventStream({ opening, events, provenance = null } = {}) {
       order.filled += p.quantity;
       fills.add(p.fillId);
     } else if (e.type === "POSITION_CHANGED") {
-      if (!ASSETS.has(p.assetClass) || typeof p.instrumentKey !== "string" ||
+      if (!ASSETS.has(p.assetClass) || typeof p.instrumentKey !== "string" || !p.instrumentKey.startsWith("MOCK|") ||
+          !PRODUCTS.has(p.product || "DELIVERY") ||
+          !integer(p.reservedQuantityDelta ?? 0) || (p.reservedQuantityDelta ?? 0) !== 0 ||
           (e.engine === "EQUITY" && p.assetClass !== "EQUITY") ||
           (e.engine === "FUTURES" && p.assetClass !== "FUTURE") ||
           (e.engine === "OPTIONS" && p.assetClass !== "OPTION") ||
