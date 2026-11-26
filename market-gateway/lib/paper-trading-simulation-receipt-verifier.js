@@ -64,7 +64,7 @@ function validatePayload(payload) {
     if (typeof payload[field] !== "string" || !ID.test(payload[field])) fail("RECEIPT_IDENTITY_INVALID:" + field);
   }
   if (!ASSETS.has(payload.assetClass)) fail("RECEIPT_ASSET_INVALID");
-  if (typeof payload.instrumentKey !== "string" || payload.instrumentKey.length < 1 || payload.instrumentKey.length > 160 || /[\\u0000-\\u001f]/.test(payload.instrumentKey)) fail("RECEIPT_INSTRUMENT_INVALID");
+  if (typeof payload.instrumentKey !== "string" || payload.instrumentKey.length < 1 || payload.instrumentKey.length > 160 || /[\x00-\x1f]/.test(payload.instrumentKey)) fail("RECEIPT_INSTRUMENT_INVALID");
   if (!["BUY", "SELL"].includes(payload.side)) fail("RECEIPT_SIDE_INVALID");
   if (typeof payload.product !== "string" || !ID.test(payload.product)) fail("RECEIPT_PRODUCT_INVALID");
   if (payload.currency !== "INR" || payload.simulationOnly !== true) fail("RECEIPT_NOT_EXPLICITLY_SIMULATED_INR");
