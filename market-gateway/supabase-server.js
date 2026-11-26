@@ -539,7 +539,7 @@ app.post("/paper/protective-orders/:orderId/cancel",async(req,res)=>{
 app.get("/paper/orders",async(req,res)=>{
   try{
     const {user,userDb}=await auth(req),raw=String(req.query.limit??"50");
-    if(!/^\\d+$/.test(raw)||Number(raw)<1)return res.status(400).json({error:"Order history limit must be a whole number from 1 to 100."});
+    if(!/^\d+$/.test(raw)||Number(raw)<1)return res.status(400).json({error:"Order history limit must be a whole number from 1 to 100."});
     const limit=Math.min(Number(raw),100);
     let cursor=null;
     if(req.query.cursor!==undefined){
