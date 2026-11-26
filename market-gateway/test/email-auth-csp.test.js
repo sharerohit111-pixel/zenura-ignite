@@ -23,7 +23,7 @@ test("authenticated email UI does not require inline style attributes or style b
 
 test("standalone demo page declares a restrictive same-origin CSP", () => {
   const demo = fs.readFileSync(path.join(root, "demo.html"), "utf8");
-  const match = demo.match(/<meta\\s+http-equiv="Content-Security-Policy"\\s+content="([^"]+)"/i);
+  const match = demo.match(/<meta\s+http-equiv="Content-Security-Policy"\s+content="([^"]+)"/i);
   assert.ok(match, "demo page must declare a CSP");
   const csp = match[1];
   for (const directive of [
@@ -32,5 +32,5 @@ test("standalone demo page declares a restrictive same-origin CSP", () => {
     "script-src-attr 'none'", "style-src 'self'", "style-src-attr 'none'",
     "connect-src 'self'"
   ]) assert.ok(csp.includes(directive), "demo CSP must include " + directive);
-  assert.doesNotMatch(csp, /'unsafe-inline'|'unsafe-eval'|\\*/);
+  assert.doesNotMatch(csp, /'unsafe-inline'|'unsafe-eval'|\*/);
 });
