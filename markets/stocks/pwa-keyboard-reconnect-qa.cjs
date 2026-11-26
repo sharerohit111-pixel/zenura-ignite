@@ -13,7 +13,7 @@ const SCREENS = ["home","market","watchlists","charts","equity","futures","optio
 async function verifyProductionWorkerCacheCleanup() {
   const source = fs.readFileSync(path.join(__dirname, "..", "service-worker.js"), "utf8");
   const handlers = {};
-  const existingCaches = ["zenura-markets-shell-v10", "zenura-markets-shell-v9", "unrelated-app-cache", "zenura-markets-shell-v12"];
+  const existingCaches = ["zenura-markets-shell-v10", "zenura-markets-shell-v9", "zenura-markets-shell-v11", "unrelated-app-cache", "zenura-markets-shell-v12"];
   const deleted = [];
   const self = {
     registration: { scope: "https://qa.example/markets/" },
@@ -31,7 +31,7 @@ async function verifyProductionWorkerCacheCleanup() {
   let activation;
   handlers.activate({ waitUntil: promise => { activation = promise; } });
   await activation;
-  assert.deepEqual(deleted.sort(), ["zenura-markets-shell-v10", "zenura-markets-shell-v9"]);
+  assert.deepEqual(deleted.sort(), ["zenura-markets-shell-v10", "zenura-markets-shell-v11", "zenura-markets-shell-v9"]);
   assert.ok(!deleted.includes("unrelated-app-cache"), "activation must preserve unrelated application caches");
   assert.ok(!deleted.includes("zenura-markets-shell-v12"), "activation must preserve current shell cache");
   console.log(JSON.stringify({ workerCacheCleanup: "PASS", deleted, preserved: ["unrelated-app-cache", "zenura-markets-shell-v12"] }));
@@ -53,7 +53,7 @@ async function verifyProductionWorkerCacheCleanup() {
       keys: await caches.keys(),
       controller: navigator.serviceWorker.controller?.scriptURL || null
     }));
-    assert.ok(activationInfo.keys.includes("zenura-markets-shell-v12"), "current v11 cache must be active: " + JSON.stringify(activationInfo));
+    assert.ok(activationInfo.keys.includes("zenura-markets-shell-v12"), "current v12 cache must be active: " + JSON.stringify(activationInfo));
     await pwaPage.reload({ waitUntil: "domcontentloaded" });
     await pwaPage.waitForFunction(() => !!navigator.serviceWorker.controller, null, { timeout: 15000 });
     const controlledWorker = await pwaPage.evaluate(() => navigator.serviceWorker.controller?.scriptURL || null);
@@ -74,7 +74,7 @@ async function verifyProductionWorkerCacheCleanup() {
     assert.equal(await pwaPage.locator("#screen-nav button[data-screen]").count(), 15, "offline demo must expose all 15 navigation controls");
     await pwaPage.reload({ waitUntil: "domcontentloaded", timeout: 15000 });
     await pwaPage.waitForFunction(() => document.querySelector("#demo-status")?.textContent.includes("4 canonical fixtures validated"), null, { timeout: 10000 });
-    console.log(JSON.stringify({ pwaUpgrade: "PASS", activeCache: "v11", workerCleanupUnitTest: "PASS", privateAuthCacheProbe: "PASS", offlineNavigation: "PASS", offlineReload: "PASS" }));
+    console.log(JSON.stringify({ pwaUpgrade: "PASS", activeCache: "v12", workerCleanupUnitTest: "PASS", privateAuthCacheProbe: "PASS", offlineNavigation: "PASS", offlineReload: "PASS" }));
 
     await pwaContext.setOffline(false);
     await pwaPage.waitForFunction(() => navigator.onLine === true, null, { timeout: 10000 });
