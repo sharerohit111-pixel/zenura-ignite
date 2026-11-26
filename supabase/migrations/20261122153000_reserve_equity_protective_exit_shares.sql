@@ -5,6 +5,23 @@
 -- Preserve any pre-existing active draft exits when advancing the schema.
 do $reservation_backfill$
 begin
+  -- Fail closed for orphaned active exits. The aggregate check below uses an
+  -- inner join, so without this explicit LEFT JOIN guard an order with no
+  -- matching position would be silently skipped by the reservation backfill.
+  if exists (
+    select 1
+      from public.paper_protective_orders po
+      left join public.paper_equity_positions ep
+        on ep.user_id=po.user_id
+       and ep.instrument_key=po.instrument_key
+       and ep.product=po.product
+     where po.asset_class='EQUITY' and po.side='SELL'
+       and po.status in ('ACTIVE','TRIGGERED')
+       and ep.user_id is null
+  ) then
+    raise exception 'An active equity protective exit has no matching position; reconcile before applying reservation migration';
+  end if;
+
   if exists (
     select 1
       from public.paper_protective_orders po
