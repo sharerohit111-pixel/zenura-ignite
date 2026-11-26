@@ -74,6 +74,17 @@ Retired `paper_investing_*` tables, if present, are explicitly outside this audi
 
 A separate read-only hosted catalog/function-definition query confirmed both `public.execute_paper_long_option_order` and `public.execute_paper_futures_market_order` exist. Both function definitions reference account cash and charges; the queried definitions contain no receipt reference. This confirms the missing receipt gate in the currently hosted function definitions, not merely in candidate source files. No function was invoked and no data was changed.
 
+**Prior receipt-contract draft chain — not integrated into PR #245 or hosted:** A targeted review of the earlier receipt work found these still-open Draft PRs, each on a separate branch/base:
+
+| PR | Exact head | State / contribution | Remaining trust gap |
+|---|---|---|---|
+| [#187](https://github.com/sharerohit111-pixel/zenura-ignite/pull/187) | `7e9d6f3b3b1aeae4110e4047519c2895570e9361` | Receipt validation contract; scope, issuer allowlist, replay IDs and amount direction | Verifier is injected; no production issuer registry, key resolution or cryptographic verifier |
+| [#192](https://github.com/sharerohit111-pixel/zenura-ignite/pull/192) | `08c2c17272b41e8a7bdcca8ec1bc05d09ab19d2f` | Closes generic settlement-event append bypass | Still depends on #187's untrusted verifier seam |
+| [#196](https://github.com/sharerohit111-pixel/zenura-ignite/pull/196) | `f8b307e3c272e6f709333ac0eb3f2fd902033a8c` | Binds Options receipts to canonical order/fill and bounds Futures reservation release | No actual trusted issuer/key trust chain or authoritative receipt corpus |
+| [#213](https://github.com/sharerohit111-pixel/zenura-ignite/pull/213) | `c4d58c331951850c36219ef8309609213cc916a8` | Fail-closed generic wallet changes unless receipt path accepted | Demo event-ledger only; verifier seam remains test-only, no production trust |
+
+All four PRs were confirmed open, Draft and unmerged at inspection; their branches are not part of the current PR #245 candidate or PR #267. The validator in #187 accepts a caller-provided `verifyAttestation` callback and caller-provided `trustedIssuerIds`; the positive test uses a test callback that compares a literal test signature string. That proves the contract's fail-closed wiring, not cryptographic signature authenticity. Do not copy this test callback or a hard-coded allowlist into production, and do not merge these stacked drafts independently or assume their combined ancestry is hosted. The safe next dependency is a separately reviewed production trust design (issuer identity, key lifecycle/rotation/revocation, canonical signed payload, algorithm policy, replay store, source provenance and operational ownership) before any receipt can authorize persisted cash/margin movements.
+
 ## 5. Arithmetic, replay and ordering
 
 - Persisted money columns and transaction inputs use integer paise (`bigint`); relevant SQL functions include safe-range checks and integer gross calculations.
