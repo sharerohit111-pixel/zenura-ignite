@@ -114,7 +114,17 @@ BEGIN
     END IF;
     IF has_function_privilege('anon',v_proc.oid,'EXECUTE')
        OR has_function_privilege('authenticated',v_proc.oid,'EXECUTE') THEN
-      RAISE EXCEPTION 'SECURITY DEFINER function % is callable by a client role',v_proc.proname;
+      -- A small, explicit class of user-facing RPCs is intentionally callable
+      -- by authenticated users. Such functions must bind the supplied owner ID
+      -- to auth.uid() inside the SECURITY DEFINER body before any row access.
+      IF v_proc.proname NOT IN (
+           'create_paper_equity_protective_order',
+           'cancel_paper_protective_order'
+         )
+         OR position('auth.uid()' in pg_get_functiondef(v_proc.oid)) = 0
+         OR position('p_user_id is distinct from auth.uid()' in lower(pg_get_functiondef(v_proc.oid))) = 0 THEN
+        RAISE EXCEPTION 'SECURITY DEFINER function % is callable by a client role without an approved auth.uid()-bound owner guard',v_proc.proname;
+      END IF;
     END IF;
   END LOOP;
 END
