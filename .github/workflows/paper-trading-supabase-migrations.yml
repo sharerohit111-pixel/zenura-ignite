@@ -254,6 +254,8 @@ jobs:
         run: psql -v ON_ERROR_STOP=1 -f supabase/tests/option_buy_with_futures_margin.sql
       - name: Exercise BSE scrip master import and group-specific fee rules
         run: psql -v ON_ERROR_STOP=1 -f supabase/tests/bse_equity_fee_master.sql
+      - name: Verify BSE protective SELL fee-aware settlement and ledger reconciliation
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/protective_sell_bse_charges.sql
       - name: Exercise verified NSE and BSE session calendar imports
         run: psql -v ON_ERROR_STOP=1 -f supabase/tests/exchange_session_import.sql
       - name: Verify Supabase market worker single-writer lease and expiry
