@@ -230,6 +230,8 @@ jobs:
         run: bash supabase/tests/paper_api_rate_limit_concurrency.sh
       - name: Reconcile Indian-market Futures ledger cash, charges, realized P&L and margin
         run: psql -v ON_ERROR_STOP=1 -f supabase/tests/futures_market_order_accounting.sql
+      - name: Verify terminal legacy Futures MARKET rows never retain a LIMIT remainder
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/futures_legacy_market_backfill.sql
       - name: Exercise atomic Futures LIMIT submit, reservation, cancel and expiry
         run: psql -v ON_ERROR_STOP=1 -f supabase/tests/futures_limit_submit_release.sql
       - name: Exercise atomic Futures LIMIT partial fills and settlement conservation
@@ -1721,8 +1723,10 @@ jobs:
               v_execution_id,repeat('b',64),9000,v_now,v_now
             );
             IF v_result->>'status'<>'FILLED'
-               OR (v_result->>'realized_pnl_paise')::bigint<>4000 THEN
-              RAISE EXCEPTION 'Equity protective fill did not calculate expected realized P&L';
+               OR (v_result->>'realized_pnl_paise')::bigint<>-757
+               OR (v_result->>'charges_paise')::bigint<>4757
+               OR (v_result->>'cash_delta_paise')::bigint<>31243 THEN
+              RAISE EXCEPTION 'Equity protective fill did not settle net proceeds and fees';
             END IF;
             v_result:=public.execute_paper_equity_protective_fill(
               'abababab-abab-4bab-8bab-abababababab',
@@ -1756,11 +1760,11 @@ jobs:
               RAISE EXCEPTION 'Equity protective fill did not reduce position exactly once';
             END IF;
             IF (SELECT cash_paise FROM public.paper_accounts
-                WHERE user_id='12121212-1212-4212-8212-121212121212')<>100036000
+                WHERE user_id='12121212-1212-4212-8212-121212121212')<>100031243
                OR (SELECT realized_pnl_paise FROM public.paper_accounts
-                WHERE user_id='12121212-1212-4212-8212-121212121212')<>4000
+                WHERE user_id='12121212-1212-4212-8212-121212121212')<>-757
                OR (SELECT delivery_realized_pnl_paise FROM public.paper_accounts
-                WHERE user_id='12121212-1212-4212-8212-121212121212')<>4000 THEN
+                WHERE user_id='12121212-1212-4212-8212-121212121212')<>-757 THEN
               RAISE EXCEPTION 'Equity protective fill did not update account cash and realized P&L exactly once';
             END IF;
             IF (SELECT cost_basis_paise FROM public.paper_equity_positions
@@ -1771,6 +1775,11 @@ jobs:
             IF (SELECT count(*) FROM public.paper_orders
                 WHERE order_id=v_execution_id AND status='FILLED')<>1 THEN
               RAISE EXCEPTION 'Equity protective fill did not create one canonical filled order';
+            END IF;
+            IF (SELECT charges_paise FROM public.paper_orders WHERE order_id=v_execution_id)<>4757
+               OR (SELECT cash_delta_paise FROM public.paper_orders WHERE order_id=v_execution_id)<>31243
+               OR (SELECT charges_breakdown->>'exchange' FROM public.paper_orders WHERE order_id=v_execution_id)<>'NSE' THEN
+              RAISE EXCEPTION 'Protective execution order history omitted exchange fee breakdown or net cash delta';
             END IF;
           END
           $protective_fill_assertions$;

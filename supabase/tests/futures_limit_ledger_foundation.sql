@@ -50,6 +50,12 @@ BEGIN
      WHERE table_schema='public' AND table_name='paper_futures_fills'
        AND grantee IN ('anon','authenticated')
   ) THEN RAISE EXCEPTION 'Client role has direct fill ledger privileges'; END IF;
+  IF NOT has_table_privilege('service_role','public.paper_futures_fills','SELECT')
+     OR has_table_privilege('service_role','public.paper_futures_fills','INSERT')
+     OR has_table_privilege('service_role','public.paper_futures_fills','UPDATE')
+     OR has_table_privilege('service_role','public.paper_futures_fills','DELETE') THEN
+    RAISE EXCEPTION 'Futures fill ledger must be readable but not directly writable by service_role';
+  END IF;
 END
 $ledger_schema$;
 ROLLBACK;
