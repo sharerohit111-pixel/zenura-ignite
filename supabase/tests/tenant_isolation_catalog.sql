@@ -97,7 +97,9 @@ BEGIN
   END LOOP;
 
   -- SECURITY DEFINER functions must pin search_path and must never be
-  -- executable by anon/authenticated (including via PUBLIC inheritance).
+  -- executable by anon (including via PUBLIC inheritance). Authenticated
+  -- execution is permitted only for the two explicitly user-facing protective
+  -- order RPCs, whose bodies independently bind p_user_id to auth.uid().
   FOR v_proc IN
     SELECT p.oid,p.proname,p.proconfig
       FROM pg_proc p
@@ -112,10 +114,48 @@ BEGIN
     ) THEN
       RAISE EXCEPTION 'SECURITY DEFINER function % has no pinned search_path',v_proc.proname;
     END IF;
-    IF has_function_privilege('anon',v_proc.oid,'EXECUTE')
-       OR has_function_privilege('authenticated',v_proc.oid,'EXECUTE') THEN
-      RAISE EXCEPTION 'SECURITY DEFINER function % is callable by a client role',v_proc.proname;
+    IF has_function_privilege('anon',v_proc.oid,'EXECUTE') THEN
+      RAISE EXCEPTION 'SECURITY DEFINER function % is callable by anon',v_proc.proname;
+    END IF;
+    IF has_function_privilege('authenticated',v_proc.oid,'EXECUTE')
+       AND v_proc.oid NOT IN (
+         to_regprocedure('public.create_paper_equity_protective_order(uuid,uuid,text,text,text,bigint,integer)'),
+         to_regprocedure('public.cancel_paper_protective_order(uuid,uuid)')
+       ) THEN
+      RAISE EXCEPTION 'Unapproved SECURITY DEFINER function % is callable by authenticated',v_proc.proname;
     END IF;
   END LOOP;
+
+  -- The two allowlisted client RPCs must exist, remain SECURITY DEFINER,
+  -- retain their pinned search_path, and enforce caller ownership internally.
+  FOREACH v_proc IN
+    SELECT p.oid,p.proname,p.prosrc,p.proconfig
+      FROM pg_proc p
+     WHERE p.oid IN (
+       to_regprocedure('public.create_paper_equity_protective_order(uuid,uuid,text,text,text,bigint,integer)'),
+       to_regprocedure('public.cancel_paper_protective_order(uuid,uuid)')
+     )
+  LOOP
+    IF NOT EXISTS (
+      SELECT 1
+        FROM unnest(coalesce(v_proc.proconfig,ARRAY[]::text[])) setting
+       WHERE setting LIKE 'search_path=%'
+    ) THEN
+      RAISE EXCEPTION 'Allowlisted protective RPC % has no pinned search_path',v_proc.proname;
+    END IF;
+    IF NOT has_function_privilege('authenticated',v_proc.oid,'EXECUTE')
+       OR has_function_privilege('anon',v_proc.oid,'EXECUTE') THEN
+      RAISE EXCEPTION 'Protective RPC % has incorrect client execution grants',v_proc.proname;
+    END IF;
+    IF v_proc.prosrc !~* 'auth[.]uid[[:space:]]*[(][)]'
+       OR v_proc.prosrc !~* 'p_user_id[[:space:]]+is[[:space:]]+distinct[[:space:]]+from[[:space:]]+auth[.]uid[[:space:]]*[(][)]' THEN
+      RAISE EXCEPTION 'Protective RPC % lacks an explicit auth.uid()-bound owner check',v_proc.proname;
+    END IF;
+  END LOOP;
+
+  IF to_regprocedure('public.create_paper_equity_protective_order(uuid,uuid,text,text,text,bigint,integer)') IS NULL
+     OR to_regprocedure('public.cancel_paper_protective_order(uuid,uuid)') IS NULL THEN
+    RAISE EXCEPTION 'Expected owner-bound protective order RPC is missing';
+  END IF;
 END
 $tenant_isolation_catalog$;
