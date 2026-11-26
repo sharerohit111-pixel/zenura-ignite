@@ -210,14 +210,31 @@ jobs:
       - name: Apply ordered draft migrations to disposable PostgreSQL
         run: |
           set -euo pipefail
+          applied_count=0
           for migration in supabase/migrations/*.sql; do
+            # The hosted project records exactly the first 15 migrations through
+            # 20261122123415. Build that baseline, seed legacy persisted MARKET
+            # rows, then exercise every pending migration as a forward upgrade.
+            if [[ "$migration" == "supabase/migrations/20261122124500_retire_paper_investing.sql" ]]; then
+              if [[ "$applied_count" -ne 15 ]]; then
+                echo "Expected the hosted 15-migration baseline, found $applied_count" >&2
+                exit 1
+              fi
+              psql -v ON_ERROR_STOP=1 -f supabase/tests/hosted_upgrade_seed.sql
+            fi
             if [[ "$migration" == "supabase/migrations/20261122153000_reserve_equity_protective_exit_shares.sql" ]]; then
               bash supabase/tests/protective_reservation_orphan_migration.sh "$migration"
             fi
             echo "Applying $migration"
             psql -v ON_ERROR_STOP=1 -f "$migration"
+            applied_count=$((applied_count + 1))
           done
+          if [[ "$applied_count" -ne 45 ]]; then
+            echo "Expected 45 candidate migrations, found $applied_count" >&2
+            exit 1
+          fi
           psql -v ON_ERROR_STOP=1 -f supabase/tests/protective_reservation_backfill_assertions.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/tests/hosted_upgrade_assertions.sql
       - name: Verify least-privilege Supabase market gateway service-role grants
         run: psql -v ON_ERROR_STOP=1 -f supabase/tests/market_gateway_service_role_grants.sql
       - name: Verify distributed per-user API rate-limit budgets and RPC isolation
