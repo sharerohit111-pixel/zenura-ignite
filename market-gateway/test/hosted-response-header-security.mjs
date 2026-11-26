@@ -1,5 +1,18 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import { test } from "node:test";
+import { chromium } from "playwright";
+
+test("staging header configuration is strict and scoped", async () => {
+  const headersFile = await readFile(new URL("../../_headers", import.meta.url), "utf8");
+  assert.match(headersFile, /^\\/markets\\/stocks\\/\\*/m, "headers must be scoped to the Indian Market workspace");
+  assert.match(headersFile, /frame-ancestors 'none'/);
+  assert.match(headersFile, /object-src 'none'/);
+  assert.match(headersFile, /form-action 'self'/);
+  assert.match(headersFile, /X-Frame-Options: DENY/);
+  assert.match(headersFile, /X-Content-Type-Options: nosniff/);
+  assert.doesNotMatch(headersFile, /'unsafe-inline'|'unsafe-eval'|\\s\\*/);
+});
 import { chromium } from "playwright";
 
 const target = process.env.S_TRADE_STAGING_URL;
