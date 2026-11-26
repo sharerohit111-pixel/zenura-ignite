@@ -126,6 +126,21 @@ Required fields:
 
 An internal Paper Trading simulation receipt must be labelled internal/simulated and must not be presented as exchange, clearing, bank or real settlement evidence. If no external settlement is claimed, state `not_applicable` and do not fabricate this file.
 
+## 2A. Existing Firebase legacy export — known coverage limit
+
+The repository currently contains `market-gateway/scripts/firebase-readonly-export.js`. Its allowlist is exactly:
+- `indianPaperAccounts`
+- `indianPaperOrders`
+- `indianDerivativeOrders`
+- `indianMarketWatchlists`
+- Firebase Auth UID-only identity records for orphan validation
+
+It explicitly excludes profile collections and broker/payment/operational collections. The companion `firebase-to-supabase-transform.js` is an offline transformer; its tests assert `supabaseWrites=0` and `importPerformed=false`. Neither script is being executed as part of this audit.
+
+**This existing exporter is a legacy-source candidate, not a complete ledger export.** Its manifest records per-file counts and SHA-256 hashes and its Firestore reader paginates by document name, but the inspected implementation does not establish one transactionally consistent snapshot across collections or export every cursor/page boundary. The allowlisted legacy collections do not provide separate immutable fill, per-charge, reservation-event, reversal/refund or settlement histories. The account document contains current account/position state and starting cash fields, but the existence of a field alone does not establish independently verifiable opening-balance provenance.
+
+If this exporter is later run by an authorized operator, retain its raw output unchanged and privately protect the UID-bearing identity file. Do not treat its `importAllowed` transformer result as a financial reconciliation attestation or perform an import. Obtain additional authoritative source records for every missing lifecycle domain, and document the consistency gap and retention limits. No credentials are requested in this audit.
+
 ## 3. Export manifest — `manifest.json`
 
 Include:
