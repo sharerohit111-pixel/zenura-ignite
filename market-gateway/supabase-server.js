@@ -52,6 +52,7 @@ const {isUsableUpstoxTokenResponse}=require("../functions/lib/upstox-token-respo
 const {isUsableUpstoxOAuthCallback}=require("../functions/lib/upstox-oauth-callback-input");
 const {validateHttpsRedirectUri}=require("./lib/redirect-uri-policy");
 const {apiRateLimitBucket,consumeApiRateLimit}=require("./lib/api-rate-limit");
+const {encodePaperOrderCursor,decodePaperOrderCursor,paperOrderCursorFilter}=require("./lib/paper-order-cursor");
 
 const PORT=Number(process.env.PORT||8080);
 const SUPABASE_URL=process.env.SUPABASE_URL;
@@ -540,10 +541,19 @@ app.get("/paper/orders",async(req,res)=>{
     const {user,userDb}=await auth(req),raw=String(req.query.limit??"50");
     if(!/^\d+$/.test(raw)||Number(raw)<1)return res.status(400).json({error:"Order history limit must be a whole number from 1 to 100."});
     const limit=Math.min(Number(raw),100);
-    const {data,error}=await userDb.from("paper_orders").select("*").eq("user_id",user.id).order("created_at",{ascending:false}).limit(limit);
+    let cursor=null;
+    if(req.query.cursor!==undefined){
+      try{cursor=decodePaperOrderCursor(String(req.query.cursor));}
+      catch(_){return res.status(400).json({error:"Order history cursor is invalid."});}
+    }
+    let query=userDb.from("paper_orders").select("*").eq("user_id",user.id);
+    if(cursor)query=query.or(paperOrderCursorFilter(cursor));
+    const {data,error}=await query.order("created_at",{ascending:false}).order("order_id",{ascending:false}).limit(limit+1);
     if(error)throw Object.assign(new Error("Paper order history could not be loaded."),{status:503});
-    const orders=(data||[]).map(o=>({id:o.order_id,tradingSymbol:o.trading_symbol,exchange:o.exchange,side:o.side,quantity:o.quantity,product:o.product,executionPricePaise:o.execution_price_paise,limitPricePaise:o.limit_price_paise,grossPaise:o.gross_paise,chargesPaise:o.charges_paise??0,chargesBreakdown:o.charges_breakdown??{},cashDeltaPaise:o.cash_delta_paise??null,realizedPnlPaise:o.realized_pnl_paise,orderType:o.order_type,status:o.status,simulationOnly:true,createdAt:o.created_at?Date.parse(o.created_at):null}));
-    res.set("Cache-Control","private, no-store").json({orders,hasMore:false,nextCursor:null,simulationOnly:true});
+    const rows=data||[],hasMore=rows.length>limit,page=rows.slice(0,limit);
+    const orders=page.map(o=>({id:o.order_id,tradingSymbol:o.trading_symbol,exchange:o.exchange,side:o.side,quantity:o.quantity,product:o.product,executionPricePaise:o.execution_price_paise,limitPricePaise:o.limit_price_paise,grossPaise:o.gross_paise,chargesPaise:o.charges_paise??0,chargesBreakdown:o.charges_breakdown??{},cashDeltaPaise:o.cash_delta_paise??null,realizedPnlPaise:o.realized_pnl_paise,orderType:o.order_type,status:o.status,simulationOnly:true,createdAt:o.created_at?Date.parse(o.created_at):null}));
+    const nextCursor=hasMore&&page.length?encodePaperOrderCursor(page[page.length-1]):null;
+    res.set("Cache-Control","private, no-store").json({orders,hasMore,nextCursor,simulationOnly:true});
   }catch(error){sendError(res,error,"Paper order history could not be loaded.");}
 });
 app.get("/paper/portfolio",async(req,res)=>{
