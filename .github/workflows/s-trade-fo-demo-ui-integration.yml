@@ -16,6 +16,8 @@ on:
       - "markets/language-toggle.js"
       - "market-gateway/lib/paper-trading-simulation-receipt-verifier.js"
       - "market-gateway/test/paper-trading-simulation-receipt-verifier.test.js"
+      - "market-gateway/lib/paper-trading-simulation-receipt-kms-signer.js"
+      - "market-gateway/test/paper-trading-simulation-receipt-kms-signer.test.js"
       - "market-gateway/package.json"
       - ".github/workflows/s-trade-fo-demo-ui-integration.yml"
   push:
