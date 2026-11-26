@@ -188,4 +188,4 @@ function verifyPaperTradingSimulationReceipt({ receipt, keyRegistry, expected, n
   });
 }
 
-module.exports = { canonicalize, verifyPaperTradingSimulationReceipt };
+module.exports = { canonicalize, validatePaperTradingSimulationReceiptPayload: validatePayload, verifyPaperTradingSimulationReceipt };
