@@ -211,9 +211,13 @@ jobs:
         run: |
           set -euo pipefail
           for migration in supabase/migrations/*.sql; do
+            if [[ "$migration" == "supabase/migrations/20261122153000_reserve_equity_protective_exit_shares.sql" ]]; then
+              bash supabase/tests/protective_reservation_orphan_migration.sh "$migration"
+            fi
             echo "Applying $migration"
             psql -v ON_ERROR_STOP=1 -f "$migration"
           done
+          psql -v ON_ERROR_STOP=1 -f supabase/tests/protective_reservation_backfill_assertions.sql
       - name: Verify least-privilege Supabase market gateway service-role grants
         run: psql -v ON_ERROR_STOP=1 -f supabase/tests/market_gateway_service_role_grants.sql
       - name: Verify distributed per-user API rate-limit budgets and RPC isolation
