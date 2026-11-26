@@ -6,7 +6,10 @@ const { MarketDataProviderRouter, validateProviderPlan } = require("../lib/marke
 const { ProviderRateLimitPolicy } = require("../lib/provider-rate-limit");
 
 const NOW = 1_800_000_000_000;
-const approvedRightsGate = () => ({ rightsReference: "verified-provider-rights", regulatoryReference: "verified-product-clearance" });
+process.env.MARKET_DATA_RIGHTS_APPROVED = "true";
+process.env.MARKET_DATA_RIGHTS_REFERENCE = "test-only-provider-rights";
+process.env.MARKET_DATA_REGULATORY_APPROVED = "true";
+process.env.MARKET_DATA_REGULATORY_REFERENCE = "test-only-product-clearance";
 const plan = {
   quote: ["upstox", "angelone"],
   candles: ["upstox"],
@@ -40,30 +43,45 @@ function provider(providerId, getQuote) {
     getHealth: async () => ({ healthy: true }),
   };
 }
-function makeRouter(providers, entitlementResolver = async ({ providerId }) => ({ approved: true, paperTradingAllowed: true, redistributionAllowed: true, reference: "entitlement-" + providerId, rightsApprovalReference: "written-rights-" + providerId, regulatoryApprovalReference: "regulatory-" + providerId }), rightsGate = approvedRightsGate) {
+function makeRouter(providers, entitlementResolver = async ({ providerId }) => ({ approved: true, paperTradingAllowed: true, redistributionAllowed: true, reference: "entitlement-" + providerId, rightsApprovalReference: "written-rights-" + providerId, regulatoryApprovalReference: "regulatory-" + providerId })) {
   return new MarketDataProviderRouter({
     providers: new Map(providers),
     plan,
     entitlementResolver,
-    rightsGate,
     clock: () => NOW,
   });
 }
 const request = { userId: "user-1", instrumentId: "NSE_EQ|INE002A01018", exchange: "NSE" };
 
 
-test("global dual approval gate blocks the router before entitlement lookup or provider calls", async () => {
+test("global dual approval gate cannot be replaced by a caller-supplied no-op", async () => {
+  const previous = {
+    rights: process.env.MARKET_DATA_RIGHTS_APPROVED,
+    rightsReference: process.env.MARKET_DATA_RIGHTS_REFERENCE,
+    regulatory: process.env.MARKET_DATA_REGULATORY_APPROVED,
+    regulatoryReference: process.env.MARKET_DATA_REGULATORY_REFERENCE,
+  };
+  process.env.MARKET_DATA_RIGHTS_APPROVED = "false";
   let resolverCalls = 0;
   let providerCalls = 0;
   const upstream = provider("upstox", async () => { providerCalls += 1; return quote("upstox"); });
-  const router = makeRouter(
-    [["upstox", upstream]],
-    async () => { resolverCalls += 1; return { approved: true, paperTradingAllowed: true, redistributionAllowed: true, reference: "fabricated", rightsApprovalReference: "fabricated", regulatoryApprovalReference: "fabricated" }; },
-    () => { throw Object.assign(new Error("written approvals missing"), { code: "market_data_rights_not_approved", status: 503 }); }
-  );
-  await assert.rejects(router.route("quote", {}, request), { code: "market_data_rights_not_approved", status: 503 });
-  assert.equal(resolverCalls, 0);
-  assert.equal(providerCalls, 0);
+  const router = new MarketDataProviderRouter({
+    providers: new Map([["upstox", upstream]]),
+    plan,
+    entitlementResolver: async () => { resolverCalls += 1; return { approved: true, paperTradingAllowed: true, redistributionAllowed: true, reference: "fabricated", rightsApprovalReference: "fabricated", regulatoryApprovalReference: "fabricated" }; },
+    rightsGate: () => ({ rightsReference: "caller-supplied", regulatoryReference: "caller-supplied" }),
+    clock: () => NOW,
+  });
+  try {
+    await assert.rejects(router.route("quote", {}, request), { code: "market_data_rights_not_approved", status: 503 });
+    assert.equal(resolverCalls, 0);
+    assert.equal(providerCalls, 0);
+  } finally {
+    process.env.MARKET_DATA_RIGHTS_APPROVED = previous.rights;
+    process.env.MARKET_DATA_RIGHTS_REFERENCE = previous.rightsReference;
+    process.env.MARKET_DATA_REGULATORY_APPROVED = previous.regulatory;
+    process.env.MARKET_DATA_REGULATORY_REFERENCE = previous.regulatoryReference;
+  }
 });
 
 test("provider plan requires ordered, non-empty, unique provider ids", () => {
@@ -148,7 +166,7 @@ test("distributed quota denial skips that provider and never calls its upstream 
   };
   const router = new MarketDataProviderRouter({
     providers: new Map([["upstox", primary], ["angelone", fallback]]),
-    plan, rateLimiter, rightsGate: approvedRightsGate,
+    plan, rateLimiter,
     entitlementResolver: async ({ providerId }) => ({ approved: true, paperTradingAllowed: true, redistributionAllowed: true, reference: "entitlement-" + providerId, rightsApprovalReference: "written-rights-" + providerId, regulatoryApprovalReference: "regulatory-" + providerId }),
     clock: () => NOW,
   });
@@ -165,7 +183,6 @@ test("distributed quota service failure fails closed when no other provider is c
     providers: new Map([["upstox", primary]]),
     plan: { ...plan, quote: ["upstox"] },
     rateLimiter: { consume: async () => { throw Object.assign(new Error("quota db down"), { status: 503 }); } },
-    rightsGate: approvedRightsGate,
     entitlementResolver: async () => ({ approved: true, paperTradingAllowed: true, redistributionAllowed: true, reference: "entitlement-upstox", rightsApprovalReference: "written-rights-upstox", regulatoryApprovalReference: "regulatory-upstox" }),
     clock: () => NOW,
   });
