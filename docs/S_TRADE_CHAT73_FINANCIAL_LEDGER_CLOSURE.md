@@ -77,7 +77,7 @@ Retired `paper_investing_*` tables, if present, are explicitly outside this audi
 - Persisted money columns and transaction inputs use integer paise (`bigint`); relevant SQL functions include safe-range checks and integer gross calculations.
 - Account-first row locks, unique idempotency indexes, request fingerprints and duplicate-retry checks exist in the candidate transaction RPCs.
 - Candidate disposable PostgreSQL workflows exercise per-engine accounting, partial fills, replay, fill/cancel races, duplicate execution and rollback.
-- Demo schema 1.2.0 enforces safe-integer deltas, event sequence and strictly increasing timestamps, unique event/idempotency/source identifiers, and deterministic replay/hash output.
+- Demo schema 1.2.0 enforces safe-integer deltas, event sequence and strictly increasing timestamps, unique event/idempotency/source identifiers, and deterministic replay/hash output. The independent checker rejects non-zero blocked-funds deltas because this schema has no attributable reservation source/order binding.
 - Persisted SQL rows have timestamps and per-account versioning, but the inspected persisted architecture does not provide one global event sequence covering all Equity/Futures/Options events.
 - A passing per-engine test suite does not prove a single atomic cross-asset historical snapshot or complete source provenance.
 
