@@ -133,6 +133,7 @@ function verifyPaperTradingSimulationReceipt({ receipt, keyRegistry, expected, n
     fail("RECEIPT_KEY_REVOKED");
   }
   if (typeof key.publicKeyPem !== "string" || !key.publicKeyPem.trim()) fail("RECEIPT_PUBLIC_KEY_MISSING");
+  if (!key.publicKeyPem.includes("-----BEGIN PUBLIC KEY-----")) fail("RECEIPT_PUBLIC_KEY_MUST_BE_PUBLIC_ONLY");
 
   let publicKey;
   try { publicKey = crypto.createPublicKey(key.publicKeyPem); }
