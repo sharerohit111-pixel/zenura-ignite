@@ -58,6 +58,7 @@ test("rejects Equity gross/cash mismatches and overfilled orders", () => {
   events[1].deltas.cashDeltaPaise = -9999;
   assert.throws(() => reconcileDemoEventStream({ opening, events }), /EQUITY_FILL_CASH_GROSS_MISMATCH/);
   const overfill = stream();
+  overfill[1].deltas.cashDeltaPaise = -30000;
   overfill[1].payload.quantity = 3;
   overfill[1].payload.grossPaise = 30000;
   overfill[1].payload.pricePaise = 10000;
