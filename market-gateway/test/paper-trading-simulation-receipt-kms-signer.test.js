@@ -16,8 +16,27 @@ const payload = {
   keyId: "simulation-key-01",
   algorithm: "Ed25519",
   receiptId: "receipt-001",
+  idempotencyKey: "idem-001",
+  sourceTransactionId: "txn-001",
+  accountId: "account-opaque-001",
+  assetClass: "FUTURES",
+  instrumentKey: "NSE|FUT|NIFTY|2026-12-31",
+  side: "BUY",
+  product: "CARRY_FORWARD",
+  orderId: "order-001",
+  fillId: "fill-001",
+  transactionVersion: "v0001",
+  sourceSnapshotId: "quote-snapshot-001",
   simulationOnly: true,
-  currency: "INR"
+  currency: "INR",
+  amounts: {
+    quantity: 2, pricePaise: 12500, grossPaise: 25000,
+    feesPaise: 70, taxesPaise: 20, otherChargesPaise: 10,
+    netCashDeltaPaise: -25100, blockedDeltaPaise: 0
+  },
+  occurredAt: "2026-11-26T11:59:00.000Z",
+  committedAt: "2026-11-26T11:59:01.000Z",
+  issuedAt: "2026-11-26T11:59:02.000Z"
 };
 function mockKms(overrides = {}) {
   return {
@@ -74,6 +93,12 @@ test("uses raw canonical bytes and sends a correct CRC32C request checksum", asy
   assert.deepEqual(Buffer.from(observed.data), Buffer.from(canonicalize(payload)));
   assert.equal(observed.dataCrc32c.value, crc32c(observed.data));
   assert.equal("digest" in observed, false);
+});
+test("refuses to call KMS for malformed receipt payloads", async () => {
+  let calls = 0;
+  const client = { async asymmetricSign() { calls += 1; return []; } };
+  await assert.rejects(() => signer(client).signPayload({ ...payload, simulationOnly: false }), /RECEIPT_NOT_EXPLICITLY_SIMULATED_INR/);
+  assert.equal(calls, 0);
 });
 test("fails closed on mismatched payload scope", async () => {
   await assert.rejects(() => signer().signPayload({ ...payload, environment: "production" }), /KMS_SIGNER_PAYLOAD_SCOPE_MISMATCH/);
