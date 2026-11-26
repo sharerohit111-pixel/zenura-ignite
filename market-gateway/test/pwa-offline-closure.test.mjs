@@ -32,7 +32,7 @@ test("Markets web app manifest is strict JSON and has a valid standalone scope",
 
 test("Markets service worker uses the current cache generation and precaches PWA icons and canonical event ledger",async()=>{
  const sw=await read("markets/service-worker.js");
- assert.match(sw,/zenura-markets-shell-v11/);
+ assert.match(sw,/zenura-markets-shell-v12/);
  assert.match(sw,/"shared\/paper-demo-event-ledger\.mjs"/);
  assert.match(sw,/"icons\/icon-192\.svg"/);
  assert.match(sw,/"icons\/icon-512\.svg"/);
