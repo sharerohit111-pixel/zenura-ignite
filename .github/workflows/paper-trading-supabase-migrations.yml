@@ -205,6 +205,8 @@ jobs:
           $fixture$;
           GRANT EXECUTE ON FUNCTION public.rls_auto_enable() TO PUBLIC;
           SQL
+      - name: Check protective reservation migration orphan preflight contract
+        run: node --test supabase/tests/protective_reservation_migration_preflight.test.js
       - name: Apply ordered draft migrations to disposable PostgreSQL
         run: |
           set -euo pipefail
