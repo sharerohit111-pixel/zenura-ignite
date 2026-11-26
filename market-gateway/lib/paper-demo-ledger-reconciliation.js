@@ -103,6 +103,9 @@ function reconcileDemoEventStream({ opening, events, provenance = null } = {}) {
           (p.grossPaise === undefined && p.grossValuePaise === undefined)) fail("FILL_GROSS_MISMATCH:" + (i + 1));
       const order = orders.get(p.orderId);
       if (!order || order.engine !== e.engine || order.assetClass !== p.assetClass ||
+          (e.engine === "EQUITY" && p.assetClass !== "EQUITY") ||
+          (e.engine === "FUTURES" && p.assetClass !== "FUTURE") ||
+          (e.engine === "OPTIONS" && p.assetClass !== "OPTION") ||
           order.instrumentKey !== p.instrumentKey || order.side !== p.side ||
           (order.product || "DELIVERY") !== (p.product || "DELIVERY") || TERMINAL.has(order.status)) {
         fail("FILL_ORDER_BINDING_MISMATCH:" + (i + 1));
@@ -118,6 +121,9 @@ function reconcileDemoEventStream({ opening, events, provenance = null } = {}) {
       fills.add(p.fillId);
     } else if (e.type === "POSITION_CHANGED") {
       if (!ASSETS.has(p.assetClass) || typeof p.instrumentKey !== "string" ||
+          (e.engine === "EQUITY" && p.assetClass !== "EQUITY") ||
+          (e.engine === "FUTURES" && p.assetClass !== "FUTURE") ||
+          (e.engine === "OPTIONS" && p.assetClass !== "OPTION") ||
           !integer(p.quantityDelta) || !integer(p.realizedPnlDeltaPaise) ||
           !integer(p.costBasisDeltaPaise ?? 0)) fail("INVALID_POSITION_FACT:" + (i + 1));
       if (e.deltas.cashDeltaPaise !== 0 || e.deltas.blockedDeltaPaise !== 0) fail("POSITION_EVENT_CANNOT_MOVE_WALLET:" + (i + 1));
@@ -137,6 +143,12 @@ function reconcileDemoEventStream({ opening, events, provenance = null } = {}) {
     blocked = nextBlocked;
   }
 
+  for (const [orderId, order] of orders) {
+    if (order.status === "FILLED" && order.filled !== order.quantity) fail("FINAL_FILLED_ORDER_QUANTITY_MISMATCH:" + orderId);
+    if (order.status === "PARTIALLY_FILLED" && !(order.filled > 0 && order.filled < order.quantity)) fail("FINAL_PARTIAL_ORDER_QUANTITY_MISMATCH:" + orderId);
+    if (["CANCELLED", "EXPIRED", "REJECTED"].includes(order.status) && order.filled >= order.quantity) fail("FINAL_TERMINAL_ORDER_QUANTITY_MISMATCH:" + orderId);
+    if (order.status === "REJECTED" && order.filled !== 0) fail("REJECTED_ORDER_HAS_FILLS:" + orderId);
+  }
   if (events.length === 0) findings.push("No historical events supplied; opening balance has no transaction-level corroboration.");
   findings.push("Schema 1.2.0 is a synthetic Demo event stream, not an authoritative persisted ledger export.");
   findings.push("The event schema does not represent fee/charge postings, reversals/refunds, authoritative settlement receipts, dated settlement, or independent market marks.");
