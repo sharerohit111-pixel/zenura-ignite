@@ -68,6 +68,7 @@ async function scanTextContrast(page){
 
    // Browser QA explicitly opts into the local simulator; production remains fail-closed by default.
    await context.addInitScript(()=>{window.ZENURA_RUNTIME_ENV="test";});
+   await context.addInitScript({content:fs.readFileSync(axePath,"utf8")});
    const page=await context.newPage();
    const pageErrors=[];
    const browserDiagnostics=[];
@@ -220,7 +221,6 @@ async function scanTextContrast(page){
     assert.ok(portfolioRows.some(row=>row.includes("OPTION")),"unified portfolio includes Options");
    }
    await page.goto("http://127.0.0.1:4173/markets/stocks/demo.html",{waitUntil:"domcontentloaded",timeout:30000});
-   await page.addScriptTag({path:axePath});
    const axe=await page.evaluate(async()=>window.axe.run(document,{runOnly:{type:"tag",values:["wcag2a","wcag2aa","wcag21a","wcag21aa"]}}));
    const serious=axe.violations.filter(v=>v.impact==="critical"||v.impact==="serious");
    if(serious.length) console.error(JSON.stringify(serious.map(v=>({id:v.id,help:v.help,nodes:v.nodes.map(n=>({target:n.target,html:n.html,failureSummary:n.failureSummary}))}))));
