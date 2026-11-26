@@ -114,8 +114,8 @@ function validateStreamResult(result) {
 }
 
 class MarketDataProviderRouter {
-  constructor({ providers, plan, entitlementResolver, rightsGate = assertMarketDataRightsApproved, healthRegistry = null, rateLimiter = null, clock = () => Date.now(), maxQuoteAgeMs = 15000 }) {
-    if (!(providers instanceof Map) || typeof entitlementResolver !== "function" || typeof rightsGate !== "function" ||
+  constructor({ providers, plan, entitlementResolver, healthRegistry = null, rateLimiter = null, clock = () => Date.now(), maxQuoteAgeMs = 15000 }) {
+    if (!(providers instanceof Map) || typeof entitlementResolver !== "function" ||
         (healthRegistry !== null && (typeof healthRegistry.isAvailable !== "function" ||
           typeof healthRegistry.recordSuccess !== "function" || typeof healthRegistry.recordFailure !== "function")) ||
         (rateLimiter !== null && typeof rateLimiter.consume !== "function") ||
@@ -129,7 +129,6 @@ class MarketDataProviderRouter {
     this.providers = new Map(providers);
     this.plan = validateProviderPlan(plan);
     this.entitlementResolver = entitlementResolver;
-    this.rightsGate = rightsGate;
     this.healthRegistry = healthRegistry;
     this.rateLimiter = rateLimiter;
     this.clock = clock;
@@ -149,7 +148,7 @@ class MarketDataProviderRouter {
       capability === "depth" ? "getDepth" : "getQuote";
     // The generic router must independently enforce both global documentary
     // approvals; caller-supplied entitlement fields are not a substitute.
-    this.rightsGate();
+    assertMarketDataRightsApproved(process.env);
     const nowMs = this.clock();
 
     for (const providerId of this.plan[capability]) {
