@@ -13,11 +13,17 @@ jobs:
     name: Gitleaks full-history scan (redacted)
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout exact pull request head with full history
+      - name: Checkout exact pull-request merge candidate with full history
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          ref: ${{ github.sha }}
           fetch-depth: 0
+
+      - name: Record scanned candidate SHA
+        run: |
+          echo "Scanned candidate SHA: $(git rev-parse HEAD)"
+          echo "PR source head SHA: ${{ github.event.pull_request.head.sha || github.sha }}"
+          echo "PR base SHA: ${{ github.event.pull_request.base.sha || 'workflow_dispatch' }}"
 
       - name: Scan all available Git history without exposing secret values
         shell: bash
