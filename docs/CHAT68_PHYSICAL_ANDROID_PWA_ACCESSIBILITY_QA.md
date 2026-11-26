@@ -75,3 +75,22 @@ Current-head workflow snapshot:
 Therefore, the earlier SUCCESS runs listed above apply to the earlier tested runtime SHA, not automatically to this newer PR head. Do not mark current-head CI fully green until its in-progress runs complete and cancelled checks are rerun or otherwise validly satisfied. PR #245 remains open and Draft; its mergeable field was false in the latest metadata snapshot. No merge or deployment was attempted.
 
 Physical Android installation/update, on-device offline behavior, cache inspection and TalkBack remain NOT RUN and still require external handset evidence.
+
+
+## Superseding repository snapshot — 2026-11-26 16:04 UTC
+
+The current PR #245 head was re-fetched as `ed2f8452c866495b5f1048e8a752e82f71f60a34`. PR #245 remains open, unmerged and Draft; GitHub reports mergeable=true at this snapshot. No merge or deployment was attempted.
+
+The six relevant workflows attached to this exact candidate commit have now completed successfully:
+- Run 45855063261 — S-TRADE Demo Screen Wiring Tests: SUCCESS (desktop/mobile/accessibility/performance/offline PWA smoke).
+- Run 45855063150 — S-TRADE Authenticated Browser Security: SUCCESS (Chromium CSP/XSS).
+- Run 45855063232 — Paper Trading Supabase SQL smoke test: SUCCESS (including the tenant-isolation catalog guard).
+- Run 45855063259 — Validate Indian Market Code: SUCCESS (syntax and gateway unit tests).
+- Run 45855063228 — Firebase read-only export tool tests: SUCCESS.
+- Run 45855063095 — S-TRADE Futures Options Demo UI Integration: SUCCESS.
+
+The earlier catalog failure observed on a prior merge snapshot (where `cancel_paper_protective_order` was flagged) is superseded for this exact head by the successful current-head SQL smoke run. The current migration/test code explicitly checks the approved protective-order RPC allowlist and the `auth.uid()` owner guard; no speculative permission patch was applied during this QA continuation.
+
+The earlier snapshot sections above are historical evidence and must not be read as the latest state. This update supersedes their candidate-head/workflow status.
+
+Physical Android install/update, actual handset offline/reconnect/cache behavior and TalkBack remain **NOT RUN**. Chromium emulation and CI do not close those physical-device gates. No device model, OS or browser version is claimed. Keep PR #245 Draft until real handset evidence and required review are complete.
