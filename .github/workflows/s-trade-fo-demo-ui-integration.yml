@@ -1,0 +1,65 @@
+name: S-TRADE Futures Options Demo UI Integration
+on:
+  pull_request:
+    paths:
+      - "market-gateway/mock/**"
+      - "market-gateway/lib/derivative-position.js"
+      - "market-gateway/test/derivative-mock-simulator.test.js"
+      - "market-gateway/test/paper-mock-fixtures.test.js"
+      - "market-gateway/test/paper-demo-derivative-integration.test.mjs"
+      - "market-gateway/test/paper-demo-equity-integration.test.mjs"
+      - "market-gateway/test/equity-demo-execution-engine.test.js"
+      - "markets/stocks/demo*"
+      - "markets/stocks/derivative-mock-simulator.js"
+      - "markets/shared/paper-demo-adapter.mjs"
+      - "markets/service-worker.js"
+      - "markets/language-toggle.js"
+      - "market-gateway/package.json"
+      - ".github/workflows/s-trade-fo-demo-ui-integration.yml"
+  push:
+    branches:
+      - feature/s-trade-fo-demo-ui-integration-2026-11-24
+      - feature/s-trade-round3-equity-demo-screen-integration-2026-11-24
+    paths:
+      - "market-gateway/mock/**"
+      - "market-gateway/lib/derivative-position.js"
+      - "market-gateway/test/derivative-mock-simulator.test.js"
+      - "market-gateway/test/paper-mock-fixtures.test.js"
+      - "market-gateway/test/paper-demo-derivative-integration.test.mjs"
+      - "markets/stocks/demo*"
+      - "markets/stocks/derivative-mock-simulator.js"
+      - "markets/shared/paper-demo-adapter.mjs"
+      - "markets/service-worker.js"
+      - "markets/language-toggle.js"
+      - "market-gateway/package.json"
+      - ".github/workflows/s-trade-fo-demo-ui-integration.yml"
+permissions:
+  contents: read
+jobs:
+  demo-fo-integration:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Parse shared JSON schemas and fixtures
+        run: |
+          node - <<'NODE'
+          const fs=require("node:fs");
+          for(const file of ["market-gateway/mock/contracts/paper-trading-envelope.schema.json","market-gateway/mock/contracts/paper-trading-domain.schema.json",...fs.readdirSync("market-gateway/mock/fixtures").filter(x=>x.endsWith(".json")).map(x=>"market-gateway/mock/fixtures/"+x)]) JSON.parse(fs.readFileSync(file,"utf8"));
+          NODE
+      - name: Install gateway dependencies
+        run: npm install --prefix market-gateway --no-audit --no-fund --package-lock=false
+      - name: Run full gateway regression suite
+        run: npm test --prefix market-gateway
+      - name: Check gateway and browser module syntax
+        run: npm run check --prefix market-gateway && node --check markets/language-toggle.js
+      - name: Guard production gateway isolation
+        run: |
+          if grep -R -E "paper-demo-adapter|derivative-mock-simulator|paper-mock-fixtures|equity-demo-execution-engine|demo-(equity|chart|derivative)-panel|market-gateway/mock/fixtures|equity-execution.json" market-gateway/supabase-server.js market-gateway/server.js; then
+            echo "Browser Demo modules and synthetic fixtures must remain outside production routes."
+            exit 1
+          fi
+      - name: Verify interactive Demo screen wiring
+        run: node --test market-gateway/test/paper-demo-derivative-integration.test.mjs market-gateway/test/paper-demo-equity-integration.test.mjs market-gateway/test/demo-chart-data.test.mjs

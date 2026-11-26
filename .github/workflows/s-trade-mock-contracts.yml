@@ -1,0 +1,63 @@
+name: S-TRADE Mock Contract Tests
+
+on:
+  pull_request:
+    branches:
+      - feature/s-trade-distributed-api-rate-limit-2026-11-24
+      - feature/s-trade-mock-contract-architecture-2026-11-24
+      - feature/s-trade-shared-demo-consumer-adapter-2026-11-24
+    paths:
+      - "market-gateway/mock/**"
+      - "market-gateway/lib/paper-mock-fixtures.js"
+      - "market-gateway/test/paper-mock-fixtures.test.js"
+      - "markets/shared/paper-demo-adapter.mjs"
+      - "market-gateway/test/paper-demo-adapter.test.mjs"
+      - ".github/workflows/s-trade-mock-contracts.yml"
+  push:
+    branches:
+      - feature/s-trade-mock-contract-architecture-2026-11-24
+      - feature/s-trade-shared-demo-consumer-adapter-2026-11-24
+    paths:
+      - "market-gateway/mock/**"
+      - "market-gateway/lib/paper-mock-fixtures.js"
+      - "market-gateway/test/paper-mock-fixtures.test.js"
+      - "markets/shared/paper-demo-adapter.mjs"
+      - "market-gateway/test/paper-demo-adapter.test.mjs"
+      - ".github/workflows/s-trade-mock-contracts.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  mock-contracts:
+    name: Validate mock JSON contracts and fixtures
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Parse shared JSON schemas and fixture files
+        run: |
+          node - <<'NODE'
+          const fs = require('node:fs');
+          const files = [
+            'market-gateway/mock/contracts/paper-trading-envelope.schema.json',
+            'market-gateway/mock/contracts/paper-trading-domain.schema.json',
+            ...fs.readdirSync('market-gateway/mock/fixtures').filter(x => x.endsWith('.json'))
+              .map(x => 'market-gateway/mock/fixtures/' + x)
+          ];
+          for (const file of files) JSON.parse(fs.readFileSync(file, 'utf8'));
+          console.log('Parsed ' + files.length + ' contract/fixture JSON files.');
+          NODE
+      - name: Run deterministic fixture tests
+        run: node --test market-gateway/test/paper-mock-fixtures.test.js
+      - name: Run shared browser-safe demo adapter tests
+        run: node --test market-gateway/test/paper-demo-adapter.test.mjs
+      - name: Ensure fixture loader is not wired into production gateway
+        run: |
+          if grep -R "paper-mock-fixtures" market-gateway/supabase-server.js market-gateway/server.js; then
+            echo "Mock fixtures must not be wired into production gateway routes."
+            exit 1
+          fi
+          echo "No production gateway fixture import found."

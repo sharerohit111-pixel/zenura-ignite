@@ -1,0 +1,33 @@
+{
+  "name": "zenura-indian-market-gateway",
+  "version": "1.0.0",
+  "private": true,
+  "main": "supabase-server.js",
+  "engines": {
+    "node": "22"
+  },
+  "scripts": {
+    "start": "node supabase-server.js",
+    "test": "node --test test/*.test.js",
+    "check": "node --check server.js && node --check supabase-server.js && node --check lib/bse-equity-fee-master.js && node --check scripts/import-bse-scrip-master.js && node --check lib/exchange-session-import.js && node --check scripts/import-exchange-sessions.js && node --check lib/supabase-runtime.js && node --check lib/protective-order-worker.js && node --check lib/paper-futures-limit-worker.js && node --check lib/upstox-rest-executable-quote.js && node --check ../markets/stocks/stocks.js && node --check ../markets/stocks/futures-limit-policy.js && node --check ../markets/stocks/futures-limit-workspace.js && node --check ../markets/stocks/protective-orders.js && node --check ../markets/stocks/chart-engine.js && node --check ../markets/stocks/derivative-mock-simulator.js && node --check ../markets/stocks/demo-derivative-panel.mjs && node --check ../markets/stocks/demo-equity-panel.mjs && node --check ../markets/stocks/demo-chart-data.mjs && node --check ../markets/stocks/demo-chart-panel.mjs && node --check lib/equity-demo-execution-engine.js",
+    "start:legacy-firebase": "node server.js",
+    "worker:limit": "node paper-limit-worker.js",
+    "import:bse-master": "node scripts/import-bse-scrip-master.js",
+    "import:exchange-sessions": "node scripts/import-exchange-sessions.js"
+  },
+  "dependencies": {
+    "express": "4.22.3",
+    "protobufjs": "7.6.6",
+    "ws": "8.23.0",
+    "@supabase/supabase-js": "2.119.2"
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "4.0.1",
+    "firebase": "11.0.2",
+    "@google-cloud/firestore": "9.4.1",
+    "firebase-admin": "14.5.1"
+  },
+  "overrides": {
+    "@grpc/grpc-js": "1.14.7"
+  }
+}

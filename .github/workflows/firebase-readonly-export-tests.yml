@@ -1,0 +1,81 @@
+name: Firebase read-only export tool tests
+
+on:
+  pull_request:
+    paths:
+      - "market-gateway/scripts/firebase-readonly-export.js"
+      - "market-gateway/test/firebase-readonly-export.test.js"
+      - "market-gateway/FIREBASE_READONLY_EXPORT.md"
+      - "market-gateway/scripts/firebase-to-supabase-transform.js"
+      - "market-gateway/test/firebase-to-supabase-transform.test.js"
+      - "market-gateway/FIREBASE_TO_SUPABASE_TRANSFORM.md"
+      - "market-gateway/scripts/paper-trading-reconcile.js"
+      - "market-gateway/test/paper-trading-reconcile.test.js"
+      - "market-gateway/PAPER_TRADING_RECONCILIATION.md"
+      - "market-gateway/PAPER_TRADING_SCHEMA_COMPATIBILITY_AUDIT.md"
+      - "market-gateway/lib/supabase-paper-identity.js"
+      - "market-gateway/test/supabase-paper-identity.test.js"
+      - "market-gateway/FIREBASE_SUPABASE_IDENTITY_ADAPTER.md"
+      - "market-gateway/scripts/firebase-role-claim-audit.js"
+      - "market-gateway/test/firebase-role-claim-audit.test.js"
+      - "market-gateway/FIREBASE_ROLE_CLAIM_AUDIT.md"
+      - "market-gateway/FIREBASE_ROLE_CLAIM_ROLLOUT_PLAN.md"
+      - "market-gateway/FIREBASE_CUSTOM_CLAIM_WRITER_INVENTORY.md"
+      - "market-gateway/test/firebase-firestore-rules-audit.test.js"
+      - "market-gateway/FIREBASE_FIRESTORE_RULES_AUDIT.md"
+      - "firestore.rules"
+      - ".github/workflows/firebase-readonly-export-tests.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  firebase-readonly-export:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install market gateway test dependencies
+        working-directory: market-gateway
+        run: npm install --no-save --no-package-lock --no-audit --no-fund
+      - name: Check exporter syntax
+        working-directory: market-gateway
+        run: node --check scripts/firebase-readonly-export.js
+      - name: Run exporter tests
+        working-directory: market-gateway
+        run: node --test test/firebase-readonly-export.test.js
+      - name: Check transformer syntax
+        working-directory: market-gateway
+        run: node --check scripts/firebase-to-supabase-transform.js
+      - name: Run transformer tests
+        working-directory: market-gateway
+        run: node --test test/firebase-to-supabase-transform.test.js
+      - name: Check reconciliation syntax
+        working-directory: market-gateway
+        run: node --check scripts/paper-trading-reconcile.js
+      - name: Run reconciliation tests
+        working-directory: market-gateway
+        run: node --test test/paper-trading-reconcile.test.js
+      - name: Check identity adapter syntax
+        working-directory: market-gateway
+        run: node --check lib/supabase-paper-identity.js
+      - name: Run identity adapter tests
+        working-directory: market-gateway
+        run: node --test test/supabase-paper-identity.test.js
+      - name: Check Firebase role claim audit syntax
+        working-directory: market-gateway
+        run: node --check scripts/firebase-role-claim-audit.js
+      - name: Run Firebase role claim audit tests
+        working-directory: market-gateway
+        run: node --test test/firebase-role-claim-audit.test.js
+      - name: Run static Firestore migration rules audit
+        working-directory: market-gateway
+        run: node --test test/firebase-firestore-rules-audit.test.js
+      - name: Run Firestore Emulator security tests
+        working-directory: market-gateway
+        env:
+          REQUIRE_FIRESTORE_EMULATOR: "1"
+        run: npx --yes firebase-tools emulators:exec --config ../firebase.json --only firestore --project demo-zenura-ignite "node --test test/firestore-rules-client.test.js"

@@ -1,0 +1,89 @@
+{
+  "schemaVersion": "1.0.0",
+  "mode": "MOCK",
+  "simulated": true,
+  "requestId": "mock-market-0001",
+  "asOf": "2026-11-24T09:30:00+05:30",
+  "meta": {
+    "source": "SYNTHETIC_FIXTURE",
+    "stale": false,
+    "cursor": null
+  },
+  "data": {
+    "exchange": "NSE",
+    "marketStatus": "OPEN",
+    "quotes": [
+      {
+        "instrumentKey": "MOCK|NSE|EQ|0001",
+        "symbol": "MOCKALPHA",
+        "lastPricePaise": 125050,
+        "changePaise": 1250,
+        "volume": 1200,
+        "provider": "MOCK",
+        "timestamp": "2026-11-24T09:30:00+05:30",
+        "stale": false
+      },
+      {
+        "instrumentKey": "MOCK|BSE|EQ|0002",
+        "symbol": "MOCKBETA",
+        "lastPricePaise": 87525,
+        "changePaise": -225,
+        "volume": 800,
+        "provider": "MOCK",
+        "timestamp": "2026-11-24T09:30:00+05:30",
+        "stale": false
+      },
+      {
+        "instrumentKey": "MOCK|NSE|INDEX|0003",
+        "symbol": "MOCKNIFTY50",
+        "lastPricePaise": 2450125,
+        "changePaise": 1250,
+        "volume": 0,
+        "provider": "MOCK",
+        "timestamp": "2026-11-24T09:30:00+05:30",
+        "stale": false
+      },
+      {
+        "instrumentKey": "MOCK|BSE|INDEX|0004",
+        "symbol": "MOCKSENSEX",
+        "lastPricePaise": 8200125,
+        "changePaise": -850,
+        "volume": 0,
+        "provider": "MOCK",
+        "timestamp": "2026-11-24T09:30:00+05:30",
+        "stale": false
+      }
+    ],
+    "depth": {
+      "instrumentKey": "MOCK|NSE|EQ|0001",
+      "bids": [
+        {
+          "pricePaise": 124950,
+          "quantity": 2
+        },
+        {
+          "pricePaise": 124900,
+          "quantity": 3
+        },
+        {
+          "pricePaise": 124850,
+          "quantity": 4
+        }
+      ],
+      "asks": [
+        {
+          "pricePaise": 125050,
+          "quantity": 2
+        },
+        {
+          "pricePaise": 125100,
+          "quantity": 3
+        },
+        {
+          "pricePaise": 125150,
+          "quantity": 4
+        }
+      ]
+    }
+  }
+}

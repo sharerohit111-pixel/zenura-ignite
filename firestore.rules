@@ -106,6 +106,18 @@ service cloud.firestore {
     match /razorpayEvents/{eventId} {
       allow read, write: if false;
     }
+    // Indian-market OAuth state, broker credentials and paper-trading records are server-only.
+    match /upstoxOAuthStates/{stateId} { allow read, write: if false; }
+    match /upstoxConnections/{uid} { allow read, write: if false; }
+    match /upstoxConnectionControls/{uid} { allow read, write: if false; }
+    match /indianMarketStreamLeases/{uid} { allow read, write: if false; }
+    match /indianMarketWorkerState/{workerId} { allow read, write: if false; }
+    match /indianMarketWatchlists/{uid} { allow read, write: if false; }
+    match /indianPaperAccounts/{uid} { allow read, write: if false; }
+    match /indianPaperOrders/{orderId} { allow read, write: if false; }
+    match /indianDerivativeOrders/{orderId} { allow read, write: if false; }
+    match /indianMarginPreviewLimits/{uid} { allow read, write: if false; }
+
     match /users/{uid} {
       allow read: if request.auth != null && request.auth.uid == uid;
       allow write: if false;

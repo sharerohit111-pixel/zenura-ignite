@@ -1,0 +1,114 @@
+.stocks-page{background:radial-gradient(ellipse at 50% -22%,#173b5a 0,transparent 52%),#07111f}.back{color:#a7c1d5;text-decoration:none;font-size:10px;letter-spacing:1px;font-weight:800}.stock-hero{display:flex;align-items:end;justify-content:space-between;gap:20px;padding:34px 0 22px}.stock-hero h1{font-size:clamp(30px,5vw,45px);margin:10px 0 7px;letter-spacing:-1.4px}.stock-hero h1 em{font-style:normal;color:#35dfb7}.stock-hero p{color:#8ba1b7;font-size:12px;margin:0}.connection{display:flex;gap:10px;align-items:center;padding:12px 15px;border:1px solid #6a5530;background:#241f17;border-radius:12px;max-width:310px}.connection b,.connection small{display:block}.connection b{font-size:9px;letter-spacing:.8px;color:#f2c77a}.connection small{font-size:9px;color:#b39d76;margin-top:4px;line-height:1.4}.status-dot{width:9px;height:9px;flex:none;border-radius:50%;background:#e3a43b;box-shadow:0 0 12px #e3a43b66}.notice{display:grid;grid-template-columns:auto 1fr auto;gap:14px;align-items:center;padding:14px 16px;border:1px solid #294b62;background:#0d2234;border-radius:13px;color:#a7bfd1;font-size:10px;line-height:1.55}.notice b{color:#6fe2c4}.notice a{color:#8eb4ff;text-decoration:none;white-space:nowrap}.workspace{display:grid;grid-template-columns:245px minmax(300px,1fr) 245px;gap:13px;margin-top:15px;align-items:stretch}.panel{min-width:0;background:linear-gradient(150deg,#10243a,#0a1727);border:1px solid #203b54;border-radius:17px;padding:16px}.panel-head{display:flex;align-items:center;justify-content:space-between}.panel-head small,.chart-head small{font-size:8px;letter-spacing:1.5px;color:#7892aa;font-weight:800}.panel-head h2,.chart-head h2{font-size:17px;margin:5px 0}.pill{padding:6px 9px;border:1px solid #276c60;border-radius:20px;color:#55dbb6;background:#12352f;font-size:8px;letter-spacing:1px}.pill.muted{border-color:#354b60;background:#182a3b;color:#9ab0c3}.watch-tabs{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin:16px 0 10px}.watch-tabs button,.chart-tools button{border:1px solid #29435c;border-radius:7px;background:#0b1a2a;color:#8fa8bc;padding:8px 5px;font-size:9px;cursor:pointer}.watch-tabs button.active{background:#123d3b;border-color:#286d63;color:#5ce2bd}.search{display:flex;align-items:center;gap:7px;border:1px solid #29435c;border-radius:8px;background:#091624;padding:0 9px;height:37px;color:#76a0b8}.search input{min-width:0;width:100%;border:0;outline:0;background:none;color:#eaf3fa;font-size:10px}.instrument-list{padding-top:10px}.empty{padding:20px 8px;text-align:center;color:#718aa0;font-size:10px;line-height:1.6}.chart-panel{display:flex;flex-direction:column}.chart-head{display:flex;justify-content:space-between;gap:12px}.chart-head h2{font-size:19px}.chart-head span{font-size:9px;color:#829bb0}.price{font-size:18px;font-weight:800;color:#8da5b9}.chart-placeholder{flex:1;min-height:270px;margin:15px 0 10px;border:1px dashed #29445c;border-radius:12px;background:repeating-linear-gradient(0deg,#0b1a29,#0b1a29 39px,#13283a 40px);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:20px}.chart-mark{display:grid;place-items:center;width:48px;height:48px;border-radius:15px;background:#153a3c;color:#5fe3c0;font-size:25px;font-weight:900;margin-bottom:15px}.chart-placeholder b{font-size:12px}.chart-placeholder span{max-width:280px;color:#7f97ad;font-size:10px;line-height:1.6;margin-top:7px}.chart-tools{display:flex;align-items:center;gap:5px;flex-wrap:wrap}.chart-tools button:disabled,.primary:disabled{opacity:.45;cursor:not-allowed}.chart-tools span{font-size:8px;color:#6f879d;margin-left:auto}.order-empty{min-height:230px;display:grid;place-items:center}.primary{width:100%;border:0;border-radius:9px;background:linear-gradient(100deg,#10b98c,#35dfb7);color:#03251d;padding:12px;font-size:10px;font-weight:900}.option-panel{margin-top:14px}.option-empty{padding:32px 14px;text-align:center;color:#8198ad;font-size:10px;line-height:1.7;border:1px dashed #29445c;border-radius:10px;margin-top:14px}footer{padding:23px 0}@media(max-width:980px){.workspace{grid-template-columns:220px 1fr}.order-panel{grid-column:1/-1}.order-empty{min-height:90px}}@media(max-width:650px){.stock-hero{display:block}.connection{margin-top:18px;max-width:none}.notice{grid-template-columns:1fr;gap:6px}.notice a{white-space:normal}.workspace{grid-template-columns:1fr}.watch{order:2}.chart-panel{order:1;min-height:390px}.order-panel{order:3}.back{font-size:8px}.panel{padding:13px}}
+.connection{flex-wrap:wrap}.connection-copy{flex:1;min-width:130px}.connect-button{border:1px solid #287e70;background:#123c37;color:#70e8c8;border-radius:8px;padding:9px 11px;font-size:8px;font-weight:900;letter-spacing:.7px;cursor:pointer}.connect-button:disabled{opacity:.55;cursor:wait}.connection.connected{border-color:#286c55;background:#102b25}.connection.connected b{color:#75e4b6}.connection.connected .status-dot{background:#40d99b;box-shadow:0 0 12px #40d99b66}.connect-help{font-size:9px;color:#a7bfd1;line-height:1.5;margin-top:8px}.connect-help a{color:#8eb4ff}
+
+.instrument-row{display:flex;width:100%;flex-direction:column;gap:4px;text-align:left;padding:10px 9px;border:0;border-bottom:1px solid #1c344a;background:transparent;color:#dce9f3;cursor:pointer}.instrument-row b{font-size:10px}.instrument-row small{font-size:8px;color:#7f98ad}.instrument-row.active{background:#123d3b;border-radius:7px}.instrument-row:hover{background:#142d40}
+
+.chart-placeholder{display:block;overflow:hidden}.chart-placeholder svg{display:block;width:100%;height:auto;min-height:190px;overflow:visible}.chart-gridline{stroke:#29445c;stroke-width:1;stroke-dasharray:4 6}.chart-line{fill:none;stroke:#35dfb7;stroke-width:3;stroke-linecap:round;stroke-linejoin:round}.candle-summary{display:flex;gap:12px;flex-wrap:wrap;justify-content:center;margin-top:8px}.candle-summary span{font-size:9px;color:#9bb2c5}.candle-summary span:nth-child(2){color:#65dfb5}.candle-summary span:nth-child(3){color:#f08b8b}.chart-range{display:block;color:#718aa0;font-size:8px;margin-top:9px;overflow-wrap:anywhere}.chart-tools button.active{background:#123d3b;border-color:#286d63;color:#5ce2bd}
+
+.option-controls{display:flex;align-items:end;gap:10px;flex-wrap:wrap;margin:14px 0}.option-controls label{display:grid;gap:5px;color:#8fa8bc;font-size:9px}.option-controls select{background:#091624;color:#eaf3fa;border:1px solid #29435c;border-radius:7px;padding:9px;font-size:10px}.option-controls button{border:1px solid #287e70;background:#123c37;color:#70e8c8;border-radius:8px;padding:10px 12px;font-size:9px;font-weight:900}.option-controls button:disabled{opacity:.5}.option-controls span{font-size:9px;color:#7f97ad}.option-table-wrap{overflow-x:auto}.option-table{width:100%;border-collapse:collapse;min-width:760px;font-size:9px}.option-table th,.option-table td{padding:9px 7px;border-bottom:1px solid #203b54;text-align:right;white-space:nowrap}.option-table thead th{color:#8fa8bc;font-size:8px;letter-spacing:.5px}.option-table thead tr:first-child th:first-child{color:#62dcb7}.option-table thead tr:first-child th:nth-child(2){text-align:center}.option-table thead tr:first-child th:last-child{color:#ef9a9a}.option-table .strike-cell{text-align:center;color:#f1cc80;font-weight:900}.option-table td{color:#c6d6e3}.option-table .option-empty{text-align:center;color:#8198ad;padding:25px}
+
+/* Indian market paper simulator controls */
+.paper-account{display:grid;gap:5px;padding:13px;margin:12px 0;border:1px solid rgba(90,160,210,.22);border-radius:12px;background:rgba(20,50,75,.24)}
+.paper-account span,.paper-account small{font-size:11px;color:var(--muted,#91a7bb)}
+.paper-account b{font-size:22px;letter-spacing:.2px}
+.paper-quantity{display:grid;gap:7px;margin:12px 0;font-size:12px;color:var(--muted,#91a7bb)}
+.paper-quantity input{width:100%;box-sizing:border-box;padding:11px;border:1px solid rgba(120,160,200,.3);border-radius:9px;background:rgba(3,12,25,.65);color:inherit;font:inherit}
+.paper-actions{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.paper-actions button{min-height:42px;border:0;border-radius:9px;font-weight:800;cursor:pointer}
+.paper-actions button:disabled{opacity:.38;cursor:not-allowed}
+.paper-actions .secondary{background:rgba(220,80,90,.16);color:#ff9b9f;border:1px solid rgba(220,80,90,.3)}
+#paper-order-status{margin-top:12px;line-height:1.5;overflow-wrap:anywhere}
+
+.portfolio-panel{margin-top:14px}
+.portfolio-panel>.panel-head>button{border:1px solid #287e70;background:#123c37;color:#70e8c8;border-radius:8px;padding:9px 12px;font-size:9px;font-weight:900;cursor:pointer}
+.portfolio-metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:14px 0}
+.portfolio-metrics>div{display:grid;gap:7px;padding:13px;border:1px solid #203b54;border-radius:11px;background:#0a1928;min-width:0}
+.portfolio-metrics small{font-size:8px;letter-spacing:.8px;color:#829bb0}
+.portfolio-metrics b{font-size:clamp(14px,2vw,20px);overflow-wrap:anywhere}
+.portfolio-status{font-size:10px;color:#8fa8bc;line-height:1.5}
+.table-scroll{width:100%;overflow-x:auto;margin:10px 0 18px}
+.paper-table{width:100%;min-width:650px;border-collapse:collapse;font-size:9px}
+.paper-table th,.paper-table td{padding:10px 9px;border-bottom:1px solid #203b54;text-align:left;white-space:nowrap}
+.paper-table th{font-size:8px;letter-spacing:.6px;color:#829bb0}
+.paper-table td{color:#d0dfeb}
+.history-heading{padding-top:8px;border-top:1px solid #203b54}
+@media(max-width:600px){.portfolio-metrics{grid-template-columns:1fr 1fr}.portfolio-metrics>div:last-child{grid-column:1/-1}}
+
+/* Private per-user watchlist */
+.watchlist-tools{margin-top:14px;padding-top:12px;border-top:1px solid #203b54}
+.watchlist-title{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.watchlist-title b{font-size:8px;letter-spacing:1px;color:#8fa8bc}
+.watchlist-title button,.saved-watch-remove{border:1px solid #287e70;background:#123c37;color:#70e8c8;border-radius:7px;padding:7px 8px;font-size:8px;font-weight:900;cursor:pointer}
+.watchlist-title button:disabled{opacity:.4;cursor:not-allowed}
+#watchlist-status{font-size:9px;color:#829bb0;line-height:1.5;margin:8px 0}
+.saved-watchlist{display:grid;gap:5px}
+.saved-watch-row{display:flex;align-items:center;gap:6px;padding:6px 7px;background:#0a1928;border:1px solid #203b54;border-radius:8px}
+.saved-watch-pick{flex:1;min-width:0;text-align:left;border:0;background:transparent;color:#dce9f3;font-size:10px;font-weight:800;overflow:hidden;text-overflow:ellipsis;cursor:pointer}
+.saved-watch-remove{padding:5px 6px;border-color:#68464a;background:#301d26;color:#f2a0a0}
+
+.saved-watch-info{display:flex;flex-direction:column;align-items:flex-start;min-width:0;gap:3px}
+.saved-watch-quote{font-size:.72rem;color:var(--muted);font-variant-numeric:tabular-nums}
+.saved-watch-quote.positive{color:#35d49a}
+.saved-watch-quote.negative{color:#ff7185}
+.saved-watch-quote.neutral{color:var(--muted)}
+.watchlist-title>div{display:flex;gap:6px;flex-wrap:wrap}
+
+.watchlist-select-label{display:flex;flex-direction:column;gap:6px;margin:10px 0;color:var(--muted);font-size:.68rem;letter-spacing:.08em}
+.watchlist-select-label select{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:rgba(7,17,31,.8);color:var(--text);font:inherit}
+
+.history-controls{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.history-controls span{font-size:8px;color:#829bb0}
+.history-controls button{border:1px solid #287e70;background:#123c37;color:#70e8c8;border-radius:8px;padding:9px 12px;font-size:8px;font-weight:900;letter-spacing:.6px;cursor:pointer}
+.history-controls button:disabled{opacity:.4;cursor:not-allowed}
+@media(max-width:520px){.history-heading{align-items:flex-start;gap:8px;flex-direction:column}.history-controls{width:100%;justify-content:space-between}}
+
+.option-buy-button{display:inline-flex;align-items:center;justify-content:center;margin:3px 0;padding:5px 7px;border:1px solid rgba(35,197,135,.55);border-radius:7px;background:rgba(35,197,135,.12);color:var(--accent,#24c98a);font:700 10px/1.2 inherit;white-space:nowrap;cursor:pointer}.option-buy-button:focus-visible{outline:2px solid currentColor;outline-offset:2px}.option-buy-button:disabled{opacity:.5;cursor:not-allowed}
+
+.option-buy-button.option-sell-button{border-color:rgba(239,91,103,.55);background:rgba(239,91,103,.1);color:var(--danger,#ef5b67)}
+
+.product-mode-nav{display:flex;gap:7px;align-items:center;flex-wrap:wrap}
+.product-mode-nav a{display:inline-flex;align-items:center;min-height:30px;padding:7px 10px;border:1px solid #31506b;border-radius:8px;color:#a9c1d4;text-decoration:none;font-size:9px;font-weight:900;letter-spacing:.07em}
+.product-mode-nav a.active{background:#123c37;border-color:#35dfb7;color:#7cebd0}
+@media(max-width:900px){.product-mode-nav{order:3;width:100%;justify-content:flex-start}}
+
+.futures-order-panel,.futures-portfolio-panel{margin-top:14px;padding:14px}
+.futures-order-panel .option-controls{display:flex;align-items:end;gap:10px;flex-wrap:wrap}
+.futures-order-panel label{display:grid;gap:5px;color:#9eb5c7;font-size:10px;font-weight:800}
+.futures-order-panel input,.futures-order-panel select{min-height:38px;padding:8px;border:1px solid #35516d;border-radius:8px;background:#071624;color:#eaf3fa}
+.futures-order-panel button{min-height:38px;padding:8px 14px;border:1px solid #267e68;border-radius:8px;background:#0e4035;color:#76f1d1;font-size:10px;font-weight:900}
+.futures-order-panel button:last-of-type{border-color:#9a435a;background:#3d1d2b;color:#ff9cae}
+.futures-order-panel button:disabled{opacity:.35;cursor:not-allowed}
+
+
+/* Professional chart controls shared by Paper Trading and Paper Investing */
+.chart-toolbar{display:grid;gap:8px;margin-top:10px;padding:10px;border:1px solid #203b54;border-radius:11px;background:rgba(5,16,29,.72)}
+.chart-display-controls,.chart-indicator-controls,.chart-template-controls,.chart-edit-controls,.chart-drawing-controls{display:flex;align-items:center;gap:6px;flex-wrap:wrap;min-width:0}
+.chart-toolbar label{font-size:9px;color:#8fa8bc;font-weight:800}
+.chart-toolbar select,.chart-toolbar input{min-height:31px;max-width:100%;padding:6px 8px;border:1px solid #29435c;border-radius:7px;background:#091624;color:#dce9f3;font-size:9px}
+.chart-toolbar input{min-width:130px;flex:1}
+.chart-toolbar button{min-height:30px;padding:6px 9px;border:1px solid #29435c;border-radius:7px;background:#0b1a2a;color:#9db4c7;font-size:8px;font-weight:850;letter-spacing:.35px;cursor:pointer}
+.chart-toolbar button:hover,.chart-toolbar button.active{border-color:#286d63;background:#123d3b;color:#6ce5c3}
+.chart-toolbar #chart-remove-indicator{border-color:#6a4550;color:#e6a5ad;background:#291a25}
+.chart-toolbar #chart-remove-indicator:hover{border-color:#b75d6d;background:#3c202c;color:#ffc0c6}
+.chart-drawing-controls{padding-top:7px;border-top:1px solid #1e374d}
+.chart-template-controls{padding-top:7px;border-top:1px solid #1e374d}
+.chart-edit-controls{justify-content:flex-end}
+.chart-toolbar select:focus-visible,.chart-toolbar input:focus-visible,.chart-toolbar button:focus-visible{outline:2px solid #54d9c0;outline-offset:2px}
+@media(max-width:650px){
+ .chart-toolbar{padding:8px;gap:7px}
+ .chart-toolbar button{min-height:34px;padding:7px 8px}
+ .chart-indicator-controls select{flex:1;min-width:130px}
+ .chart-drawing-controls button{flex:1 1 62px}
+ .chart-template-controls input{min-width:100px}
+}
+
+
+.paper-protective-controls{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin-top:12px;padding:11px;border:1px solid #31506b;border-radius:10px;background:rgba(8,24,39,.72)}
+.paper-protective-controls label{display:grid;gap:5px;color:#9eb5c7;font-size:10px;font-weight:800}
+.paper-protective-controls input,.paper-protective-controls select{min-height:38px;min-width:0;padding:8px;border:1px solid #35516d;border-radius:8px;background:#071624;color:#eaf3fa}
+.paper-protective-controls button{min-height:38px;padding:8px 14px;border:1px solid #267e68;border-radius:8px;background:#0e4035;color:#76f1d1;font-size:10px;font-weight:900}
+.paper-protective-controls button:disabled{opacity:.35;cursor:not-allowed}
+.paper-protective-controls p{grid-column:1/-1;margin:0;color:#9eb5c7;font-size:10px;line-height:1.5}
+.protective-orders-panel{margin-top:14px;padding:14px}
+.protective-orders-panel button{min-height:30px;padding:6px 10px;border:1px solid #754653;border-radius:7px;background:#321e2a;color:#ffb4c0;font-size:9px;font-weight:850}
+@media(max-width:520px){.paper-protective-controls{grid-template-columns:1fr}.paper-protective-controls p{grid-column:auto}}

@@ -1,0 +1,116 @@
+/* Isolated light/dark appearance controls for the Indian-market chart. */
+.chart-theme-toggle{
+  position:fixed;
+  left:max(14px,env(safe-area-inset-left));
+  bottom:max(14px,env(safe-area-inset-bottom));
+  z-index:30;
+  min-height:44px;
+  padding:10px 14px;
+  border:1px solid #7895a8;
+  border-radius:999px;
+  background:rgba(13,31,48,.94);
+  color:#d7e8f5;
+  font-size:10px;
+  font-weight:900;
+  letter-spacing:.5px;
+  box-shadow:0 8px 30px #0005;
+  backdrop-filter:blur(12px);
+  cursor:pointer;
+}
+.chart-theme-toggle:focus-visible{outline:2px solid #35dfb7;outline-offset:3px}
+.stocks-page[data-chart-theme="light"] .chart-panel{
+  color:#172b3b;
+  background:linear-gradient(150deg,#fff,#edf4f8);
+  border-color:#c7d6e1;
+}
+.stocks-page[data-chart-theme="light"] .chart-panel .chart-head small,
+.stocks-page[data-chart-theme="light"] .chart-panel .chart-head span,
+.stocks-page[data-chart-theme="light"] .chart-tools span{color:#587083}
+.stocks-page[data-chart-theme="light"] .chart-panel .chart-head h2,
+.stocks-page[data-chart-theme="light"] .chart-panel .price{color:#172b3b}
+.stocks-page[data-chart-theme="light"] .chart-placeholder{
+  color:#172b3b;
+  border-color:#c4d4df;
+  background:repeating-linear-gradient(0deg,#f8fbfd,#f8fbfd 39px,#e7eff4 40px);
+}
+.stocks-page[data-chart-theme="light"] .chart-placeholder b{color:#1b3447}
+.stocks-page[data-chart-theme="light"] .chart-placeholder span,
+.stocks-page[data-chart-theme="light"] .chart-range,
+.stocks-page[data-chart-theme="light"] .candle-summary span{color:#587083}
+.stocks-page[data-chart-theme="light"] .chart-gridline{stroke:#cbd9e2}
+.stocks-page[data-chart-theme="light"] .chart-line{stroke:#087e68}
+.stocks-page[data-chart-theme="light"] .chart-tools button{
+  color:#405b70;
+  background:#f5f9fb;
+  border-color:#c7d6e1;
+}
+.stocks-page[data-chart-theme="light"] .chart-tools button.active{
+  color:#075d4f;
+  background:#d9f3eb;
+  border-color:#69bba5;
+}
+.stocks-page[data-chart-theme="light"] .chart-mark{background:#d9f3eb;color:#087e68}
+.stocks-page[data-chart-theme="light"] .chart-theme-toggle{
+  color:#17364a;
+  background:rgba(245,250,253,.96);
+  border-color:#9bb3c3;
+  box-shadow:0 8px 28px #16364a22;
+}
+@media(max-width:420px){.chart-theme-toggle{font-size:9px;padding:9px 11px;min-height:42px}}
+
+/* Professional KLineChart workspace and compact mobile-first toolbars. */
+#market-chart.zenura-pro-chart{
+  display:block;
+  width:100%;
+  height:430px;
+  min-height:340px;
+  padding:0;
+  overflow:hidden;
+  border:1px solid var(--chart-border,#29425b);
+  border-radius:12px;
+  background:#071321;
+  touch-action:pan-y;
+}
+#market-chart.zenura-pro-chart canvas{max-width:100%;touch-action:pan-y}
+.chart-toolbar{display:grid;gap:9px;padding:10px 0 2px}
+.chart-display-controls,.chart-indicator-controls,.chart-edit-controls,.chart-drawing-controls{
+  display:flex;align-items:center;gap:7px;flex-wrap:wrap
+}
+.chart-display-controls label{font-size:10px;color:#9eb3c8;font-weight:800}
+.chart-toolbar select,.chart-toolbar button{
+  min-height:34px;padding:7px 10px;border:1px solid #35516d;border-radius:8px;
+  background:#0b1c2c;color:#d8e7f4;font:inherit;font-size:10px;font-weight:800
+}
+.chart-toolbar select{max-width:100%;min-width:150px}
+.chart-toolbar button{cursor:pointer;white-space:nowrap}
+.chart-toolbar button:hover,.chart-toolbar button.active{
+  border-color:#35dfb7;background:#123b37;color:#8ff4d8
+}
+.chart-toolbar button:focus-visible,.chart-toolbar select:focus-visible{outline:2px solid #35dfb7;outline-offset:2px}
+.chart-drawing-controls{overflow-x:auto;flex-wrap:nowrap;padding-bottom:3px;scrollbar-width:thin}
+.chart-drawing-controls button{flex:0 0 auto}
+.chart-edit-controls button{font-size:9px;min-height:30px}
+.chart-engine-error{display:block;padding:8px 12px;color:#ffb6c3;font-size:11px}
+.stocks-page[data-chart-theme="light"] #market-chart.zenura-pro-chart{background:#f7fafc;border-color:#c7d6e1}
+.stocks-page[data-chart-theme="light"] .chart-toolbar select,
+.stocks-page[data-chart-theme="light"] .chart-toolbar button{
+  background:#f5f9fb;color:#405b70;border-color:#c7d6e1
+}
+.stocks-page[data-chart-theme="light"] .chart-toolbar button.active{
+  color:#075d4f;background:#d9f3eb;border-color:#69bba5
+}
+.stocks-page[data-chart-theme="light"] .chart-display-controls label{color:#587083}
+@media(max-width:600px){
+  #market-chart.zenura-pro-chart{height:360px;min-height:320px}
+  .chart-toolbar{gap:7px}
+  .chart-toolbar select{min-width:130px;flex:1}
+  .chart-drawing-controls{margin-right:-8px;padding-right:8px}
+}
+
+.chart-template-controls{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.chart-template-controls input,.chart-template-controls select{min-height:34px;min-width:130px;max-width:100%;padding:7px 10px;border:1px solid #35516d;border-radius:8px;background:#0b1c2c;color:#d8e7f4;font:inherit;font-size:10px}
+.chart-template-controls input{flex:1}
+.chart-template-controls button{min-height:34px;padding:7px 10px;border:1px solid #35516d;border-radius:8px;background:#0b1c2c;color:#d8e7f4;font:inherit;font-size:10px;font-weight:800}
+.stocks-page[data-chart-theme="light"] .chart-template-controls input,
+.stocks-page[data-chart-theme="light"] .chart-template-controls select,
+.stocks-page[data-chart-theme="light"] .chart-template-controls button{background:#f5f9fb;color:#405b70;border-color:#c7d6e1}

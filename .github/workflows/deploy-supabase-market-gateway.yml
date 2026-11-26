@@ -1,0 +1,137 @@
+name: Deploy ZENURA Supabase Market Gateway
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  id-token: write
+
+concurrency:
+  group: zenura-market-gateway-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+      REGION: asia-south1
+      SERVICE: zenura-market-gateway
+      SERVICE_ACCOUNT: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+      WIF_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+      MARKET_GATEWAY_URL: ${{ vars.MARKET_GATEWAY_URL }}
+      FRONTEND_ORIGIN: ${{ vars.FRONTEND_ORIGIN }}
+      UPSTOX_REDIRECT_URI: ${{ vars.UPSTOX_REDIRECT_URI }}
+      ZENURA_APP_REDIRECT_URI: ${{ vars.ZENURA_APP_REDIRECT_URI }}
+      MARKET_DATA_RIGHTS_APPROVED: ${{ vars.MARKET_DATA_RIGHTS_APPROVED }}
+      MARKET_DATA_RIGHTS_REFERENCE: ${{ vars.MARKET_DATA_RIGHTS_REFERENCE }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate deployment configuration before cloud changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          for name in PROJECT_ID SERVICE_ACCOUNT WIF_PROVIDER MARKET_GATEWAY_URL FRONTEND_ORIGIN UPSTOX_REDIRECT_URI ZENURA_APP_REDIRECT_URI ; do
+            if [[ -z "${!name}" ]]; then echo "::error::Missing GitHub secret/variable: $name"; exit 1; fi
+          done
+          if [[ "$MARKET_DATA_RIGHTS_APPROVED" != "true" || -z "$MARKET_DATA_RIGHTS_REFERENCE" ]]; then echo "::error::Public market-data deployment is blocked until written provider/regulatory approval is recorded."; exit 1; fi
+          [[ "$MARKET_GATEWAY_URL" == https://* ]] || { echo "::error::MARKET_GATEWAY_URL must be HTTPS"; exit 1; }
+          [[ "$FRONTEND_ORIGIN" == https://* && "$FRONTEND_ORIGIN" != */ ]] || { echo "::error::FRONTEND_ORIGIN must be an HTTPS origin without trailing slash"; exit 1; }
+          [[ "$UPSTOX_REDIRECT_URI" == "$MARKET_GATEWAY_URL/upstox/oauth/callback" ]] || { echo "::error::UPSTOX_REDIRECT_URI must exactly match MARKET_GATEWAY_URL/upstox/oauth/callback"; exit 1; }
+          [[ "$ZENURA_APP_REDIRECT_URI" == "$FRONTEND_ORIGIN/markets/stocks/" ]] || { echo "::error::ZENURA_APP_REDIRECT_URI must be the Paper Trading return URL"; exit 1; }
+
+      - name: Authenticate to Google Cloud with Workload Identity Federation
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - name: Set up Google Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Enable required Google Cloud APIs
+        shell: bash
+        run: |
+          set -euo pipefail
+          gcloud services enable run.googleapis.com artifactregistry.googleapis.com --project "$PROJECT_ID"
+
+      - name: Verify required Secret Manager entries exist
+        shell: bash
+        run: |
+          set -euo pipefail
+          for secret in zenura-supabase-service-role zenura-upstox-encryption-key zenura-upstox-client-id zenura-upstox-client-secret; do
+            gcloud secrets describe "$secret" --project "$PROJECT_ID" >/dev/null
+          done
+
+      - name: Create Artifact Registry repository if needed
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! gcloud artifacts repositories describe zenura --project "$PROJECT_ID" --location "$REGION" >/dev/null 2>&1; then
+            gcloud artifacts repositories create zenura --project "$PROJECT_ID" --location "$REGION" --repository-format docker --description "ZENURA IGNITE market gateway images"
+          fi
+          gcloud auth configure-docker "$REGION-docker.pkg.dev" --quiet
+
+      - name: Build and push gateway image from repository root
+        shell: bash
+        run: |
+          set -euo pipefail
+          IMAGE="$REGION-docker.pkg.dev/$PROJECT_ID/zenura/market-gateway:$GITHUB_SHA"
+          docker build --pull -f market-gateway/Dockerfile -t "$IMAGE" .
+          docker push "$IMAGE"
+          echo "IMAGE=$IMAGE" >> "$GITHUB_ENV"
+
+      - name: Deploy the market gateway to Cloud Run
+        shell: bash
+        run: |
+          set -euo pipefail
+          gcloud run deploy "$SERVICE" \
+            --project "$PROJECT_ID" --image "$IMAGE" --region "$REGION" \
+            --platform managed --allow-unauthenticated \
+            --min 1 --max 5 --cpu 2 --memory 2Gi --concurrency 40 --timeout 3600 --no-cpu-throttling \
+            --service-account "$SERVICE_ACCOUNT" \
+            --set-env-vars "SUPABASE_URL=https://atvbjibhunvzpmfagagm.supabase.co,SUPABASE_PUBLISHABLE_KEY=sb_publishable_kdTDQxlrYkry8mK4Ptlc9w_6oZJEYRQ,UPSTOX_REDIRECT_URI=$UPSTOX_REDIRECT_URI,ZENURA_APP_REDIRECT_URI=$ZENURA_APP_REDIRECT_URI,ALLOWED_ORIGINS=$FRONTEND_ORIGIN,MAX_INSTRUMENT_KEYS=100,PAPER_LIMIT_WORKER_ENABLED=true,PAPER_LIMIT_WORKER_INTERVAL_MS=2000" \
+            --set-secrets "SUPABASE_SERVICE_ROLE_KEY=zenura-supabase-service-role:latest,UPSTOX_TOKEN_ENCRYPTION_KEY=zenura-upstox-encryption-key:latest,UPSTOX_CLIENT_ID=zenura-upstox-client-id:latest,UPSTOX_CLIENT_SECRET=zenura-upstox-client-secret:latest"
+
+      - name: Verify configured gateway origin is live
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in {1..12}; do
+            if curl --fail --silent --show-error "$MARKET_GATEWAY_URL/health" | jq -e '.ok and .instrumentMasterLoaded and .limitWorker.enabled and .limitWorker.lastRunAt != null and .limitWorker.lastCycle.cycleError == false' >/dev/null; then
+              echo "Gateway health and Paper LIMIT worker are ready."
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "::error::Gateway health or the Paper LIMIT worker did not become ready."
+          exit 1
+
+      - name: Update both market modes to the verified gateway origin
+        uses: actions/github-script@v7
+        env:
+          GATEWAY_URL: ${{ env.MARKET_GATEWAY_URL }}
+        with:
+          script: |
+            const branch = context.ref.replace(/^refs\/heads\//, "");
+            for (const path of ["markets/stocks/index.html"]) {
+              const { data: file } = await github.rest.repos.getContent({
+                owner: context.repo.owner, repo: context.repo.repo, path, ref: branch
+              });
+              const current = Buffer.from(file.content, "base64").toString("utf8");
+              const next = current.replace(
+                /<meta name="market-gateway-url" content="[^"]*">/,
+                `<meta name="market-gateway-url" content="${process.env.GATEWAY_URL}">`
+              );
+              if (next === current) throw new Error("Gateway URL meta tag not updated in " + path);
+              await github.rest.repos.createOrUpdateFileContents({
+                owner: context.repo.owner, repo: context.repo.repo, path, branch,
+                message: "deploy: point market modes at verified Supabase gateway",
+                content: Buffer.from(next, "utf8").toString("base64"),
+                sha: file.sha
+              });
+            }
