@@ -41,6 +41,9 @@ function signer(client = mockKms(), options = {}) {
   });
 }
 
+test("CRC32C matches the standard Castagnoli check vector", () => {
+  assert.equal(crc32c(Buffer.from("123456789", "ascii")), 0xe3069283);
+});
 test("signs canonical receipt bytes through the KMS adapter and verifies the returned Ed25519 signature", async () => {
   const result = await signer().signPayload(payload);
   const data = Buffer.from(canonicalize(payload), "utf8");
