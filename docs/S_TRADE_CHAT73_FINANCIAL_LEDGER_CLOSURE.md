@@ -118,7 +118,21 @@ For both derivative classes, do not create cash, margin, blocked-fund or settlem
 
 Chat 73's new branch must receive its own exact-head CI before this report/checker port is considered tested on the current candidate.
 
-## 8. Required closure evidence
+## 8. Product decision — hybrid simulation receipts (user-confirmed 2026-11-26)
+
+The product owner selected **Hybrid (C)** for Paper Trading:
+
+- An internal, digitally signed **simulation receipt** may support virtual Paper Trading accounting only after a production-grade signing and verification trust boundary is designed, reviewed and implemented.
+- Such a receipt records an app-generated simulation event. It is not an exchange execution report, clearing-corporation receipt, bank movement, or real-world settlement confirmation.
+- Any external-settlement claim requires independently authenticated evidence from the relevant authorized exchange/clearing source. Do not infer external settlement from an internal simulation receipt.
+- Receipt verification, issuer/key lookup, signature validation, canonical payload validation, order/fill binding, amount/currency/direction checks, expiry/revocation policy and replay prevention must all succeed before a receipt is accepted for its explicitly permitted purpose.
+- Missing, invalid, revoked, expired, duplicated, mismatched or unverifiable receipts must fail closed. No inferred derivative cash, margin, blocked-funds or settlement movement is permitted.
+- The current injected `verifyAttestation` test seam in prior Draft PR #187 is not production cryptographic verification. No production issuer, key registry, signer, verifier, key lifecycle or operational owner has yet been evidenced. Do not treat this decision as implementation or authorization to post balances.
+- The independent Demo reducer remains a read-only synthetic-schema checker and must continue returning `ledgerReconciled=false`.
+
+This decision clarifies product semantics; it does not close the persisted-ledger, provenance, hosted migration, receipt-trust or reconciliation blockers.
+
+## 9. Required closure evidence
 
 1. A complete, account-scoped, read-only source export from the authoritative persisted store, with snapshot time, table coverage, source hashes and pagination/consistency proof.
 2. Verified opening-balance provenance and complete order/fill/charge/reservation/reversal/refund/settlement history for each asset class.
