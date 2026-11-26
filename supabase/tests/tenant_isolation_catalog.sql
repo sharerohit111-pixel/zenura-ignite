@@ -134,6 +134,7 @@ BEGIN
        ) THEN
       RAISE EXCEPTION 'Protective RPC % lacks an explicit auth.uid()-bound owner guard',v_proc.proname;
     END IF;
+  END LOOP;
 
   -- Both intentionally authenticated RPCs must exist and have authenticated
   -- EXECUTE while remaining inaccessible to anon and PUBLIC.
@@ -148,6 +149,5 @@ BEGIN
      OR has_function_privilege('anon',to_regprocedure('public.cancel_paper_protective_order(uuid,uuid)'),'EXECUTE') THEN
     RAISE EXCEPTION 'Protective order RPC client execution grants are incorrect';
   END IF;
-  END LOOP;
 END
 $tenant_isolation_catalog$;
