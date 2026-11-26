@@ -87,6 +87,6 @@ test("fails closed when KMS response signature checksum is wrong", async () => {
 });
 test("fails closed on malformed KMS response, KMS outage and invalid key configuration", async () => {
   await assert.rejects(() => signer({ async asymmetricSign() { throw new Error("unavailable"); } }).signPayload(payload), /KMS_SIGNER_REQUEST_FAILED/);
-  assert.throws(() => signer({}, { keyVersionName: "not-a-key-version" }), /KMS_SIGNER_KEY_VERSION_NAME_INVALID/);
+  assert.throws(() => signer(mockKms(), { keyVersionName: "not-a-key-version" }), /KMS_SIGNER_KEY_VERSION_NAME_INVALID/);
   assert.throws(() => createGoogleCloudKmsEd25519Signer({ keyVersionName, issuerId: "issuer", keyId: "key", environment: "test" }), /KMS_SIGNER_CLIENT_REQUIRED/);
 });
