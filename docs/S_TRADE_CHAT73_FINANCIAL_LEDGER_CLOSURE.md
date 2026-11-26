@@ -70,6 +70,8 @@ Retired `paper_investing_*` tables, if present, are explicitly outside this audi
 | Reversals/refunds | No complete hosted Paper Trading reversal/refund source tables found in the queried names | Historical reversal/refund completeness is not established |
 | Settlement receipts | No hosted receipt/settlement relation among queried names; earlier receipt designs use an injected verifier seam | No authoritative receipt corpus, trusted issuer/key registry or production cryptographic verification was evidenced |
 
+**Derivative cash-movement finding:** the candidate `execute_paper_long_option_order` SQL computes a virtual cash delta from option premium and charges, while `execute_paper_futures_market_order` updates virtual cash from realized P&L less charges and updates margin reservations. These are simulation transaction calculations, not independently evidenced authoritative settlement receipts. Because the hosted receipt source and trusted issuer/key verification are absent, these movements cannot be certified as receipt-backed settlement under this Chat 73 acceptance rule. Keep the derivative settlement gate blocked; do not treat successful SQL simulation tests as receipt evidence.
+
 ## 5. Arithmetic, replay and ordering
 
 - Persisted money columns and transaction inputs use integer paise (`bigint`); relevant SQL functions include safe-range checks and integer gross calculations.
@@ -83,9 +85,9 @@ Retired `paper_investing_*` tables, if present, are explicitly outside this audi
 
 **Equity:** Gross notional, cash direction, fee-aware transaction paths, reservations and cost-basis checks exist in candidate SQL/tests. Hosted core rows are zero. Complete lifetime fill/charge/reversal/T+1 settlement provenance is not established.
 
-**Futures:** Candidate Futures SQL supports margin reservations, realized P&L and fill lifecycle tests. Futures cash, margin and P&L must not be inferred from synthetic Demo events. No hosted Futures fill table or authoritative settlement receipt source was found in this audit.
+**Futures:** Candidate Futures SQL supports margin reservations, realized P&L and fill lifecycle tests. Its MARKET transaction function currently derives virtual cash from simulated realized P&L and charges and updates margin. No hosted Futures fill table or authoritative settlement receipt source was found. Under this audit's stricter acceptance rule, those movements are not receipt-backed and remain non-attestable.
 
-**Options:** Candidate long-option transactions include charge breakdown and cash deltas; later LIMIT migrations define fill and reservation lifecycle. Those later relations are absent from hosted schema. No trusted authoritative expiry/settlement receipt corpus was evidenced.
+**Options:** Candidate long-option transactions include charge breakdown and derive virtual cash deltas from simulated premium and charges; later LIMIT migrations define fill and reservation lifecycle. Those later relations are absent from hosted schema. No trusted authoritative expiry/settlement receipt corpus was evidenced. These simulated cash movements do not satisfy the receipt-backed settlement gate.
 
 For both derivative classes, do not create cash, margin, blocked-fund or settlement movements from inferred fills. Require a trusted, order/fill-bound authoritative receipt before any such movement is accepted.
 
