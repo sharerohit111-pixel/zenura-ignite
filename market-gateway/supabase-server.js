@@ -120,6 +120,10 @@ function validDate(value){
   return !Number.isNaN(d.getTime())&&d.toISOString().slice(0,10)===value;
 }
 const refreshInstrumentCache=createSingleFlight(async()=>{
+  // The instrument master is exchange-derived reference data, not public-domain
+  // content. Require the same documentary rights and regulatory gate before
+  // downloading or retaining it, including internal worker refreshes.
+  assertMarketDataRightsApproved(process.env);
   const now=Date.now();
   if(instrumentRefreshLastAttemptAt&&now-instrumentRefreshLastAttemptAt<30000)
     throw new Error("Upstox instrument master refresh is cooling down after a recent attempt.");
@@ -255,6 +259,9 @@ app.delete("/upstox/connection",async(req,res)=>{
 
 app.get("/instruments",async(req,res)=>{
   try{
+    // Never expose exchange-derived reference data publicly or anonymously.
+    await auth(req);
+    assertMarketDataRightsApproved(process.env);
     if(!instrumentCache.length||Date.now()-instrumentCacheUpdatedAt>6*60*60*1000)await refreshInstrumentCache();
     const kind=String(req.query.kind||"all").toLowerCase(),exchange=String(req.query.exchange||"").toUpperCase();
     const q=String(req.query.q||"").trim().toLowerCase().slice(0,60);
@@ -274,7 +281,7 @@ app.get("/instruments",async(req,res)=>{
       lot_size:item.lot_size??null,tick_size:item.tick_size??null,
       underlying_symbol:item.underlying_symbol??null
     }));
-    res.set("Cache-Control","public, max-age=60").json({source:"Upstox BOD instrument master",updatedAt:instrumentCacheUpdatedAt,count:matches.length,results:matches});
+    res.set("Cache-Control","private, no-store").json({source:"Upstox BOD instrument master",updatedAt:instrumentCacheUpdatedAt,count:matches.length,results:matches});
   }catch(error){sendError(res,error,"Official instrument master is temporarily unavailable.");}
 });
 app.get("/candles",async(req,res)=>{
