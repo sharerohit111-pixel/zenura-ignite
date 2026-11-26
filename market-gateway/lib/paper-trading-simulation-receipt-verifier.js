@@ -53,7 +53,7 @@ function validatePayload(payload) {
   const allowedPayloadFields = new Set([
     "receiptType", "schemaVersion", "environment", "issuerId", "keyId", "algorithm",
     "receiptId", "idempotencyKey", "sourceTransactionId", "accountId", "assetClass",
-    "orderId", "fillId", "transactionVersion", "currency", "simulationOnly",
+    "orderId", "fillId", "transactionVersion", "sourceSnapshotId", "currency", "simulationOnly",
     "amounts", "occurredAt", "committedAt", "issuedAt", "expiresAt"
   ]);
   if (Object.keys(payload).some(field => !allowedPayloadFields.has(field))) fail("RECEIPT_UNKNOWN_PAYLOAD_FIELD");
@@ -64,15 +64,21 @@ function validatePayload(payload) {
     if (typeof payload[field] !== "string" || !ID.test(payload[field])) fail("RECEIPT_IDENTITY_INVALID:" + field);
   }
   if (!ASSETS.has(payload.assetClass)) fail("RECEIPT_ASSET_INVALID");
+  if (typeof payload.instrumentKey !== "string" || payload.instrumentKey.length < 1 || payload.instrumentKey.length > 160 || /[\\u0000-\\u001f]/.test(payload.instrumentKey)) fail("RECEIPT_INSTRUMENT_INVALID");
+  if (!["BUY", "SELL"].includes(payload.side)) fail("RECEIPT_SIDE_INVALID");
+  if (typeof payload.product !== "string" || !ID.test(payload.product)) fail("RECEIPT_PRODUCT_INVALID");
   if (payload.currency !== "INR" || payload.simulationOnly !== true) fail("RECEIPT_NOT_EXPLICITLY_SIMULATED_INR");
   if (!isObject(payload.amounts)) fail("RECEIPT_AMOUNTS_REQUIRED");
-  const amountFields = ["quantity", "pricePaise", "grossPaise", "chargesPaise", "netCashDeltaPaise", "blockedDeltaPaise"];
+  const amountFields = ["quantity", "pricePaise", "grossPaise", "feesPaise", "taxesPaise", "otherChargesPaise", "netCashDeltaPaise", "blockedDeltaPaise"];
   if (Object.keys(payload.amounts).some(field => !amountFields.includes(field))) fail("RECEIPT_UNKNOWN_AMOUNT_FIELD");
   for (const field of amountFields) {
     if (!isSafeInteger(payload.amounts[field])) fail("RECEIPT_AMOUNT_INVALID:" + field);
   }
-  if (payload.amounts.quantity <= 0 || payload.amounts.pricePaise < 0 ||
-      payload.amounts.grossPaise < 0 || payload.amounts.chargesPaise < 0) {
+  const totalCharges = payload.amounts.feesPaise + payload.amounts.taxesPaise + payload.amounts.otherChargesPaise;
+  if (!isSafeInteger(totalCharges)) fail("RECEIPT_CHARGES_OVERFLOW");
+  if (payload.amounts.quantity <= 0 || payload.amounts.pricePaise < 1 ||
+      payload.amounts.grossPaise < 1 || payload.amounts.feesPaise < 0 ||
+      payload.amounts.taxesPaise < 0 || payload.amounts.otherChargesPaise < 0) {
     fail("RECEIPT_AMOUNT_OUT_OF_RANGE");
   }
   const occurredAt = timestamp(payload.occurredAt, "RECEIPT_OCCURRED_AT_INVALID");
@@ -108,13 +114,13 @@ function lookupKey(keyRegistry, issuerId, keyId) {
  */
 function verifyPaperTradingSimulationReceipt({ receipt, keyRegistry, expected, now = Date.now() } = {}) {
   if (!isObject(receipt) || !isObject(receipt.payload)) fail("RECEIPT_REQUIRED");
-  if (typeof receipt.signature !== "string" || !BASE64URL.test(receipt.signature)) fail("RECEIPT_SIGNATURE_REQUIRED");
+  if (typeof receipt.signature !== "string" || receipt.signature.length !== 86 || !BASE64URL.test(receipt.signature)) fail("RECEIPT_SIGNATURE_REQUIRED");
   if (!isSafeInteger(now) || now < 0) fail("RECEIPT_VERIFICATION_TIME_INVALID");
   if (!isObject(expected)) fail("RECEIPT_EXPECTED_BINDING_REQUIRED");
 
   const times = validatePayload(receipt.payload);
   const payload = receipt.payload;
-  for (const field of ["environment", "accountId", "assetClass", "orderId", "fillId", "sourceTransactionId"]) {
+  for (const field of ["environment", "accountId", "assetClass", "instrumentKey", "side", "product", "orderId", "fillId", "sourceTransactionId", "sourceSnapshotId"]) {
     if (typeof expected[field] !== "string" || payload[field] !== expected[field]) {
       fail("RECEIPT_TRANSACTION_BINDING_MISMATCH:" + field);
     }
@@ -148,6 +154,7 @@ function verifyPaperTradingSimulationReceipt({ receipt, keyRegistry, expected, n
   }
 
   const signedBytes = Buffer.from(canonicalize(payload), "utf8");
+  if (signedBytes.length > 65536) fail("RECEIPT_PAYLOAD_TOO_LARGE");
   let verified = false;
   try { verified = crypto.verify(null, signedBytes, publicKey, signature); }
   catch { verified = false; }
@@ -164,6 +171,9 @@ function verifyPaperTradingSimulationReceipt({ receipt, keyRegistry, expected, n
     sourceTransactionId: payload.sourceTransactionId,
     accountId: payload.accountId,
     assetClass: payload.assetClass,
+    instrumentKey: payload.instrumentKey,
+    side: payload.side,
+    product: payload.product,
     orderId: payload.orderId,
     fillId: payload.fillId,
     transactionVersion: payload.transactionVersion,
