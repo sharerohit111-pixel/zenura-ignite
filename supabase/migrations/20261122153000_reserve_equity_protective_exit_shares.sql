@@ -5,6 +5,24 @@
 -- Preserve any pre-existing active draft exits when advancing the schema.
 do $reservation_backfill$
 begin
+  -- Every active equity protective SELL must resolve to a real position row.
+  -- The backfill UPDATE below cannot reserve shares for orphaned orders.
+  if exists (
+    select 1
+      from public.paper_protective_orders po
+     where po.asset_class='EQUITY' and po.side='SELL'
+       and po.status in ('ACTIVE','TRIGGERED')
+       and not exists (
+         select 1
+           from public.paper_equity_positions ep
+          where ep.user_id=po.user_id
+            and ep.instrument_key=po.instrument_key
+            and ep.product=po.product
+       )
+  ) then
+    raise exception 'Active protective exits have no matching equity position; reconcile before applying reservation migration';
+  end if;
+
   if exists (
     select 1
       from public.paper_protective_orders po
