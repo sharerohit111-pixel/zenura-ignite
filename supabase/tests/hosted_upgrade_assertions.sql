@@ -4,7 +4,7 @@ DO $hosted_upgrade_assertions$
 BEGIN
   IF NOT EXISTS (
     SELECT 1 FROM public.paper_futures_orders
-     WHERE order_id=repeat('e',64) AND status='FILLED'
+     WHERE order_id='0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef' AND status='FILLED'
        AND filled_quantity=5 AND remaining_quantity=0
        AND average_fill_price_paise=1000
        AND reserved_open_margin_paise=0 AND reserved_close_quantity=0
@@ -13,7 +13,7 @@ BEGIN
   END IF;
   IF EXISTS (
     SELECT 1 FROM public.paper_futures_orders
-     WHERE order_id IN (repeat('f',64),repeat('d',64))
+     WHERE order_id IN ('fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210','13579bdf2468ace013579bdf2468ace013579bdf2468ace013579bdf2468ace0')
        AND (filled_quantity<>0 OR remaining_quantity<>0
          OR average_fill_price_paise IS NOT NULL
          OR reserved_open_margin_paise<>0 OR reserved_close_quantity<>0)
