@@ -50,6 +50,13 @@ function timestamp(value, code) {
 
 function validatePayload(payload) {
   if (!isObject(payload) || Object.getPrototypeOf(payload) !== Object.prototype) fail("RECEIPT_PAYLOAD_REQUIRED");
+  const allowedPayloadFields = new Set([
+    "receiptType", "schemaVersion", "environment", "issuerId", "keyId", "algorithm",
+    "receiptId", "idempotencyKey", "sourceTransactionId", "accountId", "assetClass",
+    "orderId", "fillId", "transactionVersion", "currency", "simulationOnly",
+    "amounts", "occurredAt", "committedAt", "issuedAt", "expiresAt"
+  ]);
+  if (Object.keys(payload).some(field => !allowedPayloadFields.has(field))) fail("RECEIPT_UNKNOWN_PAYLOAD_FIELD");
   if (payload.receiptType !== RECEIPT_TYPE || payload.schemaVersion !== SCHEMA_VERSION) fail("RECEIPT_TYPE_OR_SCHEMA_UNSUPPORTED");
   if (!ENVIRONMENTS.has(payload.environment)) fail("RECEIPT_ENVIRONMENT_INVALID");
   if (payload.algorithm !== ALGORITHM) fail("RECEIPT_ALGORITHM_UNSUPPORTED");
@@ -60,6 +67,7 @@ function validatePayload(payload) {
   if (payload.currency !== "INR" || payload.simulationOnly !== true) fail("RECEIPT_NOT_EXPLICITLY_SIMULATED_INR");
   if (!isObject(payload.amounts)) fail("RECEIPT_AMOUNTS_REQUIRED");
   const amountFields = ["quantity", "pricePaise", "grossPaise", "chargesPaise", "netCashDeltaPaise", "blockedDeltaPaise"];
+  if (Object.keys(payload.amounts).some(field => !amountFields.includes(field))) fail("RECEIPT_UNKNOWN_AMOUNT_FIELD");
   for (const field of amountFields) {
     if (!isSafeInteger(payload.amounts[field])) fail("RECEIPT_AMOUNT_INVALID:" + field);
   }
