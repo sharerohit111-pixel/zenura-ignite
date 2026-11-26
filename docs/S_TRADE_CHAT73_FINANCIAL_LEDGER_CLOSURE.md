@@ -116,7 +116,11 @@ For both derivative classes, virtual cash/margin movements must come only from t
 - All seven reported completed successfully. The SQL workflow completed 70 numbered test steps and disposable-container cleanup.
 - These checks validate that candidate SHA, not the missing hosted migration history or real account reconciliation.
 
-**Chat 73 audit branch exact-head CI:** Code/test parent `679783253501af86c847ed9e017ce80e5ffe78f1` received Demo UI Integration run `45861617919` (completed successfully) and Paper Trading Supabase SQL smoke run `45861617899` (completed successfully; all 70 numbered steps and disposable-container cleanup completed). The full gateway regression and Demo wiring steps also completed successfully. These runs validate the code/test parent, not the hosted receipt trust boundary or historical account provenance. All commits after the tested code/test parent are documentation-only changes to the two audit/design Markdown files; no executable code changed after that tested parent. The latest documentation-only head has no workflow runs or status checks returned by GitHub, so the evidence is reported against the exact tested code/test parent rather than misrepresented as an exact-head code test.
+**Chat 73 audit branch code/test parent:** `679783253501af86c847ed9e017ce80e5ffe78f1` received Demo UI Integration run `45861617919` and Paper Trading Supabase SQL smoke run `45861617899`; both completed successfully, with all 70 SQL steps and disposable-container cleanup.
+
+**Ed25519 verifier current exact code/test HEAD:** `847fbde3f13fdbd6130e4bd180ac3af4916b5918` received Demo UI Integration run `45863444973`, completed successfully. The full gateway regression reported 697 tests, 660 passed, 0 failed, 37 skipped; the separate Demo screen integration reported 16 passed, 0 failed, 0 skipped. Gateway/browser syntax, production isolation and interactive Demo wiring also passed. Dedicated verifier tests passed, including signature verification, altered-payload rejection, committed-amount/version binding, key scope/revocation and private-key-material rejection.
+
+Paper Trading Supabase SQL smoke run `45863444954` was still in progress at this report update. It is not counted as passed until GitHub reports completion. These CI results validate repository test code only; they do not prove hosted historical ledger completeness, production KMS provisioning, receipt issuance, or persisted account reconciliation.
 
 ## 8. Product decision — hybrid simulation receipts (user-confirmed 2026-11-26)
 
