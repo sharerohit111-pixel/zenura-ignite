@@ -53,7 +53,7 @@ function validatePayload(payload) {
   const allowedPayloadFields = new Set([
     "receiptType", "schemaVersion", "environment", "issuerId", "keyId", "algorithm",
     "receiptId", "idempotencyKey", "sourceTransactionId", "accountId", "assetClass",
-    "orderId", "fillId", "transactionVersion", "sourceSnapshotId", "currency", "simulationOnly",
+    "instrumentKey", "side", "product", "orderId", "fillId", "transactionVersion", "sourceSnapshotId", "currency", "simulationOnly",
     "amounts", "occurredAt", "committedAt", "issuedAt", "expiresAt"
   ]);
   if (Object.keys(payload).some(field => !allowedPayloadFields.has(field))) fail("RECEIPT_UNKNOWN_PAYLOAD_FIELD");
