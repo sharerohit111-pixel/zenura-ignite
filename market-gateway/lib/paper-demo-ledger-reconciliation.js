@@ -75,6 +75,7 @@ function reconcileDemoEventStream({ opening, events, provenance = null } = {}) {
         if (existing) fail("DUPLICATE_ORDER_ID:" + (i + 1));
         if (e.type === "ORDER_ACCEPTED" && p.status !== "PENDING") fail("INVALID_INITIAL_ORDER_STATUS:" + (i + 1));
         if (e.type === "ORDER_REJECTED" && p.status !== "REJECTED") fail("INVALID_REJECTION_STATUS:" + (i + 1));
+        if (e.type === "ORDER_REJECTED" && p.status !== "REJECTED") fail("INVALID_REJECTION_STATUS:" + (i + 1));
       } else {
         if (!existing) fail("ORDER_UPDATE_WITHOUT_ACCEPTANCE:" + (i + 1));
         if (TERMINAL.has(existing.status)) fail("TERMINAL_ORDER_REOPENED:" + (i + 1));
@@ -97,7 +98,9 @@ function reconcileDemoEventStream({ opening, events, provenance = null } = {}) {
           typeof p.instrumentKey !== "string" || !integer(p.quantity) || p.quantity < 1 ||
           !integer(p.pricePaise) || p.pricePaise < 1) fail("INVALID_OR_DUPLICATE_FILL:" + (i + 1));
       const gross = p.quantity * p.pricePaise;
-      if (!integer(gross) || (p.grossPaise !== gross && p.grossValuePaise !== gross)) fail("FILL_GROSS_MISMATCH:" + (i + 1));
+      if (!integer(gross) || (p.grossPaise !== undefined && p.grossPaise !== gross) ||
+          (p.grossValuePaise !== undefined && p.grossValuePaise !== gross) ||
+          (p.grossPaise === undefined && p.grossValuePaise === undefined)) fail("FILL_GROSS_MISMATCH:" + (i + 1));
       const order = orders.get(p.orderId);
       if (!order || order.engine !== e.engine || order.assetClass !== p.assetClass ||
           order.instrumentKey !== p.instrumentKey || order.side !== p.side ||
