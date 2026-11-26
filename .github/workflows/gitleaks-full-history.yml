@@ -1,5 +1,6 @@
 name: Gitleaks Full-History Secret Scan
 # Exact-head security gate; do not suppress or allowlist findings.
+# Re-run after the PR #245 base branch advances.
 
 on:
   pull_request:
