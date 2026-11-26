@@ -58,3 +58,20 @@ No device identity or browser version is fabricated in this record.
 - No Crypto source/configuration modified.
 - Keep PR #245 Draft until physical-device evidence and required review are complete.
 - Chromium and CI results are automated evidence only; they do not close the physical Android or TalkBack gates.
+
+
+## Superseding repository snapshot — 2026-11-26 16:00 UTC
+
+A later concurrent update advanced PR #245 after the runtime CI snapshot above. The current PR head observed during Chat 68 continuation is `521953d030c517c6f8a36fdaf8b99917c7fd076b`. The manifest, registration script, service worker and two browser QA scripts were re-fetched from the current branch and their file SHAs/content remain unchanged from the previously inspected versions. The QA report itself is documentation and does not establish device evidence.
+
+Current-head workflow snapshot:
+- Run 45854558782 — Demo Screen Wiring: IN PROGRESS at inspection time.
+- Run 45854558504 — Validate Indian Market Code: IN PROGRESS.
+- Run 45854558788 — Firebase read-only export tests: IN PROGRESS.
+- Run 45854559194 — Futures/Options Demo UI Integration: SUCCESS.
+- Run 45854558619 — Supabase SQL smoke: CANCELLED.
+- Run 45854558468 — Authenticated Browser Security: CANCELLED.
+
+Therefore, the earlier SUCCESS runs listed above apply to the earlier tested runtime SHA, not automatically to this newer PR head. Do not mark current-head CI fully green until its in-progress runs complete and cancelled checks are rerun or otherwise validly satisfied. PR #245 remains open and Draft; its mergeable field was false in the latest metadata snapshot. No merge or deployment was attempted.
+
+Physical Android installation/update, on-device offline behavior, cache inspection and TalkBack remain NOT RUN and still require external handset evidence.
