@@ -1,0 +1,34 @@
+name: S-TRADE Hosted CSP Header Gate
+on:
+  pull_request:
+    paths:
+      - "_headers"
+      - "market-gateway/test/hosted-response-header-security.mjs"
+      - ".github/workflows/s-trade-hosted-csp-header-gate.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: s-trade-hosted-csp-header-gate-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  staging-header-policy:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install pinned Playwright
+        run: |
+          npm init -y
+          npm install --no-save --ignore-scripts playwright@1.56.1
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Check hosted header test syntax
+        run: node --check market-gateway/test/hosted-response-header-security.mjs
+      - name: Validate strict staging header configuration
+        run: node --test market-gateway/test/hosted-response-header-security.mjs
