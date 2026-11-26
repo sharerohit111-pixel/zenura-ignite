@@ -112,20 +112,42 @@ BEGIN
     ) THEN
       RAISE EXCEPTION 'SECURITY DEFINER function % has no pinned search_path',v_proc.proname;
     END IF;
-    IF has_function_privilege('anon',v_proc.oid,'EXECUTE')
-       OR has_function_privilege('authenticated',v_proc.oid,'EXECUTE') THEN
-      -- A small, explicit class of user-facing RPCs is intentionally callable
-      -- by authenticated users. Such functions must bind the supplied owner ID
-      -- to auth.uid() inside the SECURITY DEFINER body before any row access.
-      IF v_proc.proname NOT IN (
-           'create_paper_equity_protective_order',
-           'cancel_paper_protective_order'
-         )
-         OR position('auth.uid()' in pg_get_functiondef(v_proc.oid)) = 0
-         OR position('p_user_id is distinct from auth.uid()' in lower(pg_get_functiondef(v_proc.oid))) = 0 THEN
-        RAISE EXCEPTION 'SECURITY DEFINER function % is callable by a client role without an approved auth.uid()-bound owner guard',v_proc.proname;
-      END IF;
+    -- PUBLIC inheritance and anon must never expose a privileged RPC.
+    IF has_function_privilege('anon',v_proc.oid,'EXECUTE') THEN
+      RAISE EXCEPTION 'SECURITY DEFINER function % is callable by anon',v_proc.proname;
+    END IF;
+
+    -- Authenticated execution is allowed only for these exact, user-facing
+    -- protective-order RPC signatures, after their in-function owner guard.
+    IF has_function_privilege('authenticated',v_proc.oid,'EXECUTE')
+       AND v_proc.oid NOT IN (
+         to_regprocedure('public.create_paper_equity_protective_order(uuid,uuid,text,text,text,bigint,integer)'),
+         to_regprocedure('public.cancel_paper_protective_order(uuid,uuid)')
+       ) THEN
+      RAISE EXCEPTION 'Unapproved SECURITY DEFINER function % is callable by authenticated',v_proc.proname;
+    END IF;
+
+    IF has_function_privilege('authenticated',v_proc.oid,'EXECUTE')
+       AND (
+         position('auth.uid()' in pg_get_functiondef(v_proc.oid)) = 0
+         OR position('p_user_id is distinct from auth.uid()' in lower(pg_get_functiondef(v_proc.oid))) = 0
+       ) THEN
+      RAISE EXCEPTION 'Protective RPC % lacks an explicit auth.uid()-bound owner guard',v_proc.proname;
     END IF;
   END LOOP;
+
+  -- Both intentionally authenticated RPCs must exist and have authenticated
+  -- EXECUTE while remaining inaccessible to anon and PUBLIC.
+  IF to_regprocedure('public.create_paper_equity_protective_order(uuid,uuid,text,text,text,bigint,integer)') IS NULL
+     OR to_regprocedure('public.cancel_paper_protective_order(uuid,uuid)') IS NULL THEN
+    RAISE EXCEPTION 'Expected owner-bound protective order RPC is missing';
+  END IF;
+
+  IF NOT has_function_privilege('authenticated',to_regprocedure('public.create_paper_equity_protective_order(uuid,uuid,text,text,text,bigint,integer)'),'EXECUTE')
+     OR has_function_privilege('anon',to_regprocedure('public.create_paper_equity_protective_order(uuid,uuid,text,text,text,bigint,integer)'),'EXECUTE')
+     OR NOT has_function_privilege('authenticated',to_regprocedure('public.cancel_paper_protective_order(uuid,uuid)'),'EXECUTE')
+     OR has_function_privilege('anon',to_regprocedure('public.cancel_paper_protective_order(uuid,uuid)'),'EXECUTE') THEN
+    RAISE EXCEPTION 'Protective order RPC client execution grants are incorrect';
+  END IF;
 END
 $tenant_isolation_catalog$;
