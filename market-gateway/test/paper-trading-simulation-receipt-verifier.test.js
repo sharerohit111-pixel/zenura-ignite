@@ -25,7 +25,19 @@ const expected = {
   sourceSnapshotId: "quote-snapshot-001",
   orderId: "order-001",
   fillId: "fill-001",
-  sourceTransactionId: "txn-001"
+  sourceTransactionId: "txn-001",
+  transactionVersion: "v0001",
+  amounts: expectedAmounts
+};
+const expectedAmounts = {
+  quantity: 2,
+  pricePaise: 12500,
+  grossPaise: 25000,
+  feesPaise: 70,
+  taxesPaise: 20,
+  otherChargesPaise: 10,
+  netCashDeltaPaise: -25100,
+  blockedDeltaPaise: 0
 };
 function payload(overrides = {}) {
   return {
@@ -49,16 +61,7 @@ function payload(overrides = {}) {
     transactionVersion: "v0001",
     currency: "INR",
     simulationOnly: true,
-    amounts: {
-      quantity: 2,
-      pricePaise: 12500,
-      grossPaise: 25000,
-      feesPaise: 70,
-      taxesPaise: 20,
-      otherChargesPaise: 10,
-      netCashDeltaPaise: -25100,
-      blockedDeltaPaise: 0
-    },
+    amounts: { ...expectedAmounts },
     occurredAt: "2026-11-26T11:59:00.000Z",
     committedAt: "2026-11-26T11:59:01.000Z",
     issuedAt: "2026-11-26T11:59:02.000Z",
@@ -106,6 +109,12 @@ test("rejects cross-account, order, fill, asset, source-transaction and environm
     const p = payload({ [field]: value });
     assert.throws(() => verify(signedReceipt(p)), new RegExp("RECEIPT_TRANSACTION_BINDING_MISMATCH:" + field));
   }
+});
+test("rejects receipt amounts or transaction version that differ from the committed database facts", () => {
+  assert.throws(() => verify(signedReceipt(payload({
+    amounts: { ...expectedAmounts, netCashDeltaPaise: -1 }
+  }))), /RECEIPT_COMMITTED_AMOUNT_BINDING_MISMATCH/);
+  assert.throws(() => verify(signedReceipt(payload({ transactionVersion: "v0002" }))), /RECEIPT_TRANSACTION_BINDING_MISMATCH:transactionVersion/);
 });
 test("rejects unknown issuer and key", () => {
   assert.throws(() => verify(signedReceipt(payload({ issuerId: "unknown-issuer" }))), /RECEIPT_ISSUER_NOT_TRUSTED/);
