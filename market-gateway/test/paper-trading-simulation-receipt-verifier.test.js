@@ -169,3 +169,23 @@ test("requires a server-owned Map trust registry and exact expected transaction 
   assert.throws(() => verify(signedReceipt(), { keyRegistry: {} }), /RECEIPT_TRUST_REGISTRY_REQUIRED/);
   assert.throws(() => verify(signedReceipt(), { expected: { ...expected, fillId: undefined } }), /RECEIPT_TRANSACTION_BINDING_MISMATCH:fillId/);
 });
+
+test("rejects impossible calendar dates and out-of-range wall-clock components", () => {
+  for (const occurredAt of [
+    "2026-02-30T11:59:00.000Z",
+    "2026-13-01T11:59:00.000Z",
+    "2026-04-31T11:59:00.000Z",
+    "2026-11-26T24:00:00.000Z",
+    "2026-11-26T12:60:00.000Z",
+    "2026-11-26T12:00:60.000Z",
+    "2026-11-26T12:00:00+24:00",
+    "2026-11-26T12:00:00+05:60"
+  ]) {
+    assert.throws(() => verify(signedReceipt(payload({ occurredAt }))), /RECEIPT_OCCURRED_AT_INVALID/);
+  }
+});
+
+test("accepts valid leap-day and offset timestamps", () => {
+  const valid = signedReceipt(payload({ occurredAt: "2024-02-29T23:59:59.999+05:30" }));
+  assert.equal(verify(valid).verified, true);
+});
