@@ -130,6 +130,19 @@ The successful SQL run is meaningful engine-level integration evidence, but it d
 
 The PR description was also updated to record these exact-head results. These results apply only to commit `dbb5f70349b88558b1ad31b35762157356758f0c`; any subsequent commit requires fresh exact-head CI before its changes can be considered tested.
 
+## 13. Latest exact-head CI — 2026-11-26
+
+The latest checker hardening commit `9d49b0366a4dfc7c365cee186dca9aecd6956542` has completed both relevant GitHub Actions workflows successfully:
+
+| Workflow | Run ID | Result | Scope |
+|---|---:|---|---|
+| S-TRADE Futures Options Demo UI Integration | `45857404864` | Completed — success | Full gateway regression: 682 tests, 645 passed, 0 failed, 37 skipped; separate Demo integration: 16 passed, 0 failed, 0 skipped |
+| Paper Trading Supabase SQL smoke test | `45857404835` | Completed — success | Disposable PostgreSQL 16 job: 74 steps, 74 succeeded, 0 failed, 0 skipped; ordered draft migrations, accounting, partial-fill/replay, race, tenant-isolation and RPC-boundary checks |
+
+The SQL workflow's final cleanup step completed successfully; its disposable PostgreSQL service was stopped and removed. The expected rejection messages in negative SQL tests are test fixtures, not workflow failures. The workflow performed no hosted Supabase migration, production/staging write, deployment, or live-account mutation.
+
+This is the latest exact-head CI evidence for the checker code. It still does not establish a unified cross-asset persisted ledger or authoritative historical financial reconciliation. The independent checker continues to report `ledgerReconciled=false`.
+
 ## 12. Required next verification before any reconciliation flag change
 
 - Obtain a read-only, complete, account-scoped export with source hashes and coverage boundaries for every authoritative table/event stream.
