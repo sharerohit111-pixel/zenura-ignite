@@ -120,6 +120,12 @@ test("rejects algorithm and environment key-registry confusion", () => {
   }]])]]);
   assert.throws(() => verify(signedReceipt(), { keyRegistry: wrongEnvRegistry }), /RECEIPT_KEY_SCOPE_MISMATCH/);
 });
+test("rejects unknown signed payload and amount fields", () => {
+  assert.throws(() => verify(signedReceipt(payload({ unreviewedFlag: true }))), /RECEIPT_UNKNOWN_PAYLOAD_FIELD/);
+  assert.throws(() => verify(signedReceipt(payload({
+    amounts: { ...payload().amounts, hiddenAdjustmentPaise: 1 }
+  }))), /RECEIPT_UNKNOWN_AMOUNT_FIELD/);
+});
 test("rejects unsafe monetary numbers, non-INR and non-simulation receipts", () => {
   assert.throws(() => verify(signedReceipt(payload({ amounts: { ...payload().amounts, grossPaise: Number.MAX_SAFE_INTEGER + 1 } }))), /RECEIPT_AMOUNT_INVALID:grossPaise/);
   assert.throws(() => verify(signedReceipt(payload({ currency: "USD" }))), /RECEIPT_NOT_EXPLICITLY_SIMULATED_INR/);
