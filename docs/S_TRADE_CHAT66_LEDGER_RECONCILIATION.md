@@ -111,7 +111,11 @@ A separate read-only Node module, `market-gateway/lib/paper-demo-ledger-reconcil
 
 This is a **Demo-event consistency checker only**, not an authoritative persisted-ledger reconciliation. The event schema has no first-class fee, reversal, authoritative settlement receipt, dated settlement or market-mark events. The reducer therefore returns explicit blockers for those omitted source domains and for absent independently verified opening/history provenance. Its tests must not be interpreted as proof of PostgreSQL transaction, concurrency or production ledger behavior.
 
-## 10. Required next verification before any reconciliation flag change
+## 10. Disposable PostgreSQL coverage reviewed
+
+The existing disposable PostgreSQL workflow on the current candidate includes transaction-scoped SQL tests ending in `ROLLBACK`, including Futures partial/full fill and replay assertions, Options partial/full fill and replay assertions, and concurrent Futures/Options fill-versus-cancel plus duplicate execution race scripts. It also runs the complete `market-gateway` Node test suite. This is useful per-engine regression coverage, but it is not an independently reconciled unified cross-asset event ledger; the tests use separate persisted engines and do not establish one atomic cross-asset account snapshot. The new independent Demo reducer tests are Node-only and do not claim PostgreSQL coverage. The exact continuation PR workflow must run successfully before its changes can be considered tested.
+
+## 11. Required next verification before any reconciliation flag change
 
 - Obtain a read-only, complete, account-scoped export with source hashes and coverage boundaries for every authoritative table/event stream.
 - Build an independent deterministic report that starts from verified opening evidence and enumerates every event; report missing/extra/conflicting IDs and per-invariant totals. Never fill gaps with a synthetic transaction.
