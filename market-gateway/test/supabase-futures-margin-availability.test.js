@@ -41,11 +41,11 @@ test("Options LIMIT and unknown order types fail closed before instrument or pro
   const route=server.slice(server.indexOf('app.post("/paper/derivative/orders"'),server.indexOf('app.get("/paper/derivative/orders"'));
   const orderType=route.indexOf('const orderType=String(req.body?.order_type||"MARKET").toUpperCase()');
   const reject=route.indexOf('if(orderType!=="MARKET")return res.status(400)');
-  const cache=route.indexOf("refreshInstrumentCache()");
+  const cache=route.indexOf("ensureInstrumentCacheAvailable()");
   const token=route.indexOf("getUpstoxAccessToken(user.id)");
   const rpc=route.indexOf('execute_paper_long_option_order');
   assert.ok(orderType>=0&&reject>orderType,"unknown/Options LIMIT types must be rejected explicitly");
-  assert.ok(cache>reject&&token>reject&&rpc>reject,"unsupported order types must be rejected before cache/provider/database execution");
+  assert.ok(cache>reject&&token>reject&&rpc>reject,"unsupported order types must be rejected before approval/cache/provider/database execution");
   assert.match(route,/Options LIMIT orders are not supported yet/);
 });
 
