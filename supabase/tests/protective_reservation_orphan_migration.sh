@@ -48,7 +48,7 @@ fi
 
 # The pre-existing fixture rows must survive the aborted transaction unchanged.
 psql -v ON_ERROR_STOP=1 <<SQL
-DO $rollback_assertions$
+DO \$rollback_assertions\$
 BEGIN
   IF NOT EXISTS (
     SELECT 1 FROM public.paper_protective_orders
@@ -71,7 +71,7 @@ BEGIN
     RAISE EXCEPTION 'Orphan fixture unexpectedly acquired a position';
   END IF;
 END
-$rollback_assertions$;
+\$rollback_assertions\$;
 DELETE FROM public.paper_protective_orders WHERE order_id='$orphan_order_id';
 SQL
 
