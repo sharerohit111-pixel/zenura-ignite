@@ -26,7 +26,10 @@ global.fetch = async (input, init) => {
       email_confirmed_at: "2026-01-01T00:00:00.000Z"
     }), { status: 200, headers: { "content-type": "application/json" } });
   }
-  throw new Error("Unexpected outbound request in /instruments compliance test: " + url);
+  if (url.startsWith(process.env.SUPABASE_URL + "/rest/v1/paper_watchlists")) {
+    return new Response("[]", { status: 200, headers: { "content-type": "application/json" } });
+  }
+  throw new Error("Unexpected outbound request in market-data cache compliance test: " + url);
 };
 
 const { app } = require("../supabase-server");
@@ -73,6 +76,21 @@ test("GET /instruments fails closed when separate regulatory clearance is absent
   process.env.MARKET_DATA_REGULATORY_REFERENCE = "counsel-clearance-ref";
 
   const response = await requestInstruments(true);
+  const body = await response.json();
+  assert.equal(response.status, 503);
+  assert.equal(body.code, "market_data_rights_not_approved");
+});
+
+
+test("GET /watchlists rechecks rights before reading a warm instrument cache", async () => {
+  process.env.MARKET_DATA_RIGHTS_APPROVED = "false";
+  process.env.MARKET_DATA_RIGHTS_REFERENCE = "provider-agreement-ref";
+  process.env.MARKET_DATA_REGULATORY_APPROVED = "true";
+  process.env.MARKET_DATA_REGULATORY_REFERENCE = "counsel-clearance-ref";
+
+  const response = await nativeFetch("http://127.0.0.1:" + server.address().port + "/watchlists", {
+    headers: { authorization: "Bearer route-test-access-token" }
+  });
   const body = await response.json();
   assert.equal(response.status, 503);
   assert.equal(body.code, "market_data_rights_not_approved");
