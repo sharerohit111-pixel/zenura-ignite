@@ -140,7 +140,7 @@ Do not infer a universal attribution phrase. Follow the exact wording, prominenc
 - Keep user-scoped entitlements and data segregation; enforce entitlement at the server boundary, not only in the UI.
 - Store only fields and durations permitted by the agreement; encrypt retained data, restrict service-role access, log reads/exports where required, and support expiry/deletion on revocation or contract termination.
 - Do not persist provider raw payloads, ticks, depth, candles, instrument masters or derived series merely because a database/cache is available. Each class needs a documented retention right.
-- Review instrument-master/reference data separately. The existing /instruments route serves a cached Upstox instrument master without the shared market-price token gate; this audit does not certify that route's public redistribution rights. Keep it non-price/reference-only and obtain written permission or disable public distribution before release.
+- Review instrument-master/reference data separately. The /instruments route is now protected by Supabase authentication, both documentary approval gates, and private, no-store responses; instrument-master refreshes also require both gates before download/retention. This is an engineering containment measure, not proof of redistribution rights. Obtain written permission covering instrument identifiers/reference fields, caching, display and user access before enabling the gates for this route.
 
 ### Runtime and release gate
 
