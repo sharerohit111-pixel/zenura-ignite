@@ -44,7 +44,7 @@ function timestamp(value, code) {
     /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,3}))?(Z|[+-](\d{2}):(\d{2}))$/.exec(value);
   if (!match) fail(code);
 
-  const [, yearText, monthText, dayText, hourText, minuteText, secondText, fractionText, zone, offsetHourText, offsetMinuteText] = match;
+  const [, yearText, monthText, dayText, hourText, minuteText, secondText, , , offsetHourText, offsetMinuteText] = match;
   const year = Number(yearText);
   const month = Number(monthText);
   const day = Number(dayText);
@@ -53,7 +53,10 @@ function timestamp(value, code) {
   const second = Number(secondText);
   const offsetHour = offsetHourText === undefined ? 0 : Number(offsetHourText);
   const offsetMinute = offsetMinuteText === undefined ? 0 : Number(offsetMinuteText);
-  const date = new Date(Date.UTC(year, month - 1, day));
+  // Date.UTC treats years 0–99 as 1900–1999; setUTCFullYear preserves the literal ISO year.
+  const date = new Date(0);
+  date.setUTCHours(0, 0, 0, 0);
+  date.setUTCFullYear(year, month - 1, day);
 
   // Date.parse normalizes some impossible calendar dates (for example Feb 30).
   // Validate the literal wall-clock components before applying the UTC offset.
