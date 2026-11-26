@@ -14,7 +14,7 @@ const make = (overrides = {}) => ({
 });
 function stream() {
   return [
-    make({ deltas: { cashDeltaPaise: 0, blockedDeltaPaise: 50000 } }),
+    make({ deltas: { cashDeltaPaise: 0, blockedDeltaPaise: 0 } }),
     make({ sequence: 2, eventId: "event-2", idempotencyKey: "idem-2", sourceEventId: "source-2", occurredAt: "2026-11-26T09:31:00+05:30", type: "FILL_RECORDED",
       deltas: { cashDeltaPaise: -10000, blockedDeltaPaise: -50000 },
       payload: { fillId: "fill-1", orderId: "order-1", assetClass: "EQUITY", instrumentKey: "MOCK|NSE|EQ|ABC", side: "BUY", quantity: 1, pricePaise: 10000, grossPaise: 10000 } }),
@@ -45,6 +45,11 @@ test("rejects duplicate event, idempotency and source identifiers", () => {
   events[1].idempotencyKey = events[0].idempotencyKey;
   assert.throws(() => reconcileDemoEventStream({ opening, events }), /DUPLICATE_EVENT_IDEMPOTENCY_OR_SOURCE/);
 });
+test("rejects blocked-funds movements without an attributable reservation source", () => {
+  const events = [make({ deltas: { cashDeltaPaise: 0, blockedDeltaPaise: 50000 } })];
+  assert.throws(() => reconcileDemoEventStream({ opening, events }), /UNVERIFIABLE_RESERVATION_DELTA_PROVENANCE/);
+});
+
 test("rejects sequence gaps and non-monotonic timestamps", () => {
   const events = stream();
   events[2].sequence = 9;
