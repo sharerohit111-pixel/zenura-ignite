@@ -126,9 +126,6 @@ function verifyPaperTradingSimulationReceipt({ receipt, keyRegistry, expected, n
       fail("RECEIPT_TRANSACTION_BINDING_MISMATCH:" + field);
     }
   }
-  if (!isObject(expected.amounts) || canonicalize(expected.amounts) !== canonicalize(payload.amounts)) {
-    fail("RECEIPT_COMMITTED_AMOUNT_BINDING_MISMATCH");
-  }
   if (times.issuedAt > now) fail("RECEIPT_ISSUED_IN_FUTURE");
   if (payload.expiresAt !== undefined && timestamp(payload.expiresAt, "RECEIPT_EXPIRES_AT_INVALID") <= now) {
     fail("RECEIPT_EXPIRED");
@@ -163,6 +160,9 @@ function verifyPaperTradingSimulationReceipt({ receipt, keyRegistry, expected, n
   try { verified = crypto.verify(null, signedBytes, publicKey, signature); }
   catch { verified = false; }
   if (!verified) fail("RECEIPT_SIGNATURE_INVALID");
+  if (!isObject(expected.amounts) || canonicalize(expected.amounts) !== canonicalize(payload.amounts)) {
+    fail("RECEIPT_COMMITTED_AMOUNT_BINDING_MISMATCH");
+  }
 
   return Object.freeze({
     verified: true,
