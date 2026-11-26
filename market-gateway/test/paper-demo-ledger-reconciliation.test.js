@@ -78,3 +78,17 @@ test("never attests reconciliation even for a structurally consistent event stre
 test("rejects an opening snapshot with blocked funds beyond cash", () => {
   assert.throws(() => reconcileDemoEventStream({ opening: { ...opening, blockedFundsPaise: opening.cashBalancePaise + 1 }, events: [] }), /INVALID_OPENING_SNAPSHOT/);
 });
+
+test("rejects a rejected order carrying a non-rejected state or any fill quantity", () => {
+  const invalid = [make({ type: "ORDER_REJECTED", payload: { orderId: "reject-1", assetClass: "EQUITY", instrumentKey: "MOCK|NSE|EQ|ABC", side: "BUY", orderType: "MARKET", quantity: 1, status: "PENDING" } })];
+  assert.throws(() => reconcileDemoEventStream({ opening, events: invalid }), /INVALID_REJECTION_STATUS/);
+});
+test("rejects terminal FILLED order states without full fill quantity", () => {
+  const events = [
+    make(),
+    make({ sequence: 2, eventId: "event-2", idempotencyKey: "idem-2", sourceEventId: "source-2",
+      occurredAt: "2026-11-26T09:31:00+05:30", type: "ORDER_UPDATED",
+      payload: { orderId: "order-1", assetClass: "EQUITY", instrumentKey: "MOCK|NSE|EQ|ABC", side: "BUY", orderType: "LIMIT", quantity: 2, status: "FILLED" } })
+  ];
+  assert.throws(() => reconcileDemoEventStream({ opening, events }), /ORDER_STATUS_FILL_QUANTITY_MISMATCH|FINAL_FILLED_ORDER_QUANTITY_MISMATCH/);
+});
