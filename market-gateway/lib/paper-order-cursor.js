@@ -1,7 +1,20 @@
 "use strict";
 
 const ORDER_ID_PATTERN = /^[a-f0-9]{64}$/;
-const CREATED_AT_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?(?:Z|[+-]\d{2}:\d{2})$/;
+const CREATED_AT_PATTERN = /^(\\d{4})-(\\d{2})-(\\d{2})T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,6})?(?:Z|[+-]\\d{2}:\\d{2})$/;
+
+function isValidCreatedAt(value) {
+  if (typeof value !== "string") return false;
+  const match = CREATED_AT_PATTERN.exec(value);
+  if (!match || !Number.isFinite(Date.parse(value))) return false;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  if (month < 1 || month > 12) return false;
+  const leapYear = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+  const daysInMonth = [31, leapYear ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  return day >= 1 && day <= daysInMonth[month - 1];
+}
 
 function invalidCursor() {
   return Object.assign(new Error("Order history cursor is invalid."), { status: 400 });
@@ -10,8 +23,7 @@ function invalidCursor() {
 function encodePaperOrderCursor(order) {
   const createdAt = order?.created_at;
   const orderId = order?.order_id;
-  if (typeof createdAt !== "string" || !CREATED_AT_PATTERN.test(createdAt)
-      || !Number.isFinite(Date.parse(createdAt))
+  if (!isValidCreatedAt(createdAt)
       || typeof orderId !== "string" || !ORDER_ID_PATTERN.test(orderId)) {
     throw new TypeError("Cannot encode an invalid paper order cursor.");
   }
@@ -27,9 +39,7 @@ function decodePaperOrderCursor(value) {
     const parsed = JSON.parse(raw);
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)
         || Object.keys(parsed).length !== 2
-        || typeof parsed.createdAt !== "string"
-        || !CREATED_AT_PATTERN.test(parsed.createdAt)
-        || !Number.isFinite(Date.parse(parsed.createdAt))
+        || !isValidCreatedAt(parsed.createdAt)
         || typeof parsed.orderId !== "string"
         || !ORDER_ID_PATTERN.test(parsed.orderId)) throw invalidCursor();
     return Object.freeze({ createdAt: parsed.createdAt, orderId: parsed.orderId });
