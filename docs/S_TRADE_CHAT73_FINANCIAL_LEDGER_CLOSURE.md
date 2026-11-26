@@ -31,7 +31,9 @@ The PR #252 independent reducer, `market-gateway/lib/paper-demo-ledger-reconcili
 
 Project: `zenura-paper-trading` (`atvbjibhunvzpmfagagm`), region `ap-south-1`, status `ACTIVE_HEALTHY`, PostgreSQL 17.12.
 
-A subsequent read-only inventory across all non-system schemas (not only `public`) found no additional application-owned ledger, event, fill, settlement, refund, reversal or receipt table in another schema. The other listed schemas are Supabase-managed `auth`, `storage`, `realtime`, `vault` and `supabase_migrations`; their internal migration/identity/storage metadata is not a Paper Trading transaction journal. This broadens the schema-name inventory only; it does not establish lifetime history completeness or authorize reading auth/user contents.\n\nThe hosted migration history contains **15 applied versions**. The inspected PR #245 candidate contains **44 migration files**; therefore **29 candidate migration versions are absent from the hosted migration history** at this audit. This is a schema/code divergence measurement, not an instruction to apply those migrations. No migration was applied.
+A subsequent read-only inventory across all non-system schemas (not only `public`) found no additional application-owned ledger, event, fill, settlement, refund, reversal or receipt table in another schema. The other listed schemas are Supabase-managed `auth`, `storage`, `realtime`, `vault` and `supabase_migrations`; their internal migration/identity/storage metadata is not a Paper Trading transaction journal. This broadens the schema-name inventory only; it does not establish lifetime history completeness or authorize reading auth/user contents.
+
+The hosted migration history contains **15 applied versions**. The inspected PR #245 candidate contains **44 migration files**; therefore **29 candidate migration versions are absent from the hosted migration history** at this audit. This is a schema/code divergence measurement, not an instruction to apply those migrations. No migration was applied.
 
 Exact read-only `COUNT(*)` results for the eight existing core Paper Trading accounting tables:
 
@@ -84,6 +86,12 @@ A separate read-only hosted catalog/function-definition query confirmed both `pu
 | [#213](https://github.com/sharerohit111-pixel/zenura-ignite/pull/213) | `c4d58c331951850c36219ef8309609213cc916a8` | Fail-closed generic wallet changes unless receipt path accepted | Demo event-ledger only; verifier seam remains test-only, no production trust |
 
 All four PRs were confirmed open, Draft and unmerged at inspection; their branches are not part of the current PR #245 candidate or PR #267. The validator in #187 accepts a caller-provided `verifyAttestation` callback and caller-provided `trustedIssuerIds`; the positive test uses a test callback that compares a literal test signature string. That proves the contract's fail-closed wiring, not cryptographic signature authenticity. Do not copy this test callback or a hard-coded allowlist into production, and do not merge these stacked drafts independently or assume their combined ancestry is hosted. The safe next dependency is a separately reviewed production trust design (issuer identity, key lifecycle/rotation/revocation, canonical signed payload, algorithm policy, replay store, source provenance and operational ownership) before any receipt can be trusted as audit evidence for persisted cash/margin movements.
+
+## 4A. Legacy Firebase source coverage
+
+The repository contains a read-only Firebase exporter with an explicit allowlist of `indianPaperAccounts`, `indianPaperOrders`, `indianDerivativeOrders` and `indianMarketWatchlists`, plus Firebase Auth UID-only records for orphan validation. Its companion transformer is offline-only and does not write to Supabase. The exporter provides per-file record counts and SHA-256 hashes and paginates Firestore documents by name.
+
+This is useful legacy-source evidence but is **not a complete historical ledger export**: it does not export independent fill, charge, reservation-event, reversal/refund or settlement journals, and its implementation does not prove one transactionally consistent snapshot across all collections or record every page cursor in the manifest. The account document's starting/current cash fields do not by themselves prove opening-balance provenance. No exporter was run and no Firebase credentials or data were accessed in this continuation.
 
 ## 5. Arithmetic, replay and ordering
 
