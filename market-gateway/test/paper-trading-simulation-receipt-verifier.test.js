@@ -112,6 +112,14 @@ test("rejects a key outside its validity window or revoked for current verificat
   }]])]]);
   assert.throws(() => verify(signedReceipt(), { keyRegistry: revokedRegistry }), /RECEIPT_KEY_REVOKED/);
 });
+test("rejects private key material in the verifier trust registry", () => {
+  const privateKeyPem = privateKey.export({ type: "pkcs8", format: "pem" });
+  const unsafeRegistry = new Map([["zenura-internal-paper", new Map([["test-key-01", {
+    algorithm: "Ed25519", environment: "test", publicKeyPem: privateKeyPem,
+    notBefore: "2026-01-01T00:00:00.000Z", notAfter: "2027-01-01T00:00:00.000Z"
+  }]])]]);
+  assert.throws(() => verify(signedReceipt(), { keyRegistry: unsafeRegistry }), /RECEIPT_PUBLIC_KEY_MUST_BE_PUBLIC_ONLY/);
+});
 test("rejects algorithm and environment key-registry confusion", () => {
   assert.throws(() => verify(signedReceipt(payload({ algorithm: "RS256" }))), /RECEIPT_ALGORITHM_UNSUPPORTED/);
   const wrongEnvRegistry = new Map([["zenura-internal-paper", new Map([["test-key-01", {
