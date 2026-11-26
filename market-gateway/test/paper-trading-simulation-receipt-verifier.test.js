@@ -3,7 +3,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const crypto = require("node:crypto");
-const { canonicalize, verifyPaperTradingSimulationReceipt } = require("../lib/paper-trading-simulation-receipt-verifier");
+const { canonicalize, validatePaperTradingSimulationReceiptPayload, verifyPaperTradingSimulationReceipt } = require("../lib/paper-trading-simulation-receipt-verifier");
 
 const now = Date.parse("2026-11-26T12:00:00.000Z");
 const { publicKey, privateKey } = crypto.generateKeyPairSync("ed25519");
@@ -188,4 +188,17 @@ test("rejects impossible calendar dates and out-of-range wall-clock components",
 test("accepts valid leap-day and offset timestamps", () => {
   const valid = signedReceipt(payload({ occurredAt: "2024-02-29T23:59:59.999+05:30" }));
   assert.equal(verify(valid).verified, true);
+});
+
+
+test("validates ISO calendar years below 0100 without JavaScript Date.UTC year remapping", () => {
+  assert.doesNotThrow(() => validatePaperTradingSimulationReceiptPayload(payload({
+    occurredAt: "0099-01-01T00:00:00.000Z"
+  })));
+  assert.doesNotThrow(() => validatePaperTradingSimulationReceiptPayload(payload({
+    occurredAt: "0096-02-29T00:00:00.000Z"
+  })));
+  assert.throws(() => validatePaperTradingSimulationReceiptPayload(payload({
+    occurredAt: "0099-02-29T00:00:00.000Z"
+  })), /RECEIPT_OCCURRED_AT_INVALID/);
 });
