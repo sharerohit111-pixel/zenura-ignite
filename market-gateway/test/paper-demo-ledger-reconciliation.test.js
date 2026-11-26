@@ -16,7 +16,7 @@ function stream() {
   return [
     make({ deltas: { cashDeltaPaise: 0, blockedDeltaPaise: 0 } }),
     make({ sequence: 2, eventId: "event-2", idempotencyKey: "idem-2", sourceEventId: "source-2", occurredAt: "2026-11-26T09:31:00+05:30", type: "FILL_RECORDED",
-      deltas: { cashDeltaPaise: -10000, blockedDeltaPaise: -50000 },
+      deltas: { cashDeltaPaise: -10000, blockedDeltaPaise: 0 },
       payload: { fillId: "fill-1", orderId: "order-1", assetClass: "EQUITY", instrumentKey: "MOCK|NSE|EQ|ABC", side: "BUY", quantity: 1, pricePaise: 10000, grossPaise: 10000 } }),
     make({ sequence: 3, eventId: "event-3", idempotencyKey: "idem-3", sourceEventId: "source-3", occurredAt: "2026-11-26T09:32:00+05:30", type: "ORDER_UPDATED",
       deltas: { cashDeltaPaise: 0, blockedDeltaPaise: 0 },
@@ -70,7 +70,7 @@ test("rejects Equity gross/cash mismatches and overfilled orders", () => {
   assert.throws(() => reconcileDemoEventStream({ opening, events: overfill }), /FILL_QUANTITY_EXCEEDS_ORDER/);
 });
 test("rejects derivative wallet movements without receipt-backed event contract", () => {
-  const events = [make({ engine: "FUTURES", type: "ORDER_ACCEPTED", deltas: { cashDeltaPaise: 0, blockedDeltaPaise: 1 },
+  const events = [make({ engine: "FUTURES", type: "ORDER_ACCEPTED", deltas: { cashDeltaPaise: -1, blockedDeltaPaise: 0 },
     payload: { orderId: "future-1", assetClass: "FUTURE", instrumentKey: "MOCK|NSE|FUT|NIFTY", side: "BUY", orderType: "LIMIT", quantity: 1, status: "PENDING" } })];
   assert.throws(() => reconcileDemoEventStream({ opening, events }), /DERIVATIVE_CASH_REQUIRES_AUTHORITATIVE_RECEIPT/);
 });
@@ -83,7 +83,7 @@ test("rejects both Futures and Options wallet cash or blocked-fund movements wit
     const events = [make({
       engine,
       type: "ORDER_ACCEPTED",
-      deltas: { cashDeltaPaise: -100, blockedDeltaPaise: 100 },
+      deltas: { cashDeltaPaise: -100, blockedDeltaPaise: 0 },
       payload: { orderId: engine.toLowerCase()+"-1", assetClass, instrumentKey, side: "BUY", orderType: "LIMIT", quantity: 1, status: "PENDING" }
     })];
     assert.throws(() => reconcileDemoEventStream({ opening, events }), /DERIVATIVE_CASH_REQUIRES_AUTHORITATIVE_RECEIPT/);
