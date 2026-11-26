@@ -99,7 +99,9 @@ test("rejects a payload altered after signing", () => {
 test("rejects cross-account, order, fill, asset, source-transaction and environment substitution", () => {
   for (const [field, value] of [
     ["accountId", "account-other"], ["orderId", "order-other"], ["fillId", "fill-other"],
-    ["assetClass", "OPTIONS"], ["sourceTransactionId", "txn-other"], ["environment", "production"]
+    ["assetClass", "OPTIONS"], ["instrumentKey", "NSE|FUT|BANKNIFTY|2026-12-31"],
+    ["side", "SELL"], ["product", "INTRADAY"], ["sourceSnapshotId", "quote-snapshot-other"],
+    ["sourceTransactionId", "txn-other"], ["environment", "production"]
   ]) {
     const p = payload({ [field]: value });
     assert.throws(() => verify(signedReceipt(p)), new RegExp("RECEIPT_TRANSACTION_BINDING_MISMATCH:" + field));
@@ -145,7 +147,7 @@ test("rejects unknown signed payload and amount fields", () => {
   }))), /RECEIPT_UNKNOWN_AMOUNT_FIELD/);
 });
 test("rejects unsafe monetary numbers, non-INR and non-simulation receipts", () => {
-  assert.throws(() => verify(signedReceipt(payload({ amounts: { ...payload().amounts, grossPaise: Number.MAX_SAFE_INTEGER + 1 } }))), /RECEIPT_AMOUNT_INVALID:grossPaise/);
+  assert.throws(() => canonicalize(payload({ amounts: { ...payload().amounts, grossPaise: Number.MAX_SAFE_INTEGER + 1 } })), /RECEIPT_NON_INTEGER_NUMBER/);
   assert.throws(() => verify(signedReceipt(payload({ currency: "USD" }))), /RECEIPT_NOT_EXPLICITLY_SIMULATED_INR/);
   assert.throws(() => verify(signedReceipt(payload({ simulationOnly: false }))), /RECEIPT_NOT_EXPLICITLY_SIMULATED_INR/);
 });
