@@ -61,6 +61,7 @@ on:
       - "market-gateway/test/market-data-rights-gate.test.js"
       - "market-gateway/test/provider-paper-trading-policy.test.js"
       - "market-gateway/test/market-data-distribution-compliance.test.js"
+      - "market-gateway/test/market-data-instruments-route-compliance.test.js"
       - "market-gateway/MARKET-DATA-COMPLIANCE.md"
       - ".github/workflows/s-trade-provider-contract-checks.yml"
       - "market-gateway/lib/provider-rate-limit.js"
