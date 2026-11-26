@@ -1,7 +1,7 @@
 "use strict";
 
 const ORDER_ID_PATTERN = /^[a-f0-9]{64}$/;
-const CREATED_AT_PATTERN = /^(\\d{4})-(\\d{2})-(\\d{2})T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,6})?(?:Z|[+-]\\d{2}:\\d{2})$/;
+const CREATED_AT_PATTERN = /^(\d{4})-(\d{2})-(\d{2})T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?(?:Z|[+-]\d{2}:\d{2})$/;
 
 function isValidCreatedAt(value) {
   if (typeof value !== "string") return false;
