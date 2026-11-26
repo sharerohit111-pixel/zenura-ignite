@@ -2,6 +2,7 @@
 
 const test = require("node:test");
 const assert = require("node:assert/strict");
+const { once } = require("node:events");
 
 // Configure a disposable Supabase client before loading the real Express app.
 // Its auth transport is stubbed below; no external service or market-data
@@ -30,8 +31,11 @@ global.fetch = async (input, init) => {
 
 const { app } = require("../supabase-server");
 const server = app.listen(0, "127.0.0.1");
-const address = server.address();
-const endpoint = "http://127.0.0.1:" + address.port + "/instruments";
+let endpoint;
+test.before(async () => {
+  await once(server, "listening");
+  endpoint = "http://127.0.0.1:" + server.address().port + "/instruments";
+});
 
 async function requestInstruments(authenticated) {
   const headers = authenticated ? { authorization: "Bearer route-test-access-token" } : {};
