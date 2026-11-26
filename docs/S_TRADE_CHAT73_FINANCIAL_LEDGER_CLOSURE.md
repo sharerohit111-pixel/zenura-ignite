@@ -132,6 +132,8 @@ The product owner selected **Hybrid (C)** for Paper Trading:
 
 This decision clarifies product semantics; it does not close the persisted-ledger, provenance, hosted migration, receipt-trust or reconciliation blockers.
 
+The proposed internal receipt trust boundary is documented separately in [`S_TRADE_INTERNAL_SIMULATION_RECEIPT_TRUST_DESIGN.md`](./S_TRADE_INTERNAL_SIMULATION_RECEIPT_TRUST_DESIGN.md). It is a design-only artifact: it preserves the existing persisted Paper Trading transaction path as source of truth, treats a signed receipt as post-commit audit evidence (not a balance-posting authority), and requires managed asymmetric signing, independent verification, replay protection, key lifecycle controls and explicit simulated-only labelling. No signer, key registry, verifier, migration or transaction-path change is implemented by that document.
+
 ## 9. Required closure evidence
 
 1. A complete, account-scoped, read-only source export from the authoritative persisted store, with snapshot time, table coverage, source hashes and pagination/consistency proof.
