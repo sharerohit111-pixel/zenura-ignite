@@ -69,6 +69,21 @@ test("rejects derivative wallet movements without receipt-backed event contract"
     payload: { orderId: "future-1", assetClass: "FUTURE", instrumentKey: "MOCK|NSE|FUT|NIFTY", side: "BUY", orderType: "LIMIT", quantity: 1, status: "PENDING" } })];
   assert.throws(() => reconcileDemoEventStream({ opening, events }), /DERIVATIVE_CASH_REQUIRES_AUTHORITATIVE_RECEIPT/);
 });
+
+test("rejects both Futures and Options wallet cash or blocked-fund movements without a trusted receipt", () => {
+  for (const [engine, assetClass, instrumentKey] of [
+    ["FUTURES", "FUTURE", "MOCK|NSE|FUT|NIFTY"],
+    ["OPTIONS", "OPTION", "MOCK|NSE|OPT|NIFTY"]
+  ]) {
+    const events = [make({
+      engine,
+      type: "ORDER_ACCEPTED",
+      deltas: { cashDeltaPaise: -100, blockedDeltaPaise: 100 },
+      payload: { orderId: engine.toLowerCase()+"-1", assetClass, instrumentKey, side: "BUY", orderType: "LIMIT", quantity: 1, status: "PENDING" }
+    })];
+    assert.throws(() => reconcileDemoEventStream({ opening, events }), /DERIVATIVE_CASH_REQUIRES_AUTHORITATIVE_RECEIPT/);
+  }
+});
 test("never attests reconciliation even for a structurally consistent event stream", () => {
   const report = reconcileDemoEventStream({ opening, events: stream(), provenance: { verified: true } });
   assert.equal(report.ledgerReconciled, false);
