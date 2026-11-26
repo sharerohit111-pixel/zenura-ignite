@@ -13,7 +13,15 @@ test("Markets web app manifest is strict JSON and has a valid standalone scope",
  assert.equal(manifest.scope,"./");
  assert.equal(manifest.start_url,"./");
  assert.equal(manifest.display,"standalone");
- assert.ok(Array.isArray(manifest.icons)&&manifest.icons.length>0);
+ assert.ok(Array.isArray(manifest.icons)&&manifest.icons.length>=2);
+ assert.ok(manifest.icons.some(icon=>icon.sizes==="192x192"));
+ assert.ok(manifest.icons.some(icon=>icon.sizes==="512x512"&&icon.purpose==="maskable"));
+ for(const icon of manifest.icons){
+  const iconPath=resolve(root,"markets",icon.src.replace(/^\.\//,""));
+  assert.ok(iconPath.startsWith(resolve(root,"markets")+"/"));
+  const svg=await readFile(iconPath,"utf8");
+  assert.match(svg,/<svg[^>]*width="(?:192|512)"[^>]*height="(?:192|512)"/);
+ }
  assert.ok(Array.isArray(manifest.shortcuts));
  for(const shortcut of manifest.shortcuts){
   const scope=new URL("./","https://example.test/zenura-ignite/markets/");
@@ -22,10 +30,12 @@ test("Markets web app manifest is strict JSON and has a valid standalone scope",
  }
 });
 
-test("Markets service worker uses a new cache generation and precaches the canonical event ledger",async()=>{
+test("Markets service worker uses the current cache generation and precaches PWA icons and canonical event ledger",async()=>{
  const sw=await read("markets/service-worker.js");
  assert.match(sw,/zenura-markets-shell-v11/);
  assert.match(sw,/"shared\/paper-demo-event-ledger\.mjs"/);
+ assert.match(sw,/"icons\/icon-192\.svg"/);
+ assert.match(sw,/"icons\/icon-512\.svg"/);
  assert.doesNotMatch(sw,/zenura-markets-shell-v9/);
 });
 
