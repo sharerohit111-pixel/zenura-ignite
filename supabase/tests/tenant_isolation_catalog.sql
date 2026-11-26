@@ -134,7 +134,6 @@ BEGIN
        ) THEN
       RAISE EXCEPTION 'Protective RPC % lacks an explicit auth.uid()-bound owner guard',v_proc.proname;
     END IF;
-  END LOOP;
 
   -- Both intentionally authenticated RPCs must exist and have authenticated
   -- EXECUTE while remaining inaccessible to anon and PUBLIC.
