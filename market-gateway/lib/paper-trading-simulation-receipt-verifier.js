@@ -40,9 +40,28 @@ function canonicalize(value) {
 }
 
 function timestamp(value, code) {
-  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$/.test(value)) {
-    fail(code);
-  }
+  const match = typeof value === "string" &&
+    /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,3}))?(Z|[+-](\d{2}):(\d{2}))$/.exec(value);
+  if (!match) fail(code);
+
+  const [, yearText, monthText, dayText, hourText, minuteText, secondText, fractionText, zone, offsetHourText, offsetMinuteText] = match;
+  const year = Number(yearText);
+  const month = Number(monthText);
+  const day = Number(dayText);
+  const hour = Number(hourText);
+  const minute = Number(minuteText);
+  const second = Number(secondText);
+  const offsetHour = offsetHourText === undefined ? 0 : Number(offsetHourText);
+  const offsetMinute = offsetMinuteText === undefined ? 0 : Number(offsetMinuteText);
+  const date = new Date(Date.UTC(year, month - 1, day));
+
+  // Date.parse normalizes some impossible calendar dates (for example Feb 30).
+  // Validate the literal wall-clock components before applying the UTC offset.
+  if (month < 1 || month > 12 || date.getUTCFullYear() !== year ||
+      date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day ||
+      hour > 23 || minute > 59 || second > 59 ||
+      offsetHour > 23 || offsetMinute > 59) fail(code);
+
   const parsed = Date.parse(value);
   if (!Number.isFinite(parsed)) fail(code);
   return parsed;
