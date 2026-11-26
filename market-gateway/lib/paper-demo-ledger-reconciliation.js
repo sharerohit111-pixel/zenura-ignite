@@ -57,6 +57,10 @@ function reconcileDemoEventStream({ opening, events, provenance = null } = {}) {
     if (ids.has(e.eventId) || idempotency.has(e.idempotencyKey) || sources.has(sourceKey)) fail("DUPLICATE_EVENT_IDEMPOTENCY_OR_SOURCE:" + (i + 1));
     ids.add(e.eventId); idempotency.add(e.idempotencyKey); sources.add(sourceKey);
 
+    // This Demo schema carries no authoritative reservation source/order binding.
+    // Never accept a blocked-funds delta that cannot be independently attributed.
+    if (e.deltas.blockedDeltaPaise !== 0) fail("UNVERIFIABLE_RESERVATION_DELTA_PROVENANCE:" + (i + 1));
+
     const nextCash = cash + e.deltas.cashDeltaPaise;
     const nextBlocked = blocked + e.deltas.blockedDeltaPaise;
     if (![nextCash, nextBlocked, nextCash - nextBlocked].every(integer) ||
