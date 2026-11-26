@@ -28,9 +28,9 @@ test("standalone demo page declares a restrictive same-origin CSP", () => {
   const csp = match[1];
   for (const directive of [
     "default-src 'self'", "base-uri 'self'", "object-src 'none'",
-    "frame-src 'none'", "form-action 'self'", "script-src 'self'",
+    "frame-src 'none'", "form-action 'self'", "script-src 'self' https://esm.sh",
     "script-src-attr 'none'", "style-src 'self'", "style-src-attr 'none'",
-    "connect-src 'self'"
+    "connect-src 'self' https://atvbjibhunvzpmfagagm.supabase.co"
   ]) assert.ok(csp.includes(directive), "demo CSP must include " + directive);
   assert.doesNotMatch(csp, /'unsafe-inline'|'unsafe-eval'|\*/);
 });
