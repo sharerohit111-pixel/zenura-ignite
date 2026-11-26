@@ -1,0 +1,54 @@
+name: Gitleaks Full-History Secret Scan
+
+on:
+  push:
+    branches: [security/chat71-gitleaks-current-candidate-v2-2026-11-26]
+  pull_request:
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  gitleaks-full-history:
+    name: Gitleaks full-history scan (redacted)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact pull request head with full history
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Scan all available Git history without exposing secret values
+        shell: bash
+        run: |
+          set -euo pipefail
+          report="$RUNNER_TEMP/gitleaks.json"
+          set +e
+          docker run --rm \
+            -w /repo \
+            -v "$PWD:/repo" \
+            -v "$RUNNER_TEMP:/reports" \
+            zricethezav/gitleaks:v8.24.2 \
+            git --redact --no-banner \
+            --report-format json \
+            --report-path /reports/gitleaks.json \
+            --log-opts=--all .
+          scan_status=$?
+          set -e
+
+          if [ -f "$report" ]; then
+            echo "Redacted finding metadata only (rule, file, line range, commit):"
+            jq -r '.[] | [.RuleID, .File, (.StartLine|tostring), (.EndLine|tostring), .Commit] | @tsv' "$report"
+          else
+            echo "Gitleaks did not produce a report."
+          fi
+
+          if [ "$scan_status" -ne 0 ]; then
+            echo "::error::Gitleaks detected findings or the scan failed. No findings are suppressed."
+            exit "$scan_status"
+          fi
+
+          echo "Gitleaks full-history scan passed with no findings."
