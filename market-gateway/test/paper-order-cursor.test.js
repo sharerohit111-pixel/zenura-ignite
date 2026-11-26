@@ -56,6 +56,7 @@ test("paper order history endpoint applies owner-scoped stable keyset pagination
   assert.ok(start >= 0 && end > start);
   const route = source.slice(start, end);
   assert.match(route, /\.eq\("user_id",user\.id\)/);
+  assert.match(route, /!\/\^\\d\+\$\/\.test\(raw\)/);
   assert.match(route, /decodePaperOrderCursor/);
   assert.match(route, /\.or\(paperOrderCursorFilter\(cursor\)\)/);
   assert.match(route, /\.order\("created_at",\{ascending:false\}\)\.order\("order_id",\{ascending:false\}\)/);
