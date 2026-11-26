@@ -108,7 +108,8 @@ function lookupKey(keyRegistry, issuerId, keyId) {
  *   algorithm: "Ed25519", environment, publicKeyPem, notBefore, notAfter, revokedAt?
  * }))
  * expected: exact trusted transaction context to bind (environment, accountId,
- * assetClass, orderId, fillId, sourceTransactionId).
+ * assetClass, instrumentKey, side, product, orderId, fillId, sourceTransactionId,
+ * sourceSnapshotId, transactionVersion and committed integer-paise amounts).
  *
  * This function does not persist a replay index, issue receipts, or authorize postings.
  */
@@ -120,10 +121,13 @@ function verifyPaperTradingSimulationReceipt({ receipt, keyRegistry, expected, n
 
   const times = validatePayload(receipt.payload);
   const payload = receipt.payload;
-  for (const field of ["environment", "accountId", "assetClass", "instrumentKey", "side", "product", "orderId", "fillId", "sourceTransactionId", "sourceSnapshotId"]) {
+  for (const field of ["environment", "accountId", "assetClass", "instrumentKey", "side", "product", "orderId", "fillId", "sourceTransactionId", "sourceSnapshotId", "transactionVersion"]) {
     if (typeof expected[field] !== "string" || payload[field] !== expected[field]) {
       fail("RECEIPT_TRANSACTION_BINDING_MISMATCH:" + field);
     }
+  }
+  if (!isObject(expected.amounts) || canonicalize(expected.amounts) !== canonicalize(payload.amounts)) {
+    fail("RECEIPT_COMMITTED_AMOUNT_BINDING_MISMATCH");
   }
   if (times.issuedAt > now) fail("RECEIPT_ISSUED_IN_FUTURE");
   if (payload.expiresAt !== undefined && timestamp(payload.expiresAt, "RECEIPT_EXPIRES_AT_INVALID") <= now) {
