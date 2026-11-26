@@ -15,6 +15,16 @@ const keyRegistry = new Map([["zenura-internal-paper", new Map([["test-key-01", 
   notBefore: "2026-01-01T00:00:00.000Z",
   notAfter: "2027-01-01T00:00:00.000Z"
 }]])]]);
+const expectedAmounts = {
+  quantity: 2,
+  pricePaise: 12500,
+  grossPaise: 25000,
+  feesPaise: 70,
+  taxesPaise: 20,
+  otherChargesPaise: 10,
+  netCashDeltaPaise: -25100,
+  blockedDeltaPaise: 0
+};
 const expected = {
   environment: "test",
   accountId: "account-opaque-001",
@@ -28,16 +38,6 @@ const expected = {
   sourceTransactionId: "txn-001",
   transactionVersion: "v0001",
   amounts: expectedAmounts
-};
-const expectedAmounts = {
-  quantity: 2,
-  pricePaise: 12500,
-  grossPaise: 25000,
-  feesPaise: 70,
-  taxesPaise: 20,
-  otherChargesPaise: 10,
-  netCashDeltaPaise: -25100,
-  blockedDeltaPaise: 0
 };
 function payload(overrides = {}) {
   return {
