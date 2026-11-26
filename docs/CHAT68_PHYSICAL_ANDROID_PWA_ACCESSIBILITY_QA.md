@@ -94,3 +94,22 @@ The earlier catalog failure observed on a prior merge snapshot (where `cancel_pa
 The earlier snapshot sections above are historical evidence and must not be read as the latest state. This update supersedes their candidate-head/workflow status.
 
 Physical Android install/update, actual handset offline/reconnect/cache behavior and TalkBack remain **NOT RUN**. Chromium emulation and CI do not close those physical-device gates. No device model, OS or browser version is claimed. Keep PR #245 Draft until real handset evidence and required review are complete.
+
+
+## Superseding repository snapshot — 2026-11-26 (exact-head CI completion)
+
+PR #245 was re-fetched after the workflow completion. It remains open, Draft, unmerged, and GitHub reports mergeable=true. Its exact head is `f0438d61ca55d56e3df92f167919417a33b2f396`; base is `main` at `dbb7eeaf8ef2fe5a2a77040e8c95b5f8c16c08c9`.
+
+All six relevant pull-request workflows attached to this exact PR head completed successfully:
+- Run 45855634990 — S-TRADE Demo Screen Wiring Tests: SUCCESS.
+- Run 45855634828 — S-TRADE Authenticated Browser Security: SUCCESS.
+- Run 45855634765 — Firebase read-only export tool tests: SUCCESS.
+- Run 45855634801 — S-TRADE Futures Options Demo UI Integration: SUCCESS.
+- Run 45855634759 — Paper Trading Supabase SQL smoke test: SUCCESS; the job's 70-step disposable PostgreSQL/migration/isolation suite completed.
+- Run 45855634795 — Validate Indian Market Code: SUCCESS; syntax, dependency audits, gateway unit/Firestore emulator tests, Docker image build, and non-root image verification all completed successfully.
+
+Freshness qualification for the ACL/catalog assertion: after this six-workflow snapshot, a separate Draft PR #259 was opened from this exact #245 head to carry the narrowly scoped strict `supabase/tests/tenant_isolation_catalog.sql` correction. PR #259 head is `8aa2c0627cb784ca36ec45d000cab6b86ecd460e`, base is this candidate branch at `f0438d61...`. Its exact-head Paper Trading Supabase SQL smoke run 45855972449 is **IN PROGRESS**; at last inspection the production gateway image build step was still running and the tenant-isolation catalog steps had not yet executed. Therefore the six green checks above are valid for #245's exact head, but do not treat the newer strict ACL/catalog correction as validated until PR #259's exact-head SQL run completes successfully.
+
+The prior snapshot sections are historical; this section is the latest exact-head CI record. No production migration, deployment, APK signing, merge, Crypto source/configuration change, or runtime code modification was performed by this QA continuation. PR #245 remains Draft.
+
+Physical Android install/update, real-device offline/reconnect/cache behavior, and TalkBack remain **NOT RUN**. Chromium emulation and CI are not substitutes for handset evidence. Do not claim physical-device acceptance until the device model/Android/Chrome versions and sanitized install/update/offline/TalkBack evidence are supplied.
