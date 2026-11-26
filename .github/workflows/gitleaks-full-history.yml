@@ -1,6 +1,8 @@
 name: Gitleaks Full-History Secret Scan
 
 on:
+  push:
+    branches: [security/chat71-gitleaks-current-candidate-v2-2026-11-26]
   pull_request:
     types: [opened, synchronize, reopened]
   workflow_dispatch:
