@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - feature/s-trade-multi-provider-market-data-2026-11-24
+      - feature/s-trade-indian-market-data-compliance-gate-2026-11-26
     paths:
       - "market-gateway/lib/*provider-contract.js"
       - "market-gateway/lib/provider-market-data-adapters.js"
@@ -43,6 +44,7 @@ on:
   pull_request:
     branches:
       - feature/s-trade-upstox-oauth-market-data-security-2026-11-23
+      - feature/s-trade-multi-provider-market-data-2026-11-24
     paths:
       - "market-gateway/lib/*provider-contract.js"
       - "market-gateway/lib/provider-market-data-adapters.js"
