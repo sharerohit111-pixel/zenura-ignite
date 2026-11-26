@@ -6,7 +6,7 @@
 // It is not wired into the Paper Trading transaction path.
 
 const crypto = require("node:crypto");
-const { canonicalize } = require("./paper-trading-simulation-receipt-verifier");
+const { canonicalize, validatePaperTradingSimulationReceiptPayload } = require("./paper-trading-simulation-receipt-verifier");
 
 const ALGORITHM = "Ed25519";
 const RECEIPT_TYPE = "PAPER_TRADING_SIMULATION";
@@ -54,6 +54,7 @@ function createGoogleCloudKmsEd25519Signer({
           payload.algorithm !== ALGORITHM || payload.environment !== environment) {
         fail("KMS_SIGNER_PAYLOAD_SCOPE_MISMATCH");
       }
+      validatePaperTradingSimulationReceiptPayload(payload);
       const data = Buffer.from(canonicalize(payload), "utf8");
       if (data.length === 0 || data.length > 65536) fail("KMS_SIGNER_PAYLOAD_SIZE_INVALID");
       const dataCrc32c = crc32c(data);
