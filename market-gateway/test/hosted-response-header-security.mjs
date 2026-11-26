@@ -34,6 +34,7 @@ test("hosted staging sends strict CSP response headers and blocks framing", {
   for (const required of [
     "default-src 'self'", "base-uri 'self'", "object-src 'none'", "frame-src 'none'",
     "frame-ancestors 'none'", "form-action 'self'", "script-src 'self' https://esm.sh",
+    "https://cdn.jsdelivr.net", "https://unpkg.com",
     "script-src-attr 'none'", "style-src 'self'", "style-src-attr 'none'",
     "img-src 'self' data:", "font-src 'self'",
     "https://atvbjibhunvzpmfagagm.supabase.co", "wss://atvbjibhunvzpmfagagm.supabase.co"
