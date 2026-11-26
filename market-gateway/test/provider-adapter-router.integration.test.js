@@ -6,6 +6,7 @@ const {MarketDataProviderRouter}=require("../lib/market-data-provider-router");
 const {ProviderHealthRegistry}=require("../lib/provider-health-registry");
 const {createUpstoxMarketDataAdapter}=require("../lib/provider-market-data-adapters");
 const NOW=Date.parse("2026-11-24T04:30:00Z");
+const approvedRightsGate=()=>({rightsReference:"verified-provider-rights",regulatoryReference:"verified-product-clearance"});
 const args={userId:"user-1",instrumentId:"NSE_EQ|INE002A01018",exchange:"NSE",entitlementReference:"entitlement-upstox"};
 function client(){
  const native={instrumentKey:args.instrumentId};
@@ -26,6 +27,7 @@ test("provider-neutral router accepts normalized Upstox quote, candles, depth, m
   providers:new Map([["upstox",adapter]]),
   plan:{quote:["upstox"],candles:["upstox"],depth:["upstox"],instrumentMaster:["upstox"],stream:["upstox"]},
   entitlementResolver:async()=>({approved:true,paperTradingAllowed:true,redistributionAllowed:true,reference:"entitlement-upstox",rightsApprovalReference:"written-rights",regulatoryApprovalReference:"counsel-clearance"}),
+  rightsGate:approvedRightsGate,
   healthRegistry:new ProviderHealthRegistry({clock:()=>NOW}),
   clock:()=>NOW,
  });
@@ -41,6 +43,7 @@ test("provider-neutral router rejects data until both written approval reference
   providers:new Map([["upstox",adapter]]),
   plan:{quote:["upstox"],candles:["upstox"],depth:["upstox"],instrumentMaster:["upstox"],stream:["upstox"]},
   entitlementResolver:async()=>({approved:true,paperTradingAllowed:true,redistributionAllowed:true,reference:"entitlement-upstox",rightsApprovalReference:"written-rights"}),
+  rightsGate:approvedRightsGate,
   clock:()=>NOW,
  });
  await assert.rejects(router.route("quote",{},args),{code:"market_data_unavailable",status:503});
