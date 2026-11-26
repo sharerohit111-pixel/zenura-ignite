@@ -10,7 +10,7 @@
 
 No production or staging writes, migrations, deployments, broker activity, Crypto changes, merges, or balance adjustments were performed. No opening balance, transaction, fill, fee, charge, settlement, reversal, receipt, or historical event has been synthesized.
 
-The current mainline integration candidate is PR #245 (Draft/Open, base `main` at `dbb7eeaf8ef2fe5a2a77040e8c95b5f8c16c08c9`, head `98d7c300d33a7d9307ecc14fe93542ca500f08e6`). The repository's Chat 66 audit branch starts from that exact head.
+At the time this Chat 66 continuation branch was created, its base was the then-current PR #245 head `2e400f67cc1f5548441c8fa499584a9913d43fd3`. The older PR #245 head `98d7c300d33a7d9307ecc14fe93542ca500f08e6` appears in earlier audit notes and is not the base of this continuation.
 
 ## 2. Canonical event architecture inspected
 
@@ -28,7 +28,7 @@ This is a **synthetic browser Demo event ledger**, not proof that the authentica
 
 | PR | Head SHA | Status / relevance |
 |---|---|---|
-| #245 | `98d7c300d33a7d9307ecc14fe93542ca500f08e6` | Draft mainline integration candidate; audit base |
+| #245 | `2e400f67cc1f5548441c8fa499584a9913d43fd3` | Exact base SHA used by this Chat 66 continuation branch; Draft mainline integration candidate |
 | #179 | `7314c1a6b0d5dfe9bc9a34d67e80159d01694961` | Draft shared Demo ledger/session; synthetic Equity/Futures/Options projections; wallet reconciliation explicitly excluded |
 | #203 | `9db7f3cb00ed89f7a45381cb3ef45fe6981f985e` | Draft clean-port of schema/replay/terminal guards; exact-head CI was pending in its recorded evidence |
 | #205 | `6082d19ece570921a3d7b07d0d97042edc1a27c2` | Draft event invariants; exact fill gross and blocks derivative wallet cash without authoritative receipts |
@@ -113,9 +113,24 @@ This is a **Demo-event consistency checker only**, not an authoritative persiste
 
 ## 10. Disposable PostgreSQL coverage reviewed
 
-The existing disposable PostgreSQL workflow on the current candidate includes transaction-scoped SQL tests ending in `ROLLBACK`, including Futures partial/full fill and replay assertions, Options partial/full fill and replay assertions, and concurrent Futures/Options fill-versus-cancel plus duplicate execution race scripts. It also runs the complete `market-gateway` Node test suite. This is useful per-engine regression coverage, but it is not an independently reconciled unified cross-asset event ledger; the tests use separate persisted engines and do not establish one atomic cross-asset account snapshot. The new independent Demo reducer tests are Node-only and do not claim PostgreSQL coverage. The exact continuation PR workflow must run successfully before its changes can be considered tested.
+The existing disposable PostgreSQL workflow on the current candidate includes transaction-scoped SQL tests ending in `ROLLBACK`, including Futures partial/full fill and replay assertions, Options partial/full fill and replay assertions, and concurrent Futures/Options fill-versus-cancel plus duplicate execution race scripts. It also runs the complete `market-gateway` Node test suite. This is useful per-engine regression coverage, but it is not an independently reconciled unified cross-asset event ledger; the tests use separate persisted engines and do not establish one atomic cross-asset account snapshot. The new independent Demo reducer tests are Node-only and do not claim PostgreSQL coverage. The exact continuation PR workflow results are recorded in Section 11 below. These workflow results do not expand the scope of what the SQL fixtures prove.
 
-## 11. Required next verification before any reconciliation flag change
+## 11. Exact-head CI evidence — 2026-11-26
+
+The GitHub Actions runs associated with this continuation branch head `099a8546e849d32d847435fdb4056386466dec4b` were fetched by commit SHA. Both relevant workflows completed successfully:
+
+| Workflow | Run ID | Result | Scope |
+|---|---:|---|---|
+| S-TRADE Futures Options Demo UI Integration | `45855240878` | Completed — success | Full gateway regression: 679 tests, 642 passed, 0 failed, 37 skipped; separate Demo integration test run: 16 passed, 0 failed, 0 skipped; syntax, production-isolation and Demo wiring checks passed |
+| Paper Trading Supabase SQL smoke test | `45855240930` | Completed — success | Disposable PostgreSQL 16 migration and SQL smoke job: 74 steps, 74 succeeded, 0 failed, 0 skipped; per-engine accounting, partial-fill/replay, race, tenant-isolation and RPC-boundary checks completed |
+
+The SQL workflow applied the ordered draft migrations only to its disposable PostgreSQL 16 service. The disposable database/container was stopped and removed by the workflow. No hosted Supabase migration, production/staging write, deployment, or live-account mutation was performed.
+
+The successful SQL run is meaningful engine-level integration evidence, but it does **not** demonstrate a single atomic cross-asset historical ledger snapshot, complete authoritative source history, production receipt trust, or hosted real-user balance reconciliation. The 37 skipped Node tests are reported explicitly and are not counted as passes. The separate 16-test Demo integration run is not additive to the 679-test full-suite total.
+
+These results apply only to the exact head SHA recorded above. Any subsequent commit requires fresh exact-head CI before its changes can be considered tested.
+
+## 12. Required next verification before any reconciliation flag change
 
 - Obtain a read-only, complete, account-scoped export with source hashes and coverage boundaries for every authoritative table/event stream.
 - Build an independent deterministic report that starts from verified opening evidence and enumerates every event; report missing/extra/conflicting IDs and per-invariant totals. Never fill gaps with a synthetic transaction.
