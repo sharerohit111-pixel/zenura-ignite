@@ -98,6 +98,16 @@ Before production activation:
 
 ## 10. Current state
 
-This document records product semantics and a proposed trust design only. The current repository/hosted evidence does not establish a production signer, managed key, issuer registry, verifier, complete receipt store or complete historical ledger provenance. Existing injected test callbacks are contract seams, not cryptographic trust.
+A first isolated Node.js Ed25519 verification primitive has now been added to the Chat 73 audit branch at `market-gateway/lib/paper-trading-simulation-receipt-verifier.js`, with generated-key cryptographic tests in `market-gateway/test/paper-trading-simulation-receipt-verifier.test.js`. It uses the Node crypto implementation to verify detached signatures over a deterministic, sorted-key JSON serialization of an integer-only payload subset; it checks explicit simulation/INR labels, environment, issuer/key binding, key validity/revocation, public-key-only PEM input, timestamps, and exact account/order/fill/source-transaction bindings. Unknown payload/amount fields are rejected.
 
-**Current decision remains BLOCKED.** No production code, migration, hosted function, balance, account, settlement or deployment is changed by this design. The independent Demo reducer remains Demo-only and must continue to return `ledgerReconciled=false`.
+This is a **verification primitive only**, not a production receipt system:
+- No signer or KMS/HSM adapter is implemented; no private key is stored or provisioned.
+- No production issuer/key registry is configured. The verifier accepts a registry object supplied by its future trusted server bootstrap; it is not yet wired to one.
+- The canonicalizer is a constrained project serialization, not yet independently certified against a complete RFC 8785 conformance suite.
+- Durable replay prevention still requires database uniqueness/consumption semantics; the primitive explicitly reports that replay protection is external.
+- No transaction RPC, balance, margin, reservation, position, receipt table, hosted function or browser path calls this module. It cannot authorize accounting postings.
+- No external exchange/clearing settlement integration is implemented.
+
+Before any production integration, add a managed KMS/HSM signer adapter, audited server-owned key registry, canonicalization conformance vectors, durable idempotent receipt storage/outbox, independent security review, and exact-head CI. Keep all signing credentials out of the client and repository.
+
+**Current decision remains BLOCKED.** No production migration, hosted function, balance, account, settlement or deployment was changed. The independent Demo reducer remains Demo-only and must continue to return `ledgerReconciled=false`.
