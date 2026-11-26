@@ -132,7 +132,7 @@ The product owner selected **Hybrid (C)** for Paper Trading:
 
 This decision clarifies product semantics; it does not close the persisted-ledger, provenance, hosted migration, receipt-trust or reconciliation blockers.
 
-The proposed internal receipt trust boundary is documented separately in [`S_TRADE_INTERNAL_SIMULATION_RECEIPT_TRUST_DESIGN.md`](./S_TRADE_INTERNAL_SIMULATION_RECEIPT_TRUST_DESIGN.md). It is a design-only artifact: it preserves the existing persisted Paper Trading transaction path as source of truth, treats a signed receipt as post-commit audit evidence (not a balance-posting authority), and requires managed asymmetric signing, independent verification, replay protection, key lifecycle controls and explicit simulated-only labelling. No signer, key registry, verifier, migration or transaction-path change is implemented by that document.
+The proposed internal receipt trust boundary is documented separately in [`S_TRADE_INTERNAL_SIMULATION_RECEIPT_TRUST_DESIGN.md`](./S_TRADE_INTERNAL_SIMULATION_RECEIPT_TRUST_DESIGN.md). A first isolated Ed25519 signature-verification primitive and generated-key tests have also been added to the audit branch (`market-gateway/lib/paper-trading-simulation-receipt-verifier.js` and its test). This primitive verifies signatures and exact transaction bindings but is not wired to accounting RPCs, does not issue receipts, does not persist replay state, and cannot authorize balance postings. No production KMS/HSM signer, production issuer/key registry, receipt store, migration or hosted transaction-path change is implemented. The canonical serializer still requires independent RFC 8785 conformance review.
 
 ## 9. Required closure evidence
 
