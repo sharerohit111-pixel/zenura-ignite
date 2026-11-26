@@ -148,3 +148,8 @@ The proposed internal receipt trust boundary is documented separately in [`S_TRA
 6. Zero unexplained differences and complete source coverage before any reconciliation attestation.
 
 **Final decision: BLOCKED. Keep `ledgerReconciled=false`.** No balance repair, production migration, deployment, activation, merge, settlement posting or historical data synthesis is authorized by this report.
+
+
+## 10. Authoritative export intake handoff
+
+A separate non-mutating intake contract is now available at [`S_TRADE_CHAT73_LEDGER_EXPORT_INTAKE_SPEC.md`](./S_TRADE_CHAT73_LEDGER_EXPORT_INTAKE_SPEC.md). It defines the minimum account-scoped exports, provenance fields, integer units, snapshot/pagination manifest, privacy exclusions and deterministic reconciliation checks required before any closure decision. It is a request/specification only: no source export has been received or independently validated, and it does not change the BLOCKED decision.
