@@ -1521,6 +1521,8 @@ jobs:
           END
           $contract$;
           SQL
+      - name: Verify catalog-level tenant isolation, private grants and SECURITY DEFINER boundaries
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/tenant_isolation_catalog.sql
       - name: Verify RLS and privileged RPC boundaries
         run: |
           psql -v ON_ERROR_STOP=1 <<'SQL'
