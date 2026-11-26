@@ -1,0 +1,117 @@
+name: Crypto Paper Trading checks
+
+on:
+  pull_request:
+    paths:
+      - "crypto/**"
+      - "crypto-gateway/**"
+      - "supabase/migrations/*_s_trade_crypto_*.sql"
+      - "supabase/tests/crypto_*.sql"
+      - ".github/workflows/crypto-paper-trading-checks.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  crypto-postgres:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: crypto_paper_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d crypto_paper_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      PGHOST: localhost
+      PGPORT: 5432
+      PGUSER: postgres
+      PGPASSWORD: postgres
+      PGDATABASE: crypto_paper_test
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare isolated Supabase Auth test roles
+        run: |
+          psql -v ON_ERROR_STOP=1 <<'SQL'
+          CREATE ROLE anon NOLOGIN;
+          CREATE ROLE authenticated NOLOGIN;
+          CREATE ROLE service_role NOLOGIN BYPASSRLS;
+          CREATE SCHEMA auth;
+          CREATE TABLE auth.users (id uuid PRIMARY KEY);
+          CREATE FUNCTION auth.uid()
+          RETURNS uuid LANGUAGE sql STABLE
+          AS $uid$
+            SELECT NULLIF(COALESCE(
+              current_setting('request.jwt.claim.sub', true),
+              (NULLIF(current_setting('request.jwt.claims', true), '')::jsonb ->> 'sub')
+            ), '')::uuid
+          $uid$;
+          GRANT USAGE ON SCHEMA auth TO authenticated, service_role;
+          GRANT EXECUTE ON FUNCTION auth.uid() TO authenticated, service_role;
+          SQL
+      - name: Apply Crypto-only migrations to disposable PostgreSQL
+        run: |
+          set -euo pipefail
+          for migration in supabase/migrations/*_s_trade_crypto_*.sql; do
+            echo "Applying $migration"
+            psql -v ON_ERROR_STOP=1 -f "$migration"
+          done
+      - name: Verify full-position LIMIT SELL reservation lifecycle
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/crypto_limit_full_exit_reservation.sql
+      - name: Verify reserved Crypto position delete guard
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/crypto_reserved_position_guard.sql
+      - name: Verify MARKET SELL preserves reserved LIMIT quantity
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/crypto_market_sell_reservation.sql
+      - name: Verify authenticated Crypto row-level isolation
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/crypto_rls_isolation.sql
+      - name: Verify Crypto LIMIT BUY reservation, cancellation and fill accounting
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/crypto_limit_buy_reservation.sql
+      - name: Verify Crypto LIMIT worker lease expiry and stale-token safety
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/crypto_limit_worker_lease.sql
+      - name: Verify Crypto LIMIT BUY reservation survives FX drift
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/crypto_limit_fx_reservation_guard.sql
+      - name: Verify Crypto virtual account reset preserves history and releases reservations
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/crypto_account_reset.sql
+      - name: Verify Crypto cloud SL/Target reservation and cancellation
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/crypto_risk_plan_reservations.sql
+      - name: Check Crypto browser module syntax
+        run: |
+          node --input-type=module --check < crypto/supabase-client.js
+          node --input-type=module --check < crypto/supabase-auth.js
+          node --input-type=module --check < crypto/supabase-cloud.js
+          node <<'NODE'
+          const fs = require('node:fs');
+          const html = fs.readFileSync('crypto/index.html', 'utf8');
+          const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)]
+            .map(match => match[1]).filter(source => source.trim());
+          if (!scripts.length) throw new Error('No inline Crypto Terminal scripts found');
+          for (const source of scripts) new Function(source);
+          NODE
+      - name: Set up Node.js 22 for Crypto gateway
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Test standalone Crypto gateway
+        working-directory: crypto-gateway
+        run: |
+          npm install --ignore-scripts --no-audit --no-fund
+          npm test
+          node --check server.js
+      - name: Enforce Crypto client isolation from Indian Market frontend
+        run: |
+          if grep -R "../markets/stocks/supabase-client.js" crypto/supabase-*.js; then
+            echo "Crypto frontend must not import the Indian Market Supabase client."
+            exit 1
+          fi
+          if grep -R -E "paper_(accounts|orders|equity_positions)|upstox_" supabase/migrations/*_s_trade_crypto_*.sql; then
+            echo "Crypto migration unexpectedly references Indian-market tables."
+            exit 1
+          fi
