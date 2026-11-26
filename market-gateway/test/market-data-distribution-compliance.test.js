@@ -21,7 +21,7 @@ const validRights = {
 test("live, delayed, snapshot, EOD and historical exchange prices never bypass the two approval gates", () => {
   const feedModes = [
     "live", "realtime", "snapshot", "delayed", "delayed_15m",
-    "delayed_30d", "end_of_day", "historical", "educational",
+    "delayed_30d", "end_of_day", "historical", "derived", "educational",
     "nism_simulation_lab",
   ];
   for (const mode of feedModes) {
