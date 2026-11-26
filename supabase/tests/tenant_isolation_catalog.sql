@@ -128,7 +128,7 @@ BEGIN
 
   -- The two allowlisted client RPCs must exist, remain SECURITY DEFINER,
   -- retain their pinned search_path, and enforce caller ownership internally.
-  FOREACH v_proc IN
+  FOR v_proc IN
     SELECT p.oid,p.proname,p.prosrc,p.proconfig
       FROM pg_proc p
      WHERE p.oid IN (
