@@ -1,3 +1,4 @@
+// Static contract test only; this does not execute the migration against an orphan-order database fixture.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
