@@ -24,6 +24,7 @@ on:
       - "market-gateway/supabase-server.js"
       - "market-gateway/test/market-data-rights-gate.test.js"
       - "market-gateway/test/market-data-distribution-compliance.test.js"
+      - "market-gateway/test/market-data-instruments-route-compliance.test.js"
       - ".github/workflows/deploy-supabase-market-gateway.yml"
       - "market-gateway/lib/provider-rate-limit.js"
       - "market-gateway/lib/provider-health-registry.js"
