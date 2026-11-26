@@ -2,6 +2,7 @@
 
 const { assertMarketDataProvider, normalizeMarketDataSnapshot } = require("./market-data-provider-contract");
 const { hasPaperTradingMarketDataRights } = require("./provider-paper-trading-policy");
+const { assertMarketDataRightsApproved } = require("./market-data-rights-gate");
 
 const CAPABILITIES = Object.freeze(["quote", "candles", "depth", "instrumentMaster", "stream"]);
 const TRANSIENT_STATUSES = new Set([408, 425, 429, 500, 502, 503, 504]);
@@ -113,8 +114,8 @@ function validateStreamResult(result) {
 }
 
 class MarketDataProviderRouter {
-  constructor({ providers, plan, entitlementResolver, healthRegistry = null, rateLimiter = null, clock = () => Date.now(), maxQuoteAgeMs = 15000 }) {
-    if (!(providers instanceof Map) || typeof entitlementResolver !== "function" ||
+  constructor({ providers, plan, entitlementResolver, rightsGate = assertMarketDataRightsApproved, healthRegistry = null, rateLimiter = null, clock = () => Date.now(), maxQuoteAgeMs = 15000 }) {
+    if (!(providers instanceof Map) || typeof entitlementResolver !== "function" || typeof rightsGate !== "function" ||
         (healthRegistry !== null && (typeof healthRegistry.isAvailable !== "function" ||
           typeof healthRegistry.recordSuccess !== "function" || typeof healthRegistry.recordFailure !== "function")) ||
         (rateLimiter !== null && typeof rateLimiter.consume !== "function") ||
@@ -128,6 +129,7 @@ class MarketDataProviderRouter {
     this.providers = new Map(providers);
     this.plan = validateProviderPlan(plan);
     this.entitlementResolver = entitlementResolver;
+    this.rightsGate = rightsGate;
     this.healthRegistry = healthRegistry;
     this.rateLimiter = rateLimiter;
     this.clock = clock;
@@ -145,6 +147,9 @@ class MarketDataProviderRouter {
       capability === "stream" ? "openStream" :
       capability === "candles" ? "getCandles" :
       capability === "depth" ? "getDepth" : "getQuote";
+    // The generic router must independently enforce both global documentary
+    // approvals; caller-supplied entitlement fields are not a substitute.
+    this.rightsGate();
     const nowMs = this.clock();
 
     for (const providerId of this.plan[capability]) {
