@@ -105,13 +105,13 @@ A separate isolated Google Cloud KMS Ed25519 signer adapter is now present at `m
 **Provider recommendation:** Because the current gateway deployment workflow targets Google Cloud Run and uses Workload Identity Federation, Google Cloud KMS is the preferred first provider candidate. Before provisioning, confirm the required protection level and algorithm are supported in the selected KMS location. Google documents `ASYMMETRIC_SIGN`, the `cloudkms.cryptoKeyVersions.useToSign` permission, and Ed25519 as a pure-mode algorithm that signs raw data. If an HSM-backed key is mandatory, do not assume Ed25519 is available at that protection level; select and test an algorithm explicitly supported for HSM (P-256/SHA-256 is a documented recommended candidate). References: [Cloud KMS signing](https://docs.cloud.google.com/kms/docs/create-validate-signatures), [algorithms and protection levels](https://docs.cloud.google.com/kms/docs/algorithms), and [protection levels](https://docs.cloud.google.com/kms/docs/protection-levels).
 
 This is a **verification primitive and isolated signer adapter only**, not a production receipt system:
-- No signer or KMS/HSM adapter is implemented; no private key is stored or provisioned.
+- The KMS adapter is not connected to a real Google Cloud KMS client or production key version; no KMS key has been provisioned and no private key is stored in the repository or application runtime.
 - No production issuer/key registry is configured. The verifier accepts a registry object supplied by its future trusted server bootstrap; it is not yet wired to one.
 - The canonicalizer is a constrained project serialization, not yet independently certified against a complete RFC 8785 conformance suite.
 - Durable replay prevention still requires database uniqueness/consumption semantics; the primitive explicitly reports that replay protection is external.
 - No transaction RPC, balance, margin, reservation, position, receipt table, hosted function or browser path calls this module. It cannot authorize accounting postings.
 - No external exchange/clearing settlement integration is implemented.
 
-Before any production integration, add a managed KMS/HSM signer adapter, audited server-owned key registry, canonicalization conformance vectors, durable idempotent receipt storage/outbox, independent security review, and exact-head CI. Keep all signing credentials out of the client and repository.
+Before production integration, provision and audit the chosen managed KMS/HSM key, connect the adapter using the Cloud Run service identity with least-privilege signing permission, establish the server-owned issuer/key registry, complete canonicalization conformance vectors, implement durable idempotent receipt storage/outbox and replay protection, complete independent security review, and pass exact-head CI. Keep all signing credentials out of the client and repository.
 
 **Current decision remains BLOCKED.** No production migration, hosted function, balance, account, settlement or deployment was changed. The independent Demo reducer remains Demo-only and must continue to return `ledgerReconciled=false`.
