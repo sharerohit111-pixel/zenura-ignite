@@ -47,7 +47,7 @@ function reconcileDemoEventStream({ opening, events, provenance = null } = {}) {
         !object(e.deltas) || !integer(e.deltas.cashDeltaPaise) ||
         !integer(e.deltas.blockedDeltaPaise) || !object(e.payload)) fail("INVALID_EVENT_ENVELOPE:" + (i + 1));
     if (typeof e.occurredAt !== "string" ||
-        !/^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,3})?(?:Z|[+-]\\d{2}:\\d{2})$/.test(e.occurredAt)) {
+        !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$/.test(e.occurredAt)) {
       fail("INVALID_EVENT_TIMESTAMP:" + (i + 1));
     }
     const time = Date.parse(e.occurredAt);
