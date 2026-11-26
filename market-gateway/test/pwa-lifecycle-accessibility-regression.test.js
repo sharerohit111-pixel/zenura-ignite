@@ -70,3 +70,9 @@ test("all 15 demo screens retain native keyboard-operable navigation buttons",()
  assert.match(html,/<nav[^>]*aria-label="Demo screens"/);
  assert.match(html,/<button type="button" id="paper-language-toggle"[^>]*aria-label="Switch to Hindi"/);
 });
+
+test("Markets portal favicon uses the Markets-owned PWA icon instead of the Crypto app icon",()=>{
+ const html=read("markets/index.html");
+ assert.match(html,/<link rel="icon" href="\.\/icons\/icon-192\.svg" type="image\/svg\+xml">/);
+ assert.doesNotMatch(html,/<link rel="icon" href="\.\.\/crypto\/icon\.svg"/);
+});
