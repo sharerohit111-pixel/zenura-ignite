@@ -31,7 +31,7 @@ The PR #252 independent reducer, `market-gateway/lib/paper-demo-ledger-reconcili
 
 Project: `zenura-paper-trading` (`atvbjibhunvzpmfagagm`), region `ap-south-1`, status `ACTIVE_HEALTHY`, PostgreSQL 17.12.
 
-The hosted migration history contains **15 applied versions**. The inspected PR #245 candidate contains **44 migration files**; therefore **29 candidate migration versions are absent from the hosted migration history** at this audit. This is a schema/code divergence measurement, not an instruction to apply those migrations. No migration was applied.
+A subsequent read-only inventory across all non-system schemas (not only `public`) found no additional application-owned ledger, event, fill, settlement, refund, reversal or receipt table in another schema. The other listed schemas are Supabase-managed `auth`, `storage`, `realtime`, `vault` and `supabase_migrations`; their internal migration/identity/storage metadata is not a Paper Trading transaction journal. This broadens the schema-name inventory only; it does not establish lifetime history completeness or authorize reading auth/user contents.\n\nThe hosted migration history contains **15 applied versions**. The inspected PR #245 candidate contains **44 migration files**; therefore **29 candidate migration versions are absent from the hosted migration history** at this audit. This is a schema/code divergence measurement, not an instruction to apply those migrations. No migration was applied.
 
 Exact read-only `COUNT(*)` results for the eight existing core Paper Trading accounting tables:
 
