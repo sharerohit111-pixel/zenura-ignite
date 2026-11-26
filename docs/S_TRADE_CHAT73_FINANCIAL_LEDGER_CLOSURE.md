@@ -72,6 +72,8 @@ Retired `paper_investing_*` tables, if present, are explicitly outside this audi
 
 **Derivative cash-movement finding:** the candidate `execute_paper_long_option_order` SQL computes a virtual cash delta from option premium and charges, while `execute_paper_futures_market_order` updates virtual cash from realized P&L less charges and updates margin reservations. These are simulation transaction calculations, not independently evidenced authoritative settlement receipts. Because the hosted receipt source and trusted issuer/key verification are absent, these movements cannot be certified as receipt-backed settlement under this Chat 73 acceptance rule. Keep the derivative settlement gate blocked; do not treat successful SQL simulation tests as receipt evidence.
 
+A separate read-only hosted catalog/function-definition query confirmed both `public.execute_paper_long_option_order` and `public.execute_paper_futures_market_order` exist. Both function definitions reference account cash and charges; the queried definitions contain no receipt reference. This confirms the missing receipt gate in the currently hosted function definitions, not merely in candidate source files. No function was invoked and no data was changed.
+
 ## 5. Arithmetic, replay and ordering
 
 - Persisted money columns and transaction inputs use integer paise (`bigint`); relevant SQL functions include safe-range checks and integer gross calculations.
