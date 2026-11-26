@@ -22,6 +22,7 @@ on:
       - "market-gateway/lib/market-data-rights-gate.js"
       - "market-gateway/supabase-server.js"
       - "market-gateway/test/market-data-rights-gate.test.js"
+      - "market-gateway/test/market-data-distribution-compliance.test.js"
       - ".github/workflows/deploy-supabase-market-gateway.yml"
       - "market-gateway/lib/provider-rate-limit.js"
       - "market-gateway/lib/provider-health-registry.js"
@@ -97,4 +98,4 @@ jobs:
           node --check market-gateway/lib/distributed-provider-rate-limit.js
           node --check market-gateway/lib/instrument-identity.js
       - name: Run provider contract, routing, outage, health and distributed quota tests
-        run: node --test market-gateway/test/provider-contract.test.js market-gateway/test/provider-market-data-adapters.test.js market-gateway/test/upstox-stream-normalizer.test.js market-gateway/test/upstox-feed-decoder.test.js market-gateway/test/angelone-stream-decoder.test.js market-gateway/test/provider-adapter-router.integration.test.js market-gateway/test/market-data-router.test.js market-gateway/test/provider-paper-trading-policy.test.js market-gateway/test/market-data-rights-gate.test.js market-gateway/test/market-data-shapes.test.js market-gateway/test/provider-health-registry.test.js market-gateway/test/distributed-provider-rate-limit.test.js market-gateway/test/instrument-identity.test.js
+        run: node --test market-gateway/test/provider-contract.test.js market-gateway/test/provider-market-data-adapters.test.js market-gateway/test/upstox-stream-normalizer.test.js market-gateway/test/upstox-feed-decoder.test.js market-gateway/test/angelone-stream-decoder.test.js market-gateway/test/provider-adapter-router.integration.test.js market-gateway/test/market-data-router.test.js market-gateway/test/provider-paper-trading-policy.test.js market-gateway/test/market-data-rights-gate.test.js market-gateway/test/market-data-distribution-compliance.test.js market-gateway/test/market-data-shapes.test.js market-gateway/test/provider-health-registry.test.js market-gateway/test/distributed-provider-rate-limit.test.js market-gateway/test/instrument-identity.test.js
