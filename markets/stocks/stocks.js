@@ -25,17 +25,21 @@
   }
   async function loadInstruments(){
     const request=++instrumentLoadSeq,requestedList=activeList,requestedQuery=search.value.trim();
+    const connector=window.ZENURA_MARKET_CONNECTOR,uid=connector?.getUserId?.();
     if(!gateway){message('Market gateway URL is not configured yet. Deploy Cloud Run and set the market-gateway-url meta value.');return;}
+    if(!connector?.getIdToken||!uid){message('Sign in to load the official Upstox instrument master.');return;}
     message('Loading official Upstox instrument master…');
     const params=new URLSearchParams({kind:requestedList,limit:'100'});
     if(requestedQuery)params.set('q',requestedQuery);
     try{
-      const response=await fetch(gateway+'/instruments?'+params.toString(),{headers:{Accept:'application/json'}});
+      const token=await connector.getIdToken();
+      if(request!==instrumentLoadSeq||connector.getUserId()!==uid||requestedList!==activeList||requestedQuery!==search.value.trim())return;
+      const response=await fetch(gateway+'/instruments?'+params.toString(),{headers:{Authorization:'Bearer '+token,Accept:'application/json'}});
       if(!response.ok)throw new Error('Instrument service unavailable ('+response.status+').');
       const data=await response.json();
-      if(request!==instrumentLoadSeq||requestedList!==activeList||requestedQuery!==search.value.trim())return;
+      if(request!==instrumentLoadSeq||connector.getUserId()!==uid||requestedList!==activeList||requestedQuery!==search.value.trim())return;
       items=data.results||[];render(items);
-    }catch(error){if(request===instrumentLoadSeq&&requestedList===activeList&&requestedQuery===search.value.trim())message(error.message||'Could not load instruments.');}
+    }catch(error){if(request===instrumentLoadSeq&&connector.getUserId()===uid&&requestedList===activeList&&requestedQuery===search.value.trim())message(error.message||'Could not load instruments.');}
   }
   const watchAdd=document.getElementById('watchlist-add'),watchStatus=document.getElementById('watchlist-status'),watchBody=document.getElementById('saved-watchlist'),watchSelect=document.getElementById('watchlist-select');
   let savedWatchlist=[],watchQuotes=new Map(),activeWatchlist=watchSelect.value,watchlistLoadSeq=0,watchQuoteSeq=0;
