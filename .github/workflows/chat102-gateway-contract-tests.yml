@@ -1,0 +1,48 @@
+name: CHAT 102 Disposable Gateway Contract Tests
+
+on:
+  push:
+    branches:
+      - audit/chat102-gateway-staging-readiness-2026-11-27
+    paths:
+      - "market-gateway/lib/staging-worker-policy.js"
+      - "market-gateway/test/supabase-staging-contract.test.js"
+      - "market-gateway/supabase-server.js"
+      - "market-gateway/lib/supabase-runtime.js"
+      - "market-gateway/package.json"
+      - ".github/workflows/chat102-gateway-contract-tests.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  disposable-contract-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout isolated audit branch
+        uses: actions/checkout@v4
+        with:
+          ref: audit/chat102-gateway-staging-readiness-2026-11-27
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install pinned direct dependencies without writing a lockfile
+        working-directory: market-gateway
+        run: npm install --no-package-lock --ignore-scripts --no-audit --no-fund
+
+      - name: Run disposable HTTP and staging worker-policy tests
+        working-directory: market-gateway
+        env:
+          NODE_ENV: test
+        run: node --test test/supabase-staging-contract.test.js
+
+      - name: Assert production deployment workflow was not dispatched
+        run: |
+          test -f .github/workflows/deploy-supabase-market-gateway.yml
+          ! grep -q -- '--allow-unauthenticated' .github/workflows/chat102-gateway-contract-tests.yml
+          ! grep -q 'gcloud run deploy' .github/workflows/chat102-gateway-contract-tests.yml
