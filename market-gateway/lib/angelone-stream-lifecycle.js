@@ -61,7 +61,6 @@ function createAngelOneStreamLifecycle({
     assertGeneration(candidateGeneration);
     if (state !== "connecting") fail("Angel One open event arrived in an invalid state.");
     state = "connected";
-    reconnectAttempts = 0;
     nextReconnectAtMs = null;
     lastHeartbeatSentAtMs = now();
     lastHeartbeatAckAtMs = null;
