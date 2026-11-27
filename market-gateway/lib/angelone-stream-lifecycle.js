@@ -91,6 +91,13 @@ function createAngelOneStreamLifecycle({
     return Object.freeze({ generation, acknowledgedAtMs: lastHeartbeatAckAtMs });
   }
 
+  function markStable(candidateGeneration) {
+    assertGeneration(candidateGeneration);
+    if (state !== "connected") fail("Angel One stability marker requires an open connection.");
+    reconnectAttempts = 0;
+    return Object.freeze({ generation, reconnectAttempts });
+  }
+
   function onTransportFailure(candidateGeneration) {
     assertGeneration(candidateGeneration);
     if (state !== "connected" && state !== "connecting") {
@@ -133,6 +140,7 @@ function createAngelOneStreamLifecycle({
     heartbeatDue,
     markHeartbeatSent,
     onHeartbeatAck,
+    markStable,
     onTransportFailure,
     beginReconnect,
     close,
