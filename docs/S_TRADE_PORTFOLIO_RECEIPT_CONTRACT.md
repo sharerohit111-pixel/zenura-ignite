@@ -100,3 +100,10 @@ Lifetime realized P&L/charges are null unless every required execution and settl
 
 ## Explicit non-goals
 No write RPC, broker order, provider feed, worker enablement, hosted database mutation, production deployment, auth-policy change, or crypto modification. Delivery LIMIT worker remains disabled.
+
+
+## CHAT 115 update — Futures MARKET receipt protection
+
+The isolated candidate now adds a database trigger that rejects UPDATE and DELETE for completed Futures MARKET order receipts, and also prevents changing a non-MARKET order into MARKET. Futures LIMIT rows retain their mutable pending/fill/cancel lifecycle. Disposable SQL regression coverage verifies both behaviors. This is not yet accepted as passing until exact-head CI completes.
+
+The remaining accounting design blocker is cross-stream P&L aggregation: MARKET close/reversal receipts, daily MTM events, expiry settlement and simulated square-off events must be normalized without counting the same realized-P&L delta twice. The existing MARKET accounting test's order-history reconciliation is not a complete proof across MTM/risk events.
