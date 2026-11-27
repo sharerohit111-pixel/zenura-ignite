@@ -112,6 +112,29 @@ test("unsupported dates fail closed instead of applying a stale STT schedule", (
   assert.throws(() => aggregateCashEquityStt([trade("future", { tradeDate: "2026-11-28" })]), /No verified cash STT schedule/);
 });
 
+test("client STT is rounded separately per trading day, not across dates", () => {
+  const result = aggregateCashEquityStt([
+    trade("day-1", {
+      tradeDate: "2026-11-26",
+      settlementId: "S-26",
+      settlementType: "NON_NETTED",
+      side: "BUY",
+      quantity: 1,
+      tradeValuePaise: 25_000
+    }),
+    trade("day-2", {
+      tradeDate: "2026-11-27",
+      settlementId: "S-27",
+      settlementType: "NON_NETTED",
+      side: "BUY",
+      quantity: 1,
+      tradeValuePaise: 25_000
+    })
+  ]);
+  assert.equal(result.clients.length, 2);
+  assert.deepEqual(result.clients.map(x => x.payableSttRupees), [0, 0]);
+});
+
 test("empty input returns no groups or client liabilities", () => {
   assert.deepEqual(aggregateCashEquityStt([]), { groups: [], clients: [] });
 });
