@@ -158,3 +158,17 @@ MARKET_DATA_RIGHTS_APPROVED=true plus a real MARKET_DATA_RIGHTS_REFERENCE is nec
 8. Exact-head CI passing, including fail-closed tests; no production deployment or provider activation is part of this task.
 
 **Release status remains BLOCKED** until all applicable items are complete and reviewed. This checklist does not constitute legal advice or legal approval.
+
+
+## Critical NSE policy blocker — Clause 7.4 (explicitly recorded 2026-11-27)
+
+The consolidated NSE / NSE Data Sharing & Usage Policy contains an express restriction in **Clause 7.4**: Market Data shall not be provided to individuals, entities, platforms, apps or websites engaging in online gaming, virtual trading or simulation, fantasy games, similar activities, or activities prohibited by applicable law/regulator/government/judicial authority. Clause 7.3 separately prohibits redistribution except as agreed in the Relevant Agreement. The policy defines Market Data broadly, including streaming, real-time, snapshot, delayed, end-of-day, historical and corporate data, as well as securities/derivatives identifiers, prices, volumes and trade-related data.
+
+Official primary source (consolidated policy PDF): https://nsearchives.nseindia.com/web/sites/default/files/inline-files/NSE_Data_Sharing%26Usage_Policy.pdf
+Official NSE policy page: https://www.nseindia.in/static/market-data/nse-data-policy
+
+**S-TRADE impact:** S-TRADE is designed as a paper/virtual trading simulator. On the face of Clause 7.4, NSE Market Data must therefore remain blocked for this product unless NSE provides a written, product-specific clarification/authorization that is legally available under the policy and applicable SEBI directions, and qualified Indian securities counsel confirms the permitted scope. Do not assume that an ordinary market-data subscription, a broker retail API/OAuth entitlement, a vendor contract, a 15-minute/30-day delay, an EOD/historical label, or an educational/NISM label overrides Clause 7.4. This document does not assert that an exception exists.
+
+The separate NSE circular **NSE/COMP/56426 dated 20 April 2023** advised trading members to use NSE data for legitimate trading purposes by clients and not for gaming or virtual trading. Treat that circular as additional context; the direct product/data restriction recorded above is Clause 7.4 of the consolidated Data Sharing & Usage Policy. Official circular: https://nsearchives.nseindia.com/content/circulars/COMP56426.pdf
+
+**Required release disposition:** NSE-sourced data for S-TRADE remains **BLOCKED**. Obtain (1) written NSE/NSE Data legal/compliance clarification naming ZENURA IGNITE S-TRADE and its exact simulation use, data classes, channels and end-user model; (2) evidence that the proposed permission is consistent with Clause 7.4 and current SEBI directions; and (3) a signed opinion from qualified Indian securities counsel. If NSE confirms that the proposed use is not permitted, do not use NSE data; redesign around independently generated synthetic data or another legally cleared route, subject to separate product-level legal review. Never activate NSE feed flags while this blocker is unresolved.
