@@ -173,10 +173,13 @@ function aggregateCashEquityStt(trades) {
       rateVersion: RATE_VERSION
     }));
 
-    clientTotals.set(g.clientId, (clientTotals.get(g.clientId) || 0n) + BigInt(groupSttPaise));
+    const clientDayKey = JSON.stringify([g.clientId, g.tradeDate]);
+    const clientDay = clientTotals.get(clientDayKey) || { clientId: g.clientId, tradeDate: g.tradeDate, total: 0n };
+    clientDay.total += BigInt(groupSttPaise);
+    clientTotals.set(clientDayKey, clientDay);
   }
 
-  const clients = [...clientTotals.entries()].map(([clientId, total]) => {
+  const clients = [...clientTotals.values()].map(({ clientId, tradeDate, total }) => {
     if (total > BigInt(Number.MAX_SAFE_INTEGER)) {
       throw new RangeError("Client STT aggregate exceeds supported safe integer range.");
     }
@@ -184,6 +187,7 @@ function aggregateCashEquityStt(trades) {
     const payableRupees = roundPaiseToNearestRupee(totalPaise);
     return Object.freeze({
       clientId,
+      tradeDate,
       totalSttPaise: totalPaise,
       payableSttRupees: payableRupees,
       roundedPayablePaise: payableRupees * 100,
