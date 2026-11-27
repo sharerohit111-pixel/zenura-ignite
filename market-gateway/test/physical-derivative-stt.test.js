@@ -66,7 +66,7 @@ test("does not merge different clients, settlement dates or contracts", () => {
   const result = aggregatePhysicalDerivativeStt([
     event("a"),
     event("b", { clientId: "client-b" }),
-    event("c", { settlementDate: "2026-11-28" }),
+    event("c", { settlementDate: "2026-11-26" }),
     event("d", { contractId: "TCS-2026-11-26-FUT" })
   ]);
   assert.equal(result.groups.length, 4);
