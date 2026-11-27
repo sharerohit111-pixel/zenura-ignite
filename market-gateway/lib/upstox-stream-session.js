@@ -68,10 +68,10 @@ function createUpstoxStreamSession({
     }
 
     const quotes = normalizeQuotes(frame, {
+      ...options,
       instrumentMap,
       now: now(),
       maxAgeMs,
-      ...options,
     });
     if (!Array.isArray(quotes)) {
       fail("Upstox quote normalizer returned an invalid result.");
