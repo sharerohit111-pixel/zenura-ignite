@@ -28,7 +28,7 @@ const {chromium}=require("playwright");
     await page.locator('nav.terminal-nav [data-terminal-page="'+route+'"]').click();
     await page.waitForFunction(value=>document.body.dataset.terminalPage===value,route);
     assert.equal(await page.locator(selector).isVisible(),true,route+" page must show its own panel");
-    assert.equal(await page.locator('[data-terminal-page="'+route+'"]').getAttribute("aria-current"),"page",route+" nav item must be current");
+    assert.equal(await page.locator('nav.terminal-nav [data-terminal-page="'+route+'"]').getAttribute("aria-current"),"page",route+" nav item must be current");
     const overflow=await page.evaluate(()=>document.documentElement.scrollWidth>window.innerWidth+1);
     assert.equal(overflow,false,viewport.name+" horizontal overflow on "+route);
    }
