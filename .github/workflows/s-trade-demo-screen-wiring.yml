@@ -98,7 +98,7 @@ jobs:
       - name: Install Chromium browser QA dependencies
         run: |
           npm install --prefix "$RUNNER_TEMP/zenura-playwright" playwright@1.61.1 axe-core@4.10.3 --ignore-scripts --no-audit --no-fund
-          "$RUNNER_TEMP/zenura-playwright/node_modules/.bin/playwright" install --with-deps chromium
+          "$RUNNER_TEMP/zenura-playwright/node_modules/.bin/playwright" install chromium
       - name: Run desktop, mobile, accessibility, performance and offline PWA smoke
         timeout-minutes: 12
         run: |
