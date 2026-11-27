@@ -9,8 +9,9 @@ This harness measures GET-only gateway latency, throughput, HTTP status distribu
 - TARGET_ENV=disposable accepts only loopback, RFC1918 IPv4, .test or .local hosts.
 - TARGET_ENV=staging requires HTTPS and an exact hostname in STAGING_HOST_ALLOWLIST.
 - A deliberate acknowledgement is required through ZENURA_LOAD_TEST_CONFIRM=DISPOSABLE_OR_APPROVED_STAGING.
-- Only a fixed allowlist of GET routes is accepted. No arbitrary URL, HTTP method or request body is configurable.
-- Authenticated reads require a JSON token file. Keep it outside the repository, use disposable test users, and never print or commit it. Rate-limit consumption may write counters, so authenticated runs are restricted to disposable or explicitly approved staging only.
+- Only a fixed allowlist of documented, side-effect-free GET routes is accepted. No arbitrary method, request body, order submission, cancellation or worker activation is configurable.
+- **/paper/account is deliberately excluded.** Its GET handler invokes initialize_paper_trading_account, which can create/write an account; it is not safe to classify as a read-only load endpoint.
+- Authenticated reads require a JSON token file. Keep it outside the repository, use disposable test users, and never print or commit it. Rate-limit counters may be written by authenticated GETs, so authenticated runs are restricted to disposable or explicitly approved staging only.
 - Use synthetic instruments/test accounts only. Do not configure Upstox credentials or a real broker account.
 
 ## Run
@@ -42,7 +43,7 @@ For an approved staging target, set TARGET_ENV=staging, BASE_URL=https://approve
 | LOAD_STAGES | 10,25,50,100,250,500 | Strictly ascending integers, 1–500 |
 | STAGE_SECONDS | 10 | 1–60 seconds per stage |
 | REQUEST_TIMEOUT_MS | 10000 | 250–30000 ms |
-| LOAD_PATHS | /health | Comma-separated fixed GET route allowlist |
+| LOAD_PATHS | /health | Comma-separated fixed GET allowlist |
 | AUTH_TOKEN_FILE | unset | JSON array of JWT strings; required for authenticated routes |
 | STAGING_HOST_ALLOWLIST | unset | Exact comma-separated hostnames; staging only |
 
