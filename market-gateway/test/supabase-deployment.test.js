@@ -123,7 +123,7 @@ test("Protective scan index only covers active, supported equity SELL exits",()=
 test("Public health response confirms Delivery LIMIT worker remains disabled without exposing secrets",()=>{
  assert.match(server,/limitWorker:\{\.\.\.paperLimitWorkerStatus\}/);
  assert.match(server,/lastCycle=\{scanned:result\.scanned,filled:result\.filled,failed:result\.failed,locked:result\.locked,cycleError:false\}/);
- assert.match(deployWorkflow,/jq -e '\.ok and \.instrumentMasterLoaded and \.limitWorker\.enabled and \.limitWorker\.lastRunAt != null and \.limitWorker\.lastCycle\.cycleError == false'/);
+ assert.match(deployWorkflow,/jq -e '\\.ok and \\.limitWorker\\.enabled == false'/);
  assert.doesNotMatch(server,/health[^\n]*SERVICE_ROLE_KEY|health[^\n]*UPSTOX_CLIENT_SECRET/i);
 });
 
