@@ -16,10 +16,11 @@ const siteRoot = path.join(out, "site");
 const outMarkets = path.join(siteRoot, "markets");
 fs.mkdirSync(outMarkets, { recursive: true });
 
+const excludedMarketDirectories = new Set(["investing", "crypto", "__tests__", "tests"]);
 function copyPublicTree(src, dest) {
   for (const entry of fs.readdirSync(src, { withFileTypes: true })) {
     if (entry.name.startsWith(".")) continue;
-    if (entry.isDirectory() && ["investing", "__tests__", "tests"].includes(entry.name)) continue;
+    if (entry.isDirectory() && excludedMarketDirectories.has(entry.name.toLowerCase())) continue;
     const from = path.join(src, entry.name);
     const to = path.join(dest, entry.name);
     if (entry.isDirectory()) {
@@ -57,10 +58,25 @@ for (const item of shellPaths) {
   if (!fs.existsSync(resolved)) throw new Error("PWA shell dependency missing from artifact: " + item);
 }
 
-const stockHtml = fs.readFileSync(path.join(outMarkets, "stocks", "index.html"), "utf8");
-const manifest = fs.readFileSync(path.join(outMarkets, "manifest.webmanifest"), "utf8");
-if (/\.\.\/\.\.\/crypto\//i.test(stockHtml) || /\.\.\/crypto\//i.test(manifest)) {
-  throw new Error("Public PWA artifact still references Crypto assets");
+const artifactFiles = [];
+function collectArtifactFiles(dir, prefix = "") {
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const relative = path.posix.join(prefix, entry.name);
+    if (entry.isDirectory()) {
+      if (entry.name.toLowerCase() === "crypto") throw new Error("Crypto directory leaked into public PWA artifact: " + relative);
+      collectArtifactFiles(path.join(dir, entry.name), relative);
+    } else if (entry.isFile()) {
+      artifactFiles.push({ absolute: path.join(dir, entry.name), relative });
+    }
+  }
+}
+collectArtifactFiles(siteRoot);
+const cryptoPathReference = /(?:\.\.?\/)+crypto\/|(?:^|["'(])\/?crypto\//i;
+for (const file of artifactFiles) {
+  if (/\.(html|css|js|mjs|json|webmanifest|svg)$/i.test(file.relative)) {
+    const source = fs.readFileSync(file.absolute, "utf8");
+    if (cryptoPathReference.test(source)) throw new Error("Crypto asset reference found in public PWA artifact: " + file.relative);
+  }
 }
 const gatewayFiles = [];
 function walk(dir, prefix = "") {
