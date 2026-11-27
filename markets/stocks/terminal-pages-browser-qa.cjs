@@ -11,7 +11,7 @@ const {chromium}=require("playwright");
    const errors=[];
    page.on("pageerror",error=>errors.push(error.message));
    await page.goto("http://127.0.0.1:4173/markets/stocks/index.html",{waitUntil:"domcontentloaded",timeout:30000});
-   await page.waitForSelector('[data-terminal-page="dashboard"]',{timeout:10000});
+   await page.waitForSelector('nav.terminal-nav [data-terminal-page="dashboard"]',{timeout:10000});
    const routes=[
     ["dashboard",".dashboard-overview"],
     ["chart",".chart-panel"],
@@ -25,16 +25,16 @@ const {chromium}=require("playwright");
     ["settings",".settings-page"]
    ];
    for(const [route,selector] of routes){
-    await page.locator('[data-terminal-page="'+route+'"]').click();
+    await page.locator('nav.terminal-nav [data-terminal-page="'+route+'"]').click();
     await page.waitForFunction(value=>document.body.dataset.terminalPage===value,route);
     assert.equal(await page.locator(selector).isVisible(),true,route+" page must show its own panel");
     assert.equal(await page.locator('[data-terminal-page="'+route+'"]').getAttribute("aria-current"),"page",route+" nav item must be current");
     const overflow=await page.evaluate(()=>document.documentElement.scrollWidth>window.innerWidth+1);
     assert.equal(overflow,false,viewport.name+" horizontal overflow on "+route);
    }
-   await page.locator('[data-terminal-page="balance"]').click();
+   await page.locator('nav.terminal-nav [data-terminal-page="balance"]').click();
    assert.equal(await page.locator(".paper-ticket-controls").isVisible(),false,"wallet must not expose order-entry controls");
-   await page.locator('[data-terminal-page="history"]').click();
+   await page.locator('nav.terminal-nav [data-terminal-page="history"]').click();
    assert.equal(await page.locator("#paper-trades-workspace-body").isVisible(),true,"trade history table must be visible");
    assert.equal(await page.locator("#paper-positions").isVisible(),false,"positions table must not leak into trade history");
    assert.deepEqual(errors,[],viewport.name+" page runtime errors");
