@@ -1,6 +1,9 @@
 name: S-TRADE Deployment Worker Safety
 
 on:
+  push:
+    branches:
+      - "security/keep-delivery-limit-worker-disabled-2026-11-27"
   pull_request:
     paths:
       - ".github/workflows/deploy-supabase-market-gateway.yml"
