@@ -1,5 +1,7 @@
 "use strict";
 
+const { normalizeUpstoxFeedQuotes } = require("./upstox-stream-normalizer");
+
 function fail(message, code = "invalid_market_data") {
   throw Object.assign(new Error(message), { status: 409, code });
 }
@@ -15,9 +17,15 @@ function fail(message, code = "invalid_market_data") {
  * A session is not ready for trading until at least one mapped, fresh quote
  * has passed the supplied normalizer after market_info was received.
  */
-function createUpstoxStreamSession({ normalizeQuotes } = {}) {
-  if (typeof normalizeQuotes !== "function") {
-    throw new TypeError("Upstox stream session requires a quote normalizer.");
+function createUpstoxStreamSession({
+  instrumentMap,
+  now = () => Date.now(),
+  maxAgeMs = 15000,
+  normalizeQuotes = (frame, options) => normalizeUpstoxFeedQuotes(frame, options),
+} = {}) {
+  if (typeof normalizeQuotes !== "function" || typeof now !== "function" ||
+      !Number.isSafeInteger(maxAgeMs) || maxAgeMs <= 0) {
+    throw new TypeError("Upstox stream session requires a valid normalizer, clock and freshness policy.");
   }
 
   let phase = "awaiting_market_info";
@@ -59,7 +67,12 @@ function createUpstoxStreamSession({ normalizeQuotes } = {}) {
       fail("Upstox stream session received an invalid feed frame.");
     }
 
-    const quotes = normalizeQuotes(frame, options);
+    const quotes = normalizeQuotes(frame, {
+      instrumentMap,
+      now: now(),
+      maxAgeMs,
+      ...options,
+    });
     if (!Array.isArray(quotes)) {
       fail("Upstox quote normalizer returned an invalid result.");
     }
