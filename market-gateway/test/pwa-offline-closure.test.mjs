@@ -41,6 +41,9 @@ test("Markets service worker uses the current cache generation and precaches PWA
  const sw=await read("markets/service-worker.js");
  assert.match(sw,/zenura-markets-shell-v12/);
  assert.match(sw,/"shared\/paper-demo-event-ledger\.mjs"/);
+ assert.match(sw,/"icons\\/icon-192\\.png"/);
+ assert.match(sw,/"icons\\/icon-512\\.png"/);
+ assert.match(sw,/"icons\\/icon-512-maskable\\.png"/);
  assert.match(sw,/"icons\/icon-192\.svg"/);
  assert.match(sw,/"icons\/icon-512\.svg"/);
  assert.doesNotMatch(sw,/zenura-markets-shell-v9/);
