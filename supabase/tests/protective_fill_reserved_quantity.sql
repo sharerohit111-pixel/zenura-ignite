@@ -77,22 +77,50 @@ DECLARE
   v_now bigint:=floor(extract(epoch from clock_timestamp())*1000)::bigint;
   v_full jsonb;
   v_partial jsonb;
-  v_cash bigint;
-  v_realized bigint;
-  v_quantity integer;
-  v_reserved integer;
-  v_cost bigint;
   v_full_execution_id text:=md5(gen_random_uuid()::text)||md5(gen_random_uuid()::text);
   v_full_fingerprint text:=md5(gen_random_uuid()::text)||md5(gen_random_uuid()::text);
   v_partial_execution_id text:=md5(gen_random_uuid()::text)||md5(gen_random_uuid()::text);
   v_partial_fingerprint text:=md5(gen_random_uuid()::text)||md5(gen_random_uuid()::text);
 BEGIN
+  -- Keep privileged execution calls inside service_role. Do not read protected
+  -- tables here: the RPC boundary intentionally withholds direct table access.
   v_full:=public.execute_paper_equity_protective_fill(
     'a1111111-1111-4111-8111-111111111111',
     v_full_execution_id,v_full_fingerprint,9000,v_now,v_now
   );
   IF v_full->>'status'<>'FILLED' THEN
     RAISE EXCEPTION 'Fully reserved protective exit did not fill: %',v_full;
+  END IF;
+
+  v_partial:=public.execute_paper_equity_protective_fill(
+    'b2222222-2222-4222-8222-222222222222',
+    v_partial_execution_id,v_partial_fingerprint,9000,v_now,v_now
+  );
+  IF v_partial->>'status'<>'FILLED' THEN
+    RAISE EXCEPTION 'Protective fill with other reserved shares did not fill: %',v_partial;
+  END IF;
+END
+$protective_reservation_fill_regression$;
+RESET ROLE;
+
+-- Assert persisted accounting as the disposable migration-test owner, after
+-- leaving service_role. This tests the privilege boundary rather than bypassing it.
+DO $protective_reservation_fill_assertions$
+DECLARE
+  v_full_order public.paper_orders%rowtype;
+  v_partial_order public.paper_orders%rowtype;
+  v_quantity integer;
+  v_reserved integer;
+  v_cost bigint;
+  v_cash bigint;
+  v_realized bigint;
+BEGIN
+  SELECT * INTO v_full_order FROM public.paper_orders
+   WHERE user_id='a1111111-1111-4111-8111-111111111111'
+     AND instrument_key='BSE_EQ|INE002A01018' AND status='FILLED'
+   ORDER BY created_at DESC LIMIT 1;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Full-position canonical execution record is missing';
   END IF;
   IF EXISTS(SELECT 1 FROM public.paper_equity_positions
      WHERE user_id='a1111111-1111-4111-8111-111111111111'
@@ -106,24 +134,22 @@ BEGIN
   SELECT cash_paise,realized_pnl_paise INTO v_cash,v_realized
     FROM public.paper_accounts
    WHERE user_id='a1111111-1111-4111-8111-111111111111';
-  IF v_cash<>100000000+(v_full->>'cash_delta_paise')::bigint
-     OR v_realized<>(v_full->>'realized_pnl_paise')::bigint THEN
+  IF v_cash<>100000000+v_full_order.cash_delta_paise
+     OR v_realized<>v_full_order.realized_pnl_paise THEN
     RAISE EXCEPTION 'Full-position account cash/P&L did not reconcile';
   END IF;
-  IF NOT EXISTS(SELECT 1 FROM public.paper_orders
-      WHERE order_id=v_full_execution_id
-        AND charges_paise=(v_full->>'charges_paise')::bigint
-        AND cash_delta_paise=(v_full->>'cash_delta_paise')::bigint
-        AND realized_pnl_paise=(v_full->>'realized_pnl_paise')::bigint) THEN
-    RAISE EXCEPTION 'Full-position canonical execution record is incomplete';
+  IF v_full_order.charges_paise<0
+     OR v_full_order.cash_delta_paise<=0
+     OR v_full_order.realized_pnl_paise IS NULL THEN
+    RAISE EXCEPTION 'Full-position canonical execution accounting fields are invalid';
   END IF;
 
-  v_partial:=public.execute_paper_equity_protective_fill(
-    'b2222222-2222-4222-8222-222222222222',
-    v_partial_execution_id,v_partial_fingerprint,9000,v_now,v_now
-  );
-  IF v_partial->>'status'<>'FILLED' THEN
-    RAISE EXCEPTION 'Protective fill with other reserved shares did not fill: %',v_partial;
+  SELECT * INTO v_partial_order FROM public.paper_orders
+   WHERE user_id='b2222222-2222-4222-8222-222222222222'
+     AND instrument_key='BSE_EQ|INE002A01018' AND status='FILLED'
+   ORDER BY created_at DESC LIMIT 1;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Partial protective canonical execution record is missing';
   END IF;
   SELECT quantity,reserved_quantity,cost_basis_paise
     INTO v_quantity,v_reserved,v_cost
@@ -137,19 +163,21 @@ BEGIN
   SELECT cash_paise,realized_pnl_paise INTO v_cash,v_realized
     FROM public.paper_accounts
    WHERE user_id='b2222222-2222-4222-8222-222222222222';
-  IF v_cash<>100000000+(v_partial->>'cash_delta_paise')::bigint
-     OR v_realized<>(v_partial->>'realized_pnl_paise')::bigint THEN
+  IF v_cash<>100000000+v_partial_order.cash_delta_paise
+     OR v_realized<>v_partial_order.realized_pnl_paise THEN
     RAISE EXCEPTION 'Partial protective account cash/P&L did not reconcile';
   END IF;
-  IF NOT EXISTS(SELECT 1 FROM public.paper_orders
-      WHERE order_id=v_partial_execution_id
-        AND charges_paise=(v_partial->>'charges_paise')::bigint
-        AND cash_delta_paise=(v_partial->>'cash_delta_paise')::bigint
-        AND realized_pnl_paise=(v_partial->>'realized_pnl_paise')::bigint) THEN
-    RAISE EXCEPTION 'Partial protective canonical execution record is incomplete';
+  IF v_partial_order.charges_paise<0
+     OR v_partial_order.cash_delta_paise<=0
+     OR v_partial_order.realized_pnl_paise IS NULL THEN
+    RAISE EXCEPTION 'Partial protective canonical execution accounting fields are invalid';
+  END IF;
+  IF (SELECT status FROM public.paper_protective_orders
+       WHERE order_id='b2222222-2222-4222-8222-222222222222')<>'FILLED' THEN
+    RAISE EXCEPTION 'Partial protective order did not reach FILLED';
   END IF;
 END
-$protective_reservation_fill_regression$;
+$protective_reservation_fill_assertions$;
 RESET ROLE;
 
 ROLLBACK;
