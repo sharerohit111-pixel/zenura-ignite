@@ -30,6 +30,7 @@ on:
       - "market-gateway/test/paper-demo-derivative-integration.test.mjs"
       - "market-gateway/test/derivative-mock-simulator.test.js"
       - "markets/stocks/index.html"
+      - "markets/stocks/page-navigation.js"
       - "market-gateway/test/paper-demo-dashboard.test.mjs"
       - "markets/stocks/demo-browser-smoke.cjs"
       - "markets/stocks/terminal-pages-browser-qa.cjs"
