@@ -5,7 +5,7 @@ const assert=require("node:assert/strict");
 const { createUpstoxMarketDataAdapter, createAngelOneMarketDataAdapter, istTimestamp }=require("../lib/provider-market-data-adapters");
 const NOW=Date.parse("2026-11-24T04:30:00Z");
 const args={userId:"user-1",instrumentId:"NSE_EQ|INE002A01018",exchange:"NSE",entitlementReference:"rights-ref"};
-const upNative={instrumentKey:"NSE_EQ|INE002A01018"};
+const upNative={instrumentKey:"NSE_EQ|INE002A01018",exchange:"NSE"};
 const angelNative={exchange:"NSE",exchangeSegment:"NSE",symbolToken:"3045"};
 function upQuote(){return {status:"success",data:{"NSE_EQ:RELIANCE":{instrument_token:upNative.instrumentKey,last_price:123.45,timestamp:new Date(NOW-200).toISOString(),last_trade_time:String(NOW-300),depth:{buy:[{price:123.4,quantity:10}],sell:[{price:123.5,quantity:12}]}}}};}
 function angelQuote(){return {status:true,data:{fetched:[{exchange:"NSE",symbolToken:"3045",ltp:123.45,exchFeedTime:"24-Nov-2026 10:00:00",exchTradeTime:"24-Nov-2026 09:59:59",depth:{buy:[{price:123.4,quantity:10}],sell:[{price:123.5,quantity:12}]}}]}};}
@@ -58,4 +58,25 @@ test("fails closed when a provider cannot resolve a native instrument for candle
  const angel=createAngelOneMarketDataAdapter({client:clientFor("angelone",angelQuote),resolveInstrument:async()=>({symbolToken:"3045",exchangeSegment:"NSE"}),now:()=>NOW});
  await assert.rejects(angel.getCandles(args),/instrument mapping is missing/);
  await assert.rejects(angel.openStream(args),/instrument mapping is missing/);
+});
+
+test("rejects native instrument exchange mismatch before any provider request",async()=>{
+ for(const provider of ["upstox","angelone"]){
+  let upstreamCalls=0;
+  const client=clientFor(provider,provider==="upstox"?upQuote:angelQuote);
+  for(const method of ["getQuote","getCandles","openStream"]){
+   const original=client[method];
+   client[method]=async(...args)=>{upstreamCalls++;return original(...args);};
+  }
+  const wrong=provider==="upstox"
+   ?{instrumentKey:upNative.instrumentKey,exchange:"BSE"}
+   :{...angelNative,exchange:"BSE"};
+  const adapter=provider==="upstox"
+   ?createUpstoxMarketDataAdapter({client,resolveInstrument:async()=>wrong,now:()=>NOW})
+   :createAngelOneMarketDataAdapter({client,resolveInstrument:async()=>wrong,now:()=>NOW});
+  await assert.rejects(adapter.getQuote(args),{code:"instrument_mismatch"});
+  await assert.rejects(adapter.getCandles(args),{code:"instrument_mismatch"});
+  await assert.rejects(adapter.openStream(args),{code:"instrument_mismatch"});
+  assert.equal(upstreamCalls,0,provider+" must reject before upstream I/O");
+ }
 });
