@@ -70,7 +70,7 @@ test("active protective orders expose owner-scoped modification without weakenin
 test("protective modification RPC preserves share reservations and serializes against fills",()=>{
   const migration=fs.readFileSync(path.join(root,"supabase/migrations/20261127110000_modify_equity_protective_order_rpc.sql"),"utf8");
   assert.match(migration,/security definer/);
-  assert.match(migration,/auth\.uid\(\) is distinct from p_user_id/);
+  assert.match(migration,/p_user_id is distinct from auth.uid()/);
   assert.match(migration,/for update/);
   assert.match(migration,/v_order\.status<>'ACTIVE'/);
   assert.match(migration,/v_position\.quantity-v_position\.reserved_quantity<v_quantity_delta/);
