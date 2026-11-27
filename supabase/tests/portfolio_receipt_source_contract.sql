@@ -25,14 +25,14 @@ BEGIN
     IF to_regclass('public.' || item.table_name) IS NULL THEN
       RAISE EXCEPTION 'Portfolio receipt source table is missing: %', item.table_name;
     END IF;
-    SELECT array_agg(u.column_name ORDER BY required.column_name)
+    SELECT array_agg(u.column_name ORDER BY u.column_name)
       INTO missing_columns
       FROM unnest(item.columns_required) AS u(column_name)
      WHERE NOT EXISTS (
        SELECT 1 FROM information_schema.columns c
         WHERE c.table_schema='public'
           AND c.table_name=item.table_name
-          AND c.column_name=required.column_name
+          AND c.column_name=u.column_name
      );
     IF missing_columns IS NOT NULL THEN
       RAISE EXCEPTION 'Portfolio receipt source %.% missing columns: %',
