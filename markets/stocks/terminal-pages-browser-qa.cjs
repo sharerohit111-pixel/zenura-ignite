@@ -29,8 +29,9 @@ const {chromium}=require("playwright");
     await page.waitForFunction(value=>document.body.dataset.terminalPage===value,route);
     assert.equal(await page.locator(selector).isVisible(),true,route+" page must show its own panel");
     assert.equal(await page.locator('nav.terminal-nav [data-terminal-page="'+route+'"]').getAttribute("aria-current"),"page",route+" nav item must be current");
-    const overflow=await page.evaluate(()=>document.documentElement.scrollWidth>window.innerWidth+1);
-    assert.equal(overflow,false,viewport.name+" horizontal overflow on "+route);
+    const overflow=await page.evaluate(()=>({hasOverflow:document.documentElement.scrollWidth>window.innerWidth+1,scrollWidth:document.documentElement.scrollWidth,innerWidth:window.innerWidth,offenders:[...document.querySelectorAll("body *")].map(el=>({tag:el.tagName,id:el.id,cls:typeof el.className==="string"?el.className:"",left:Math.round(el.getBoundingClientRect().left),right:Math.round(el.getBoundingClientRect().right),width:Math.round(el.getBoundingClientRect().width)})).filter(x=>x.right>window.innerWidth+1||x.left< -1).slice(0,12)}));
+    if(overflow.hasOverflow) console.log(JSON.stringify({viewport:viewport.name,route,overflow}));
+    assert.equal(overflow.hasOverflow,false,viewport.name+" horizontal overflow on "+route);
    }
    await page.locator('nav.terminal-nav [data-terminal-page="balance"]').click();
    assert.equal(await page.locator(".paper-ticket-controls").isVisible(),false,"wallet must not expose order-entry controls");
