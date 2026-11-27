@@ -82,10 +82,14 @@ DECLARE
   v_quantity integer;
   v_reserved integer;
   v_cost bigint;
+  v_full_execution_id text:=md5(gen_random_uuid()::text)||md5(gen_random_uuid()::text);
+  v_full_fingerprint text:=md5(gen_random_uuid()::text)||md5(gen_random_uuid()::text);
+  v_partial_execution_id text:=md5(gen_random_uuid()::text)||md5(gen_random_uuid()::text);
+  v_partial_fingerprint text:=md5(gen_random_uuid()::text)||md5(gen_random_uuid()::text);
 BEGIN
   v_full:=public.execute_paper_equity_protective_fill(
     'a1111111-1111-4111-8111-111111111111',
-    repeat('1',64),repeat('2',64),9000,v_now,v_now
+    v_full_execution_id,v_full_fingerprint,9000,v_now,v_now
   );
   IF v_full->>'status'<>'FILLED' THEN
     RAISE EXCEPTION 'Fully reserved protective exit did not fill: %',v_full;
@@ -107,7 +111,7 @@ BEGIN
     RAISE EXCEPTION 'Full-position account cash/P&L did not reconcile';
   END IF;
   IF NOT EXISTS(SELECT 1 FROM public.paper_orders
-      WHERE order_id=repeat('1',64)
+      WHERE order_id=v_full_execution_id
         AND charges_paise=(v_full->>'charges_paise')::bigint
         AND cash_delta_paise=(v_full->>'cash_delta_paise')::bigint
         AND realized_pnl_paise=(v_full->>'realized_pnl_paise')::bigint) THEN
@@ -116,7 +120,7 @@ BEGIN
 
   v_partial:=public.execute_paper_equity_protective_fill(
     'b2222222-2222-4222-8222-222222222222',
-    repeat('3',64),repeat('4',64),9000,v_now,v_now
+    v_partial_execution_id,v_partial_fingerprint,9000,v_now,v_now
   );
   IF v_partial->>'status'<>'FILLED' THEN
     RAISE EXCEPTION 'Protective fill with other reserved shares did not fill: %',v_partial;
@@ -138,7 +142,7 @@ BEGIN
     RAISE EXCEPTION 'Partial protective account cash/P&L did not reconcile';
   END IF;
   IF NOT EXISTS(SELECT 1 FROM public.paper_orders
-      WHERE order_id=repeat('3',64)
+      WHERE order_id=v_partial_execution_id
         AND charges_paise=(v_partial->>'charges_paise')::bigint
         AND cash_delta_paise=(v_partial->>'cash_delta_paise')::bigint
         AND realized_pnl_paise=(v_partial->>'realized_pnl_paise')::bigint) THEN
