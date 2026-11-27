@@ -1,0 +1,35 @@
+name: Firebase Supabase role-claim backfill tests
+
+on:
+  pull_request:
+    paths:
+      - "functions/lib/supabase-role-claim-backfill.js"
+      - "functions/backfill-supabase-role-claims.js"
+      - "functions/supabase-auth-claims.js"
+      - "functions/index.js"
+      - "functions/test/supabase-role-claim-backfill.test.js"
+      - ".github/workflows/firebase-supabase-role-claim-tests.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  role-claim-backfill-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Check backfill utility and trigger syntax
+        run: |
+          node --check functions/backfill-supabase-role-claims.js
+          node --check functions/supabase-auth-claims.js
+          node --check functions/index.js
+      - name: Install Firebase Functions runtime dependencies
+        run: npm install --prefix functions --ignore-scripts --no-audit --no-fund
+      - name: Verify Firebase Auth trigger registration
+        run: node -e "const exports = require('./functions/supabase-auth-claims.js'); if (typeof exports.assignSupabaseRoleClaimOnUserCreate !== 'function') throw new Error('Firebase Auth onCreate trigger did not register');"
+      - name: Run role-claim backfill and trigger unit tests
+        run: node --test functions/test/supabase-role-claim-backfill.test.js

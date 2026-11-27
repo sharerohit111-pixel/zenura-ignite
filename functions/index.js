@@ -160,3 +160,6 @@ exports.authorizePaperOrder=onCall({region:"asia-south1"},async req=>{
 // Mega Kirana callable backend modules. Registered for the production Functions deploy; backend module export verified.
 Object.assign(exports, require("./kirana"));
 Object.assign(exports, require("./kirana-ledger"));
+
+// Supabase Firebase third-party Auth role claim (inert until the readiness flag is enabled).
+Object.assign(exports, require("./supabase-auth-claims"));
