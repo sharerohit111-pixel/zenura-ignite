@@ -14,8 +14,10 @@ test("fresh quote accepts exact age boundary",()=>{
   assert.equal(isFreshQuote(NOW-15000,15000,NOW),true);
   assert.equal(isFreshQuote(NOW-15001,15000,NOW),false);
 });
-test("fresh quote allows only five seconds of future clock skew",()=>{
-  assert.equal(isFreshQuote(NOW+5000,15000,NOW),true);
+test("fresh quote rejects every future timestamp consistently",()=>{
+  assert.equal(isFreshQuote(NOW,15000,NOW),true);
+  assert.equal(isFreshQuote(NOW+1,15000,NOW),false);
+  assert.equal(isFreshQuote(NOW+5000,15000,NOW),false);
   assert.equal(isFreshQuote(NOW+5001,15000,NOW),false);
 });
 test("different endpoints can apply different maximum ages",()=>{
