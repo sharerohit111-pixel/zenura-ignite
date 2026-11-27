@@ -28,6 +28,7 @@ function createAngelOneStreamLifecycle({
   let generation = 0;
   let reconnectAttempts = 0;
   let nextReconnectAtMs = null;
+  let connectedAtMs = null;
   let lastHeartbeatSentAtMs = null;
   let lastHeartbeatAckAtMs = null;
   let subscriptions = [];
@@ -62,7 +63,8 @@ function createAngelOneStreamLifecycle({
     if (state !== "connecting") fail("Angel One open event arrived in an invalid state.");
     state = "connected";
     nextReconnectAtMs = null;
-    lastHeartbeatSentAtMs = now();
+    connectedAtMs = now();
+    lastHeartbeatSentAtMs = null;
     lastHeartbeatAckAtMs = null;
     return Object.freeze({
       generation,
@@ -72,7 +74,8 @@ function createAngelOneStreamLifecycle({
   }
 
   function heartbeatDue() {
-    return state === "connected" && now() - lastHeartbeatSentAtMs >= heartbeatIntervalMs;
+    const baseline = lastHeartbeatSentAtMs === null ? connectedAtMs : lastHeartbeatSentAtMs;
+    return state === "connected" && baseline !== null && now() - baseline >= heartbeatIntervalMs;
   }
 
   function heartbeatExpired() {
@@ -110,6 +113,7 @@ function createAngelOneStreamLifecycle({
     if (state !== "connected" && state !== "connecting") {
       fail("Angel One transport failure arrived in an invalid state.");
     }
+    connectedAtMs = null;
     lastHeartbeatSentAtMs = null;
     lastHeartbeatAckAtMs = null;
     reconnectAttempts += 1;
@@ -135,6 +139,7 @@ function createAngelOneStreamLifecycle({
     state = "closed";
     generation += 1;
     nextReconnectAtMs = null;
+    connectedAtMs = null;
     lastHeartbeatSentAtMs = null;
     lastHeartbeatAckAtMs = null;
     return Object.freeze({ state, generation });
@@ -158,6 +163,7 @@ function createAngelOneStreamLifecycle({
         generation,
         reconnectAttempts,
         nextReconnectAtMs,
+        connectedAtMs,
         lastHeartbeatSentAtMs,
         lastHeartbeatAckAtMs,
         subscriptionCount: subscriptions.length,
