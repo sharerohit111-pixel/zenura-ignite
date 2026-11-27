@@ -110,7 +110,9 @@ test("authenticated wallet and empty portfolio APIs return only the caller's acc
   global.fetch = (input, init) => {
     const rawUrl = typeof input === "string" ? input : input.url;
     if (rawUrl.startsWith(supabaseOrigin)) {
-      return nativeFetch(rawUrl.replace(supabaseOrigin, `http://127.0.0.1:${supabasePort}`), init);
+      const localUrl = rawUrl.replace(supabaseOrigin, `http://127.0.0.1:${supabasePort}`);
+      const localInput = input instanceof Request ? new Request(localUrl, input) : localUrl;
+      return nativeFetch(localInput, init);
     }
     return nativeFetch(input, init);
   };
