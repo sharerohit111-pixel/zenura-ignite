@@ -10,7 +10,7 @@
     watchlist:[".workspace"],
     balance:[".workspace",".paper-order-book"],
     orders:[".paper-order-book",".protective-orders-panel"],
-    history:[".paper-order-book"],
+    history:[".paper-order-book",".portfolio-panel"],
     positions:[".portfolio-panel",".futures-portfolio-panel"],
     pnl:[".portfolio-panel"],
     derivatives:[".futures-margin-panel",".futures-order-panel",".futures-limit-panel",".futures-portfolio-panel",".options-limit-panel",".option-panel"],
@@ -43,6 +43,12 @@
     const show={chart:["chart-panel","order-panel"],watchlist:["watch"],balance:["order-panel"]}[page]||[];
     [...workspace.children].forEach(el=>el.dataset.pageHidden=String(!show.includes([...el.classList].find(c=>["watch","chart-panel","order-panel"].includes(c)))));
   }
+  function configureWallet(page){
+    const panel=document.querySelector(".order-panel");
+    if(!panel)return;
+    const walletChildren=new Set([0,2,7]);
+    [...panel.children].forEach((el,index)=>{el.dataset.pageHidden=String(page==="balance"?!walletChildren.has(index):false);});
+  }
   function configureOrderBook(page){
     const book=document.querySelector(".paper-order-book");
     if(!book)return;
@@ -60,17 +66,19 @@
     const children=[...panel.children];
     const pnlIndices=new Set([0,1,2,3,5,6]);
     const positionIndices=new Set([0,2,4,7,8,9,10]);
+    const historyIndices=new Set([5,6,9,10]);
     children.forEach((el,i)=>{
-      const visible=page==="pnl"?pnlIndices.has(i):page==="positions"?positionIndices.has(i):true;
+      const visible=page==="pnl"?pnlIndices.has(i):page==="positions"?positionIndices.has(i):page==="history"?historyIndices.has(i):true;
       el.dataset.pageHidden=String(!visible);
     });
-    panel.querySelectorAll(".portfolio-metrics").forEach(el=>el.dataset.pageHidden=String(page==="positions"));
+    panel.querySelectorAll(".portfolio-metrics").forEach(el=>el.dataset.pageHidden=String(page==="positions"||page==="history"));
   }
   function show(page,updateHash){
     if(!pageSections[page])page="dashboard";
     document.body.dataset.terminalPage=page;
     pageElements.forEach(sel=>setHidden(sel,!pageSections[page].includes(sel)));
     configureWorkspace(page);
+    configureWallet(page);
     configureOrderBook(page);
     configurePortfolio(page);
     links.forEach(a=>{const active=a.dataset.terminalPage===page;if(active)a.setAttribute("aria-current","page");else a.removeAttribute("aria-current");});
