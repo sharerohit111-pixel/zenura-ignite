@@ -98,3 +98,19 @@ test("converts only exact positive paise precision", () => {
   assert.equal(rupeesToPaise(123.456), null);
   assert.equal(rupeesToPaise(0), null);
 });
+
+test("accepts the initial Upstox V3 market_info control frame without emitting a quote", () => {
+  const control = {
+    type: "market_info",
+    currentTs: String(NOW - 100),
+    marketInfo: {
+      segmentStatus: { NSE_EQ: "NORMAL_OPEN", BSE_EQ: "NORMAL_OPEN" },
+      casMarketStatus: {},
+      preOpenSessionStatus: {},
+    },
+  };
+  assert.deepEqual(normalizeUpstoxFeedQuotes(control, { instrumentMap: mapping, now: NOW }), []);
+  assert.throws(() => normalizeUpstoxFeedQuotes({
+    type: "market_info", currentTs: String(NOW), marketInfo: {},
+  }, { instrumentMap: mapping, now: NOW }), /market-info control frame is malformed/);
+});

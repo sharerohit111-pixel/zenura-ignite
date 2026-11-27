@@ -2,6 +2,7 @@
 
 const { assertMarketDataProvider, normalizeMarketDataSnapshot } = require("./market-data-provider-contract");
 const { hasPaperTradingMarketDataRights } = require("./provider-paper-trading-policy");
+const { assertMarketDataRightsApproved } = require("./market-data-rights-gate");
 
 const CAPABILITIES = Object.freeze(["quote", "candles", "depth", "instrumentMaster", "stream"]);
 const TRANSIENT_STATUSES = new Set([408, 425, 429, 500, 502, 503, 504]);
@@ -145,6 +146,9 @@ class MarketDataProviderRouter {
       capability === "stream" ? "openStream" :
       capability === "candles" ? "getCandles" :
       capability === "depth" ? "getDepth" : "getQuote";
+    // The generic router must independently enforce both global documentary
+    // approvals; caller-supplied entitlement fields are not a substitute.
+    assertMarketDataRightsApproved(process.env);
     const nowMs = this.clock();
 
     for (const providerId of this.plan[capability]) {

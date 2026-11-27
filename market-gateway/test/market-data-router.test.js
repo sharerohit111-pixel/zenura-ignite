@@ -6,6 +6,10 @@ const { MarketDataProviderRouter, validateProviderPlan } = require("../lib/marke
 const { ProviderRateLimitPolicy } = require("../lib/provider-rate-limit");
 
 const NOW = 1_800_000_000_000;
+process.env.MARKET_DATA_RIGHTS_APPROVED = "true";
+process.env.MARKET_DATA_RIGHTS_REFERENCE = "test-only-provider-rights";
+process.env.MARKET_DATA_REGULATORY_APPROVED = "true";
+process.env.MARKET_DATA_REGULATORY_REFERENCE = "test-only-product-clearance";
 const plan = {
   quote: ["upstox", "angelone"],
   candles: ["upstox"],
@@ -48,6 +52,37 @@ function makeRouter(providers, entitlementResolver = async ({ providerId }) => (
   });
 }
 const request = { userId: "user-1", instrumentId: "NSE_EQ|INE002A01018", exchange: "NSE" };
+
+
+test("global dual approval gate cannot be replaced by a caller-supplied no-op", async () => {
+  const previous = {
+    rights: process.env.MARKET_DATA_RIGHTS_APPROVED,
+    rightsReference: process.env.MARKET_DATA_RIGHTS_REFERENCE,
+    regulatory: process.env.MARKET_DATA_REGULATORY_APPROVED,
+    regulatoryReference: process.env.MARKET_DATA_REGULATORY_REFERENCE,
+  };
+  process.env.MARKET_DATA_RIGHTS_APPROVED = "false";
+  let resolverCalls = 0;
+  let providerCalls = 0;
+  const upstream = provider("upstox", async () => { providerCalls += 1; return quote("upstox"); });
+  const router = new MarketDataProviderRouter({
+    providers: new Map([["upstox", upstream]]),
+    plan,
+    entitlementResolver: async () => { resolverCalls += 1; return { approved: true, paperTradingAllowed: true, redistributionAllowed: true, reference: "fabricated", rightsApprovalReference: "fabricated", regulatoryApprovalReference: "fabricated" }; },
+    rightsGate: () => ({ rightsReference: "caller-supplied", regulatoryReference: "caller-supplied" }),
+    clock: () => NOW,
+  });
+  try {
+    await assert.rejects(router.route("quote", {}, request), { code: "market_data_rights_not_approved", status: 503 });
+    assert.equal(resolverCalls, 0);
+    assert.equal(providerCalls, 0);
+  } finally {
+    process.env.MARKET_DATA_RIGHTS_APPROVED = previous.rights;
+    process.env.MARKET_DATA_RIGHTS_REFERENCE = previous.rightsReference;
+    process.env.MARKET_DATA_REGULATORY_APPROVED = previous.regulatory;
+    process.env.MARKET_DATA_REGULATORY_REFERENCE = previous.regulatoryReference;
+  }
+});
 
 test("provider plan requires ordered, non-empty, unique provider ids", () => {
   assert.deepEqual(validateProviderPlan(plan).quote, ["upstox", "angelone"]);

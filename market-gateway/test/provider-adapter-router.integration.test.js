@@ -6,9 +6,13 @@ const {MarketDataProviderRouter}=require("../lib/market-data-provider-router");
 const {ProviderHealthRegistry}=require("../lib/provider-health-registry");
 const {createUpstoxMarketDataAdapter}=require("../lib/provider-market-data-adapters");
 const NOW=Date.parse("2026-11-24T04:30:00Z");
+process.env.MARKET_DATA_RIGHTS_APPROVED="true";
+process.env.MARKET_DATA_RIGHTS_REFERENCE="test-only-provider-rights";
+process.env.MARKET_DATA_REGULATORY_APPROVED="true";
+process.env.MARKET_DATA_REGULATORY_REFERENCE="test-only-product-clearance";
 const args={userId:"user-1",instrumentId:"NSE_EQ|INE002A01018",exchange:"NSE",entitlementReference:"entitlement-upstox"};
 function client(){
- const native={instrumentKey:args.instrumentId};
+ const native={instrumentKey:args.instrumentId,exchange:"NSE"};
  const entry={instrument_token:native.instrumentKey,last_price:123.45,timestamp:new Date(NOW-200).toISOString(),last_trade_time:String(NOW-300),depth:{buy:[{price:123.4,quantity:10}],sell:[{price:123.5,quantity:12}]}};
  return {
   getHealth:async()=>({healthy:true}),
@@ -21,7 +25,7 @@ function client(){
  };
 }
 test("provider-neutral router accepts normalized Upstox quote, candles, depth, master and stream",async()=>{
- const adapter=createUpstoxMarketDataAdapter({client:client(),resolveInstrument:async()=>({instrumentKey:args.instrumentId}),now:()=>NOW});
+ const adapter=createUpstoxMarketDataAdapter({client:client(),resolveInstrument:async()=>({instrumentKey:args.instrumentId,exchange:"NSE"}),now:()=>NOW});
  const router=new MarketDataProviderRouter({
   providers:new Map([["upstox",adapter]]),
   plan:{quote:["upstox"],candles:["upstox"],depth:["upstox"],instrumentMaster:["upstox"],stream:["upstox"]},

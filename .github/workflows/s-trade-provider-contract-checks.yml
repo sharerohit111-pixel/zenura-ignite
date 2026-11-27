@@ -4,13 +4,20 @@ on:
   push:
     branches:
       - feature/s-trade-multi-provider-market-data-2026-11-24
+      - feature/s-trade-indian-market-data-compliance-gate-2026-11-26
     paths:
       - "market-gateway/lib/*provider-contract.js"
       - "market-gateway/lib/provider-market-data-adapters.js"
       - "market-gateway/lib/upstox-stream-normalizer.js"
+      - "market-gateway/lib/angelone-stream-lifecycle.js"
+      - "market-gateway/test/angelone-stream-lifecycle.test.js"
+      - "market-gateway/lib/upstox-stream-session.js"
+      - "market-gateway/test/upstox-stream-session.test.js"
       - "market-gateway/lib/upstox-feed-decoder.js"
       - "market-gateway/lib/angelone-stream-decoder.js"
       - "market-gateway/test/angelone-stream-decoder.test.js"
+      - "market-gateway/lib/angelone-stream-lifecycle.js"
+      - "market-gateway/test/angelone-stream-lifecycle.test.js"
       - "market-gateway/test/upstox-feed-decoder.test.js"
       - "market-gateway/test/upstox-stream-normalizer.test.js"
       - "market-gateway/test/provider-market-data-adapters.test.js"
@@ -22,6 +29,8 @@ on:
       - "market-gateway/lib/market-data-rights-gate.js"
       - "market-gateway/supabase-server.js"
       - "market-gateway/test/market-data-rights-gate.test.js"
+      - "market-gateway/test/market-data-distribution-compliance.test.js"
+      - "market-gateway/test/market-data-instruments-route-compliance.test.js"
       - ".github/workflows/deploy-supabase-market-gateway.yml"
       - "market-gateway/lib/provider-rate-limit.js"
       - "market-gateway/lib/provider-health-registry.js"
@@ -42,6 +51,7 @@ on:
   pull_request:
     branches:
       - feature/s-trade-upstox-oauth-market-data-security-2026-11-23
+      - feature/s-trade-multi-provider-market-data-2026-11-24
     paths:
       - "market-gateway/lib/*provider-contract.js"
       - "market-gateway/lib/provider-market-data-adapters.js"
@@ -51,6 +61,15 @@ on:
       - "market-gateway/test/provider-market-data-adapters.test.js"
       - "market-gateway/test/upstox-stream-normalizer.test.js"
       - "market-gateway/lib/market-data-provider-router.js"
+      - "market-gateway/lib/provider-paper-trading-policy.js"
+      - "market-gateway/lib/market-data-rights-gate.js"
+      - "market-gateway/supabase-server.js"
+      - "market-gateway/test/market-data-rights-gate.test.js"
+      - "market-gateway/test/provider-paper-trading-policy.test.js"
+      - "market-gateway/test/market-data-distribution-compliance.test.js"
+      - "market-gateway/test/market-data-instruments-route-compliance.test.js"
+      - "market-gateway/MARKET-DATA-COMPLIANCE.md"
+      - ".github/workflows/s-trade-provider-contract-checks.yml"
       - "market-gateway/lib/provider-rate-limit.js"
       - "market-gateway/lib/provider-health-registry.js"
       - "market-gateway/lib/distributed-provider-rate-limit.js"
@@ -87,14 +106,17 @@ jobs:
           node --check market-gateway/lib/market-data-provider-router.js
           node --check market-gateway/lib/provider-market-data-adapters.js
           node --check market-gateway/lib/upstox-stream-normalizer.js
+          node --check market-gateway/lib/upstox-stream-session.js
           node --check market-gateway/lib/upstox-feed-decoder.js
           node --check market-gateway/lib/angelone-stream-decoder.js
+          node --check market-gateway/lib/angelone-stream-lifecycle.js
           node --check market-gateway/lib/provider-paper-trading-policy.js
           node --check market-gateway/lib/market-data-rights-gate.js
           node --check market-gateway/supabase-server.js
+          node --check market-gateway/test/market-data-instruments-route-compliance.test.js
           node --check market-gateway/lib/provider-rate-limit.js
           node --check market-gateway/lib/provider-health-registry.js
           node --check market-gateway/lib/distributed-provider-rate-limit.js
           node --check market-gateway/lib/instrument-identity.js
       - name: Run provider contract, routing, outage, health and distributed quota tests
-        run: node --test market-gateway/test/provider-contract.test.js market-gateway/test/provider-market-data-adapters.test.js market-gateway/test/upstox-stream-normalizer.test.js market-gateway/test/upstox-feed-decoder.test.js market-gateway/test/angelone-stream-decoder.test.js market-gateway/test/provider-adapter-router.integration.test.js market-gateway/test/market-data-router.test.js market-gateway/test/provider-paper-trading-policy.test.js market-gateway/test/market-data-rights-gate.test.js market-gateway/test/market-data-shapes.test.js market-gateway/test/provider-health-registry.test.js market-gateway/test/distributed-provider-rate-limit.test.js market-gateway/test/instrument-identity.test.js
+        run: node --test market-gateway/test/provider-contract.test.js market-gateway/test/provider-market-data-adapters.test.js market-gateway/test/upstox-stream-normalizer.test.js market-gateway/test/upstox-stream-session.test.js market-gateway/test/upstox-feed-decoder.test.js market-gateway/test/angelone-stream-decoder.test.js market-gateway/test/angelone-stream-lifecycle.test.js market-gateway/test/provider-adapter-router.integration.test.js market-gateway/test/market-data-router.test.js market-gateway/test/provider-paper-trading-policy.test.js market-gateway/test/market-data-rights-gate.test.js market-gateway/test/market-data-distribution-compliance.test.js market-gateway/test/market-data-instruments-route-compliance.test.js market-gateway/test/market-data-shapes.test.js market-gateway/test/provider-health-registry.test.js market-gateway/test/distributed-provider-rate-limit.test.js market-gateway/test/instrument-identity.test.js

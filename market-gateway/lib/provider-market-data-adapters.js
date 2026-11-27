@@ -71,14 +71,19 @@ function normalizeCandles(rows) {
     return { timestampMs:t, openPaise:open, highPaise:high, lowPaise:low, closePaise:close, volume };
   });
 }
-function requireNativeInstrument(native, providerId) {
+function requireNativeInstrument(native, providerId, expectedExchange) {
   if (!native || typeof native !== "object" || Array.isArray(native)) fail(providerId + " instrument mapping is missing.");
+  if (!["NSE", "BSE"].includes(expectedExchange) || !["NSE", "BSE"].includes(native.exchange)) {
+    fail(providerId + " instrument mapping is missing or has an unsupported exchange.");
+  }
+  if (native.exchange !== expectedExchange) {
+    fail(providerId + " native instrument exchange does not match the requested exchange.", "instrument_mismatch");
+  }
   if (providerId === "upstox" &&
       (typeof native.instrumentKey !== "string" || !native.instrumentKey.trim())) fail("Upstox instrument mapping is missing.");
   if (providerId === "angelone" &&
       (typeof native.symbolToken !== "string" || !native.symbolToken.trim() ||
-       typeof native.exchangeSegment !== "string" || !native.exchangeSegment.trim() ||
-       typeof native.exchange !== "string" || !native.exchange.trim())) fail("Angel One instrument mapping is missing.");
+       typeof native.exchangeSegment !== "string" || !native.exchangeSegment.trim())) fail("Angel One instrument mapping is missing.");
   return native;
 }
 function makeBase(providerId, client, resolveInstrument, now) {
@@ -108,7 +113,7 @@ function makeBase(providerId, client, resolveInstrument, now) {
         generatedAtMs:now(), sourceReference:providerId+"-instrument-master", instruments };
     },
     async openStream(args) {
-      const nativeInstrument=requireNativeInstrument(await resolveInstrument(args),providerId);
+      const nativeInstrument=requireNativeInstrument(await resolveInstrument(args),providerId,args.exchange);
       const stream=await client.openStream({ ...args, nativeInstrument });
       if (!stream || typeof stream.close !== "function" ||
           (typeof stream.subscribe !== "function" && typeof stream[Symbol.asyncIterator] !== "function")) {
@@ -123,8 +128,7 @@ function makeBase(providerId, client, resolveInstrument, now) {
 function createUpstoxMarketDataAdapter({ client, resolveInstrument, now=()=>Date.now(), maxAgeMs=15000 }) {
   const base=makeBase("upstox",client,resolveInstrument,now);
   async function read(args) {
-    const native=await resolveInstrument(args);
-    if (!native || typeof native.instrumentKey !== "string" || !native.instrumentKey) fail("Upstox instrument mapping is missing.");
+    const native=requireNativeInstrument(await resolveInstrument(args),"upstox",args.exchange);
     return { native, payload:await client.getQuote({ instrumentKey:native.instrumentKey }) };
   }
   return Object.freeze({
@@ -156,7 +160,7 @@ function createUpstoxMarketDataAdapter({ client, resolveInstrument, now=()=>Date
         timestampMs, sourceSequence:"upstox:"+native.instrumentKey+":"+timestampMs, bids, asks };
     },
     async getCandles(args) {
-      const native=requireNativeInstrument(await resolveInstrument(args), "upstox");
+      const native=requireNativeInstrument(await resolveInstrument(args), "upstox", args.exchange);
       const payload=await client.getCandles({ ...args, instrumentKey:native.instrumentKey });
       if (!payload || payload.status!=="success" || !Array.isArray(payload.data?.candles)) fail("Upstox historical candles response is unsuccessful.");
       return { providerId:"upstox", instrumentId:args.instrumentId, exchange:args.exchange,
@@ -169,9 +173,7 @@ function createUpstoxMarketDataAdapter({ client, resolveInstrument, now=()=>Date
 function createAngelOneMarketDataAdapter({ client, resolveInstrument, now=()=>Date.now(), maxAgeMs=15000 }) {
   const base=makeBase("angelone",client,resolveInstrument,now);
   async function read(args, mode="FULL") {
-    const native=await resolveInstrument(args);
-    if (!native || typeof native.symbolToken !== "string" || !native.symbolToken ||
-        typeof native.exchangeSegment !== "string" || !native.exchangeSegment) fail("Angel One instrument mapping is missing.");
+    const native=requireNativeInstrument(await resolveInstrument(args),"angelone",args.exchange);
     const payload=await client.getQuote({ mode, exchangeTokens:{ [native.exchangeSegment]:[native.symbolToken] } });
     if (!payload || payload.status!==true || !Array.isArray(payload.data?.fetched)) fail("Angel One market-data response is unsuccessful.");
     const entry=payload.data.fetched.find(x=>String(x.symbolToken)===native.symbolToken && x.exchange===native.exchange);
@@ -202,7 +204,7 @@ function createAngelOneMarketDataAdapter({ client, resolveInstrument, now=()=>Da
         timestampMs, sourceSequence:"angelone:"+entry.symbolToken+":"+timestampMs, bids, asks };
     },
     async getCandles(args) {
-      const native=requireNativeInstrument(await resolveInstrument(args), "angelone");
+      const native=requireNativeInstrument(await resolveInstrument(args), "angelone", args.exchange);
       const payload=await client.getCandles({ ...args, exchange:native.exchange, symbolToken:native.symbolToken });
       if (!payload || payload.status!==true || !Array.isArray(payload.data)) fail("Angel One historical candle response is unsuccessful.");
       return { providerId:"angelone", instrumentId:args.instrumentId, exchange:args.exchange,

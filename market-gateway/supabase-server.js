@@ -120,6 +120,10 @@ function validDate(value){
   return !Number.isNaN(d.getTime())&&d.toISOString().slice(0,10)===value;
 }
 const refreshInstrumentCache=createSingleFlight(async()=>{
+  // The instrument master is exchange-derived reference data, not public-domain
+  // content. Require the same documentary rights and regulatory gate before
+  // downloading or retaining it, including internal worker refreshes.
+  assertMarketDataRightsApproved(process.env);
   const now=Date.now();
   if(instrumentRefreshLastAttemptAt&&now-instrumentRefreshLastAttemptAt<30000)
     throw new Error("Upstox instrument master refresh is cooling down after a recent attempt.");
@@ -131,6 +135,14 @@ const refreshInstrumentCache=createSingleFlight(async()=>{
     throw new Error("Unexpected Upstox instrument master format");
   instrumentCache=parsed;instrumentCacheUpdatedAt=Date.now();return instrumentCache.length;
 });
+async function ensureInstrumentCacheAvailable(){
+  // Recheck rights on every read, not only when a refresh is required. This
+  // prevents a warm in-memory cache from surviving approval revocation.
+  assertMarketDataRightsApproved(process.env);
+  if(!instrumentCache.length||Date.now()-instrumentCacheUpdatedAt>6*60*60*1000)
+    await refreshInstrumentCache();
+  return instrumentCache;
+}
 async function loadProto(){
   const root=await protobuf.load(path.join(__dirname,"proto","MarketDataFeedV3.proto"));
   FeedResponse=root.lookupType("com.upstox.marketdatafeederv3udapi.rpc.proto.FeedResponse");
@@ -255,7 +267,10 @@ app.delete("/upstox/connection",async(req,res)=>{
 
 app.get("/instruments",async(req,res)=>{
   try{
-    if(!instrumentCache.length||Date.now()-instrumentCacheUpdatedAt>6*60*60*1000)await refreshInstrumentCache();
+    // Never expose exchange-derived reference data publicly or anonymously.
+    await auth(req);
+    assertMarketDataRightsApproved(process.env);
+    await ensureInstrumentCacheAvailable();
     const kind=String(req.query.kind||"all").toLowerCase(),exchange=String(req.query.exchange||"").toUpperCase();
     const q=String(req.query.q||"").trim().toLowerCase().slice(0,60);
     const limit=Math.min(Math.max(Number.parseInt(req.query.limit||"50",10)||50,1),100);
@@ -274,7 +289,7 @@ app.get("/instruments",async(req,res)=>{
       lot_size:item.lot_size??null,tick_size:item.tick_size??null,
       underlying_symbol:item.underlying_symbol??null
     }));
-    res.set("Cache-Control","public, max-age=60").json({source:"Upstox BOD instrument master",updatedAt:instrumentCacheUpdatedAt,count:matches.length,results:matches});
+    res.set("Cache-Control","private, no-store").json({source:"Upstox BOD instrument master",updatedAt:instrumentCacheUpdatedAt,count:matches.length,results:matches});
   }catch(error){sendError(res,error,"Official instrument master is temporarily unavailable.");}
 });
 app.get("/candles",async(req,res)=>{
@@ -293,7 +308,7 @@ app.get("/candles",async(req,res)=>{
       const maxDays=unit==="minutes"?(interval<=15?31:92):unit==="hours"?92:unit==="days"?3653:Infinity;
       if(days>maxDays)return res.status(400).json({error:"Requested date range exceeds the supported historical window."});
     }
-    if(!instrumentCache.length||Date.now()-instrumentCacheUpdatedAt>6*60*60*1000)await refreshInstrumentCache();
+    await ensureInstrumentCacheAvailable();
     if(!instrumentCache.some(item=>item.instrument_key===instrumentKey))return res.status(400).json({error:"Instrument key is not present in the official instrument master."});
     const {token}=await getUpstoxAccessToken(user.id);
     const parts=[encodeURIComponent(instrumentKey),unit,String(interval),encodeURIComponent(toDate)];
@@ -310,7 +325,7 @@ app.get("/option-chain",async(req,res)=>{
     if(!instrumentKey||instrumentKey.length>100||/[\r\n]/.test(instrumentKey))return res.status(400).json({error:"A valid underlying instrument_key is required."});
     const relative=["current_week","next_week","far_week","current_month","next_month","far_month"];
     if(!relative.includes(expiry)&&!validDate(expiry))return res.status(400).json({error:"expiry_date must be YYYY-MM-DD or a supported expiry keyword."});
-    if(!instrumentCache.length||Date.now()-instrumentCacheUpdatedAt>6*60*60*1000)await refreshInstrumentCache();
+    await ensureInstrumentCacheAvailable();
     const underlying=instrumentCache.find(item=>item.instrument_key===instrumentKey);
     if(!underlying||!["NSE_INDEX","BSE_INDEX","NSE_EQ","BSE_EQ"].includes(underlying.segment))return res.status(400).json({error:"Select a verified NSE/BSE equity or index underlying."});
     const {token}=await getUpstoxAccessToken(user.id);
@@ -352,7 +367,7 @@ function publicInstrument(item){return {instrument_key:item.instrument_key,segme
 app.get("/watchlists",async(req,res)=>{
   try{
     const {user,userDb}=await auth(req),watchlists=await readWatchlists(userDb,user.id);
-    if(!instrumentCache.length||Date.now()-instrumentCacheUpdatedAt>6*60*60*1000)await refreshInstrumentCache();
+    await ensureInstrumentCacheAvailable();
     const mapped={};for(const name of WATCHLIST_NAMES)mapped[name]=watchlists[name].map(key=>instrumentCache.find(x=>x.instrument_key===key)).filter(Boolean).map(publicInstrument);
     res.set("Cache-Control","private, no-store").json({watchlists:mapped,names:WATCHLIST_NAMES,maxItemsPerList:50});
   }catch(error){sendError(res,error,"Watchlists could not be loaded.");}
@@ -360,7 +375,7 @@ app.get("/watchlists",async(req,res)=>{
 app.get("/watchlist",async(req,res)=>{
   try{
     const {user,userDb}=await auth(req),name=watchlistName(req),watchlists=await readWatchlists(userDb,user.id);
-    if(!instrumentCache.length||Date.now()-instrumentCacheUpdatedAt>6*60*60*1000)await refreshInstrumentCache();
+    await ensureInstrumentCacheAvailable();
     const items=watchlists[name].map(key=>instrumentCache.find(x=>x.instrument_key===key)).filter(Boolean).map(publicInstrument);
     res.set("Cache-Control","private, no-store").json({name,items,maxItems:50});
   }catch(error){sendError(res,error,"Watchlist could not be loaded.");}
@@ -370,7 +385,7 @@ app.put("/watchlist",async(req,res)=>{
     const {user,userDb}=await auth(req),name=watchlistName(req),raw=req.body?.instrumentKeys;
     if(!Array.isArray(raw)||raw.length>50||raw.some(x=>typeof x!=="string"||!x||x.length>100))return res.status(400).json({error:"Watchlist must contain up to 50 valid instrument keys."});
     const keys=[...new Set(raw)];
-    if(!instrumentCache.length||Date.now()-instrumentCacheUpdatedAt>6*60*60*1000)await refreshInstrumentCache();
+    await ensureInstrumentCacheAvailable();
     const valid=new Set(instrumentCache.map(x=>x.instrument_key));
     if(keys.some(key=>!valid.has(key)))return res.status(400).json({error:"Watchlist contains an instrument not present in the official instrument master."});
     const {error}=await userDb.from("paper_watchlists").upsert({user_id:user.id,name,instrument_keys:keys,updated_at:new Date().toISOString()},{onConflict:"user_id,name"});
@@ -401,7 +416,7 @@ app.post("/paper/orders",async(req,res)=>{
       limitPricePaise=req.body?.limit_price_paise!==undefined?Number(req.body.limit_price_paise):parseLimitPricePaise(req.body?.limit_price);
       if(!Number.isSafeInteger(limitPricePaise)||limitPricePaise<1)return res.status(400).json({error:"LIMIT orders require a valid positive price in paise."});
     }
-    if(!instrumentCache.length||Date.now()-instrumentCacheUpdatedAt>6*60*60*1000)await refreshInstrumentCache();
+    await ensureInstrumentCacheAvailable();
     const instrument=instrumentCache.find(x=>x.instrument_key===instrumentKey&&x.instrument_type==="EQ"&&["NSE_EQ","BSE_EQ"].includes(x.segment));
     if(!instrument)return res.status(400).json({error:"Select a verified NSE/BSE cash-equity instrument from the official instrument master."});
     const orderId=makeOrderId(user.id,idempotencyKey);
@@ -479,7 +494,7 @@ app.post("/paper/protective-orders",async(req,res)=>{
        ||!Number.isSafeInteger(triggerPricePaise)||triggerPricePaise<1
        ||!Number.isSafeInteger(quantity)||quantity<1||quantity>1000000)
       return res.status(400).json({error:"Invalid equity protective order details."});
-    if(!instrumentCache.length||Date.now()-instrumentCacheUpdatedAt>6*60*60*1000)await refreshInstrumentCache();
+    await ensureInstrumentCacheAvailable();
     const instrument=instrumentCache.find(item=>item.instrument_key===instrumentKey
       &&item.instrument_type==="EQ"&&["NSE_EQ","BSE_EQ"].includes(item.segment));
     if(!instrument)return res.status(400).json({error:"Select a verified NSE/BSE cash equity instrument."});
@@ -542,7 +557,7 @@ app.get("/paper/orders",async(req,res)=>{
 app.get("/paper/portfolio",async(req,res)=>{
   try{
     const {user,userDb}=await auth(req),product=normalizeProductMode(req.query.product);
-    if(!instrumentCache.length||Date.now()-instrumentCacheUpdatedAt>6*60*60*1000)await refreshInstrumentCache();
+    await ensureInstrumentCacheAvailable();
     if(product===null)return res.status(400).json({error:"product must be DELIVERY or INTRADAY."});
     const [{data:account,error:accountError},{data:rows,error:positionError}]=await Promise.all([
       userDb.from("paper_accounts").select("*").eq("user_id",user.id).maybeSingle(),
@@ -565,7 +580,7 @@ app.get("/paper/portfolio",async(req,res)=>{
 app.post("/paper/derivative/margin-preview",async(req,res)=>{
   try{
     const {user,userDb}=await auth(req),{instrumentKey,lots,side,product}=parseMarginPreviewInput(req.body);
-    if(!instrumentCache.length||Date.now()-instrumentCacheUpdatedAt>6*60*60*1000)await refreshInstrumentCache();
+    await ensureInstrumentCacheAvailable();
     const instrument=instrumentCache.find(x=>x.instrument_key===instrumentKey&&x.instrument_type==="FUT"&&["NSE_FO","BSE_FO"].includes(x.segment));
     if(!instrument)return res.status(400).json({error:"Select a verified NSE/BSE futures contract from the official instrument master."});
     // Reject invalid instruments before consuming provider credentials; rate-limit
@@ -634,7 +649,7 @@ app.post("/paper/derivative/limit-orders",async(req,res)=>{
         status:prior.status,idempotentReplay:true,simulationOnly:true
       });
     }
-    if(!instrumentCache.length||Date.now()-instrumentCacheUpdatedAt>6*60*60*1000)await refreshInstrumentCache();
+    await ensureInstrumentCacheAvailable();
     const instrument=instrumentCache.find(x=>x.instrument_key===instrumentKey
       &&x.exchange==="NSE"&&x.segment==="NSE_FO"&&["CE","PE"].includes(x.instrument_type));
     if(!instrument)return res.status(400).json({error:"Select a verified NSE CE/PE contract from the official instrument master."});
@@ -754,7 +769,7 @@ app.post("/paper/derivative/orders",async(req,res)=>{
     if(orderType!=="MARKET")return res.status(400).json({error:"Options LIMIT orders are not supported yet. Only MARKET orders are currently available."});
     if(!isUuid(idempotencyKey))return res.status(400).json({error:"A valid UUID idempotency_key is required."});
     if(!["BUY","SELL"].includes(side))return res.status(400).json({error:"Only BUY and SELL to close existing long CE/PE positions are supported."});
-    if(!instrumentCache.length||Date.now()-instrumentCacheUpdatedAt>6*60*60*1000)await refreshInstrumentCache();
+    await ensureInstrumentCacheAvailable();
     const instrument=instrumentCache.find(x=>x.instrument_key===instrumentKey&&["CE","PE"].includes(x.instrument_type)&&["NSE_FO","BSE_FO"].includes(x.segment));
     if(!instrument)return res.status(400).json({error:"Select a verified NSE/BSE CE/PE contract from the official instrument master."});
     // Resolve contract identity and idempotency before requiring a live quote.
@@ -835,7 +850,7 @@ app.get("/paper/derivatives/portfolio",async(req,res)=>{
 app.get("/watchlist/quotes",async(req,res)=>{
   try{
     const {user,userDb}=await auth(req),name=watchlistName(req),watchlists=await readWatchlists(userDb,user.id),keys=watchlists[name];
-    if(!instrumentCache.length||Date.now()-instrumentCacheUpdatedAt>6*60*60*1000)await refreshInstrumentCache();
+    await ensureInstrumentCacheAvailable();
     if(!keys.length)return res.set("Cache-Control","private, no-store").json({name,quotes:[],status:"empty"});
     const {token}=await getUpstoxAccessToken(user.id);
     const response=await fetchProvider("https://api.upstox.com/v3/market-quote/quotes?"+new URLSearchParams({instrument_key:keys.join(",")}),{headers:{Authorization:"Bearer "+token,Accept:"application/json"}});
@@ -867,7 +882,7 @@ app.post("/paper/futures/orders",async(req,res)=>{
     const limitPricePaise=orderType==="LIMIT"?Number(req.body?.limit_price_paise):null;
     if(orderType==="LIMIT"&&(!Number.isSafeInteger(limitPricePaise)||limitPricePaise<=0))return res.status(400).json({error:"LIMIT orders require a positive integer limit_price_paise."});
     if(!["BUY","SELL"].includes(side)||product===null)return res.status(400).json({error:"Choose BUY/SELL and a valid Intraday/Delivery futures product."});
-    if(!instrumentCache.length||Date.now()-instrumentCacheUpdatedAt>6*60*60*1000)await refreshInstrumentCache();
+    await ensureInstrumentCacheAvailable();
     const instrument=instrumentCache.find(x=>x.instrument_key===instrumentKey&&x.instrument_type==="FUT"&&["NSE_FO","BSE_FO"].includes(x.segment));
     if(!instrument)return res.status(400).json({error:"Select a verified NSE/BSE futures contract from the official instrument master."});
     // Resolve the immutable contract metadata first. A retry of an already-filled
@@ -1113,7 +1128,7 @@ app.post("/stream",async(req,res)=>{
       onLost:()=>finishStream("Live market stream lease expired. Reconnect to continue.","stream_lease_expired"),
       onError:()=>finishStream("Live market stream lease could not be renewed.","stream_lease_renewal_failed")
     });
-    if(!instrumentCache.length||Date.now()-instrumentCacheUpdatedAt>6*60*60*1000)await refreshInstrumentCache();
+    await ensureInstrumentCacheAvailable();
     const keys=validateStreamInstrumentKeys(req.body?.instrumentKeys,instrumentCache.map(item=>item.instrument_key),MAX_KEYS);
     const mode=req.body?.mode||"ltpc";
     if(!["ltpc","full","option_greeks"].includes(mode))return res.status(400).json({error:"Unsupported feed mode."});
@@ -1205,7 +1220,7 @@ async function runPaperLimitWorker({maxOrders=50}={}){
   if(lease?.data!==true)return {locked:true,scanned:0,filled:0,notEligible:0,failed:0,alreadyFilled:0};
   const summary={locked:false,scanned:0,filled:0,notEligible:0,failed:0,alreadyFilled:0};
   try{
-    if(!instrumentCache.length||Date.now()-instrumentCacheUpdatedAt>6*60*60*1000)await refreshInstrumentCache();
+    await ensureInstrumentCacheAvailable();
     const stateResult=await serviceDb.from("paper_market_worker_state")
       .select("cursor_created_at,cursor_order_id").eq("state_key","paper_limit_orders").maybeSingle();
     if(stateResult.error)throw new Error("Paper LIMIT worker cursor could not be read.");
@@ -1303,7 +1318,7 @@ async function runPaperLimitWorker({maxOrders=50}={}){
 const runPaperIntradayLimitWorker=createPaperIntradayLimitWorker({
   serviceDb,
   ensureInstrumentCache:async()=>{
-    if(!instrumentCache.length||Date.now()-instrumentCacheUpdatedAt>6*60*60*1000)await refreshInstrumentCache();
+    await ensureInstrumentCacheAvailable();
     return instrumentCache;
   },
   getUpstoxAccessToken,fetchProvider,readProviderJson,normalizeProviderQuote
@@ -1312,7 +1327,7 @@ const runPaperIntradayLimitWorker=createPaperIntradayLimitWorker({
 const runPaperProtectiveWorker=createPaperProtectiveWorker({
   serviceDb,
   ensureInstrumentCache:async()=>{
-    if(!instrumentCache.length||Date.now()-instrumentCacheUpdatedAt>6*60*60*1000)await refreshInstrumentCache();
+    await ensureInstrumentCacheAvailable();
     return instrumentCache;
   },
   getUpstoxAccessToken,fetchProvider,readProviderJson,normalizeProviderQuote
@@ -1321,7 +1336,7 @@ const runPaperProtectiveWorker=createPaperProtectiveWorker({
 const runPaperFuturesLimitWorker=createPaperFuturesLimitWorker({
   serviceDb,
   ensureInstrumentCache:async()=>{
-    if(!instrumentCache.length||Date.now()-instrumentCacheUpdatedAt>6*60*60*1000)await refreshInstrumentCache();
+    await ensureInstrumentCacheAvailable();
     return instrumentCache;
   },
   getUpstoxAccessToken,fetchProvider,readProviderJson
@@ -1330,7 +1345,7 @@ const runPaperFuturesLimitWorker=createPaperFuturesLimitWorker({
 const runPaperOptionLimitWorker=createPaperOptionLimitWorker({
   serviceDb,
   ensureInstrumentCache:async()=>{
-    if(!instrumentCache.length||Date.now()-instrumentCacheUpdatedAt>6*60*60*1000)await refreshInstrumentCache();
+    await ensureInstrumentCacheAvailable();
     return instrumentCache;
   },
   getUpstoxAccessToken,fetchProvider,readProviderJson
