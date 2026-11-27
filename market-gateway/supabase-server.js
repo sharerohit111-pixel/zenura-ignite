@@ -420,7 +420,7 @@ app.post("/paper/orders",async(req,res)=>{
       if(!tick||limitPricePaise%tick!==0)return res.status(400).json({error:"LIMIT price must match the official instrument tick size."});
       const rpcName=product==="INTRADAY"?"submit_paper_intraday_limit_order":"submit_paper_limit_order";
       const rpcArgs=product==="INTRADAY"?{
-        p_user_id:user.id,p_order_id:orderId,p_idempotency_key:idempotencyKey,
+        p_order_id:orderId,p_idempotency_key:idempotencyKey,
         p_request_fingerprint:requestFingerprint,p_instrument_key:instrumentKey,
         p_trading_symbol:instrument.trading_symbol||instrument.name,p_exchange:instrument.exchange,
         p_side:side,p_quantity:quantity,p_limit_price_paise:limitPricePaise
@@ -461,14 +461,14 @@ app.post("/paper/orders",async(req,res)=>{
 });
 app.post("/paper/orders/:orderId/cancel",async(req,res)=>{
   try{
-    const {user}=await auth(req),orderId=String(req.params.orderId||"");
+    const {user,userDb}=await auth(req),orderId=String(req.params.orderId||"");
     if(!/^[a-f0-9]{64}$/.test(orderId))return res.status(400).json({error:"Invalid paper order id."});
     const {data:order,error:orderError}=await userDb.from("paper_orders")
       .select("product,order_type").eq("user_id",user.id).eq("order_id",orderId).maybeSingle();
     if(orderError)throw Object.assign(new Error("Order ownership and product could not be verified."),{status:503});
     if(!order||order.order_type!=="LIMIT")return res.status(404).json({error:"Pending LIMIT order was not found."});
     const result=order.product==="INTRADAY"
-      ?await runtime.callUserRpc(user,"cancel_paper_intraday_limit_order",{p_user_id:user.id,p_order_id:orderId})
+      ?await runtime.callUserRpc(user,"cancel_paper_intraday_limit_order",{p_order_id:orderId})
       :await runtime.callUserRpc(user,"cancel_paper_limit_order",{p_order_id:orderId});
     res.set("Cache-Control","private, no-store").json({orderId,status:result?.status||"CANCELLED",
       cashPaise:result?.cash_paise??null,reservedCashPaise:result?.reserved_cash_paise??null,
