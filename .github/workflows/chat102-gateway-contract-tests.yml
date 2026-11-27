@@ -48,6 +48,15 @@ jobs:
         working-directory: .
         run: docker build --pull -f market-gateway/Dockerfile -t zenura-gateway-chat102:${GITHUB_SHA} .
 
+      - name: Smoke-test container module loading with disposable config
+        run: |
+          docker run --rm \
+            -e SUPABASE_URL=https://staging-contract.invalid \
+            -e SUPABASE_PUBLISHABLE_KEY=sb_publishable_disposable_contract_test \
+            -e SUPABASE_SERVICE_ROLE_KEY=disposable-service-role-contract-test \
+            --entrypoint node zenura-gateway-chat102:${GITHUB_SHA} \
+            -e "const gateway = require('./supabase-server'); if (!gateway.app || typeof gateway.start !== 'function') process.exit(1);"
+
       - name: Assert this run is restricted to the isolated audit branch
         run: |
           test "$GITHUB_EVENT_NAME" = "push"
