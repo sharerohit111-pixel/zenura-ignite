@@ -39,7 +39,7 @@ test("Markets web app manifest is strict JSON and has a valid standalone scope",
 
 test("Markets service worker uses the current cache generation and precaches PWA icons and canonical event ledger",async()=>{
  const sw=await read("markets/service-worker.js");
- assert.match(sw,/zenura-markets-shell-v12/);
+ assert.match(sw,/zenura-markets-shell-v13/);
  assert.match(sw,/"shared\/paper-demo-event-ledger\.mjs"/);
  assert.ok(sw.includes('"icons/icon-192.png"'));
  assert.ok(sw.includes('"icons/icon-512.png"'));
@@ -72,6 +72,33 @@ test("all static transitive imports from the 15-screen demo entrypoint are in th
  assert.ok(visited.has("markets/shared/paper-demo-event-ledger.mjs"));
  const html=await read("markets/stocks/demo.html");
  for(const screen of screens)assert.ok(html.includes('data-screen="'+screen+'"'),"missing screen "+screen);
+});
+
+
+test("Stocks terminal static assets are all included in the Markets shell precache",async()=>{
+ const sw=await read("markets/service-worker.js");
+ const html=await read("markets/stocks/index.html");
+ const block=sw.match(/const SHELL=\[([\s\S]*?)\]\.map/);
+ assert.ok(block,"SHELL allowlist exists");
+ const shell=new Set([...block[1].matchAll(/"([^"]*)"/g)].map(match=>new URL(match[1],"https://example.test/markets/").toString()));
+ const tags=[...html.matchAll(/<(?:script|link)\b[^>]*>/gi)].map(match=>match[0]);
+ const refs=tags.flatMap(tag=>{
+  let value;
+  if(/<script\b/i.test(tag))value=tag.match(/\bsrc=["']([^"']+)["']/i)?.[1];
+  else if(/<link\b/i.test(tag)&&/rel=["'](?:stylesheet|manifest)["']/i.test(tag))value=tag.match(/\bhref=["']([^"']+)["']/i)?.[1];
+  return value&&!/^(https?:|data:|#)/i.test(value)?[new URL(value,"https://example.test/markets/stocks/").toString()]:[];
+ });
+ assert.ok(refs.length>0,"Stocks terminal must expose local static references");
+ for(const ref of refs)assert.ok(shell.has(ref),"Stocks terminal asset missing from PWA shell: "+ref);
+});
+
+test("PWA install omits ambient cookies and navigation HTML is never written to CacheStorage",async()=>{
+ const sw=await read("markets/service-worker.js");
+ assert.match(sw,/cache\.addAll\(SHELL\.map\(url=>new Request\(url,\{credentials:"omit"\}\)\)\)/);
+ const nav=sw.match(/if\(request\.mode==="navigate"\)\{([\s\S]*?)\n  return;\n \}/);
+ assert.ok(nav,"navigation handler exists");
+ assert.doesNotMatch(nav[1],/cache\.put/,"network navigation responses must not be persisted");
+ assert.match(nav[1],/fetch\(request\)/);
 });
 
 test("service worker never caches arbitrary authenticated or private navigation responses",async()=>{
