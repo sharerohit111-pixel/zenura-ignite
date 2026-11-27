@@ -34,12 +34,9 @@ function copyPublicTree(src, dest) {
 }
 copyPublicTree(sourceMarkets, outMarkets);
 
-const externalAssets = [];
-for (const item of shellPaths) {
-  if (!item.startsWith("../market-gateway/")) continue;
-  const relative = item.slice("../".length);
-  if (relative.includes("..") || path.isAbsolute(relative)) throw new Error("Unsafe external PWA asset path: " + item);
-  externalAssets.push(relative);
+const externalAssets = [...worker.matchAll(/"(..\/market-gateway\/[^"]+)"/g)].map((m) => m[1].slice("../".length));
+for (const relative of externalAssets) {
+  if (relative.includes("..") || path.isAbsolute(relative)) throw new Error("Unsafe external PWA asset path: " + relative);
 }
 if (!externalAssets.length) throw new Error("No explicitly allowlisted public demo assets found");
 
