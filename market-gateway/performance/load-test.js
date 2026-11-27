@@ -32,7 +32,7 @@ export function validateTarget(rawUrl, targetEnv, allowlist = "") {
   let url;
   try { url = new URL(rawUrl); } catch { throw new Error("BASE_URL must be a valid absolute URL."); }
   if (url.username || url.password || url.search || url.hash) throw new Error("BASE_URL must not contain credentials, query parameters or a fragment.");
-  const host = url.hostname.toLowerCase().replace(/^\\[|\\]$/g, "");
+  const host = url.hostname.toLowerCase().replace("[", "").replace("]", "");
   if (targetEnv === "disposable") {
     const local = ["localhost", "127.0.0.1", "::1"].includes(host) || isPrivateIpv4(host) || host.endsWith(".test") || host.endsWith(".local");
     if (!local) throw new Error("Disposable runs are restricted to localhost, private IPv4, .test or .local hosts.");
