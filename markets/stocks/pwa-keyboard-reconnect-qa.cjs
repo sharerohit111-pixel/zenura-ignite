@@ -34,7 +34,7 @@ async function verifyProductionWorkerCacheCleanup() {
   assert.deepEqual(deleted.sort(), ["zenura-markets-shell-v10", "zenura-markets-shell-v12", "zenura-markets-shell-v9"]);
   assert.ok(!deleted.includes("unrelated-app-cache"), "activation must preserve unrelated application caches");
   assert.ok(!deleted.includes("zenura-markets-shell-v13"), "activation must preserve current shell cache");
-  console.log(JSON.stringify({ workerCacheCleanup: "PASS", deleted, preserved: ["unrelated-app-cache", "zenura-markets-shell-v12"] }));
+  console.log(JSON.stringify({ workerCacheCleanup: "PASS", deleted, preserved: ["unrelated-app-cache", "zenura-markets-shell-v13"] }));
 }
 
 (async () => {
