@@ -21,13 +21,13 @@ BEGIN
   PERFORM public.begin_upstox_oauth(v_user,v_replay_hash,
     clock_timestamp()+interval '5 minutes',
     floor(extract(epoch from clock_timestamp())*1000)::bigint);
-  v_state := public.consume_upstox_oauth_state(repeat('a',64),
+  v_state := public.consume_upstox_oauth_state(v_replay_hash,
     floor(extract(epoch from clock_timestamp())*1000)::bigint);
   IF v_state->>'user_id' IS DISTINCT FROM v_user::text
      OR (v_state->>'connection_generation')::bigint <> 0 THEN
     RAISE EXCEPTION 'OAuth state did not return its original user and generation: %',v_state;
   END IF;
-  IF public.consume_upstox_oauth_state(repeat('a',64),
+  IF public.consume_upstox_oauth_state(v_replay_hash,
        floor(extract(epoch from clock_timestamp())*1000)::bigint) IS NOT NULL THEN
     RAISE EXCEPTION 'OAuth state replay was accepted';
   END IF;
@@ -92,7 +92,7 @@ BEGIN
   IF v_generation <> 1 THEN
     RAISE EXCEPTION 'New OAuth attempt did not capture current generation';
   END IF;
-  v_state := public.consume_upstox_oauth_state(repeat('c',64),
+  v_state := public.consume_upstox_oauth_state(v_fresh_hash,
     floor(extract(epoch from clock_timestamp())*1000)::bigint);
   IF (v_state->>'connection_generation')::bigint <> 1 THEN
     RAISE EXCEPTION 'New OAuth state did not bind generation 1';
