@@ -132,3 +132,24 @@
 .terminal-nav a:focus-visible{outline:2px solid #65e8ce;outline-offset:2px}
 .stocks-page [data-page-hidden="true"]{display:none!important}
 @media(max-width:650px){.terminal-nav{margin-right:-13px;padding-right:13px}.terminal-nav a{min-height:42px;padding:10px 12px}.stock-hero h1{color:#f4f8fc}}
+
+
+/* Dedicated terminal dashboard and settings pages */
+.dashboard-overview,.settings-page{margin:14px 0;padding:14px;min-width:0}
+.dashboard-status-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:14px 0}
+.dashboard-status-grid article{display:grid;gap:8px;min-width:0;padding:14px;border:1px solid #29465e;border-radius:12px;background:#0a1928}
+.dashboard-status-grid small{font-size:9px;letter-spacing:.08em;color:#91a9bd}
+.dashboard-status-grid b{font-size:clamp(12px,2vw,16px);line-height:1.4;color:#edf6ff;overflow-wrap:anywhere}
+.dashboard-shortcuts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}
+.dashboard-shortcuts a,.settings-row button{display:flex;align-items:center;justify-content:center;min-height:42px;padding:10px;border:1px solid #286d63;border-radius:9px;background:#123d3b;color:#8ff2d9;text-align:center;text-decoration:none;font-size:11px;font-weight:850}
+.settings-row{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:15px 0;border-bottom:1px solid #203b54}
+.settings-row>div{min-width:0}
+.settings-row b{color:#edf6ff;font-size:13px}
+.settings-row p{margin:5px 0 0;color:#91a9bd;font-size:11px;line-height:1.5}
+.settings-row button{flex:0 0 auto;min-width:132px;cursor:pointer}
+@media(max-width:650px){
+ .dashboard-status-grid{grid-template-columns:1fr}
+ .dashboard-shortcuts{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .settings-row{align-items:flex-start;flex-direction:column}
+ .settings-row button{width:100%}
+}
