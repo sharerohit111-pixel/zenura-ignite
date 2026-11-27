@@ -9,6 +9,7 @@ on:
       - "market-gateway/lib/derivative-position.js"
       - "market-gateway/mock/fixtures/**"
       - "scripts/build-markets-pwa-artifact.mjs"
+      - "netlify.toml"
       - ".github/workflows/markets-pwa-artifact.yml"
   push:
     branches: ["feature/s-trade-real-pwa-release-prep-2026-11-27"]
