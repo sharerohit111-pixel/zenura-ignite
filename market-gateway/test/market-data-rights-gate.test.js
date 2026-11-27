@@ -1,6 +1,8 @@
 "use strict";
 const test = require("node:test");
 const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const path = require("node:path");
 const {
   marketDataRightsApproval,
   assertMarketDataRightsApproved,
@@ -59,4 +61,12 @@ test("market-data gate is independent of feed labels and synthetic flags", () =>
       MARKET_DATA_SOURCE_TYPE: mode,
     }), null);
   }
+});
+
+test("gateway blocks instrument-master and authenticated Upstox market-data access without approvals", () => {
+  const source = fs.readFileSync(path.join(__dirname, "../supabase-server.js"), "utf8");
+  assert.match(source, /const \{assertMarketDataRightsApproved\}=require\("\.\/lib\/market-data-rights-gate"\)/);
+  assert.match(source, /const refreshInstrumentCache=createSingleFlight\(async\(\)=>\{\s*assertMarketDataRightsApproved\(process\.env\)/);
+  assert.match(source, /async function getUpstoxAccessToken\(userId\)\{\s*assertMarketDataRightsApproved\(process\.env\)/);
+  assert.match(source, /app\.get\("\/instruments",async\(req,res\)=>\{\s*try\{\s*assertMarketDataRightsApproved\(process\.env\)/);
 });
