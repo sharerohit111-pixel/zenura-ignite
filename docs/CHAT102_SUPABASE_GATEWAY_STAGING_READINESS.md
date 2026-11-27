@@ -58,13 +58,16 @@ Inspected `market-gateway/supabase-server.js` and `market-gateway/lib/supabase-r
 
 **Required before staging:** validate variable names and presence using dummy/disposable configuration only; never print secret values. Verify service-account least privilege, Secret Manager bindings, callback URLs, allowed origins, and Supabase Auth reachability in an isolated environment.
 
-### 4. Health and readiness — BLOCKED
+### 4. Health and readiness — PARTIAL IMPLEMENTATION; hosted verification BLOCKED
 
-- `GET /health` returns `ok: true` without checking Supabase connectivity.
-- No separate `/ready` route was found in the inspected server source.
-- The current workflow's health predicate requires instrument-master readiness and a successful Delivery LIMIT worker cycle, which is not an acceptable readiness condition while the worker must remain disabled.
+- `GET /health` remains a liveness-only response and does not check Supabase connectivity.
+- `GET /ready` has now been added. It returns 503 until gateway startup has completed, then performs bounded read-only GET probes to Supabase Auth `/auth/v1/health` and the Data API `/rest/v1/`.
+- Each dependency probe has a 3-second default timeout. Responses expose only boolean check results; no keys, tokens, user data, or upstream response bodies are returned.
+- The probe requires an HTTPS project origin and a configured publishable key. It does not issue RPCs or write database data.
+- Worker status is not used as a readiness failure condition. Delivery LIMIT and all other trading workers must still be disabled in staging through the separate staging policy gate.
+- The new unit tests cover both successful dependencies, an individual dependency failure, invalid configuration, network failure/timeout, and the HTTP endpoint's 503 response before startup.
 
-**Required before staging:** keep `/health` as liveness only; add a bounded, non-mutating readiness check that verifies required runtime dependencies without exposing secrets or user data. Worker-disabled status must be an explicit expected state, not a deployment failure.
+**Remaining limitation:** the readiness unit tests use injected mock fetch responses. No hosted Supabase request, real Auth/Data API connectivity, container startup, or Cloud Run readiness check has been performed.
 
 ### 5. API contract and authentication — PARTIAL STATIC REVIEW
 
@@ -81,7 +84,7 @@ Two isolated files were added on the audit branch:
 - `market-gateway/lib/staging-worker-policy.js`: fail-closed policy helper that rejects any staging environment where Delivery LIMIT, Intraday LIMIT, Futures LIMIT submission/worker, Options LIMIT submission/worker, or equity protective worker flags are set to `true`. Unset and explicit false values are accepted.
 - `market-gateway/test/supabase-staging-contract.test.js`: Node test coverage for the policy helper and a disposable local HTTP instance. It uses dummy Supabase values, does not call `start()`, does not connect to Supabase or Upstox, verifies secret-free health output, checks all worker status fields begin disabled, verifies missing Bearer tokens are rejected by order/portfolio endpoints, and checks allowed/denied CORS preflights.
 
-**Important limitation:** the policy helper is not yet wired into a staging deployment workflow or production gateway startup. A future staging-only workflow must invoke this helper before any cloud action. These tests were committed but were not executed in this environment; exact-head CI is still required. The health endpoint assertions document current liveness behaviour only and do not create a readiness endpoint.
+**Important limitation:** the worker policy helper is still not wired into a staging deployment workflow. A future staging-only workflow must invoke it before any cloud action. It is deliberately not wired into production gateway startup because production worker configuration has separate operational semantics. The new `/ready` endpoint is implemented, but its tests use mocked dependencies and do not prove hosted connectivity.
 
 ## CI evidence
 
@@ -111,7 +114,9 @@ A dedicated workflow, `.github/workflows/chat102-gateway-contract-tests.yml`, wa
 
 Two earlier workflow attempts failed only in the additional workflow-guard step (first a file-presence assumption, then a self-matching grep expression); in both attempts the five application contract tests passed. The guard was simplified to assert the push event and exact isolated branch, and run #3 passed.
 
-This CI proves the five local contract tests only. It does not prove reproducible dependency resolution, Docker build/startup, real Supabase authentication/connectivity, Cloud Run IAM, OAuth, readiness, or hosted staging. The package-lock and readiness blockers remain open.
+This first CI proves the five local HTTP/worker-policy tests only. It does not prove reproducible dependency resolution, Docker build/startup, real Supabase authentication/connectivity, Cloud Run IAM, OAuth, or hosted staging.
+
+A follow-up workflow revision now runs both disposable test files and attempts a Docker image build. On commit `eaba845bf8a1ed2e1c8d45f7a9d2ce8c9b226391`, dependency installation and all tests completed successfully; the Docker image build was still running when this report was updated. Its final result must be recorded separately. The package-lock and hosted readiness blockers remain open.
 
 ## Exit criteria
 
