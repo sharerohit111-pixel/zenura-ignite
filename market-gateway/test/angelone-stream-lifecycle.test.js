@@ -133,3 +133,18 @@ test("resets retry budget only after transport explicitly marks a stable session
   assert.equal(retryAgain.state, "reconnect_wait");
   assert.equal(retryAgain.reconnectAttempts, 1);
 });
+
+test("detects an unacknowledged heartbeat timeout without performing transport I/O", () => {
+  let now = 10000;
+  const lifecycle = createAngelOneStreamLifecycle({ now: () => now, heartbeatIntervalMs: 30000 });
+  const connection = lifecycle.beginConnection();
+  lifecycle.onOpen(connection.generation);
+  now += 30000;
+  assert.equal(lifecycle.heartbeatDue(), true);
+  assert.equal(lifecycle.heartbeatExpired(), false);
+  lifecycle.markHeartbeatSent(connection.generation);
+  now += 30000;
+  assert.equal(lifecycle.heartbeatExpired(), true);
+  lifecycle.onHeartbeatAck(connection.generation);
+  assert.equal(lifecycle.heartbeatExpired(), false);
+});
