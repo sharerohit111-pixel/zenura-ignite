@@ -53,12 +53,12 @@ BEGIN
   INSERT INTO public.paper_futures_orders(
     order_id,user_id,request_fingerprint,instrument_key,trading_symbol,
     exchange,segment,expiry,lot_size,side,product,order_type,status,
-    quantity,limit_price_paise
+    quantity,limit_price_paise,tick_size_paise
   ) VALUES (
     repeat('d',64),'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',repeat('b',64),
     'NSE_FO|LIMIT_IMMUTABLE_TEST','LIMIT_IMMUTABLE_TEST',
     'NSE','NSE_FO',current_date+5,25,'BUY','DELIVERY','LIMIT','PENDING',
-    25,10000
+    25,10000,5
   );
   UPDATE public.paper_futures_orders
      SET status='CANCELLED',cancelled_at=clock_timestamp(),updated_at=clock_timestamp()
