@@ -34,3 +34,9 @@ test("markets PWA shell entries are unique",()=>{
 test("markets PWA shell cache version is bumped",()=>{
  assert.match(worker,/CACHE_NAME="zenura-markets-shell-v3"/);
 });
+
+test("markets PWA manifest is valid JSON",()=>{
+ const manifest=JSON.parse(fs.readFileSync(path.join(root,"manifest.webmanifest"),"utf8"));
+ assert.equal(manifest.start_url,"./");
+ assert.equal(manifest.scope,"./");
+});
