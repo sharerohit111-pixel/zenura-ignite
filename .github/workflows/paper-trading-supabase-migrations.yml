@@ -229,8 +229,8 @@ jobs:
             psql -v ON_ERROR_STOP=1 -f "$migration"
             applied_count=$((applied_count + 1))
           done
-          if [[ "$applied_count" -ne 45 ]]; then
-            echo "Expected 45 candidate migrations, found $applied_count" >&2
+          if [[ "$applied_count" -ne 46 ]]; then
+            echo "Expected 46 candidate migrations, found $applied_count" >&2
             exit 1
           fi
           psql -v ON_ERROR_STOP=1 -f supabase/tests/protective_reservation_backfill_assertions.sql
@@ -1807,6 +1807,8 @@ jobs:
         run: psql -v ON_ERROR_STOP=1 -f supabase/tests/protective_order_cancel.sql
       - name: Verify MARKET and LIMIT sells cannot consume protective-reserved shares
         run: psql -v ON_ERROR_STOP=1 -f supabase/tests/protective_reservation_sell_guard.sql
+      - name: Verify fully and partially reserved Equity protective fills
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/protective_fill_reserved_quantity.sql
       - name: Exercise concurrent protective fill versus cancel row-lock races
         run: bash supabase/tests/protective_fill_cancel_race.sh
       - name: Verify expected schema and RPC registration
