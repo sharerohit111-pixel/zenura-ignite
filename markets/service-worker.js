@@ -1,13 +1,13 @@
 "use strict";
 const BASE=new URL("./",self.registration.scope);
-const CACHE_NAME="zenura-markets-shell-v11";
+const CACHE_NAME="zenura-markets-shell-v12";
 const SHELL=[
  "", "index.html","portal.css","pwa-register.js","language-toggle.js",
  "stocks/","stocks/index.html","stocks/demo.html","stocks/demo.css","stocks/demo.js","stocks/demo-watchlist-persistence.mjs","stocks/demo-derivative-panel.mjs","stocks/demo-derivative-ledger-bridge.mjs","stocks/demo-equity-panel.mjs","stocks/demo-equity-ledger-bridge.mjs","stocks/demo-unified-ledger-panel.mjs","stocks/demo-chart-panel.mjs","stocks/demo-chart-data.mjs","stocks/derivative-mock-simulator.js","shared/paper-demo-adapter.mjs","shared/paper-demo-ledger-session.mjs","shared/paper-demo-event-ledger.mjs","../market-gateway/lib/derivative-position.js","../market-gateway/lib/equity-demo-execution-engine.js","../market-gateway/mock/fixtures/market.json","../market-gateway/mock/fixtures/account.json","../market-gateway/mock/fixtures/equity.json","../market-gateway/mock/fixtures/derivatives.json","../market-gateway/mock/fixtures/equity-execution.json","stocks/stocks.css","stocks/order-workspace.css","stocks/chart-theme.css",
  "stocks/sse-parser.js","stocks/live-quote.js","stocks/reconnect-policy.js","stocks/paper-order-retry-policy.js",
  "stocks/chart-indicators.js","stocks/chart-engine.js","stocks/stocks.js","stocks/order-workspace.js","stocks/chart-theme.js",
  "stocks/supabase-client.js","stocks/connect.js","stocks/email-auth.js",
- "manifest.webmanifest","../crypto/icon.svg"
+ "manifest.webmanifest","icons/icon-192.png","icons/icon-512.png","icons/icon-512-maskable.png","icons/icon-192.svg","icons/icon-512.svg"
 ].map(path=>new URL(path,BASE).toString());
 self.addEventListener("install",event=>{
  event.waitUntil((async()=>{

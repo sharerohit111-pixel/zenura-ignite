@@ -13,7 +13,22 @@ test("Markets web app manifest is strict JSON and has a valid standalone scope",
  assert.equal(manifest.scope,"./");
  assert.equal(manifest.start_url,"./");
  assert.equal(manifest.display,"standalone");
- assert.ok(Array.isArray(manifest.icons)&&manifest.icons.length>0);
+ assert.ok(Array.isArray(manifest.icons)&&manifest.icons.length>=2);
+ assert.ok(manifest.icons.some(icon=>icon.sizes==="192x192"&&icon.type==="image/png"));
+ assert.ok(manifest.icons.some(icon=>icon.sizes==="512x512"&&icon.purpose==="maskable"&&icon.type==="image/png"));
+ for(const icon of manifest.icons){
+  const iconPath=resolve(root,"markets",icon.src.replace(/^\.\//,""));
+  assert.ok(iconPath.startsWith(resolve(root,"markets")+"/"));
+  if(icon.type==="image/png"){
+   const png=await readFile(iconPath);
+   assert.deepEqual([...png.subarray(0,8)],[137,80,78,71,13,10,26,10]);
+   assert.equal(png.readUInt32BE(16),Number(icon.sizes.split("x")[0]));
+   assert.equal(png.readUInt32BE(20),Number(icon.sizes.split("x")[1]));
+  }else{
+   const svg=await readFile(iconPath,"utf8");
+   assert.match(svg,/<svg[^>]*width="(?:192|512)"[^>]*height="(?:192|512)"/);
+  }
+ }
  assert.ok(Array.isArray(manifest.shortcuts));
  for(const shortcut of manifest.shortcuts){
   const scope=new URL("./","https://example.test/zenura-ignite/markets/");
@@ -22,10 +37,15 @@ test("Markets web app manifest is strict JSON and has a valid standalone scope",
  }
 });
 
-test("Markets service worker uses a new cache generation and precaches the canonical event ledger",async()=>{
+test("Markets service worker uses the current cache generation and precaches PWA icons and canonical event ledger",async()=>{
  const sw=await read("markets/service-worker.js");
- assert.match(sw,/zenura-markets-shell-v11/);
+ assert.match(sw,/zenura-markets-shell-v12/);
  assert.match(sw,/"shared\/paper-demo-event-ledger\.mjs"/);
+ assert.ok(sw.includes('"icons/icon-192.png"'));
+ assert.ok(sw.includes('"icons/icon-512.png"'));
+ assert.ok(sw.includes('"icons/icon-512-maskable.png"'));
+ assert.match(sw,/"icons\/icon-192\.svg"/);
+ assert.match(sw,/"icons\/icon-512\.svg"/);
  assert.doesNotMatch(sw,/zenura-markets-shell-v9/);
 });
 
