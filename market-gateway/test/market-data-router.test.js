@@ -43,7 +43,7 @@ function provider(providerId, getQuote) {
     getHealth: async () => ({ healthy: true }),
   };
 }
-function makeRouter(providers, entitlementResolver = async ({ providerId }) => ({ approved: true, paperTradingAllowed: true, redistributionAllowed: true, reference: "entitlement-" + providerId, rightsApprovalReference: "written-rights-" + providerId, regulatoryApprovalReference: "regulatory-" + providerId })) {
+function makeRouter(providers, entitlementResolver = async ({ providerId }) => ({ approved: true, paperTradingAllowed: true, redistributionAllowed: true, displayAllowed: true, reference: "entitlement-" + providerId, rightsApprovalReference: "written-rights-" + providerId, regulatoryApprovalReference: "regulatory-" + providerId })) {
   return new MarketDataProviderRouter({
     providers: new Map(providers),
     plan,
@@ -68,7 +68,7 @@ test("global dual approval gate cannot be replaced by a caller-supplied no-op", 
   const router = new MarketDataProviderRouter({
     providers: new Map([["upstox", upstream]]),
     plan,
-    entitlementResolver: async () => { resolverCalls += 1; return { approved: true, paperTradingAllowed: true, redistributionAllowed: true, reference: "fabricated", rightsApprovalReference: "fabricated", regulatoryApprovalReference: "fabricated" }; },
+    entitlementResolver: async () => { resolverCalls += 1; return { approved: true, paperTradingAllowed: true, redistributionAllowed: true, displayAllowed: true, reference: "fabricated", rightsApprovalReference: "fabricated", regulatoryApprovalReference: "fabricated" }; },
     rightsGate: () => ({ rightsReference: "caller-supplied", regulatoryReference: "caller-supplied" }),
     clock: () => NOW,
   });
@@ -167,7 +167,7 @@ test("distributed quota denial skips that provider and never calls its upstream 
   const router = new MarketDataProviderRouter({
     providers: new Map([["upstox", primary], ["angelone", fallback]]),
     plan, rateLimiter,
-    entitlementResolver: async ({ providerId }) => ({ approved: true, paperTradingAllowed: true, redistributionAllowed: true, reference: "entitlement-" + providerId, rightsApprovalReference: "written-rights-" + providerId, regulatoryApprovalReference: "regulatory-" + providerId }),
+    entitlementResolver: async ({ providerId }) => ({ approved: true, paperTradingAllowed: true, redistributionAllowed: true, displayAllowed: true, reference: "entitlement-" + providerId, rightsApprovalReference: "written-rights-" + providerId, regulatoryApprovalReference: "regulatory-" + providerId }),
     clock: () => NOW,
   });
   const result = await router.route("quote", {}, request);
@@ -183,18 +183,18 @@ test("distributed quota service failure fails closed when no other provider is c
     providers: new Map([["upstox", primary]]),
     plan: { ...plan, quote: ["upstox"] },
     rateLimiter: { consume: async () => { throw Object.assign(new Error("quota db down"), { status: 503 }); } },
-    entitlementResolver: async () => ({ approved: true, paperTradingAllowed: true, redistributionAllowed: true, reference: "entitlement-upstox", rightsApprovalReference: "written-rights-upstox", regulatoryApprovalReference: "regulatory-upstox" }),
+    entitlementResolver: async () => ({ approved: true, paperTradingAllowed: true, redistributionAllowed: true, displayAllowed: true, reference: "entitlement-upstox", rightsApprovalReference: "written-rights-upstox", regulatoryApprovalReference: "regulatory-upstox" }),
     clock: () => NOW,
   });
   await assert.rejects(router.route("quote", {}, request), { code: "market_data_unavailable", status: 503 });
   assert.equal(providerCalls, 0);
 });
 
-test("requires explicit paper-trading and redistribution rights, not a generic API entitlement", async () => {
+test("requires explicit paper-trading, display and redistribution rights, not a generic API entitlement", async () => {
   let calls = 0;
   const upstream = provider("upstox", async () => { calls += 1; return quote("upstox"); });
   const router = makeRouter([["upstox", upstream]], async () => ({
-    approved: true, reference: "broker-api-access-only",
+    approved: true, paperTradingAllowed: true, redistributionAllowed: true, reference: "broker-api-access-only",
   }));
   await assert.rejects(router.route("quote", {}, request), { code: "market_data_unavailable" });
   assert.equal(calls, 0);
@@ -204,6 +204,18 @@ test("hard-blocks providers whose published terms/support prohibit live-data pap
   let calls = 0;
   const dhan = provider("dhan", async () => { calls += 1; return quote("dhan"); });
   const router = makeRouter([["dhan", dhan]]);
+  await assert.rejects(router.route("quote", {}, request), { code: "market_data_unavailable" });
+  assert.equal(calls, 0);
+});
+
+
+test("does not use a provider when explicit display rights are absent", async () => {
+  let calls = 0;
+  const upstream = provider("upstox", async () => { calls += 1; return quote("upstox"); });
+  const router = makeRouter([["upstox", upstream]], async () => ({
+    approved: true, paperTradingAllowed: true, redistributionAllowed: true,
+    reference: "entitlement", rightsApprovalReference: "written-rights", regulatoryApprovalReference: "counsel-clearance",
+  }));
   await assert.rejects(router.route("quote", {}, request), { code: "market_data_unavailable" });
   assert.equal(calls, 0);
 });

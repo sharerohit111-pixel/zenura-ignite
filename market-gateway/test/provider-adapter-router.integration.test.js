@@ -29,7 +29,7 @@ test("provider-neutral router accepts normalized Upstox quote, candles, depth, m
  const router=new MarketDataProviderRouter({
   providers:new Map([["upstox",adapter]]),
   plan:{quote:["upstox"],candles:["upstox"],depth:["upstox"],instrumentMaster:["upstox"],stream:["upstox"]},
-  entitlementResolver:async()=>({approved:true,paperTradingAllowed:true,redistributionAllowed:true,reference:"entitlement-upstox",rightsApprovalReference:"written-rights",regulatoryApprovalReference:"counsel-clearance"}),
+  entitlementResolver:async()=>({approved:true,paperTradingAllowed:true,redistributionAllowed:true,displayAllowed:true,reference:"entitlement-upstox",rightsApprovalReference:"written-rights",regulatoryApprovalReference:"counsel-clearance"}),
   healthRegistry:new ProviderHealthRegistry({clock:()=>NOW}),
   clock:()=>NOW,
  });

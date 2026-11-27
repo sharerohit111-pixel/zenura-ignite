@@ -25,6 +25,7 @@ function hasPaperTradingMarketDataRights(providerId, entitlement) {
   if (policy.status !== "approval_required" || !entitlement || typeof entitlement !== "object") return false;
   return entitlement.approved === true &&
     entitlement.paperTradingAllowed === true &&
+    entitlement.displayAllowed === true &&
     entitlement.redistributionAllowed === true &&
     typeof entitlement.reference === "string" && entitlement.reference.trim().length > 0 &&
     typeof entitlement.rightsApprovalReference === "string" && entitlement.rightsApprovalReference.trim().length > 0 &&

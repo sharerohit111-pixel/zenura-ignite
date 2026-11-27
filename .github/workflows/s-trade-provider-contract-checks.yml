@@ -52,6 +52,7 @@ on:
     branches:
       - feature/s-trade-upstox-oauth-market-data-security-2026-11-23
       - feature/s-trade-multi-provider-market-data-2026-11-24
+      - feature/s-trade-indian-market-data-compliance-gate-2026-11-26
     paths:
       - "market-gateway/lib/*provider-contract.js"
       - "market-gateway/lib/provider-market-data-adapters.js"
@@ -59,6 +60,7 @@ on:
       - "market-gateway/lib/upstox-feed-decoder.js"
       - "market-gateway/test/upstox-feed-decoder.test.js"
       - "market-gateway/test/provider-market-data-adapters.test.js"
+      - "market-gateway/test/provider-adapter-router.integration.test.js"
       - "market-gateway/test/upstox-stream-normalizer.test.js"
       - "market-gateway/lib/market-data-provider-router.js"
       - "market-gateway/lib/provider-paper-trading-policy.js"
