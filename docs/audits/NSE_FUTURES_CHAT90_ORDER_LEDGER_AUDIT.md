@@ -145,6 +145,18 @@ Source review of the PR #135 settlement migration identified integration gates t
 - **T+1 distinction:** PR #135 explicitly states its simulator posts variation to virtual cash immediately and does not separately model exchange T+1 receivable/payable timing. Do not present the current cash behavior as an exact exchange cash-settlement timeline.
 - **Expiry-day square-off boundary:** the RPC rejects `SIMULATED_SQUARE_OFF` when the settlement date is on/after contract expiry, even if an intraday exit might otherwise be allowed before the expiry cutoff. Confirm intended product policy; do not silently treat this RPC as a complete expiry-day order lifecycle.
 
+### Shared-wallet compatibility review against the current candidate
+
+The cross-asset account contract is materially stricter than the settlement branch assumes:
+
+- The current core schema has paper_accounts.cash_paise >= 0 and reserved_cash_paise + reserved_margin_paise <= cash_paise. PR #135 removes both checks to permit a Futures MTM debit to exceed virtual cash and adds a generated margin_deficit_paise.
+- The current service-role account initializer initialize_paper_trading_account independently rejects cash_paise < 0 and reservations exceeding cash. If the PR #135 migration were ported without updating this RPC, the wallet/account bootstrap/read path would throw SQLSTATE 23514 after a legitimate MTM deficit. Its current return JSON also does not include margin_deficit_paise.
+- Existing Equity MARKET, Equity LIMIT, long-Options MARKET/LIMIT and Futures MARKET/LIMIT accounting functions explicitly validate non-negative cash and/or require remaining cash to cover reservations. They fail closed on a negative cash state; this is safer than permitting new risk, but the behavior must be deliberate, tested and visible rather than treated as generic account corruption.
+- Current Futures MARKET and LIMIT fill accounting also rejects a negative post-close cash value. Therefore, after an MTM loss creates a deficit, the old Futures close order path may be unable to reduce exposure; the dedicated risk close RPC is intended to provide the exit, but its caller-supplied charges and source-provenance limitations remain unresolved.
+- The PR #135 settlement test exercises Futures MTM, margin call, square-off and expiry on its own older migration chain. It does not assert the current candidate's account initializer behavior, Equity/Options fail-closed behavior, cross-asset reservation invariants, or that a Futures position can always be reduced after an MTM deficit.
+
+**Required before port:** explicitly define the shared-wallet deficit contract; update the account snapshot/initializer to report negative cash and generated deficit without treating it as corrupted state; ensure all risk-increasing paths reject while deficit exists; prove reduce-only exits and expiry settlement still work; add cross-asset SQL regression tests on the current 45-migration candidate. Preserve ledgerReconciled=false until authoritative settlement reconciliation is available.
+
 ## 9. Findings and required follow-up
 
 | ID | Severity | Finding | Required action |
@@ -154,7 +166,7 @@ Source review of the PR #135 settlement migration identified integration gates t
 | F-03 | HIGH | Current Futures evidence does not include a dedicated concurrent MARKET margin-contention race | Add same-account competing MARKET BUY/opening orders and cross-engine reservation stress tests; assert no over-reservation |
 | F-04 | MEDIUM | Charges and margin fixtures prove internal consistency, not external tariff/SPAN correctness | Add dated, source-backed golden vectors and independent fee/margin review; never label simulation inputs as official margin |
 | F-05 | MEDIUM | LIMIT race coverage is present, but multi-instance worker operational rehearsal is not established by this exact-head SQL run | Keep worker disabled; conduct disposable multi-instance lease/heartbeat/session-close rehearsal before any enablement |
-| F-06 | HIGH | PR #135 settlement migration changes shared wallet cash/reservation constraints | Reconcile generated deficit semantics with current cross-asset wallet invariants and run account-wide regressions before porting |
+| F-06 | HIGH | PR #135 drops shared account cash/reserve constraints, while the current account initializer still rejects negative cash and invalid reserve coverage | Define a visible margin-deficit wallet contract; update account snapshot/read validation; test risk-increase blocks and reduce-only exits across Equity/Futures/Options before porting |
 | F-07 | HIGH | Expiry/square-off charges are supplied as an RPC argument, not calculated/verified by the settlement SQL | Wire to canonical dated Futures charge resolver and external golden vectors; reject unverified fee inputs |
 | F-08 | HIGH | Settlement source hash/domain checks do not prove fetched document authenticity; ingestion worker is missing | Implement trusted source ingestion, verify bytes/hash/session/contract mapping, then keep settlement RPC service-role-only |
 | F-09 | HIGH | No two-connection same-session MTM/expiry concurrency or duplicate-expiry replay test is present in PR #135's fixture | Add concurrent disposable PostgreSQL tests for duplicate session/event, stale basis, expiry replay and conservation |
