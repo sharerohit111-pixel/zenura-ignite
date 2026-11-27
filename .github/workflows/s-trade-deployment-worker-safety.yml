@@ -1,0 +1,27 @@
+name: S-TRADE Deployment Worker Safety
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/deploy-supabase-market-gateway.yml"
+      - ".github/workflows/s-trade-deployment-worker-safety.yml"
+      - "market-gateway/supabase-server.js"
+      - "market-gateway/test/deployment-worker-gate.test.js"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  delivery-limit-worker-disabled:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Assert deployment cannot enable Delivery LIMIT worker
+        run: node --test market-gateway/test/deployment-worker-gate.test.js
