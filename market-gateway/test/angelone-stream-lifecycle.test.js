@@ -50,12 +50,12 @@ test("uses bounded exponential reconnect delay and resubmits desired tokens on o
   assert.deepEqual(reopened.subscriptions, ["3045", "26000"]);
 
   const failure2 = lifecycle.onTransportFailure(second.generation);
-  assert.equal(failure2.delayMs, 1000);
+  assert.equal(failure2.delayMs, 2000);
   now = failure2.retryAtMs;
   const third = lifecycle.beginReconnect();
   lifecycle.onOpen(third.generation);
   const failure3 = lifecycle.onTransportFailure(third.generation);
-  assert.equal(failure3.delayMs, 1000);
+  assert.equal(failure3.delayMs, 2500);
 });
 
 test("caps exponential backoff and fails closed after retry budget is exhausted", () => {
@@ -111,4 +111,25 @@ test("does not claim to send heartbeat or reconnect without transport action", (
   assert.equal(lifecycle.heartbeatDue(), true);
   assert.equal(lifecycle.getState().lastHeartbeatSentAtMs, 1000);
   assert.equal(lifecycle.getState().state, "connected");
+});
+
+test("resets retry budget only after transport explicitly marks a stable session", () => {
+  let now = 1000;
+  const lifecycle = createAngelOneStreamLifecycle({
+    now: () => now,
+    baseBackoffMs: 1000,
+    maxReconnectAttempts: 1,
+  });
+  const first = lifecycle.beginConnection();
+  lifecycle.onOpen(first.generation);
+  lifecycle.markStable(first.generation);
+  const retry = lifecycle.onTransportFailure(first.generation);
+  assert.equal(retry.reconnectAttempts, 1);
+  now = retry.retryAtMs;
+  const second = lifecycle.beginReconnect();
+  lifecycle.onOpen(second.generation);
+  assert.equal(lifecycle.markStable(second.generation).reconnectAttempts, 0);
+  const retryAgain = lifecycle.onTransportFailure(second.generation);
+  assert.equal(retryAgain.state, "reconnect_wait");
+  assert.equal(retryAgain.reconnectAttempts, 1);
 });
