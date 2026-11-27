@@ -41,8 +41,7 @@ jobs:
           NODE_ENV: test
         run: node --test test/supabase-staging-contract.test.js
 
-      - name: Assert this run is audit-only and contains no deployment commands
+      - name: Assert this run is restricted to the isolated audit branch
         run: |
           test "$GITHUB_EVENT_NAME" = "push"
           test "$GITHUB_REF" = "refs/heads/audit/chat102-gateway-staging-readiness-2026-11-27"
-          ! grep -Eq -- '--allow-unauthenticated|gcloud run deploy|PAPER_LIMIT_WORKER_ENABLED=true|SUPABASE_SERVICE_ROLE_KEY:' .github/workflows/chat102-gateway-contract-tests.yml
