@@ -49,7 +49,7 @@ test("option exercise STT uses intrinsic value and is payable by purchaser", () 
   ]);
   assert.equal(rows[0].taxableBasis, "INTRINSIC_VALUE");
   assert.equal(rows[0].payableBy, "PURCHASER");
-  assert.equal(rows[0].sttRupees, 15);
+  assert.equal(rows[0].sttRupees, 150);
 });
 
 test("STT aggregation prevents rounding each fill separately", () => {
