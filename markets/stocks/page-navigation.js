@@ -64,14 +64,14 @@
     const panel=document.querySelector(".portfolio-panel");
     if(!panel)return;
     const children=[...panel.children];
-    const pnlIndices=new Set([0,1,2,3,5,6]);
-    const positionIndices=new Set([0,2,4,7,8,9,10]);
+    const pnlIndices=new Set([0,1,2,3]);
+    const positionIndices=new Set([0,2,4,7,8]);
     const historyIndices=new Set([5,6,9,10]);
     children.forEach((el,i)=>{
       const visible=page==="pnl"?pnlIndices.has(i):page==="positions"?positionIndices.has(i):page==="history"?historyIndices.has(i):true;
       el.dataset.pageHidden=String(!visible);
     });
-    panel.querySelectorAll(".portfolio-metrics").forEach(el=>el.dataset.pageHidden=String(page==="positions"||page==="history"));
+    panel.querySelectorAll(".portfolio-metrics").forEach(el=>el.dataset.pageHidden=String(page!=="pnl"));
   }
   function show(page,updateHash){
     if(!pageSections[page])page="dashboard";
