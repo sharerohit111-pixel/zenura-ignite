@@ -39,6 +39,7 @@ const {decodeFeedResponse}=require("./lib/upstox-feed-decoder");
 const {filterFreshMarketFeeds}=require("./lib/market-feed-validation");
 const {createMarketFeedEventOrderFilter}=require("./lib/market-feed-event-order");
 const {createLeaseHeartbeat}=require("./lib/lease-heartbeat");
+const {assertMarketDataRightsApproved}=require("./lib/market-data-rights-gate");
 const {readProviderJson}=require("./lib/provider-json");
 const {upstoxHttpError}=require("./lib/upstox-http-policy");
 const {getUpstoxUserCooldown,recordUpstoxUserFailure,clearUpstoxUserCooldown}=require("./lib/upstox-user-cooldown");
@@ -131,6 +132,7 @@ function validDate(value){
   return !Number.isNaN(d.getTime())&&d.toISOString().slice(0,10)===value;
 }
 const refreshInstrumentCache=createSingleFlight(async()=>{
+  assertMarketDataRightsApproved(process.env);
   const now=Date.now();
   if(instrumentRefreshLastAttemptAt&&now-instrumentRefreshLastAttemptAt<30000)
     throw new Error("Upstox instrument master refresh is cooling down after a recent attempt.");
@@ -158,6 +160,7 @@ function connectionUsable(connection){
     &&connection.tokenCiphertext&&typeof connection.tokenCiphertext==="object";
 }
 async function getUpstoxAccessToken(userId){
+  assertMarketDataRightsApproved(process.env);
   const connection=await getConnection(userId);
   if(!connection)throw Object.assign(new Error("Connect your Upstox account before requesting market data."),{status:403});
   if(!connectionUsable(connection))throw Object.assign(new Error("Upstox token expired. Reconnect your account."),{status:403});
@@ -263,6 +266,7 @@ app.delete("/upstox/connection",async(req,res)=>{
 
 app.get("/instruments",async(req,res)=>{
   try{
+    assertMarketDataRightsApproved(process.env);
     if(!instrumentCache.length||Date.now()-instrumentCacheUpdatedAt>6*60*60*1000)await refreshInstrumentCache();
     const kind=String(req.query.kind||"all").toLowerCase(),exchange=String(req.query.exchange||"").toUpperCase();
     const q=String(req.query.q||"").trim().toLowerCase().slice(0,60);
