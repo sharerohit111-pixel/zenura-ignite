@@ -73,7 +73,10 @@ function normalizeCandles(rows) {
 }
 function requireNativeInstrument(native, providerId, expectedExchange) {
   if (!native || typeof native !== "object" || Array.isArray(native)) fail(providerId + " instrument mapping is missing.");
-  if (!["NSE", "BSE"].includes(expectedExchange) || native.exchange !== expectedExchange) {
+  if (!["NSE", "BSE"].includes(expectedExchange) || !["NSE", "BSE"].includes(native.exchange)) {
+    fail(providerId + " instrument mapping is missing or has an unsupported exchange.");
+  }
+  if (native.exchange !== expectedExchange) {
     fail(providerId + " native instrument exchange does not match the requested exchange.", "instrument_mismatch");
   }
   if (providerId === "upstox" &&
