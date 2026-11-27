@@ -71,6 +71,7 @@ test("invalid and unsafe inputs fail closed", () => {
   assert.throws(() => roundPaiseToNearestRupee(Number.MAX_SAFE_INTEGER + 1), /non-negative/);
   assert.throws(() => sumPaiseAndRoundToNearestRupee([]), /non-empty/);
   assert.throws(() => sumPaiseAndRoundToNearestRupee([Number.MAX_SAFE_INTEGER, 1]), /safe integer range/);
+  assert.throws(() => sumPaiseAndRoundToNearestRupee([Number.MAX_SAFE_INTEGER]), /rounded payable paise/);
   assert.throws(() => calculatePercentageTaxRoundedToRupees({
     basePaise: 100, rateNumerator: -1, rateDenominator: 100
   }), /rate numerator/);
