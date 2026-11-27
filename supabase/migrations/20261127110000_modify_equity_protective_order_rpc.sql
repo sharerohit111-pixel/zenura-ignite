@@ -22,7 +22,7 @@ begin
      or auth.uid() is null or p_user_id is distinct from auth.uid() then
     raise exception using errcode='42501',message='Authenticated ownership is required';
   end if;
-  if p_trigger_type not in ('STOP_LOSS','TARGET')
+  if p_trigger_type is null or p_trigger_type not in ('STOP_LOSS','TARGET')
      or p_trigger_price_paise is null or p_trigger_price_paise<=0
      or p_quantity is null or p_quantity not between 1 and 1000000 then
     raise exception using errcode='22023',message='Invalid equity protective order modification';
