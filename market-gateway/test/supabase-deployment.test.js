@@ -13,6 +13,7 @@ const deployWorkflow=fs.readFileSync(path.join(root,"../.github/workflows/deploy
 const marketDataCompliance=fs.readFileSync(path.join(root,"MARKET-DATA-COMPLIANCE.md"),"utf8");
 const tradingPage=fs.readFileSync(path.join(root,"../markets/stocks/index.html"),"utf8");
 const workflow=fs.readFileSync(path.join(root,"../.github/workflows/deploy-supabase-market-gateway.yml"),"utf8");
+const pagesWorkflow=fs.readFileSync(path.join(root,"../.github/workflows/pages.yml"),"utf8");
 test("Cloud Run and npm default entrypoints run the Supabase-native gateway",()=>{
  assert.equal(pkg.main,"supabase-server.js");
  assert.equal(pkg.scripts.start,"node supabase-server.js");
@@ -56,19 +57,30 @@ test("Production gateway deployment is manual, main-only and uses WIF plus Secre
  assert.doesNotMatch(workflow,/firebase deploy|firebase functions:deploy/i);
 });
 
-test("Manual production deployment keeps the leased LIMIT worker active in the gateway",()=>{
+test("Manual production deployment keeps the leased LIMIT worker disabled",()=>{
  assert.match(deployWorkflow,/workflow_dispatch/);
  assert.match(deployWorkflow,/id-token:\s*write/);
  assert.match(deployWorkflow,/workload_identity_provider/);
  assert.match(deployWorkflow,/gcloud run deploy/);
  assert.match(deployWorkflow,/SERVICE:\s*zenura-market-gateway/);
- assert.match(deployWorkflow,/PAPER_LIMIT_WORKER_ENABLED=true/);
+ assert.match(deployWorkflow,/PAPER_LIMIT_WORKER_ENABLED=false/);
+ assert.doesNotMatch(deployWorkflow,/PAPER_LIMIT_WORKER_ENABLED=true/);
  assert.match(deployWorkflow,/--no-cpu-throttling/);
  assert.match(server,/PAPER_LIMIT_WORKER_ENABLED==="true"/);
  assert.match(server,/setInterval\(runWorker,intervalMs\)/);
  assert.match(server,/runPaperLimitWorker\(\{maxOrders:10\}\)/);
  assert.match(deployWorkflow,/github\.ref == 'refs\/heads\/main'/);
  assert.doesNotMatch(deployWorkflow,/gcloud run jobs deploy|gcloud scheduler jobs create|firebase deploy|firebase functions:deploy|service_account_key:/i);
+});
+
+
+test("Pages artifact receives a validated public gateway origin without committing generated config",()=>{
+ assert.match(pagesWorkflow,/vars\\.MARKET_GATEWAY_URL/);
+ assert.match(pagesWorkflow,/MARKET_GATEWAY_URL must be a configured HTTPS origin/);
+ assert.match(pagesWorkflow,/Expected exactly one market-gateway-url meta tag/);
+ assert.match(pagesWorkflow,/Configure market gateway URL for the Pages artifact/);
+ assert.match(deployWorkflow,/contents: read/);
+ assert.doesNotMatch(deployWorkflow,/github-script|createOrUpdateFileContents/);
 });
 
 test("Paper Trading frontend gates protective exits on server worker readiness",()=>{
@@ -120,10 +132,10 @@ test("Protective scan index only covers active, supported equity SELL exits",()=
  assert.match(migration,/where status='ACTIVE' and asset_class='EQUITY' and side='SELL'/);
  assert.match(migration,/product in \('DELIVERY','INTRADAY'\)/);
 });
-test("Public health response confirms the leased LIMIT worker without exposing secrets",()=>{
+test("Public health response exposes LIMIT worker state without exposing secrets",()=>{
  assert.match(server,/limitWorker:\{\.\.\.paperLimitWorkerStatus\}/);
  assert.match(server,/lastCycle=\{scanned:result\.scanned,filled:result\.filled,failed:result\.failed,locked:result\.locked,cycleError:false\}/);
- assert.match(deployWorkflow,/jq -e '\.ok and \.instrumentMasterLoaded and \.limitWorker\.enabled and \.limitWorker\.lastRunAt != null and \.limitWorker\.lastCycle\.cycleError == false'/);
+ assert.match(deployWorkflow,/jq -e .*limitWorker.*enabled == false/);
  assert.doesNotMatch(server,/health[^\n]*SERVICE_ROLE_KEY|health[^\n]*UPSTOX_CLIENT_SECRET/i);
 });
 

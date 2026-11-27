@@ -23,6 +23,32 @@ jobs:
         uses: actions/configure-pages@v5
         with:
           enablement: true
+      - name: Configure market gateway URL for the Pages artifact
+        env:
+          MARKET_GATEWAY_URL: ${{ vars.MARKET_GATEWAY_URL }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import os
+          import re
+          from pathlib import Path
+          from urllib.parse import urlparse
+
+          url = os.environ.get("MARKET_GATEWAY_URL", "").strip()
+          parsed = urlparse(url)
+          if parsed.scheme != "https" or not parsed.netloc or parsed.path not in ("", "/") or parsed.query or parsed.fragment:
+              raise SystemExit("MARKET_GATEWAY_URL must be a configured HTTPS origin without path, query, or fragment.")
+          page = Path("markets/stocks/index.html")
+          html = page.read_text(encoding="utf-8")
+          pattern = r'<meta name="market-gateway-url" content="[^"]*">'
+          matches = re.findall(pattern, html)
+          if len(matches) != 1:
+              raise SystemExit("Expected exactly one market-gateway-url meta tag.")
+          html = re.sub(pattern, f'<meta name="market-gateway-url" content="{url}">', html, count=1)
+          page.write_text(html, encoding="utf-8")
+          print("Configured the public gateway origin in the Pages artifact only.")
+          PY
       - name: Upload site artifact
         uses: actions/upload-pages-artifact@v3
         with:
