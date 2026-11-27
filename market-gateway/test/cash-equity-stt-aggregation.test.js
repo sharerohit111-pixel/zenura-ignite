@@ -88,8 +88,8 @@ test("NSE delivery rate 0.10 percent applies to buy and sell legs", () => {
     trade("sell", { settlementType: "NON_NETTED", side: "SELL", quantity: 1, tradeValuePaise: 100_000 })
   ]);
   const g = result.groups[0];
-  assert.equal(g.deliveryBuySttPaise, 10);
-  assert.equal(g.deliverySellSttPaise, 10);
+  assert.equal(g.deliveryBuySttPaise, 100);
+  assert.equal(g.deliverySellSttPaise, 100);
 });
 
 test("rejects duplicate trades, invalid side, settlement type, date and amount", () => {
