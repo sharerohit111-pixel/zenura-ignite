@@ -53,7 +53,7 @@ async function verifyProductionWorkerCacheCleanup() {
       keys: await caches.keys(),
       controller: navigator.serviceWorker.controller?.scriptURL || null
     }));
-    assert.ok(activationInfo.keys.includes("zenura-markets-shell-v12"), "current v12 cache must be active: " + JSON.stringify(activationInfo));
+    assert.ok(activationInfo.keys.includes("zenura-markets-shell-v13"), "current v13 cache must be active: " + JSON.stringify(activationInfo));
     await pwaPage.reload({ waitUntil: "domcontentloaded" });
     await pwaPage.waitForFunction(() => !!navigator.serviceWorker.controller, null, { timeout: 15000 });
     const controlledWorker = await pwaPage.evaluate(() => navigator.serviceWorker.controller?.scriptURL || null);
@@ -62,7 +62,7 @@ async function verifyProductionWorkerCacheCleanup() {
       await fetch("/markets/private-session-qa-probe", { headers: { Authorization: "Bearer synthetic-qa-only" } }).catch(() => null);
     });
     const privateCacheEntries = await pwaPage.evaluate(async () => {
-      const cache = await caches.open("zenura-markets-shell-v12");
+      const cache = await caches.open("zenura-markets-shell-v13");
       return (await cache.keys()).map(request => request.url).filter(url => url.includes("private-session-qa-probe"));
     });
     assert.deepEqual(privateCacheEntries, [], "authorized private probe must not enter the shell cache");
@@ -74,7 +74,7 @@ async function verifyProductionWorkerCacheCleanup() {
     assert.equal(await pwaPage.locator("#screen-nav button[data-screen]").count(), 15, "offline demo must expose all 15 navigation controls");
     await pwaPage.reload({ waitUntil: "domcontentloaded", timeout: 15000 });
     await pwaPage.waitForFunction(() => document.querySelector("#demo-status")?.textContent.includes("4 canonical fixtures validated"), null, { timeout: 10000 });
-    console.log(JSON.stringify({ pwaUpgrade: "PASS", activeCache: "v12", workerCleanupUnitTest: "PASS", privateAuthCacheProbe: "PASS", offlineNavigation: "PASS", offlineReload: "PASS" }));
+    console.log(JSON.stringify({ pwaUpgrade: "PASS", activeCache: "v13", workerCleanupUnitTest: "PASS", privateAuthCacheProbe: "PASS", offlineNavigation: "PASS", offlineReload: "PASS" }));
 
     await pwaContext.setOffline(false);
     await pwaPage.waitForFunction(() => navigator.onLine === true, null, { timeout: 10000 });
