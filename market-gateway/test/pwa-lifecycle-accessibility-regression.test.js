@@ -70,6 +70,6 @@ test("paper terminal has separate navigation destinations and offline page routi
  assert.match(nav,/configureWorkspace/);
  assert.match(nav,/configureOrderBook/);
  assert.match(nav,/configurePortfolio/);
- assert.match(sw,/"stocks\/page-navigation\\.js"/);
+ assert.ok(sw.includes('"stocks/page-navigation.js"'));
  assert.match(nav,/data-settings-action/);
 });
