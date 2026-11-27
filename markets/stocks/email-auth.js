@@ -87,7 +87,7 @@ if (card && connectButton) {
       if (error) throw error;
       message.textContent = data.session
         ? "Account created. You are now signed in."
-        : "Account created. Email confirmation is still enabled in Supabase; an administrator must disable it before direct sign-in can work.";
+        : "Account created. Check your inbox and confirm your email using the link sent by Supabase. After confirmation, return here and sign in.";
     } catch (error) {
       const known = {
         "User already registered": "This email already has an account. Choose SIGN IN.",
