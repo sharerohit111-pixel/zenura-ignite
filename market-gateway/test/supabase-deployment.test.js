@@ -130,7 +130,11 @@ test("Public health response confirms the leased LIMIT worker without exposing s
 test("Production deployment fails closed without written market-data rights approval",()=>{
  assert.match(deployWorkflow,/MARKET_DATA_RIGHTS_APPROVED/);
  assert.match(deployWorkflow,/MARKET_DATA_RIGHTS_REFERENCE/);
- assert.match(deployWorkflow,/written provider\/regulatory approval is recorded/);
+ assert.match(deployWorkflow,/MARKET_DATA_REGULATORY_APPROVED/);
+ assert.match(deployWorkflow,/MARKET_DATA_REGULATORY_REFERENCE/);
+ assert.match(deployWorkflow,/separate securities-law\/regulatory clearance is missing/);
+ assert.match(deployWorkflow,/MARKET_DATA_REGULATORY_APPROVED=\$MARKET_DATA_REGULATORY_APPROVED/);
+ assert.match(deployWorkflow,/PAPER_LIMIT_WORKER_ENABLED=false/);
  assert.match(marketDataCompliance,/30-day lag/);
  assert.match(marketDataCompliance,/written confirmation from Upstox/);
 });
