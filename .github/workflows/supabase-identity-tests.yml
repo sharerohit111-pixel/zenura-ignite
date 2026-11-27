@@ -1,0 +1,25 @@
+name: Supabase Firebase identity resolver tests
+
+on:
+  pull_request:
+    paths:
+      - "market-gateway/lib/supabase-identity.js"
+      - "market-gateway/test/supabase-identity.test.js"
+      - ".github/workflows/supabase-identity-tests.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  identity-resolver-unit-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Check identity resolver syntax
+        run: node --check market-gateway/lib/supabase-identity.js
+      - name: Run isolated identity resolver tests
+        run: node --test market-gateway/test/supabase-identity.test.js
