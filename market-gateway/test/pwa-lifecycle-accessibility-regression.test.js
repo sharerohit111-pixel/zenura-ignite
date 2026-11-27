@@ -13,15 +13,19 @@ test("Markets PWA manifest provides scoped standalone install metadata and dedic
  assert.equal(manifest.display,"standalone");
  assert.ok(manifest.name && manifest.short_name);
  assert.ok(Array.isArray(manifest.icons) && manifest.icons.length>=2);
- const icon192=manifest.icons.find(icon=>icon.sizes==="192x192");
- const icon512=manifest.icons.find(icon=>icon.sizes==="512x512"&&icon.purpose==="any");
- const maskable=manifest.icons.find(icon=>icon.sizes==="512x512"&&icon.purpose==="maskable");
+ const icon192=manifest.icons.find(icon=>icon.sizes==="192x192"&&icon.type==="image/png");
+ const icon512=manifest.icons.find(icon=>icon.sizes==="512x512"&&icon.purpose==="any"&&icon.type==="image/png");
+ const maskable=manifest.icons.find(icon=>icon.sizes==="512x512"&&icon.purpose==="maskable"&&icon.type==="image/png");
  assert.ok(icon192&&icon512&&maskable,"192px, 512px and maskable icon declarations are required");
  for(const icon of [icon192,icon512,maskable]){
-  assert.ok(icon.src&&icon.type==="image/svg+xml");
+  assert.ok(icon.src&&icon.type==="image/png");
   const pathOnDisk=path.resolve(root,"markets",icon.src.replace(/^\.\//,""));
   assert.ok(pathOnDisk.startsWith(path.resolve(root,"markets")+path.sep));
   assert.ok(fs.existsSync(pathOnDisk),"manifest icon must exist: "+icon.src);
+  const png=fs.readFileSync(pathOnDisk);
+  assert.deepEqual([...png.subarray(0,8)],[137,80,78,71,13,10,26,10]);
+  assert.equal(png.readUInt32BE(16),Number(icon.sizes.split("x")[0]));
+  assert.equal(png.readUInt32BE(20),Number(icon.sizes.split("x")[1]));
  }
 });
 
@@ -43,6 +47,9 @@ test("install precache is a unique static allowlist without authenticated payloa
  assert.ok(entries.length>0);
  assert.equal(new Set(entries).size,entries.length);
  for(const entry of entries)assert.doesNotMatch(entry,/([?&](token|access_token|session)=|\/api\/|\/auth\/|\/private\/)/i);
+ assert.ok(entries.includes("icons/icon-192.png"));
+ assert.ok(entries.includes("icons/icon-512.png"));
+ assert.ok(entries.includes("icons/icon-512-maskable.png"));
  assert.ok(entries.includes("icons/icon-192.svg"));
  assert.ok(entries.includes("icons/icon-512.svg"));
 });

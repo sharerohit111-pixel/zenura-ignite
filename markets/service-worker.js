@@ -7,7 +7,7 @@ const SHELL=[
  "stocks/sse-parser.js","stocks/live-quote.js","stocks/reconnect-policy.js","stocks/paper-order-retry-policy.js",
  "stocks/chart-indicators.js","stocks/chart-engine.js","stocks/stocks.js","stocks/order-workspace.js","stocks/chart-theme.js",
  "stocks/supabase-client.js","stocks/connect.js","stocks/email-auth.js",
- "manifest.webmanifest","icons/icon-192.svg","icons/icon-512.svg"
+ "manifest.webmanifest","icons/icon-192.png","icons/icon-512.png","icons/icon-512-maskable.png","icons/icon-192.svg","icons/icon-512.svg"
 ].map(path=>new URL(path,BASE).toString());
 self.addEventListener("install",event=>{
  event.waitUntil((async()=>{
