@@ -80,6 +80,7 @@ test("all 15 demo screens retain native keyboard-operable navigation buttons",()
 
 test("Markets portal favicon uses the Markets-owned PWA icon instead of the Crypto app icon",()=>{
  const html=read("markets/index.html");
+ assert.match(html,/<link rel="icon" href="\\.\\/icons\\/icon-192\\.png" type="image\\/png">/);
  assert.match(html,/<link rel="icon" href="\.\/icons\/icon-192\.svg" type="image\/svg\+xml">/);
  assert.doesNotMatch(html,/<link rel="icon" href="\.\.\/crypto\/icon\.svg"/);
 });
