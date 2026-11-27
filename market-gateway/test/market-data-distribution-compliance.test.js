@@ -93,6 +93,7 @@ test("conditionally eligible providers require every independent documentary ent
       approved: true,
       paperTradingAllowed: true,
       redistributionAllowed: true,
+      displayAllowed: true,
       reference: "account-entitlement",
       rightsApprovalReference: "signed-rights",
       regulatoryApprovalReference: "counsel-clearance",
