@@ -91,7 +91,7 @@ test("authenticated wallet and empty portfolio APIs return only the caller's acc
         ? sendJson(res, 200, account)
         : sendJson(res, 406, { message: "no account" });
     }
-    if (/^\/rest\/v1\/paper_(positions|derivative_positions|futures_positions)$/.test(url.pathname)) {
+    if (/^\/rest\/v1\/paper_(equity_positions|positions|derivative_positions|futures_positions)$/.test(url.pathname)) {
       observedQueries.push({
         table: url.pathname.split("/").pop(),
         userId: url.searchParams.get("user_id"),
