@@ -33,13 +33,28 @@ function normalizeUpstoxFeedQuotes(payload, {
   now = Date.now(),
   maxAgeMs = 15000,
 } = {}) {
-  if (!payload || typeof payload !== "object" || Array.isArray(payload) ||
-      !payload.feeds || typeof payload.feeds !== "object" || Array.isArray(payload.feeds)) {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
     fail("Upstox feed frame is malformed.");
   }
   if (!Number.isSafeInteger(now) || now <= 0 ||
       !Number.isSafeInteger(maxAgeMs) || maxAgeMs <= 0) {
     fail("Upstox feed freshness policy is invalid.");
+  }
+  // Upstox V3 sends market_info before the initial live snapshot. It is a
+  // protocol-control frame, not a quote. Accept and ignore it at this quote
+  // boundary; market status must not be mistaken for a tradable price snapshot.
+  if (payload.type === "market_info") {
+    if (!epochMs(payload.currentTs) || !payload.marketInfo ||
+        typeof payload.marketInfo !== "object" || Array.isArray(payload.marketInfo) ||
+        !payload.marketInfo.segmentStatus ||
+        typeof payload.marketInfo.segmentStatus !== "object" ||
+        Array.isArray(payload.marketInfo.segmentStatus)) {
+      fail("Upstox market-info control frame is malformed.");
+    }
+    return [];
+  }
+  if (!payload.feeds || typeof payload.feeds !== "object" || Array.isArray(payload.feeds)) {
+    fail("Upstox live-feed frame is malformed.");
   }
   const frameTimestampMs = epochMs(payload.currentTs);
   if (!frameTimestampMs || frameTimestampMs > now || now - frameTimestampMs > maxAgeMs) return [];
