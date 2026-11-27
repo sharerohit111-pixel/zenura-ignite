@@ -1,0 +1,10 @@
+"$schema" = "https://open-api.netlify.com/netlify.schema.json"
+
+# ZENURA IGNITE S-TRADE review build.
+# Publishes only the allowlisted static PWA artifact; this file does not deploy.
+[build]
+  command = "node scripts/build-markets-pwa-artifact.mjs"
+  publish = "dist/markets-pwa/site"
+
+[build.environment]
+  NODE_VERSION = "20"

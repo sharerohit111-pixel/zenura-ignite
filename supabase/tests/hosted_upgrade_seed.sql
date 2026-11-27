@@ -1,6 +1,6 @@
 -- Disposable hosted-baseline upgrade fixture.
 -- Run after the exact 15 migrations already recorded by hosted Supabase and
--- before applying any of the 30 pending candidate migrations.
+-- before applying any of the 31 pending candidate migrations.
 INSERT INTO auth.users(id)
 VALUES ('e1e1e1e1-e1e1-41e1-81e1-e1e1e1e1e1e1')
 ON CONFLICT(id) DO NOTHING;

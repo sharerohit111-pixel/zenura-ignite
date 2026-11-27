@@ -24,6 +24,9 @@ test("protective-order UI calls only authenticated server-side paper endpoints",
   assert.match(source,/Authorization:'Bearer '\+token/);
   assert.match(gateway,/create_paper_equity_protective_order/);
   assert.match(gateway,/cancel_paper_protective_order/);
+  assert.match(source,/method:\'PUT\'/);
+  assert.match(source,/Protective order modified\./);
+  assert.match(gateway,/modify_paper_equity_protective_order/);
   assert.match(gateway,/instrument_type==="EQ"&&\["NSE_EQ","BSE_EQ"\]\.includes\(item\.segment\)/);
 });
 
@@ -54,4 +57,27 @@ test("protective order rendering uses text nodes and account transitions invalid
 test("new protective-order module is included in the gateway syntax-check command",()=>{
   const pkg=JSON.parse(fs.readFileSync(path.join(__dirname,"../package.json"),"utf8"));
   assert.match(pkg.scripts.check,/protective-orders\.js/);
+});
+
+
+test("active protective orders expose owner-scoped modification without weakening worker gates",()=>{
+  assert.match(gateway,/modify_paper_equity_protective_order/);
+  assert.match(source,/method:'PUT'/);
+  assert.match(source,/status==='ACTIVE'/);
+  assert.match(gateway,/app\.put\("\/paper\/protective-orders\/:orderId"/);
+  assert.match(gateway,/userDb\.rpc\("modify_paper_equity_protective_order"/);
+  assert.match(gateway,/p_protective_order_id:orderId,p_user_id:user\.id/);
+  assert.match(source,/Protective order modified\./);
+});
+
+test("protective modification RPC preserves share reservations and serializes against fills",()=>{
+  const migration=fs.readFileSync(path.join(root,"supabase/migrations/20261127110000_modify_equity_protective_order_rpc.sql"),"utf8");
+  assert.match(migration,/security definer/);
+  assert.match(migration,/p_user_id is distinct from auth.uid()/);
+  assert.match(migration,/for update/);
+  assert.match(migration,/v_order\.status<>'ACTIVE'/);
+  assert.match(migration,/v_position\.quantity-v_position\.reserved_quantity<v_quantity_delta/);
+  assert.match(migration,/reserved_quantity=reserved_quantity\+v_quantity_delta/);
+  assert.match(migration,/trigger_direction=v_direction/);
+  assert.match(migration,/grant execute on function public\.modify_paper_equity_protective_order/);
 });
