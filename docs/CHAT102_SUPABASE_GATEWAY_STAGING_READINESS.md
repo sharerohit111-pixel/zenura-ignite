@@ -97,6 +97,22 @@ GitHub Actions metadata for commit `089fbf91ef2babb44f2bc2a1406374ca980392e2` sh
 
 This is existing CI evidence only. It does not establish a Docker image build, a Cloud Run startup, hosted Supabase connectivity, OAuth callback operation, or staging API contract pass.
 
+## Exact-head disposable CI result
+
+A dedicated workflow, `.github/workflows/chat102-gateway-contract-tests.yml`, was added on this isolated branch. It has read-only repository permission, installs only the gateway package dependencies without writing a lockfile, runs the disposable local HTTP tests, and asserts that the run event/ref are the audit branch. It contains no Cloud Run deployment step, no Supabase credentials, and no hosted service calls.
+
+- Final corrected run: [GitHub Actions run #3](https://github.com/sharerohit111-pixel/zenura-ignite/actions/runs/45956770945)
+- Commit: `56bf22b1927c64a08f495781a3c50bc95b73ae24`
+- Result: **success**
+- Node.js: 22.23.5
+- npm dependency install: 262 packages, `--no-package-lock`
+- Disposable contract tests: **5 passed, 0 failed, 0 skipped**
+- Audit-branch event assertion: passed.
+
+Two earlier workflow attempts failed only in the additional workflow-guard step (first a file-presence assumption, then a self-matching grep expression); in both attempts the five application contract tests passed. The guard was simplified to assert the push event and exact isolated branch, and run #3 passed.
+
+This CI proves the five local contract tests only. It does not prove reproducible dependency resolution, Docker build/startup, real Supabase authentication/connectivity, Cloud Run IAM, OAuth, readiness, or hosted staging. The package-lock and readiness blockers remain open.
+
 ## Exit criteria
 
 Do not mark CHAT 102 complete until all are satisfied:
