@@ -39,7 +39,7 @@
     'Cancel':'रद्द करें',
     'Modify':'बदलें','Save':'सहेजें','Saving…':'सहेजा जा रहा है…','Close':'बंद करें',
     'Protective order modified.':'प्रोटेक्टिव ऑर्डर बदल दिया गया।','Protective order modification failed.':'प्रोटेक्टिव ऑर्डर में बदलाव नहीं हो सका।',
-    'Enter a valid trigger price and whole-number quantity.':'सही ट्रिगर कीमत और पूर्ण संख्या में मात्रा दर्ज करें。',
+    'Enter a valid trigger price and whole-number quantity.':'सही ट्रिगर कीमत और पूर्ण संख्या में मात्रा दर्ज करें।',
     'CANCELLING…':'रद्द किया जा रहा है…',
     'Protective order cancelled.':'प्रोटेक्टिव ऑर्डर रद्द हो गया।',
     'Protective order cancellation failed.':'प्रोटेक्टिव ऑर्डर रद्द नहीं हो सका।',
