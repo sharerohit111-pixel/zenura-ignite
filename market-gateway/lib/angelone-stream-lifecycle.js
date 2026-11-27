@@ -75,6 +75,13 @@ function createAngelOneStreamLifecycle({
     return state === "connected" && now() - lastHeartbeatSentAtMs >= heartbeatIntervalMs;
   }
 
+  function heartbeatExpired() {
+    return state === "connected" &&
+      lastHeartbeatSentAtMs !== null &&
+      now() - lastHeartbeatSentAtMs >= heartbeatIntervalMs &&
+      (lastHeartbeatAckAtMs === null || lastHeartbeatAckAtMs < lastHeartbeatSentAtMs);
+  }
+
   function markHeartbeatSent(candidateGeneration) {
     assertGeneration(candidateGeneration);
     if (state !== "connected" || !heartbeatDue()) {
@@ -138,6 +145,7 @@ function createAngelOneStreamLifecycle({
     beginConnection,
     onOpen,
     heartbeatDue,
+    heartbeatExpired,
     markHeartbeatSent,
     onHeartbeatAck,
     markStable,
