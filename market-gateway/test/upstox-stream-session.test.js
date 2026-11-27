@@ -99,3 +99,50 @@ test("empty normalized initial data leaves session unready until a valid quote a
   assert.equal(snapshot.kind, "initial_snapshot");
   assert.equal(stream.getState().ready, true);
 });
+
+test("default session path uses strict entitlement-bound quote normalization", () => {
+  const key = "NSE_EQ|INE002A01018";
+  const stream = createUpstoxStreamSession({
+    instrumentMap: {
+      [key]: {
+        nativeInstrumentKey: key,
+        instrumentId: key,
+        exchange: "NSE",
+        entitlementReference: "fixture-entitlement",
+      },
+    },
+    now: () => NOW,
+  });
+  stream.processFrame(marketInfo);
+  const valid = stream.processFrame({
+    currentTs: String(NOW - 100),
+    feeds: { [key]: { ltpc: { ltp: 123.45, ltt: String(NOW - 200) } } },
+  });
+  assert.equal(valid.kind, "initial_snapshot");
+  assert.equal(valid.ready, true);
+  assert.equal(valid.quotes[0].lastPricePaise, 12345);
+  assert.equal(valid.quotes[0].entitlementReference, "fixture-entitlement");
+});
+
+test("default session path remains unready when the initial quote is stale", () => {
+  const key = "NSE_EQ|INE002A01018";
+  const stream = createUpstoxStreamSession({
+    instrumentMap: {
+      [key]: {
+        nativeInstrumentKey: key,
+        instrumentId: key,
+        exchange: "NSE",
+        entitlementReference: "fixture-entitlement",
+      },
+    },
+    now: () => NOW,
+  });
+  stream.processFrame(marketInfo);
+  const stale = stream.processFrame({
+    currentTs: String(NOW - 20000),
+    feeds: { [key]: { ltpc: { ltp: 123.45, ltt: String(NOW - 20000) } } },
+  });
+  assert.equal(stale.kind, "awaiting_initial_snapshot");
+  assert.equal(stale.ready, false);
+  assert.equal(stream.getState().ready, false);
+});
