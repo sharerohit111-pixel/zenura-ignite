@@ -71,10 +71,36 @@ INSERT INTO public.paper_protective_orders(
   'STOP_LOSS','AT_OR_BELOW',10000,4,'ACTIVE'
 );
 
+-- Execute the privileged RPCs as service_role, but keep verification reads
+-- outside that role. Do not widen service_role table grants for test visibility.
+CREATE TEMP TABLE protective_fill_results (
+  case_name text PRIMARY KEY,
+  result jsonb NOT NULL
+) ON COMMIT DROP;
+GRANT INSERT ON pg_temp.protective_fill_results TO service_role;
+
 SET ROLE service_role;
+INSERT INTO pg_temp.protective_fill_results(case_name,result)
+SELECT 'full', public.execute_paper_equity_protective_fill(
+  'a1111111-1111-4111-8111-111111111111',
+  md5(gen_random_uuid()::text)||md5(gen_random_uuid()::text),
+  md5(gen_random_uuid()::text)||md5(gen_random_uuid()::text),
+  9000, n.now_ms, n.now_ms
+)
+FROM (SELECT floor(extract(epoch from clock_timestamp())*1000)::bigint AS now_ms) n;
+
+INSERT INTO pg_temp.protective_fill_results(case_name,result)
+SELECT 'partial', public.execute_paper_equity_protective_fill(
+  'b2222222-2222-4222-8222-222222222222',
+  md5(gen_random_uuid()::text)||md5(gen_random_uuid()::text),
+  md5(gen_random_uuid()::text)||md5(gen_random_uuid()::text),
+  9000, n.now_ms, n.now_ms
+)
+FROM (SELECT floor(extract(epoch from clock_timestamp())*1000)::bigint AS now_ms) n;
+RESET ROLE;
+
 DO $protective_reservation_fill_regression$
 DECLARE
-  v_now bigint:=floor(extract(epoch from clock_timestamp())*1000)::bigint;
   v_full jsonb;
   v_partial jsonb;
   v_cash bigint;
@@ -82,15 +108,10 @@ DECLARE
   v_quantity integer;
   v_reserved integer;
   v_cost bigint;
-  v_full_execution_id text:=md5(gen_random_uuid()::text)||md5(gen_random_uuid()::text);
-  v_full_fingerprint text:=md5(gen_random_uuid()::text)||md5(gen_random_uuid()::text);
-  v_partial_execution_id text:=md5(gen_random_uuid()::text)||md5(gen_random_uuid()::text);
-  v_partial_fingerprint text:=md5(gen_random_uuid()::text)||md5(gen_random_uuid()::text);
 BEGIN
-  v_full:=public.execute_paper_equity_protective_fill(
-    'a1111111-1111-4111-8111-111111111111',
-    v_full_execution_id,v_full_fingerprint,9000,v_now,v_now
-  );
+  SELECT result INTO v_full FROM pg_temp.protective_fill_results WHERE case_name='full';
+  SELECT result INTO v_partial FROM pg_temp.protective_fill_results WHERE case_name='partial';
+
   IF v_full->>'status'<>'FILLED' THEN
     RAISE EXCEPTION 'Fully reserved protective exit did not fill: %',v_full;
   END IF;
@@ -111,17 +132,13 @@ BEGIN
     RAISE EXCEPTION 'Full-position account cash/P&L did not reconcile';
   END IF;
   IF NOT EXISTS(SELECT 1 FROM public.paper_orders
-      WHERE order_id=v_full_execution_id
+      WHERE order_id=v_full->>'execution_order_id'
         AND charges_paise=(v_full->>'charges_paise')::bigint
         AND cash_delta_paise=(v_full->>'cash_delta_paise')::bigint
         AND realized_pnl_paise=(v_full->>'realized_pnl_paise')::bigint) THEN
     RAISE EXCEPTION 'Full-position canonical execution record is incomplete';
   END IF;
 
-  v_partial:=public.execute_paper_equity_protective_fill(
-    'b2222222-2222-4222-8222-222222222222',
-    v_partial_execution_id,v_partial_fingerprint,9000,v_now,v_now
-  );
   IF v_partial->>'status'<>'FILLED' THEN
     RAISE EXCEPTION 'Protective fill with other reserved shares did not fill: %',v_partial;
   END IF;
@@ -142,7 +159,7 @@ BEGIN
     RAISE EXCEPTION 'Partial protective account cash/P&L did not reconcile';
   END IF;
   IF NOT EXISTS(SELECT 1 FROM public.paper_orders
-      WHERE order_id=v_partial_execution_id
+      WHERE order_id=v_partial->>'execution_order_id'
         AND charges_paise=(v_partial->>'charges_paise')::bigint
         AND cash_delta_paise=(v_partial->>'cash_delta_paise')::bigint
         AND realized_pnl_paise=(v_partial->>'realized_pnl_paise')::bigint) THEN
@@ -150,6 +167,5 @@ BEGIN
   END IF;
 END
 $protective_reservation_fill_regression$;
-RESET ROLE;
 
 ROLLBACK;
