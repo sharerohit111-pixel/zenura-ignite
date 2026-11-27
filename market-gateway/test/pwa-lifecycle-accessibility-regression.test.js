@@ -19,7 +19,7 @@ test("Markets PWA manifest remains installable and scoped away from Crypto",()=>
 test("service worker cache generation is explicit and activation removes stale Markets generations",()=>{
  const sw=read("markets/service-worker.js");
  const cache=sw.match(/const CACHE_NAME="([^"]+)"/)?.[1];
- assert.equal(cache,"zenura-markets-shell-v12");
+ assert.equal(cache,"zenura-markets-shell-v13");
  assert.match(sw,/await self\.skipWaiting\(\)/);
  assert.match(sw,/await self\.clients\.claim\(\)/);
  assert.match(sw,/key\.startsWith\("zenura-markets-"\)&&key!==CACHE_NAME/);
@@ -58,4 +58,18 @@ test("all 15 demo screens retain native keyboard-operable navigation buttons",()
  for(const screen of screens)assert.match(html,new RegExp('<button\\s+data-screen="'+screen+'"'));
  assert.match(html,/<nav[^>]*aria-label="Demo screens"/);
  assert.match(html,/<button type="button" id="paper-language-toggle"[^>]*aria-label="Switch to Hindi"/);
+});
+
+test("paper terminal has separate navigation destinations and offline page routing",()=>{
+ const html=read("markets/stocks/index.html");
+ const nav=read("markets/stocks/page-navigation.js");
+ const sw=read("markets/service-worker.js");
+ const pages=["dashboard","chart","watchlist","balance","positions","orders","history","pnl","derivatives","settings"];
+ for(const page of pages)assert.match(html,new RegExp('data-terminal-page="'+page+'"'));
+ assert.match(nav,/pageSections/);
+ assert.match(nav,/configureWorkspace/);
+ assert.match(nav,/configureOrderBook/);
+ assert.match(nav,/configurePortfolio/);
+ assert.match(sw,/"stocks\/page-navigation\\.js"/);
+ assert.match(nav,/data-settings-action/);
 });
