@@ -4,7 +4,6 @@ DO $portfolio_receipt_contract$
 DECLARE
   item record;
   missing_columns text[];
-  required record;
 BEGIN
   FOR item IN
     SELECT * FROM (VALUES
@@ -26,9 +25,9 @@ BEGIN
     IF to_regclass('public.' || item.table_name) IS NULL THEN
       RAISE EXCEPTION 'Portfolio receipt source table is missing: %', item.table_name;
     END IF;
-    SELECT array_agg(required.column_name ORDER BY required.column_name)
+    SELECT array_agg(u.column_name ORDER BY required.column_name)
       INTO missing_columns
-      FROM unnest(item.columns_required) AS required(column_name)
+      FROM unnest(item.columns_required) AS u(column_name)
      WHERE NOT EXISTS (
        SELECT 1 FROM information_schema.columns c
         WHERE c.table_schema='public'
