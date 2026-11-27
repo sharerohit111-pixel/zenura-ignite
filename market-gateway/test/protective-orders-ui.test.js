@@ -58,7 +58,7 @@ test("new protective-order module is included in the gateway syntax-check comman
 
 
 test("active protective orders expose owner-scoped modification without weakening worker gates",()=>{
-  assert.match(source,/modify_paper_equity_protective_order/);
+  assert.match(gateway,/modify_paper_equity_protective_order/);
   assert.match(source,/method:'PUT'/);
   assert.match(source,/status==='ACTIVE'/);
   assert.match(gateway,/app\.put\("\/paper\/protective-orders\/:orderId"/);
