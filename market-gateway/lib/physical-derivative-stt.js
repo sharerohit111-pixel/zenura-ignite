@@ -100,10 +100,15 @@ function aggregatePhysicalDerivativeStt(events) {
       rateVersion: RATE_VERSION,
       eventCount: g.eventCount
     }));
-    clientTotals.set(g.clientId, (clientTotals.get(g.clientId) || 0n) + BigInt(sttPaise));
+    const clientDayKey = JSON.stringify([g.clientId, g.settlementDate]);
+    const clientDay = clientTotals.get(clientDayKey) || {
+      clientId: g.clientId, settlementDate: g.settlementDate, total: 0n
+    };
+    clientDay.total += BigInt(sttPaise);
+    clientTotals.set(clientDayKey, clientDay);
   }
 
-  const clients = [...clientTotals.entries()].map(([clientId, total]) => {
+  const clients = [...clientTotals.values()].map(({ clientId, settlementDate, total }) => {
     if (total > BigInt(Number.MAX_SAFE_INTEGER)) {
       throw new RangeError("Client physical STT aggregate exceeds supported safe integer range.");
     }
@@ -111,6 +116,7 @@ function aggregatePhysicalDerivativeStt(events) {
     const payableRupees = roundPaiseToNearestRupee(totalPaise);
     return Object.freeze({
       clientId,
+      settlementDate,
       totalSttPaise: totalPaise,
       payableSttRupees: payableRupees,
       roundedPayablePaise: payableRupees * 100
