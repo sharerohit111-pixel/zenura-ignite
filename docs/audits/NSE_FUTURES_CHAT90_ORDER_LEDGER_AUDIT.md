@@ -154,7 +154,7 @@ Source review of the PR #135 settlement migration identified integration gates t
 | F-09 | HIGH | No two-connection same-session MTM/expiry concurrency or duplicate-expiry replay test is present in PR #135's fixture | Add concurrent disposable PostgreSQL tests for duplicate session/event, stale basis, expiry replay and conservation |
 | F-10 | MEDIUM | PR #135 simulator posts variation to cash immediately and does not model T+1 receivable/payable separately | Label the timing as simulator behavior or add explicit settlement receivable/payable states before exchange-timing claims |
 
-## 9. Safety and scope confirmation
+## 10. Safety and scope confirmation
 
 - No production orders or broker orders were submitted.
 - No hosted/production database writes or migrations were performed by this audit.
