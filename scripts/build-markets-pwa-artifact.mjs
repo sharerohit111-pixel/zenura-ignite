@@ -8,7 +8,7 @@ const workerPath = path.join(sourceMarkets, "service-worker.js");
 const worker = fs.readFileSync(workerPath, "utf8");
 const match = worker.match(/const SHELL=\[([\s\S]*?)\]\.map/);
 if (!match) throw new Error("Could not read the canonical PWA SHELL allowlist");
-const shellPaths = [...match[1].matchAll(/"([^"]+)"/g)].map((m) => m[1]);
+const shellPaths = [...match[1].matchAll(/"([^"]*)"/g)].map((m) => m[1]);
 if (!shellPaths.length) throw new Error("PWA shell allowlist is empty");
 
 fs.rmSync(out, { recursive: true, force: true });
