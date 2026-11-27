@@ -1,7 +1,7 @@
 "use strict";
 import test from "node:test";
 import assert from "node:assert/strict";
-import { parseStages, validateTarget, parsePaths, summarize } from "../performance/load-test.js";
+import { parseStages, validateTarget, parsePaths, summarize, READ_ONLY_PATHS } from "../performance/load-test.js";
 
 test("accepts bounded ascending default concurrency ramp", () => assert.deepEqual(parseStages(), [10,25,50,100,250,500]));
 test("rejects unsafe or unordered concurrency ramps", () => {
@@ -17,9 +17,10 @@ test("staging requires HTTPS and an exact hostname allowlist", () => {
   assert.throws(() => validateTarget("https://gateway.staging.example","staging","*.example"));
   assert.throws(() => validateTarget("http://gateway.staging.example","staging","gateway.staging.example"));
 });
-test("rejects write paths and unknown endpoints", () => {
+test("rejects account initialization GET and every write or unknown route", () => {
+  assert.equal(READ_ONLY_PATHS.includes("/paper/account"), false);
   assert.deepEqual(parsePaths("/health,/paper/orders"),["/health","/paper/orders"]);
-  for (const value of ["/paper/orders,/paper/orders/submit","/paper/orders?limit=10","POST:/paper/orders",""]) assert.throws(() => parsePaths(value));
+  for (const value of ["/paper/account","/paper/orders,/paper/orders/submit","/paper/orders?limit=10","POST:/paper/orders",""]) assert.throws(() => parsePaths(value));
 });
 test("reports percentiles, status distribution and errors", () => {
   const result=summarize([{status:200,latencyMs:10},{status:200,latencyMs:20},{status:429,latencyMs:30},{status:null,latencyMs:40}],1000,4);
