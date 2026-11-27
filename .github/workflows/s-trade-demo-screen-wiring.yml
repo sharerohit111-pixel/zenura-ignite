@@ -85,7 +85,7 @@ jobs:
         with:
           node-version: "22"
       - name: Check browser module syntax
-        run: node --check markets/shared/paper-demo-adapter.mjs && node --check markets/shared/paper-demo-event-ledger.mjs && node --check markets/shared/paper-demo-ledger-session.mjs && node --check markets/stocks/demo.js && node --check markets/stocks/demo-watchlist-persistence.mjs && node --check markets/stocks/demo-derivative-panel.mjs && node --check markets/stocks/demo-unified-ledger-panel.mjs && node --check markets/stocks/demo-derivative-ledger-bridge.mjs && node --check markets/stocks/derivative-mock-simulator.js && node --check markets/stocks/demo-chart-data.mjs && node --check markets/stocks/demo-chart-panel.mjs && node --check markets/stocks/page-navigation.js
+        run: node --check markets/shared/paper-demo-adapter.mjs && node --check markets/shared/paper-demo-event-ledger.mjs && node --check markets/shared/paper-demo-ledger-session.mjs && node --check markets/stocks/demo.js && node --check markets/stocks/demo-watchlist-persistence.mjs && node --check markets/stocks/demo-derivative-panel.mjs && node --check markets/stocks/demo-unified-ledger-panel.mjs && node --check markets/stocks/demo-derivative-ledger-bridge.mjs && node --check markets/stocks/derivative-mock-simulator.js && node --check markets/stocks/demo-chart-data.mjs && node --check markets/stocks/demo-chart-panel.mjs && node --check markets/stocks/page-navigation.js && node --check markets/stocks/protective-orders.js
       - name: Validate shared fixtures
         run: |
           node - <<'NODE'
