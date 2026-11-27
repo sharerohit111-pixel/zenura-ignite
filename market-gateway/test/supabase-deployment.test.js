@@ -56,13 +56,15 @@ test("Production gateway deployment is manual, main-only and uses WIF plus Secre
  assert.doesNotMatch(workflow,/firebase deploy|firebase functions:deploy/i);
 });
 
-test("Manual production deployment keeps the leased LIMIT worker active in the gateway",()=>{
+test("Manual production deployment keeps the leased Delivery LIMIT worker disabled",()=>{
  assert.match(deployWorkflow,/workflow_dispatch/);
  assert.match(deployWorkflow,/id-token:\s*write/);
  assert.match(deployWorkflow,/workload_identity_provider/);
  assert.match(deployWorkflow,/gcloud run deploy/);
  assert.match(deployWorkflow,/SERVICE:\s*zenura-market-gateway/);
- assert.match(deployWorkflow,/PAPER_LIMIT_WORKER_ENABLED=true/);
+ assert.match(deployWorkflow,/PAPER_LIMIT_WORKER_ENABLED=false/);
+ assert.doesNotMatch(deployWorkflow,/PAPER_LIMIT_WORKER_ENABLED=true/);
+ assert.match(deployWorkflow,/\\.limitWorker\\.enabled == false/);
  assert.match(deployWorkflow,/--no-cpu-throttling/);
  assert.match(server,/PAPER_LIMIT_WORKER_ENABLED==="true"/);
  assert.match(server,/setInterval\(runWorker,intervalMs\)/);
