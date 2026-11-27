@@ -7,6 +7,7 @@ const crypto=require("node:crypto");
 const path=require("node:path");
 const {createClient}=require("@supabase/supabase-js");
 const {createSupabaseRuntime,readBearerToken}=require("./lib/supabase-runtime");
+const {checkSupabaseReadiness}=require("./lib/supabase-readiness");
 const {downloadInstrumentMaster}=require("./lib/instrument-master-download");
 const {validateUpstoxFeedUrl}=require("./lib/upstox-feed-url");
 const {WATCHLIST_NAMES,normalizeWatchlists,mergeWatchlistUpdate}=require("./lib/watchlists");
@@ -74,6 +75,7 @@ const runtime=createSupabaseRuntime({
 });
 const serviceDb=runtime.serviceDb;
 const app=express();
+let gatewayStartupComplete=false;
 app.use(express.json({limit:"32kb"}));
 app.use((req,res,next)=>{
   const origin=req.get("origin");
@@ -177,6 +179,20 @@ app.get("/health",(_req,res)=>res.json({
   instrumentMasterUpdatedAt:instrumentCacheUpdatedAt||null,
   limitWorker:{...paperLimitWorkerStatus},intradayLimitWorker:{...paperIntradayLimitWorkerStatus},futuresLimitSubmissionEnabled:process.env.PAPER_FUTURES_LIMIT_ENABLED==="true",futuresLimitWorker:{...paperFuturesLimitWorkerStatus},optionsLimitSubmissionEnabled:process.env.PAPER_OPTIONS_LIMIT_ENABLED==="true",optionsLimitWorker:{...paperOptionLimitWorkerStatus},protectiveWorker:{...paperProtectiveWorkerStatus}
 }));
+
+app.get("/ready",async(_req,res)=>{
+  if(!gatewayStartupComplete){
+    return res.status(503).json({ready:false,checks:{startup:false,supabaseAuth:false,supabaseDataApi:false}});
+  }
+  const dependencies=await checkSupabaseReadiness({
+    supabaseUrl:SUPABASE_URL,
+    publishableKey:SUPABASE_PUBLISHABLE_KEY,
+    fetchImpl:fetch
+  });
+  const checks={startup:true,...dependencies};
+  const ready=checks.startup&&checks.authApi&&checks.dataApi;
+  res.status(ready?200:503).json({ready,checks});
+});
 
 app.get("/upstox/connection",async(req,res)=>{
   try{
@@ -1368,6 +1384,7 @@ async function start(){
     throw new Error("ALLOWED_ORIGINS must contain the exact HTTPS origin of ZENURA_APP_REDIRECT_URI.");
   }
   await loadProto();
+  gatewayStartupComplete=true;
   app.listen(PORT,"0.0.0.0",()=>console.log("Supabase-native ZENURA market gateway listening on",PORT));
   refreshInstrumentCache().catch(error=>console.error("Initial instrument refresh failed:",error.message));
   if(process.env.PAPER_PROTECTIVE_WORKER_ENABLED==="true"){
