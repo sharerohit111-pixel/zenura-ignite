@@ -109,7 +109,8 @@ test("does not claim to send heartbeat or reconnect without transport action", (
   lifecycle.onOpen(first.generation);
   now += 30000;
   assert.equal(lifecycle.heartbeatDue(), true);
-  assert.equal(lifecycle.getState().lastHeartbeatSentAtMs, 1000);
+  assert.equal(lifecycle.getState().lastHeartbeatSentAtMs, null);
+  assert.equal(lifecycle.getState().connectedAtMs, 1000);
   assert.equal(lifecycle.getState().state, "connected");
 });
 
