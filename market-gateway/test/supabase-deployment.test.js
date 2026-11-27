@@ -56,13 +56,13 @@ test("Production gateway deployment is manual, main-only and uses WIF plus Secre
  assert.doesNotMatch(workflow,/firebase deploy|firebase functions:deploy/i);
 });
 
-test("Manual production deployment keeps the leased LIMIT worker active in the gateway",()=>{
+test("Manual production deployment keeps the Delivery LIMIT worker disabled until staging approval",()=>{
  assert.match(deployWorkflow,/workflow_dispatch/);
  assert.match(deployWorkflow,/id-token:\s*write/);
  assert.match(deployWorkflow,/workload_identity_provider/);
  assert.match(deployWorkflow,/gcloud run deploy/);
  assert.match(deployWorkflow,/SERVICE:\s*zenura-market-gateway/);
- assert.match(deployWorkflow,/PAPER_LIMIT_WORKER_ENABLED=true/);
+ assert.match(deployWorkflow,/PAPER_LIMIT_WORKER_ENABLED=false/);
  assert.match(deployWorkflow,/--no-cpu-throttling/);
  assert.match(server,/PAPER_LIMIT_WORKER_ENABLED==="true"/);
  assert.match(server,/setInterval\(runWorker,intervalMs\)/);
@@ -123,14 +123,18 @@ test("Protective scan index only covers active, supported equity SELL exits",()=
 test("Public health response confirms the leased LIMIT worker without exposing secrets",()=>{
  assert.match(server,/limitWorker:\{\.\.\.paperLimitWorkerStatus\}/);
  assert.match(server,/lastCycle=\{scanned:result\.scanned,filled:result\.filled,failed:result\.failed,locked:result\.locked,cycleError:false\}/);
- assert.match(deployWorkflow,/jq -e '\.ok and \.instrumentMasterLoaded and \.limitWorker\.enabled and \.limitWorker\.lastRunAt != null and \.limitWorker\.lastCycle\.cycleError == false'/);
+ assert.match(deployWorkflow,/jq -e '\.ok and \.instrumentMasterLoaded and \.limitWorker\.enabled == false'/);
  assert.doesNotMatch(server,/health[^\n]*SERVICE_ROLE_KEY|health[^\n]*UPSTOX_CLIENT_SECRET/i);
 });
 
 test("Production deployment fails closed without written market-data rights approval",()=>{
  assert.match(deployWorkflow,/MARKET_DATA_RIGHTS_APPROVED/);
  assert.match(deployWorkflow,/MARKET_DATA_RIGHTS_REFERENCE/);
- assert.match(deployWorkflow,/written provider\/regulatory approval is recorded/);
+ assert.match(deployWorkflow,/MARKET_DATA_REGULATORY_APPROVED/);
+ assert.match(deployWorkflow,/MARKET_DATA_REGULATORY_REFERENCE/);
+ assert.match(deployWorkflow,/separate securities-law\/regulatory clearance is missing/);
+ assert.match(deployWorkflow,/MARKET_DATA_REGULATORY_APPROVED=\$MARKET_DATA_REGULATORY_APPROVED/);
+ assert.match(deployWorkflow,/PAPER_LIMIT_WORKER_ENABLED=false/);
  assert.match(marketDataCompliance,/30-day lag/);
  assert.match(marketDataCompliance,/written confirmation from Upstox/);
 });

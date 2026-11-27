@@ -4,14 +4,14 @@
 
 - **Supabase** is the application backend: native Auth, Postgres, RLS and transactional RPCs.
 - **Cloud Run** hosts one Node.js HTTP/SSE market gateway. It is not Firebase and does not use Firebase Auth, Firestore or Firebase Functions.
-- The same Cloud Run process runs the leased Delivery LIMIT worker and, when explicitly enabled, separately leased Intraday LIMIT and equity protective-order workers. There is **no separate Cloud Run Job or Cloud Scheduler** in the current design.
+- The same Cloud Run process can run the leased Delivery LIMIT worker and, when explicitly enabled, separately leased Intraday LIMIT and equity protective-order workers. All execution workers remain disabled by default until their individual staging and release gates pass. There is **no separate Cloud Run Job or Cloud Scheduler** in the current design.
 - Each user authorizes their own Upstox account. The gateway resolves that user's encrypted token only after validating the user's Supabase access token.
 - All orders are virtual paper orders. The app does not submit orders to Upstox or an exchange.
 - The frontend's gateway URL remains blank until a verified gateway is deployed.
 
 ## Important release gate: market-data rights
 
-Public real-time market-data deployment is blocked until written Upstox/provider permission and Indian securities counsel's applicability review are recorded. API credentials alone do not prove redistribution/display rights. See [MARKET-DATA-COMPLIANCE.md](./MARKET-DATA-COMPLIANCE.md). The manual deployment workflow fails closed unless `MARKET_DATA_RIGHTS_APPROVED=true` and a written approval reference are present.
+Public market-data deployment is blocked until two independent approvals are documented: (1) written provider/exchange rights for the exact data use, and (2) separate Indian securities-law/regulatory clearance for the public paper-trading product. API credentials alone do not prove redistribution/display rights. See [MARKET-DATA-COMPLIANCE.md](./MARKET-DATA-COMPLIANCE.md). The manual deployment workflow fails closed unless both approval flags are exactly `true` and both references are non-empty. These variables must never be populated with placeholders or self-attestations.
 
 Do not bypass this check. If public real-time display is not approved, use a licensed source or implement the required delayed-data mode before launch.
 
@@ -59,16 +59,18 @@ Configure GitHub Actions **variables**:
 - `UPSTOX_REDIRECT_URI`: exactly `MARKET_GATEWAY_URL/upstox/oauth/callback`.
 - `ZENURA_APP_REDIRECT_URI`: exactly `FRONTEND_ORIGIN/markets/stocks/`.
 - `MARKET_DATA_RIGHTS_APPROVED`: set to `true` only after written provider/legal approval is actually received.
-- `MARKET_DATA_RIGHTS_REFERENCE`: reference to the written approval (document ID or approved record).
+- `MARKET_DATA_RIGHTS_REFERENCE`: reference to the verified written provider/exchange rights document.
+- `MARKET_DATA_REGULATORY_APPROVED`: set to `true` only after separate product-level securities-law/regulatory clearance is independently verified.
+- `MARKET_DATA_REGULATORY_REFERENCE`: reference to the signed counsel opinion and/or authorized regulatory clearance record.
 
 The workflow validates these values and the four Secret Manager entries before it builds or deploys. It then:
 
 1. Builds the Docker image from the repository root (the shared OAuth helpers under `functions/lib` are included).
 2. Deploys `zenura-market-gateway` to Cloud Run.
 3. Runs one warm instance (2 vCPU / 2 GiB) with CPU always allocated.
-4. Enables the leased equity Delivery LIMIT worker at a 2-second polling interval.
-5. Waits for the instrument master and a successful worker cycle in the public health response.
-6. Updates both market-mode HTML pages to use the verified gateway URL.
+4. Explicitly keeps the Delivery LIMIT worker disabled (`PAPER_LIMIT_WORKER_ENABLED=false`).
+5. Waits for instrument-master readiness and verifies that the Delivery LIMIT worker remains disabled in the public health response.
+6. Updates the market-mode HTML page to use the verified gateway URL.
 
 ## Runtime and performance settings
 
@@ -79,7 +81,7 @@ The deployment uses:
 - `--no-cpu-throttling`: required because the LIMIT worker runs in the background between HTTP requests.
 - `--concurrency 40`: limit request concurrency per instance.
 - `--timeout 3600`: supports long-lived Upstox V3 SSE streams.
-- `PAPER_LIMIT_WORKER_ENABLED=true` and `PAPER_LIMIT_WORKER_INTERVAL_MS=2000`.
+- `PAPER_LIMIT_WORKER_ENABLED=false` by default. Do not enable the Delivery LIMIT worker until isolated staging submit/fill/cancel/expiry, concurrency, lease/retry, user-token isolation, market-data rights and compliance gates are independently verified and explicitly approved.
 - `PAPER_INTRADAY_LIMIT_WORKER_ENABLED` remains unset/false by default. Do not enable it until the reviewed official NSE/BSE session calendar has been populated and verified in `paper_exchange_sessions`, the migration is approved/applied, and the live calendar/session smoke checks are complete. Optional interval: `PAPER_INTRADAY_LIMIT_WORKER_INTERVAL_MS`.
 - `PAPER_PROTECTIVE_WORKER_ENABLED` remains unset/false by default. Enable only after the protective-order UI, SQL migration checks, end-to-end tests, written market-data rights and compliance gates are complete. Optional interval: `PAPER_PROTECTIVE_WORKER_INTERVAL_MS`.
 - `PAPER_OPTIONS_LIMIT_ENABLED` and `PAPER_OPTIONS_LIMIT_WORKER_ENABLED` remain unset/false by default. Both must be explicitly true before the NSE long CE/PE Options LIMIT API or worker can run. Enable only after staging submit/fill/cancel/expiry, concurrent race, Upstox token-isolation, instrument/session, UI, written market-data rights and compliance checks are complete. Optional interval: `PAPER_OPTIONS_LIMIT_WORKER_INTERVAL_MS`. BSE Options LIMIT is not supported.
@@ -102,7 +104,7 @@ These Auth settings are separate from the Cloud Run deployment workflow and must
 ## Current order-type coverage
 
 - Paper Trading equity MARKET orders are supported.
-- Equity LIMIT orders are currently supported for **Delivery** and are processed by the in-service worker.
+- Equity LIMIT orders are implemented for **Delivery**, but automatic execution remains unavailable while the Delivery LIMIT worker is disabled by default. Do not represent pending Delivery LIMIT orders as automatically executed until the worker has passed its separate release gates and is explicitly enabled.
 - Intraday LIMIT now has a separate SQL reservation/fill/cancel/expiry lifecycle, session-aware quote validation, a dedicated leased worker and gateway routing. It remains **disabled by default** until official verified calendar rows are loaded and reviewed; the deployment workflow does not enable it.
 - Futures LIMIT and NSE long CE/PE Options LIMIT have isolated draft backend/RPC/worker implementations and a gated Options LIMIT ticket UI under review; none is deployed or enabled in production. Options LIMIT is NSE-only and long-only; BSE Options LIMIT and short-option opening remain unsupported.
 - Futures and long CE/PE option market-order paths are separate transactional flows.
