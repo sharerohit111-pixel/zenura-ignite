@@ -3,8 +3,11 @@
 import fs from "node:fs";
 import { pathToFileURL } from "node:url";
 
+// Keep this list aligned with actual Express GET routes. /paper/account is
+// intentionally excluded: its handler invokes initialize_paper_trading_account,
+// which may create/write an account and is therefore not a read-only load target.
 export const READ_ONLY_PATHS = Object.freeze([
-  "/health", "/instruments", "/paper/account", "/paper/orders", "/paper/portfolio",
+  "/health", "/instruments", "/paper/orders", "/paper/portfolio",
   "/paper/derivative/orders", "/paper/derivatives/portfolio", "/paper/futures/orders",
   "/paper/futures/portfolio", "/watchlists"
 ]);
@@ -29,7 +32,7 @@ export function validateTarget(rawUrl, targetEnv, allowlist = "") {
   let url;
   try { url = new URL(rawUrl); } catch { throw new Error("BASE_URL must be a valid absolute URL."); }
   if (url.username || url.password || url.search || url.hash) throw new Error("BASE_URL must not contain credentials, query parameters or a fragment.");
-  const host = url.hostname.toLowerCase().replace(/^\[|\]$/g, "");
+  const host = url.hostname.toLowerCase().replace(/^\\[|\\]$/g, "");
   if (targetEnv === "disposable") {
     const local = ["localhost", "127.0.0.1", "::1"].includes(host) || isPrivateIpv4(host) || host.endsWith(".test") || host.endsWith(".local");
     if (!local) throw new Error("Disposable runs are restricted to localhost, private IPv4, .test or .local hosts.");
@@ -43,7 +46,7 @@ export function validateTarget(rawUrl, targetEnv, allowlist = "") {
 export function parsePaths(value = "/health") {
   const paths = String(value).split(",").map(x => x.trim()).filter(Boolean);
   if (!paths.length || paths.some(path => !READ_ONLY_PATHS.includes(path)))
-    throw new Error("LOAD_PATHS may contain only the documented GET-only read paths.");
+    throw new Error("LOAD_PATHS may contain only documented, side-effect-free GET paths.");
   return [...new Set(paths)];
 }
 export function summarize(samples, elapsedMs, vus) {
