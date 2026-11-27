@@ -41,8 +41,8 @@ jobs:
           NODE_ENV: test
         run: node --test test/supabase-staging-contract.test.js
 
-      - name: Assert production deployment workflow was not dispatched
+      - name: Assert this run is audit-only and contains no deployment commands
         run: |
-          test -f .github/workflows/deploy-supabase-market-gateway.yml
-          ! grep -q -- '--allow-unauthenticated' .github/workflows/chat102-gateway-contract-tests.yml
-          ! grep -q 'gcloud run deploy' .github/workflows/chat102-gateway-contract-tests.yml
+          test "$GITHUB_EVENT_NAME" = "push"
+          test "$GITHUB_REF" = "refs/heads/audit/chat102-gateway-staging-readiness-2026-11-27"
+          ! grep -Eq -- '--allow-unauthenticated|gcloud run deploy|PAPER_LIMIT_WORKER_ENABLED=true|SUPABASE_SERVICE_ROLE_KEY:' .github/workflows/chat102-gateway-contract-tests.yml
