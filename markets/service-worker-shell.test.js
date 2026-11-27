@@ -10,8 +10,9 @@ const worker=fs.readFileSync(path.join(root,"service-worker.js"),"utf8");
 const shellBlock=worker.match(/const SHELL=\[([\s\S]*?)\]\.map\(/);
 assert.ok(shellBlock,"service worker must declare a static shell list");
 const shellPaths=[...shellBlock[1].matchAll(/"([^"]+)"/g)].map(match=>match[1]);
-const normalize=value=>path.posix.normalize(path.posix.join("markets/stocks",value)).replace(/^markets\//,"");
-const shellSet=new Set(shellPaths.map(normalize));
+const normalizeShell=value=>path.posix.normalize(path.posix.join("markets",value)).replace(/^markets\//,"");
+const normalizePageAsset=value=>path.posix.normalize(path.posix.join("markets","stocks",value)).replace(/^markets\//,"");
+const shellSet=new Set(shellPaths.map(normalizeShell));
 const localAssets=[];
 for(const match of html.matchAll(/<(?:script|link)\b[^>]*>/gi)){
  const tag=match[0];
@@ -23,7 +24,7 @@ for(const match of html.matchAll(/<(?:script|link)\b[^>]*>/gi)){
  if(!value||/^(?:https?:|data:|#)/i.test(value))continue;
  localAssets.push(value);
 }
-const missing=[...new Set(localAssets.map(normalize).filter(asset=>!shellSet.has(asset)))];
+const missing=[...new Set(localAssets.map(normalizePageAsset).filter(asset=>!shellSet.has(asset)))];
 test("markets PWA install shell includes every local page script, stylesheet and manifest",()=>{
  assert.deepEqual(missing,[]);
 });
