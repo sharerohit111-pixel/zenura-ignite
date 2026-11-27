@@ -122,12 +122,9 @@ BEGIN
   IF NOT FOUND THEN
     RAISE EXCEPTION 'Full-position canonical execution record is missing';
   END IF;
-  IF NOT EXISTS(SELECT 1 FROM public.paper_equity_positions
+  IF EXISTS(SELECT 1 FROM public.paper_equity_positions
      WHERE user_id='a1111111-1111-4111-8111-111111111111'
-       AND product='DELIVERY' AND instrument_key='BSE_EQ|INE002A01018') IS FALSE THEN
-    -- Full close must remove the position.
-    NULL;
-  ELSE
+       AND product='DELIVERY' AND instrument_key='BSE_EQ|INE002A01018') THEN
     RAISE EXCEPTION 'Fully closed position was not removed';
   END IF;
   IF (SELECT status FROM public.paper_protective_orders
