@@ -271,7 +271,7 @@ async function scanTextContrast(page){
   const demoPage=controlledPage;
   await demoPage.waitForFunction(()=>document.querySelector("#demo-status")?.textContent.includes("4 canonical fixtures validated"),null,{timeout:10000});
   const cached=await demoPage.evaluate(async()=>{
-   const cache=await caches.open("zenura-markets-shell-v11");
+   const cache=await caches.open("zenura-markets-shell-v12");
    const paths=["market","account","equity","derivatives"].map(name=>new URL("../../market-gateway/mock/fixtures/"+name+".json",location.href).href);
    const found=[];
    for(const url of paths)found.push({url,found:!!(await cache.match(url))});
@@ -294,7 +294,7 @@ async function scanTextContrast(page){
    assert.equal(overflow,false,"offline horizontal overflow on "+name);
   }
   const cachePolicy=await demoPage.evaluate(async()=>{
-   const cache=await caches.open("zenura-markets-shell-v11");
+   const cache=await caches.open("zenura-markets-shell-v12");
    const keys=(await cache.keys()).map(request=>request.url);
    const privateSegments=["api","auth","account","profile","wallet","orders","positions","holdings"];
    const privateLike=keys.filter(url=>new URL(url).pathname.split("/").some(segment=>privateSegments.includes(segment.toLowerCase())));
