@@ -194,6 +194,8 @@ jobs:
         run: psql -v ON_ERROR_STOP=1 -f supabase/tests/market_gateway_service_role_grants.sql
       - name: Reconcile Indian-market Futures ledger cash, charges, realized P&L and margin
         run: psql -v ON_ERROR_STOP=1 -f supabase/tests/futures_market_order_accounting.sql
+      - name: Verify immutable completed Futures MARKET receipts and mutable LIMIT lifecycle
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/futures_market_receipt_immutability.sql
       - name: Exercise atomic Futures LIMIT submit, reservation, cancel and expiry
         run: psql -v ON_ERROR_STOP=1 -f supabase/tests/futures_limit_submit_release.sql
       - name: Exercise atomic Futures LIMIT partial fills and settlement conservation
@@ -1760,6 +1762,8 @@ jobs:
         run: psql -v ON_ERROR_STOP=1 -f supabase/tests/protective_reservation_sell_guard.sql
       - name: Exercise concurrent protective fill versus cancel row-lock races
         run: bash supabase/tests/protective_fill_cancel_race.sh
+      - name: Verify unified portfolio receipt source schema contract
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/portfolio_receipt_source_contract.sql
       - name: Verify expected schema and RPC registration
         run: |
           psql -v ON_ERROR_STOP=1 <<'SQL'
