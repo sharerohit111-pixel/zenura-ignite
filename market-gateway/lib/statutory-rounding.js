@@ -27,6 +27,14 @@ function roundNonNegativeRatioHalfUp(numerator, denominator) {
 }
 
 // CGST Act section 170 / STT Rules rule 4: nearest rupee; 50 paise rounds up.
+function safeRupeesToPaise(rupees) {
+  const paise = BigInt(rupees) * 100n;
+  if (paise > BigInt(Number.MAX_SAFE_INTEGER)) {
+    throw new RangeError("Rounded payable paise exceeds the safe integer range.");
+  }
+  return Number(paise);
+}
+
 function roundPaiseToNearestRupee(paise) {
   assertPaise(paise);
   return roundNonNegativeRatioHalfUp(BigInt(paise), 100n);
@@ -47,10 +55,11 @@ function sumPaiseAndRoundToNearestRupee(values) {
     throw new RangeError("Aggregated paise exceeds the safe integer range.");
   }
   const totalPaise = Number(total);
+  const payableRupees = roundNonNegativeRatioHalfUp(total, 100n);
   return Object.freeze({
     totalPaise,
-    payableRupees: roundNonNegativeRatioHalfUp(total, 100n),
-    roundedPayablePaise: roundNonNegativeRatioHalfUp(total, 100n) * 100
+    payableRupees,
+    roundedPayablePaise: safeRupeesToPaise(payableRupees)
   });
 }
 
@@ -73,7 +82,7 @@ function calculatePercentageTaxRoundedToRupees({ basePaise, rateNumerator, rateD
     exactTaxNumeratorPaise: numerator.toString(),
     exactTaxDenominator: rateDenominator,
     payableRupees,
-    roundedPayablePaise: payableRupees * 100
+    roundedPayablePaise: safeRupeesToPaise(payableRupees)
   });
 }
 
