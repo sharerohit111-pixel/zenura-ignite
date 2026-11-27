@@ -28,9 +28,11 @@ Inspected `market-gateway/Dockerfile` and `market-gateway/package.json`.
 - The repository does not contain `market-gateway/package-lock.json`.
 - Dockerfile runs `npm install --omit=dev`, not `npm ci`.
 - Dependency versions in package.json are pinned, but the full transitive dependency graph is not lockfile-pinned.
-- No Docker build was executed in this audit environment. A previous local clone attempt failed because GitHub DNS/network access was unavailable.
+- A disposable GitHub Actions Docker image build has now passed using the existing Dockerfile.
+- A disposable container module-load smoke test with dummy Supabase configuration has also passed; it imports the gateway app but does not start the HTTP server or contact Supabase/Upstox.
+- The Dockerfile still runs `npm install --omit=dev`; this successful build is not reproducible/lockfile-backed.
 
-**Required before staging:** generate and review a committed npm lockfile, use `npm ci --omit=dev`, then run the image build and container smoke test in disposable CI.
+**Required before staging:** generate and review a committed npm lockfile, change the Docker build to `npm ci --omit=dev`, then rerun the image build and container startup/readiness smoke tests in disposable CI.
 
 ### 2. Deployment workflow — BLOCKED / DO NOT DISPATCH
 
@@ -104,19 +106,20 @@ This is existing CI evidence only. It does not establish a Docker image build, a
 
 A dedicated workflow, `.github/workflows/chat102-gateway-contract-tests.yml`, was added on this isolated branch. It has read-only repository permission, installs only the gateway package dependencies without writing a lockfile, runs the disposable local HTTP tests, and asserts that the run event/ref are the audit branch. It contains no Cloud Run deployment step, no Supabase credentials, and no hosted service calls.
 
-- Final corrected run: [GitHub Actions run #3](https://github.com/sharerohit111-pixel/zenura-ignite/actions/runs/45956770945)
-- Commit: `56bf22b1927c64a08f495781a3c50bc95b73ae24`
+- Initial corrected run: [GitHub Actions run #3](https://github.com/sharerohit111-pixel/zenura-ignite/actions/runs/45956770945), 5 tests passed.
+- Expanded final run: [GitHub Actions run #7](https://github.com/sharerohit111-pixel/zenura-ignite/actions/runs/45957238132)
+- Final tested commit: `5a0449e9207e30aed39fdf6f7a3eb8beb1ae5498`
 - Result: **success**
 - Node.js: 22.23.5
 - npm dependency install: 262 packages, `--no-package-lock`
-- Disposable contract tests: **5 passed, 0 failed, 0 skipped**
-- Audit-branch event assertion: passed.
+- Disposable contract and readiness tests: **10 passed, 0 failed, 0 skipped**
+- Docker image build: **passed**; base image `node:22-slim`, production dependency install added 92 packages.
+- Container module-load smoke test with dummy Supabase values: **passed**. This imported the app inside the built image; it did not start the HTTP listener or contact hosted services.
+- Audit-branch event/ref assertion: passed.
 
-Two earlier workflow attempts failed only in the additional workflow-guard step (first a file-presence assumption, then a self-matching grep expression); in both attempts the five application contract tests passed. The guard was simplified to assert the push event and exact isolated branch, and run #3 passed.
+Two earlier workflow attempts failed only in the additional workflow-guard step; their five application tests passed. The guard was corrected, and run #3 passed. Expanded run #6 passed the 10 tests and Docker build. Run #7 additionally passed the container module-load smoke test.
 
-This first CI proves the five local HTTP/worker-policy tests only. It does not prove reproducible dependency resolution, Docker build/startup, real Supabase authentication/connectivity, Cloud Run IAM, OAuth, or hosted staging.
-
-A follow-up workflow revision now runs both disposable test files and attempts a Docker image build. On commit `eaba845bf8a1ed2e1c8d45f7a9d2ce8c9b226391`, dependency installation and all tests completed successfully; the Docker image build was still running when this report was updated. Its final result must be recorded separately. The package-lock and hosted readiness blockers remain open.
+This CI proves disposable local tests, a Docker image build, and container module loading only. It does not prove a reproducible lockfile-based build, a live container startup, hosted Supabase Auth/Data API connectivity, Cloud Run IAM, OAuth callback operation, or hosted staging. The package-lock, actual startup, and hosted readiness blockers remain open.
 
 ## Exit criteria
 
