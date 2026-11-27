@@ -145,3 +145,23 @@ Rules:
 | Consider release approval separately | Authorized legal/compliance owners | Explicit signed release decision |
 
 **Final disposition: BLOCKED.** This register records outstanding evidence only. It does not grant, imply or create legal permission. No merge, deployment, feed activation or approval-variable change is authorized by this file.
+
+
+## 9. Explicit NSE Clause 7.4 blocker — reviewed 2026-11-27
+
+**Primary-source finding:** The consolidated NSE / NSE Data Sharing & Usage Policy, Clause 7.4, states that Market Data shall not be provided to individuals/entities/platforms/apps/websites engaging in online gaming, virtual trading or simulation, fantasy games, similar activities, or activities prohibited by applicable laws/regulators/authorities. Clause 7.3 separately limits redistribution to what is agreed in the Relevant Agreement. The policy definition of Market Data includes real-time, snapshot, delayed, EOD, historical and corporate data and securities/derivatives identifiers, prices, volumes and trade-related data.
+
+- Official consolidated policy PDF: https://nsearchives.nseindia.com/web/sites/default/files/inline-files/NSE_Data_Sharing%26Usage_Policy.pdf
+- Official NSE policy page: https://www.nseindia.in/static/market-data/nse-data-policy
+- Separate NSE circular NSE/COMP/56426 (20 April 2023): https://nsearchives.nseindia.com/content/circulars/COMP56426.pdf
+
+**Decision for S-TRADE:** Because the product is a paper/virtual trading simulator, NSE-sourced Market Data is **BLOCKED** on the present evidence. Do not treat a routine data subscription, broker API/OAuth, vendor relationship, delayed/EOD/historical label, or educational/NISM label as an override. No exception or waiver has been established. This is an engineering/compliance hold, not a legal opinion on whether NSE could grant any specific permission.
+
+**Evidence required to reconsider:**
+- [ ] Written NSE/NSE Data legal/compliance response naming ZENURA IGNITE S-TRADE and expressly addressing Clause 7.4.
+- [ ] Written confirmation of whether the exact simulation use and each requested data class/channel/end-user model is permitted under current policy and SEBI directions; if not permitted, record the rejection and keep NSE source disabled.
+- [ ] Qualified Indian securities counsel's signed opinion on the proposed route and any conditions.
+- [ ] If permitted, executed licence schedule covering the precise source, segments, fields, data classes, display, users, redistribution, derived data, storage, attribution, audit and revocation.
+- [ ] Independent reviewer verifies authenticity, authority, validity and scope before either runtime approval gate can be considered.
+
+**Fail-closed rule:** Until every applicable item is verified, MARKET_DATA_RIGHTS_APPROVED and MARKET_DATA_REGULATORY_APPROVED remain unapproved; NSE provider routes and all NSE data classes remain disabled. Synthetic fixtures must be independently generated and must not be copied, sampled, transformed, delayed or calibrated from restricted NSE/vendor feeds. Product-level legal review remains necessary even for synthetic-data public simulator launch.
