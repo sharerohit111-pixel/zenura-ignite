@@ -506,6 +506,30 @@ app.post("/paper/protective-orders",async(req,res)=>{
     });
   }catch(error){sendError(res,error,"Equity protective order could not be created.");}
 });
+app.put("/paper/protective-orders/:orderId",async(req,res)=>{
+  try{
+    const {user,userDb}=await auth(req),orderId=String(req.params.orderId||"");
+    const triggerType=String(req.body?.trigger_type||"").toUpperCase();
+    const triggerPricePaise=Number(req.body?.trigger_price_paise),quantity=Number(req.body?.quantity);
+    if(!/^[0-9a-f-]{36}$/i.test(orderId)
+       ||!["STOP_LOSS","TARGET"].includes(triggerType)
+       ||!Number.isSafeInteger(triggerPricePaise)||triggerPricePaise<1
+       ||!Number.isSafeInteger(quantity)||quantity<1||quantity>1000000)
+      return res.status(400).json({error:"Invalid protective order modification details."});
+    const {data,error}=await userDb.rpc("modify_paper_equity_protective_order",{
+      p_protective_order_id:orderId,p_user_id:user.id,p_trigger_type:triggerType,
+      p_trigger_price_paise:triggerPricePaise,p_quantity:quantity
+    });
+    if(error)throw Object.assign(new Error("Protective order could not be modified."),{status:409});
+    const order=data?.order||{};
+    res.set("Cache-Control","private, no-store").json({
+      orderId:order.order_id||orderId,triggerType:order.trigger_type||triggerType,
+      triggerDirection:order.trigger_direction,triggerPricePaise:order.trigger_price_paise??triggerPricePaise,
+      quantity:order.quantity??quantity,status:order.status||"UNKNOWN",
+      idempotentReplay:data?.idempotent_replay===true,simulationOnly:true
+    });
+  }catch(error){sendError(res,error,"Protective order modification failed.");}
+});
 app.get("/paper/protective-orders",async(req,res)=>{
   try{
     const {user,userDb}=await auth(req),raw=String(req.query.limit??"50");
