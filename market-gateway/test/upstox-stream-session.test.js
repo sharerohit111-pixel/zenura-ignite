@@ -117,6 +117,10 @@ test("default session path uses strict entitlement-bound quote normalization", (
   const valid = stream.processFrame({
     currentTs: String(NOW - 100),
     feeds: { [key]: { ltpc: { ltp: 123.45, ltt: String(NOW - 200) } } },
+  }, {
+    now: NOW + 60000,
+    maxAgeMs: 60000,
+    instrumentMap: {},
   });
   assert.equal(valid.kind, "initial_snapshot");
   assert.equal(valid.ready, true);
