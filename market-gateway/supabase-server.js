@@ -511,7 +511,7 @@ app.put("/paper/protective-orders/:orderId",async(req,res)=>{
     const {user,userDb}=await auth(req),orderId=String(req.params.orderId||"");
     const triggerType=String(req.body?.trigger_type||"").toUpperCase();
     const triggerPricePaise=Number(req.body?.trigger_price_paise),quantity=Number(req.body?.quantity);
-    if(!/^[0-9a-f-]{36}$/i.test(orderId)
+    if(!isUuid(orderId)
        ||!["STOP_LOSS","TARGET"].includes(triggerType)
        ||!Number.isSafeInteger(triggerPricePaise)||triggerPricePaise<1
        ||!Number.isSafeInteger(quantity)||quantity<1||quantity>1000000)
