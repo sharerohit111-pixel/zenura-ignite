@@ -229,8 +229,8 @@ jobs:
             psql -v ON_ERROR_STOP=1 -f "$migration"
             applied_count=$((applied_count + 1))
           done
-          if [[ "$applied_count" -ne 45 ]]; then
-            echo "Expected 45 candidate migrations, found $applied_count" >&2
+          if [[ "$applied_count" -ne 46 ]]; then
+            echo "Expected 46 candidate migrations, found $applied_count" >&2
             exit 1
           fi
           psql -v ON_ERROR_STOP=1 -f supabase/tests/protective_reservation_backfill_assertions.sql
