@@ -109,7 +109,10 @@ test("rejects invalid event, identity, date and negative taxable values", () => 
   assert.throws(() => aggregateDerivativeStt([event("x", { contractId: "" })]), /contractId/);
   assert.throws(() => aggregateDerivativeStt([event("x", { tradeDate: "2026-02-30" })]), /valid YYYY-MM-DD/);
   assert.throws(() => aggregateDerivativeStt([event("x", { taxableValuePaise: -1 })]), /non-negative/);
-  assert.throws(() => aggregateDerivativeStt([event("x", { taxableValuePaise: Number.MAX_SAFE_INTEGER })]), /Aggregated taxable value/);
+  assert.throws(() => aggregateDerivativeStt([
+    event("x1", { taxableValuePaise: Number.MAX_SAFE_INTEGER }),
+    event("x2", { taxableValuePaise: 1 })
+  ]), /Aggregated taxable value/);
 });
 
 test("zero intrinsic value creates zero exercise STT", () => {
