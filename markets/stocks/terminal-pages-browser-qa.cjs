@@ -34,8 +34,16 @@ const {chromium}=require("playwright");
    }
    await page.locator('nav.terminal-nav [data-terminal-page="balance"]').click();
    assert.equal(await page.locator(".paper-ticket-controls").isVisible(),false,"wallet must not expose order-entry controls");
+   await page.locator('nav.terminal-nav [data-terminal-page="positions"]').click();
+   assert.equal(await page.locator("#paper-positions").isVisible(),true,"equity positions must be visible on Positions page");
+   assert.equal(await page.locator("#paper-history").isVisible(),false,"equity order history must not leak into Positions page");
+   assert.equal(await page.locator(".portfolio-metrics").isVisible(),false,"P&L summary must remain on P&L page");
+   await page.locator('nav.terminal-nav [data-terminal-page="pnl"]').click();
+   assert.equal(await page.locator(".portfolio-metrics").isVisible(),true,"P&L summary must be visible on P&L page");
+   assert.equal(await page.locator("#paper-positions").isVisible(),false,"positions table must not leak into P&L summary");
    await page.locator('nav.terminal-nav [data-terminal-page="history"]').click();
    assert.equal(await page.locator("#paper-trades-workspace-body").isVisible(),true,"trade history table must be visible");
+   assert.equal(await page.locator("#paper-orders-workspace-body").isVisible(),false,"pending order book must not leak into Trade History");
    assert.equal(await page.locator("#paper-positions").isVisible(),false,"positions table must not leak into trade history");
    assert.deepEqual(errors,[],viewport.name+" page runtime errors");
    console.log(JSON.stringify({viewport:viewport.name,pages:routes.length,overflow:false,pageErrors:errors.length,walletOrderControlsHidden:true,tradeHistoryIsolated:true}));
