@@ -20,8 +20,8 @@ test("equity portfolio exposes available cash and sellable quantity after close 
  assert.match(r,/reservedCashPaise:account\.reserved_cash_paise/);
 });
 test("Options and Futures portfolio APIs expose the same wallet availability contract",()=>{
- const o=route('app.get("/paper/derivatives/portfolio"', 'app.post("/paper/derivatives/stream"');
- const f=route('app.get("/paper/futures/portfolio"', 'app.post("/paper/futures/limit"');
+ const o=route('app.get("/paper/derivatives/portfolio"', 'app.post("/paper/futures/orders"');
+ const f=route('app.get("/paper/futures/portfolio"', 'app.post("/stream"');
  for(const r of [o,f]){
   assert.match(r,/availablePaperCash\(account\)/);
   assert.match(r,/availableCashPaise,blockedCashPaise/);
