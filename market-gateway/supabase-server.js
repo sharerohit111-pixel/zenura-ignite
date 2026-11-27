@@ -336,9 +336,12 @@ app.get("/paper/account",async(req,res)=>{
     const initialized=await runtime.callUserRpc(user,"initialize_paper_trading_account",{});
     const {data,error}=await userDb.from("paper_accounts").select("*").eq("user_id",user.id).maybeSingle();
     if(error||!data)return res.status(409).json({error:"Paper Trading account could not be initialized or read."});
+    const availableCashPaise=availablePaperCash(data);
+    const blockedCashPaise=data.reserved_cash_paise+data.reserved_margin_paise;
     res.set("Cache-Control","private, no-store").json({
-      cashPaise:data.cash_paise,reservedCashPaise:data.reserved_cash_paise||0,
-      reservedMarginPaise:data.reserved_margin_paise||0,realizedPnlPaise:data.realized_pnl_paise||0,
+      cashPaise:data.cash_paise,availableCashPaise,blockedCashPaise,
+      reservedCashPaise:data.reserved_cash_paise,reservedMarginPaise:data.reserved_margin_paise,
+      realizedPnlPaise:data.realized_pnl_paise||0,
       version:data.version,created:initialized?.created===true,simulationOnly:true
     });
   }catch(error){sendError(res,error,"Paper account could not be loaded.");}
@@ -567,16 +570,25 @@ app.get("/paper/portfolio",async(req,res)=>{
     ]);
     if(accountError||!account)return res.status(404).json({error:"Indian paper account has not been initialized."});
     if(positionError)throw Object.assign(new Error("Paper positions could not be loaded."),{status:503});
-    const positions=(rows||[]).map(p=>[p.instrument_key,{quantity:p.quantity,averagePricePaise:p.average_price_paise,costBasisPaise:p.cost_basis_paise}]).filter(([,p])=>p.quantity>0);
+    const availableCashPaise=availablePaperCash(account);
+    const blockedCashPaise=account.reserved_cash_paise+account.reserved_margin_paise;
+    const positions=(rows||[]).map(p=>[p.instrument_key,{quantity:p.quantity,averagePricePaise:p.average_price_paise,costBasisPaise:p.cost_basis_paise,reservedQuantity:p.reserved_quantity??0}]).filter(([,p])=>p.quantity>0);
     const realized=product==="INTRADAY"?(account.intraday_realized_pnl_paise||0):(account.delivery_realized_pnl_paise??account.realized_pnl_paise??0);
-    if(!positions.length)return res.set("Cache-Control","private, no-store").json({product,positions:[],cashPaise:account.cash_paise,marketValuePaise:0,unrealizedPnlPaise:0,equityPaise:account.cash_paise,realizedPnlPaise:realized,valuationStatus:"no_open_positions",stalePositions:0,simulationOnly:true});
+    if(!positions.length)return res.set("Cache-Control","private, no-store").json({product,positions:[],cashPaise:account.cash_paise,availableCashPaise,blockedCashPaise,reservedCashPaise:account.reserved_cash_paise,reservedMarginPaise:account.reserved_margin_paise,marketValuePaise:0,unrealizedPnlPaise:0,equityPaise:account.cash_paise,realizedPnlPaise:realized,valuationStatus:"no_open_positions",stalePositions:0,simulationOnly:true});
     if(positions.length>50)return res.status(409).json({error:"Portfolio contains more than 50 open positions; valuation stopped."});
     const {token}=await getUpstoxAccessToken(user.id),keys=positions.map(([key])=>key);
     const response=await fetchProvider("https://api.upstox.com/v3/market-quote/quotes?"+new URLSearchParams({instrument_key:keys.join(",")}),{headers:{Authorization:"Bearer "+token,Accept:"application/json"}});
     const payload=await readProviderJson(response);
     if(!response.ok)throw upstoxHttpError(response);
     const valuation=buildPortfolioValuation({positions,quotes:Object.values(payload?.data||{}),cashPaise:account.cash_paise,realizedPnlPaise:realized,instruments:instrumentCache,now:Date.now(),maxAgeMs:60000});
-    res.set("Cache-Control","private, no-store").json({...valuation,product});
+    const valuedPositions=valuation.positions.map(position=>{
+      const source=positions.find(([key])=>key===position.instrumentKey)?.[1];
+      const reservedQuantity=source?.reservedQuantity??0;
+      if(!Number.isSafeInteger(reservedQuantity)||reservedQuantity<0||reservedQuantity>position.quantity)
+        throw Object.assign(new Error("Paper position reservation is invalid; portfolio valuation stopped."),{status:409});
+      return {...position,reservedQuantity,sellableQuantity:position.quantity-reservedQuantity};
+    });
+    res.set("Cache-Control","private, no-store").json({...valuation,positions:valuedPositions,availableCashPaise,blockedCashPaise,reservedCashPaise:account.reserved_cash_paise,reservedMarginPaise:account.reserved_margin_paise,product});
   }catch(error){sendError(res,error,"Portfolio valuation could not be loaded.");}
 });
 app.post("/paper/derivative/margin-preview",async(req,res)=>{
@@ -827,13 +839,15 @@ app.get("/paper/derivatives/portfolio",async(req,res)=>{
   try{
     const {user,userDb}=await auth(req);
     const [{data:account,error:accountError},{data:rows,error:positionError}]=await Promise.all([
-      userDb.from("paper_accounts").select("cash_paise,realized_pnl_paise").eq("user_id",user.id).maybeSingle(),
+      userDb.from("paper_accounts").select("cash_paise,reserved_cash_paise,reserved_margin_paise,realized_pnl_paise").eq("user_id",user.id).maybeSingle(),
       userDb.from("paper_derivative_positions").select("*").eq("user_id",user.id)
     ]);
     if(accountError||!account)return res.status(404).json({error:"Indian paper account has not been initialized."});
     if(positionError)throw Object.assign(new Error("Derivative positions could not be loaded."),{status:503});
+    const availableCashPaise=availablePaperCash(account);
+    const blockedCashPaise=account.reserved_cash_paise+account.reserved_margin_paise;
     const positions=(rows||[]).map(p=>({instrumentKey:p.instrument_key,instrumentType:p.instrument_type,netQuantity:p.net_quantity,averagePricePaise:p.average_price_paise,costBasisPaise:p.cost_basis_paise}));
-    if(!positions.length)return res.set("Cache-Control","private, no-store").json({positions:[],cashPaise:account.cash_paise,marketValuePaise:0,unrealizedPnlPaise:0,reservedMarginPaise:0,realizedPnlPaise:account.realized_pnl_paise||0,valuationStatus:"no_open_positions",simulationOnly:true,includesEntryCharges:true,excludesEstimatedExitCharges:true});
+    if(!positions.length)return res.set("Cache-Control","private, no-store").json({positions:[],cashPaise:account.cash_paise,availableCashPaise,blockedCashPaise,reservedCashPaise:account.reserved_cash_paise,reservedMarginPaise:account.reserved_margin_paise,marketValuePaise:0,unrealizedPnlPaise:0,realizedPnlPaise:account.realized_pnl_paise||0,valuationStatus:"no_open_positions",simulationOnly:true,includesEntryCharges:true,excludesEstimatedExitCharges:true});
     const {token}=await getUpstoxAccessToken(user.id),keys=positions.map(p=>p.instrumentKey);
     const upstream=await fetchProvider("https://api.upstox.com/v3/market-quote/quotes?"+new URLSearchParams({instrument_key:keys.join(",")}),{headers:{Authorization:"Bearer "+token,Accept:"application/json"}});
     const payload=await readProviderJson(upstream);
@@ -845,7 +859,7 @@ app.get("/paper/derivatives/portfolio",async(req,res)=>{
       quotes.push({instrumentKey:p.instrumentKey,pricePaise:q.pricePaise,observedAtMs:q.tradeTimeMs});
     }
     const valuation=calculateDerivativePortfolio({positions,quotes,now:Date.now()});
-    res.set("Cache-Control","private, no-store").json({...valuation,cashPaise:account.cash_paise,realizedPnlPaise:account.realized_pnl_paise||0,simulationOnly:true,includesEntryCharges:true,excludesEstimatedExitCharges:true});
+    res.set("Cache-Control","private, no-store").json({...valuation,cashPaise:account.cash_paise,availableCashPaise,blockedCashPaise,reservedCashPaise:account.reserved_cash_paise,reservedMarginPaise:account.reserved_margin_paise,realizedPnlPaise:account.realized_pnl_paise||0,simulationOnly:true,includesEntryCharges:true,excludesEstimatedExitCharges:true});
   }catch(error){sendError(res,error,"Derivative portfolio valuation could not be loaded.");}
 });
 
@@ -1061,13 +1075,15 @@ app.get("/paper/futures/portfolio",async(req,res)=>{
   try{
     const {user,userDb}=await auth(req);
     const [{data:account,error:accountError},{data:rows,error:positionError}]=await Promise.all([
-      userDb.from("paper_accounts").select("cash_paise,reserved_margin_paise,realized_pnl_paise").eq("user_id",user.id).maybeSingle(),
+      userDb.from("paper_accounts").select("cash_paise,reserved_cash_paise,reserved_margin_paise,realized_pnl_paise").eq("user_id",user.id).maybeSingle(),
       userDb.from("paper_futures_positions").select("*").eq("user_id",user.id)
     ]);
     if(accountError||!account)return res.status(404).json({error:"Paper Trading account has not been initialized."});
     if(positionError)throw Object.assign(new Error("Futures positions could not be loaded."),{status:503});
+    const availableCashPaise=availablePaperCash(account);
+    const blockedCashPaise=account.reserved_cash_paise+account.reserved_margin_paise;
     const positions=rows||[];
-    if(!positions.length)return res.set("Cache-Control","private, no-store").json({positions:[],cashPaise:account.cash_paise,marketValuePaise:0,unrealizedPnlPaise:0,reservedMarginPaise:account.reserved_margin_paise||0,realizedPnlPaise:account.realized_pnl_paise||0,valuationStatus:"no_open_positions",marginStatus:"none",simulationOnly:true});
+    if(!positions.length)return res.set("Cache-Control","private, no-store").json({positions:[],cashPaise:account.cash_paise,availableCashPaise,blockedCashPaise,reservedCashPaise:account.reserved_cash_paise,reservedMarginPaise:account.reserved_margin_paise,marketValuePaise:0,unrealizedPnlPaise:0,realizedPnlPaise:account.realized_pnl_paise||0,valuationStatus:"no_open_positions",marginStatus:"none",simulationOnly:true});
     const {token}=await getUpstoxAccessToken(user.id);
     const keys=positions.map(p=>p.instrument_key);
     const quoteResponse=await fetchProvider("https://api.upstox.com/v3/market-quote/quotes?"+new URLSearchParams({instrument_key:keys.join(",")}),{headers:{Authorization:"Bearer "+token,Accept:"application/json"}});
@@ -1083,7 +1099,7 @@ app.get("/paper/futures/portfolio",async(req,res)=>{
       unrealizedPnlPaise+=pnl;
       return {instrumentKey:p.instrument_key,tradingSymbol:p.trading_symbol,exchange:p.exchange,expiry:p.expiry,product:p.product,netQuantity:p.net_quantity,averagePricePaise:p.average_price_paise,marketPricePaise:q.pricePaise,unrealizedPnlPaise:pnl,marginReservedPaise:p.reserved_margin_paise,quoteAgeMs:q.quoteAgeMs,valuationStatus:"fresh"};
     });
-    res.set("Cache-Control","private, no-store").json({positions:valued,cashPaise:account.cash_paise,marketValuePaise:0,unrealizedPnlPaise:stalePositions?null:unrealizedPnlPaise,reservedMarginPaise:account.reserved_margin_paise||0,realizedPnlPaise:account.realized_pnl_paise||0,equityPaise:stalePositions?null:account.cash_paise+unrealizedPnlPaise,valuationStatus:stalePositions?"partial_stale":"fresh",stalePositions,marginStatus:"entry_estimate",simulationOnly:true});
+    res.set("Cache-Control","private, no-store").json({positions:valued,cashPaise:account.cash_paise,availableCashPaise,blockedCashPaise,reservedCashPaise:account.reserved_cash_paise,reservedMarginPaise:account.reserved_margin_paise,marketValuePaise:0,unrealizedPnlPaise:stalePositions?null:unrealizedPnlPaise,realizedPnlPaise:account.realized_pnl_paise||0,equityPaise:stalePositions?null:account.cash_paise+unrealizedPnlPaise,valuationStatus:stalePositions?"partial_stale":"fresh",stalePositions,marginStatus:"entry_estimate",simulationOnly:true});
   }catch(error){sendError(res,error,"Futures portfolio could not be loaded.");}
 });
 
