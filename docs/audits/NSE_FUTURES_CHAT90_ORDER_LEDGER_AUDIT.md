@@ -122,6 +122,8 @@ Read-only source inspection of the related branch found:
 
 **Disposition:** Do not recreate the same settlement schema/RPCs in Chat 90. First reconcile PR #135 and its branch against the current canonical integration candidate, the ordered Futures LIMIT migrations, and the hosted migration baseline. Then rerun the complete disposable PostgreSQL suite on the exact reconciled head, including two-connection same-session settlement races, long/short signs, stale basis, missing/invalid provenance, expiry idempotency and account/position/order-reservation conservation. Keep the settlement feature disabled until that integration review is complete.
 
+A second integration candidate, [PR #169 — cross-asset wallet and portfolio migration candidate](https://github.com/sharerohit111-pixel/zenura-ignite/pull/169), also contains the two Futures risk migrations on branch `feature/s-trade-wallet-portfolio-integration-candidate-2026-11-25`. The migration files match the related risk-ledger branch blobs, but the settlement SQL test file was not found on that integration branch. GitHub compare against the current canonical release branch reports `diverged`, 1,278 commits ahead and 63 behind (merge base `6b98ffaf99c9dcc6f5a330e8f83f39066eb20406`); it is not a safe direct-merge candidate. Treat #169 as migration-line evidence only, not as a validated integration. The safe path is a surgical, dependency-reviewed port onto the current candidate with the missing tests restored, canonical migration versions/order reconciled, and full exact-head CI.
+
 ## 8. Findings and required follow-up
 
 | ID | Severity | Finding | Required action |
