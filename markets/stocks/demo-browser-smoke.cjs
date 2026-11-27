@@ -294,7 +294,7 @@ async function scanTextContrast(page){
    assert.equal(overflow,false,"offline horizontal overflow on "+name);
   }
   const cachePolicy=await demoPage.evaluate(async()=>{
-   const cache=await caches.open("zenura-markets-shell-v12");
+   const cache=await caches.open("zenura-markets-shell-v14");
    const keys=(await cache.keys()).map(request=>request.url);
    const privateSegments=["api","auth","account","profile","wallet","orders","positions","holdings"];
    const privateLike=keys.filter(url=>new URL(url).pathname.split("/").some(segment=>privateSegments.includes(segment.toLowerCase())));
