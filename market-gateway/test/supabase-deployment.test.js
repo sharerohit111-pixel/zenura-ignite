@@ -80,7 +80,7 @@ test("Pages artifact receives a validated public gateway origin without committi
  assert.match(pagesWorkflow,/Expected exactly one market-gateway-url meta tag/);
  assert.match(pagesWorkflow,/Configure market gateway URL for the Pages artifact/);
  assert.match(deployWorkflow,/contents: read/);
- assert.doesNotMatch(deployWorkflow,/actions\\/github-script|createOrUpdateFileContents/);
+ assert.doesNotMatch(deployWorkflow,/github-script|createOrUpdateFileContents/);
 });
 
 test("Paper Trading frontend gates protective exits on server worker readiness",()=>{
