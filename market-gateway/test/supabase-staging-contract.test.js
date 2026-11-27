@@ -24,7 +24,7 @@ test("staging worker policy fails closed for every enabled worker or order flag"
       new RegExp(flag)
     );
   }
-  assert.doesNotThrow(() => assertStagingWorkersDisabled({ PAPER_LIMIT_WORKER_ENABLED: "TRUE " }));
+  assert.throws(() => assertStagingWorkersDisabled({ PAPER_LIMIT_WORKER_ENABLED: "TRUE " }), /PAPER_LIMIT_WORKER_ENABLED/);
 });
 
 let httpServer;
