@@ -1805,6 +1805,8 @@ jobs:
           SQL
       - name: Verify owner-bound protective cancellation and idempotent replay
         run: psql -v ON_ERROR_STOP=1 -f supabase/tests/protective_order_cancel.sql
+      - name: Verify owner-bound protective order modification and share reservation adjustment
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/protective_order_modify.sql
       - name: Verify MARKET and LIMIT sells cannot consume protective-reserved shares
         run: psql -v ON_ERROR_STOP=1 -f supabase/tests/protective_reservation_sell_guard.sql
       - name: Exercise concurrent protective fill versus cancel row-lock races
