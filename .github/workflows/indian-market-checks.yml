@@ -1,0 +1,270 @@
+name: Validate Indian Market Code
+
+on:
+  pull_request:
+    branches: ["main"]
+    paths:
+      - "markets/stocks/**"
+      - "crypto/index.html"
+      - "index.html"
+      - "admin.html"
+      - "admin.js"
+      - "admin.css"
+      - "digital-products-data.js"
+      - "digital-products.js"
+      - "products.css"
+      - "firebase-client.js"
+      - "firebase-config.js"
+      - "storage.rules"
+      - "our-products.html"
+      - "i18n.js"
+      - "script.js"
+      - "enquiry.js"
+      - "solutions-catalogue*.js"
+      - "solutions-catalogue*.css"
+      - "styles.css"
+      - "language-switcher.css"
+      - "market-gateway/**"
+      - "functions/**"
+      - "firebase.json"
+      - ".firebaserc"
+      - "market-gateway/DEPLOYMENT.md"
+      - "market-gateway/README.md"
+      - "firestore.rules"
+      - "firestore.indexes.json"
+      - ".github/workflows/indian-market-checks.yml"
+      - ".github/workflows/deploy-firebase-rules.yml"
+  push:
+    branches: ["feature/indian-stock-market", "reconcile/indian-stock-market-main-sync"]
+    paths:
+      - "markets/stocks/**"
+      - "crypto/index.html"
+      - "index.html"
+      - "admin.html"
+      - "admin.js"
+      - "admin.css"
+      - "digital-products-data.js"
+      - "digital-products.js"
+      - "products.css"
+      - "firebase-client.js"
+      - "firebase-config.js"
+      - "storage.rules"
+      - "our-products.html"
+      - "i18n.js"
+      - "script.js"
+      - "enquiry.js"
+      - "solutions-catalogue*.js"
+      - "solutions-catalogue*.css"
+      - "styles.css"
+      - "language-switcher.css"
+      - "market-gateway/**"
+      - "functions/**"
+      - "firebase.json"
+      - ".firebaserc"
+      - "market-gateway/DEPLOYMENT.md"
+      - "market-gateway/README.md"
+      - "firestore.rules"
+      - "firestore.indexes.json"
+      - ".github/workflows/indian-market-checks.yml"
+      - ".github/workflows/deploy-firebase-rules.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  syntax-and-unit-tests:
+    name: Syntax and gateway unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          package-manager-cache: false
+      - name: Check existing Crypto app inline JavaScript syntax
+        run: |
+          node -e "const fs=require('node:fs'); const html=fs.readFileSync('crypto/index.html','utf8'); const scripts=[...html.matchAll(/<script(?![^>]*\\bsrc=)[^>]*>([\\s\\S]*?)<\\/script>/gi)].map(x=>x[1]); if(!scripts.length) throw new Error('No inline scripts found'); scripts.forEach((code,i)=>require('node:child_process').execFileSync(process.execPath,['--check'],{input:code,stdio:['pipe','inherit','inherit']})); console.log('Checked '+scripts.length+' inline script(s)');"
+      - name: Check website scripts used by the product catalogue
+        run: |
+          node --check i18n.js
+          node --check script.js
+          node --input-type=module --check < enquiry.js
+          node --input-type=module --check < solutions-catalogue.js
+          node --input-type=module --check < admin.js
+          node --input-type=module --check < digital-products.js
+          node --input-type=module --check < firebase-client.js
+      - name: Validate product catalogue page local assets
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+          for (const page of ['index.html', 'our-products.html', 'admin.html']) {
+            const html = fs.readFileSync(page, 'utf8');
+            const refs = [...html.matchAll(/(?:src|href)="([^"]+)"/g)]
+              .map(match => match[1].split(/[?#]/, 1)[0])
+              .filter(ref => ref && !/^(?:https?:|mailto:|#|\/\/)/i.test(ref));
+            for (const ref of refs) {
+              if (!fs.existsSync(ref)) throw new Error(page + ' references missing local asset: ' + ref);
+            }
+          }
+          console.log('Product catalogue pages reference existing local assets.');
+          NODE
+      - name: Check browser module syntax
+        run: node --check markets/stocks/stocks.js
+      - name: Check chart theme module syntax
+        run: node --check markets/stocks/chart-theme.js
+      - name: Check SSE parser syntax
+        run: node --check markets/stocks/sse-parser.js
+      - name: Check email authentication module syntax
+        run: node --input-type=module --check < markets/stocks/email-auth.js
+      - name: Check Upstox connection module syntax
+        run: node --input-type=module --check < markets/stocks/connect.js
+      - name: Check gateway syntax
+        run: node --check market-gateway/server.js
+      - name: Validate gateway package manifest
+        run: node -e "JSON.parse(require('node:fs').readFileSync('market-gateway/package.json','utf8'))"
+      - name: Check Firebase Functions syntax
+        run: |
+          find functions -name '*.js' -type f -print0 | xargs -0 -n1 node --check
+      - name: Validate scheduled paper LIMIT worker wiring
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+          const schedule = fs.readFileSync('functions/indian-market.js', 'utf8');
+          const worker = fs.readFileSync('functions/lib/pending-limit-order-worker.js', 'utf8');
+          const gate = fs.readFileSync('functions/lib/pending-limit-worker-gate.js', 'utf8');
+          const tests = 'functions/test/pending-limit-order-worker.test.js';
+          const gateTests = 'functions/test/pending-limit-worker-gate.test.js';
+          for (const token of [
+            'exports.processPendingPaperLimitOrders',
+            'onSchedule(',
+            'TOKEN_ENCRYPTION_KEY',
+            'maxOrders:50',
+            'fetchFreshPendingLimitQuote'
+          ]) {
+            if (!schedule.includes(token)) throw new Error('Scheduled LIMIT worker missing: ' + token);
+          }
+          for (const token of [
+            'runTransaction',
+            'status:"FILLED"',
+            'quoteAgeMs',
+            '15000'
+          ]) {
+            if (!worker.includes(token)) throw new Error('LIMIT worker safety check missing: ' + token);
+          }
+          if (!fs.existsSync(tests)) throw new Error('Scheduled LIMIT worker tests are missing.');
+          if (!schedule.includes('if(!isPendingLimitWorkerEnabled())')) throw new Error('Scheduled LIMIT worker must be disabled unless explicitly opted in.');
+          if (!gate.includes('ZENURA_ENABLE_PAPER_LIMIT_WORKER==="true"')) throw new Error('Scheduled LIMIT worker opt-in must require the exact true value.');
+          if (!fs.existsSync(gateTests)) throw new Error('Scheduled LIMIT worker opt-in regression tests are missing.');
+          console.log('Scheduled LIMIT worker wiring, quote freshness, disabled-by-default gate and tests are present.');
+          NODE
+      - name: Validate Firebase configuration and indexes
+        run: |
+          node -e "JSON.parse(require('node:fs').readFileSync('firebase.json','utf8'))"
+          node -e "JSON.parse(require('node:fs').readFileSync('firestore.indexes.json','utf8'))"
+          node -e "if (JSON.parse(require('node:fs').readFileSync('firebase.json','utf8')).storage?.rules !== 'storage.rules') throw new Error('Firebase Storage rules must be configured.')"
+          test -s storage.rules
+          node -e "const r=require('node:fs').readFileSync('storage.rules','utf8'); for (const token of ['isZenuraAdmin()', 'request.resource.contentType.matches(\'image/.*\')', '10 * 1024 * 1024', '100 * 1024 * 1024']) if (!r.includes(token)) throw new Error('Storage rules missing required media restriction: '+token)"
+          test -s digital-products-data.js
+          test -s products.css
+      - name: Guard Firebase deployment scope
+        run: |
+          node -e "
+            const scripts = require('./functions/package.json').scripts || {};
+            const deploy = scripts.deploy || '';
+            const required = [
+              'functions:startUpstoxAuthorization',
+              'functions:upstoxOAuthCallback',
+              'functions:disconnectUpstoxAccount',
+              'functions:getIndianMarketConnectionStatus'
+            ];
+            const limitWorker = 'functions:processPendingPaperLimitOrders';
+            const limitDeploy = scripts['deploy:limit-worker'] || '';
+            if (!deploy.includes('FIREBASE_STAGING_PROJECT_ID') ||
+                !deploy.includes('firebase deploy --project') ||
+                !deploy.includes('--only ') ||
+                !deploy.includes('zenura-ignite-technologies') ||
+                !deploy.includes('test -n')) {
+              throw new Error('OAuth deploy script must require an explicit non-production staging project and allowlist.');
+            }
+            const targets = (deploy.split('--only ').pop() || '').split(',');
+            if (targets.length !== required.length || targets.some(target => !/^functions:[A-Za-z0-9]+$/.test(target))) {
+              throw new Error('Only the four OAuth Functions may be deployed by the default script.');
+            }
+            for (const target of required) {
+              if (!targets.includes(target)) throw new Error('Missing deployment target: ' + target);
+            }
+            if (targets.includes(limitWorker)) throw new Error('Scheduled LIMIT worker must stay out of the default deploy script.');
+            if (!limitDeploy.includes('FIREBASE_STAGING_PROJECT_ID') ||
+                !limitDeploy.includes('firebase deploy --project') ||
+                !limitDeploy.includes('--only ' + limitWorker) ||
+                !limitDeploy.includes('zenura-ignite-technologies') ||
+                !limitDeploy.includes('test -n')) {
+              throw new Error('LIMIT worker deploy must require an explicit non-production staging project.');
+            }
+            console.log('Default Firebase deploy is restricted to four OAuth Functions; LIMIT worker deploy requires an explicit non-production staging project.');
+          "
+      - name: Install Firebase Functions test dependencies
+        run: npm install --prefix functions --ignore-scripts --no-audit --no-fund
+      - name: Enforce Firebase Functions high and critical dependency audit
+        run: |
+          npm audit --prefix functions --json > "$RUNNER_TEMP/firebase-functions-npm-audit.json" || true
+          node -e "
+            const report = require(process.env.RUNNER_TEMP + '/firebase-functions-npm-audit.json');
+            const summary = report.metadata?.vulnerabilities || {};
+            const vulnerabilities = report.vulnerabilities || {};
+            console.log(JSON.stringify({
+              metadata: summary,
+              packages: Object.entries(vulnerabilities).map(([name, item]) => ({
+                name,
+                severity: item.severity,
+                direct: item.isDirect,
+                range: item.range,
+                fixAvailable: item.fixAvailable
+              }))
+            }, null, 2));
+            const blocking = (summary.high || 0) + (summary.critical || 0);
+            if (blocking > 0) {
+              throw new Error('Firebase Functions dependencies contain ' + blocking + ' high/critical vulnerabilities.');
+            }
+          "
+      - name: Install gateway test dependencies
+        run: npm install --prefix market-gateway --ignore-scripts --no-audit --no-fund
+      - name: Enforce gateway high and critical dependency audit
+        run: |
+          npm audit --prefix market-gateway --json > "$RUNNER_TEMP/market-gateway-npm-audit.json" || true
+          node -e "
+            const report = require(process.env.RUNNER_TEMP + '/market-gateway-npm-audit.json');
+            const vulnerabilities = report.vulnerabilities || {};
+            const summary = report.metadata?.vulnerabilities || {};
+            console.log(JSON.stringify({
+              metadata: summary,
+              packages: Object.entries(vulnerabilities).map(([name, item]) => ({
+                name,
+                severity: item.severity,
+                direct: item.isDirect,
+                range: item.range,
+                via: item.via.map(entry => typeof entry === 'string' ? entry : {
+                  title: entry.title, url: entry.url, range: entry.range
+                }),
+                fixAvailable: item.fixAvailable
+              }))
+            }, null, 2));
+            const blocking = (summary.high || 0) + (summary.critical || 0);
+            if (blocking > 0) {
+              throw new Error('Gateway dependencies contain ' + blocking + ' high/critical vulnerabilities.');
+            }
+          "
+      - name: Set up Java for Firestore emulator
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "21"
+      - name: Run unit and Firestore emulator integration tests
+        run: npx --yes firebase-tools@14 emulators:exec --only firestore --project demo-zenura-ignite "node --test functions/test/*.test.js market-gateway/test/*.test.js markets/stocks/*.test.js"
+      - name: Build gateway Docker image
+        run: docker build --tag zenura-indian-market-gateway:ci market-gateway
+      - name: Verify gateway image runs as non-root
+        run: |
+          test "$(docker image inspect zenura-indian-market-gateway:ci --format '{{.Config.User}}')" = "node"
+          docker run --rm --entrypoint node zenura-indian-market-gateway:ci -e "if (process.getuid() === 0) { throw new Error('Gateway container process is running as root'); } console.log('Gateway container UID:', process.getuid());"

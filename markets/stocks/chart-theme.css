@@ -1,0 +1,59 @@
+/* Isolated light/dark appearance controls for the Indian-market chart. */
+.chart-theme-toggle{
+  position:fixed;
+  left:max(14px,env(safe-area-inset-left));
+  bottom:max(14px,env(safe-area-inset-bottom));
+  z-index:30;
+  min-height:44px;
+  padding:10px 14px;
+  border:1px solid #7895a8;
+  border-radius:999px;
+  background:rgba(13,31,48,.94);
+  color:#d7e8f5;
+  font-size:10px;
+  font-weight:900;
+  letter-spacing:.5px;
+  box-shadow:0 8px 30px #0005;
+  backdrop-filter:blur(12px);
+  cursor:pointer;
+}
+.chart-theme-toggle:focus-visible{outline:2px solid #35dfb7;outline-offset:3px}
+.stocks-page[data-chart-theme="light"] .chart-panel{
+  color:#172b3b;
+  background:linear-gradient(150deg,#fff,#edf4f8);
+  border-color:#c7d6e1;
+}
+.stocks-page[data-chart-theme="light"] .chart-panel .chart-head small,
+.stocks-page[data-chart-theme="light"] .chart-panel .chart-head span,
+.stocks-page[data-chart-theme="light"] .chart-tools span{color:#587083}
+.stocks-page[data-chart-theme="light"] .chart-panel .chart-head h2,
+.stocks-page[data-chart-theme="light"] .chart-panel .price{color:#172b3b}
+.stocks-page[data-chart-theme="light"] .chart-placeholder{
+  color:#172b3b;
+  border-color:#c4d4df;
+  background:repeating-linear-gradient(0deg,#f8fbfd,#f8fbfd 39px,#e7eff4 40px);
+}
+.stocks-page[data-chart-theme="light"] .chart-placeholder b{color:#1b3447}
+.stocks-page[data-chart-theme="light"] .chart-placeholder span,
+.stocks-page[data-chart-theme="light"] .chart-range,
+.stocks-page[data-chart-theme="light"] .candle-summary span{color:#587083}
+.stocks-page[data-chart-theme="light"] .chart-gridline{stroke:#cbd9e2}
+.stocks-page[data-chart-theme="light"] .chart-line{stroke:#087e68}
+.stocks-page[data-chart-theme="light"] .chart-tools button{
+  color:#405b70;
+  background:#f5f9fb;
+  border-color:#c7d6e1;
+}
+.stocks-page[data-chart-theme="light"] .chart-tools button.active{
+  color:#075d4f;
+  background:#d9f3eb;
+  border-color:#69bba5;
+}
+.stocks-page[data-chart-theme="light"] .chart-mark{background:#d9f3eb;color:#087e68}
+.stocks-page[data-chart-theme="light"] .chart-theme-toggle{
+  color:#17364a;
+  background:rgba(245,250,253,.96);
+  border-color:#9bb3c3;
+  box-shadow:0 8px 28px #16364a22;
+}
+@media(max-width:420px){.chart-theme-toggle{font-size:9px;padding:9px 11px;min-height:42px}}
