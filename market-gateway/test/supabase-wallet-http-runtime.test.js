@@ -4,6 +4,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const http = require("node:http");
 const { once } = require("node:events");
+const { gzipSync } = require("node:zlib");
 
 const nativeFetch = global.fetch;
 const USERS = {
@@ -107,8 +108,14 @@ test("authenticated wallet and empty portfolio APIs return only the caller's acc
   supabaseOrigin = `https://127.0.0.1:${supabasePort}`;
 
   // Route the Supabase SDK's HTTPS requests to this isolated local HTTP stub.
+  let instrumentMasterFixtureRequests = 0;
   global.fetch = (input, init) => {
     const rawUrl = typeof input === "string" ? input : input.url;
+    if (rawUrl === "https://assets.upstox.com/market-quote/instruments/exchange/complete.json.gz") {
+      instrumentMasterFixtureRequests += 1;
+      const fixture = gzipSync(JSON.stringify([{ instrument_key: "NSE_EQ|TEST", segment: "NSE_EQ" }]));
+      return Promise.resolve(new Response(fixture, { status: 200, headers: { "content-type": "application/gzip" } }));
+    }
     if (rawUrl.startsWith(supabaseOrigin)) {
       const localUrl = rawUrl.replace(supabaseOrigin, `http://127.0.0.1:${supabasePort}`);
       const localInput = input instanceof Request ? new Request(localUrl, input) : localUrl;
@@ -184,4 +191,5 @@ test("authenticated wallet and empty portfolio APIs return only the caller's acc
   }
   assert.ok(observedQueries.some(query => query.token === "token-user-a"));
   assert.ok(observedQueries.some(query => query.token === "token-user-b"));
+  assert.equal(instrumentMasterFixtureRequests, 1, "portfolio tests must use one deterministic local instrument-master fixture");
 });
