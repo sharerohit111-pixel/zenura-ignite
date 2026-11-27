@@ -1335,6 +1335,8 @@ jobs:
           END
           $upstox$;
           SQL
+      - name: Verify bounded Upstox OAuth state retention
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/upstox_oauth_state_generation.sql
       - name: Reject future and off-tick Options quotes
         run: |
           psql -v ON_ERROR_STOP=1 <<'SQL'
