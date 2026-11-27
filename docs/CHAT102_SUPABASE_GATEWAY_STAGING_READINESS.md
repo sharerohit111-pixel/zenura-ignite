@@ -74,6 +74,15 @@ Inspected `market-gateway/supabase-server.js` and `market-gateway/lib/supabase-r
 
 **Required before staging:** add disposable HTTP contract tests for unauthenticated/expired tokens, valid test identity, cross-user access denial, invalid RPC, caller-supplied identity rejection, safe health/readiness responses, and stream cleanup. Use mocked Supabase/provider clients or disposable test services only.
 
+## Disposable staging guards and HTTP contract tests added
+
+Two isolated files were added on the audit branch:
+
+- `market-gateway/lib/staging-worker-policy.js`: fail-closed policy helper that rejects any staging environment where Delivery LIMIT, Intraday LIMIT, Futures LIMIT submission/worker, Options LIMIT submission/worker, or equity protective worker flags are set to `true`. Unset and explicit false values are accepted.
+- `market-gateway/test/supabase-staging-contract.test.js`: Node test coverage for the policy helper and a disposable local HTTP instance. It uses dummy Supabase values, does not call `start()`, does not connect to Supabase or Upstox, verifies secret-free health output, checks all worker status fields begin disabled, verifies missing Bearer tokens are rejected by order/portfolio endpoints, and checks allowed/denied CORS preflights.
+
+**Important limitation:** the policy helper is not yet wired into a staging deployment workflow or production gateway startup. A future staging-only workflow must invoke this helper before any cloud action. These tests were committed but were not executed in this environment; exact-head CI is still required. The health endpoint assertions document current liveness behaviour only and do not create a readiness endpoint.
+
 ## CI evidence
 
 GitHub Actions metadata for commit `089fbf91ef2babb44f2bc2a1406374ca980392e2` showed 7/7 associated pull-request workflows completed successfully:
