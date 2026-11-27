@@ -109,17 +109,30 @@ Pending LIMIT order expiry and release of its unfilled reservation are tested. C
 
 This is not the same as final contract settlement. The audited candidate does not establish an executable authoritative NSE Clearing final settlement-price import, provenance verification, atomic final cash settlement, residual margin release, or replay-safe terminal settlement record. Daily variation-margin cash posting is also not established. Intraday square-off is a separate rule and must not be inferred from contract-expiry handling.
 
-## 7. Findings and required follow-up
+## 7. Related settlement implementation discovered outside the audited candidate
+
+A separate unmerged Draft, [PR #135 — Futures risk ledger, daily MTM, margin calls and settlement engine](https://github.com/sharerohit111-pixel/zenura-ignite/pull/135), advertises an implementation of an append-only Futures risk event journal, daily MTM posting, provider margin refresh/risk guards, explicit expiry settlement and paper-only square-off. The related branch `feature/s-trade-futures-risk-ledger-v2-2026-11-24` contains the settlement migration and a disposable SQL test file. These files are **not present** on audited candidate HEAD `089fbf91...`; therefore they cannot be counted as part of the Chat 90 candidate.
+
+Read-only source inspection of the related branch found:
+- Futures-specific settlement state, risk state and append-only risk-event tables.
+- RLS with owner-only SELECT policies and no client mutation grants on the new tables.
+- Daily MTM, provider-margin refresh and close/expiry-related `SECURITY DEFINER` RPCs with empty search paths; execute grants are restricted to `service_role`.
+- SQL assertions for positive/negative daily MTM, idempotent replay and changed-payload rejection, margin-call risk blocking, square-off accounting, expiry closure, append-only event protection and client privilege boundaries.
+- The PR #135 description says its dedicated new risk-ledger settlement workflow was queued; an earlier SQL integration test passed before final guardrail consolidation. That description is not exact-head CI evidence for the current related branch. No verified concurrent duplicate daily-settlement race result was obtained in this audit.
+
+**Disposition:** Do not recreate the same settlement schema/RPCs in Chat 90. First reconcile PR #135 and its branch against the current canonical integration candidate, the ordered Futures LIMIT migrations, and the hosted migration baseline. Then rerun the complete disposable PostgreSQL suite on the exact reconciled head, including two-connection same-session settlement races, long/short signs, stale basis, missing/invalid provenance, expiry idempotency and account/position/order-reservation conservation. Keep the settlement feature disabled until that integration review is complete.
+
+## 8. Findings and required follow-up
 
 | ID | Severity | Finding | Required action |
 |---|---|---|---|
-| F-01 | HIGH | Daily MTM and final contract-expiry cash settlement are not proven implemented | Separate approved settlement design, trusted official settlement source/provenance, transactional SQL and disposable-PG replay/concurrency tests |
-| F-02 | HIGH | MARKET multi-level depth sweep and atomic per-level settlement are not established | Approve shared accounting contract; implement isolated Futures-only batch settlement with per-level immutable fills and all-or-nothing insufficient-depth behavior |
+| F-01 | HIGH | Daily MTM/expiry implementation exists on a separate unmerged line, but is absent from the audited candidate and has no verified exact-head final CI/concurrency evidence here | Reconcile PR #135 into the canonical dependency line; review source/provenance and rerun disposable-PG settlement and same-session race tests on the exact integrated head |
+| F-02 | HIGH | MARKET multi-level depth planner exists separately, but atomic per-level settlement is not integrated or established | Reconcile the existing planner work (PR #126/#109 lineage) with Chat 4 accounting approval; require atomic per-level fills and all-or-nothing insufficient-depth tests |
 | F-03 | HIGH | Current Futures evidence does not include a dedicated concurrent MARKET margin-contention race | Add same-account competing MARKET BUY/opening orders and cross-engine reservation stress tests; assert no over-reservation |
 | F-04 | MEDIUM | Charges and margin fixtures prove internal consistency, not external tariff/SPAN correctness | Add dated, source-backed golden vectors and independent fee/margin review; never label simulation inputs as official margin |
 | F-05 | MEDIUM | LIMIT race coverage is present, but multi-instance worker operational rehearsal is not established by this exact-head SQL run | Keep worker disabled; conduct disposable multi-instance lease/heartbeat/session-close rehearsal before any enablement |
 
-## 8. Safety and scope confirmation
+## 9. Safety and scope confirmation
 
 - No production orders or broker orders were submitted.
 - No hosted/production database writes or migrations were performed by this audit.
