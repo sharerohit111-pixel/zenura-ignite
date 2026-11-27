@@ -149,3 +149,4 @@ UPDATE public.paper_accounts
        delivery_realized_pnl_paise=0,intraday_realized_pnl_paise=0,
        version=version+1,updated_at=clock_timestamp()
  WHERE user_id='$USER_ID';
+SQL
