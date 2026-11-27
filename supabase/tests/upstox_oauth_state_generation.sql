@@ -12,10 +12,13 @@ DECLARE
   v_state jsonb;
   v_generation bigint;
   v_saved boolean;
-  v_expired_hash text := repeat('b',64);
+  v_replay_hash text := md5('zenura-upstox-state-generation-replay') || md5('zenura-upstox-state-generation-replay-v2');
+  v_expired_hash text := md5('zenura-upstox-state-generation-expired') || md5('zenura-upstox-state-generation-expired-v2');
+  v_new_hash text := md5('zenura-upstox-state-generation-new') || md5('zenura-upstox-state-generation-new-v2');
+  v_fresh_hash text := md5('zenura-upstox-state-generation-fresh') || md5('zenura-upstox-state-generation-fresh-v2');
 BEGIN
   -- A state can be consumed exactly once and returns its bound user/generation.
-  PERFORM public.begin_upstox_oauth(v_user,repeat('a',64),
+  PERFORM public.begin_upstox_oauth(v_user,v_replay_hash,
     clock_timestamp()+interval '5 minutes',
     floor(extract(epoch from clock_timestamp())*1000)::bigint);
   v_state := public.consume_upstox_oauth_state(repeat('a',64),
@@ -46,17 +49,17 @@ BEGIN
   INSERT INTO public.upstox_oauth_states(
     state_hash,user_id,connection_generation,used,expires_at
   )
-  SELECT lpad(to_hex(n),64,'0'),v_user,0,true,
+  SELECT (md5('zenura-upstox-state-generation-prune:'||n::text) || md5('zenura-upstox-state-generation-prune-v2:'||n::text)),v_user,0,true,
          clock_timestamp()-interval '2 days'
     FROM generate_series(1,501) AS n;
-  PERFORM public.begin_upstox_oauth(v_user,repeat('d',64),
+  PERFORM public.begin_upstox_oauth(v_user,v_new_hash,
     clock_timestamp()+interval '5 minutes',
     floor(extract(epoch from clock_timestamp())*1000)::bigint);
   IF (SELECT count(*) FROM public.upstox_oauth_states
        WHERE expires_at<clock_timestamp()-interval '1 day')<>1 THEN
     RAISE EXCEPTION 'OAuth state cleanup did not prune exactly 500 old rows';
   END IF;
-  IF NOT EXISTS(SELECT 1 FROM public.upstox_oauth_states WHERE state_hash=repeat('d',64)) THEN
+  IF NOT EXISTS(SELECT 1 FROM public.upstox_oauth_states WHERE state_hash=v_new_hash) THEN
     RAISE EXCEPTION 'OAuth state cleanup removed the newly created state';
   END IF;
   IF to_regclass('public.upstox_oauth_states_expires_at_idx') IS NULL THEN
@@ -83,7 +86,7 @@ BEGIN
   END IF;
 
   -- A fresh OAuth attempt after disconnect captures generation 1 and may save.
-  v_generation := public.begin_upstox_oauth(v_user,repeat('c',64),
+  v_generation := public.begin_upstox_oauth(v_user,v_fresh_hash,
     clock_timestamp()+interval '5 minutes',
     floor(extract(epoch from clock_timestamp())*1000)::bigint);
   IF v_generation <> 1 THEN
