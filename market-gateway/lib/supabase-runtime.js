@@ -9,6 +9,8 @@ const SERVER_RPCS = new Set([
   "execute_paper_market_order",
   "submit_paper_limit_order",
   "cancel_paper_limit_order",
+  "submit_paper_intraday_limit_order",
+  "cancel_paper_intraday_limit_order",
   "execute_paper_long_option_order",
   "execute_paper_futures_market_order",
   "submit_paper_futures_limit_order",
