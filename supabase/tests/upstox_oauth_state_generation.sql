@@ -3,7 +3,7 @@
 BEGIN;
 
 INSERT INTO auth.users(id) VALUES
- ('a0a0a0a0-a0a0-4a0a-8a0a-a0a0a0a0a0a0a0')
+ ('a0a0a0a0-a0a0-4a0a-8a0a-a0a0a0a0a0a0')
 ON CONFLICT(id) DO NOTHING;
 
 DO $upstox_oauth$
