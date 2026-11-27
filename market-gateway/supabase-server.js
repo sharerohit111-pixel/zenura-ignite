@@ -420,7 +420,7 @@ app.post("/paper/orders",async(req,res)=>{
       if(!tick||limitPricePaise%tick!==0)return res.status(400).json({error:"LIMIT price must match the official instrument tick size."});
       const rpcName=product==="INTRADAY"?"submit_paper_intraday_limit_order":"submit_paper_limit_order";
       const rpcArgs=product==="INTRADAY"?{
-        p_user_id:user.id,p_order_id:orderId,p_idempotency_key:idempotencyKey,
+        p_order_id:orderId,p_idempotency_key:idempotencyKey,
         p_request_fingerprint:requestFingerprint,p_instrument_key:instrumentKey,
         p_trading_symbol:instrument.trading_symbol||instrument.name,p_exchange:instrument.exchange,
         p_side:side,p_quantity:quantity,p_limit_price_paise:limitPricePaise
