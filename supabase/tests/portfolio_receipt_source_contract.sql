@@ -70,6 +70,15 @@ BEGIN
     RAISE EXCEPTION 'Options LIMIT fills must reference their parent order';
   END IF;
 
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_trigger
+     WHERE tgrelid='public.paper_futures_orders'::regclass
+       AND tgname='paper_futures_market_receipt_immutable'
+       AND NOT tgisinternal
+  ) THEN
+    RAISE EXCEPTION 'Completed Futures MARKET receipt immutability trigger is missing';
+  END IF;
+
   -- Options expiry settlement is a separate accounting stream with conservation guards.
   IF NOT EXISTS (
     SELECT 1 FROM pg_constraint
