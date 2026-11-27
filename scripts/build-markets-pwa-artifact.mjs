@@ -16,6 +16,21 @@ const siteRoot = path.join(out, "site");
 const outMarkets = path.join(siteRoot, "markets");
 fs.mkdirSync(outMarkets, { recursive: true });
 
+// Supabase may fall back to its configured Site URL when an OAuth redirect
+// destination is not yet allowlisted. The published artifact intentionally
+// lives under /markets, so provide a tiny root callback bridge. Preserve both
+// PKCE query parameters and URL fragments while forwarding to the real app.
+fs.writeFileSync(path.join(siteRoot, "index.html"), [
+  "<!doctype html>",
+  '<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">',
+  '<meta name="robots" content="noindex"><title>ZENURA IGNITE · Returning to Paper Trading</title></head>',
+  '<body><p>Returning to ZENURA IGNITE…</p><script src="/auth-return-redirect.js"></script></body></html>',
+  ""
+].join("\\n"));
+fs.writeFileSync(path.join(siteRoot, "auth-return-redirect.js"),
+  'window.location.replace("/markets/stocks/" + window.location.search + window.location.hash);\\n'
+);
+
 const excludedMarketDirectories = new Set(["investing", "crypto", "__tests__", "tests"]);
 function copyPublicTree(src, dest) {
   for (const entry of fs.readdirSync(src, { withFileTypes: true })) {
