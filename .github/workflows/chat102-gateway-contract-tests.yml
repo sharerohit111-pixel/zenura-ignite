@@ -6,10 +6,13 @@ on:
       - audit/chat102-gateway-staging-readiness-2026-11-27
     paths:
       - "market-gateway/lib/staging-worker-policy.js"
+      - "market-gateway/lib/supabase-readiness.js"
       - "market-gateway/test/supabase-staging-contract.test.js"
+      - "market-gateway/test/supabase-readiness.test.js"
       - "market-gateway/supabase-server.js"
       - "market-gateway/lib/supabase-runtime.js"
       - "market-gateway/package.json"
+      - "market-gateway/Dockerfile"
       - ".github/workflows/chat102-gateway-contract-tests.yml"
   workflow_dispatch:
 
@@ -39,7 +42,11 @@ jobs:
         working-directory: market-gateway
         env:
           NODE_ENV: test
-        run: node --test test/supabase-staging-contract.test.js
+        run: node --test test/supabase-staging-contract.test.js test/supabase-readiness.test.js
+
+      - name: Build disposable gateway image
+        working-directory: .
+        run: docker build --pull -f market-gateway/Dockerfile -t zenura-gateway-chat102:${GITHUB_SHA} .
 
       - name: Assert this run is restricted to the isolated audit branch
         run: |
