@@ -18,6 +18,7 @@ on:
       - "market-gateway/DEPLOYMENT.md"
       - "market-gateway/MARKET-DATA-COMPLIANCE.md"
       - "market-gateway/test/supabase-deployment.test.js"
+      - "market-gateway/test/supabase-wallet-http-runtime.test.js"
       - "market-gateway/lib/paper-limit-worker.js"
       - "market-gateway/lib/paper-intraday-limit-worker.js"
       - "market-gateway/test/paper-intraday-limit-worker.test.js"
