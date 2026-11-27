@@ -226,7 +226,9 @@ jobs:
               bash supabase/tests/protective_reservation_orphan_migration.sh "$migration"
             fi
             echo "Applying $migration"
-            psql -v ON_ERROR_STOP=1 -f "$migration"
+            # Each versioned migration is an atomic unit: a failed statement must
+            # roll back every earlier statement in that same file.
+            psql --single-transaction -v ON_ERROR_STOP=1 -f "$migration"
             applied_count=$((applied_count + 1))
           done
           if [[ "$applied_count" -ne 45 ]]; then
@@ -235,6 +237,81 @@ jobs:
           fi
           psql -v ON_ERROR_STOP=1 -f supabase/tests/protective_reservation_backfill_assertions.sql
           psql -v ON_ERROR_STOP=1 -f supabase/tests/hosted_upgrade_assertions.sql
+      - name: Rehearse independent clean-database installation and migration atomicity
+        run: |
+          set -euo pipefail
+          fresh_db=paper_trading_fresh_install_test
+          createdb "$fresh_db"
+          PGDATABASE="$fresh_db" psql -v ON_ERROR_STOP=1 <<'SQL'
+          CREATE SCHEMA auth;
+          CREATE TABLE auth.users (id uuid PRIMARY KEY);
+          CREATE FUNCTION auth.uid()
+          RETURNS uuid
+          LANGUAGE sql
+          STABLE
+          AS $uid$
+            SELECT NULLIF(COALESCE(
+              current_setting('request.jwt.claim.sub', true),
+              (NULLIF(current_setting('request.jwt.claims', true), '')::jsonb ->> 'sub')
+            ), '')::uuid
+          $uid$;
+          GRANT USAGE ON SCHEMA auth TO authenticated, service_role;
+          GRANT EXECUTE ON FUNCTION auth.uid() TO authenticated, service_role;
+          CREATE FUNCTION public.rls_auto_enable()
+          RETURNS event_trigger
+          LANGUAGE plpgsql
+          SECURITY DEFINER
+          SET search_path = pg_catalog
+          AS $fixture$
+          BEGIN
+            RETURN;
+          END
+          $fixture$;
+          GRANT EXECUTE ON FUNCTION public.rls_auto_enable() TO PUBLIC;
+          SQL
+          fresh_count=0
+          for migration in supabase/migrations/*.sql; do
+            echo "Fresh install applying $migration"
+            PGDATABASE="$fresh_db" psql --single-transaction -v ON_ERROR_STOP=1 -f "$migration"
+            fresh_count=$((fresh_count + 1))
+          done
+          if [[ "$fresh_count" -ne 45 ]]; then
+            echo "Expected 45 migrations in independent clean install, found $fresh_count" >&2
+            exit 1
+          fi
+          PGDATABASE="$fresh_db" psql -v ON_ERROR_STOP=1 <<'SQL'
+          DO $fresh_schema$
+          BEGIN
+            IF to_regclass('public.paper_accounts') IS NULL
+               OR to_regclass('public.paper_equity_positions') IS NULL
+               OR to_regclass('public.paper_futures_orders') IS NULL
+               OR to_regclass('public.paper_protective_orders') IS NULL THEN
+              RAISE EXCEPTION 'Fresh install is missing a required Paper Trading table';
+            END IF;
+            IF to_regprocedure('public.execute_paper_equity_protective_fill(uuid,text,text,bigint,bigint,bigint)') IS NULL
+               OR to_regprocedure('public.execute_paper_futures_limit_fill(text,text,integer,integer,bigint,bigint,bigint,integer,integer,bigint,bigint,bigint)') IS NULL THEN
+              RAISE EXCEPTION 'Fresh install is missing a required accounting RPC';
+            END IF;
+          END
+          $fresh_schema$;
+          SQL
+          # Prove that the exact psql transaction mode used above does not leave
+          # earlier statements committed when a later statement in one migration fails.
+          if PGDATABASE="$fresh_db" psql --single-transaction -v ON_ERROR_STOP=1 <<'SQL'
+          CREATE TABLE public.migration_atomicity_probe(id integer PRIMARY KEY);
+          INSERT INTO public.migration_atomicity_probe VALUES (1);
+          SELECT 1/0;
+          SQL
+          then
+            echo "Injected failure unexpectedly succeeded" >&2
+            exit 1
+          fi
+          if PGDATABASE="$fresh_db" psql -Atqc "SELECT to_regclass('public.migration_atomicity_probe') IS NULL" | grep -qx t; then
+            echo "Atomic rollback probe passed: failed transaction left no table."
+          else
+            echo "Atomic rollback probe failed: partial DDL survived injected failure." >&2
+            exit 1
+          fi
       - name: Verify least-privilege Supabase market gateway service-role grants
         run: psql -v ON_ERROR_STOP=1 -f supabase/tests/market_gateway_service_role_grants.sql
       - name: Verify distributed per-user API rate-limit budgets and RPC isolation
