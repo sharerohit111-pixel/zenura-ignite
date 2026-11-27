@@ -63,6 +63,15 @@ test("health endpoint is a secret-free liveness response, not a readiness claim"
   assert.doesNotMatch(serialized, /disposable-service-role-contract-test|disposable_contract_test|UPSTOX_CLIENT_SECRET/i);
 });
 
+test("readiness stays unavailable until gateway startup has completed", async () => {
+  const response = await fetch(baseUrl + "/ready");
+  assert.equal(response.status, 503);
+  assert.deepEqual(await response.json(), {
+    ready: false,
+    checks: { startup: false, supabaseAuth: false, supabaseDataApi: false }
+  });
+});
+
 test("paper order and portfolio APIs reject requests without a Bearer token", async () => {
   for (const route of ["/paper/orders", "/paper/portfolio?product=DELIVERY"]) {
     const response = await fetch(baseUrl + route);
