@@ -45,17 +45,6 @@ test("accepts market_info but does not declare readiness before a valid snapshot
   assert.equal(stream.getState().phase, "awaiting_initial_snapshot");
 });
 
-test("does not mark an empty initial feed as ready; first valid quote becomes snapshot", () => {
-  const stream = session();
-  stream.processFrame(marketInfo);
-  const empty = stream.processFrame(feed("NSE_EQ|ABC"), {
-    // This option is consumed by real normalizers; the fixture below tests
-    // the coordinator's fail-closed empty-result behavior separately.
-  });
-  assert.equal(empty.kind, "initial_snapshot");
-  assert.equal(empty.ready, true);
-});
-
 test("first non-empty feed is the initial snapshot and subsequent frames are updates", () => {
   const stream = session();
   stream.processFrame(marketInfo);
