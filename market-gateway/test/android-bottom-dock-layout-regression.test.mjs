@@ -30,7 +30,7 @@ test("Android dock has one authoritative final viewport and safe-area contract",
 test("five-item dock remains generated from the existing five functional routes",()=>{
  assert.match(shell,/\[\["dashboard","Home"\],\["derivatives","Option Chain"\],\["positions","Live Pos\. \/ P&L"\],\["watchlist","Quick Watchlist"\],\["support","Help & Support"\]\]/);
  assert.match(html,/viewport-fit=cover/);
- assert.match(worker,/zenura-markets-shell-v26/);
+ assert.match(worker,/zenura-markets-shell-v27/);
  assert.match(worker,/"stocks\/premium-shell\.css"/);
 });
 
@@ -52,5 +52,13 @@ test("installed app launches directly into the main Paper Trading dashboard",()=
  assert.match(html,/location\.replace\(new URL\("\.\/stocks\/",location\.href\)\.href\)/);
  assert.equal(manifest.start_url,"./stocks/");
  assert.equal(manifest.id,"./");
- assert.match(worker,/zenura-markets-shell-v26/);
+ assert.match(worker,/zenura-markets-shell-v27/);
+});
+
+
+test("Android dock guard collapses empty wrappers around failed bottom images",()=>{
+ assert.match(guard,/function hideEmptyImageWrappers\(img\)/);
+ assert.match(guard,/parent\.textContent\.trim\(\)\.length>0/);
+ assert.match(guard,/depth<5/);
+ assert.match(css,/zenura-broken-bottom-image-wrap\{display:none!important/);
 });
