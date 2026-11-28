@@ -38,6 +38,8 @@ INSERT INTO public.broker_connections(
 );
 INSERT INTO public.broker_oauth_states(state_hash,user_id,broker_name,expires_at,created_at)
 VALUES (repeat('c',64),'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa','fyers',now()-interval '1 day',now()-interval '2 days');
+INSERT INTO public.broker_oauth_states(state_hash,user_id,broker_name,expires_at,consumed_at,created_at)
+VALUES (repeat('d',64),'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa','fyers',now()+interval '5 minutes',now()-interval '2 days',now()-interval '2 days');
 SELECT public.begin_broker_oauth_state(
   repeat('a',64),'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa','fyers',now()+interval '5 minutes',now()
 );
@@ -51,6 +53,9 @@ DECLARE
 BEGIN
   IF EXISTS (SELECT 1 FROM public.broker_oauth_states WHERE state_hash=repeat('c',64)) THEN
     RAISE EXCEPTION 'Expired OAuth state was not pruned when a new flow began';
+  END IF;
+  IF EXISTS (SELECT 1 FROM public.broker_oauth_states WHERE state_hash=repeat('d',64)) THEN
+    RAISE EXCEPTION 'Old consumed OAuth state was not pruned when a new flow began';
   END IF;
   SELECT user_id INTO v_user FROM public.consume_broker_oauth_state(repeat('a',64),'fyers',now());
   IF v_user <> 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' THEN
