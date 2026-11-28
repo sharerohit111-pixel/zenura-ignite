@@ -113,6 +113,10 @@ function createRedisSubscriberLifecycle({
     client.removeListener("reconnecting", onReconnect);
     client.removeListener("end", onEnd);
     client.removeListener("error", onError);
+    // Do not close the dedicated client while a subscription attempt is still
+    // in flight. The generation/state guards prevent that attempt from
+    // restoring readiness after shutdown.
+    if (readyPromise) await readyPromise;
     if (closeOwnedClient) {
       if (typeof client.quit === "function") await client.quit();
       else if (typeof client.disconnect === "function") await client.disconnect();
