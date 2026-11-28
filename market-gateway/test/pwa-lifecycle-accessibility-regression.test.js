@@ -74,13 +74,19 @@ test("paper terminal has separate navigation destinations and offline page routi
  assert.match(nav,/data-settings-action/);
 });
 
-test("paper terminal mobile bottom navigation is rendered and has a visible fixed safe-area surface",()=>{
+test("paper terminal mobile bottom bar exposes the four requested functional shortcuts",()=>{
  const html=read("markets/stocks/index.html");
  const shell=read("markets/stocks/premium-shell.js");
+ const nav=read("markets/stocks/page-navigation.js");
  const css=read("markets/stocks/premium-shell.css");
  assert.match(shell,/bottom\.dataset\.appBottomNav=""/);
- for(const page of ["dashboard","watchlist","chart","positions","settings"])assert.ok(shell.includes('["'+page+'"'));
+ for(const page of ["derivatives","positions","watchlist","support"])assert.ok(shell.includes('["'+page+'"'));
+ assert.match(shell,/\["derivatives","Option Chain"\],\["positions","Live Pos\. \/ P&L"\],\["watchlist","Quick Watchlist"\],\["support","Help & Support"\]/);
+ assert.match(nav,/support:\["\.support-page"\]/);
+ assert.match(nav,/supportFooter/);
+ assert.match(nav,/support-save-draft/);
  assert.match(css,/\.stocks-page \.app-bottom-nav\{[\s\S]*?position:fixed!important/);
+ assert.match(css,/grid-template-columns:repeat\(4,minmax\(0,1fr\)\)!important/);
  assert.match(css,/z-index:9999!important/);
  assert.match(css,/visibility:visible!important/);
  assert.match(css,/env\(safe-area-inset-bottom\)/);
