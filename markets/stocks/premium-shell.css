@@ -211,3 +211,22 @@
   .stocks-page{padding-bottom:calc(76px + env(safe-area-inset-bottom))!important}
   .stocks-page .paper-language-toggle{bottom:calc(72px + env(safe-area-inset-bottom))!important}
 }
+
+/* Touch-device override: must win even when Android Chrome uses Desktop site viewport. */
+.stocks-page.touch-terminal .wrap{width:auto!important;max-width:100%!important;margin:0 auto!important;padding-left:12px!important;padding-right:12px!important;box-sizing:border-box!important}
+.stocks-page.touch-terminal .top{display:flex!important;flex-wrap:wrap!important;gap:10px!important}
+.stocks-page.touch-terminal .top>.brand{flex:1 1 auto!important;min-width:0!important}
+.stocks-page.touch-terminal .terminal-nav{display:flex!important;flex-wrap:nowrap!important;max-width:100%!important;overflow-x:auto!important;overscroll-behavior-x:contain!important}
+.stocks-page.touch-terminal .stock-hero{display:block!important}
+.stocks-page.touch-terminal .connection{width:100%!important;max-width:none!important;box-sizing:border-box!important;margin-top:14px!important}
+.stocks-page.touch-terminal .notice{grid-template-columns:minmax(0,1fr)!important}
+.stocks-page.touch-terminal .workspace{display:grid!important;grid-template-columns:minmax(0,1fr)!important;gap:12px!important}
+.stocks-page.touch-terminal .workspace>.watch,.stocks-page.touch-terminal .workspace>.chart-panel,.stocks-page.touch-terminal .workspace>.order-panel{grid-column:1!important}
+.stocks-page.touch-terminal #zenura-quick-actions{position:fixed!important;display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr))!important;inset:auto 0 0 0!important;width:100%!important;height:auto!important;min-height:68px!important;max-width:none!important;margin:0!important;padding:7px 5px calc(7px + env(safe-area-inset-bottom))!important;box-sizing:border-box!important;transform:none!important;border-radius:0!important;z-index:2147483647!important;background:#fff!important;border:0!important;border-top:1px solid #d8e2e0!important;box-shadow:0 -6px 22px rgba(0,0,0,.12)!important;visibility:visible!important;opacity:1!important}
+.stocks-page[data-app-theme="night"].touch-terminal #zenura-quick-actions{background:#101923!important;border-top-color:#334451!important}
+.stocks-page.touch-terminal #zenura-quick-actions>a{display:flex!important;min-width:0!important;min-height:50px!important;align-items:center!important;justify-content:center!important;flex-direction:column!important;gap:4px!important;padding:3px 1px!important;color:#087e68!important;font-size:clamp(7px,2.2vw,10px)!important;font-weight:800!important;line-height:1.1!important;text-align:center!important;text-decoration:none!important;white-space:normal!important}
+.stocks-page.touch-terminal #zenura-quick-actions>a>svg{display:block!important;width:21px!important;height:21px!important;max-width:21px!important;flex:none!important}
+.stocks-page.touch-terminal #zenura-quick-actions>a[aria-current=page]{background:#e1f3ee!important;border-radius:9px!important}
+.stocks-page.touch-terminal{padding-bottom:calc(82px + env(safe-area-inset-bottom))!important}
+.stocks-page.touch-terminal .paper-language-toggle{bottom:calc(76px + env(safe-area-inset-bottom))!important}
+.stocks-page.touch-terminal .chart-theme-toggle{bottom:calc(76px + env(safe-area-inset-bottom))!important}
