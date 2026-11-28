@@ -5,6 +5,8 @@ const {createPaperIntradayLimitWorker}=require("../lib/paper-intraday-limit-work
 const {marketDateString}=require("../lib/exchange-session-calendar");
 const cooldown=require("../lib/upstox-user-cooldown");
 test.beforeEach(()=>cooldown.clearAllUpstoxUserCooldownsForTests());
+const FIXED_NOW=Date.parse("2026-11-27T05:00:00.000Z");
+const fixedNow=()=>FIXED_NOW;
 
 function makeDb({orders=[],locked=false,failExpiry=false}={}){
   const calls=[];
@@ -40,14 +42,15 @@ function deps(db,overrides={}){
     getUpstoxAccessToken:async()=>({token:"token"}),
     fetchProvider:async()=>({ok:true}),
     readProviderJson:async()=>({data:{quote:{instrument_token:instrument.instrument_key}}}),
-    normalizeProviderQuote:()=>({pricePaise:9900,tradeTimeMs:Date.now()-1000,quoteAgeMs:1000}),
-    loadSession:async()=>({exchange:"NSE",sessionDate:marketDateString(Date.now()),
-      isTradingDay:true,openMinute:0,closeMinute:1440}),
+    normalizeProviderQuote:()=>({pricePaise:9900,tradeTimeMs:fixedNow()-1000,quoteAgeMs:1000}),
+    loadSession:async(_db,exchange,nowMs)=>({exchange,sessionDate:marketDateString(nowMs),
+      isTradingDay:true,openMinute:9*60+15,closeMinute:15*60+30}),
+    now:fixedNow,
     ...overrides
   };
 }
 function pendingOrder(){
-  const now=Date.now();
+  const now=FIXED_NOW;
   return {order_id:"a".repeat(64),user_id:"11111111-1111-4111-8111-111111111111",
     instrument_key:instrument.instrument_key,trading_symbol:"TEST",exchange:"NSE",
     side:"BUY",product:"INTRADAY",order_type:"LIMIT",status:"PENDING",quantity:1,
@@ -95,9 +98,9 @@ test("fresh BSE quote uses the BSE-verified session and atomic Intraday LIMIT fi
   const run=createPaperIntradayLimitWorker(deps(db.serviceDb,{
     ensureInstrumentCache:async()=>[bseInstrument],
     readProviderJson:async()=>({data:{quote:{instrument_token:bseInstrument.instrument_key}}}),
-    normalizeProviderQuote:()=>({pricePaise:9900,tradeTimeMs:Date.now()-1000,quoteAgeMs:1000}),
-    loadSession:async(_serviceDb,exchange)=>({exchange,sessionDate:marketDateString(Date.now()),
-      isTradingDay:true,openMinute:0,closeMinute:1440})
+    normalizeProviderQuote:()=>({pricePaise:9900,tradeTimeMs:fixedNow()-1000,quoteAgeMs:1000}),
+    loadSession:async(_serviceDb,exchange,nowMs)=>({exchange,sessionDate:marketDateString(nowMs),
+      isTradingDay:true,openMinute:9*60+15,closeMinute:15*60+30})
   }));
   const result=await run();
   assert.equal(result.scanned,1);
