@@ -34,7 +34,7 @@ function createRedisSubscriberLifecycle({
   }
 
   function unavailable(reason) {
-    if (state === "stopped") return;
+    if (state === "stopped" || state === "unavailable") return;
     generation += 1;
     subscribedGeneration = -1;
     readyPromise = null;
@@ -71,7 +71,8 @@ function createRedisSubscriberLifecycle({
   }
 
   function onReconnect() {
-    if (state !== "stopped") state = "reconnecting";
+    unavailable("reconnecting");
+    if (state !== "stopped" && state !== "unavailable") state = "reconnecting";
   }
   function onEnd() { unavailable("end"); }
   function onError(error) { report(error); }
