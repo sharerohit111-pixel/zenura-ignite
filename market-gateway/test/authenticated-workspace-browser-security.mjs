@@ -71,9 +71,18 @@ test("authenticated workspace CSP and auth DOM resist browser injection", async 
   }));
 
   try {
-    await page.goto(`http://127.0.0.1:${address.port}/markets/stocks/index.html`, { waitUntil: "networkidle" });
+    const htmlResponse = await page.goto(`http://127.0.0.1:${address.port}/markets/stocks/index.html`, { waitUntil: "networkidle" });
+    const servedHtml = await htmlResponse.text();
+    assert.equal(htmlResponse.status(), 200, "authenticated workspace HTML must be served successfully");
+    assert.match(servedHtml, /id="connection"/, "served HTML must contain the authentication connection card");
+    assert.match(servedHtml, /id="upstox-connect"/, "served HTML must contain the connection button");
     await page.locator("#email-auth-message").waitFor({ timeout: 10000 }).catch(async error => {
       const diagnostics = await page.evaluate(() => ({
+        url: location.href,
+        title: document.title,
+        readyState: document.readyState,
+        bodyStart: document.body?.innerHTML?.slice(0, 6000),
+        htmlHasConnection: document.documentElement.outerHTML.includes('id="connection"'),
         scripts: [...document.scripts].map(script => ({ src: script.src, type: script.type })),
         authCard: Boolean(document.querySelector("#connection")),
         connectButton: Boolean(document.querySelector("#upstox-connect")),
