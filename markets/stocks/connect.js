@@ -55,6 +55,15 @@ async function api(path, options = {}) {
   }
   return payload;
 }
+window.ZENURA_ANGEL_ONE_LOGIN = async function (credentials) {
+  return api("/angel-one/session", { method: "POST", body: JSON.stringify(credentials) });
+};
+window.ZENURA_ANGEL_ONE_STATUS = async function () {
+  return api("/angel-one/connection");
+};
+window.ZENURA_ANGEL_ONE_DISCONNECT = async function () {
+  return api("/angel-one/connection", { method: "DELETE" });
+};
 window.ZENURA_GET_BROKER_STATUS = async function (provider) {
   if (provider !== "fyers") throw new Error("Broker status is not available.");
   return api("/fyers/connection");
