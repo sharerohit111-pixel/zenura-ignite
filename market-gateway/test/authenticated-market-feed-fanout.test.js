@@ -1,0 +1,173 @@
+"use strict";
+
+const test = require("node:test");
+const assert = require("node:assert/strict");
+const { createAuthenticatedMarketFeedFanout } = require("../lib/authenticated-market-feed-fanout");
+
+function makeFanout(overrides = {}) {
+  return createAuthenticatedMarketFeedFanout({
+    authenticate: async (credential) => ({
+      userId: credential.userId,
+      tenantId: credential.tenantId,
+    }),
+    authorizeInstrument: async () => ({
+      allowed: true,
+      entitlementReference: "approved-entitlement",
+    }),
+    ...overrides,
+  });
+}
+
+test("fanout delivers only to authenticated connections subscribed to the event instrument", async () => {
+  const receivedA = [];
+  const receivedB = [];
+  const fanout = makeFanout();
+  await fanout.subscribe({
+    credential: { userId: "user-a", tenantId: "tenant-a" },
+    instruments: ["NSE:AAA"],
+    send: async (event) => receivedA.push(event),
+  });
+  await fanout.subscribe({
+    credential: { userId: "user-b", tenantId: "tenant-b" },
+    instruments: ["NSE:BBB"],
+    send: async (event) => receivedB.push(event),
+  });
+
+  assert.equal(await fanout.dispatch({ instrumentId: "NSE:AAA", lastPricePaise: 100 }), 1);
+  assert.equal(receivedA.length, 1);
+  assert.equal(receivedB.length, 0);
+});
+
+test("authentication failure and missing instrument entitlement fail closed", async () => {
+  const badAuth = makeFanout({ authenticate: async () => null });
+  await assert.rejects(badAuth.subscribe({
+    credential: "bad",
+    instruments: ["NSE:AAA"],
+    send: async () => {},
+  }), { code: "market_feed_authentication_failed" });
+
+  const deniedFeed = makeFanout({
+    authorizeInstrument: async () => ({ allowed: false }),
+  });
+  await assert.rejects(deniedFeed.subscribe({
+    credential: { userId: "u", tenantId: "t" },
+    instruments: ["NSE:AAA"],
+    send: async () => {},
+  }), { code: "market_feed_subscription_denied" });
+  assert.equal(deniedFeed.getStatus().connectionCount, 0);
+});
+
+test("revocation removes every connection for the exact user and tenant", async () => {
+  const received = [];
+  const fanout = makeFanout();
+  const credential = { userId: "u1", tenantId: "t1" };
+  await fanout.subscribe({ credential, instruments: ["NSE:AAA"], send: async (e) => received.push(e) });
+  await fanout.subscribe({
+    credential: { userId: "u1", tenantId: "t2" },
+    instruments: ["NSE:AAA"],
+    send: async (e) => received.push(e),
+  });
+
+  assert.equal(fanout.revokePrincipal({ userId: "u1", tenantId: "t1" }), 1);
+  assert.equal(await fanout.dispatch({ instrumentId: "NSE:AAA" }), 1);
+  assert.equal(received.length, 1);
+});
+
+test("disconnect and failed send clean up subscriptions", async () => {
+  const fanout = makeFanout();
+  const subscription = await fanout.subscribe({
+    credential: { userId: "u", tenantId: "t" },
+    instruments: ["NSE:AAA"],
+    send: async () => { throw new Error("socket closed"); },
+  });
+  assert.equal(await fanout.dispatch({ instrumentId: "NSE:AAA" }), 0);
+  assert.equal(fanout.getStatus().connectionCount, 0);
+  assert.equal(subscription.unsubscribe(), false);
+});
+
+test("bounds, duplicate instrument IDs and closed state are enforced", async () => {
+  const fanout = makeFanout({ maxConnections: 1 });
+  const args = {
+    credential: { userId: "u", tenantId: "t" },
+    instruments: ["NSE:AAA"],
+    send: async () => {},
+  };
+  await assert.rejects(fanout.subscribe({ ...args, instruments: ["NSE:AAA", "NSE:AAA"] }), TypeError);
+  await fanout.subscribe(args);
+  await assert.rejects(fanout.subscribe(args), { code: "market_feed_capacity" });
+  assert.equal(fanout.close(), true);
+  assert.equal(fanout.getStatus().connectionCount, 0);
+  await assert.rejects(fanout.subscribe(args), { code: "market_feed_fanout_closed" });
+});
+
+
+test("concurrent subscriptions cannot exceed the configured connection cap", async () => {
+  let releaseAuthorization;
+  const authorizationGate = new Promise((resolve) => { releaseAuthorization = resolve; });
+  const fanout = makeFanout({
+    maxConnections: 1,
+    authorizeInstrument: async () => {
+      await authorizationGate;
+      return { allowed: true, entitlementReference: "approved-entitlement" };
+    },
+  });
+  const args = {
+    credential: { userId: "u", tenantId: "t" },
+    instruments: ["NSE:AAA"],
+    send: async () => {},
+  };
+
+  const first = fanout.subscribe(args);
+  const second = fanout.subscribe(args);
+  releaseAuthorization();
+  const results = await Promise.allSettled([first, second]);
+
+  assert.equal(results.filter((result) => result.status === "fulfilled").length, 1);
+  assert.equal(results.filter((result) => result.status === "rejected").length, 1);
+  assert.equal(results.find((result) => result.status === "rejected").reason.code, "market_feed_capacity");
+  assert.equal(fanout.getStatus().connectionCount, 1);
+});
+
+test("multi-instrument authorization is atomic and fails closed when any instrument is denied", async () => {
+  const checked = [];
+  const fanout = makeFanout({
+    authorizeInstrument: async ({ instrumentId }) => {
+      checked.push(instrumentId);
+      return instrumentId === "NSE:AAA"
+        ? { allowed: true, entitlementReference: "entitlement-a" }
+        : { allowed: false };
+    },
+  });
+
+  await assert.rejects(fanout.subscribe({
+    credential: { userId: "u", tenantId: "t" },
+    instruments: ["NSE:AAA", "NSE:BBB"],
+    send: async () => {},
+  }), { code: "market_feed_subscription_denied" });
+
+  assert.deepEqual(checked, ["NSE:AAA", "NSE:BBB"]);
+  assert.equal(fanout.getStatus().connectionCount, 0);
+  assert.equal(await fanout.dispatch({ instrumentId: "NSE:AAA" }), 0);
+});
+
+
+test("fanout delivers a burst to 500 authorized connections without cross-instrument leakage", async () => {
+  const fanout = makeFanout({ maxConnections: 600 });
+  const received = new Array(500).fill(0);
+  const subscriptions = await Promise.all(Array.from({ length: 500 }, (_, index) =>
+    fanout.subscribe({
+      credential: { userId: `load-user-${index}`, tenantId: "load-tenant" },
+      instruments: [index % 2 === 0 ? "NSE:LOAD-A" : "NSE:LOAD-B"],
+      send: async () => { received[index] += 1; },
+    })
+  ));
+
+  assert.equal(fanout.getStatus().connectionCount, 500);
+  assert.equal(await fanout.dispatch({ instrumentId: "NSE:LOAD-A", sequence: 1 }), 250);
+  assert.equal(await fanout.dispatch({ instrumentId: "NSE:LOAD-B", sequence: 2 }), 250);
+  assert.ok(received.every((count) => count === 1));
+  assert.equal(fanout.getStatus().connectionCount, 500);
+
+  for (const subscription of subscriptions) subscription.unsubscribe();
+  assert.equal(fanout.getStatus().connectionCount, 0);
+});
