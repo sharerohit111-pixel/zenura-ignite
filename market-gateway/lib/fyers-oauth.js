@@ -123,16 +123,16 @@ function createFyersOAuthRouter({ auth, serviceDb, fetchProvider, readProviderJs
         body: JSON.stringify({ grant_type: "authorization_code", appIdHash, code })
       });
       const tokenPayload = await readProviderJson(tokenResponse);
-      if (!tokenResponse.ok || !isUsableFyersTokenResponse(tokenPayload)) return finish(res, "error");
-
       const issuedAt = new Date();
       const expiresAt = nextFyersTokenExpiry(issuedAt.getTime());
       let encryptedAccessToken;
       try {
+        // Invalid/error provider responses can still contain a token-like field.
+        if (!tokenResponse.ok || !isUsableFyersTokenResponse(tokenPayload)) return finish(res, "error");
         encryptedAccessToken = encryptUpstoxToken(tokenPayload.access_token, encryptionKey);
       } finally {
-        // Clear the provider token even if encryption itself throws.
-        tokenPayload.access_token = "";
+        // Clear the access token for success, invalid responses and encryption failures.
+        if (tokenPayload && typeof tokenPayload === "object") tokenPayload.access_token = "";
       }
       const row = {
         user_id: consumed.user_id,
@@ -158,7 +158,7 @@ function createFyersOAuthRouter({ auth, serviceDb, fetchProvider, readProviderJs
       }
       return finish(res, "connected");
     } catch (error) {
-      logger.error("FYERS OAuth callback failed:", error.message);
+      logger.error("FYERS OAuth callback failed.");
       return finish(res, "error");
     }
   });
