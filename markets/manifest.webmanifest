@@ -1,17 +1,24 @@
 {
-  "id": "./",
+  "id": "./stocks/",
   "name": "ZENURA IGNITE – Paper Trading",
   "short_name": "ZENURA IGNITE",
-  "description": "Installable Indian-market paper trading workspace for equities, futures and options.",
+  "description": "Direct launch to the Indian-market paper trading dashboard.",
   "lang": "en-IN",
-  "start_url": "./",
+  "start_url": "./stocks/",
   "scope": "./",
   "display": "standalone",
-  "display_override": ["standalone", "minimal-ui"],
+  "display_override": [
+    "standalone",
+    "minimal-ui"
+  ],
   "orientation": "any",
   "background_color": "#07111f",
   "theme_color": "#07111f",
-  "categories": ["finance", "education", "utilities"],
+  "categories": [
+    "finance",
+    "education",
+    "utilities"
+  ],
   "icons": [
     {
       "src": "./icons/icon-192.svg",
