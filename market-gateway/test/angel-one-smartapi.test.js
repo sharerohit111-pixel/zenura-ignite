@@ -41,6 +41,7 @@ test("Angel One adapter never persists or logs PIN and TOTP", () => {
   assert.match(source, /payload\.data\.jwtToken = ""/);
   assert.match(source, /payload\.data\.refreshToken = ""/);
   assert.match(source, /payload\.data\.feedToken = ""/);
+  assert.match(source, /finally \{\s*\/\/ Clear all plaintext provider tokens even if encryption fails\.\s*payload\.data\.jwtToken = "";\s*payload\.data\.refreshToken = "";\s*payload\.data\.feedToken = "";\s*\}/);
   assert.match(source, /eq\("broker_name", "angel_one"\)/);
 });
 
