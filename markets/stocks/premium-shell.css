@@ -260,3 +260,22 @@
 .stocks-page.touch-terminal [data-page-hidden="true"]{
   display:none!important;
 }
+
+
+/* Keep typed email/password readable on the dark authentication fields.
+   The app-wide input rule uses !important and otherwise overrides this form. */
+.stocks-page .email-auth input,
+.stocks-page .email-auth input:focus,
+.stocks-page .email-auth input:-webkit-autofill,
+.stocks-page .email-auth input:-webkit-autofill:hover,
+.stocks-page .email-auth input:-webkit-autofill:focus{
+  color:#eaf3fa!important;
+  -webkit-text-fill-color:#eaf3fa!important;
+  caret-color:#eaf3fa!important;
+  background-color:#091624!important;
+}
+.stocks-page .email-auth input::placeholder{
+  color:#8da3b6!important;
+  -webkit-text-fill-color:#8da3b6!important;
+  opacity:1!important;
+}
