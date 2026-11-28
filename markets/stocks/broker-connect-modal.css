@@ -53,3 +53,11 @@ body[data-chart-theme="light"] .broker-connect-close{background:#e8eff5;color:#1
 .broker-connect-disconnect:disabled{opacity:.55;cursor:wait}
 body[data-chart-theme="light"] .broker-connect-status{color:#526a80}
 body[data-chart-theme="light"] .broker-connect-disconnect{color:#9f2424;background:#fff0f0;border-color:#e8bcbc}
+
+.angel-one-login-form{display:grid;gap:7px;margin-top:10px}
+.angel-one-login-form label{display:grid;gap:4px;color:#9db2c5;font-size:11px;text-align:left}
+.angel-one-login-form input{width:100%;min-width:0;padding:9px 10px;border:1px solid rgba(173,196,220,.28);border-radius:7px;background:rgba(5,13,23,.55);color:#f4f8fc;font:inherit;font-size:13px;outline-offset:2px}
+.angel-one-login-form input:focus{border-color:#56c8ff}
+.angel-one-login-form .broker-connect-action{width:100%;margin-top:3px}
+body[data-chart-theme="light"] .angel-one-login-form label{color:#526a80}
+body[data-chart-theme="light"] .angel-one-login-form input{background:#fff;border-color:#c6d4e0;color:#15283b}
