@@ -4,7 +4,13 @@ const assert=require("node:assert/strict");
 const {createPaperIntradayLimitWorker}=require("../lib/paper-intraday-limit-worker");
 const {marketDateString}=require("../lib/exchange-session-calendar");
 const cooldown=require("../lib/upstox-user-cooldown");
-test.beforeEach(()=>cooldown.clearAllUpstoxUserCooldownsForTests());
+const originalDateNow=Date.now;
+test.beforeEach(()=>{
+  cooldown.clearAllUpstoxUserCooldownsForTests();
+  // Deterministic Friday 10:00 IST: inside the verified NSE/BSE regular session.
+  Date.now=()=>Date.parse("2026-11-27T10:00:00+05:30");
+});
+test.afterEach(()=>{Date.now=originalDateNow;});
 
 function makeDb({orders=[],locked=false,failExpiry=false}={}){
   const calls=[];

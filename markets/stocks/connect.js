@@ -12,11 +12,11 @@ const detail = document.getElementById("connection-sub");
 const gateway = (document.querySelector('meta[name="market-gateway-url"]')?.content || "").trim().replace(/\/+$/, "");
 
 function setState(title, message, connected = false, showDisconnect = connected) {
-  heading.textContent = title;
-  detail.textContent = message;
-  card.classList.toggle("connected", connected);
-  button.textContent = connected ? "RECONNECT UPSTOX" : "CONNECT UPSTOX";
-  disconnectButton.hidden = !showDisconnect;
+  if (heading) heading.textContent = title;
+  if (detail) detail.textContent = message;
+  if (card) card.classList.toggle("connected", connected);
+  if (button) button.textContent = connected ? "RECONNECT UPSTOX" : "CONNECT UPSTOX";
+  if (disconnectButton) disconnectButton.hidden = !showDisconnect;
 }
 function explainError(error, payload) {
   const code = error?.code || payload?.code || "";
@@ -92,7 +92,7 @@ async function refreshStatus(sequence = authStateSequence) {
     if (sequence === authStateSequence) setState("MARKET BACKEND NOT READY", explainError(error, error.payload));
   }
 }
-disconnectButton.addEventListener("click", async () => {
+disconnectButton?.addEventListener("click", async () => {
   disconnectButton.disabled = true;
   try {
     setState("DISCONNECTING UPSTOX", "Ending this app's market-data connection…", false, true);
@@ -104,7 +104,7 @@ disconnectButton.addEventListener("click", async () => {
     disconnectButton.disabled = false;
   }
 });
-button.addEventListener("click", async () => {
+button?.addEventListener("click", async () => {
   button.disabled = true;
   try {
     const session = await sessionSnapshot();
