@@ -68,3 +68,14 @@
 .demo-page[data-app-theme="day"] .demo-eq-button{background:var(--d-panel)!important;color:var(--d-text)!important;border-color:var(--d-line)!important}
 .demo-page[data-app-theme="day"] .demo-eq-button.primary{background:color-mix(in srgb,var(--d-accent) 12%,var(--d-panel))!important;color:var(--d-accent)!important;border-color:var(--d-accent)!important}
 .demo-page[data-app-theme="day"] .demo-eq-button.danger{background:#fff1f2!important;color:#9f1239!important;border-color:#e5a0ad!important}
+
+/* Day-mode derivative simulator palette, including disclosure chips and section labels. */
+.demo-page[data-app-theme="day"] .demo-fo-panel{background:var(--d-panel)!important;color:var(--d-text)!important;border-color:var(--d-line)!important}
+.demo-page[data-app-theme="day"] .demo-fo-heading{color:var(--d-text)!important}
+.demo-page[data-app-theme="day"] .demo-fo-identity{color:var(--d-accent)!important;background:color-mix(in srgb,var(--d-accent) 8%,var(--d-panel));border-color:color-mix(in srgb,var(--d-accent) 40%,var(--d-line))}
+.demo-page[data-app-theme="day"] .demo-fo-field,
+.demo-page[data-app-theme="day"] .demo-fo-subhead{color:var(--d-muted)!important}
+.demo-page[data-app-theme="day"] .demo-fo-input{background:var(--d-card)!important;color:var(--d-text)!important;border-color:var(--d-line)!important}
+.demo-page[data-app-theme="day"] .demo-fo-button{background:color-mix(in srgb,var(--d-accent) 12%,var(--d-panel))!important;color:var(--d-accent)!important;border-color:var(--d-accent)!important}
+.demo-page[data-app-theme="day"] .demo-fo-button.secondary{background:var(--d-card)!important;color:var(--d-text)!important;border-color:var(--d-line)!important}
+.demo-page[data-app-theme="day"] .demo-fo-table-wrap{background:var(--d-panel)!important;border-color:var(--d-line)!important}
