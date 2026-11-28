@@ -39,6 +39,22 @@ const {chromium}=require("playwright");
     if(overflow.hasOverflow) console.log(JSON.stringify({viewport:viewport.name,route,overflow}));
     assert.equal(overflow.hasOverflow,false,viewport.name+" horizontal overflow on "+route);
    }
+   const sidebarPages=["dashboard","chart","watchlist","derivatives","positions","orders","balance","pnl","settings","support"];
+   for(const route of sidebarPages){
+    await page.locator("#zenura-sidebar-toggle").click();
+    assert.equal(await page.locator("#zenura-sidebar [data-sidebar-page]").count(),10,"sidebar must expose exactly ten destinations");
+    assert.equal(await page.locator("#zenura-sidebar").getAttribute("aria-hidden"),"false","drawer must open accessibly");
+    await page.locator("#zenura-sidebar [data-sidebar-page="+JSON.stringify(route)+"]").click();
+    await page.waitForFunction(value=>document.body.dataset.terminalPage===value,route);
+    assert.equal(await page.locator("#zenura-sidebar").getAttribute("aria-hidden"),"true","drawer must close after navigation");
+   }
+   assert.equal(await page.locator("#zenura-quick-actions a").count(),4,"existing four-item bottom bar must remain intact");
+   await page.locator("nav.terminal-nav [data-terminal-page=\"settings\"]").click();
+   assert.equal(await page.locator(".settings-feature").count(),6,"Settings must expose six requested controls");
+   await page.locator("[data-settings-feature=\"theme\"]").click();
+   assert.ok(["day","night"].includes(await page.locator("body").getAttribute("data-app-theme")),"theme setting must update the app");
+   await page.locator("[data-settings-feature=\"chart\"]").click();
+   assert.equal(await page.locator("body").getAttribute("data-terminal-page"),"chart","Chart Settings must open Chart & Trade");
    await page.locator('nav.terminal-nav [data-terminal-page="balance"]').click();
    assert.equal(await page.locator(".paper-ticket-controls").isVisible(),false,"wallet must not expose order-entry controls");
    await page.locator('nav.terminal-nav [data-terminal-page="positions"]').click();
