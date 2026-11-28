@@ -78,10 +78,10 @@ test("broken image artifacts at the mobile viewport bottom are removed without h
  const guard=read("markets/bottom-artifact-guard.js");
  const portal=read("markets/index.html");
  const terminal=read("markets/stocks/index.html");
- assert.match(portal,/bottom-artifact-guard\\.js/);
- assert.match(terminal,/bottom-artifact-guard\\.js/);
- assert.match(guard,/img\\.naturalWidth===0/);
- assert.match(guard,/r\\.bottom>h-220/);
+ assert.match(portal,/bottom-artifact-guard\.js/);
+ assert.match(terminal,/bottom-artifact-guard\.js/);
+ assert.match(guard,/img\.naturalWidth===0/);
+ assert.match(guard,/r\.bottom>h-220/);
  assert.match(guard,/zenura-empty-bottom-asset-wrap/);
  assert.match(guard,/MutationObserver/);
 });
@@ -89,7 +89,7 @@ test("broken image artifacts at the mobile viewport bottom are removed without h
 test("PWA registration checks for updates on launch and when the app returns to foreground",()=>{
  const registration=read("markets/pwa-register.js");
  assert.match(registration,/updateViaCache:"none"/);
- assert.match(registration,/registration\\.update\\(\\)/);
+ assert.match(registration,/registration\.update\\(\\)/);
  assert.match(registration,/controllerchange/);
  assert.match(registration,/visibilitychange/);
 });
