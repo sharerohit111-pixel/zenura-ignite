@@ -3,14 +3,12 @@ name: S-TRADE Central Feed Engine Checks
 on:
   pull_request:
     branches:
-      - feature/s-trade-commercial-feed-onboarding-plan-2026-11-28
+      - feature/s-trade-central-feed-engine-clean-2026-11-28
     paths:
       - "market-gateway/lib/central-market-feed.js"
       - "market-gateway/lib/redis-market-feed-transport.js"
-      - "market-gateway/lib/authenticated-market-feed-fanout.js"
       - "market-gateway/test/central-market-feed.test.js"
       - "market-gateway/test/redis-market-feed-transport.test.js"
-      - "market-gateway/test/authenticated-market-feed-fanout.test.js"
       - ".github/workflows/s-trade-central-feed-engine.yml"
   workflow_dispatch:
 
@@ -29,9 +27,7 @@ jobs:
         run: |
           node --check market-gateway/lib/central-market-feed.js
           node --check market-gateway/lib/redis-market-feed-transport.js
-          node --check market-gateway/lib/authenticated-market-feed-fanout.js
           node --check market-gateway/test/central-market-feed.test.js
           node --check market-gateway/test/redis-market-feed-transport.test.js
-          node --check market-gateway/test/authenticated-market-feed-fanout.test.js
-      - name: Run deterministic central feed, Redis transport and fan-out tests
-        run: node --test market-gateway/test/central-market-feed.test.js market-gateway/test/redis-market-feed-transport.test.js market-gateway/test/authenticated-market-feed-fanout.test.js
+      - name: Run deterministic central feed and Redis transport tests
+        run: node --test market-gateway/test/central-market-feed.test.js market-gateway/test/redis-market-feed-transport.test.js
