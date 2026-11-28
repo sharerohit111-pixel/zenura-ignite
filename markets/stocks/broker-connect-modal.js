@@ -2,7 +2,8 @@
 (function () {
   const root = document.getElementById("broker-connect-overlay");
   if (!root) return;
-  const referralConfig = window.ZENURA_BROKER_REFERRALS || {};\n  const providers = [
+  const referralConfig = window.ZENURA_BROKER_REFERRALS || {};
+  const providers = [
     { id: "upstox", name: "Upstox", mark: "u", tag: "BROKER API", note: "Zero AMC and eligible brokerage offers*", referralUrl: referralConfig.upstox || "https://upstox.onelink.me/0H1s/5CAYMN" },
     { id: "fyers", name: "FYERS", mark: "F", tag: "BROKER API", note: "Referral code FRN9GVV · Up to ₹2,000 FYERS Credits*", referralUrl: referralConfig.fyers || "https://fyers.onelink.me/cj1P/l3nujhwy" },
     { id: "angel_one", name: "Angel One", mark: "A", tag: "SMARTAPI", note: "Free Demat account offer and other benefits*", referralUrl: referralConfig.angel_one || "https://angel-one.onelink.me/Wjgr/gw4o5lz2" }
@@ -143,7 +144,8 @@
         return window.ZENURA_DISCONNECT_BROKER("fyers");
       }).then(() => {
         feedback.textContent = "FYERS disconnected from this app.";
-        refreshFyersStatus();\n  refreshAngelOneStatus();
+        refreshFyersStatus();
+  refreshAngelOneStatus();
       }).catch((error) => {
         feedback.textContent = error?.message || "FYERS disconnect failed.";
       }).finally(() => { disconnectFyers.disabled = false; });
@@ -181,7 +183,8 @@
   window.addEventListener("zenura-broker-connection-ready", close);
   window.addEventListener("zenura-broker-connection-expired", open);
   window.addEventListener("zenura-broker-connection-missing", open);
-  window.addEventListener("zenura-fyers-connection-updated", refreshFyersStatus);\n  window.addEventListener("zenura-market-auth-ready", refreshAngelOneStatus);
+  window.addEventListener("zenura-fyers-connection-updated", refreshFyersStatus);
+  window.addEventListener("zenura-market-auth-ready", refreshAngelOneStatus);
   window.addEventListener("zenura-market-auth-ready", (event) => {
     if (event.detail?.signedIn && status?.textContent?.includes("AUTHORIZED")) close();
   });
