@@ -115,3 +115,23 @@ test("owned client is closed once on shutdown", async () => {
   await h.lifecycle.stop();
   assert.equal(quit, 1);
 });
+
+test("shutdown drains an in-flight subscription before closing an owned client", async () => {
+  let finish;
+  let quit = 0;
+  const h = harness({
+    closeOwnedClient: true,
+    ensureSubscription: () => new Promise((resolve) => { finish = resolve; }),
+  });
+  h.client.quit = async () => { quit += 1; };
+  await h.lifecycle.start();
+  const connecting = h.lifecycle.onReady();
+  await Promise.resolve();
+  const stopping = h.lifecycle.stop();
+  assert.equal(quit, 0);
+  finish();
+  await connecting;
+  await stopping;
+  assert.equal(quit, 1);
+  assert.equal(h.lifecycle.getStatus().state, "stopped");
+});
