@@ -60,6 +60,7 @@ test("reconnect ready creates one new generation subscription", async () => {
   await h.lifecycle.start();
   h.client.emit("ready");
   await h.lifecycle.onReady();
+  const old = h.lifecycle.getStatus().generation;
   h.client.emit("reconnecting");
   assert.equal(h.lifecycle.getStatus().state, "reconnecting");
   assert.equal(h.lifecycle.getStatus().generation, old + 1);
