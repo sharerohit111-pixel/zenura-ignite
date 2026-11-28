@@ -362,3 +362,168 @@ test("Angel One connection status fails closed for auth and database errors", as
   assert.equal(dbRes.statusCode, 503);
   assert.equal(dbRes.body.connected, undefined);
 });
+
+
+function fyersDisconnectHarness({ authError = null, updateError = null } = {}) {
+  const calls = [];
+  const serviceDb = {
+    from(table) {
+      assert.equal(table, "broker_connections");
+      const builder = {
+        update(value) { calls.push({ update: value }); return this; },
+        eq(field, value) { calls.push({ eq: [field, value] }); return this; },
+        then(resolve, reject) { return Promise.resolve({ error: updateError }).then(resolve, reject); }
+      };
+      return builder;
+    }
+  };
+  const router = createFyersOAuthRouter({
+    auth: async () => {
+      if (authError) throw authError;
+      return { user: { id: "user-3", emailConfirmedAt: "2026-01-01" } };
+    },
+    serviceDb, fetchProvider: async () => { throw new Error("unexpected provider request"); },
+    readProviderJson: async () => ({}), appRedirectUri: "https://app.example/",
+    clientId: "client-id", clientSecret: "client-secret",
+    redirectUri: "https://gateway.example/fyers/oauth/callback",
+    encryptionKey: KEY, logger: { error() {} }
+  });
+  return { router, calls };
+}
+
+test("FYERS disconnect clears only the authenticated user's FYERS token row", async () => {
+  const h = fyersDisconnectHarness();
+  const res = response();
+  await routeHandler(h.router, "delete", "/connection")({}, res);
+  assert.equal(res.body.disconnected, true);
+  assert.ok(h.calls.some(x => x.eq?.[0] === "user_id" && x.eq[1] === "user-3"));
+  assert.ok(h.calls.some(x => x.eq?.[0] === "broker_name" && x.eq[1] === "fyers"));
+  const update = h.calls.find(x => x.update).update;
+  assert.equal(update.connection_status, "disconnected");
+  assert.equal(update.access_token_ciphertext, null);
+  assert.equal(update.refresh_token_ciphertext, null);
+  assert.equal(res.headers["Cache-Control"], "no-store");
+});
+
+test("FYERS disconnect fails closed on auth or database update failure", async () => {
+  const authFailure = fyersDisconnectHarness({ authError: new Error("not signed in") });
+  const authRes = response();
+  await routeHandler(authFailure.router, "delete", "/connection")({}, authRes);
+  assert.equal(authRes.statusCode, 500);
+  assert.equal(authFailure.calls.length, 0);
+
+  const dbFailure = fyersDisconnectHarness({ updateError: { code: "WRITE_FAILED" } });
+  const dbRes = response();
+  await routeHandler(dbFailure.router, "delete", "/connection")({}, dbRes);
+  assert.equal(dbRes.statusCode, 503);
+  assert.equal(dbRes.body.disconnected, undefined);
+});
+
+function angelLoginHarness({ authError = null, user = { id: "user-4", emailConfirmedAt: "2026-01-01" },
+  rate = { allowed: true }, rateError = null, providerResponse = { ok: true },
+  payload = { status: true, data: { jwtToken: "jwt-secret", refreshToken: "refresh-secret", feedToken: "feed-secret" } },
+  saveError = null } = {}) {
+  const calls = { rpc: [], fetch: [], upsert: [] };
+  const serviceDb = {
+    async rpc(name, args) {
+      calls.rpc.push({ name, args });
+      return { data: rate, error: rateError };
+    },
+    from(table) {
+      assert.equal(table, "broker_connections");
+      return { upsert: async (row, options) => {
+        calls.upsert.push({ row, options });
+        return { error: saveError };
+      }};
+    }
+  };
+  const router = createAngelOneRouter({
+    auth: async () => {
+      if (authError) throw authError;
+      return { user };
+    },
+    serviceDb,
+    fetchProvider: async (url, options) => {
+      calls.fetch.push({ url, options });
+      return providerResponse;
+    },
+    readProviderJson: async () => payload,
+    encryptionKey: KEY, apiKey: "api-key", clientLocalIp: "192.0.2.1",
+    clientPublicIp: "198.51.100.1", macAddress: "AA:BB:CC:DD:EE:FF",
+    sourceId: "WEB", logger: { error() {} }
+  });
+  return { router, calls, payload };
+}
+
+function angelRequestBody() {
+  return { clientcode: "AB1234", pin: "1234", totp: "654321" };
+}
+
+test("Angel One login scrubs PIN and TOTP before authentication and on early rejection", async () => {
+  const authFailure = angelLoginHarness({ authError: new Error("not signed in") });
+  const authBody = angelRequestBody(), authRes = response();
+  await routeHandler(authFailure.router, "post", "/session")({ body: authBody }, authRes);
+  assert.equal(authRes.statusCode, 502);
+  assert.equal(authBody.pin, "");
+  assert.equal(authBody.totp, "");
+
+  const unconfirmed = angelLoginHarness({ user: { id: "user-4", emailConfirmedAt: null } });
+  const unconfirmedBody = angelRequestBody(), unconfirmedRes = response();
+  await routeHandler(unconfirmed.router, "post", "/session")({ body: unconfirmedBody }, unconfirmedRes);
+  assert.equal(unconfirmedRes.statusCode, 403);
+  assert.equal(unconfirmedBody.pin, "");
+  assert.equal(unconfirmedBody.totp, "");
+  assert.equal(unconfirmed.calls.rpc.length, 0);
+});
+
+test("Angel One login rate limiter failures and denials prevent provider authentication", async () => {
+  const unavailable = angelLoginHarness({ rateError: { code: "DB_DOWN" }, rate: null });
+  const unavailableBody = angelRequestBody(), unavailableRes = response();
+  await routeHandler(unavailable.router, "post", "/session")({ body: unavailableBody }, unavailableRes);
+  assert.equal(unavailableRes.statusCode, 503);
+  assert.equal(unavailable.calls.fetch.length, 0);
+  assert.equal(unavailableBody.pin, "");
+  assert.equal(unavailableBody.totp, "");
+
+  const limited = angelLoginHarness({ rate: { allowed: false, retry_after_seconds: 60 } });
+  const limitedBody = angelRequestBody(), limitedRes = response();
+  await routeHandler(limited.router, "post", "/session")({ body: limitedBody }, limitedRes);
+  assert.equal(limitedRes.statusCode, 429);
+  assert.equal(limitedRes.headers["Retry-After"], "60");
+  assert.equal(limited.calls.fetch.length, 0);
+  assert.equal(limitedBody.pin, "");
+  assert.equal(limitedBody.totp, "");
+});
+
+test("Angel One successful login stores encrypted tokens only and scrubs provider payload", async () => {
+  const h = angelLoginHarness();
+  const body = angelRequestBody(), res = response();
+  await routeHandler(h.router, "post", "/session")({ body }, res);
+  assert.equal(res.body.connected, true);
+  assert.equal(body.pin, "");
+  assert.equal(body.totp, "");
+  assert.equal(h.calls.rpc[0].name, "reserve_angel_one_login_attempt");
+  assert.equal(h.calls.fetch.length, 1);
+  assert.equal(h.calls.upsert.length, 1);
+  assert.equal(h.calls.upsert[0].row.user_id, "user-4");
+  assert.equal(h.calls.upsert[0].row.broker_name, "angel_one");
+  assert.notEqual(h.calls.upsert[0].row.access_token_ciphertext, "jwt-secret");
+  assert.equal(h.payload.data.jwtToken, "");
+  assert.equal(h.payload.data.refreshToken, "");
+  assert.equal(h.payload.data.feedToken, "");
+  assert.doesNotMatch(JSON.stringify(res.body), /jwt-secret|refresh-secret|feed-secret/);
+});
+
+test("Angel One invalid provider login response is scrubbed and never persisted", async () => {
+  const payload = { status: false, data: { jwtToken: "bad-jwt", refreshToken: "bad-refresh", feedToken: "bad-feed" } };
+  const h = angelLoginHarness({ payload });
+  const body = angelRequestBody(), res = response();
+  await routeHandler(h.router, "post", "/session")({ body }, res);
+  assert.equal(res.statusCode, 401);
+  assert.equal(h.calls.upsert.length, 0);
+  assert.equal(payload.data.jwtToken, "");
+  assert.equal(payload.data.refreshToken, "");
+  assert.equal(payload.data.feedToken, "");
+  assert.equal(body.pin, "");
+  assert.equal(body.totp, "");
+});
