@@ -18,9 +18,9 @@ test("Angel One session response must contain JWT, refresh and feed tokens", () 
   assert.equal(isValidAngelOneLogin({ status: false, data: null }), false);
 });
 
-test("Angel One session expiry is 05:00 on the next India-local day", () => {
+test("Angel One session expiry is midnight on the next India-local day", () => {
   const now = Date.parse("2026-11-28T12:00:00.000Z");
-  assert.equal(nextAngelOneSessionExpiry(now).toISOString(), "2026-11-28T23:30:00.000Z");
+  assert.equal(nextAngelOneSessionExpiry(now).toISOString(), "2026-11-28T18:30:00.000Z");
   assert.throws(() => nextAngelOneSessionExpiry(-1));
 });
 
