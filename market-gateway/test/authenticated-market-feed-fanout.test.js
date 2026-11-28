@@ -149,3 +149,25 @@ test("multi-instrument authorization is atomic and fails closed when any instrum
   assert.equal(fanout.getStatus().connectionCount, 0);
   assert.equal(await fanout.dispatch({ instrumentId: "NSE:AAA" }), 0);
 });
+
+
+test("fanout delivers a burst to 500 authorized connections without cross-instrument leakage", async () => {
+  const fanout = makeFanout({ maxConnections: 600 });
+  const received = new Array(500).fill(0);
+  const subscriptions = await Promise.all(Array.from({ length: 500 }, (_, index) =>
+    fanout.subscribe({
+      credential: { userId: `load-user-${index}`, tenantId: "load-tenant" },
+      instruments: [index % 2 === 0 ? "NSE:LOAD-A" : "NSE:LOAD-B"],
+      send: async () => { received[index] += 1; },
+    })
+  ));
+
+  assert.equal(fanout.getStatus().connectionCount, 500);
+  assert.equal(await fanout.dispatch({ instrumentId: "NSE:LOAD-A", sequence: 1 }), 250);
+  assert.equal(await fanout.dispatch({ instrumentId: "NSE:LOAD-B", sequence: 2 }), 250);
+  assert.ok(received.every((count) => count === 1));
+  assert.equal(fanout.getStatus().connectionCount, 500);
+
+  for (const subscription of subscriptions) subscription.unsubscribe();
+  assert.equal(fanout.getStatus().connectionCount, 0);
+});
