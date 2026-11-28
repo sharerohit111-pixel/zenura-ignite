@@ -45,8 +45,8 @@ if(header&&!header.querySelector("[data-app-theme-toggle]")){
 document.querySelectorAll(".terminal-nav > a[data-terminal-page]").forEach(a=>{
  a.classList.add("terminal-nav-link");
 });
-const bottom=document.createElement("nav");bottom.id="zenura-quick-actions";bottom.className="app-bottom-nav";bottom.dataset.appBottomNav="";bottom.setAttribute("aria-label","Quick trading navigation");bottom.setAttribute("role","navigation");bottom.dataset.quickTradeNav="";
-const items=[["derivatives","Option Chain"],["positions","Live Pos. / P&L"],["watchlist","Quick Watchlist"],["support","Help & Support"]];
+const bottom=document.createElement("nav");bottom.id="zenura-quick-actions";bottom.className="app-bottom-nav";bottom.dataset.appBottomNav="";bottom.setAttribute("aria-label","Primary app navigation");bottom.setAttribute("role","navigation");bottom.dataset.quickTradeNav="";
+const items=[["dashboard","Home"],["derivatives","Option Chain"],["positions","Live Pos. / P&L"],["watchlist","Quick Watchlist"],["support","Help & Support"]];
 items.forEach(([page,label])=>{
  const a=document.createElement("a");
  a.href="#"+page;
@@ -68,7 +68,7 @@ bottom.style.setProperty("right","0","important");
 bottom.style.setProperty("bottom","0","important");
 bottom.style.setProperty("z-index","2147483647","important");
 bottom.style.setProperty("display","grid","important");
-bottom.style.setProperty("grid-template-columns","repeat(4,minmax(0,1fr))","important");
+bottom.style.setProperty("grid-template-columns","repeat(5,minmax(0,1fr))","important");
 bottom.style.setProperty("min-height","72px","important");
 bottom.style.setProperty("box-sizing","border-box","important");
 bottom.style.setProperty("padding","8px 8px calc(8px + env(safe-area-inset-bottom))","important");

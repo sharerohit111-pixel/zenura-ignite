@@ -19,7 +19,7 @@ test("Markets PWA manifest remains installable and scoped away from Crypto",()=>
 test("service worker cache generation is explicit and activation removes stale Markets generations",()=>{
  const sw=read("markets/service-worker.js");
  const cache=sw.match(/const CACHE_NAME="([^"]+)"/)?.[1];
- assert.equal(cache,"zenura-markets-shell-v20");
+ assert.equal(cache,"zenura-markets-shell-v21");
  assert.match(sw,/await self\.skipWaiting\(\)/);
  assert.match(sw,/await self\.clients\.claim\(\)/);
  assert.match(sw,/key\.startsWith\("zenura-markets-"\)&&key!==CACHE_NAME/);
@@ -74,19 +74,19 @@ test("paper terminal has separate navigation destinations and offline page routi
  assert.match(nav,/data-settings-action/);
 });
 
-test("paper terminal mobile bottom bar exposes the four requested functional shortcuts",()=>{
+test("paper terminal mobile bottom bar exposes the five requested functional shortcuts",()=>{
  const html=read("markets/stocks/index.html");
  const shell=read("markets/stocks/premium-shell.js");
  const nav=read("markets/stocks/page-navigation.js");
  const css=read("markets/stocks/premium-shell.css");
  assert.match(shell,/bottom\.dataset\.appBottomNav=""/);
- for(const page of ["derivatives","positions","watchlist","support"])assert.ok(shell.includes('["'+page+'"'));
- assert.match(shell,/\["derivatives","Option Chain"\],\["positions","Live Pos\. \/ P&L"\],\["watchlist","Quick Watchlist"\],\["support","Help & Support"\]/);
+ for(const page of ["dashboard","derivatives","positions","watchlist","support"])assert.ok(shell.includes('["'+page+'"'));
+ assert.match(shell,/\["dashboard","Home"\],\["derivatives","Option Chain"\],\["positions","Live Pos\. \/ P&L"\],\["watchlist","Quick Watchlist"\],\["support","Help & Support"\]/);
  assert.match(nav,/support:\["\.support-page"\]/);
  assert.match(nav,/pageRoot\.append\(support\)/);
  assert.match(nav,/support-save-draft/);
  assert.match(css,/\.stocks-page \.app-bottom-nav\{[\s\S]*?position:fixed!important/);
- assert.match(css,/grid-template-columns:repeat\(4,minmax\(0,1fr\)\)!important/);
+ assert.match(css,/grid-template-columns:repeat\(5,minmax\(0,1fr\)\)!important/);
  assert.match(css,/z-index:9999!important/);
  assert.match(css,/visibility:visible!important/);
  assert.match(css,/env\(safe-area-inset-bottom\)/);
