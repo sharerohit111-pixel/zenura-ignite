@@ -91,3 +91,29 @@ test("channel parser validates encoded instrument IDs", () => {
   assert.throws(() => parseChannel("s-trade:market-data:%ZZ"), { code: "invalid_market_feed_message" });
   assert.throws(() => parseChannel("s-trade:market-data:*"), { code: "invalid_market_feed_message" });
 });
+
+
+test("subscriber preserves arrival order across a 250-message burst", async () => {
+  const order = [];
+  const h = harness({ fanout: { async dispatch(event) {
+    await Promise.resolve();
+    order.push(event.sequence);
+    return 1;
+  } } });
+  await h.bridge.start();
+
+  const pending = Array.from({ length: 250 }, (_, sequence) =>
+    h.emit(
+      JSON.stringify({ instrumentId: "NSE:BURST", sequence }),
+      "s-trade:market-data:NSE:BURST",
+    )
+  );
+  const delivered = await Promise.all(pending);
+
+  assert.equal(delivered.length, 250);
+  assert.ok(delivered.every((count) => count === 1));
+  assert.deepEqual(order, Array.from({ length: 250 }, (_, sequence) => sequence));
+  assert.equal(h.bridge.getStatus().accepted, 250);
+  assert.equal(h.bridge.getStatus().rejected, 0);
+  await h.bridge.stop();
+});
