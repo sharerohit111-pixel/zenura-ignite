@@ -8,7 +8,7 @@ test("Angel One login requires bounded client ID, PIN and current six digit TOTP
     { clientcode: "AB1234", pin: "1234", totp: "654321" });
   assert.equal(validateAngelOneCredentials({ clientcode: "AB1234", pin: "123", totp: "654321" }), null);
   assert.equal(validateAngelOneCredentials({ clientcode: "AB1234", pin: "1234", totp: "65432" }), null);
-  assert.equal(validateAngelOneCredentials({ clientcode: "AB1234", pin: "1234", totp: "654321", extra: "unexpected" }).totp, "654321");
+  assert.equal(validateAngelOneCredentials({ clientcode: "AB1234", pin: "1234", totp: "654321", extra: "unexpected" }), null);
   assert.equal(validateAngelOneCredentials(null), null);
 });
 
@@ -45,4 +45,13 @@ test("Angel One server requires explicit real network header configuration", () 
   assert.doesNotMatch(server, /ANGEL_ONE_CLIENT_LOCAL_IP\|\|/);
   assert.doesNotMatch(server, /ANGEL_ONE_CLIENT_PUBLIC_IP\|\|/);
   assert.doesNotMatch(server, /ANGEL_ONE_MAC_ADDRESS\|\|/);
+});
+
+test("Angel One adapter has no default placeholder network identity", () => {
+  const fs = require("node:fs");
+  const path = require("node:path");
+  const source = fs.readFileSync(path.join(__dirname, "../lib/angel-one-smartapi.js"), "utf8");
+  assert.doesNotMatch(source, /clientLocalIp\s*=\s*["']/);
+  assert.doesNotMatch(source, /clientPublicIp\s*=\s*["']/);
+  assert.doesNotMatch(source, /macAddress\s*=\s*["']/);
 });
