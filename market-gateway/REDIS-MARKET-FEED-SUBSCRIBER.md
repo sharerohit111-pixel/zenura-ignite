@@ -24,3 +24,8 @@ This is an isolated Redis pattern-subscriber adapter. It does not create or own 
 6. Keep vendor and exchange rights/regulatory gates closed until executed approvals explicitly cover S-TRADE paper trading and multi-user distribution.
 
 No current gateway route, UI, broker order flow, Supabase schema, Crypto code or production runtime is changed by this module.
+
+
+## CI dependency note
+
+The subscriber bridge test workflow is evaluated against the authenticated fan-out stack branch so the CI checkout contains the fan-out implementation as well as the Redis bridge. The pull request remains Draft until the complete stacked test run passes.
