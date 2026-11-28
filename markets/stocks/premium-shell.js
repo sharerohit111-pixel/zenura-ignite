@@ -1,6 +1,9 @@
 (function(){
 "use strict";
 const body=document.body;
+// Android Chrome may expose a desktop-width viewport while running Desktop site.
+// Detect touch hardware independently of viewport width and force the mobile shell.
+if((navigator.maxTouchPoints>0)||("ontouchstart" in window))body.classList.add("touch-terminal");
 const KEY="zenura-s-trade-app-theme-v1";
 const icons={
 dashboard:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="8" height="8" rx="2"/><rect x="13" y="3" width="8" height="5" rx="2"/><rect x="13" y="10" width="8" height="11" rx="2"/><rect x="3" y="13" width="8" height="8" rx="2"/></svg>',
