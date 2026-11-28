@@ -67,7 +67,7 @@ function createFyersOAuthRouter({ auth, serviceDb, fetchProvider, readProviderJs
       if (typeof code !== "string" || !code.trim() || code.length > 8192
         || typeof state !== "string" || !/^[a-f0-9]{64}$/.test(state)
         || req.query.s === "error") return finish(res, "error");
-      if (!clientId || !clientSecret || !redirectUri || !encryptionKey) return finish(res, "error");
+      if (!clientId || !clientSecret || !isValidFyersRedirectUri(redirectUri) || !encryptionKey) return finish(res, "error");
       const stateHash = crypto.createHash("sha256").update(state).digest("hex");
       const { data: stateData, error: stateError } = await serviceDb.rpc("consume_broker_oauth_state", {
         p_state_hash: stateHash, p_broker_name: "fyers"
