@@ -52,3 +52,13 @@ test("demo action closes the broker modal and requests demo mode without a broke
   assert.match(modal, /window\.dispatchEvent\(new CustomEvent\("zenura-demo-mode-requested"\)\)/);
   assert.match(html, /No Broker Login Required/);
 });
+
+test("broker modal traps keyboard focus and supports Escape dismissal", () => {
+  assert.match(modal, /event\.key === "Escape"/);
+  assert.match(modal, /event\.key !== "Tab"/);
+  assert.match(modal, /getFocusableElements\(\)/);
+  assert.match(modal, /last\.focus\(\)/);
+  assert.match(modal, /first\.focus\(\)/);
+  assert.match(modal, /returnFocusTo\.focus\(\)/);
+  assert.match(modal, /data-close-broker-modal.*?\.focus\(\)/s);
+});
