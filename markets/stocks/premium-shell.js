@@ -34,9 +34,11 @@ const header=document.querySelector(".top");
 if(header&&!header.querySelector("[data-app-theme-toggle]")){
  const btn=document.createElement("button");btn.type="button";btn.className="app-theme-switch";btn.dataset.appThemeToggle="";btn.addEventListener("click",()=>{theme=theme==="day"?"night":"day";render()});header.append(btn);
 }
-document.querySelectorAll("[data-terminal-page]").forEach(a=>{
- const page=a.dataset.terminalPage,ic=icons[pageIcons[page]]||icons.chart;
- const label=a.textContent.trim();a.innerHTML=ic+"<span>"+label+"</span>";
+// Keep existing navigation anchor contents intact. Replacing innerHTML here can
+// detach the terminal document when malformed/legacy markup nests page content
+// inside the first anchor. The desktop navigation remains text-first and safe.
+document.querySelectorAll(".terminal-nav > a[data-terminal-page]").forEach(a=>{
+ a.classList.add("terminal-nav-link");
 });
 const bottom=document.createElement("nav");bottom.className="app-bottom-nav";bottom.setAttribute("aria-label","Main navigation");
 const items=[["dashboard","Home"],["watchlist","Watchlist"],["chart","Trade"],["positions","Portfolio"],["settings","Profile"]];
