@@ -114,3 +114,30 @@
 @media(max-width:760px){
  .stocks-page .top>.product-mode-nav{width:100%;flex:1 0 100%;align-self:stretch}
 }
+
+
+/* Dashboard readability and mobile typography corrections (isolated shell layer). */
+.stocks-page .market-pulse{display:grid;gap:12px;margin:18px 0;padding:16px;border:1px solid var(--app-line);border-radius:14px;background:var(--app-raised);min-width:0}
+.stocks-page .market-pulse-head{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:5px 12px;min-width:0}
+.stocks-page .market-pulse-head>b{color:var(--app-text);font-size:15px;font-weight:850}
+.stocks-page .market-pulse-head>span{color:var(--app-muted);font-size:12px}
+.stocks-page .market-pulse-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;min-width:0}
+.stocks-page .market-pulse-grid>article{display:grid;grid-template-columns:minmax(0,1fr);gap:4px;min-width:0;padding:11px;border:1px solid var(--app-line);border-radius:11px;background:var(--app-surface)}
+.stocks-page .market-pulse-grid>article>small{color:var(--app-muted);font-size:10px;font-weight:800;letter-spacing:.04em}
+.stocks-page .market-pulse-grid>article>strong{color:var(--app-text);font-size:17px;line-height:1.25}
+.stocks-page .market-pulse-grid>article>span{color:var(--app-muted);font-size:11px;line-height:1.4;overflow-wrap:anywhere}
+.stocks-page .top .brand b{white-space:normal;overflow-wrap:normal}
+.stocks-page .top .brand small{max-width:100%;overflow-wrap:anywhere}
+.stocks-page footer{display:flex;flex-wrap:wrap;align-items:center;gap:6px 18px;padding:22px 0 28px;line-height:1.55;font-size:12px}
+.stocks-page footer>span{display:block;min-width:0}
+@media(max-width:430px){
+ .stocks-page .market-pulse{padding:12px;margin:14px 0}
+ .stocks-page .market-pulse-head{display:grid;gap:4px}
+ .stocks-page .market-pulse-head>b{font-size:14px}
+ .stocks-page .market-pulse-head>span{font-size:11px}
+ .stocks-page .market-pulse-grid{gap:7px}
+ .stocks-page .market-pulse-grid>article{padding:9px}
+ .stocks-page .market-pulse-grid>article>strong{font-size:15px}
+ .stocks-page .market-pulse-grid>article>span{font-size:10px}
+ .stocks-page footer{display:grid;gap:5px;padding-bottom:32px}
+}
