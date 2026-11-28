@@ -1,0 +1,33 @@
+name: S-TRADE Central Feed Engine Checks
+
+on:
+  pull_request:
+    branches:
+      - feature/s-trade-commercial-feed-onboarding-plan-2026-11-28
+    paths:
+      - "market-gateway/lib/central-market-feed.js"
+      - "market-gateway/lib/redis-market-feed-transport.js"
+      - "market-gateway/test/central-market-feed.test.js"
+      - "market-gateway/test/redis-market-feed-transport.test.js"
+      - ".github/workflows/s-trade-central-feed-engine.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  central-feed-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Check central feed source and tests
+        run: |
+          node --check market-gateway/lib/central-market-feed.js
+          node --check market-gateway/lib/redis-market-feed-transport.js
+          node --check market-gateway/test/central-market-feed.test.js
+          node --check market-gateway/test/redis-market-feed-transport.test.js
+      - name: Run deterministic central feed and Redis transport tests
+        run: node --test market-gateway/test/central-market-feed.test.js market-gateway/test/redis-market-feed-transport.test.js
