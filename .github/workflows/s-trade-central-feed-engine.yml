@@ -15,7 +15,6 @@ on:
       - "market-gateway/test/authenticated-market-feed-fanout.test.js"
       - "market-gateway/test/redis-market-feed-subscriber.test.js"
       - "market-gateway/test/redis-subscriber-lifecycle.test.js"
-      - ".github/workflows/s-trade-central-feed-engine.yml"
   workflow_dispatch:
 
 permissions:
