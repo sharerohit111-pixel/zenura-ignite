@@ -17,6 +17,7 @@ function nextAngelOneSessionExpiry(now = Date.now()) {
 function validateAngelOneCredentials(body) {
   if (!body || typeof body !== "object" || Array.isArray(body)) return null;
   const { clientcode, pin, totp } = body;
+  if (Object.keys(body).some(key => !["clientcode", "pin", "totp"].includes(key))) return null;
   if (typeof clientcode !== "string" || !/^[A-Za-z0-9]{4,20}$/.test(clientcode)
     || typeof pin !== "string" || !/^\d{4,6}$/.test(pin)
     || typeof totp !== "string" || !/^\d{6}$/.test(totp)) return null;
@@ -31,8 +32,7 @@ function isValidAngelOneLogin(payload) {
 }
 
 function createAngelOneRouter({ auth, serviceDb, fetchProvider, readProviderJson, encryptionKey,
-  apiKey, clientLocalIp = "127.0.0.1", clientPublicIp = "127.0.0.1",
-  macAddress = "00:00:00:00:00:00", sourceId = "WEB", logger = console }) {
+  apiKey, clientLocalIp, clientPublicIp, macAddress, sourceId, logger = console }) {
   const router = express.Router();
   const attempts = new Map();
   function checkRateLimit(userId) {
