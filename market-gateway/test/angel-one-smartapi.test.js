@@ -53,6 +53,7 @@ test("Angel One provider logout sends the required authenticated session headers
   assert.match(source, /"x-api-key": apiKey/);
   assert.match(source, /"x-client-code": data\.provider_account_ref/);
   assert.match(source, /"x-feed-token": session\.feedToken/);
+  assert.match(source, /finally \{\s*\/\/ The database row is already cleared; also drop decrypted local token references\.\s*session\.jwtToken = "";\s*session\.refreshToken = "";\s*session\.feedToken = "";\s*\}/);
 });
 
 test("Angel One login limiter is database-backed and fails closed", () => {
