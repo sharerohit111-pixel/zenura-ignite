@@ -5,9 +5,10 @@
 .demo-page .demo-shell{max-width:1440px;padding-bottom:calc(92px + env(safe-area-inset-bottom))}
 .demo-page .demo-header{position:sticky;top:0;z-index:20;padding:12px 14px;background:color-mix(in srgb,var(--d-panel) 94%,transparent);border:1px solid var(--d-line);border-radius:0 0 18px 18px;box-shadow:var(--d-shadow);backdrop-filter:blur(18px)}
 .demo-page .brand,.demo-page .brand b{color:var(--d-text)}
-.demo-page .brand-mark{border:0;background:linear-gradient(145deg,#087d63,#006a52);color:#fff}
+.demo-page .brand-mark{border:0;background:#006a52;color:#fff}
 .demo-page .brand i,.demo-page .demo-intro em,.demo-page .eyebrow{color:var(--d-accent)}
 .demo-page .brand small,.demo-page .demo-intro p,.demo-page .screen-title p{color:var(--d-muted)}
+.demo-page .read-only{color:var(--d-muted);background:var(--d-panel);border-color:var(--d-line)}
 .demo-page .demo-chip{border-color:color-mix(in srgb,var(--d-accent) 30%,var(--d-line));color:var(--d-accent)}
 .demo-page .demo-intro{padding:24px 0 18px}
 .demo-page .demo-status{border-color:var(--d-line);background:var(--d-panel);color:var(--d-muted)}
