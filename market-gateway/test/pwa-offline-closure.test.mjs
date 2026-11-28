@@ -24,8 +24,10 @@ test("Markets web app manifest is strict JSON and has a valid standalone scope",
 
 test("Markets service worker uses a new cache generation and precaches the canonical event ledger",async()=>{
  const sw=await read("markets/service-worker.js");
- assert.match(sw,/zenura-markets-shell-v11/);
+ assert.match(sw,/zenura-markets-shell-v15/);
  assert.match(sw,/"shared\/paper-demo-event-ledger\.mjs"/);
+ assert.match(sw,/"bottom-artifact-guard\.js"/);
+ assert.match(sw,/fetch\(request,\{cache:"no-store"\}\)/);
  assert.doesNotMatch(sw,/zenura-markets-shell-v9/);
 });
 
@@ -52,6 +54,24 @@ test("all static transitive imports from the 15-screen demo entrypoint are in th
  assert.ok(visited.has("markets/shared/paper-demo-event-ledger.mjs"));
  const html=await read("markets/stocks/demo.html");
  for(const screen of screens)assert.ok(html.includes('data-screen="'+screen+'"'),"missing screen "+screen);
+});
+
+test("stock terminal static scripts and styles are fully precached for offline app launch",async()=>{
+ const sw=await read("markets/service-worker.js");
+ const block=sw.match(/const SHELL=\[([\s\S]*?)\]\.map/);
+ assert.ok(block,"SHELL allowlist exists");
+ const shell=new Set([...block[1].matchAll(/"([^"]*)"/g)].map(match=>relative(root,resolve(root,"markets",match[1])).split("\\").join("/")));
+ const html=await read("markets/stocks/index.html");
+ const assets=[...html.matchAll(/(?:src|href)="([^"]+\.(?:js|css))"/g)].map(match=>match[1]);
+ for(const asset of assets){
+  const target=relative(root,resolve(root,"markets/stocks",asset)).split("\\").join("/");
+  assert.ok(shell.has(target),"stock terminal asset missing from offline precache: "+target);
+ }
+ for(const asset of ["markets/stocks/futures-limit-workspace.css","markets/stocks/options-limit-workspace.css",
+  "markets/stocks/futures-limit-workspace.js","markets/stocks/options-limit-workspace.js",
+  "markets/stocks/protective-orders.js","markets/stocks/page-navigation.js"]){
+  assert.ok(shell.has(asset),"critical trading module missing from offline precache: "+asset);
+ }
 });
 
 test("service worker never caches arbitrary authenticated or private navigation responses",async()=>{

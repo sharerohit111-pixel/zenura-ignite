@@ -30,8 +30,10 @@ on:
       - "market-gateway/test/paper-demo-derivative-integration.test.mjs"
       - "market-gateway/test/derivative-mock-simulator.test.js"
       - "markets/stocks/index.html"
+      - "markets/stocks/page-navigation.js"
       - "market-gateway/test/paper-demo-dashboard.test.mjs"
       - "markets/stocks/demo-browser-smoke.cjs"
+      - "markets/stocks/terminal-pages-browser-qa.cjs"
       - "markets/stocks/pwa-keyboard-reconnect-qa.cjs"
       - "markets/stocks/demo-chart-data.mjs"
       - "markets/stocks/demo-chart-panel.mjs"
@@ -83,7 +85,7 @@ jobs:
         with:
           node-version: "22"
       - name: Check browser module syntax
-        run: node --check markets/shared/paper-demo-adapter.mjs && node --check markets/shared/paper-demo-event-ledger.mjs && node --check markets/shared/paper-demo-ledger-session.mjs && node --check markets/stocks/demo.js && node --check markets/stocks/demo-watchlist-persistence.mjs && node --check markets/stocks/demo-derivative-panel.mjs && node --check markets/stocks/demo-unified-ledger-panel.mjs && node --check markets/stocks/demo-derivative-ledger-bridge.mjs && node --check markets/stocks/derivative-mock-simulator.js && node --check markets/stocks/demo-chart-data.mjs && node --check markets/stocks/demo-chart-panel.mjs
+        run: node --check markets/shared/paper-demo-adapter.mjs && node --check markets/shared/paper-demo-event-ledger.mjs && node --check markets/shared/paper-demo-ledger-session.mjs && node --check markets/stocks/demo.js && node --check markets/stocks/demo-watchlist-persistence.mjs && node --check markets/stocks/demo-derivative-panel.mjs && node --check markets/stocks/demo-unified-ledger-panel.mjs && node --check markets/stocks/demo-derivative-ledger-bridge.mjs && node --check markets/stocks/derivative-mock-simulator.js && node --check markets/stocks/demo-chart-data.mjs && node --check markets/stocks/demo-chart-panel.mjs && node --check markets/stocks/page-navigation.js && node --check markets/stocks/protective-orders.js
       - name: Validate shared fixtures
         run: |
           node - <<'NODE'
@@ -96,7 +98,7 @@ jobs:
       - name: Install Chromium browser QA dependencies
         run: |
           npm install --prefix "$RUNNER_TEMP/zenura-playwright" playwright@1.61.1 axe-core@4.10.3 --ignore-scripts --no-audit --no-fund
-          "$RUNNER_TEMP/zenura-playwright/node_modules/.bin/playwright" install --with-deps chromium
+          "$RUNNER_TEMP/zenura-playwright/node_modules/.bin/playwright" install chromium
       - name: Run desktop, mobile, accessibility, performance and offline PWA smoke
         timeout-minutes: 12
         run: |
@@ -109,6 +111,7 @@ jobs:
           curl --silent --fail http://127.0.0.1:4173/markets/stocks/demo.html >/dev/null
           NODE_PATH="$RUNNER_TEMP/zenura-playwright/node_modules" node markets/stocks/demo-browser-smoke.cjs
           NODE_PATH="$RUNNER_TEMP/zenura-playwright/node_modules" node markets/stocks/pwa-keyboard-reconnect-qa.cjs
+          NODE_PATH="$RUNNER_TEMP/zenura-playwright/node_modules" node markets/stocks/terminal-pages-browser-qa.cjs
       - name: Guard production gateway isolation
         run: |
           if grep -R -E "paper-demo-adapter|paper-demo-event-ledger|paper-demo-ledger-session|demo-equity-ledger-bridge|demo-derivative-ledger-bridge|demo-unified-ledger-panel|derivative-mock-simulator|paper-mock-fixtures|equity-demo-execution-engine|demo-(equity|chart|derivative)-panel|market-gateway/mock/fixtures|equity-execution.json" market-gateway/supabase-server.js market-gateway/server.js; then

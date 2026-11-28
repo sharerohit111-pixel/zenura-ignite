@@ -66,7 +66,7 @@ The workflow validates these values and the four Secret Manager entries before i
 1. Builds the Docker image from the repository root (the shared OAuth helpers under `functions/lib` are included).
 2. Deploys `zenura-market-gateway` to Cloud Run.
 3. Runs one warm instance (2 vCPU / 2 GiB) with CPU always allocated.
-4. Enables the leased equity Delivery LIMIT worker at a 2-second polling interval.
+4. Keeps the leased equity Delivery LIMIT worker explicitly disabled. Do not enable it in production.
 5. Waits for the instrument master and a successful worker cycle in the public health response.
 6. Updates both market-mode HTML pages to use the verified gateway URL.
 
@@ -79,12 +79,12 @@ The deployment uses:
 - `--no-cpu-throttling`: required because the LIMIT worker runs in the background between HTTP requests.
 - `--concurrency 40`: limit request concurrency per instance.
 - `--timeout 3600`: supports long-lived Upstox V3 SSE streams.
-- `PAPER_LIMIT_WORKER_ENABLED=true` and `PAPER_LIMIT_WORKER_INTERVAL_MS=2000`.
+- `PAPER_LIMIT_WORKER_ENABLED=false` (mandatory release safety setting). Keep the Delivery LIMIT worker disabled; do not change this to `true`.
 - `PAPER_INTRADAY_LIMIT_WORKER_ENABLED` remains unset/false by default. Do not enable it until the reviewed official NSE/BSE session calendar has been populated and verified in `paper_exchange_sessions`, the migration is approved/applied, and the live calendar/session smoke checks are complete. Optional interval: `PAPER_INTRADAY_LIMIT_WORKER_INTERVAL_MS`.
 - `PAPER_PROTECTIVE_WORKER_ENABLED` remains unset/false by default. Enable only after the protective-order UI, SQL migration checks, end-to-end tests, written market-data rights and compliance gates are complete. Optional interval: `PAPER_PROTECTIVE_WORKER_INTERVAL_MS`.
 - `PAPER_OPTIONS_LIMIT_ENABLED` and `PAPER_OPTIONS_LIMIT_WORKER_ENABLED` remain unset/false by default. Both must be explicitly true before the NSE long CE/PE Options LIMIT API or worker can run. Enable only after staging submit/fill/cancel/expiry, concurrent race, Upstox token-isolation, instrument/session, UI, written market-data rights and compliance checks are complete. Optional interval: `PAPER_OPTIONS_LIMIT_WORKER_INTERVAL_MS`. BSE Options LIMIT is not supported.
 
-Every instance may start the worker loop, but the Postgres lease ensures only one worker is the active writer. Worker errors and instrument-master refresh failures use bounded exponential backoff. The public `/health` response exposes only safe readiness data: instrument-master availability, worker liveness and cycle counts. A cycle-level worker fault is distinguished from an individual user's expired token or rejected order; per-user failures are counted without falsely declaring the whole service unhealthy. It never exposes credentials or user data.
+Every instance may start the worker loop, but the Postgres lease ensures only one worker is the active writer. Worker errors and instrument-master refresh failures use bounded exponential backoff. The deployment health check confirms the gateway is ready while Delivery LIMIT worker remains disabled. The public `/health` response exposes only safe readiness data: instrument-master availability, worker liveness and cycle counts. A cycle-level worker fault is distinguished from an individual user's expired token or rejected order; per-user failures are counted without falsely declaring the whole service unhealthy. It never exposes credentials or user data.
 
 **Cost warning:** one warm 2-vCPU/2-GiB instance with CPU always allocated creates ongoing Google Cloud charges. Keep deployment manual and configure a billing budget/alert first.
 

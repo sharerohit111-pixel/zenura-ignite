@@ -112,3 +112,55 @@
 .protective-orders-panel{margin-top:14px;padding:14px}
 .protective-orders-panel button{min-height:30px;padding:6px 10px;border:1px solid #754653;border-radius:7px;background:#321e2a;color:#ffb4c0;font-size:9px;font-weight:850}
 @media(max-width:520px){.paper-protective-controls{grid-template-columns:1fr}.paper-protective-controls p{grid-column:auto}}
+
+
+/* Readability and responsive multi-page terminal navigation */
+.stocks-page{color:#e8f2fb}
+.stocks-page h1,.stocks-page h2,.stocks-page h3,.stocks-page h4,
+.stocks-page .brand,.stocks-page .brand b,.stocks-page .brand i,
+.stocks-page .panel-head h2,.stocks-page .chart-head h2{color:#edf6ff}
+.stocks-page .stock-hero h1{color:#f2f7fc}
+.stocks-page .top .brand{text-decoration:none;color:#f0f7ff}
+.stocks-page .top .brand:visited,.stocks-page .top .brand:hover{text-decoration:none;color:#f0f7ff}
+.stocks-page .top .brand .logo{color:#65e8ce}
+.stocks-page .top .brand b{color:#eaf5ff;text-decoration:none}
+.stocks-page .top .brand i{color:#68e6ce;text-decoration:none}
+.stocks-page .top .brand small{color:#9bb4c9}
+.terminal-nav{display:flex;gap:7px;overflow-x:auto;padding:8px 0 13px;margin:0 0 4px;scrollbar-width:thin}
+.terminal-nav a{flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;min-height:39px;padding:9px 13px;border:1px solid #29465e;border-radius:10px;background:#0b1c2b;color:#b7cad9;text-decoration:none;font-size:10px;font-weight:850;letter-spacing:.02em;white-space:nowrap}
+.terminal-nav a[aria-current="page"]{background:#123c37;border-color:#35dfb7;color:#8ff2d9;box-shadow:inset 0 0 0 1px #35dfb733}
+.terminal-nav a:focus-visible{outline:2px solid #65e8ce;outline-offset:2px}
+.stocks-page [data-page-hidden="true"]{display:none!important}
+@media(max-width:650px){.terminal-nav{box-sizing:border-box;max-width:100%;min-width:0;margin-right:0;padding-right:0;overflow-x:auto;overscroll-behavior-x:contain}.terminal-nav a{min-height:42px;padding:10px 12px}.stock-hero h1{color:#f4f8fc}}
+
+
+/* Dedicated terminal dashboard and settings pages */
+.dashboard-overview,.settings-page{margin:14px 0;padding:14px;min-width:0}
+.dashboard-status-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:14px 0}
+.dashboard-status-grid article{display:grid;gap:8px;min-width:0;padding:14px;border:1px solid #29465e;border-radius:12px;background:#0a1928}
+.dashboard-status-grid small{font-size:9px;letter-spacing:.08em;color:#91a9bd}
+.dashboard-status-grid b{font-size:clamp(12px,2vw,16px);line-height:1.4;color:#edf6ff;overflow-wrap:anywhere}
+.dashboard-shortcuts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}
+.dashboard-shortcuts a,.settings-row button{display:flex;align-items:center;justify-content:center;min-height:42px;padding:10px;border:1px solid #286d63;border-radius:9px;background:#123d3b;color:#8ff2d9;text-align:center;text-decoration:none;font-size:11px;font-weight:850}
+.settings-row{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:15px 0;border-bottom:1px solid #203b54}
+.settings-row>div{min-width:0}
+.settings-row b{color:#edf6ff;font-size:13px}
+.settings-row p{margin:5px 0 0;color:#91a9bd;font-size:11px;line-height:1.5}
+.settings-row button{flex:0 0 auto;min-width:132px;cursor:pointer}
+@media(max-width:650px){
+ .dashboard-status-grid{grid-template-columns:1fr}
+ .dashboard-shortcuts{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .settings-row{align-items:flex-start;flex-direction:column}
+ .settings-row button{width:100%}
+}
+
+
+/* Protective exit inline modification controls */
+.protective-edit-form{display:grid;grid-template-columns:repeat(3,minmax(76px,1fr));gap:6px;min-width:220px;margin-top:8px}
+.protective-edit-form select,.protective-edit-form input{box-sizing:border-box;width:100%;min-width:0;min-height:34px;padding:6px;border:1px solid #36556d;border-radius:6px;background:#081725;color:#edf6ff;font-size:11px}
+.protective-edit-form button{min-height:34px;padding:6px 9px;border:1px solid #286d63;border-radius:6px;background:#123d3b;color:#8ff2d9;font-size:10px;font-weight:800;cursor:pointer}
+.protective-edit-form button:disabled{opacity:.55;cursor:wait}
+@media(max-width:520px){.protective-edit-form{grid-template-columns:1fr 1fr;min-width:190px}.protective-edit-form select{grid-column:1/-1}}
+
+/* Hide only failed image assets and their empty wrappers near the mobile viewport bottom. */
+.zenura-failed-bottom-asset,.zenura-empty-bottom-asset-wrap{display:none!important;visibility:hidden!important;max-height:0!important;min-height:0!important;height:0!important;overflow:hidden!important;}

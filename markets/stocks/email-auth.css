@@ -4,5 +4,6 @@
 .email-auth-actions{display:flex;gap:7px;flex-wrap:wrap}
 .email-auth button{border:1px solid #287e70;background:#123c37;color:#70e8c8;border-radius:7px;padding:8px 10px;font-size:8px;font-weight:900;cursor:pointer}
 .email-auth button[type=submit]{background:#35dfb7;color:#03251d}
+.email-auth button.email-auth-google{width:100%;border-color:#6b8297;background:#f5f7fa;color:#17212b;padding:10px;font-size:9px}
 .email-auth button:disabled{opacity:.5;cursor:wait}
 .email-auth small{color:#a7bfd1;font-size:9px;line-height:1.5}

@@ -37,6 +37,9 @@
     'Saved protective retry data is unreadable. No request was sent.':'सहेजा गया retry डेटा पढ़ा नहीं जा सका। कोई अनुरोध नहीं भेजा गया।',
     'Protective order could not be created.':'प्रोटेक्टिव ऑर्डर नहीं बन सका।',
     'Cancel':'रद्द करें',
+    'Modify':'बदलें','Save':'सहेजें','Saving…':'सहेजा जा रहा है…','Close':'बंद करें',
+    'Protective order modified.':'प्रोटेक्टिव ऑर्डर बदल दिया गया।','Protective order modification failed.':'प्रोटेक्टिव ऑर्डर में बदलाव नहीं हो सका।',
+    'Enter a valid trigger price and whole-number quantity.':'सही ट्रिगर कीमत और पूर्ण संख्या में मात्रा दर्ज करें।',
     'CANCELLING…':'रद्द किया जा रहा है…',
     'Protective order cancelled.':'प्रोटेक्टिव ऑर्डर रद्द हो गया।',
     'Protective order cancellation failed.':'प्रोटेक्टिव ऑर्डर रद्द नहीं हो सका।',
@@ -120,6 +123,10 @@
       cell(row,tr(order.status));
       const action=cell(row,'');
       if (order.status==='ACTIVE') {
+        const modify=document.createElement('button');
+        modify.type='button';modify.textContent=tr('Modify');
+        modify.addEventListener('click',()=>beginEdit(order,action));
+        action.append(modify);
         const button=document.createElement('button');
         button.type='button';button.textContent=tr('Cancel');
         button.addEventListener('click',()=>cancelOrder(order.orderId,button));
@@ -147,6 +154,61 @@
       setEnabled(false);
       show(listStatus,error.message || 'Protective orders could not be loaded.','error');
     }
+  }
+  function beginEdit(order,actionCell) {
+    if (actionCell.querySelector('.protective-edit-form')) return;
+    const form=document.createElement('form');
+    form.className='protective-edit-form';
+    const rule=document.createElement('select');
+    rule.setAttribute('aria-label','Protective rule');
+    for (const [value,label] of [['STOP_LOSS','STOP_LOSS'],['TARGET','TARGET']]) {
+      const option=document.createElement('option');option.value=value;option.textContent=tr(label);rule.append(option);
+    }
+    rule.value=order.triggerType;
+    const trigger=document.createElement('input');
+    trigger.type='number';trigger.min='0.01';trigger.max='99999999';trigger.step='0.01';
+    trigger.inputMode='decimal';trigger.value=(order.triggerPricePaise/100).toFixed(2);
+    trigger.setAttribute('aria-label','Trigger price in rupees');
+    const qty=document.createElement('input');
+    qty.type='number';qty.min='1';qty.max='1000000';qty.step='1';
+    qty.inputMode='numeric';qty.value=String(order.quantity);qty.setAttribute('aria-label','Quantity');
+    const save=document.createElement('button');
+    save.type='submit';save.textContent=tr('Save');
+    const close=document.createElement('button');
+    close.type='button';close.textContent=tr('Close');
+    close.addEventListener('click',()=>form.remove());
+    form.append(rule,trigger,qty,save,close);
+    actionCell.append(form);
+    form.addEventListener('submit',async event=>{
+      event.preventDefault();
+      const userId=uid(),priceValue=trigger.value.trim(),priceNumber=Number(priceValue),quantityValue=Number(qty.value);
+      if (!userId||!gateway) { show(status,'Sign in to load protective orders.','warning');return; }
+      if (!Number.isSafeInteger(quantityValue)||quantityValue<1||quantityValue>1000000
+          ||!Number.isFinite(priceNumber)||priceNumber<=0||priceNumber>99999999
+          ||!/^\\d{1,8}(?:\\.\\d{1,2})?$/.test(priceValue)) {
+        show(status,'Enter a valid trigger price and whole-number quantity.','error');return;
+      }
+      const triggerPricePaise=Math.round(priceNumber*100);
+      if (!Number.isSafeInteger(triggerPricePaise)||triggerPricePaise<1) {
+        show(status,'Enter a valid trigger price and whole-number quantity.','error');return;
+      }
+      save.disabled=true;save.textContent=tr('Saving…');
+      try {
+        const response=await fetch(gateway+'/paper/protective-orders/'+encodeURIComponent(order.orderId),{
+          method:'PUT',headers:await headers(userId),
+          body:JSON.stringify({trigger_type:rule.value,trigger_price_paise:triggerPricePaise,quantity:quantityValue})
+        });
+        const data=await response.json();
+        if (uid()!==userId) return;
+        if (!response.ok) throw new Error(data.error||'Protective order modification failed.');
+        show(status,'Protective order modified.','success');
+        await loadOrders();
+      } catch(error) {
+        if (uid()===userId) show(status,error.message||'Protective order modification failed.','error');
+      } finally {
+        save.disabled=false;save.textContent=tr('Save');
+      }
+    });
   }
   async function createOrder() {
     if (submitting || !workerEnabled) return;

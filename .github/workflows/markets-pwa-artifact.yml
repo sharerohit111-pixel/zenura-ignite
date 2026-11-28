@@ -1,0 +1,38 @@
+name: Validate Markets PWA Hosting Artifact
+
+on:
+  pull_request:
+    branches: ["release/s-trade-mainline-integration-2026-11-25"]
+    paths:
+      - "markets/**"
+      - "market-gateway/lib/equity-demo-execution-engine.js"
+      - "market-gateway/lib/derivative-position.js"
+      - "market-gateway/mock/fixtures/**"
+      - "scripts/build-markets-pwa-artifact.mjs"
+      - "netlify.toml"
+      - ".github/workflows/markets-pwa-artifact.yml"
+  push:
+    branches: ["feature/s-trade-real-pwa-release-prep-2026-11-27"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Build audited public PWA artifact
+        run: node scripts/build-markets-pwa-artifact.mjs
+      - name: Upload artifact for review only
+        uses: actions/upload-artifact@v4
+        with:
+          name: zenura-markets-pwa-preview
+          path: dist/markets-pwa/site/
+          if-no-files-found: error
+          retention-days: 7

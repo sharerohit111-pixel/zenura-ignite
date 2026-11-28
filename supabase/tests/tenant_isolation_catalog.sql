@@ -119,7 +119,8 @@ BEGIN
       -- to auth.uid() inside the SECURITY DEFINER body before any row access.
       IF v_proc.proname NOT IN (
            'create_paper_equity_protective_order',
-           'cancel_paper_protective_order'
+           'cancel_paper_protective_order',
+           'modify_paper_equity_protective_order'
          )
          OR position('auth.uid()' in pg_get_functiondef(v_proc.oid)) = 0
          OR position('p_user_id is distinct from auth.uid()' in lower(pg_get_functiondef(v_proc.oid))) = 0 THEN
