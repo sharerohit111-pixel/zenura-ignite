@@ -34,18 +34,6 @@ function isValidAngelOneLogin(payload) {
 function createAngelOneRouter({ auth, serviceDb, fetchProvider, readProviderJson, encryptionKey,
   apiKey, clientLocalIp, clientPublicIp, macAddress, sourceId, logger = console }) {
   const router = express.Router();
-  const attempts = new Map();
-  function checkRateLimit(userId) {
-    const now = Date.now();
-    const recent = (attempts.get(userId) || []).filter(time => now - time < 15 * 60 * 1000);
-    if (recent.length >= 5 || (recent.length && now - recent[recent.length - 1] < 1000)) {
-      attempts.set(userId, recent);
-      return false;
-    }
-    recent.push(now);
-    attempts.set(userId, recent);
-    return true;
-  }
   function headers() {
     return {
       "Content-Type": "application/json",
@@ -66,7 +54,11 @@ function createAngelOneRouter({ auth, serviceDb, fetchProvider, readProviderJson
       if (!apiKey || !encryptionKey || net.isIP(clientLocalIp) !== 4 || net.isIP(clientPublicIp) !== 4 || !/^(?:[0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$/.test(macAddress) || !["WEB", "MOBILE"].includes(sourceId)) return res.status(503).json({ error: "Angel One server configuration is incomplete. Configure API key, encryption key, local/public IPv4, MAC address and source ID." });
       const credentials = validateAngelOneCredentials(req.body);
       if (!credentials) return res.status(400).json({ error: "Enter a valid Client ID, 4–6 digit PIN and current 6-digit TOTP." });
-      if (!checkRateLimit(user.id)) return res.status(429).set("Retry-After", "2").json({ error: "Too many Angel One login attempts. Wait before trying again." });
+      const { data: rateRows, error: rateError } = await serviceDb.rpc("reserve_angel_one_login_attempt", { p_user_id: user.id });
+      const rate = Array.isArray(rateRows) ? rateRows[0] : rateRows;
+      if (rateError || !rate) return res.status(503).json({ error: "Angel One login protection is temporarily unavailable." });
+      if (!rate.allowed) return res.status(429).set("Retry-After", String(rate.retry_after_seconds || 1))
+        .json({ error: "Too many Angel One login attempts. Wait before trying again." });
 
       let providerResponse, payload;
       try {

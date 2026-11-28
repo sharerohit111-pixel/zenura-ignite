@@ -35,6 +35,15 @@ test("Angel One adapter never persists or logs PIN and TOTP", () => {
   assert.match(source, /eq\("broker_name", "angel_one"\)/);
 });
 
+test("Angel One login limiter is database-backed and fails closed", () => {
+  const fs = require("node:fs");
+  const path = require("node:path");
+  const source = fs.readFileSync(path.join(__dirname, "../lib/angel-one-smartapi.js"), "utf8");
+  assert.match(source, /reserve_angel_one_login_attempt/);
+  assert.match(source, /rateError \|\| !rate/);
+  assert.doesNotMatch(source, /new Map\(\)/);
+});
+
 test("Angel One server requires explicit real network header configuration", () => {
   const fs = require("node:fs");
   const path = require("node:path");
