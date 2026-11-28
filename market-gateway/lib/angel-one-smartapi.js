@@ -169,35 +169,38 @@ function createAngelOneRouter({ auth, serviceDb, fetchProvider, readProviderJson
       if (data?.access_token_ciphertext) {
         try { session = JSON.parse(decryptUpstoxToken(data.access_token_ciphertext, encryptionKey)); } catch (_) { session = null; }
       }
-      const { error: clearError } = await serviceDb.from("broker_connections").update({
-        connection_status: "disconnected", access_token_ciphertext: null, refresh_token_ciphertext: null,
-        token_expires_at: null, refresh_token_expires_at: null, updated_at: new Date().toISOString()
-      }).eq("user_id", user.id).eq("broker_name", "angel_one");
-      if (clearError) throw Object.assign(new Error("session clear failed"), { status: 503 });
       let providerRevoked = "not_attempted";
-      if (session?.jwtToken && data?.provider_account_ref && apiKey) {
-        try {
-          const response = await fetchProvider(LOGOUT_URL, {
-            method: "POST", headers: {
-              ...headers(),
-              Authorization: "Bearer " + session.jwtToken,
-              "x-api-key": apiKey,
-              "x-client-code": data.provider_account_ref,
-              "x-feed-token": session.feedToken
-            },
-            body: JSON.stringify({ clientcode: data.provider_account_ref })
-          });
-          const result = await readProviderJson(response, { maxBytes: 128 * 1024 });
-          providerRevoked = response.ok && result?.status === true ? "confirmed" : "unconfirmed";
-        } catch (_) { providerRevoked = "unconfirmed"; }
-        finally {
-          // The database row is already cleared; also drop decrypted local token references.
+      try {
+        const { error: clearError } = await serviceDb.from("broker_connections").update({
+          connection_status: "disconnected", access_token_ciphertext: null, refresh_token_ciphertext: null,
+          token_expires_at: null, refresh_token_expires_at: null, updated_at: new Date().toISOString()
+        }).eq("user_id", user.id).eq("broker_name", "angel_one");
+        if (clearError) throw Object.assign(new Error("session clear failed"), { status: 503 });
+        if (session?.jwtToken && data?.provider_account_ref && apiKey) {
+          try {
+            const response = await fetchProvider(LOGOUT_URL, {
+              method: "POST", headers: {
+                ...headers(),
+                Authorization: "Bearer " + session.jwtToken,
+                "x-api-key": apiKey,
+                "x-client-code": data.provider_account_ref,
+                "x-feed-token": session.feedToken
+              },
+              body: JSON.stringify({ clientcode: data.provider_account_ref })
+            });
+            const result = await readProviderJson(response, { maxBytes: 128 * 1024 });
+            providerRevoked = response.ok && result?.status === true ? "confirmed" : "unconfirmed";
+          } catch (_) { providerRevoked = "unconfirmed"; }
+        }
+        res.set("Cache-Control", "no-store").json({ disconnected: true, providerRevocation: providerRevoked });
+      } finally {
+        // Clear decrypted token references even when revocation is skipped or DB clearing fails.
+        if (session && typeof session === "object") {
           session.jwtToken = "";
           session.refreshToken = "";
           session.feedToken = "";
         }
       }
-      res.set("Cache-Control", "no-store").json({ disconnected: true, providerRevocation: providerRevoked });
     } catch (error) {
       res.status(Number.isInteger(error.status) ? error.status : 503).json({ error: "Angel One disconnect could not be completed." });
     }
