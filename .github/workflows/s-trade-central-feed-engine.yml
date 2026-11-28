@@ -35,3 +35,5 @@ jobs:
           node --check market-gateway/test/authenticated-market-feed-fanout.test.js
       - name: Run deterministic central feed, Redis transport and fan-out tests
         run: node --test market-gateway/test/central-market-feed.test.js market-gateway/test/redis-market-feed-transport.test.js market-gateway/test/authenticated-market-feed-fanout.test.js
+
+# Keep this workflow revision explicit for the authenticated fan-out stage.
