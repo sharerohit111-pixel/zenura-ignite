@@ -60,4 +60,5 @@ self.addEventListener("fetch",event=>{
     return cached||new Response("",{status:504});
    }
   })());
+ }
 });
