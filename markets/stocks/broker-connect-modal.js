@@ -37,6 +37,11 @@
         disconnect.hidden = true;
         card.append(brokerStatus, disconnect);
       }
+      if (p.id === "angel_one") {
+        const form = el("div", "angel-one-login-form");
+        form.innerHTML = '<label>Client ID<input data-angel-client autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="20"></label><label>Trading PIN<input data-angel-pin type="password" inputmode="numeric" autocomplete="new-password" maxlength="6"></label><label>6-digit TOTP<input data-angel-totp type="password" inputmode="numeric" autocomplete="one-time-code" maxlength="6"></label><button type="button" class="broker-connect-action" data-angel-login>Connect Angel One</button><small data-angel-status class="broker-connect-status">PIN and TOTP are sent only to the secure server for login and are not saved.</small><button type="button" class="broker-connect-disconnect" data-angel-disconnect hidden>Disconnect Angel One</button>';
+        card.append(form);
+      }
       loginGrid.append(card);
 
       const account = el("article", "broker-account-card");
@@ -69,12 +74,66 @@
       disconnectNode.hidden = true;
     }
   }
+  async function refreshAngelOneStatus() {
+    const node = root.querySelector("[data-angel-status]");
+    const disconnect = root.querySelector("[data-angel-disconnect]");
+    if (!node || typeof window.ZENURA_ANGEL_ONE_STATUS !== "function") return;
+    try {
+      const result = await window.ZENURA_ANGEL_ONE_STATUS();
+      if (result.connected) {
+        node.textContent = "CONNECTED · " + (result.account || "Angel One") + " · expires " + new Date(result.expiresAt).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", dateStyle: "medium", timeStyle: "short" }) + " IST";
+        disconnect.hidden = false;
+      } else {
+        node.textContent = "NOT CONNECTED · PIN and TOTP are never stored.";
+        disconnect.hidden = true;
+      }
+    } catch (_) {
+      node.textContent = "Sign in to check Angel One connection.";
+      disconnect.hidden = true;
+    }
+  }
   function open() { root.hidden = false; document.body.classList.add("broker-connect-open"); }
   function close() { root.hidden = true; document.body.classList.remove("broker-connect-open"); }
   render();
   root.addEventListener("click", (event) => {
     const target = event.target;
     if (target.matches("[data-close-broker-modal]") || target === root) close();
+    const angelDisconnect = target.closest("[data-angel-disconnect]");
+    if (angelDisconnect) {
+      angelDisconnect.disabled = true;
+      const node = root.querySelector("[data-angel-status]");
+      if (node) node.textContent = "Disconnecting Angel One…";
+      Promise.resolve().then(() => window.ZENURA_ANGEL_ONE_DISCONNECT()).then((result) => {
+        if (node) node.textContent = result.providerRevocation === "confirmed"
+          ? "Disconnected; Angel One confirmed logout." : "Disconnected locally; provider-side logout not confirmed.";
+        refreshAngelOneStatus();
+      }).catch(() => { if (node) node.textContent = "Disconnect failed. Please retry."; })
+        .finally(() => { angelDisconnect.disabled = false; });
+      return;
+    }
+    const angelLogin = target.closest("[data-angel-login]");
+    if (angelLogin) {
+      const client = root.querySelector("[data-angel-client]");
+      const pin = root.querySelector("[data-angel-pin]");
+      const totp = root.querySelector("[data-angel-totp]");
+      const node = root.querySelector("[data-angel-status]");
+      const credentials = { clientcode: client.value.trim(), pin: pin.value, totp: totp.value };
+      pin.value = ""; totp.value = "";
+      angelLogin.disabled = true;
+      if (node) node.textContent = "Authenticating securely with Angel One…";
+      Promise.resolve().then(() => window.ZENURA_ANGEL_ONE_LOGIN(credentials)).then((result) => {
+        if (node) node.textContent = "CONNECTED · session expires " + new Date(result.expiresAt).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", dateStyle: "medium", timeStyle: "short" }) + " IST";
+        client.value = "";
+        refreshAngelOneStatus();
+      }).catch((error) => {
+        if (node) node.textContent = error?.message || "Angel One login failed. Check details and current TOTP.";
+      }).finally(() => {
+        credentials.pin = ""; credentials.totp = "";
+        pin.value = ""; totp.value = "";
+        angelLogin.disabled = false;
+      });
+      return;
+    }
     const disconnectFyers = target.closest("[data-fyers-disconnect]");
     if (disconnectFyers) {
       disconnectFyers.disabled = true;
@@ -84,7 +143,7 @@
         return window.ZENURA_DISCONNECT_BROKER("fyers");
       }).then(() => {
         feedback.textContent = "FYERS disconnected from this app.";
-        refreshFyersStatus();
+        refreshFyersStatus();\n  refreshAngelOneStatus();
       }).catch((error) => {
         feedback.textContent = error?.message || "FYERS disconnect failed.";
       }).finally(() => { disconnectFyers.disabled = false; });
@@ -122,7 +181,7 @@
   window.addEventListener("zenura-broker-connection-ready", close);
   window.addEventListener("zenura-broker-connection-expired", open);
   window.addEventListener("zenura-broker-connection-missing", open);
-  window.addEventListener("zenura-fyers-connection-updated", refreshFyersStatus);
+  window.addEventListener("zenura-fyers-connection-updated", refreshFyersStatus);\n  window.addEventListener("zenura-market-auth-ready", refreshAngelOneStatus);
   window.addEventListener("zenura-market-auth-ready", (event) => {
     if (event.detail?.signedIn && status?.textContent?.includes("AUTHORIZED")) close();
   });
