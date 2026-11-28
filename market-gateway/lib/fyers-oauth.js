@@ -11,6 +11,14 @@ function nextFyersTokenExpiry(now = Date.now()) {
   return new Date(target > now ? target : target + 86400000);
 }
 
+function isValidFyersRedirectUri(value) {
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" && url.pathname.endsWith("/fyers/oauth/callback")
+      && !url.username && !url.password && !url.search && !url.hash;
+  } catch (_) { return false; }
+}
+
 function isUsableFyersTokenResponse(payload) {
   return !!payload && payload.s === "ok" && Number(payload.code) === 200
     && typeof payload.access_token === "string" && payload.access_token.trim().length > 0
@@ -31,7 +39,7 @@ function createFyersOAuthRouter({ auth, serviceDb, fetchProvider, readProviderJs
     try {
       const { user } = await auth(req);
       if (!user.emailConfirmedAt) return res.status(403).json({ error: "Verify your Supabase email before connecting FYERS.", code: "email_not_confirmed" });
-      if (!clientId || !clientSecret || !redirectUri || !encryptionKey) {
+      if (!clientId || !clientSecret || !isValidFyersRedirectUri(redirectUri) || !encryptionKey) {
         return res.status(503).json({ error: "FYERS OAuth server configuration is incomplete." });
       }
       const state = crypto.randomBytes(32).toString("hex");
@@ -109,4 +117,4 @@ function createFyersOAuthRouter({ auth, serviceDb, fetchProvider, readProviderJs
   return router;
 }
 
-module.exports = { createFyersOAuthRouter, isUsableFyersTokenResponse, nextFyersTokenExpiry };
+module.exports = { createFyersOAuthRouter, isUsableFyersTokenResponse, isValidFyersRedirectUri, nextFyersTokenExpiry };
