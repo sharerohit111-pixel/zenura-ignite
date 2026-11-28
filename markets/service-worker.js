@@ -58,4 +58,6 @@ self.addEventListener("fetch",event=>{
     const cached=await cache.match(request);
     return cached||new Response("",{status:504});
    }
-  })());});
+  })());
+ }
+});
