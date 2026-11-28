@@ -43,18 +43,18 @@ document.querySelectorAll(".terminal-nav > a[data-terminal-page]").forEach(a=>{
  a.classList.add("terminal-nav-link");
 });
 const bottom=document.createElement("nav");bottom.className="app-bottom-nav";bottom.dataset.appBottomNav="";bottom.setAttribute("aria-label","Quick trading navigation");bottom.setAttribute("role","navigation");bottom.dataset.quickTradeNav="";
-const items=[["watchlist","Watchlist"],["chart","Chart"],["positions","Live Positions"],["derivatives","Option Chain"],["pnl","P&L"]];
+const items=[["derivatives","Option Chain"],["support","Help & Support"],["positions","Live Pos. / P&L"],["watchlist","Quick Watchlist"]];
 items.forEach(([page,label])=>{
  const a=document.createElement("a");
  a.href="#"+page;
  a.dataset.bottomPage=page;
  a.setAttribute("aria-label",label);
- a.innerHTML=icons[pageIcons[page]]+"<span>"+label+"</span>";
+ a.innerHTML=icons[pageIcons[page]||"profile"]+"<span>"+label+"</span>";
  a.addEventListener("click",e=>{
   e.preventDefault();
   const target=document.querySelector('[data-terminal-page="'+page+'"]');
   if(target)target.click();
-  else location.hash=page;
+  else{location.hash=page;}
  });
  bottom.append(a);
 });
