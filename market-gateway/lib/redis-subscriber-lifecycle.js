@@ -105,7 +105,7 @@ function createRedisSubscriberLifecycle({
     return true;
   }
 
-  function isCurrentGeneration(candidate) {
+  function invalidate(reason = "external-invalidation") {\n    if (state === "stopped") return false;\n    if (state === "unavailable") return false;\n    unavailable(reason);\n    return true;\n  }\n\n  function isCurrentGeneration(candidate) {
     return state === "ready" && candidate === generation &&
       subscribedGeneration === generation;
   }
@@ -142,7 +142,7 @@ function createRedisSubscriberLifecycle({
     return Object.freeze({ state, generation, subscribedGeneration });
   }
 
-  return Object.freeze({ start, stop, onReady, isCurrentGeneration, dispatchIfCurrent, getStatus });
+  return Object.freeze({ start, stop, onReady, invalidate, isCurrentGeneration, dispatchIfCurrent, getStatus });
 }
 
 module.exports = { createRedisSubscriberLifecycle };
