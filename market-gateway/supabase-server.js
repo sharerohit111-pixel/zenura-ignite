@@ -175,6 +175,12 @@ async function getQuote(accessToken,instrumentKey){
   const quote=Object.values(payload?.data||{}).find(x=>x&&x.instrument_token===instrumentKey);
   return {quote,payload};
 }
+app.use("/fyers",createFyersOAuthRouter({
+  auth,serviceDb,fetchProvider,readProviderJson,appRedirectUri:APP_REDIRECT_URI,
+  clientId:process.env.FYERS_CLIENT_ID,clientSecret:process.env.FYERS_CLIENT_SECRET,
+  redirectUri:process.env.FYERS_REDIRECT_URI,
+  encryptionKey:process.env.BROKER_TOKEN_ENCRYPTION_KEY||ENC_KEY
+}));
 app.get("/health",(_req,res)=>res.json({
   ok:true,service:"zenura-supabase-market-gateway",authProvider:"supabase",
   feedProtocol:"upstox-v3",marketDataEnabled:!!marketDataRightsApproval(process.env),marketDataBlockReason:marketDataRightsApproval(process.env)?null:"written_provider_and_regulatory_approval_required",instrumentMasterLoaded:instrumentCache.length>0,
