@@ -31,10 +31,11 @@ const {chromium}=require("playwright");
     ["settings",".settings-page"]
    ];
    for(const [route,selector] of routes){
-    await page.locator('nav.terminal-nav [data-terminal-page="'+route+'"]').click();
+    await page.locator("#zenura-sidebar-toggle").click();
+    await page.locator("#zenura-sidebar [data-sidebar-page="+JSON.stringify(route)+"]").click();
     await page.waitForFunction(value=>document.body.dataset.terminalPage===value,route);
     assert.equal(await page.locator(selector).isVisible(),true,route+" page must show its own panel");
-    assert.equal(await page.locator('nav.terminal-nav [data-terminal-page="'+route+'"]').getAttribute("aria-current"),"page",route+" nav item must be current");
+    assert.equal(await page.locator("#zenura-sidebar [data-sidebar-page="+JSON.stringify(route)+"]").getAttribute("aria-current"),"page",route+" sidebar item must be current");
     const overflow=await page.evaluate(()=>({hasOverflow:document.documentElement.scrollWidth>window.innerWidth+1,scrollWidth:document.documentElement.scrollWidth,innerWidth:window.innerWidth,offenders:[...document.querySelectorAll("body *")].map(el=>({tag:el.tagName,id:el.id,cls:typeof el.className==="string"?el.className:"",left:Math.round(el.getBoundingClientRect().left),right:Math.round(el.getBoundingClientRect().right),width:Math.round(el.getBoundingClientRect().width)})).filter(x=>x.right>window.innerWidth+1||x.left< -1).slice(0,12)}));
     if(overflow.hasOverflow) console.log(JSON.stringify({viewport:viewport.name,route,overflow}));
     assert.equal(overflow.hasOverflow,false,viewport.name+" horizontal overflow on "+route);
