@@ -6,10 +6,10 @@ const { encryptUpstoxToken } = require("./upstox-token-crypto");
 
 function nextFyersTokenExpiry(now = Date.now()) {
   if (!Number.isSafeInteger(now) || now < 0) throw new TypeError("Invalid token issue time.");
-  // FYERS' current API policy requires fresh daily 2FA; expire conservatively at
-  // the next India-local calendar day boundary instead of assuming refresh-token continuity.
+  // FYERS v3 documentation: access tokens expire daily at 06:30 Asia/Kolkata.
   const indiaNow = new Date(now + 330 * 60 * 1000);
-  return new Date(Date.UTC(indiaNow.getUTCFullYear(), indiaNow.getUTCMonth(), indiaNow.getUTCDate() + 1) - 330 * 60 * 1000);
+  const expiryUtc = Date.UTC(indiaNow.getUTCFullYear(), indiaNow.getUTCMonth(), indiaNow.getUTCDate(), 6, 30, 0, 0) - 330 * 60 * 1000;
+  return new Date(expiryUtc > now ? expiryUtc : expiryUtc + 86400000);
 }
 
 function isValidFyersRedirectUri(value) {
