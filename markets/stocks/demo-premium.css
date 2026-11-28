@@ -51,3 +51,20 @@
 .demo-page[data-app-theme="day"] .demo-loading{color:var(--d-muted)!important;fill:var(--d-muted)!important}
 .demo-page[data-app-theme="day"] .demo-chart-card,
 .demo-page[data-app-theme="day"] .demo-depth-card{background:var(--d-card)!important;color:var(--d-text)!important;border-color:var(--d-line)!important}
+
+/* Day-mode Equity simulator palette and readable synthetic-data disclosures. */
+.demo-page[data-app-theme="day"] .demo-eq-panel,
+.demo-page[data-app-theme="day"] .demo-eq-summary{background:var(--d-panel)!important;color:var(--d-text)!important;border-color:var(--d-line)!important}
+.demo-page[data-app-theme="day"] .demo-eq-heading{color:var(--d-text)!important}
+.demo-page[data-app-theme="day"] .demo-eq-identity{color:var(--d-accent)!important;background:color-mix(in srgb,var(--d-accent) 8%,var(--d-panel));border-color:color-mix(in srgb,var(--d-accent) 40%,var(--d-line))}
+.demo-page[data-app-theme="day"] .demo-eq-disclaimer,
+.demo-page[data-app-theme="day"] .demo-eq-field,
+.demo-page[data-app-theme="day"] .demo-eq-status,
+.demo-page[data-app-theme="day"] .demo-eq-subhead,
+.demo-page[data-app-theme="day"] .demo-eq-stat span{color:var(--d-muted)!important}
+.demo-page[data-app-theme="day"] .demo-eq-input{background:var(--d-card)!important;color:var(--d-text)!important;border-color:var(--d-line)!important}
+.demo-page[data-app-theme="day"] .demo-eq-status{background:var(--d-card)!important;border-color:var(--d-line)!important}
+.demo-page[data-app-theme="day"] .demo-eq-stat{background:var(--d-card)!important;border-color:var(--d-line)!important;color:var(--d-text)!important}
+.demo-page[data-app-theme="day"] .demo-eq-button{background:var(--d-panel)!important;color:var(--d-text)!important;border-color:var(--d-line)!important}
+.demo-page[data-app-theme="day"] .demo-eq-button.primary{background:color-mix(in srgb,var(--d-accent) 12%,var(--d-panel))!important;color:var(--d-accent)!important;border-color:var(--d-accent)!important}
+.demo-page[data-app-theme="day"] .demo-eq-button.danger{background:#fff1f2!important;color:#9f1239!important;border-color:#e5a0ad!important}
