@@ -3,14 +3,16 @@ name: S-TRADE Central Feed Engine Checks
 on:
   pull_request:
     branches:
-      - feature/s-trade-authenticated-market-fanout-clean2-2026-11-28
+      - feature/s-trade-redis-subscriber-bridge-clean-2026-11-28
     paths:
       - "market-gateway/lib/central-market-feed.js"
       - "market-gateway/lib/redis-market-feed-transport.js"
       - "market-gateway/lib/authenticated-market-feed-fanout.js"
+      - "market-gateway/lib/redis-market-feed-subscriber.js"
       - "market-gateway/test/central-market-feed.test.js"
       - "market-gateway/test/redis-market-feed-transport.test.js"
       - "market-gateway/test/authenticated-market-feed-fanout.test.js"
+      - "market-gateway/test/redis-market-feed-subscriber.test.js"
       - ".github/workflows/s-trade-central-feed-engine.yml"
   workflow_dispatch:
 
@@ -25,13 +27,15 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-      - name: Check central feed and authenticated fan-out source and tests
+      - name: Check all staged market-feed modules and tests
         run: |
           node --check market-gateway/lib/central-market-feed.js
           node --check market-gateway/lib/redis-market-feed-transport.js
           node --check market-gateway/lib/authenticated-market-feed-fanout.js
+          node --check market-gateway/lib/redis-market-feed-subscriber.js
           node --check market-gateway/test/central-market-feed.test.js
           node --check market-gateway/test/redis-market-feed-transport.test.js
           node --check market-gateway/test/authenticated-market-feed-fanout.test.js
-      - name: Run deterministic central feed, Redis transport and fan-out tests
-        run: node --test market-gateway/test/central-market-feed.test.js market-gateway/test/redis-market-feed-transport.test.js market-gateway/test/authenticated-market-feed-fanout.test.js
+          node --check market-gateway/test/redis-market-feed-subscriber.test.js
+      - name: Run all deterministic market-feed contract tests
+        run: node --test market-gateway/test/central-market-feed.test.js market-gateway/test/redis-market-feed-transport.test.js market-gateway/test/authenticated-market-feed-fanout.test.js market-gateway/test/redis-market-feed-subscriber.test.js
