@@ -32,6 +32,11 @@ begin
      or p_expires_at > p_now + interval '10 minutes' then
     raise exception 'Invalid broker OAuth state parameters' using errcode = '22023';
   end if;
+  -- Opportunistically prune expired or long-consumed nonces whenever a new flow starts.
+  -- This keeps the server-only state table bounded without a separate scheduler.
+  delete from public.broker_oauth_states
+   where expires_at <= p_now
+      or consumed_at <= p_now - interval '1 day';
   insert into public.broker_oauth_states(state_hash,user_id,broker_name,expires_at,created_at)
   values (p_state_hash,p_user_id,p_broker_name,p_expires_at,p_now);
   return true;
