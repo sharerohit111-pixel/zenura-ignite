@@ -527,3 +527,37 @@ test("Angel One invalid provider login response is scrubbed and never persisted"
   assert.equal(body.pin, "");
   assert.equal(body.totp, "");
 });
+
+
+test("Angel One login scrubs credentials after provider network and secure-save failures", async () => {
+  const network = angelLoginHarness();
+  network.router.stack.find(layer => layer.route?.path === "/session").route.stack[0].handle;
+  const networkRouter = createAngelOneRouter({
+    auth: async () => ({ user: { id: "user-4", emailConfirmedAt: "2026-01-01" } }),
+    serviceDb: {
+      async rpc() { return { data: { allowed: true }, error: null }; },
+      from() { throw new Error("unexpected database write"); }
+    },
+    fetchProvider: async () => { throw new Error("provider unavailable"); },
+    readProviderJson: async () => ({}), encryptionKey: KEY, apiKey: "api-key",
+    clientLocalIp: "192.0.2.1", clientPublicIp: "198.51.100.1",
+    macAddress: "AA:BB:CC:DD:EE:FF", sourceId: "WEB", logger: { error() {} }
+  });
+  const networkBody = angelRequestBody(), networkRes = response();
+  await routeHandler(networkRouter, "post", "/session")({ body: networkBody }, networkRes);
+  assert.equal(networkRes.statusCode, 502);
+  assert.equal(networkBody.pin, "");
+  assert.equal(networkBody.totp, "");
+
+  const persistence = angelLoginHarness({ saveError: { code: "WRITE_FAILED" } });
+  const persistenceBody = angelRequestBody(), persistenceRes = response();
+  await routeHandler(persistence.router, "post", "/session")({ body: persistenceBody }, persistenceRes);
+  assert.equal(persistenceRes.statusCode, 503);
+  assert.equal(persistence.calls.upsert.length, 1);
+  assert.equal(persistenceBody.pin, "");
+  assert.equal(persistenceBody.totp, "");
+  assert.equal(persistence.payload.data.jwtToken, "");
+  assert.equal(persistence.payload.data.refreshToken, "");
+  assert.equal(persistence.payload.data.feedToken, "");
+  assert.doesNotMatch(JSON.stringify(persistenceRes.body), /jwt-secret|refresh-secret|feed-secret/);
+});
