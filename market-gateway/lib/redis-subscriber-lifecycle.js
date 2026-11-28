@@ -106,8 +106,11 @@ function createRedisSubscriberLifecycle({
   }
 
   function invalidate(reason = "external-invalidation") {
-    if (state === "stopped") return false;
-    if (state === "unavailable") return false;
+    if (state === "stopped" || state === "unavailable") return false;
+    if (state === "reconnecting") {
+      state = "unavailable";
+      return true;
+    }
     unavailable(reason);
     return true;
   }
