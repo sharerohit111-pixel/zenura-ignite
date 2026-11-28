@@ -318,3 +318,60 @@
   line-height:1.15!important;
   text-align:center!important;
 }
+
+
+/* Form-control contrast repair: watchlist search and Futures selectors in both themes. */
+.stocks-page .search{
+  background:var(--app-raised)!important;
+  border:1px solid var(--app-line)!important;
+  color:var(--app-muted)!important;
+}
+.stocks-page .search input,
+.stocks-page .search input:focus,
+.stocks-page .search input:-webkit-autofill,
+.stocks-page .search input:-webkit-autofill:hover,
+.stocks-page .search input:-webkit-autofill:focus{
+  background:transparent!important;
+  color:var(--app-text)!important;
+  -webkit-text-fill-color:var(--app-text)!important;
+  caret-color:var(--app-accent-strong)!important;
+  opacity:1!important;
+}
+.stocks-page .search input::placeholder{
+  color:var(--app-muted)!important;
+  -webkit-text-fill-color:var(--app-muted)!important;
+  opacity:1!important;
+}
+.stocks-page .option-controls select,
+.stocks-page .option-controls input,
+.stocks-page .futures-margin-panel select,
+.stocks-page .futures-margin-panel input,
+.stocks-page .futures-order-panel select,
+.stocks-page .futures-order-panel input{
+  background:var(--app-raised)!important;
+  color:var(--app-text)!important;
+  -webkit-text-fill-color:var(--app-text)!important;
+  border:1px solid var(--app-line)!important;
+  color-scheme:light;
+}
+.stocks-page[data-app-theme="night"] .option-controls select,
+.stocks-page[data-app-theme="night"] .option-controls input,
+.stocks-page[data-app-theme="night"] .futures-margin-panel select,
+.stocks-page[data-app-theme="night"] .futures-margin-panel input,
+.stocks-page[data-app-theme="night"] .futures-order-panel select,
+.stocks-page[data-app-theme="night"] .futures-order-panel input{
+  color-scheme:dark;
+}
+.stocks-page .option-controls select option,
+.stocks-page .futures-margin-panel select option,
+.stocks-page .futures-order-panel select option{
+  background:var(--app-surface);
+  color:var(--app-text);
+}
+.stocks-page .search:focus-within,
+.stocks-page .option-controls select:focus-visible,
+.stocks-page .futures-margin-panel select:focus-visible,
+.stocks-page .futures-order-panel select:focus-visible{
+  outline:2px solid color-mix(in srgb,var(--app-accent) 65%,transparent);
+  outline-offset:2px;
+}
