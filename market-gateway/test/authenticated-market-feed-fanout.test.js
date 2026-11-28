@@ -99,3 +99,53 @@ test("bounds, duplicate instrument IDs and closed state are enforced", async () 
   assert.equal(fanout.getStatus().connectionCount, 0);
   await assert.rejects(fanout.subscribe(args), { code: "market_feed_fanout_closed" });
 });
+
+
+test("concurrent subscriptions cannot exceed the configured connection cap", async () => {
+  let releaseAuthorization;
+  const authorizationGate = new Promise((resolve) => { releaseAuthorization = resolve; });
+  const fanout = makeFanout({
+    maxConnections: 1,
+    authorizeInstrument: async () => {
+      await authorizationGate;
+      return { allowed: true, entitlementReference: "approved-entitlement" };
+    },
+  });
+  const args = {
+    credential: { userId: "u", tenantId: "t" },
+    instruments: ["NSE:AAA"],
+    send: async () => {},
+  };
+
+  const first = fanout.subscribe(args);
+  const second = fanout.subscribe(args);
+  releaseAuthorization();
+  const results = await Promise.allSettled([first, second]);
+
+  assert.equal(results.filter((result) => result.status === "fulfilled").length, 1);
+  assert.equal(results.filter((result) => result.status === "rejected").length, 1);
+  assert.equal(results.find((result) => result.status === "rejected").reason.code, "market_feed_capacity");
+  assert.equal(fanout.getStatus().connectionCount, 1);
+});
+
+test("multi-instrument authorization is atomic and fails closed when any instrument is denied", async () => {
+  const checked = [];
+  const fanout = makeFanout({
+    authorizeInstrument: async ({ instrumentId }) => {
+      checked.push(instrumentId);
+      return instrumentId === "NSE:AAA"
+        ? { allowed: true, entitlementReference: "entitlement-a" }
+        : { allowed: false };
+    },
+  });
+
+  await assert.rejects(fanout.subscribe({
+    credential: { userId: "u", tenantId: "t" },
+    instruments: ["NSE:AAA", "NSE:BBB"],
+    send: async () => {},
+  }), { code: "market_feed_subscription_denied" });
+
+  assert.deepEqual(checked, ["NSE:AAA", "NSE:BBB"]);
+  assert.equal(fanout.getStatus().connectionCount, 0);
+  assert.equal(await fanout.dispatch({ instrumentId: "NSE:AAA" }), 0);
+});
