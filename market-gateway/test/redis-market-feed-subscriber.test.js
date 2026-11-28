@@ -18,7 +18,7 @@ function harness(overrides = {}) {
   };
   const delivered = [];
   const errors = [];
-  const fanout = { async dispatch(event) { delivered.push(event); return 1; }, ...overrides.fanout };
+  const fanout = { async dispatch(event) {\n    delivered.push(event);\n    return overrides.fanout?.dispatch ? overrides.fanout.dispatch(event) : 1;\n  } };
   const bridge = createRedisMarketFeedSubscriber({
     subscriber, fanout, onError: (error) => errors.push(error.code), ...overrides.options,
   });
