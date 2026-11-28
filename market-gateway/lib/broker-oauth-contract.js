@@ -1,7 +1,7 @@
 "use strict";
 const BROKER_AUTH_CONTRACTS = Object.freeze({
   upstox: Object.freeze({ brokerId: "upstox", mode: "authorization_code", authorizationEndpoint: "https://api.upstox.com/v2/login/authorization/dialog", tokenEndpoint: "https://api.upstox.com/v2/login/authorization/token", callbackStateRequired: true, refresh: false }),
-  fyers: Object.freeze({ brokerId: "fyers", mode: "authorization_code", authorizationEndpoint: "https://api-t1.fyers.in/api/v3/generate-authcode", tokenEndpoint: "https://api-t1.fyers.in/api/v3/validate-authcode", callbackStateRequired: true, refresh: true, refreshValidityDays: 15 }),
+  fyers: Object.freeze({ brokerId: "fyers", mode: "authorization_code", authorizationEndpoint: "https://api-t1.fyers.in/api/v3/generate-authcode", tokenEndpoint: "https://api-t1.fyers.in/api/v3/validate-authcode", callbackStateRequired: true, refresh: false, dailyReauthentication: true }),
   angel_one: Object.freeze({ brokerId: "angel_one", mode: "smartapi_session", callbackStateRequired: false, refresh: "provider_session_contract" })
 });
 function getBrokerAuthContract(brokerId) { return BROKER_AUTH_CONTRACTS[brokerId] || null; }

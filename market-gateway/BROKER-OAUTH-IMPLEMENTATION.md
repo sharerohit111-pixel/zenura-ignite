@@ -4,7 +4,7 @@ This stage adds the provider flow registry and an HMAC-authenticated, short-live
 
 ## Provider flow distinctions
 - Upstox: authorization-code flow. The existing gateway has an Upstox-specific token exchange and encrypted token storage.
-- FYERS v3: authorization-code flow; refresh-token lifecycle is provider-specific. A 15-day refresh validity window is metadata, not a guarantee that refresh succeeds without a valid provider-issued token.
+- FYERS v3: authorization-code flow. Current FYERS guidance for API trading from 1 April 2026 requires daily 2FA and says continuous refresh-token sessions are not supported; this adapter therefore requires daily reauthentication and does not assume refresh-token continuity.
 - Angel One SmartAPI: session authentication (client code, PIN/password and TOTP) rather than a generic browser OAuth callback. It must be implemented with a dedicated server-side session adapter and never by sending the user's TOTP or PIN through frontend logs.
 
 ## Required runtime wiring (not included in this contract module)

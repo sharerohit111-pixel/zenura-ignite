@@ -11,11 +11,11 @@ test("FYERS token response must be successful and contain a bounded access token
   assert.equal(isUsableFyersTokenResponse(null), false);
 });
 
-test("FYERS access-token expiry is the next 06:30 India time boundary", () => {
-  const before = Date.parse("2026-11-28T00:59:00.000Z");
-  const after = Date.parse("2026-11-28T01:01:00.000Z");
-  assert.equal(nextFyersTokenExpiry(before).toISOString(), "2026-11-28T01:00:00.000Z");
-  assert.equal(nextFyersTokenExpiry(after).toISOString(), "2026-11-29T01:00:00.000Z");
+test("FYERS access-token expiry is the next India-local calendar day boundary", () => {
+  const beforeMidnight = Date.parse("2026-11-28T18:29:00.000Z");
+  const afterMidnight = Date.parse("2026-11-28T18:31:00.000Z");
+  assert.equal(nextFyersTokenExpiry(beforeMidnight).toISOString(), "2026-11-28T18:30:00.000Z");
+  assert.equal(nextFyersTokenExpiry(afterMidnight).toISOString(), "2026-11-29T18:30:00.000Z");
   assert.throws(() => nextFyersTokenExpiry(-1));
 });
 
