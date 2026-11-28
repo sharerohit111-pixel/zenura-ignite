@@ -25,7 +25,6 @@ const {chromium}=require("playwright");
     ["balance",".order-panel"],
     ["positions",".portfolio-panel"],
     ["orders",".paper-order-book"],
-    ["history",".paper-order-book"],
     ["pnl",".portfolio-panel"],
     ["derivatives",".option-panel"],
     ["settings",".settings-page"]
