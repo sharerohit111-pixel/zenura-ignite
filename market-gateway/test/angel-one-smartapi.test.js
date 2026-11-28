@@ -34,8 +34,12 @@ test("Angel One adapter never persists or logs PIN and TOTP", () => {
   assert.match(source, /req\.body\.totp = ""/);
   assert.match(source, /catch \(error\) \{\s*credentials\.pin = "";\s*credentials\.totp = "";\s*throw error;/,
     "credentials must be cleared when the database login limiter throws");
-  assert.ok(source.indexOf("req.body.pin =") < source.indexOf("if (!credentials)"),
-    "request PIN must be cleared before invalid-credential early return");
+  assert.ok(source.indexOf("req.body.pin =") < source.indexOf("const { user } = await auth(req)"),
+    "request PIN must be cleared before authentication can fail");
+  assert.ok(source.indexOf("req.body.totp =") < source.indexOf("const { user } = await auth(req)"),
+    "request TOTP must be cleared before authentication can fail");
+  assert.match(source, /finally \{[\s\S]*?Cover auth\/configuration\/rate-limit\/provider\/database failures and every early return\.[\s\S]*?credentials\.pin = ""; credentials\.totp = "";[\s\S]*?req\.body\.pin = ""; req\.body\.totp = "";/,
+    "credential references must be cleared on all handler exits");
   assert.doesNotMatch(source, /logger\.(?:info|warn|error)\([^\n]*(?:pin|totp|password)/i);
   assert.match(source, /access_token_ciphertext: encryptedBundle/);
   assert.match(source, /payload\.data\.jwtToken = ""/);
