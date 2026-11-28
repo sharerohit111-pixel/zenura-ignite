@@ -194,3 +194,20 @@
 #zenura-quick-actions>a>svg{display:block!important;width:21px!important;height:21px!important;flex:none!important}
 #zenura-quick-actions>a[aria-current=page]{color:var(--app-accent-strong,#087a5f)!important}
 .stocks-page{padding-bottom:calc(92px + env(safe-area-inset-bottom))!important}
+
+/* Touch-first phones must retain the mobile terminal even when Chrome requests Desktop site. */
+@media (pointer:coarse) and (hover:none){
+  .stocks-page .wrap{width:auto!important;max-width:100%!important;margin:0 auto!important;padding-left:12px!important;padding-right:12px!important;box-sizing:border-box!important}
+  .stocks-page .top{flex-wrap:wrap!important;gap:10px!important}
+  .stocks-page .top>.brand{flex:1 1 auto!important;min-width:0!important}
+  .stocks-page .top>.product-mode-nav{display:flex!important;flex:0 0 auto!important;width:auto!important}
+  .stocks-page .terminal-nav{display:flex!important;flex-wrap:nowrap!important;max-width:100%!important;overflow-x:auto!important}
+  .stocks-page .stock-hero{display:block!important}
+  .stocks-page .connection{width:100%!important;max-width:none!important;box-sizing:border-box!important;margin-top:14px!important}
+  .stocks-page .workspace{display:grid!important;grid-template-columns:minmax(0,1fr)!important;gap:12px!important}
+  .stocks-page .workspace>.watch,.stocks-page .workspace>.chart-panel,.stocks-page .workspace>.order-panel{grid-column:1!important}
+  .stocks-page .app-bottom-nav,#zenura-quick-actions{position:fixed!important;inset:auto 0 0 0!important;left:0!important;right:0!important;bottom:0!important;width:auto!important;max-width:none!important;min-width:0!important;transform:none!important;border-radius:0!important;border-left:0!important;border-right:0!important;z-index:2147483647!important;display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr))!important;box-sizing:border-box!important;padding:7px 5px calc(7px + env(safe-area-inset-bottom))!important;min-height:64px!important}
+  #zenura-quick-actions>a{min-width:0!important;min-height:48px!important;font-size:clamp(7px,2.2vw,10px)!important;white-space:normal!important;text-align:center!important}
+  .stocks-page{padding-bottom:calc(76px + env(safe-area-inset-bottom))!important}
+  .stocks-page .paper-language-toggle{bottom:calc(72px + env(safe-area-inset-bottom))!important}
+}
