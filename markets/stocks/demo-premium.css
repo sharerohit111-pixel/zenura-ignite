@@ -35,3 +35,4 @@
 
 /* Keep catalog form labels readable over the translucent control panel in both themes. */
 .demo-page .catalog-field{color:var(--d-text)!important}
+.demo-page .catalog-controls{background:var(--d-panel)!important;border-color:var(--d-line)!important}
