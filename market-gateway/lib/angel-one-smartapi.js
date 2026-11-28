@@ -9,10 +9,10 @@ const LOGOUT_URL = "https://apiconnect.angelone.in/rest/secure/angelbroking/user
 
 function nextAngelOneSessionExpiry(now = Date.now()) {
   if (!Number.isSafeInteger(now) || now < 0) throw new TypeError("Invalid session issue time.");
-  // SmartAPI's published session guidance states JWT sessions remain valid until
-  // 05:00 IST on the subsequent day, unless logged out or invalidated earlier.
+  // SmartAPI's current official documentation says a session remains active until
+  // midnight IST unless the user logs out or the broker invalidates it.
   const local = new Date(now + 330 * 60 * 1000);
-  const nextFiveAm = Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate() + 1, 5, 0, 0, 0) - 330 * 60 * 1000;
+  const nextFiveAm = Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate() + 1, 0, 0, 0, 0) - 330 * 60 * 1000;
   return new Date(nextFiveAm);
 }
 
