@@ -72,7 +72,19 @@ test("authenticated workspace CSP and auth DOM resist browser injection", async 
 
   try {
     await page.goto(`http://127.0.0.1:${address.port}/markets/stocks/index.html`, { waitUntil: "networkidle" });
-    await page.locator("#email-auth-message").waitFor();
+    await page.locator("#email-auth-message").waitFor({ timeout: 10000 }).catch(async error => {
+      const diagnostics = await page.evaluate(() => ({
+        scripts: [...document.scripts].map(script => ({ src: script.src, type: script.type })),
+        authCard: Boolean(document.querySelector("#connection")),
+        connectButton: Boolean(document.querySelector("#upstox-connect")),
+        message: document.querySelector("#email-auth-message")?.outerHTML || null,
+        supabaseGlobal: Boolean(window.ZENURA_SUPABASE),
+        cspViolations: window.__cspViolations || []
+      }));
+      throw new Error("Email auth bootstrap did not create its status node: " + JSON.stringify({
+        diagnostics, pageErrors, failedRequests, responses: responses.filter(item => item.url.includes("esm.sh"))
+      }) + "; original: " + error.message);
+    });
     const csp = await page.locator('meta[http-equiv="Content-Security-Policy"]').getAttribute("content");
     assert.ok(csp, "workspace must declare a CSP meta policy");
     for (const forbidden of ["'unsafe-inline'", "'unsafe-eval'", "*"]) {
