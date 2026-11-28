@@ -19,7 +19,7 @@ test("Markets PWA manifest remains installable and scoped away from Crypto",()=>
 test("service worker cache generation is explicit and activation removes stale Markets generations",()=>{
  const sw=read("markets/service-worker.js");
  const cache=sw.match(/const CACHE_NAME="([^"]+)"/)?.[1];
- assert.equal(cache,"zenura-markets-shell-v18");
+ assert.equal(cache,"zenura-markets-shell-v19");
  assert.match(sw,/await self\.skipWaiting\(\)/);
  assert.match(sw,/await self\.clients\.claim\(\)/);
  assert.match(sw,/key\.startsWith\("zenura-markets-"\)&&key!==CACHE_NAME/);
