@@ -95,6 +95,10 @@ function createAngelOneRouter({ auth, serviceDb, fetchProvider, readProviderJson
         refreshToken: payload.data.refreshToken,
         feedToken: payload.data.feedToken
       }), encryptionKey);
+      // Drop provider token references from the parsed response before database I/O.
+      payload.data.jwtToken = "";
+      payload.data.refreshToken = "";
+      payload.data.feedToken = "";
       const { error } = await serviceDb.from("broker_connections").upsert({
         user_id: user.id, broker_name: "angel_one", connection_status: "connected",
         access_token_ciphertext: encryptedBundle, refresh_token_ciphertext: null,
