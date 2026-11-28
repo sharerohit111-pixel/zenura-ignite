@@ -42,7 +42,7 @@ if(header&&!header.querySelector("[data-app-theme-toggle]")){
 document.querySelectorAll(".terminal-nav > a[data-terminal-page]").forEach(a=>{
  a.classList.add("terminal-nav-link");
 });
-const bottom=document.createElement("nav");bottom.className="app-bottom-nav";bottom.dataset.appBottomNav="";bottom.setAttribute("aria-label","Quick trading navigation");bottom.setAttribute("role","navigation");bottom.dataset.quickTradeNav="";
+const bottom=document.createElement("nav");bottom.id="zenura-quick-actions";bottom.className="app-bottom-nav";bottom.dataset.appBottomNav="";bottom.setAttribute("aria-label","Quick trading navigation");bottom.setAttribute("role","navigation");bottom.dataset.quickTradeNav="";
 const items=[["derivatives","Option Chain"],["positions","Live Pos. / P&L"],["watchlist","Quick Watchlist"],["support","Help & Support"]];
 items.forEach(([page,label])=>{
  const a=document.createElement("a");
@@ -59,6 +59,22 @@ items.forEach(([page,label])=>{
  bottom.append(a);
 });
 document.body.append(bottom);
+bottom.style.setProperty("position","fixed","important");
+bottom.style.setProperty("left","0","important");
+bottom.style.setProperty("right","0","important");
+bottom.style.setProperty("bottom","0","important");
+bottom.style.setProperty("z-index","2147483647","important");
+bottom.style.setProperty("display","grid","important");
+bottom.style.setProperty("grid-template-columns","repeat(4,minmax(0,1fr))","important");
+bottom.style.setProperty("min-height","72px","important");
+bottom.style.setProperty("box-sizing","border-box","important");
+bottom.style.setProperty("padding","8px 8px calc(8px + env(safe-area-inset-bottom))","important");
+bottom.style.setProperty("background","var(--app-surface, #fff)","important");
+bottom.style.setProperty("border-top","1px solid var(--app-line, #dce5e3)","important");
+bottom.style.setProperty("visibility","visible","important");
+bottom.style.setProperty("opacity","1","important");
+bottom.style.setProperty("pointer-events","auto","important");
+
 function active(){const p=body.dataset.terminalPage||location.hash.slice(1)||"dashboard";bottom.querySelectorAll("a").forEach(a=>{if(a.dataset.bottomPage===p)a.setAttribute("aria-current","page");else a.removeAttribute("aria-current")})}
 document.addEventListener("click",e=>{if(e.target.closest("[data-terminal-page],[data-go-page]"))setTimeout(active,0)});
 window.addEventListener("hashchange",active);
