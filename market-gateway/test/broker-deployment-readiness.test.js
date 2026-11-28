@@ -42,5 +42,5 @@ test("Cloud Run deployment remains manually gated to main and does not silently 
 test("broker setup guides keep credentials out of frontend configuration", () => {
   assert.match(fyersSetup, /never expose it to the browser/i);
   assert.match(angelSetup, /never expose it in the static frontend/i);
-  assert.match(deploymentGuide, /never expose them to Git, GitHub Pages, frontend environment files/i);
+  assert.match(deploymentGuide, /Do not add provider credentials to Git, GitHub Pages, frontend environment files/i);
 });
