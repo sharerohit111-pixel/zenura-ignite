@@ -31,3 +31,18 @@
 .broker-connect-feedback{min-height:18px;margin:10px 0 0;text-align:center;color:#f0c77d;font-size:12px}
 @media(max-width:760px){.broker-connect-dialog{padding:23px 17px 18px}.broker-connect-grid,.broker-account-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.broker-connect-card{padding:13px 11px}.broker-connect-card-head{gap:8px}.broker-connect-logo{width:35px;height:35px}.broker-connect-card h3{font-size:15px}.broker-connect-tag{font-size:8px;padding:3px 5px}}
 @media(max-width:390px){.broker-connect-overlay{padding:9px}.broker-connect-dialog{padding:21px 11px 14px;border-radius:14px}.broker-connect-grid,.broker-account-grid{gap:7px}.broker-connect-card{padding:10px 8px}.broker-connect-card-head{flex-wrap:wrap}.broker-connect-tag{margin-left:0}.broker-connect-card h3{font-size:14px}.broker-account-card{padding:9px 6px}}
+
+/* Three-column broker alignment and shared terminal day/night theme support. */
+.broker-connect-grid,.broker-account-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+.broker-affiliate-disclosure{display:block;margin-top:8px;color:#9db2c5;font-size:10px;line-height:1.35}
+.broker-account-note{min-height:38px}
+body[data-chart-theme="light"] .broker-connect-overlay{background:rgba(225,234,243,.72)}
+body[data-chart-theme="light"] .broker-connect-dialog{background:linear-gradient(145deg,rgba(250,253,255,.99),rgba(232,241,249,.99));border-color:#b7c9d9;box-shadow:0 28px 90px rgba(31,52,73,.25);color:#15283b}
+body[data-chart-theme="light"] .broker-connect-heading h2,body[data-chart-theme="light"] .broker-account-heading,body[data-chart-theme="light"] .broker-connect-card h3,body[data-chart-theme="light"] .broker-account-title{color:#15283b}
+body[data-chart-theme="light"] .broker-connect-heading p,body[data-chart-theme="light"] .broker-connect-divider{color:#526a80}
+body[data-chart-theme="light"] .broker-connect-card,body[data-chart-theme="light"] .broker-account-card{background:linear-gradient(155deg,#f7fbff,#e8f0f7);border-color:#c6d4e0}
+body[data-chart-theme="light"] .broker-connect-demo{background:#e6eef5;color:#1b344b;border-color:#c4d3df}
+body[data-chart-theme="light"] .broker-account-note{color:#526a80}
+body[data-chart-theme="light"] .broker-affiliate-disclosure,body[data-chart-theme="light"] .broker-connect-footnote{color:#526a80}
+body[data-chart-theme="light"] .broker-connect-close{background:#e8eff5;color:#1b344b;border-color:#c5d3df}
+@media(max-width:760px){.broker-connect-grid,.broker-account-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
