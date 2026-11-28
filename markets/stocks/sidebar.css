@@ -28,3 +28,6 @@ body.sidebar-open{overflow:hidden}
 
 /* Sidebar replaces the legacy horizontal page strip; its anchors remain available to routing code. */
 .stocks-page .terminal-nav{display:none!important}
+
+/* The six-card Settings module is the single settings surface; hide legacy duplicate rows. */
+.stocks-page .settings-page>.settings-row{display:none!important}
