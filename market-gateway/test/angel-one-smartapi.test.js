@@ -13,14 +13,14 @@ test("Angel One login requires bounded client ID, PIN and current six digit TOTP
 });
 
 test("Angel One session response must contain JWT, refresh and feed tokens", () => {
-    jwtToken: "j\n", refreshToken: "r", feedToken: "f"
+  assert.equal(isValidAngelOneLogin({ status: true, data: { jwtToken: "j", refreshToken: "r", feedToken: "f" } }), true);
   assert.equal(isValidAngelOneLogin({ status: true, data: { jwtToken: "j", refreshToken: "r" } }), false);
   assert.equal(isValidAngelOneLogin({ status: false, data: null }), false);
   assert.equal(isValidAngelOneLogin({ status: true, data: {
     jwtToken: "j".repeat(16385), refreshToken: "r", feedToken: "f"
   } }), false);
   assert.equal(isValidAngelOneLogin({ status: true, data: {
-    jwtToken: "j\\n", refreshToken: "r", feedToken: "f"
+    jwtToken: "j\n", refreshToken: "r", feedToken: "f"
   } }), false);
 });
 
