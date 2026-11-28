@@ -187,6 +187,8 @@ jobs:
             echo "Applying $migration"
             psql -v ON_ERROR_STOP=1 -f "$migration"
           done
+      - name: Verify broker credential isolation and one-time OAuth state consumption
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/broker_oauth_security.sql
       - name: Exercise provider-account and per-user distributed quota boundaries
         run: psql -v ON_ERROR_STOP=1 -f supabase/tests/market_data_provider_quotas.sql
       - name: Verify bounded distributed quota bucket retention and active-window safety
