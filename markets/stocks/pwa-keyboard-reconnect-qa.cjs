@@ -34,7 +34,7 @@ async function verifyProductionWorkerCacheCleanup() {
   assert.deepEqual(deleted.sort(), ["zenura-markets-shell-v10", "zenura-markets-shell-v12", "zenura-markets-shell-v9"]);
   assert.ok(!deleted.includes("unrelated-app-cache"), "activation must preserve unrelated application caches");
   assert.ok(!deleted.includes("zenura-markets-shell-v17"), "activation must preserve current shell cache");
-  console.log(JSON.stringify({ workerCacheCleanup: "PASS", deleted, preserved: ["unrelated-app-cache", "zenura-markets-shell-v14"] }));
+  console.log(JSON.stringify({ workerCacheCleanup: "PASS", deleted, preserved: ["unrelated-app-cache", "zenura-markets-shell-v17"] }));
 }
 
 (async () => {
@@ -53,7 +53,7 @@ async function verifyProductionWorkerCacheCleanup() {
       keys: await caches.keys(),
       controller: navigator.serviceWorker.controller?.scriptURL || null
     }));
-    assert.ok(activationInfo.keys.includes("zenura-markets-shell-v14"), "current v17 cache must be active: " + JSON.stringify(activationInfo));
+    assert.ok(activationInfo.keys.includes("zenura-markets-shell-v17"), "current v17 cache must be active: " + JSON.stringify(activationInfo));
     await pwaPage.reload({ waitUntil: "domcontentloaded" });
     await pwaPage.waitForFunction(() => !!navigator.serviceWorker.controller, null, { timeout: 15000 });
     const controlledWorker = await pwaPage.evaluate(() => navigator.serviceWorker.controller?.scriptURL || null);
@@ -62,7 +62,7 @@ async function verifyProductionWorkerCacheCleanup() {
       await fetch("/markets/private-session-qa-probe", { headers: { Authorization: "Bearer synthetic-qa-only" } }).catch(() => null);
     });
     const privateCacheEntries = await pwaPage.evaluate(async () => {
-      const cache = await caches.open("zenura-markets-shell-v14");
+      const cache = await caches.open("zenura-markets-shell-v17");
       return (await cache.keys()).map(request => request.url).filter(url => url.includes("private-session-qa-probe"));
     });
     assert.deepEqual(privateCacheEntries, [], "authorized private probe must not enter the shell cache");
