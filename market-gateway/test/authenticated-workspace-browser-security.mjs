@@ -46,7 +46,7 @@ test("authenticated workspace CSP and auth DOM resist browser injection", async 
       });
     });
   });
-  page.on("pageerror", error => pageErrors.push(error.message));
+  page.on("pageerror", error => pageErrors.push({ message: error.message, stack: error.stack }));
   page.on("requestfailed", request => failedRequests.push({ url: request.url(), error: request.failure()?.errorText }));
   page.on("response", response => responses.push({ url: response.url(), status: response.status() }));
   await page.route("https://esm.sh/**", route => route.fulfill({
@@ -81,7 +81,11 @@ test("authenticated workspace CSP and auth DOM resist browser injection", async 
         url: location.href,
         title: document.title,
         readyState: document.readyState,
-        bodyStart: document.body?.innerHTML?.slice(0, 6000),
+        bodyStart: document.body?.innerHTML?.slice(0, 2500),
+        bodyChildren: [...(document.body?.children || [])].slice(0, 20).map(el => ({ tag: el.tagName, id: el.id, className: typeof el.className === "string" ? el.className : "", childCount: el.children.length, text: el.textContent?.slice(0, 90) })),
+        documentRootChildren: [...document.documentElement.children].map(el => ({ tag: el.tagName, id: el.id, className: typeof el.className === "string" ? el.className : "" })),
+        connectionCount: document.querySelectorAll("#connection").length,
+        mainCount: document.querySelectorAll("main.wrap").length,
         htmlHasConnection: document.documentElement.outerHTML.includes('id="connection"'),
         scripts: [...document.scripts].map(script => ({ src: script.src, type: script.type })),
         authCard: Boolean(document.querySelector("#connection")),
