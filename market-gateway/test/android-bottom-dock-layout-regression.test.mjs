@@ -30,7 +30,7 @@ test("Android dock has one authoritative final viewport and safe-area contract",
 test("five-item dock remains generated from the existing five functional routes",()=>{
  assert.match(shell,/\[\["dashboard","Home"\],\["derivatives","Option Chain"\],\["positions","Live Pos\. \/ P&L"\],\["watchlist","Quick Watchlist"\],\["support","Help & Support"\]\]/);
  assert.match(html,/viewport-fit=cover/);
- assert.match(worker,/zenura-markets-shell-v25/);
+ assert.match(worker,/zenura-markets-shell-v26/);
  assert.match(worker,/"stocks\/premium-shell\.css"/);
 });
 
@@ -51,6 +51,6 @@ test("installed app launches directly into the main Paper Trading dashboard",()=
  assert.match(html,/<meta http-equiv="refresh" content="0;url=\.\/stocks\/">);
  assert.match(html,/location\.replace\(new URL\("\.\/stocks\/",location\.href\)\.href\)/);
  assert.equal(manifest.start_url,"./stocks/");
- assert.equal(manifest.id,"./stocks/");
- assert.match(worker,/zenura-markets-shell-v25/);
+ assert.equal(manifest.id,"./");
+ assert.match(worker,/zenura-markets-shell-v26/);
 });
