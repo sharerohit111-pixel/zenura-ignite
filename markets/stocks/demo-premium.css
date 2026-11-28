@@ -79,3 +79,6 @@
 .demo-page[data-app-theme="day"] .demo-fo-button{background:color-mix(in srgb,var(--d-accent) 12%,var(--d-panel))!important;color:var(--d-accent)!important;border-color:var(--d-accent)!important}
 .demo-page[data-app-theme="day"] .demo-fo-button.secondary{background:var(--d-card)!important;color:var(--d-text)!important;border-color:var(--d-line)!important}
 .demo-page[data-app-theme="day"] .demo-fo-table-wrap{background:var(--d-panel)!important;border-color:var(--d-line)!important}
+
+/* Keep the selected Day-mode navigation label above WCAG AA contrast. */
+.demo-page[data-app-theme="day"] .screen-nav button.active{color:#006b52!important}
