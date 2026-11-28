@@ -32,6 +32,7 @@ test("FYERS OAuth adapter clears the plaintext token response after encryption",
   const source = fs.readFileSync(path.join(__dirname, "../lib/fyers-oauth.js"), "utf8");
   assert.match(source, /let encryptedAccessToken;[\s\S]*encryptedAccessToken = encryptUpstoxToken\(tokenPayload\.access_token, encryptionKey\)/);
   assert.match(source, /tokenPayload\.access_token = ""/);
-  assert.match(source, /finally \{\s*\/\/ Clear the provider token even if encryption itself throws\.\s*tokenPayload\.access_token = "";\s*\}/);
+  assert.match(source, /finally \{\s*\/\/ Clear the access token for success, invalid responses and encryption failures\.\s*if \(tokenPayload && typeof tokenPayload === "object"\) tokenPayload\.access_token = "";\s*\}/);
+  assert.match(source, /if \(!tokenResponse\.ok \|\| !isUsableFyersTokenResponse\(tokenPayload\)\) return finish\(res, "error"\);[\s\S]*encryptedAccessToken = encryptUpstoxToken/);
   assert.match(source, /access_token_ciphertext: encryptedAccessToken/);
 });
