@@ -15,6 +15,26 @@ Selecting a Redis client before the deployment topology, managed Redis product, 
 5. Redis publisher and subscriber connections are separate from request/database clients. Credentials are server-only, TLS is mandatory, ACL permissions are least-privilege, and network access is private.
 6. The current direct Upstox `/stream` route remains unchanged until a separately reviewed migration proves parity and rollback.
 
+## Deployment-specific recommendation (researched; not provisioned)
+
+The existing deployment guide places the gateway on Google Cloud Run in `asia-south1` (Mumbai). The lowest-friction managed Redis fit is therefore **Google Cloud Memorystore for Redis**, in the same region and VPC as Cloud Run, rather than introducing a second cloud provider.
+
+- Prefer the standard Memorystore for Redis service (single primary/replica topology) for the first production design; do not choose Redis Cluster until measured throughput or data size requires sharding.
+- Use Cloud Run **Direct VPC egress** to reach the instance's private IP. Google documents this as the recommended Cloud Run connection path, with lower latency, higher throughput and no connector instance overhead. The existing deployment workflow currently does not configure VPC egress, so this is an infrastructure change that must be separately reviewed.
+- Use private IP only, TLS/in-transit encryption and Redis AUTH where supported by the selected instance configuration. Store credentials in Google Secret Manager; never in browser config, source code, or GitHub plaintext variables.
+- Select Standard Tier for a production multi-zone availability requirement only after the cost is approved. A Basic Tier can be used for isolated non-production integration testing, but must not be mistaken for production HA.
+- Keep the Redis instance and Cloud Run in `asia-south1` to avoid cross-region traffic and latency. Confirm current SKU availability and exact monthly estimate in the target GCP project before provisioning.
+- The Cloud Run service can scale to multiple instances. Each gateway instance must own exactly one dedicated subscriber connection and its own local fan-out registry; do not assume one global subscriber. The separate publisher/central-feed worker needs its own supervised runtime and lease/ownership design.
+- Redis Pub/Sub is transient and does not provide durable replay. On reconnect or sequence gap, affected instruments must remain stale until a fresh authoritative snapshot is obtained; never treat reconnect as proof that no ticks were missed.
+
+Official Google references:
+- Cloud Run to Memorystore connectivity and Direct VPC egress: https://docs.cloud.google.com/memorystore/docs/redis/connect-redis-instance-cloud-run
+- Cloud Run Direct VPC egress comparison: https://docs.cloud.google.com/run/docs/configuring/connecting-vpc
+- Memorystore Redis pricing and regional selection: https://cloud.google.com/memorystore/docs/redis/pricing
+- Memorystore Redis AUTH and in-transit encryption configuration: https://docs.cloud.google.com/memorystore/docs/redis/create-manage-instances
+
+This is an architecture recommendation only. No Redis resource has been provisioned, no VPC/networking/IAM/secrets have been changed, and no runtime package has been selected or installed. The user/project owner must approve the GCP budget and infrastructure change before provisioning.
+
 ## Reconnect contract to implement after client selection
 
 - Treat disconnect, reconnecting, ready, end and error as explicit lifecycle states.
