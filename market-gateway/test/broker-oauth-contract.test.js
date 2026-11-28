@@ -8,7 +8,8 @@ test("Dhan and Zerodha remain excluded from broker OAuth contracts", () => {
 });
 test("Upstox and FYERS expose authorization-code metadata", () => {
   assert.equal(getBrokerAuthContract("upstox").mode, "authorization_code");
-  assert.equal(getBrokerAuthContract("fyers").refreshValidityDays, 15);
+  assert.equal(getBrokerAuthContract("fyers").refresh, false);
+  assert.equal(getBrokerAuthContract("fyers").dailyReauthentication, true);
   const url = new URL(buildAuthorizationUrl({ brokerId:"upstox", clientId:"client", redirectUri:"https://app.example/callback", state:"opaque-state" }));
   assert.equal(url.searchParams.get("state"), "opaque-state");
   assert.equal(url.searchParams.get("client_id"), "client");
