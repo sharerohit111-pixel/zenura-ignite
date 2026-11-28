@@ -9,11 +9,12 @@ on:
       - "market-gateway/lib/redis-market-feed-transport.js"
       - "market-gateway/lib/authenticated-market-feed-fanout.js"
       - "market-gateway/lib/redis-market-feed-subscriber.js"
+      - "market-gateway/lib/redis-subscriber-lifecycle.js"
       - "market-gateway/test/central-market-feed.test.js"
       - "market-gateway/test/redis-market-feed-transport.test.js"
       - "market-gateway/test/authenticated-market-feed-fanout.test.js"
       - "market-gateway/test/redis-market-feed-subscriber.test.js"
-      - ".github/workflows/s-trade-central-feed-engine.yml"
+      - "market-gateway/test/redis-subscriber-lifecycle.test.js"
   workflow_dispatch:
 
 permissions:
@@ -33,9 +34,11 @@ jobs:
           node --check market-gateway/lib/redis-market-feed-transport.js
           node --check market-gateway/lib/authenticated-market-feed-fanout.js
           node --check market-gateway/lib/redis-market-feed-subscriber.js
+          node --check market-gateway/lib/redis-subscriber-lifecycle.js
           node --check market-gateway/test/central-market-feed.test.js
           node --check market-gateway/test/redis-market-feed-transport.test.js
           node --check market-gateway/test/authenticated-market-feed-fanout.test.js
           node --check market-gateway/test/redis-market-feed-subscriber.test.js
+          node --check market-gateway/test/redis-subscriber-lifecycle.test.js
       - name: Run all deterministic market-feed contract tests
-        run: node --test market-gateway/test/central-market-feed.test.js market-gateway/test/redis-market-feed-transport.test.js market-gateway/test/authenticated-market-feed-fanout.test.js market-gateway/test/redis-market-feed-subscriber.test.js
+        run: node --test market-gateway/test/central-market-feed.test.js market-gateway/test/redis-market-feed-transport.test.js market-gateway/test/authenticated-market-feed-fanout.test.js market-gateway/test/redis-market-feed-subscriber.test.js market-gateway/test/redis-subscriber-lifecycle.test.js
