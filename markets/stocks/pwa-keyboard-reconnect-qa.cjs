@@ -92,12 +92,14 @@ async function verifyProductionWorkerCacheCleanup() {
     assert.equal(await navButtons.count(), SCREENS.length);
     for (let index = 0; index < SCREENS.length; index++) {
       if (index === 0) {
+        // The premium shell adds a Day/Night switch inside the header after the brand.
+        // Assert the actual accessible focus sequence rather than skipping that control.
         await page.keyboard.press("Tab");
         assert.equal(await page.evaluate(() => document.activeElement?.className), "brand", "first tab stop must be the brand link");
         await page.keyboard.press("Tab");
-      } else {
-        await page.keyboard.press("Tab");
+        assert.equal(await page.evaluate(() => document.activeElement?.className), "demo-theme-switch", "second tab stop must be the Day/Night theme control");
       }
+      await page.keyboard.press("Tab");
       const active = await page.evaluate(() => document.activeElement?.getAttribute("data-screen"));
       assert.equal(active, SCREENS[index], "Tab order must reach " + SCREENS[index]);
       const focusStyle = await page.evaluate(() => {
