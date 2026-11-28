@@ -88,7 +88,7 @@ if (fyersCallbackStatus) {
   const detail = document.getElementById("connection-sub");
   if (heading) heading.textContent = fyersCallbackStatus === "connected" ? "FYERS AUTHORIZED" : "FYERS CONNECTION NOT COMPLETED";
   if (detail) detail.textContent = fyersCallbackStatus === "connected"
-    ? "Your FYERS session was securely saved. The access token expires at 06:30 IST."
+    ? "Your FYERS session was securely saved. Daily re-authentication is required under FYERS API policy."
     : "FYERS authorization could not be completed. Check server configuration and try again.";
   window.history.replaceState({}, document.title, window.location.pathname + window.location.hash);
   window.dispatchEvent(new CustomEvent("zenura-fyers-connection-updated"));

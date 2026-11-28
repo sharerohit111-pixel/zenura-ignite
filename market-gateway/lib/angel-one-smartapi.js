@@ -9,9 +9,11 @@ const LOGOUT_URL = "https://apiconnect.angelone.in/rest/secure/angelbroking/user
 
 function nextAngelOneSessionExpiry(now = Date.now()) {
   if (!Number.isSafeInteger(now) || now < 0) throw new TypeError("Invalid session issue time.");
+  // SmartAPI's published session guidance states JWT sessions remain valid until
+  // 05:00 IST on the subsequent day, unless logged out or invalidated earlier.
   const local = new Date(now + 330 * 60 * 1000);
-  const nextUtcMidnight = Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate() + 1) - 330 * 60 * 1000;
-  return new Date(nextUtcMidnight);
+  const nextFiveAm = Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate() + 1, 5, 0, 0, 0) - 330 * 60 * 1000;
+  return new Date(nextFiveAm);
 }
 
 function validateAngelOneCredentials(body) {
@@ -70,6 +72,10 @@ function createAngelOneRouter({ auth, serviceDb, fetchProvider, readProviderJson
       } finally {
         credentials.pin = "";
         credentials.totp = "";
+        if (req.body && typeof req.body === "object") {
+          req.body.pin = "";
+          req.body.totp = "";
+        }
       }
       if (!providerResponse.ok || !isValidAngelOneLogin(payload)) {
         return res.status(401).json({ error: "Angel One login was not accepted. Check Client ID, PIN and current TOTP." });

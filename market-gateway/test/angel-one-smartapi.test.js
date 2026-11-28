@@ -18,9 +18,9 @@ test("Angel One session response must contain JWT, refresh and feed tokens", () 
   assert.equal(isValidAngelOneLogin({ status: false, data: null }), false);
 });
 
-test("Angel One session expiry is next midnight in India time", () => {
+test("Angel One session expiry is 05:00 on the next India-local day", () => {
   const now = Date.parse("2026-11-28T12:00:00.000Z");
-  assert.equal(nextAngelOneSessionExpiry(now).toISOString(), "2026-11-28T18:30:00.000Z");
+  assert.equal(nextAngelOneSessionExpiry(now).toISOString(), "2026-11-28T23:30:00.000Z");
   assert.throws(() => nextAngelOneSessionExpiry(-1));
 });
 
@@ -30,6 +30,8 @@ test("Angel One adapter never persists or logs PIN and TOTP", () => {
   const source = fs.readFileSync(path.join(__dirname, "../lib/angel-one-smartapi.js"), "utf8");
   assert.match(source, /credentials\.pin = ""/);
   assert.match(source, /credentials\.totp = ""/);
+  assert.match(source, /req\.body\.pin = ""/);
+  assert.match(source, /req\.body\.totp = ""/);
   assert.doesNotMatch(source, /logger\.(?:info|warn|error)\([^\n]*(?:pin|totp|password)/i);
   assert.match(source, /access_token_ciphertext: encryptedBundle/);
   assert.match(source, /eq\("broker_name", "angel_one"\)/);
