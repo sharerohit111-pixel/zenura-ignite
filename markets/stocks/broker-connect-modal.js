@@ -2,10 +2,10 @@
 (function () {
   const root = document.getElementById("broker-connect-overlay");
   if (!root) return;
-  const providers = [
-    { id: "upstox", name: "Upstox", mark: "u", tag: "BROKER API", note: "Zero AMC and eligible brokerage offers*", referralUrl: "https://upstox.onelink.me/0H1s/5CAYMN" },
-    { id: "fyers", name: "FYERS", mark: "F", tag: "BROKER API", note: "Referral code FRN9GVV · Up to ₹2,000 FYERS Credits*", referralUrl: "https://fyers.onelink.me/cj1P/l3nujhwy" },
-    { id: "angel_one", name: "Angel One", mark: "A", tag: "SMARTAPI", note: "Free Demat account offer and other benefits*", referralUrl: "https://angel-one.onelink.me/Wjgr/gw4o5lz2" }
+  const referralConfig = window.ZENURA_BROKER_REFERRALS || {};\n  const providers = [
+    { id: "upstox", name: "Upstox", mark: "u", tag: "BROKER API", note: "Zero AMC and eligible brokerage offers*", referralUrl: referralConfig.upstox || "https://upstox.onelink.me/0H1s/5CAYMN" },
+    { id: "fyers", name: "FYERS", mark: "F", tag: "BROKER API", note: "Referral code FRN9GVV · Up to ₹2,000 FYERS Credits*", referralUrl: referralConfig.fyers || "https://fyers.onelink.me/cj1P/l3nujhwy" },
+    { id: "angel_one", name: "Angel One", mark: "A", tag: "SMARTAPI", note: "Free Demat account offer and other benefits*", referralUrl: referralConfig.angel_one || "https://angel-one.onelink.me/Wjgr/gw4o5lz2" }
   ];
   const feedback = root.querySelector("[data-broker-feedback]");
   const status = document.getElementById("connection-title");
