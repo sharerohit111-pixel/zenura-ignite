@@ -73,3 +73,16 @@ test("paper terminal has separate navigation destinations and offline page routi
  assert.ok(sw.includes('"stocks/page-navigation.js"'));
  assert.match(nav,/data-settings-action/);
 });
+
+test("paper terminal mobile bottom navigation is rendered and has a visible fixed safe-area surface",()=>{
+ const html=read("markets/stocks/index.html");
+ const shell=read("markets/stocks/premium-shell.js");
+ const css=read("markets/stocks/premium-shell.css");
+ assert.match(shell,/bottom\.dataset\.appBottomNav=""/);
+ for(const page of ["dashboard","watchlist","chart","positions","settings"])assert.ok(shell.includes('["'+page+'"'));
+ assert.match(css,/\.stocks-page \.app-bottom-nav\{[\s\S]*?position:fixed!important/);
+ assert.match(css,/z-index:9999!important/);
+ assert.match(css,/visibility:visible!important/);
+ assert.match(css,/env\(safe-area-inset-bottom\)/);
+ assert.match(html,/<nav class="terminal-nav"/);
+});
