@@ -32,3 +32,6 @@
 .demo-page .paper-language-toggle{bottom:calc(78px + env(safe-area-inset-bottom))!important;background:var(--d-panel)!important;color:var(--d-accent)!important;border-color:var(--d-line)!important;box-shadow:var(--d-shadow)!important}
 @media(min-width:900px){.demo-bottom-nav{left:auto;right:24px;bottom:20px;width:420px;border:1px solid var(--d-line);border-radius:18px;padding:8px 12px}.demo-page .demo-shell{padding-bottom:40px}}
 @media(max-width:520px){.demo-page .demo-shell{padding:10px 10px calc(90px + env(safe-area-inset-bottom))}.demo-page .demo-header{padding:10px}.demo-theme-switch{min-height:38px}.demo-page .demo-intro h1{font-size:29px}}
+
+/* Keep catalog form labels readable over the translucent control panel in both themes. */
+.demo-page .catalog-field{color:var(--d-text)!important}
