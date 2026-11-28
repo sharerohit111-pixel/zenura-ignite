@@ -1,6 +1,7 @@
 "use strict";
 
-const express = require("express");\nconst net = require("node:net");
+const express = require("express");
+const net = require("node:net");
 const { encryptUpstoxToken, decryptUpstoxToken } = require("./upstox-token-crypto");
 
 const LOGIN_URL = "https://apiconnect.angelone.in/rest/auth/angelbroking/user/v1/loginByPassword";
