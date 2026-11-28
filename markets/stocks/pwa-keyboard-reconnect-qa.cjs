@@ -13,7 +13,7 @@ const SCREENS = ["home","market","watchlists","charts","equity","futures","optio
 async function verifyProductionWorkerCacheCleanup() {
   const source = fs.readFileSync(path.join(__dirname, "..", "service-worker.js"), "utf8");
   const handlers = {};
-  const existingCaches = ["zenura-markets-shell-v10", "zenura-markets-shell-v9", "unrelated-app-cache", "zenura-markets-shell-v12"];
+  const existingCaches = ["zenura-markets-shell-v10", "zenura-markets-shell-v9", "unrelated-app-cache", "zenura-markets-shell-v12", "zenura-markets-shell-v20", "zenura-markets-shell-v21"];
   const deleted = [];
   const self = {
     registration: { scope: "https://qa.example/markets/" },
@@ -31,10 +31,10 @@ async function verifyProductionWorkerCacheCleanup() {
   let activation;
   handlers.activate({ waitUntil: promise => { activation = promise; } });
   await activation;
-  assert.deepEqual(deleted.sort(), ["zenura-markets-shell-v10", "zenura-markets-shell-v12", "zenura-markets-shell-v9"]);
+  assert.deepEqual(deleted.sort(), ["zenura-markets-shell-v10", "zenura-markets-shell-v12", "zenura-markets-shell-v20", "zenura-markets-shell-v9"]);
   assert.ok(!deleted.includes("unrelated-app-cache"), "activation must preserve unrelated application caches");
-  assert.ok(!deleted.includes("zenura-markets-shell-v14"), "activation must preserve current shell cache");
-  console.log(JSON.stringify({ workerCacheCleanup: "PASS", deleted, preserved: ["unrelated-app-cache", "zenura-markets-shell-v14"] }));
+  assert.ok(!deleted.includes("zenura-markets-shell-v21"), "activation must preserve current shell cache");
+  console.log(JSON.stringify({ workerCacheCleanup: "PASS", deleted, preserved: ["unrelated-app-cache", "zenura-markets-shell-v21"] }));
 }
 
 (async () => {
@@ -53,7 +53,7 @@ async function verifyProductionWorkerCacheCleanup() {
       keys: await caches.keys(),
       controller: navigator.serviceWorker.controller?.scriptURL || null
     }));
-    assert.ok(activationInfo.keys.includes("zenura-markets-shell-v14"), "current v14 cache must be active: " + JSON.stringify(activationInfo));
+    assert.ok(activationInfo.keys.includes("zenura-markets-shell-v21"), "current v21 cache must be active: " + JSON.stringify(activationInfo));
     await pwaPage.reload({ waitUntil: "domcontentloaded" });
     await pwaPage.waitForFunction(() => !!navigator.serviceWorker.controller, null, { timeout: 15000 });
     const controlledWorker = await pwaPage.evaluate(() => navigator.serviceWorker.controller?.scriptURL || null);
@@ -62,7 +62,7 @@ async function verifyProductionWorkerCacheCleanup() {
       await fetch("/markets/private-session-qa-probe", { headers: { Authorization: "Bearer synthetic-qa-only" } }).catch(() => null);
     });
     const privateCacheEntries = await pwaPage.evaluate(async () => {
-      const cache = await caches.open("zenura-markets-shell-v14");
+      const cache = await caches.open("zenura-markets-shell-v21");
       return (await cache.keys()).map(request => request.url).filter(url => url.includes("private-session-qa-probe"));
     });
     assert.deepEqual(privateCacheEntries, [], "authorized private probe must not enter the shell cache");
@@ -74,7 +74,7 @@ async function verifyProductionWorkerCacheCleanup() {
     assert.equal(await pwaPage.locator("#screen-nav button[data-screen]").count(), 15, "offline demo must expose all 15 navigation controls");
     await pwaPage.reload({ waitUntil: "domcontentloaded", timeout: 15000 });
     await pwaPage.waitForFunction(() => document.querySelector("#demo-status")?.textContent.includes("4 canonical fixtures validated"), null, { timeout: 10000 });
-    console.log(JSON.stringify({ pwaUpgrade: "PASS", activeCache: "v14", workerCleanupUnitTest: "PASS", privateAuthCacheProbe: "PASS", offlineNavigation: "PASS", offlineReload: "PASS" }));
+    console.log(JSON.stringify({ pwaUpgrade: "PASS", activeCache: "v21", workerCleanupUnitTest: "PASS", privateAuthCacheProbe: "PASS", offlineNavigation: "PASS", offlineReload: "PASS" }));
 
     await pwaContext.setOffline(false);
     await pwaPage.waitForFunction(() => navigator.onLine === true, null, { timeout: 10000 });
@@ -92,12 +92,14 @@ async function verifyProductionWorkerCacheCleanup() {
     assert.equal(await navButtons.count(), SCREENS.length);
     for (let index = 0; index < SCREENS.length; index++) {
       if (index === 0) {
+        // The premium shell adds a Day/Night switch inside the header after the brand.
+        // Assert the actual accessible focus sequence rather than skipping that control.
         await page.keyboard.press("Tab");
         assert.equal(await page.evaluate(() => document.activeElement?.className), "brand", "first tab stop must be the brand link");
         await page.keyboard.press("Tab");
-      } else {
-        await page.keyboard.press("Tab");
+        assert.equal(await page.evaluate(() => document.activeElement?.className), "demo-theme-switch", "second tab stop must be the Day/Night theme control");
       }
+      await page.keyboard.press("Tab");
       const active = await page.evaluate(() => document.activeElement?.getAttribute("data-screen"));
       assert.equal(active, SCREENS[index], "Tab order must reach " + SCREENS[index]);
       const focusStyle = await page.evaluate(() => {

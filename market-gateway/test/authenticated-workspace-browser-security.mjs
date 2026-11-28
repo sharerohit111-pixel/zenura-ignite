@@ -46,12 +46,13 @@ test("authenticated workspace CSP and auth DOM resist browser injection", async 
       });
     });
   });
-  page.on("pageerror", error => pageErrors.push(error.message));
+  page.on("pageerror", error => pageErrors.push({ message: error.message, stack: error.stack }));
   page.on("requestfailed", request => failedRequests.push({ url: request.url(), error: request.failure()?.errorText }));
   page.on("response", response => responses.push({ url: response.url(), status: response.status() }));
-  await page.route("https://esm.sh/@supabase/supabase-js@2.119.2", route => route.fulfill({
+  await page.route("https://esm.sh/**", route => route.fulfill({
     status: 200,
     contentType: "text/javascript",
+    headers: { "access-control-allow-origin": "*" },
     body: `
       export function createClient() {
         const auth = {
@@ -70,8 +71,33 @@ test("authenticated workspace CSP and auth DOM resist browser injection", async 
   }));
 
   try {
-    await page.goto(`http://127.0.0.1:${address.port}/markets/stocks/index.html`, { waitUntil: "networkidle" });
-    await page.locator("#email-auth-message").waitFor();
+    const htmlResponse = await page.goto(`http://127.0.0.1:${address.port}/markets/stocks/index.html`, { waitUntil: "networkidle" });
+    const servedHtml = await htmlResponse.text();
+    assert.equal(htmlResponse.status(), 200, "authenticated workspace HTML must be served successfully");
+    assert.match(servedHtml, /id="connection"/, "served HTML must contain the authentication connection card");
+    assert.match(servedHtml, /id="upstox-connect"/, "served HTML must contain the connection button");
+    await page.locator("#email-auth-message").waitFor({ timeout: 10000 }).catch(async error => {
+      const diagnostics = await page.evaluate(() => ({
+        url: location.href,
+        title: document.title,
+        readyState: document.readyState,
+        bodyStart: document.body?.innerHTML?.slice(0, 2500),
+        bodyChildren: [...(document.body?.children || [])].slice(0, 20).map(el => ({ tag: el.tagName, id: el.id, className: typeof el.className === "string" ? el.className : "", childCount: el.children.length, text: el.textContent?.slice(0, 90) })),
+        documentRootChildren: [...document.documentElement.children].map(el => ({ tag: el.tagName, id: el.id, className: typeof el.className === "string" ? el.className : "" })),
+        connectionCount: document.querySelectorAll("#connection").length,
+        mainCount: document.querySelectorAll("main.wrap").length,
+        htmlHasConnection: document.documentElement.outerHTML.includes('id="connection"'),
+        scripts: [...document.scripts].map(script => ({ src: script.src, type: script.type })),
+        authCard: Boolean(document.querySelector("#connection")),
+        connectButton: Boolean(document.querySelector("#upstox-connect")),
+        message: document.querySelector("#email-auth-message")?.outerHTML || null,
+        supabaseGlobal: Boolean(window.ZENURA_SUPABASE),
+        cspViolations: window.__cspViolations || []
+      }));
+      throw new Error("Email auth bootstrap did not create its status node: " + JSON.stringify({
+        diagnostics, pageErrors, failedRequests, responses: responses.filter(item => item.url.includes("esm.sh"))
+      }) + "; original: " + error.message);
+    });
     const csp = await page.locator('meta[http-equiv="Content-Security-Policy"]').getAttribute("content");
     assert.ok(csp, "workspace must declare a CSP meta policy");
     for (const forbidden of ["'unsafe-inline'", "'unsafe-eval'", "*"]) {
