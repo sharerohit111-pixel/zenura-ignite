@@ -29,7 +29,7 @@
       const button = el("button", "broker-connect-action", p.pending ? "Not available yet" : "Connect & Login");
       button.type = "button";
       button.dataset.provider = p.id;
-      button.disabled = !!p.pending || p.id !== "upstox";
+      button.disabled = !!p.pending;
       if (p.id !== "upstox") button.title = "This broker's OAuth route is not yet integrated in this release.";
       card.append(head, button);
       loginGrid.append(card);
@@ -53,10 +53,14 @@
     const target = event.target;
     if (target.matches("[data-close-broker-modal]") || target === root) close();
     const providerButton = target.closest("[data-provider]");
-    if (providerButton && providerButton.dataset.provider === "upstox") {
-      const existing = document.getElementById("upstox-connect");
-      if (existing) existing.click();
-      else feedback.textContent = "Upstox authorization control is not available on this page.";
+    if (providerButton) {
+      if (providerButton.dataset.provider === "upstox") {
+        const existing = document.getElementById("upstox-connect");
+        if (existing) existing.click();
+        else feedback.textContent = "Upstox authorization control is not available on this page.";
+      } else {
+        feedback.textContent = providerButton.dataset.provider.toUpperCase().replace("_", " ") + " login integration is being completed. Demo / Replay remains available.";
+      }
     }
     if (target.closest("[data-demo-mode]")) {
       close();
