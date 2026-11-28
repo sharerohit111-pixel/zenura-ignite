@@ -82,6 +82,7 @@ if (fyersCallbackStatus) {
     ? "Your FYERS session was securely saved. The access token expires at 06:30 IST."
     : "FYERS authorization could not be completed. Check server configuration and try again.";
   window.history.replaceState({}, document.title, window.location.pathname + window.location.hash);
+  window.dispatchEvent(new CustomEvent("zenura-fyers-connection-updated"));
 }
 let authStateSequence = 0;
 let currentSession = null;
