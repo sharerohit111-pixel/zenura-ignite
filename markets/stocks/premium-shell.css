@@ -180,8 +180,8 @@
  .stocks-page{padding-bottom:40px!important}
 }
 
-/* Four-item bottom quick actions requested for the mobile terminal. */
-.stocks-page .app-bottom-nav{grid-template-columns:repeat(4,minmax(0,1fr))!important}
+/* Five-item bottom navigation requested for the mobile terminal. */
+.stocks-page .app-bottom-nav{grid-template-columns:repeat(5,minmax(0,1fr))!important}
 .stocks-page .app-bottom-nav>a>span{font-size:8px!important;letter-spacing:-.1px}
 .stocks-page .support-page textarea{display:block;width:100%;min-height:120px;box-sizing:border-box;padding:12px;border:1px solid var(--app-line);border-radius:12px;background:var(--app-raised);color:var(--app-text);font:inherit;resize:vertical}
 .stocks-page .support-message-label{display:block;margin:14px 0 7px;font-weight:700;color:var(--app-text)}
@@ -189,7 +189,7 @@
 .stocks-page .support-actions button{padding:10px 16px;border:1px solid var(--app-line);border-radius:10px;background:var(--app-accent);color:#fff;font-weight:700}
 
 /* Explicit mobile quick-action surface; independent of inherited nav styles. */
-#zenura-quick-actions{position:fixed!important;inset:auto 0 0 0!important;z-index:2147483647!important;display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr))!important;min-height:72px!important;box-sizing:border-box!important;padding:8px 8px calc(8px + env(safe-area-inset-bottom))!important;background:var(--app-surface,#fff)!important;border-top:1px solid var(--app-line,#dce5e3)!important;visibility:visible!important;opacity:1!important;pointer-events:auto!important;transform:none!important}
+#zenura-quick-actions{position:fixed!important;inset:auto 0 0 0!important;z-index:2147483647!important;display:grid!important;grid-template-columns:repeat(5,minmax(0,1fr))!important;min-height:72px!important;box-sizing:border-box!important;padding:8px 8px calc(8px + env(safe-area-inset-bottom))!important;background:var(--app-surface,#fff)!important;border-top:1px solid var(--app-line,#dce5e3)!important;visibility:visible!important;opacity:1!important;pointer-events:auto!important;transform:none!important}
 #zenura-quick-actions>a{display:flex!important;align-items:center!important;justify-content:center!important;flex-direction:column!important;gap:4px!important;min-width:0!important;min-height:52px!important;color:var(--app-muted,#52636b)!important;text-decoration:none!important;font-size:8px!important;font-weight:800!important;white-space:nowrap!important}
 #zenura-quick-actions>a>svg{display:block!important;width:21px!important;height:21px!important;flex:none!important}
 #zenura-quick-actions>a[aria-current=page]{color:var(--app-accent-strong,#087a5f)!important}
@@ -206,7 +206,7 @@
   .stocks-page .connection{width:100%!important;max-width:none!important;box-sizing:border-box!important;margin-top:14px!important}
   .stocks-page .workspace{display:grid!important;grid-template-columns:minmax(0,1fr)!important;gap:12px!important}
   .stocks-page .workspace>.watch,.stocks-page .workspace>.chart-panel,.stocks-page .workspace>.order-panel{grid-column:1!important}
-  .stocks-page .app-bottom-nav,#zenura-quick-actions{position:fixed!important;inset:auto 0 0 0!important;left:0!important;right:0!important;bottom:0!important;width:auto!important;max-width:none!important;min-width:0!important;transform:none!important;border-radius:0!important;border-left:0!important;border-right:0!important;z-index:2147483647!important;display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr))!important;box-sizing:border-box!important;padding:7px 5px calc(7px + env(safe-area-inset-bottom))!important;min-height:64px!important}
+  .stocks-page .app-bottom-nav,#zenura-quick-actions{position:fixed!important;inset:auto 0 0 0!important;left:0!important;right:0!important;bottom:0!important;width:auto!important;max-width:none!important;min-width:0!important;transform:none!important;border-radius:0!important;border-left:0!important;border-right:0!important;z-index:2147483647!important;display:grid!important;grid-template-columns:repeat(5,minmax(0,1fr))!important;box-sizing:border-box!important;padding:7px 5px calc(7px + env(safe-area-inset-bottom))!important;min-height:64px!important}
   #zenura-quick-actions>a{min-width:0!important;min-height:48px!important;font-size:clamp(7px,2.2vw,10px)!important;white-space:normal!important;text-align:center!important}
   .stocks-page{padding-bottom:calc(76px + env(safe-area-inset-bottom))!important}
   .stocks-page .paper-language-toggle{bottom:calc(72px + env(safe-area-inset-bottom))!important}
@@ -222,7 +222,7 @@
 .stocks-page.touch-terminal .notice{grid-template-columns:minmax(0,1fr)!important}
 .stocks-page.touch-terminal .workspace{display:grid!important;grid-template-columns:minmax(0,1fr)!important;gap:12px!important}
 .stocks-page.touch-terminal .workspace>.watch,.stocks-page.touch-terminal .workspace>.chart-panel,.stocks-page.touch-terminal .workspace>.order-panel{grid-column:1!important}
-.stocks-page.touch-terminal #zenura-quick-actions{position:fixed!important;display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr))!important;inset:auto 0 0 0!important;width:100%!important;height:auto!important;min-height:68px!important;max-width:none!important;margin:0!important;padding:7px 5px calc(7px + env(safe-area-inset-bottom))!important;box-sizing:border-box!important;transform:none!important;border-radius:0!important;z-index:2147483647!important;background:#fff!important;border:0!important;border-top:1px solid #d8e2e0!important;box-shadow:0 -6px 22px rgba(0,0,0,.12)!important;visibility:visible!important;opacity:1!important}
+.stocks-page.touch-terminal #zenura-quick-actions{position:fixed!important;display:grid!important;grid-template-columns:repeat(5,minmax(0,1fr))!important;inset:auto 0 0 0!important;width:100%!important;height:auto!important;min-height:68px!important;max-width:none!important;margin:0!important;padding:7px 5px calc(7px + env(safe-area-inset-bottom))!important;box-sizing:border-box!important;transform:none!important;border-radius:0!important;z-index:2147483647!important;background:#fff!important;border:0!important;border-top:1px solid #d8e2e0!important;box-shadow:0 -6px 22px rgba(0,0,0,.12)!important;visibility:visible!important;opacity:1!important}
 .stocks-page[data-app-theme="night"].touch-terminal #zenura-quick-actions{background:#101923!important;border-top-color:#334451!important}
 .stocks-page.touch-terminal #zenura-quick-actions>a{display:flex!important;min-width:0!important;min-height:50px!important;align-items:center!important;justify-content:center!important;flex-direction:column!important;gap:4px!important;padding:3px 1px!important;color:#087e68!important;font-size:clamp(7px,2.2vw,10px)!important;font-weight:800!important;line-height:1.1!important;text-align:center!important;text-decoration:none!important;white-space:normal!important}
 .stocks-page.touch-terminal #zenura-quick-actions>a>svg{display:block!important;width:21px!important;height:21px!important;max-width:21px!important;flex:none!important}
@@ -236,10 +236,10 @@
    including Android Chrome's desktop-site viewport where older rules used !important. */
 .stocks-page.touch-terminal .terminal-nav{display:none!important;visibility:hidden!important;height:0!important;min-height:0!important;margin:0!important;padding:0!important;overflow:hidden!important}
 
-/* Repaint the four quick actions as a compact, opaque mobile dock. */
+/* Repaint the five quick actions as a compact, opaque mobile dock. */
 .stocks-page.touch-terminal #zenura-quick-actions{
  position:fixed!important;inset:auto 0 0 0!important;left:0!important;right:0!important;bottom:0!important;
- display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr))!important;
+ display:grid!important;grid-template-columns:repeat(5,minmax(0,1fr))!important;
  width:100%!important;height:auto!important;min-height:66px!important;max-height:calc(76px + env(safe-area-inset-bottom))!important;
  padding:6px 5px calc(6px + env(safe-area-inset-bottom))!important;box-sizing:border-box!important;
  background:var(--app-surface,#fff)!important;border:0!important;border-top:1px solid var(--app-line,#d8e2e0)!important;
