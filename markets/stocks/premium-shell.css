@@ -187,3 +187,10 @@
 .stocks-page .support-message-label{display:block;margin:14px 0 7px;font-weight:700;color:var(--app-text)}
 .stocks-page .support-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
 .stocks-page .support-actions button{padding:10px 16px;border:1px solid var(--app-line);border-radius:10px;background:var(--app-accent);color:#fff;font-weight:700}
+
+/* Explicit mobile quick-action surface; independent of inherited nav styles. */
+#zenura-quick-actions{position:fixed!important;inset:auto 0 0 0!important;z-index:2147483647!important;display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr))!important;min-height:72px!important;box-sizing:border-box!important;padding:8px 8px calc(8px + env(safe-area-inset-bottom))!important;background:var(--app-surface,#fff)!important;border-top:1px solid var(--app-line,#dce5e3)!important;visibility:visible!important;opacity:1!important;pointer-events:auto!important;transform:none!important}
+#zenura-quick-actions>a{display:flex!important;align-items:center!important;justify-content:center!important;flex-direction:column!important;gap:4px!important;min-width:0!important;min-height:52px!important;color:var(--app-muted,#52636b)!important;text-decoration:none!important;font-size:8px!important;font-weight:800!important;white-space:nowrap!important}
+#zenura-quick-actions>a>svg{display:block!important;width:21px!important;height:21px!important;flex:none!important}
+#zenura-quick-actions>a[aria-current=page]{color:var(--app-accent-strong,#087a5f)!important}
+.stocks-page{padding-bottom:calc(92px + env(safe-area-inset-bottom))!important}
