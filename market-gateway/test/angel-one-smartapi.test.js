@@ -34,3 +34,15 @@ test("Angel One adapter never persists or logs PIN and TOTP", () => {
   assert.match(source, /access_token_ciphertext: encryptedBundle/);
   assert.match(source, /eq\("broker_name", "angel_one"\)/);
 });
+
+test("Angel One server requires explicit real network header configuration", () => {
+  const fs = require("node:fs");
+  const path = require("node:path");
+  const server = fs.readFileSync(path.join(__dirname, "../supabase-server.js"), "utf8");
+  assert.match(server, /clientLocalIp:process\.env\.ANGEL_ONE_CLIENT_LOCAL_IP,/);
+  assert.match(server, /clientPublicIp:process\.env\.ANGEL_ONE_CLIENT_PUBLIC_IP,/);
+  assert.match(server, /macAddress:process\.env\.ANGEL_ONE_MAC_ADDRESS,/);
+  assert.doesNotMatch(server, /ANGEL_ONE_CLIENT_LOCAL_IP\|\|/);
+  assert.doesNotMatch(server, /ANGEL_ONE_CLIENT_PUBLIC_IP\|\|/);
+  assert.doesNotMatch(server, /ANGEL_ONE_MAC_ADDRESS\|\|/);
+});

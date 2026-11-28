@@ -185,9 +185,9 @@ app.use("/angel-one",createAngelOneRouter({
   auth,serviceDb,fetchProvider,readProviderJson,
   apiKey:process.env.ANGEL_ONE_SMARTAPI_KEY,
   encryptionKey:process.env.BROKER_TOKEN_ENCRYPTION_KEY||ENC_KEY,
-  clientLocalIp:process.env.ANGEL_ONE_CLIENT_LOCAL_IP||"127.0.0.1",
-  clientPublicIp:process.env.ANGEL_ONE_CLIENT_PUBLIC_IP||"127.0.0.1",
-  macAddress:process.env.ANGEL_ONE_MAC_ADDRESS||"00:00:00:00:00:00",
+  clientLocalIp:process.env.ANGEL_ONE_CLIENT_LOCAL_IP,
+  clientPublicIp:process.env.ANGEL_ONE_CLIENT_PUBLIC_IP,
+  macAddress:process.env.ANGEL_ONE_MAC_ADDRESS,
   sourceId:process.env.ANGEL_ONE_SOURCE_ID||"WEB"
 }));
 app.get("/health",(_req,res)=>res.json({
