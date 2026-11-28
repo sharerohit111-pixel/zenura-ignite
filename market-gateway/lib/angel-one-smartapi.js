@@ -26,11 +26,16 @@ function validateAngelOneCredentials(body) {
   return { clientcode, pin, totp };
 }
 
+function isBoundedAngelOneToken(value) {
+  return typeof value === "string" && value.length > 0 && value.length <= 16384
+    && !/[\\x00-\\x1f\\x7f]/.test(value);
+}
+
 function isValidAngelOneLogin(payload) {
   return !!payload && payload.status === true && payload.data
-    && typeof payload.data.jwtToken === "string" && payload.data.jwtToken.length > 0
-    && typeof payload.data.refreshToken === "string" && payload.data.refreshToken.length > 0
-    && typeof payload.data.feedToken === "string" && payload.data.feedToken.length > 0;
+    && isBoundedAngelOneToken(payload.data.jwtToken)
+    && isBoundedAngelOneToken(payload.data.refreshToken)
+    && isBoundedAngelOneToken(payload.data.feedToken);
 }
 
 function createAngelOneRouter({ auth, serviceDb, fetchProvider, readProviderJson, encryptionKey,
