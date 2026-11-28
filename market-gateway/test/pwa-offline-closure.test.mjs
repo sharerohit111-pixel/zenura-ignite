@@ -26,6 +26,8 @@ test("Markets service worker uses a new cache generation and precaches the canon
  const sw=await read("markets/service-worker.js");
  assert.match(sw,/zenura-markets-shell-v15/);
  assert.match(sw,/"shared\/paper-demo-event-ledger\.mjs"/);
+ assert.match(sw,/"bottom-artifact-guard\.js"/);
+ assert.match(sw,/fetch\(request,\{cache:"no-store"\}\)/);
  assert.doesNotMatch(sw,/zenura-markets-shell-v9/);
 });
 
