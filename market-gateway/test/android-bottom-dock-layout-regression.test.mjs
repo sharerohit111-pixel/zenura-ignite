@@ -29,7 +29,7 @@ test("Android dock has one authoritative final viewport and safe-area contract",
 test("five-item dock remains generated from the existing five functional routes",()=>{
  assert.match(shell,/\[\["dashboard","Home"\],\["derivatives","Option Chain"\],\["positions","Live Pos\. \/ P&L"\],\["watchlist","Quick Watchlist"\],\["support","Help & Support"\]\]/);
  assert.match(html,/viewport-fit=cover/);
- assert.match(worker,/zenura-markets-shell-v24/);
+ assert.match(worker,/zenura-markets-shell-v25/);
  assert.match(worker,/"stocks\/premium-shell\.css"/);
 });
 
