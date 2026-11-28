@@ -79,3 +79,7 @@
 @media(min-width:900px){.app-bottom-nav{left:auto;right:24px;bottom:20px;width:420px;border:1px solid var(--app-line);border-radius:18px;padding:8px 12px}.stocks-page{padding-bottom:30px!important}}
 @media(max-width:760px){.stocks-page .top{position:relative;flex-wrap:wrap;margin:0 -4px 8px;padding:9px 10px}.stocks-page .top .back{display:none}.stocks-page .stock-hero{align-items:flex-start;flex-direction:column}.connection{width:100%;max-width:none;box-sizing:border-box}.terminal-nav{padding-bottom:10px}.terminal-nav a{font-size:10px!important}.workspace{grid-template-columns:minmax(0,1fr)!important}.workspace>.watch,.workspace>.chart-panel,.workspace>.order-panel{grid-column:1/-1}.app-theme-switch{min-height:38px;padding:0 11px}.app-theme-switch span{display:none}}
 @media(max-width:430px){.stocks-page .wrap{padding-left:10px!important;padding-right:10px!important}.panel{padding:13px!important}.stock-hero h1{font-size:26px!important}.app-bottom-nav a{font-size:8px}.dashboard-shortcuts{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+/* Floating language control sits above the five-item mobile navigation. */
+.stocks-page .paper-language-toggle{right:14px!important;bottom:calc(78px + env(safe-area-inset-bottom))!important;z-index:45!important;background:var(--app-surface)!important;color:var(--app-accent-strong)!important;border:1px solid var(--app-line)!important;box-shadow:var(--app-shadow)!important}
+@media(min-width:900px){.stocks-page .paper-language-toggle{bottom:28px!important;right:28px!important}}
