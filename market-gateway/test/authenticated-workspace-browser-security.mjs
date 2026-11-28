@@ -52,6 +52,7 @@ test("authenticated workspace CSP and auth DOM resist browser injection", async 
   await page.route("https://esm.sh/@supabase/supabase-js@2.119.2", route => route.fulfill({
     status: 200,
     contentType: "text/javascript",
+    headers: { "access-control-allow-origin": "*" },
     body: `
       export function createClient() {
         const auth = {
