@@ -97,6 +97,8 @@
   function open() { root.hidden = false; document.body.classList.add("broker-connect-open"); }
   function close() { root.hidden = true; document.body.classList.remove("broker-connect-open"); }
   render();
+  refreshFyersStatus();
+  refreshAngelOneStatus();
   root.addEventListener("click", (event) => {
     const target = event.target;
     if (target.matches("[data-close-broker-modal]") || target === root) close();
@@ -146,7 +148,6 @@
       }).then(() => {
         feedback.textContent = "FYERS disconnected from this app.";
         refreshFyersStatus();
-  refreshAngelOneStatus();
       }).catch((error) => {
         feedback.textContent = error?.message || "FYERS disconnect failed.";
       }).finally(() => { disconnectFyers.disabled = false; });
@@ -168,8 +169,6 @@
           feedback.textContent = error?.message || "FYERS authorization could not be started.";
           providerButton.disabled = false;
         });
-      } else {
-        feedback.textContent = "ANGEL ONE secure SmartAPI session integration is still in progress. Demo / Replay remains available.";
       }
     }
     if (target.closest("[data-demo-mode]")) {
@@ -185,6 +184,7 @@
   window.addEventListener("zenura-broker-connection-expired", open);
   window.addEventListener("zenura-broker-connection-missing", open);
   window.addEventListener("zenura-fyers-connection-updated", refreshFyersStatus);
+  window.addEventListener("zenura-angel-one-connection-updated", refreshAngelOneStatus);
   window.addEventListener("zenura-market-auth-ready", refreshAngelOneStatus);
   window.addEventListener("zenura-market-auth-ready", (event) => {
     if (event.detail?.signedIn && status?.textContent?.includes("AUTHORIZED")) close();

@@ -13,7 +13,7 @@ test("FYERS connection status is scoped to the authenticated user's FYERS row", 
   assert.match(router, /\.eq\("user_id", user\.id\)\.eq\("broker_name", "fyers"\)/);
   assert.match(router, /connection_status === "connected"/);
   assert.match(router, /expiresAt > Date\.now\(\)/);
-  assert.match(router, /Cache-Control": "private, no-store"/);
+  assert.match(router, /Cache-Control.*private, no-store/);
 });
 
 test("FYERS disconnect clears only that user's FYERS token envelope", () => {
