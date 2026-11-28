@@ -17,12 +17,14 @@ function makeHarness(overrides = {}) {
   const published = [];
   const statuses = [];
   let eventHandler;
+  let errorHandler;
   let closeCount = 0;
   const provider = {
     providerId: "vendor-truedata",
     async getHealth() { return { healthy: true }; },
-    async openStream({ onEvent }) {
+    async openStream({ onEvent, onError }) {
       eventHandler = onEvent;
+      errorHandler = onError;
       return { async close() { closeCount += 1; } };
     },
     ...overrides.provider,
@@ -39,6 +41,7 @@ function makeHarness(overrides = {}) {
   return {
     feed, published, statuses,
     emit: (event) => eventHandler(event),
+    triggerError: (error) => errorHandler(error),
     closeCount: () => closeCount,
   };
 }
@@ -109,6 +112,7 @@ test("duplicate source sequences are rejected and stop closes the stream", async
 test("stream errors degrade the feed without marking quotes live", async () => {
   const h = makeHarness();
   await h.feed.start();
-  h.statuses.at(-1);
-  assert.equal(h.feed.getStatus().state, "running");
+  h.triggerError(Object.assign(new Error("upstream disconnected"), { code: "socket_closed" }));
+  assert.equal(h.feed.getStatus().state, "degraded");
+  assert.equal(h.feed.getStatus().errorCode, "socket_closed");
 });
