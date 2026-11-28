@@ -8,6 +8,7 @@ const css=fs.readFileSync(path.join(root,"markets/stocks/premium-shell.css"),"ut
 const html=fs.readFileSync(path.join(root,"markets/stocks/index.html"),"utf8");
 const shell=fs.readFileSync(path.join(root,"markets/stocks/premium-shell.js"),"utf8");
 const worker=fs.readFileSync(path.join(root,"markets/service-worker.js"),"utf8");
+const guard=fs.readFileSync(path.join(root,"markets/stocks/android-bottom-dock-guard.js"),"utf8");
 
 test("Android dock has one authoritative final viewport and safe-area contract",()=>{
  const start=css.lastIndexOf("/* FINAL ANDROID DOCK CONTRACT");
@@ -30,4 +31,15 @@ test("five-item dock remains generated from the existing five functional routes"
  assert.match(html,/viewport-fit=cover/);
  assert.match(worker,/zenura-markets-shell-v24/);
  assert.match(worker,/"stocks\/premium-shell\.css"/);
+});
+
+
+test("Android dock guard removes only broken images overlapping the bottom dock",()=>{
+ assert.match(html,/android-bottom-dock-guard\.js/);
+ assert.match(worker,/"stocks\/android-bottom-dock-guard\.js"/);
+ assert.match(guard,/img\.complete/);
+ assert.match(guard,/img\.naturalWidth!==0/);
+ assert.match(guard,/r\.bottom>h-190/);
+ assert.match(guard,/zenura-broken-bottom-image/);
+ assert.match(css,/zenura-broken-bottom-image-wrap\{display:none!important/);
 });
