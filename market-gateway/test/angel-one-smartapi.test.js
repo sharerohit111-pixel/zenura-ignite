@@ -32,6 +32,8 @@ test("Angel One adapter never persists or logs PIN and TOTP", () => {
   assert.match(source, /credentials\.totp = ""/);
   assert.match(source, /req\.body\.pin = ""/);
   assert.match(source, /req\.body\.totp = ""/);
+  assert.ok(source.indexOf("req.body.pin = \\\"\\\"") < source.indexOf("if (!credentials)"),
+    "request PIN must be cleared before invalid-credential early return");
   assert.doesNotMatch(source, /logger\.(?:info|warn|error)\([^\n]*(?:pin|totp|password)/i);
   assert.match(source, /access_token_ciphertext: encryptedBundle/);
   assert.match(source, /payload\.data\.jwtToken = ""/);
