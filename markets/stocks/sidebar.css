@@ -25,3 +25,6 @@ body.sidebar-open{overflow:hidden}
 @media(min-width:900px){.sidebar-toggle{margin-left:auto}.zenura-sidebar{width:320px;min-width:320px}.sidebar-overlay{background:rgba(4,10,16,.35)}}
 @media(max-width:520px){.zenura-sidebar{width:70vw;min-width:260px;padding-left:13px;padding-right:13px}.settings-feature-grid{grid-template-columns:1fr}.sidebar-links a{min-height:44px}}
 @media(prefers-reduced-motion:reduce){.zenura-sidebar,.sidebar-overlay{transition:none}}
+
+/* Sidebar replaces the legacy horizontal page strip; its anchors remain available to routing code. */
+.stocks-page .terminal-nav{display:none!important}
