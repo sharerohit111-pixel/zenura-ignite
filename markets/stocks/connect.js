@@ -55,6 +55,14 @@ async function api(path, options = {}) {
   }
   return payload;
 }
+window.ZENURA_GET_BROKER_STATUS = async function (provider) {
+  if (provider !== "fyers") throw new Error("Broker status is not available.");
+  return api("/fyers/connection");
+};
+window.ZENURA_DISCONNECT_BROKER = async function (provider) {
+  if (provider !== "fyers") throw new Error("Broker disconnect is not available.");
+  return api("/fyers/connection", { method: "DELETE" });
+};
 window.ZENURA_START_BROKER_OAUTH = async function (provider) {
   if (provider !== "fyers") throw new Error("This broker login is not available yet.");
   const result = await api("/fyers/oauth/start", { method: "POST", body: "{}" });
