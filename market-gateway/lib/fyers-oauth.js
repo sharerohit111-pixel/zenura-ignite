@@ -122,7 +122,7 @@ function createFyersOAuthRouter({ auth, serviceDb, fetchProvider, readProviderJs
         headers: { "Content-Type": "application/json", Accept: "application/json" },
         body: JSON.stringify({ grant_type: "authorization_code", appIdHash, code })
       });
-      const tokenPayload = await readProviderJson(tokenResponse);
+      const tokenPayload = await readProviderJson(tokenResponse, { maxBytes: 256 * 1024 });
       const issuedAt = new Date();
       const expiresAt = nextFyersTokenExpiry(issuedAt.getTime());
       let encryptedAccessToken;
