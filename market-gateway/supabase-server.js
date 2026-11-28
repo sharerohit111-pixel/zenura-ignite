@@ -176,7 +176,7 @@ async function getQuote(accessToken,instrumentKey){
   return {quote,payload};
 }
 app.use("/fyers",createFyersOAuthRouter({
-  auth,serviceDb,fetchProvider,readProviderJson,appRedirectUri:APP_REDIRECT_URI,
+  auth,serviceDb,fetchProvider,readProviderJson,appRedirectUri:VALID_APP_REDIRECT_URI||"https://zenuraignite.com/markets/stocks/",
   clientId:process.env.FYERS_CLIENT_ID,clientSecret:process.env.FYERS_CLIENT_SECRET,
   redirectUri:process.env.FYERS_REDIRECT_URI,
   encryptionKey:process.env.BROKER_TOKEN_ENCRYPTION_KEY||ENC_KEY
