@@ -50,13 +50,14 @@ function createAngelOneRouter({ auth, serviceDb, fetchProvider, readProviderJson
   }
 
   router.post("/session", async (req, res) => {
+    // Snapshot only the validated fields, then scrub the parsed request body before
+    // authentication, configuration checks, rate limiting or any early return.
+    let credentials = validateAngelOneCredentials(req.body);
+    if (req.body && typeof req.body === "object") { req.body.pin = ""; req.body.totp = ""; }
     try {
       const { user } = await auth(req);
       if (!user.emailConfirmedAt) return res.status(403).json({ error: "Verify your Supabase email before connecting Angel One." });
       if (!apiKey || !encryptionKey || net.isIP(clientLocalIp) !== 4 || net.isIP(clientPublicIp) !== 4 || !/^(?:[0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$/.test(macAddress) || !["WEB", "MOBILE"].includes(sourceId)) return res.status(503).json({ error: "Angel One server configuration is incomplete. Configure API key, encryption key, local/public IPv4, MAC address and source ID." });
-      const credentials = validateAngelOneCredentials(req.body);
-      // Scrub parsed request secrets immediately, including malformed requests, before returning.
-      if (req.body && typeof req.body === "object") { req.body.pin = ""; req.body.totp = ""; }
       if (!credentials) return res.status(400).json({ error: "Enter a valid Client ID, 4–6 digit PIN and current 6-digit TOTP." });
       let rateRows, rateError;
       try {
@@ -127,6 +128,10 @@ function createAngelOneRouter({ auth, serviceDb, fetchProvider, readProviderJson
       logger.error("Angel One session request failed:", error.status || "provider_error");
       return res.status(Number.isInteger(error.status) ? error.status : 502)
         .json({ error: "Angel One login could not be completed securely." });
+    } finally {
+      // Cover auth/configuration/rate-limit/provider/database failures and every early return.
+      if (credentials) { credentials.pin = ""; credentials.totp = ""; }
+      if (req.body && typeof req.body === "object") { req.body.pin = ""; req.body.totp = ""; }
     }
   });
 
