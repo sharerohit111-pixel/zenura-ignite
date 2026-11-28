@@ -1758,7 +1758,8 @@ jobs:
               'upstox_connection_controls','paper_market_stream_leases',
               'paper_market_worker_state','paper_margin_preview_limits',
               'paper_futures_positions','paper_futures_orders','paper_protective_orders',
-              'paper_chart_drawings','paper_chart_templates','paper_chart_preferences'
+              'paper_chart_drawings','paper_chart_templates','paper_chart_preferences',
+              'broker_connections','broker_oauth_states'
             ];
             table_name text;
           BEGIN
