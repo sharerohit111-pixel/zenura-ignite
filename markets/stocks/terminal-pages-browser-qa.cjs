@@ -48,7 +48,12 @@ const {chromium}=require("playwright");
     await page.waitForFunction(value=>document.body.dataset.terminalPage===value,route);
     assert.equal(await page.locator("#zenura-sidebar").getAttribute("aria-hidden"),"true","drawer must close after navigation");
    }
-   assert.equal(await page.locator("#zenura-quick-actions a").count(),4,"existing four-item bottom bar must remain intact");
+   const bottomLinks=page.locator("#zenura-quick-actions a");
+   assert.equal(await bottomLinks.count(),5,"bottom bar must expose Home plus all four existing shortcuts");
+   assert.deepEqual(await bottomLinks.evaluateAll(nodes=>nodes.map(node=>node.dataset.bottomPage)),["dashboard","derivatives","positions","watchlist","support"],"bottom navigation order must keep P&L in the exact center");
+   await bottomLinks.nth(0).click();
+   await page.waitForFunction(()=>document.body.dataset.terminalPage==="dashboard");
+   assert.equal(await page.locator(".dashboard-overview").isVisible(),true,"Home shortcut must open the main dashboard");
    await page.locator("#zenura-sidebar-toggle").click();
    await page.locator("#zenura-sidebar [data-sidebar-page=\"orders\"]").click();
    assert.equal(await page.locator("#paper-orders-workspace-body").isVisible(),true,"Orders & Trade History must show pending orders");
