@@ -17,6 +17,7 @@ function setState(title, message, connected = false, showDisconnect = connected)
   card.classList.toggle("connected", connected);
   button.textContent = connected ? "RECONNECT UPSTOX" : "CONNECT UPSTOX";
   disconnectButton.hidden = !showDisconnect;
+  if (connected) window.dispatchEvent(new CustomEvent("zenura-broker-connection-ready"));
 }
 function explainError(error, payload) {
   const code = error?.code || payload?.code || "";
