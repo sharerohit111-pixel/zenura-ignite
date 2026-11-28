@@ -141,3 +141,41 @@
  .stocks-page .market-pulse-grid>article>span{font-size:10px}
  .stocks-page footer{display:grid;gap:5px;padding-bottom:32px}
 }
+
+/* Android browser viewport fix: keep the terminal navigation above the
+   browser's bottom inset and give it an opaque, paintable surface. */
+.stocks-page .app-bottom-nav{
+  position:fixed!important;
+  inset:auto 0 0 0!important;
+  z-index:9999!important;
+  display:grid!important;
+  grid-template-columns:repeat(5,minmax(0,1fr))!important;
+  min-height:64px;
+  box-sizing:border-box;
+  padding:8px max(8px,env(safe-area-inset-right)) calc(8px + env(safe-area-inset-bottom)) max(8px,env(safe-area-inset-left))!important;
+  background:var(--app-surface,#fff)!important;
+  border-top:1px solid var(--app-line,#dce5e3)!important;
+  box-shadow:0 -8px 28px rgba(0,0,0,.10)!important;
+  opacity:1!important;
+  visibility:visible!important;
+  pointer-events:auto!important;
+  transform:none!important;
+}
+.stocks-page .app-bottom-nav>a{
+  display:flex!important;
+  min-width:0;
+  min-height:48px;
+  align-items:center;
+  justify-content:center;
+  flex-direction:column;
+  gap:4px;
+  color:var(--app-muted,#52636b)!important;
+  text-decoration:none!important;
+}
+.stocks-page .app-bottom-nav>a>svg{display:block!important;width:20px!important;height:20px!important;max-width:20px;flex:none}
+.stocks-page .app-bottom-nav>a>span{display:block!important;font-size:9px;line-height:1.2;white-space:nowrap}
+.stocks-page{padding-bottom:calc(78px + env(safe-area-inset-bottom))!important}
+@media(min-width:900px){
+ .stocks-page .app-bottom-nav{left:auto!important;right:24px!important;bottom:20px!important;inset:auto 24px 20px auto!important;width:420px!important;border:1px solid var(--app-line,#dce5e3)!important;border-radius:18px;padding:8px 12px!important}
+ .stocks-page{padding-bottom:40px!important}
+}
