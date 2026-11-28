@@ -154,7 +154,13 @@ function createAngelOneRouter({ auth, serviceDb, fetchProvider, readProviderJson
       if (session?.jwtToken && data?.provider_account_ref && apiKey) {
         try {
           const response = await fetchProvider(LOGOUT_URL, {
-            method: "POST", headers: { ...headers(), Authorization: "Bearer " + session.jwtToken },
+            method: "POST", headers: {
+              ...headers(),
+              Authorization: "Bearer " + session.jwtToken,
+              "x-api-key": apiKey,
+              "x-client-code": data.provider_account_ref,
+              "x-feed-token": session.feedToken
+            },
             body: JSON.stringify({ clientcode: data.provider_account_ref })
           });
           const result = await readProviderJson(response, { maxBytes: 128 * 1024 });
