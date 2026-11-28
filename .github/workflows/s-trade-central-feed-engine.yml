@@ -8,9 +8,11 @@ on:
       - "market-gateway/lib/central-market-feed.js"
       - "market-gateway/lib/redis-market-feed-transport.js"
       - "market-gateway/lib/authenticated-market-feed-fanout.js"
+      - "market-gateway/lib/redis-market-feed-subscriber.js"
       - "market-gateway/test/central-market-feed.test.js"
       - "market-gateway/test/redis-market-feed-transport.test.js"
       - "market-gateway/test/authenticated-market-feed-fanout.test.js"
+      - "market-gateway/test/redis-market-feed-subscriber.test.js"
       - ".github/workflows/s-trade-central-feed-engine.yml"
   workflow_dispatch:
 
@@ -30,9 +32,11 @@ jobs:
           node --check market-gateway/lib/central-market-feed.js
           node --check market-gateway/lib/redis-market-feed-transport.js
           node --check market-gateway/lib/authenticated-market-feed-fanout.js
+          node --check market-gateway/lib/redis-market-feed-subscriber.js
           node --check market-gateway/test/central-market-feed.test.js
           node --check market-gateway/test/redis-market-feed-transport.test.js
-          node --check market-gateway/test/authenticated-market-feed-fanout.test.js
+          node --check market-gateway/test/authenticated-market-feed-fanout.test.js market-gateway/test/redis-market-feed-subscriber.test.js
+          node --check market-gateway/test/redis-market-feed-subscriber.test.js
       - name: Run deterministic central feed, Redis transport and fan-out tests
         run: node --test market-gateway/test/central-market-feed.test.js market-gateway/test/redis-market-feed-transport.test.js market-gateway/test/authenticated-market-feed-fanout.test.js
 
