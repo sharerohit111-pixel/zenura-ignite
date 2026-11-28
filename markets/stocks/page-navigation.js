@@ -24,7 +24,7 @@
   if(hero)hero.insertAdjacentElement("afterend",dashboard);
   const settings=document.createElement("section");
   settings.className="panel settings-page";
-  settings.innerHTML='<div class="panel-head"><div><small>APP PREFERENCES</small><h2>Settings</h2></div><span class="pill muted">LOCAL DISPLAY</span></div><div class="settings-row"><div><b>Language</b><p>Switch terminal labels between English and Hindi.</p></div><button type="button" data-settings-action="language">Change language</button></div><div class="settings-row"><div><b>Chart appearance</b><p>Switch chart panels between dark and light appearance.</p></div><button type="button" data-settings-action="theme">Change chart theme</button></div><div class="settings-row"><div><b>Account connection</b><p id="settings-connection-copy">Sign in to view private paper account data.</p></div><button type="button" data-settings-action="account">Account status</button></div><p class="portfolio-status">Paper Trading only. No real broker orders are submitted. Live market-data display remains unavailable until the required provider and exchange permissions are verified.</p>';
+  settings.innerHTML='<div class="panel-head"><div><small>APP PREFERENCES</small><h2>Settings</h2></div><span class="pill muted">LOCAL DISPLAY</span></div><div class="settings-row"><div><b>Language</b><p>Switch terminal labels between English and Hindi.</p></div><button type="button" data-settings-action="language">Change language</button></div><div class="settings-row"><div><b>App appearance</b><p>Switch the complete app between Day and Night modes.</p></div><button type="button" data-settings-action="theme">Change chart theme</button></div><div class="settings-row"><div><b>Account connection</b><p id="settings-connection-copy">Sign in to view private paper account data.</p></div><button type="button" data-settings-action="account">Account status</button></div><p class="portfolio-status">Paper Trading only. No real broker orders are submitted. Live market-data display remains unavailable until the required provider and exchange permissions are verified.</p>';
   const footer=document.querySelector("footer");
   if(footer)footer.insertAdjacentElement("beforebegin",settings);else pageRoot.append(settings);
   function setHidden(selector,hidden){document.querySelectorAll(selector).forEach(el=>el.dataset.pageHidden=String(hidden));}
@@ -92,7 +92,7 @@
     if(shortcut){e.preventDefault();show(shortcut.dataset.goPage,true);return;}
     const action=e.target.closest("[data-settings-action]")?.dataset.settingsAction;
     if(action==="language")document.querySelector("#paper-language-toggle")?.click();
-    if(action==="theme")document.querySelector("#paper-chart-theme-toggle")?.click();
+    if(action==="theme")document.querySelector("[data-app-theme-toggle]")?.click();
     if(action==="account")document.querySelector("#upstox-connect")?.click();
   });
   window.addEventListener("hashchange",()=>show(location.hash.slice(1),false));
