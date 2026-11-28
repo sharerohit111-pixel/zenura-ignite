@@ -14,6 +14,7 @@
     positions:[".portfolio-panel",".futures-portfolio-panel"],
     pnl:[".portfolio-panel"],
     derivatives:[".futures-margin-panel",".futures-order-panel",".futures-limit-panel",".futures-portfolio-panel",".options-limit-panel",".option-panel"],
+    support:[".support-page"],
     settings:[".settings-page"]
   };
   const pageElements=[...new Set(Object.values(pageSections).flat())];
@@ -25,6 +26,12 @@
   const settings=document.createElement("section");
   settings.className="panel settings-page";
   settings.innerHTML='<div class="panel-head"><div><small>APP PREFERENCES</small><h2>Settings</h2></div><span class="pill muted">LOCAL DISPLAY</span></div><div class="settings-row"><div><b>Language</b><p>Switch terminal labels between English and Hindi.</p></div><button type="button" data-settings-action="language">Change language</button></div><div class="settings-row"><div><b>App appearance</b><p>Switch the complete app between Day and Night modes.</p></div><button type="button" data-settings-action="theme">Change app theme</button></div><div class="settings-row"><div><b>Account connection</b><p id="settings-connection-copy">Sign in to view private paper account data.</p></div><button type="button" data-settings-action="account">Sign in / connect</button></div><p class="portfolio-status">Paper Trading only. No real broker orders are submitted. Live market-data display remains unavailable until the required provider and exchange permissions are verified.</p>';
+  const support=document.createElement("section");
+  support.className="panel support-page";
+  support.innerHTML='<div class="panel-head"><div><small>ZENURA IGNITE ASSISTANCE</small><h2>Help, Support &amp; Suggestions</h2></div><span class="pill muted">PAPER TRADING</span></div><p class="portfolio-status">अपनी समस्या या सुझाव यहाँ लिखें। यह ड्राफ्ट इसी डिवाइस पर रहेगा; अभी सर्वर पर सबमिट नहीं होगा।</p><div class="settings-row"><div><b>Quick help</b><p>लॉगिन, Upstox कनेक्शन, वॉचलिस्ट और पेपर ऑर्डर से जुड़ी सहायता।</p></div></div><label class="support-message-label" for="support-suggestion">अपनी समस्या / सुझाव लिखें</label><textarea id="support-suggestion" rows="5" maxlength="2000" placeholder="यहाँ अपना संदेश लिखें…"></textarea><div class="support-actions"><button type="button" id="support-save-draft">ड्राफ्ट सेव करें</button><button type="button" id="support-copy-draft">कॉपी करें</button></div><p id="support-draft-status" class="portfolio-status" role="status">कोई ड्राफ्ट सेव नहीं है।</p>';
+  const supportFooter=document.querySelector("footer");
+  if(supportFooter)supportFooter.insertAdjacentElement("beforebegin",support);
+  else pageRoot.append(support);
   const footer=document.querySelector("footer");
   if(footer)footer.insertAdjacentElement("beforebegin",settings);else pageRoot.append(settings);
   function setHidden(selector,hidden){document.querySelectorAll(selector).forEach(el=>el.dataset.pageHidden=String(hidden));}
@@ -95,6 +102,21 @@
     if(action==="theme")document.querySelector("[data-app-theme-toggle]")?.click();
     if(action==="account")document.querySelector("#upstox-connect")?.click();
   });
+  pageRoot.addEventListener("click",e=>{
+    const action=e.target.closest("#support-save-draft,#support-copy-draft")?.id;
+    if(!action)return;
+    const field=document.querySelector("#support-suggestion");
+    const status=document.querySelector("#support-draft-status");
+    const value=field?.value?.trim()||"";
+    if(!value){if(status)status.textContent="पहले अपना संदेश लिखें।";return;}
+    if(action==="support-save-draft"){
+      try{localStorage.setItem("zenura-s-trade-support-draft",value);if(status)status.textContent="ड्राफ्ट इस डिवाइस पर सेव हो गया।";}
+      catch(_){if(status)status.textContent="ड्राफ्ट सेव नहीं हो पाया।";}
+    }else if(navigator.clipboard?.writeText){
+      navigator.clipboard.writeText(value).then(()=>{if(status)status.textContent="संदेश कॉपी हो गया।"}).catch(()=>{if(status)status.textContent="कॉपी नहीं हो पाया; संदेश चुनकर कॉपी करें।"});
+    }else if(status)status.textContent="इस ब्राउज़र में कॉपी सुविधा उपलब्ध नहीं है।";
+  });
+  try{const saved=localStorage.getItem("zenura-s-trade-support-draft");if(saved)document.querySelector("#support-suggestion").value=saved;}catch(_){}
   window.addEventListener("hashchange",()=>show(location.hash.slice(1),false));
   show(location.hash.slice(1)||"dashboard",false);
   window.addEventListener("focus",syncStatus);
