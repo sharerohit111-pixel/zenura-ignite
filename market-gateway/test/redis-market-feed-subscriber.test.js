@@ -12,29 +12,20 @@ function harness(overrides = {}) {
   const calls = [];
   let listener;
   const subscriber = {
-    async pSubscribe(pattern, callback) {
-      calls.push(["subscribe", pattern]);
-      listener = callback;
-    },
+    async pSubscribe(pattern, callback) { calls.push(["subscribe", pattern]); listener = callback; },
     async pUnsubscribe(pattern) { calls.push(["unsubscribe", pattern]); },
     ...overrides.subscriber,
   };
   const delivered = [];
   const errors = [];
-  const fanout = {
-    async dispatch(event) { delivered.push(event); return 1; },
-    ...overrides.fanout,
-  };
+  const fanout = { async dispatch(event) { delivered.push(event); return 1; }, ...overrides.fanout };
   const bridge = createRedisMarketFeedSubscriber({
-    subscriber,
-    fanout,
-    onError: (error) => errors.push(error.code),
-    ...overrides.options,
+    subscriber, fanout, onError: (error) => errors.push(error.code), ...overrides.options,
   });
   return { bridge, calls, delivered, errors, emit: (...args) => listener(...args) };
 }
 
-test("subscribes only to the exact S-TRADE market-data wildcard and dispatches valid events", async () => {
+test("subscribes only to the S-TRADE wildcard and dispatches valid events", async () => {
   const h = harness();
   assert.equal(await h.bridge.start(), true);
   assert.deepEqual(h.calls[0], ["subscribe", CHANNEL_PATTERN]);
@@ -44,7 +35,7 @@ test("subscribes only to the exact S-TRADE market-data wildcard and dispatches v
   assert.equal(h.bridge.getStatus().accepted, 1);
 });
 
-test("rejects channel spoofing, malformed JSON, identity mismatch and oversized messages", async () => {
+test("rejects spoofed channels, malformed JSON, identity mismatch and oversized messages", async () => {
   const h = harness({ options: { maxMessageBytes: 256 } });
   await h.bridge.start();
   assert.equal(await h.emit("{", "s-trade:market-data:NSE:AAA"), false);
@@ -56,7 +47,7 @@ test("rejects channel spoofing, malformed JSON, identity mismatch and oversized 
   assert.equal(h.errors.length, 4);
 });
 
-test("message processing is serialized and stop unsubscribes without closing shared Redis client", async () => {
+test("serializes processing and unsubscribes only its own pattern", async () => {
   const order = [];
   const h = harness({ fanout: { async dispatch(event) { order.push(event.seq); return 1; } } });
   await h.bridge.start();
@@ -70,14 +61,32 @@ test("message processing is serialized and stop unsubscribes without closing sha
   assert.equal(await h.bridge.stop(), false);
 });
 
-test("start failure blocks the subscriber and invalid dependencies are rejected", async () => {
+test("start failure blocks subscriber and invalid dependencies are rejected", async () => {
   const h = harness({ subscriber: { async pSubscribe() { throw new Error("redis unavailable"); } } });
   await assert.rejects(h.bridge.start(), /redis unavailable/);
   assert.equal(h.bridge.getStatus().state, "blocked");
   assert.throws(() => createRedisMarketFeedSubscriber({ subscriber: {}, fanout: {} }), TypeError);
 });
 
-test("channel parser accepts encoded instrument IDs and rejects invalid encodings", () => {
+test("stop during pending subscription waits then unsubscribes and never enters running state", async () => {
+  let resolveSubscribe;
+  const calls = [];
+  const subscriber = {
+    pSubscribe() { return new Promise((resolve) => { resolveSubscribe = resolve; }); },
+    async pUnsubscribe(pattern) { calls.push(pattern); },
+  };
+  const bridge = createRedisMarketFeedSubscriber({ subscriber, fanout: { async dispatch() { return 1; } } });
+  const starting = bridge.start();
+  await Promise.resolve();
+  const stopping = bridge.stop();
+  resolveSubscribe();
+  assert.equal(await starting, false);
+  assert.equal(await stopping, true);
+  assert.equal(bridge.getStatus().state, "stopped");
+  assert.deepEqual(calls, [CHANNEL_PATTERN]);
+});
+
+test("channel parser validates encoded instrument IDs", () => {
   assert.equal(parseChannel("s-trade:market-data:NSE_EQ%7CABC"), "NSE_EQ|ABC");
   assert.throws(() => parseChannel("s-trade:market-data:%ZZ"), { code: "invalid_market_feed_message" });
   assert.throws(() => parseChannel("s-trade:market-data:*"), { code: "invalid_market_feed_message" });
