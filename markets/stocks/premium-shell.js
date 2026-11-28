@@ -24,6 +24,7 @@ function syncChartTheme(){
 }
 function render(){
  body.dataset.appTheme=theme;
+ const themeMeta=document.querySelector('meta[name="theme-color"]');if(themeMeta)themeMeta.content=theme==="day"?"#f5f7f8":"#080b10";
  const btn=document.querySelector("[data-app-theme-toggle]");
  if(btn){btn.innerHTML=(theme==="day"?icons.moon:icons.sun)+'<span>'+(theme==="day"?"Night mode":"Day mode")+'</span>';btn.setAttribute("aria-label",theme==="day"?"Switch to night mode":"Switch to day mode");btn.setAttribute("aria-pressed",String(theme==="night"));}
  syncChartTheme();
