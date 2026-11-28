@@ -93,23 +93,27 @@ function createAngelOneRouter({ auth, serviceDb, fetchProvider, readProviderJson
           req.body.totp = "";
         }
       }
-      if (!providerResponse.ok || !isValidAngelOneLogin(payload)) {
-        return res.status(401).json({ error: "Angel One login was not accepted. Check Client ID, PIN and current TOTP." });
-      }
       const issuedAt = new Date();
       const expiry = nextAngelOneSessionExpiry(issuedAt.getTime());
       let encryptedBundle;
       try {
+        // Error responses can still contain token-like fields; validate inside this
+        // try so every provider response is covered by the cleanup below.
+        if (!providerResponse.ok || !isValidAngelOneLogin(payload)) {
+          return res.status(401).json({ error: "Angel One login was not accepted. Check Client ID, PIN and current TOTP." });
+        }
         encryptedBundle = encryptUpstoxToken(JSON.stringify({
           jwtToken: payload.data.jwtToken,
           refreshToken: payload.data.refreshToken,
           feedToken: payload.data.feedToken
         }), encryptionKey);
       } finally {
-        // Clear all plaintext provider tokens even if encryption fails.
-        payload.data.jwtToken = "";
-        payload.data.refreshToken = "";
-        payload.data.feedToken = "";
+        // Clear token-like fields for success, invalid responses and encryption failures.
+        if (payload?.data && typeof payload.data === "object") {
+          payload.data.jwtToken = "";
+          payload.data.refreshToken = "";
+          payload.data.feedToken = "";
+        }
       }
       const { error } = await serviceDb.from("broker_connections").upsert({
         user_id: user.id, broker_name: "angel_one", connection_status: "connected",
