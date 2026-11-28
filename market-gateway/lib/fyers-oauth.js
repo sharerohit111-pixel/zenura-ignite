@@ -127,9 +127,13 @@ function createFyersOAuthRouter({ auth, serviceDb, fetchProvider, readProviderJs
 
       const issuedAt = new Date();
       const expiresAt = nextFyersTokenExpiry(issuedAt.getTime());
-      const encryptedAccessToken = encryptUpstoxToken(tokenPayload.access_token, encryptionKey);
-      // Drop the plaintext provider token reference before database I/O.
-      tokenPayload.access_token = "";
+      let encryptedAccessToken;
+      try {
+        encryptedAccessToken = encryptUpstoxToken(tokenPayload.access_token, encryptionKey);
+      } finally {
+        // Clear the provider token even if encryption itself throws.
+        tokenPayload.access_token = "";
+      }
       const row = {
         user_id: consumed.user_id,
         broker_name: "fyers",
