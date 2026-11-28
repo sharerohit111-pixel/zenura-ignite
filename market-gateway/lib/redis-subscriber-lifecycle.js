@@ -75,7 +75,7 @@ function createRedisSubscriberLifecycle({
     if (state !== "stopped" && state !== "unavailable") state = "reconnecting";
   }
   function onEnd() { unavailable("end"); }
-  function onError(error) { report(error); }
+  function onClientError(error) { report(error); }
 
   async function start() {
     if (state !== "idle") {
@@ -87,7 +87,7 @@ function createRedisSubscriberLifecycle({
     client.on("ready", onReady);
     client.on("reconnecting", onReconnect);
     client.on("end", onEnd);
-    client.on("error", onError);
+    client.on("error", onClientError);
     if (client.isReady === true) await onReady();
     return true;
   }
@@ -112,7 +112,7 @@ function createRedisSubscriberLifecycle({
     client.removeListener("ready", onReady);
     client.removeListener("reconnecting", onReconnect);
     client.removeListener("end", onEnd);
-    client.removeListener("error", onError);
+    client.removeListener("error", onClientError);
     // Do not close the dedicated client while a subscription attempt is still
     // in flight. The generation/state guards prevent that attempt from
     // restoring readiness after shutdown.
