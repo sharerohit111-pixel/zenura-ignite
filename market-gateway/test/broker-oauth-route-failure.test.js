@@ -565,7 +565,7 @@ test("FYERS OAuth start stores only a SHA-256 state hash and returns the matchin
   const h = fyersStartHarness();
   const res = response();
   await routeHandler(h.router, "post", "/oauth/start")({ body: {} }, res);
-  assert.equal(res.statusCode, undefined);
+  assert.equal(res.statusCode, 200);
   assert.equal(h.calls.length, 1);
   assert.equal(h.calls[0].rpc, "begin_broker_oauth_state");
   const { p_state_hash: storedHash, p_expires_at: expiresAt, p_user_id: owner } = h.calls[0].args;
