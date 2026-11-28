@@ -44,7 +44,7 @@ test("FYERS authorization is restricted to the official HTTPS auth endpoint", ()
 test("Angel One PIN and TOTP are cleared from fields and local credentials", () => {
   assert.match(modal, /pin\.value = "";\s*totp\.value = ""/);
   assert.match(modal, /credentials\.pin = ""; credentials\.totp = ""/);
-  assert.match(modal, /finally \(\) => \{[\s\S]*?credentials\.pin = ""; credentials\.totp = "";[\s\S]*?pin\.value = ""; totp\.value = ""/);
+  assert.match(modal, /\.finally\(\(\) => \{[\s\S]*?credentials\.pin = ""; credentials\.totp = "";[\s\S]*?pin\.value = ""; totp\.value = ""/);
 });
 
 test("demo action closes the broker modal and requests demo mode without a broker order", () => {
