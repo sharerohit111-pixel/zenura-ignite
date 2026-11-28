@@ -1,13 +1,11 @@
-/* Broker connect modal. OAuth actions delegate only to implemented provider adapters. */
+"use strict";
 (function () {
-  "use strict";
   const root = document.getElementById("broker-connect-overlay");
   if (!root) return;
   const providers = [
-    { id:"upstox", name:"Upstox", mark:"u", tag:"API ACCESS", note:"₹0 account opening*", url:"https://upstox.com/" },
-    { id:"fyers", name:"FYERS", mark:"F", tag:"API ACCESS", note:"Broker API access", url:"https://fyers.in/" },
-    { id:"angel_one", name:"Angel One", mark:"A", tag:"API ACCESS", note:"SmartAPI", url:"https://www.angelone.in/" },
-    { id:"kotak_neo", name:"Kotak Neo", mark:"K", tag:"VERIFYING", pending:true, note:"Pricing verification pending", url:"https://www.kotakneo.com/" }
+    { id: "upstox", name: "Upstox", mark: "u", tag: "BROKER API", note: "Zero AMC and eligible brokerage offers*", referralUrl: "https://upstox.onelink.me/0H1s/5CAYMN" },
+    { id: "fyers", name: "FYERS", mark: "F", tag: "BROKER API", note: "Referral code FRN9GVV · Up to ₹2,000 FYERS Credits*", referralUrl: "https://fyers.onelink.me/cj1P/l3nujhwy" },
+    { id: "angel_one", name: "Angel One", mark: "A", tag: "SMARTAPI", note: "Free Demat account offer and other benefits*", referralUrl: "https://angel-one.onelink.me/Wjgr/gw4o5lz2" }
   ];
   const feedback = root.querySelector("[data-broker-feedback]");
   const status = document.getElementById("connection-title");
@@ -25,12 +23,10 @@
       const card = el("article", "broker-connect-card");
       const head = el("div", "broker-connect-card-head");
       head.append(logo(p.mark), el("h3", "", p.name));
-      head.append(el("span", "broker-connect-tag" + (p.pending ? " pending" : ""), p.tag));
-      const button = el("button", "broker-connect-action", p.pending ? "Not available yet" : "Connect & Login");
+      head.append(el("span", "broker-connect-tag", p.tag));
+      const button = el("button", "broker-connect-action", "Connect & Login");
       button.type = "button";
       button.dataset.provider = p.id;
-      button.disabled = !!p.pending;
-      if (p.id !== "upstox") button.title = "This broker's OAuth route is not yet integrated in this release.";
       card.append(head, button);
       loginGrid.append(card);
 
@@ -38,11 +34,11 @@
       const title = el("div", "broker-account-title");
       title.append(logo(p.mark), el("span", "", p.name));
       account.append(title, el("p", "broker-account-note", p.note));
-      const link = el("a", "broker-account-link", "Open Account ↗");
-      link.href = p.url;
+      const link = el("a", "broker-account-link", "Open Free Account ↗");
+      link.href = p.referralUrl;
       link.target = "_blank";
       link.rel = "noopener noreferrer sponsored";
-      account.append(link);
+      account.append(link, el("small", "broker-affiliate-disclosure", "Referral link · S-TRADE may earn a commission*"));
       accountGrid.append(account);
     });
   }
@@ -59,7 +55,7 @@
         if (existing) existing.click();
         else feedback.textContent = "Upstox authorization control is not available on this page.";
       } else {
-        feedback.textContent = providerButton.dataset.provider.toUpperCase().replace("_", " ") + " login integration is being completed. Demo / Replay remains available.";
+        feedback.textContent = providerButton.dataset.provider.toUpperCase().replace("_", " ") + " secure login integration is being completed. Demo / Replay remains available.";
       }
     }
     if (target.closest("[data-demo-mode]")) {
