@@ -28,7 +28,7 @@ function validateAngelOneCredentials(body) {
 
 function isBoundedAngelOneToken(value) {
   return typeof value === "string" && value.length > 0 && value.length <= 16384
-    && !/[\\x00-\\x1f\\x7f]/.test(value);
+    && !/[\x00-\x1f\x7f]/.test(value);
 }
 
 function isValidAngelOneLogin(payload) {
