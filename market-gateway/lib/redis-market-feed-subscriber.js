@@ -3,6 +3,8 @@
 const CHANNEL_PREFIX = "s-trade:market-data:";
 const CHANNEL_PATTERN = CHANNEL_PREFIX + "*";
 const DEFAULT_MAX_MESSAGE_BYTES = 64 * 1024;
+const DEFAULT_MAX_PENDING_MESSAGES = 1000;
+const MAX_PENDING_MESSAGES = 10000;
 const INSTRUMENT_ID = /^[A-Za-z0-9:_|.-]{1,160}$/;
 
 function invalid(message, code = "invalid_market_feed_message") {
@@ -26,22 +28,30 @@ function createRedisMarketFeedSubscriber({
   subscriber,
   fanout,
   maxMessageBytes = DEFAULT_MAX_MESSAGE_BYTES,
+  maxPendingMessages = DEFAULT_MAX_PENDING_MESSAGES,
   onError = () => {},
+  onOverflow = onError,
 }) {
   if (!subscriber || typeof subscriber.pSubscribe !== "function" ||
       typeof subscriber.pUnsubscribe !== "function" ||
       !fanout || typeof fanout.dispatch !== "function" ||
       !Number.isSafeInteger(maxMessageBytes) || maxMessageBytes < 256 ||
-      maxMessageBytes > 1024 * 1024 || typeof onError !== "function") {
+      maxMessageBytes > 1024 * 1024 ||
+      !Number.isSafeInteger(maxPendingMessages) || maxPendingMessages < 1 ||
+      maxPendingMessages > MAX_PENDING_MESSAGES ||
+      typeof onError !== "function" || typeof onOverflow !== "function") {
     throw new TypeError("Redis subscriber dependencies or bounds are invalid.");
   }
 
   let state = "idle";
   let callback = null;
   let subscriptionPromise = null;
+  let subscribed = false;
   let inFlight = Promise.resolve();
+  let pendingMessages = 0;
   let accepted = 0;
   let rejected = 0;
+  let overflowCount = 0;
 
   async function handleMessage(message, channel) {
     try {
@@ -67,6 +77,21 @@ function createRedisMarketFeedSubscriber({
     }
   }
 
+  function overflow() {
+    if (state !== "running") return false;
+    state = "degraded";
+    overflowCount += 1;
+    rejected += 1;
+    const error = Object.assign(
+      new Error("Redis market-feed queue capacity exceeded; feed requires authoritative snapshot recovery."),
+      { code: "market_feed_queue_overflow", status: 503 },
+    );
+    try { onOverflow(error); } catch (callbackError) {
+      try { onError(callbackError); } catch (_) {}
+    }
+    return false;
+  }
+
   async function start() {
     if (state !== "idle") {
       throw Object.assign(new Error("Redis market-feed subscriber can only start once."), {
@@ -75,13 +100,18 @@ function createRedisMarketFeedSubscriber({
     }
     state = "starting";
     callback = (message, channel) => {
-      inFlight = inFlight.then(() => handleMessage(message, channel));
-      return inFlight;
+      if (state !== "running") return Promise.resolve(false);
+      if (pendingMessages >= maxPendingMessages) return Promise.resolve(overflow());
+      pendingMessages += 1;
+      const task = inFlight.then(() => handleMessage(message, channel));
+      inFlight = task.catch(() => false);
+      return task.finally(() => { pendingMessages -= 1; });
     };
     subscriptionPromise = Promise.resolve().then(() =>
       subscriber.pSubscribe(CHANNEL_PATTERN, callback));
     try {
       await subscriptionPromise;
+      subscribed = true;
       if (state !== "starting") return false;
       state = "running";
       return true;
@@ -94,21 +124,23 @@ function createRedisMarketFeedSubscriber({
 
   async function stop() {
     if (state === "stopped") return false;
-    const previous = state;
     state = "stopped";
-    if (previous === "running" || previous === "starting") {
-      if (subscriptionPromise) await subscriptionPromise.catch(() => {});
-      if (previous === "running" || subscriptionPromise) {
-        try { await subscriber.pUnsubscribe(CHANNEL_PATTERN); }
-        finally { await inFlight; }
-      }
+    if (subscriptionPromise) await subscriptionPromise.catch(() => {});
+    if (subscribed) {
+      subscribed = false;
+      try { await subscriber.pUnsubscribe(CHANNEL_PATTERN); }
+      finally { await inFlight; }
+    } else {
+      await inFlight;
     }
     callback = null;
     return true;
   }
 
   function getStatus() {
-    return Object.freeze({ state, accepted, rejected });
+    return Object.freeze({
+      state, accepted, rejected, pendingMessages, maxPendingMessages, overflowCount,
+    });
   }
 
   return Object.freeze({ start, stop, getStatus });
@@ -116,5 +148,6 @@ function createRedisMarketFeedSubscriber({
 
 module.exports = {
   CHANNEL_PREFIX, CHANNEL_PATTERN, DEFAULT_MAX_MESSAGE_BYTES,
+  DEFAULT_MAX_PENDING_MESSAGES, MAX_PENDING_MESSAGES,
   parseChannel, createRedisMarketFeedSubscriber,
 };
