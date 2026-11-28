@@ -61,7 +61,7 @@
       const orders=[0,1,2,3,4,5].includes(index);
       const history=[6,7,8].includes(index);
       const balance=[1,2].includes(index);
-      const visible=page==="orders"?orders:page==="history"?history:page==="balance"?balance:true;
+      const visible=page==="orders"?(orders||history):page==="history"?history:page==="balance"?balance:true;
       el.dataset.pageHidden=String(!visible);
     });
   }
