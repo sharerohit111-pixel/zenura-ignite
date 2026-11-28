@@ -59,7 +59,7 @@ test("Angel One provider logout sends the required authenticated session headers
   assert.match(source, /"x-api-key": apiKey/);
   assert.match(source, /"x-client-code": data\.provider_account_ref/);
   assert.match(source, /"x-feed-token": session\.feedToken/);
-  assert.match(source, /finally \{\s*\/\/ The database row is already cleared; also drop decrypted local token references\.\s*session\.jwtToken = "";\s*session\.refreshToken = "";\s*session\.feedToken = "";\s*\}/);
+  assert.match(source, /let providerRevoked = "not_attempted";[\s\S]*?try \{[\s\S]*?const \{ error: clearError \} = await serviceDb\.from\("broker_connections"\)\.update\([\s\S]*?if \(session\?\.jwtToken && data\?\.provider_account_ref && apiKey\) \{[\s\S]*?\}\s*res\.set\("Cache-Control", "no-store"\)\.json\(\{ disconnected: true, providerRevocation: providerRevoked \}\);\s*\} finally \{\s*\/\/ Clear decrypted token references even when revocation is skipped or DB clearing fails\.[\s\S]*?if \(session && typeof session === "object"\) \{\s*session\.jwtToken = "";\s*session\.refreshToken = "";\s*session\.feedToken = "";\s*\}/);
 });
 
 test("Angel One login limiter is database-backed and fails closed", () => {
