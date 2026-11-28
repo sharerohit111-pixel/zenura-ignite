@@ -55,9 +55,9 @@ function createAngelOneRouter({ auth, serviceDb, fetchProvider, readProviderJson
       if (!user.emailConfirmedAt) return res.status(403).json({ error: "Verify your Supabase email before connecting Angel One." });
       if (!apiKey || !encryptionKey || net.isIP(clientLocalIp) !== 4 || net.isIP(clientPublicIp) !== 4 || !/^(?:[0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$/.test(macAddress) || !["WEB", "MOBILE"].includes(sourceId)) return res.status(503).json({ error: "Angel One server configuration is incomplete. Configure API key, encryption key, local/public IPv4, MAC address and source ID." });
       const credentials = validateAngelOneCredentials(req.body);
-      if (!credentials) return res.status(400).json({ error: "Enter a valid Client ID, 4–6 digit PIN and current 6-digit TOTP." });
-      // Remove sensitive values from the parsed request object before any awaited work.
+      // Scrub parsed request secrets immediately, including malformed requests, before returning.
       if (req.body && typeof req.body === "object") { req.body.pin = ""; req.body.totp = ""; }
+      if (!credentials) return res.status(400).json({ error: "Enter a valid Client ID, 4–6 digit PIN and current 6-digit TOTP." });
       const { data: rateRows, error: rateError } = await serviceDb.rpc("reserve_angel_one_login_attempt", { p_user_id: user.id });
       const rate = Array.isArray(rateRows) ? rateRows[0] : rateRows;
       if (rateError || !rate) {
