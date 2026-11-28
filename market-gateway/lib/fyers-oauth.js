@@ -127,11 +127,14 @@ function createFyersOAuthRouter({ auth, serviceDb, fetchProvider, readProviderJs
 
       const issuedAt = new Date();
       const expiresAt = nextFyersTokenExpiry(issuedAt.getTime());
+      const encryptedAccessToken = encryptUpstoxToken(tokenPayload.access_token, encryptionKey);
+      // Drop the plaintext provider token reference before database I/O.
+      tokenPayload.access_token = "";
       const row = {
         user_id: consumed.user_id,
         broker_name: "fyers",
         connection_status: "connected",
-        access_token_ciphertext: encryptUpstoxToken(tokenPayload.access_token, encryptionKey),
+        access_token_ciphertext: encryptedAccessToken,
         refresh_token_ciphertext: null,
         token_expires_at: expiresAt.toISOString(),
         refresh_token_expires_at: null,
