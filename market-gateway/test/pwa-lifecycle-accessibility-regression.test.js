@@ -89,7 +89,7 @@ test("broken image artifacts at the mobile viewport bottom are removed without h
 test("PWA registration checks for updates on launch and when the app returns to foreground",()=>{
  const registration=read("markets/pwa-register.js");
  assert.match(registration,/updateViaCache:"none"/);
- assert.match(registration,/registration\.update\\(\\)/);
+ assert.match(registration,/registration\.update\(\)/);
  assert.match(registration,/controllerchange/);
  assert.match(registration,/visibilitychange/);
 });
