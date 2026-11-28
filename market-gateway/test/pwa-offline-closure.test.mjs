@@ -24,7 +24,7 @@ test("Markets web app manifest is strict JSON and has a valid standalone scope",
 
 test("Markets service worker uses a new cache generation and precaches the canonical event ledger",async()=>{
  const sw=await read("markets/service-worker.js");
- assert.match(sw,/zenura-markets-shell-v24/);
+ assert.match(sw,/zenura-markets-shell-v25/);
  assert.match(sw,/"shared\/paper-demo-event-ledger\.mjs"/);
  assert.doesNotMatch(sw,/zenura-markets-shell-v9/);
 });
