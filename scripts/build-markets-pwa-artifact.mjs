@@ -26,9 +26,9 @@ fs.writeFileSync(path.join(siteRoot, "index.html"), [
   '<meta name="robots" content="noindex"><title>ZENURA IGNITE · Returning to Paper Trading</title></head>',
   '<body><p>Returning to ZENURA IGNITE…</p><script src="/auth-return-redirect.js"></script></body></html>',
   ""
-].join("\\n"));
+].join("\n"));
 fs.writeFileSync(path.join(siteRoot, "auth-return-redirect.js"),
-  'window.location.replace("/markets/stocks/" + window.location.search + window.location.hash);\\n'
+  'window.location.replace("/markets/stocks/" + window.location.search + window.location.hash);\n'
 );
 
 const excludedMarketDirectories = new Set(["investing", "crypto", "__tests__", "tests"]);

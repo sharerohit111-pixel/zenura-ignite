@@ -1,0 +1,44 @@
+/* Isolated responsive S-TRADE sidebar module */
+.sidebar-toggle{order:10;display:inline-flex;flex-direction:column;justify-content:center;gap:5px;width:42px;height:42px;padding:9px;border:1px solid var(--app-line);border-radius:12px;background:var(--app-card);color:var(--app-text);cursor:pointer}
+.sidebar-toggle span{display:block;width:100%;height:2px;border-radius:2px;background:currentColor}
+.sidebar-overlay{position:fixed;inset:0;z-index:10000;background:rgba(4,10,16,.48);opacity:0;transition:opacity .2s ease}
+.sidebar-overlay.is-visible{opacity:1}
+.zenura-sidebar{position:fixed;z-index:10001;top:0;right:0;bottom:0;width:min(360px,70vw);min-width:min(280px,70vw);display:flex;flex-direction:column;gap:0;padding:env(safe-area-inset-top) 16px env(safe-area-inset-bottom);box-sizing:border-box;overflow-y:auto;background:var(--app-surface);color:var(--app-text);border-left:1px solid var(--app-line);box-shadow:-18px 0 48px rgba(0,0,0,.22);transform:translateX(105%);transition:transform .22s ease;overscroll-behavior:contain}
+.zenura-sidebar.is-open{transform:translateX(0)}
+.sidebar-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:20px 0 18px;border-bottom:1px solid var(--app-line)}
+.sidebar-brand{display:grid;gap:5px}.sidebar-brand b{font-size:15px;letter-spacing:.04em}.sidebar-brand i{color:var(--app-accent);font-style:normal}.sidebar-brand small{font-size:9px;letter-spacing:.12em;color:var(--app-muted)}
+.sidebar-close{width:36px;height:36px;border:1px solid var(--app-line);border-radius:10px;background:var(--app-card);color:var(--app-text);font-size:25px;line-height:1;cursor:pointer}
+.sidebar-caption{padding:19px 9px 9px;color:var(--app-muted);font-size:10px;font-weight:800;letter-spacing:.14em}
+.sidebar-links{display:grid;gap:4px}
+.sidebar-links a{display:flex;align-items:center;gap:13px;min-height:46px;padding:0 11px;border:1px solid transparent;border-radius:12px;color:var(--app-text);font-size:13px;font-weight:650;text-decoration:none}
+.sidebar-links a svg{width:19px;height:19px;flex:none;color:var(--app-muted)}
+.sidebar-links a[aria-current=page]{background:color-mix(in srgb,var(--app-accent) 12%,var(--app-surface));border-color:color-mix(in srgb,var(--app-accent) 28%,var(--app-line));color:var(--app-accent-strong)}
+.sidebar-links a[aria-current=page] svg{color:var(--app-accent)}
+.sidebar-foot{display:grid;gap:5px;margin-top:auto;padding:18px 5px 10px;border-top:1px solid var(--app-line);color:var(--app-accent);font-size:11px;font-weight:800}
+.sidebar-foot small{color:var(--app-muted);font-size:9px;font-weight:500}
+body.sidebar-open{overflow:hidden}
+.settings-feature-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:18px 0}
+.settings-feature{position:relative;display:grid;gap:7px;min-height:90px;padding:14px 34px 14px 13px;text-align:left;border:1px solid var(--app-line);border-radius:13px;background:var(--app-card);color:var(--app-text);cursor:pointer}
+.settings-feature b{font-size:12px}.settings-feature>span:not(.settings-feature-arrow){font-size:10px;line-height:1.45;color:var(--app-muted)}
+.settings-feature-arrow{position:absolute;right:12px;top:50%;transform:translateY(-50%);font-size:23px;color:var(--app-accent)}
+.settings-action-status{font-size:12px;color:var(--app-muted)}
+@media(min-width:900px){.sidebar-toggle{margin-left:auto}.zenura-sidebar{width:320px;min-width:320px}.sidebar-overlay{background:rgba(4,10,16,.35)}}
+@media(max-width:520px){.zenura-sidebar{width:70vw;min-width:260px;padding-left:13px;padding-right:13px}.settings-feature-grid{grid-template-columns:1fr}.sidebar-links a{min-height:44px}}
+@media(prefers-reduced-motion:reduce){.zenura-sidebar,.sidebar-overlay{transition:none}}
+
+/* Sidebar replaces the legacy horizontal page strip; its anchors remain available to routing code. */
+.stocks-page .terminal-nav{display:none!important}
+
+/* The six-card Settings module is the single settings surface; hide legacy duplicate rows. */
+.stocks-page .settings-page>.settings-row{display:none!important}
+
+
+/* Final mobile placement: keep the menu control at the far right of the header. */
+.stocks-page .top>.sidebar-toggle{order:99!important;margin-left:auto!important;flex:0 0 42px!important;align-self:center!important}
+@media(max-width:760px){
+ .stocks-page.touch-terminal .top>.sidebar-toggle{order:99!important;margin-left:auto!important}
+}
+
+/* The drawer always enters from the right edge. */
+.zenura-sidebar{right:0!important;left:auto!important;transform:translateX(105%)!important}
+.zenura-sidebar.is-open{transform:translateX(0)!important}

@@ -82,7 +82,10 @@ if (card && connectButton) {
     try {
       const { data, error } = await supabase.auth.signUp({
         email: email.value.trim(),
-        password: password.value
+        password: password.value,
+        options: {
+          emailRedirectTo: window.location.origin + window.location.pathname
+        }
       });
       if (error) throw error;
       message.textContent = data.session

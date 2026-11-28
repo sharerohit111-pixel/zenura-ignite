@@ -1,0 +1,281 @@
+/* ZENURA IGNITE S-TRADE premium shell — isolated visual layer */
+:root{color-scheme:dark;--app-bg:#080b10;--app-surface:#111820;--app-card:#151f29;--app-raised:#1b2732;--app-line:#273541;--app-text:#f3f7f9;--app-muted:#8c9aa5;--app-accent:#18c99a;--app-accent-strong:#00ad80;--app-positive:#12b886;--app-negative:#ef6472;--app-shadow:0 14px 38px rgba(0,0,0,.22);--app-radius:18px}
+.stocks-page[data-app-theme="day"]{color-scheme:light;--app-bg:#f5f7f8;--app-surface:#fff;--app-card:#fff;--app-raised:#f0f4f5;--app-line:#e3e9eb;--app-text:#17242b;--app-muted:#53636b;--app-accent:#087a5f;--app-accent-strong:#087a5f;--app-positive:#079d70;--app-negative:#df5262;--app-shadow:0 12px 34px rgba(24,49,61,.08)}
+.stocks-page{background:var(--app-bg)!important;color:var(--app-text)!important;font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif!important;padding-bottom:calc(86px + env(safe-area-inset-bottom))!important}
+.stocks-page .wrap{max-width:1440px!important;padding-left:clamp(12px,2.2vw,30px)!important;padding-right:clamp(12px,2.2vw,30px)!important}
+.stocks-page .top{position:sticky;top:0;z-index:25;display:flex;align-items:center;gap:14px;min-height:68px;padding:10px 14px;margin:0 -8px 12px;background:color-mix(in srgb,var(--app-surface) 92%,transparent);border:1px solid var(--app-line);border-radius:0 0 18px 18px;box-shadow:var(--app-shadow);backdrop-filter:blur(18px)}
+.stocks-page .top .brand,.stocks-page .top .brand b,.stocks-page .top .brand i,.stocks-page .top .brand small{color:var(--app-text)!important}
+.stocks-page .top .brand{display:flex;align-items:center;gap:10px;min-width:0}
+.stocks-page .top .brand .logo{display:grid;place-items:center;width:40px;height:40px;border-radius:13px;background:linear-gradient(145deg,#087d63,#006a52);color:#fff!important;font-size:19px;box-shadow:0 6px 18px #00b98b30}
+.stocks-page .top .brand b{font-size:14px;letter-spacing:.035em}.stocks-page .top .brand small{font-size:8px;letter-spacing:.14em}
+.stocks-page .top .back{color:var(--app-muted)!important;font-size:10px}
+.app-theme-switch{margin-left:auto;display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:42px;padding:0 13px;border:1px solid var(--app-line);border-radius:999px;background:var(--app-raised);color:var(--app-text);font-size:11px;font-weight:850;cursor:pointer}
+.app-theme-switch svg{width:17px;height:17px;color:var(--app-accent)}
+.product-mode-nav a{border-color:var(--app-line)!important;color:var(--app-muted)!important;background:var(--app-raised)!important}
+.product-mode-nav a.active{background:color-mix(in srgb,var(--app-accent) 12%,var(--app-surface))!important;color:var(--app-accent-strong)!important;border-color:var(--app-accent)!important}
+.terminal-nav{display:flex;gap:5px;padding:8px 2px 14px;overflow-x:auto;scrollbar-width:none}
+.terminal-nav::-webkit-scrollbar{display:none}
+.terminal-nav a{gap:7px;min-height:42px;padding:9px 13px;border:1px solid transparent!important;border-radius:12px!important;background:transparent!important;color:var(--app-muted)!important;font-size:11px!important;font-weight:750!important;letter-spacing:0!important}
+.terminal-nav a svg{width:16px;height:16px;flex:none}
+.terminal-nav a[aria-current="page"]{background:color-mix(in srgb,var(--app-accent) 12%,var(--app-surface))!important;color:var(--app-accent-strong)!important;border-color:color-mix(in srgb,var(--app-accent) 28%,var(--app-line))!important;box-shadow:none!important}
+.stock-hero{align-items:center;padding:20px 2px 16px!important}
+.stock-hero h1{font-size:clamp(25px,4vw,38px)!important;letter-spacing:-1.2px!important;color:var(--app-text)!important}
+.stock-hero h1 em{color:var(--app-accent)!important}
+.stock-hero p,.portfolio-status{color:var(--app-muted)!important}
+.connection{background:var(--app-raised)!important;border:1px solid var(--app-line)!important;border-radius:14px!important}
+.connection b{color:var(--app-text)!important}.connection small{color:var(--app-muted)!important}
+.notice{background:color-mix(in srgb,var(--app-accent) 6%,var(--app-surface))!important;border-color:color-mix(in srgb,var(--app-accent) 22%,var(--app-line))!important;color:var(--app-muted)!important;border-radius:14px!important}
+.notice b{color:var(--app-accent-strong)!important}
+.panel,.dashboard-overview,.settings-page{background:var(--app-card)!important;border:1px solid var(--app-line)!important;border-radius:var(--app-radius)!important;box-shadow:var(--app-shadow)!important;color:var(--app-text)!important}
+.panel-head h2,.chart-head h2,.panel h2,.panel h3,.panel b{color:var(--app-text)}
+.panel-head small,.chart-head small,.panel small{color:var(--app-muted)}
+.panel-head{gap:12px}
+.pill{background:color-mix(in srgb,var(--app-accent) 10%,var(--app-surface))!important;border-color:color-mix(in srgb,var(--app-accent) 28%,var(--app-line))!important;color:var(--app-accent-strong)!important}
+.watch-tabs,.chart-tools,.paper-order-tabs{gap:6px}
+.watch-tabs button,.chart-tools button,.paper-order-tabs button,.chart-toolbar button,.chart-toolbar select,.chart-toolbar input,.watchlist-select-label select,.paper-ticket-field input,.paper-ticket-field select,.futures-order-panel input,.futures-order-panel select,.futures-limit-panel input,.futures-limit-panel select,.options-limit-panel input,.options-limit-panel select{background:var(--app-raised)!important;color:var(--app-text)!important;border-color:var(--app-line)!important;border-radius:10px!important}
+.watch-tabs button.active,.chart-tools button.active,.paper-order-tabs button.active,.chart-toolbar button.active{background:color-mix(in srgb,var(--app-accent) 13%,var(--app-surface))!important;color:var(--app-accent-strong)!important;border-color:var(--app-accent)!important}
+.instrument-list,.saved-watchlist,.chart-placeholder,.paper-account,.paper-ticket-estimate,.portfolio-metrics>div,.dashboard-status-grid article,.paper-balance-grid>div{background:var(--app-raised)!important;border-color:var(--app-line)!important;color:var(--app-text)!important;border-radius:13px!important}
+.instrument-list *,.saved-watchlist *{color:var(--app-text)}
+.chart-panel,.watch,.order-panel{background:var(--app-card)!important}
+.chart-head .price{color:var(--app-text)!important}
+.chart-placeholder{min-height:320px!important}
+.chart-toolbar{background:var(--app-raised)!important;border-color:var(--app-line)!important;border-radius:14px!important}
+.chart-toolbar label,.chart-display-controls label{color:var(--app-muted)!important}
+.paper-ticket-field,.paper-quantity,.paper-protective-controls label,.futures-order-panel label{color:var(--app-muted)!important}
+.paper-order-type{background:var(--app-raised)!important;border-color:var(--app-line)!important}
+.paper-order-type button{color:var(--app-muted)!important}
+.paper-order-type button.active{background:color-mix(in srgb,var(--app-accent) 13%,var(--app-surface))!important;color:var(--app-accent-strong)!important;border-color:var(--app-accent)!important}
+.paper-ticket-field input,.paper-ticket-field input[readonly],.paper-protective-controls input,.paper-protective-controls select{background:var(--app-raised)!important;color:var(--app-text)!important;border-color:var(--app-line)!important}
+.paper-ticket-estimate b,.paper-balance-grid b,.portfolio-metrics b{color:var(--app-text)!important}
+.paper-account{border-color:color-mix(in srgb,var(--app-accent) 24%,var(--app-line))!important}
+.paper-account b{color:var(--app-accent-strong)!important}
+.paper-actions button.primary,.connect-button,.futures-limit-panel #futures-limit-buy{background:var(--app-accent)!important;color:#fff!important;border-color:var(--app-accent)!important;border-radius:11px!important}
+.paper-actions button.secondary,.futures-limit-panel #futures-limit-sell{border-radius:11px!important}
+.paper-table th,.paper-table td{border-color:var(--app-line)!important}
+.paper-table th{color:var(--app-muted)!important}.paper-table td{color:var(--app-text)!important}
+.history-heading{border-color:var(--app-line)!important}
+.dashboard-shortcuts a,.settings-row button{background:color-mix(in srgb,var(--app-accent) 12%,var(--app-surface))!important;border-color:color-mix(in srgb,var(--app-accent) 35%,var(--app-line))!important;color:var(--app-accent-strong)!important;border-radius:12px!important}
+.settings-row{border-color:var(--app-line)!important}.settings-row b{color:var(--app-text)!important}.settings-row p{color:var(--app-muted)!important}
+.stocks-page input,.stocks-page select,.stocks-page textarea{color:var(--app-text)!important}
+.stocks-page input::placeholder{color:var(--app-muted)!important}
+.stocks-page footer{color:var(--app-muted)!important;border-color:var(--app-line)!important}
+.stocks-page[data-app-theme="day"] .chart-theme-toggle{display:none!important}
+.stocks-page[data-app-theme="night"] .chart-theme-toggle{display:none!important}
+.stocks-page[data-app-theme="day"] .stocks-page,.stocks-page[data-app-theme="day"]{background:var(--app-bg)!important}
+.stocks-page[data-app-theme="day"] h1,.stocks-page[data-app-theme="day"] h2,.stocks-page[data-app-theme="day"] h3,.stocks-page[data-app-theme="day"] h4,.stocks-page[data-app-theme="day"] .brand b,.stocks-page[data-app-theme="day"] .brand i{color:var(--app-text)!important}
+.stocks-page[data-app-theme="day"] .chart-gridline{stroke:#dfe7e9!important}
+.stocks-page[data-app-theme="day"] .chart-line{stroke:#079d78!important}
+.stocks-page[data-app-theme="day"] #market-chart.zenura-pro-chart{background:#fff!important;border-color:var(--app-line)!important}
+.stocks-page[data-app-theme="night"] #market-chart.zenura-pro-chart{background:#080e14!important;border-color:var(--app-line)!important}
+.stocks-page[data-app-theme="day"] .chart-toolbar select,.stocks-page[data-app-theme="day"] .chart-toolbar button,.stocks-page[data-app-theme="day"] .chart-template-controls input,.stocks-page[data-app-theme="day"] .chart-template-controls select,.stocks-page[data-app-theme="day"] .chart-template-controls button{background:var(--app-raised)!important;color:var(--app-text)!important;border-color:var(--app-line)!important}
+.stocks-page[data-app-theme="day"] .chart-toolbar button.active{background:#dff7ef!important;color:#087a5d!important}
+.stocks-page[data-app-theme="day"] .chart-theme-toggle{display:none}
+.stocks-page .chart-theme-toggle{display:none!important}
+.app-bottom-nav{position:fixed;z-index:40;left:0;right:0;bottom:0;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:2px;padding:8px max(8px,env(safe-area-inset-right)) calc(8px + env(safe-area-inset-bottom)) max(8px,env(safe-area-inset-left));background:color-mix(in srgb,var(--app-surface) 94%,transparent);border-top:1px solid var(--app-line);box-shadow:0 -8px 28px rgba(0,0,0,.07);backdrop-filter:blur(18px)}
+.app-bottom-nav a{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;min-width:0;min-height:48px;color:var(--app-muted);text-decoration:none;font-size:9px;font-weight:750}
+.app-bottom-nav a svg{width:20px;height:20px}
+.app-bottom-nav a[aria-current="page"]{color:var(--app-accent-strong)}
+.app-bottom-nav a[aria-current="page"] svg{filter:drop-shadow(0 2px 6px color-mix(in srgb,var(--app-accent) 45%,transparent))}
+@media(min-width:900px){.app-bottom-nav{left:auto;right:24px;bottom:20px;width:420px;border:1px solid var(--app-line);border-radius:18px;padding:8px 12px}.stocks-page{padding-bottom:30px!important}}
+@media(max-width:760px){.stocks-page .top{position:relative;flex-wrap:wrap;margin:0 -4px 8px;padding:9px 10px}.stocks-page .top .back{display:none}.stocks-page .stock-hero{align-items:flex-start;flex-direction:column}.connection{width:100%;max-width:none;box-sizing:border-box}.terminal-nav{padding-bottom:10px}.terminal-nav a{font-size:10px!important}.workspace{grid-template-columns:minmax(0,1fr)!important}.workspace>.watch,.workspace>.chart-panel,.workspace>.order-panel{grid-column:1/-1}.app-theme-switch{min-height:38px;padding:0 11px}.app-theme-switch span{display:none}}
+@media(max-width:430px){.stocks-page .wrap{padding-left:10px!important;padding-right:10px!important}.panel{padding:13px!important}.stock-hero h1{font-size:26px!important}.app-bottom-nav a{font-size:8px}.dashboard-shortcuts{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+/* Floating language control sits above the five-item mobile navigation. */
+.stocks-page .paper-language-toggle{right:14px!important;bottom:calc(78px + env(safe-area-inset-bottom))!important;z-index:45!important;background:var(--app-surface)!important;color:var(--app-accent-strong)!important;border:1px solid var(--app-line)!important;box-shadow:var(--app-shadow)!important}
+@media(min-width:900px){.stocks-page .paper-language-toggle{bottom:28px!important;right:28px!important}}
+
+/* Mobile polish: keep brand, product mode and theme control in a compact header. */
+.stocks-page .top .brand{order:1;flex:1 1 calc(100% - 64px);min-width:0;gap:11px}
+.stocks-page .top .brand>span:last-child{display:flex;flex-direction:column;align-items:flex-start;justify-content:center;min-width:0;line-height:1.2}
+.stocks-page .top .brand b{display:block;white-space:nowrap;line-height:1.2}
+.stocks-page .top .brand small{display:block;margin-top:4px;line-height:1.2;white-space:normal}
+.stocks-page .top .app-theme-switch{order:2;flex:0 0 42px;width:42px;height:42px;padding:0;margin-left:auto}
+.stocks-page .top .product-mode-nav{order:3;flex:1 0 100%;margin:0}
+.stocks-page .top .product-mode-nav a{display:inline-flex;align-items:center;justify-content:center;min-height:40px;padding:0 16px}
+.stocks-page .top .back{display:none!important}
+.stocks-page .terminal-nav{display:flex;flex-wrap:nowrap;max-width:100%;overflow-x:auto;overflow-y:hidden;scroll-snap-type:x proximity;touch-action:pan-x;overscroll-behavior-x:contain;padding:8px 2px 12px}
+.stocks-page .terminal-nav>a{flex:0 0 auto;scroll-snap-align:start}
+.stocks-page .terminal-nav:after{content:"";flex:0 0 8px}
+@media(max-width:760px){
+ .stocks-page .top{position:relative;display:flex;flex-wrap:wrap;align-items:center;gap:10px;min-height:0;padding:12px;margin:0 -4px 10px;border-radius:0 0 18px 18px}
+ .stocks-page .top .brand .logo{width:44px;height:44px;flex:0 0 44px}
+ .stocks-page .top .brand b{font-size:14px}
+ .stocks-page .top .brand small{font-size:8px;letter-spacing:.11em}
+ .stocks-page .terminal-nav{margin-left:-2px;margin-right:-2px}
+ .stocks-page .terminal-nav a{min-height:44px;padding:10px 13px;font-size:11px!important}
+}
+@media(max-width:360px){
+ .stocks-page .top .brand b{font-size:12px}
+ .stocks-page .top .brand small{font-size:7px}
+}
+/* Keep the single product-mode pill intrinsic on desktop; mobile gets its own full row. */
+.stocks-page .top>.product-mode-nav{display:flex;width:auto;max-width:100%;min-width:0;flex:0 0 auto;align-self:center}
+.stocks-page .top>.product-mode-nav>a{flex:0 0 auto;white-space:nowrap}
+@media(max-width:760px){
+ .stocks-page .top>.product-mode-nav{width:100%;flex:1 0 100%;align-self:stretch}
+}
+
+
+/* Dashboard readability and mobile typography corrections (isolated shell layer). */
+.stocks-page .market-pulse{display:grid;gap:12px;margin:18px 0;padding:16px;border:1px solid var(--app-line);border-radius:14px;background:var(--app-raised);min-width:0}
+.stocks-page .market-pulse-head{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:5px 12px;min-width:0}
+.stocks-page .market-pulse-head>b{color:var(--app-text);font-size:15px;font-weight:850}
+.stocks-page .market-pulse-head>span{color:var(--app-muted);font-size:12px}
+.stocks-page .market-pulse-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;min-width:0}
+.stocks-page .market-pulse-grid>article{display:grid;grid-template-columns:minmax(0,1fr);gap:4px;min-width:0;padding:11px;border:1px solid var(--app-line);border-radius:11px;background:var(--app-surface)}
+.stocks-page .market-pulse-grid>article>small{color:var(--app-muted);font-size:10px;font-weight:800;letter-spacing:.04em}
+.stocks-page .market-pulse-grid>article>strong{color:var(--app-text);font-size:17px;line-height:1.25}
+.stocks-page .market-pulse-grid>article>span{color:var(--app-muted);font-size:11px;line-height:1.4;overflow-wrap:anywhere}
+.stocks-page .top .brand b{white-space:normal;overflow-wrap:normal}
+.stocks-page .top .brand small{max-width:100%;overflow-wrap:anywhere}
+.stocks-page footer{display:flex;flex-wrap:wrap;align-items:center;gap:6px 18px;padding:22px 0 28px;line-height:1.55;font-size:12px}
+.stocks-page footer>span{display:block;min-width:0}
+@media(max-width:430px){
+ .stocks-page .market-pulse{padding:12px;margin:14px 0}
+ .stocks-page .market-pulse-head{display:grid;gap:4px}
+ .stocks-page .market-pulse-head>b{font-size:14px}
+ .stocks-page .market-pulse-head>span{font-size:11px}
+ .stocks-page .market-pulse-grid{gap:7px}
+ .stocks-page .market-pulse-grid>article{padding:9px}
+ .stocks-page .market-pulse-grid>article>strong{font-size:15px}
+ .stocks-page .market-pulse-grid>article>span{font-size:10px}
+ .stocks-page footer{display:grid;gap:5px;padding-bottom:32px}
+}
+
+/* Android browser viewport fix: keep the terminal navigation above the
+   browser's bottom inset and give it an opaque, paintable surface. */
+.stocks-page .app-bottom-nav{
+  position:fixed!important;
+  inset:auto 0 0 0!important;
+  z-index:9999!important;
+  display:grid!important;
+  grid-template-columns:repeat(5,minmax(0,1fr))!important;
+  min-height:64px;
+  box-sizing:border-box;
+  padding:8px max(8px,env(safe-area-inset-right)) calc(8px + env(safe-area-inset-bottom)) max(8px,env(safe-area-inset-left))!important;
+  background:var(--app-surface,#fff)!important;
+  border-top:1px solid var(--app-line,#dce5e3)!important;
+  box-shadow:0 -8px 28px rgba(0,0,0,.10)!important;
+  opacity:1!important;
+  visibility:visible!important;
+  pointer-events:auto!important;
+  transform:none!important;
+}
+.stocks-page .app-bottom-nav>a{
+  display:flex!important;
+  min-width:0;
+  min-height:48px;
+  align-items:center;
+  justify-content:center;
+  flex-direction:column;
+  gap:4px;
+  color:var(--app-muted,#52636b)!important;
+  text-decoration:none!important;
+}
+.stocks-page .app-bottom-nav>a>svg{display:block!important;width:20px!important;height:20px!important;max-width:20px;flex:none}
+.stocks-page .app-bottom-nav>a>span{display:block!important;font-size:9px;line-height:1.2;white-space:nowrap}
+.stocks-page{padding-bottom:calc(78px + env(safe-area-inset-bottom))!important}
+@media(min-width:900px){
+ .stocks-page .app-bottom-nav{left:auto!important;right:24px!important;bottom:20px!important;inset:auto 24px 20px auto!important;width:420px!important;border:1px solid var(--app-line,#dce5e3)!important;border-radius:18px;padding:8px 12px!important}
+ .stocks-page{padding-bottom:40px!important}
+}
+
+/* Four-item bottom quick actions requested for the mobile terminal. */
+.stocks-page .app-bottom-nav{grid-template-columns:repeat(4,minmax(0,1fr))!important}
+.stocks-page .app-bottom-nav>a>span{font-size:8px!important;letter-spacing:-.1px}
+.stocks-page .support-page textarea{display:block;width:100%;min-height:120px;box-sizing:border-box;padding:12px;border:1px solid var(--app-line);border-radius:12px;background:var(--app-raised);color:var(--app-text);font:inherit;resize:vertical}
+.stocks-page .support-message-label{display:block;margin:14px 0 7px;font-weight:700;color:var(--app-text)}
+.stocks-page .support-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
+.stocks-page .support-actions button{padding:10px 16px;border:1px solid var(--app-line);border-radius:10px;background:var(--app-accent);color:#fff;font-weight:700}
+
+/* Explicit mobile quick-action surface; independent of inherited nav styles. */
+#zenura-quick-actions{position:fixed!important;inset:auto 0 0 0!important;z-index:2147483647!important;display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr))!important;min-height:72px!important;box-sizing:border-box!important;padding:8px 8px calc(8px + env(safe-area-inset-bottom))!important;background:var(--app-surface,#fff)!important;border-top:1px solid var(--app-line,#dce5e3)!important;visibility:visible!important;opacity:1!important;pointer-events:auto!important;transform:none!important}
+#zenura-quick-actions>a{display:flex!important;align-items:center!important;justify-content:center!important;flex-direction:column!important;gap:4px!important;min-width:0!important;min-height:52px!important;color:var(--app-muted,#52636b)!important;text-decoration:none!important;font-size:8px!important;font-weight:800!important;white-space:nowrap!important}
+#zenura-quick-actions>a>svg{display:block!important;width:21px!important;height:21px!important;flex:none!important}
+#zenura-quick-actions>a[aria-current=page]{color:var(--app-accent-strong,#087a5f)!important}
+.stocks-page{padding-bottom:calc(92px + env(safe-area-inset-bottom))!important}
+
+/* Touch-first phones must retain the mobile terminal even when Chrome requests Desktop site. */
+@media (pointer:coarse) and (hover:none){
+  .stocks-page .wrap{width:auto!important;max-width:100%!important;margin:0 auto!important;padding-left:12px!important;padding-right:12px!important;box-sizing:border-box!important}
+  .stocks-page .top{flex-wrap:wrap!important;gap:10px!important}
+  .stocks-page .top>.brand{flex:1 1 auto!important;min-width:0!important}
+  .stocks-page .top>.product-mode-nav{display:flex!important;flex:0 0 auto!important;width:auto!important}
+  .stocks-page .terminal-nav{display:flex!important;flex-wrap:nowrap!important;max-width:100%!important;overflow-x:auto!important}
+  .stocks-page .stock-hero{display:block!important}
+  .stocks-page .connection{width:100%!important;max-width:none!important;box-sizing:border-box!important;margin-top:14px!important}
+  .stocks-page .workspace{display:grid!important;grid-template-columns:minmax(0,1fr)!important;gap:12px!important}
+  .stocks-page .workspace>.watch,.stocks-page .workspace>.chart-panel,.stocks-page .workspace>.order-panel{grid-column:1!important}
+  .stocks-page .app-bottom-nav,#zenura-quick-actions{position:fixed!important;inset:auto 0 0 0!important;left:0!important;right:0!important;bottom:0!important;width:auto!important;max-width:none!important;min-width:0!important;transform:none!important;border-radius:0!important;border-left:0!important;border-right:0!important;z-index:2147483647!important;display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr))!important;box-sizing:border-box!important;padding:7px 5px calc(7px + env(safe-area-inset-bottom))!important;min-height:64px!important}
+  #zenura-quick-actions>a{min-width:0!important;min-height:48px!important;font-size:clamp(7px,2.2vw,10px)!important;white-space:normal!important;text-align:center!important}
+  .stocks-page{padding-bottom:calc(76px + env(safe-area-inset-bottom))!important}
+  .stocks-page .paper-language-toggle{bottom:calc(72px + env(safe-area-inset-bottom))!important}
+}
+
+/* Touch-device override: must win even when Android Chrome uses Desktop site viewport. */
+.stocks-page.touch-terminal .wrap{width:auto!important;max-width:100%!important;margin:0 auto!important;padding-left:12px!important;padding-right:12px!important;box-sizing:border-box!important}
+.stocks-page.touch-terminal .top{display:flex!important;flex-wrap:wrap!important;gap:10px!important}
+.stocks-page.touch-terminal .top>.brand{flex:1 1 auto!important;min-width:0!important}
+.stocks-page.touch-terminal .terminal-nav{display:flex!important;flex-wrap:nowrap!important;max-width:100%!important;overflow-x:auto!important;overscroll-behavior-x:contain!important}
+.stocks-page.touch-terminal .stock-hero{display:block!important}
+.stocks-page.touch-terminal .connection{width:100%!important;max-width:none!important;box-sizing:border-box!important;margin-top:14px!important}
+.stocks-page.touch-terminal .notice{grid-template-columns:minmax(0,1fr)!important}
+.stocks-page.touch-terminal .workspace{display:grid!important;grid-template-columns:minmax(0,1fr)!important;gap:12px!important}
+.stocks-page.touch-terminal .workspace>.watch,.stocks-page.touch-terminal .workspace>.chart-panel,.stocks-page.touch-terminal .workspace>.order-panel{grid-column:1!important}
+.stocks-page.touch-terminal #zenura-quick-actions{position:fixed!important;display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr))!important;inset:auto 0 0 0!important;width:100%!important;height:auto!important;min-height:68px!important;max-width:none!important;margin:0!important;padding:7px 5px calc(7px + env(safe-area-inset-bottom))!important;box-sizing:border-box!important;transform:none!important;border-radius:0!important;z-index:2147483647!important;background:#fff!important;border:0!important;border-top:1px solid #d8e2e0!important;box-shadow:0 -6px 22px rgba(0,0,0,.12)!important;visibility:visible!important;opacity:1!important}
+.stocks-page[data-app-theme="night"].touch-terminal #zenura-quick-actions{background:#101923!important;border-top-color:#334451!important}
+.stocks-page.touch-terminal #zenura-quick-actions>a{display:flex!important;min-width:0!important;min-height:50px!important;align-items:center!important;justify-content:center!important;flex-direction:column!important;gap:4px!important;padding:3px 1px!important;color:#087e68!important;font-size:clamp(7px,2.2vw,10px)!important;font-weight:800!important;line-height:1.1!important;text-align:center!important;text-decoration:none!important;white-space:normal!important}
+.stocks-page.touch-terminal #zenura-quick-actions>a>svg{display:block!important;width:21px!important;height:21px!important;max-width:21px!important;flex:none!important}
+.stocks-page.touch-terminal #zenura-quick-actions>a[aria-current=page]{background:#e1f3ee!important;border-radius:9px!important}
+.stocks-page.touch-terminal{padding-bottom:calc(82px + env(safe-area-inset-bottom))!important}
+.stocks-page.touch-terminal .paper-language-toggle{bottom:calc(76px + env(safe-area-inset-bottom))!important}
+.stocks-page.touch-terminal .chart-theme-toggle{bottom:calc(76px + env(safe-area-inset-bottom))!important}
+
+
+/* Sidebar owns page navigation: suppress the legacy horizontal strip on touch phones,
+   including Android Chrome's desktop-site viewport where older rules used !important. */
+.stocks-page.touch-terminal .terminal-nav{display:none!important;visibility:hidden!important;height:0!important;min-height:0!important;margin:0!important;padding:0!important;overflow:hidden!important}
+
+/* Repaint the four quick actions as a compact, opaque mobile dock. */
+.stocks-page.touch-terminal #zenura-quick-actions{
+ position:fixed!important;inset:auto 0 0 0!important;left:0!important;right:0!important;bottom:0!important;
+ display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr))!important;
+ width:100%!important;height:auto!important;min-height:66px!important;max-height:calc(76px + env(safe-area-inset-bottom))!important;
+ padding:6px 5px calc(6px + env(safe-area-inset-bottom))!important;box-sizing:border-box!important;
+ background:var(--app-surface,#fff)!important;border:0!important;border-top:1px solid var(--app-line,#d8e2e0)!important;
+ border-radius:0!important;box-shadow:0 -5px 18px rgba(0,0,0,.09)!important;
+ overflow:hidden!important;isolation:isolate!important;transform:none!important;z-index:2147483647!important
+}
+.stocks-page.touch-terminal #zenura-quick-actions::before,
+.stocks-page.touch-terminal #zenura-quick-actions::after{content:none!important;display:none!important}
+.stocks-page.touch-terminal #zenura-quick-actions>a{display:flex!important;align-items:center!important;justify-content:center!important;flex-direction:column!important;gap:4px!important;min-width:0!important;min-height:50px!important;padding:2px 1px!important;line-height:1.15!important;white-space:normal!important}
+.stocks-page.touch-terminal #zenura-quick-actions>a>svg{display:block!important;width:21px!important;height:21px!important;max-width:21px!important;min-width:21px!important;overflow:visible!important;flex:none!important}
+.stocks-page.touch-terminal #zenura-quick-actions>a>span{display:block!important;max-width:100%!important;font-size:clamp(7px,2.15vw,9px)!important;line-height:1.15!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important}
+.stocks-page.touch-terminal{padding-bottom:calc(78px + env(safe-area-inset-bottom))!important}
+
+/* Route visibility must outrank touch-layout display overrides. The login form
+   is mounted inside .stock-hero, so hiding this section also removes the
+   sign-in panel when a user opens any other workspace page. */
+.stocks-page [data-page-hidden="true"],
+.stocks-page.touch-terminal [data-page-hidden="true"]{
+  display:none!important;
+}
+
+
+/* Keep typed email/password readable on the dark authentication fields.
+   The app-wide input rule uses !important and otherwise overrides this form. */
+.stocks-page .email-auth input,
+.stocks-page .email-auth input:focus,
+.stocks-page .email-auth input:-webkit-autofill,
+.stocks-page .email-auth input:-webkit-autofill:hover,
+.stocks-page .email-auth input:-webkit-autofill:focus{
+  color:#eaf3fa!important;
+  -webkit-text-fill-color:#eaf3fa!important;
+  caret-color:#eaf3fa!important;
+  background-color:#091624!important;
+}
+.stocks-page .email-auth input::placeholder{
+  color:#8da3b6!important;
+  -webkit-text-fill-color:#8da3b6!important;
+  opacity:1!important;
+}
