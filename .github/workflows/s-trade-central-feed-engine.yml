@@ -12,7 +12,9 @@ on:
       - "market-gateway/test/central-market-feed.test.js"
       - "market-gateway/test/redis-market-feed-transport.test.js"
       - "market-gateway/test/authenticated-market-feed-fanout.test.js"
-      - "market-gateway/test/redis-market-feed-subscriber.test.js"
+      - "market-gateway/test/redis-market-feed-subscriber.test.js market-gateway/test/redis-subscriber-lifecycle.test.js"
+      - "market-gateway/lib/redis-subscriber-lifecycle.js"
+      - "market-gateway/test/redis-subscriber-lifecycle.test.js"
       - ".github/workflows/s-trade-central-feed-engine.yml"
   workflow_dispatch:
 
@@ -37,5 +39,7 @@ jobs:
           node --check market-gateway/test/redis-market-feed-transport.test.js
           node --check market-gateway/test/authenticated-market-feed-fanout.test.js
           node --check market-gateway/test/redis-market-feed-subscriber.test.js
+          node --check market-gateway/lib/redis-subscriber-lifecycle.js
+          node --check market-gateway/test/redis-subscriber-lifecycle.test.js
       - name: Run all deterministic market-feed contract tests
         run: node --test market-gateway/test/central-market-feed.test.js market-gateway/test/redis-market-feed-transport.test.js market-gateway/test/authenticated-market-feed-fanout.test.js market-gateway/test/redis-market-feed-subscriber.test.js
