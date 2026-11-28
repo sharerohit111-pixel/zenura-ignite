@@ -181,6 +181,15 @@ app.use("/fyers",createFyersOAuthRouter({
   redirectUri:process.env.FYERS_REDIRECT_URI,
   encryptionKey:process.env.BROKER_TOKEN_ENCRYPTION_KEY||ENC_KEY
 }));
+app.use("/angel-one",createAngelOneRouter({
+  auth,serviceDb,fetchProvider,readProviderJson,
+  apiKey:process.env.ANGEL_ONE_SMARTAPI_KEY,
+  encryptionKey:process.env.BROKER_TOKEN_ENCRYPTION_KEY||ENC_KEY,
+  clientLocalIp:process.env.ANGEL_ONE_CLIENT_LOCAL_IP||"127.0.0.1",
+  clientPublicIp:process.env.ANGEL_ONE_CLIENT_PUBLIC_IP||"127.0.0.1",
+  macAddress:process.env.ANGEL_ONE_MAC_ADDRESS||"00:00:00:00:00:00",
+  sourceId:process.env.ANGEL_ONE_SOURCE_ID||"WEB"
+}));
 app.get("/health",(_req,res)=>res.json({
   ok:true,service:"zenura-supabase-market-gateway",authProvider:"supabase",
   feedProtocol:"upstox-v3",marketDataEnabled:!!marketDataRightsApproval(process.env),marketDataBlockReason:marketDataRightsApproval(process.env)?null:"written_provider_and_regulatory_approval_required",instrumentMasterLoaded:instrumentCache.length>0,
