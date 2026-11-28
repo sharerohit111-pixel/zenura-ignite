@@ -36,3 +36,18 @@
 /* Keep catalog form labels readable over the translucent control panel in both themes. */
 .demo-page .catalog-field{color:var(--d-text)!important}
 .demo-page .catalog-controls{background:var(--d-panel)!important;border-color:var(--d-line)!important}
+
+/* Day-mode chart playground: replace the dark-only demo palette with theme tokens. */
+.demo-page[data-app-theme="day"] .demo-market-panel{background:var(--d-panel)!important;color:var(--d-text)!important;border-color:var(--d-line)!important}
+.demo-page[data-app-theme="day"] .demo-market-panel h2,
+.demo-page[data-app-theme="day"] .demo-chart-meta strong,
+.demo-page[data-app-theme="day"] .demo-ohlc{color:var(--d-text)!important}
+.demo-page[data-app-theme="day"] .demo-market-panel .demo-kicker,
+.demo-page[data-app-theme="day"] .demo-chart-meta small,
+.demo-page[data-app-theme="day"] .demo-time-label,
+.demo-page[data-app-theme="day"] .demo-axis,
+.demo-page[data-app-theme="day"] .demo-depth-label,
+.demo-page[data-app-theme="day"] .demo-quote-meta,
+.demo-page[data-app-theme="day"] .demo-loading{color:var(--d-muted)!important;fill:var(--d-muted)!important}
+.demo-page[data-app-theme="day"] .demo-chart-card,
+.demo-page[data-app-theme="day"] .demo-depth-card{background:var(--d-card)!important;color:var(--d-text)!important;border-color:var(--d-line)!important}
