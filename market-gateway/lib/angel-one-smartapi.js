@@ -181,6 +181,12 @@ function createAngelOneRouter({ auth, serviceDb, fetchProvider, readProviderJson
           const result = await readProviderJson(response, { maxBytes: 128 * 1024 });
           providerRevoked = response.ok && result?.status === true ? "confirmed" : "unconfirmed";
         } catch (_) { providerRevoked = "unconfirmed"; }
+        finally {
+          // The database row is already cleared; also drop decrypted local token references.
+          session.jwtToken = "";
+          session.refreshToken = "";
+          session.feedToken = "";
+        }
       }
       res.set("Cache-Control", "no-store").json({ disconnected: true, providerRevocation: providerRevoked });
     } catch (error) {
