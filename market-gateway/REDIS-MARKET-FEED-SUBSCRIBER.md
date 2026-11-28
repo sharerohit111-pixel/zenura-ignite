@@ -12,7 +12,7 @@ This is an isolated Redis pattern-subscriber adapter. It does not create or own 
 - Serializes message processing to preserve arrival order within this adapter.
 - Bounds queued plus active messages with configurable `maxPendingMessages` (default 1,000; hard maximum 10,000).
 - On queue overflow, immediately changes state to `degraded`, reports `market_feed_queue_overflow` through `onOverflow` (defaulting to `onError`), and refuses further dispatch. Already queued messages are skipped when they reach the head of the queue; the in-progress dispatch may finish.
-- A degraded bridge is not self-healing: the host must mark the feed stale, obtain an authoritative snapshot, then stop and construct a fresh bridge before resuming. Never silently drop overflowed ticks and continue presenting the feed as current.
+- A degraded bridge is not self-healing: the host must mark the feed stale, obtain an authoritative snapshot, then stop and construct a fresh bridge before resuming. Never silently drop overflowed ticks and continue presenting the feed as current. Wire `onOverflow: (error) => lifecycle.invalidate(error.code)` so the lifecycle generation is invalidated immediately; after snapshot recovery, construct a fresh bridge and establish a fresh subscription generation.
 - Reports rejected messages through an injected error callback; malformed messages are not dispatched.
 - Unsubscribes only its own pattern subscription and never closes the shared Redis client.
 - Does not trust channel names as authorization. Per-user access remains the responsibility of the authenticated fan-out module.
