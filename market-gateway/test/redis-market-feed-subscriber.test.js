@@ -164,3 +164,47 @@ test("bounded queue degrades the feed on overflow and stops queued delivery", as
 test("rejects invalid pending queue bounds", () => {
   assert.throws(() => harness({ options: { maxPendingMessages: 0 } }), TypeError);
 });
+
+
+test("queue overflow invalidates lifecycle generation and blocks stale dispatch", async () => {
+  const client = new EventEmitter();
+  client.isReady = false;
+  let unavailableReason;
+  const lifecycle = createRedisSubscriberLifecycle({
+    client,
+    ensureSubscription: async () => {},
+    markUnavailable: (reason) => { unavailableReason = reason; },
+  });
+  await lifecycle.start();
+  client.emit("ready");
+  await lifecycle.onReady();
+  const currentGeneration = lifecycle.getStatus().generation;
+
+  let releaseDispatch;
+  let started;
+  const dispatchStarted = new Promise((resolve) => { started = resolve; });
+  const gate = new Promise((resolve) => { releaseDispatch = resolve; });
+  const h = harness({
+    fanout: { async dispatch(event) {
+      dispatchStarted();
+      await gate;
+      return event.sequence;
+    } },
+    options: {
+      maxPendingMessages: 1,
+      onOverflow(error) { lifecycle.invalidate(error.code); },
+    },
+  });
+  await h.bridge.start();
+  const first = h.emit(JSON.stringify({ instrumentId: "NSE:STALE", sequence: 1 }), "s-trade:market-data:NSE:STALE");
+  await dispatchStarted;
+  assert.equal(await h.emit(JSON.stringify({ instrumentId: "NSE:STALE", sequence: 2 }), "s-trade:market-data:NSE:STALE"), false);
+
+  assert.equal(lifecycle.getStatus().state, "unavailable");
+  assert.equal(lifecycle.isCurrentGeneration(currentGeneration), false);
+  assert.equal(unavailableReason, "market_feed_queue_overflow");
+  releaseDispatch();
+  await first;
+  assert.equal(await h.bridge.stop(), true);
+  await lifecycle.stop();
+});
