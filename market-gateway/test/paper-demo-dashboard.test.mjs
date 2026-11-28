@@ -49,7 +49,7 @@ test("Demo screens disclose synthetic data and isolate local Equity execution fr
  assert.match(privateWatchlists,/controller\.reset\(nextUid\)/);
  assert.match(privateWatchlists,/request !== requestVersion/);
  const worker=await read("../service-worker.js");
- assert.match(worker,/zenura-markets-shell-v24/);
+ assert.match(worker,/zenura-markets-shell-v25/);
  assert.ok(worker.includes("shared/paper-demo-event-ledger.mjs"));
  assert.ok(worker.includes("stocks/demo-watchlist-persistence.mjs"));
  assert.match(worker,/stocks\/demo-watchlist-persistence\.mjs/);
@@ -97,7 +97,7 @@ test("responsive demo assets are included in the Markets PWA shell",async()=>{
  const sw=await readFile(new URL("../../markets/service-worker.js",import.meta.url),"utf8");
  assert.match(css,/@media\(max-width:900px\)/);
  assert.match(css,/@media\(max-width:520px\)/);
- assert.match(sw,/zenura-markets-shell-v24/);
+ assert.match(sw,/zenura-markets-shell-v25/);
  for(const asset of ["stocks/demo.html","stocks/demo.css","stocks/demo.js","stocks/demo-chart-panel.mjs","stocks/demo-chart-data.mjs","shared/paper-demo-adapter.mjs"])assert.ok(sw.includes(asset));
 });
 
