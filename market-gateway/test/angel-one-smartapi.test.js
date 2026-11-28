@@ -1,0 +1,36 @@
+"use strict";
+const test = require("node:test");
+const assert = require("node:assert/strict");
+const { isValidAngelOneLogin, nextAngelOneSessionExpiry, validateAngelOneCredentials } = require("../lib/angel-one-smartapi");
+
+test("Angel One login requires bounded client ID, PIN and current six digit TOTP", () => {
+  assert.deepEqual(validateAngelOneCredentials({ clientcode: "AB1234", pin: "1234", totp: "654321" }),
+    { clientcode: "AB1234", pin: "1234", totp: "654321" });
+  assert.equal(validateAngelOneCredentials({ clientcode: "AB1234", pin: "123", totp: "654321" }), null);
+  assert.equal(validateAngelOneCredentials({ clientcode: "AB1234", pin: "1234", totp: "65432" }), null);
+  assert.equal(validateAngelOneCredentials({ clientcode: "AB1234", pin: "1234", totp: "654321", extra: "unexpected" }).totp, "654321");
+  assert.equal(validateAngelOneCredentials(null), null);
+});
+
+test("Angel One session response must contain JWT, refresh and feed tokens", () => {
+  assert.equal(isValidAngelOneLogin({ status: true, data: { jwtToken: "j", refreshToken: "r", feedToken: "f" } }), true);
+  assert.equal(isValidAngelOneLogin({ status: true, data: { jwtToken: "j", refreshToken: "r" } }), false);
+  assert.equal(isValidAngelOneLogin({ status: false, data: null }), false);
+});
+
+test("Angel One session expiry is next midnight in India time", () => {
+  const now = Date.parse("2026-11-28T12:00:00.000Z");
+  assert.equal(nextAngelOneSessionExpiry(now).toISOString(), "2026-11-28T18:30:00.000Z");
+  assert.throws(() => nextAngelOneSessionExpiry(-1));
+});
+
+test("Angel One adapter never persists or logs PIN and TOTP", () => {
+  const fs = require("node:fs");
+  const path = require("node:path");
+  const source = fs.readFileSync(path.join(__dirname, "../lib/angel-one-smartapi.js"), "utf8");
+  assert.match(source, /credentials\.pin = ""/);
+  assert.match(source, /credentials\.totp = ""/);
+  assert.doesNotMatch(source, /logger\.(?:info|warn|error)\([^\n]*(?:pin|totp|password)/i);
+  assert.match(source, /access_token_ciphertext: encryptedBundle/);
+  assert.match(source, /eq\("broker_name", "angel_one"\)/);
+});
