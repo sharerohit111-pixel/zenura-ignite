@@ -459,7 +459,7 @@ html:has(body.stocks-page.touch-terminal){
   background:var(--app-surface,#07111f)!important;
   color-scheme:light;
 }
-html:has(body.stocks-page.touch-terminal body[data-app-theme="night"]){
+html:has(body.stocks-page.touch-terminal[data-app-theme="night"]){
   background:#101923!important;
   color-scheme:dark;
 }
