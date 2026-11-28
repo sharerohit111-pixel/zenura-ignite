@@ -108,3 +108,9 @@
  .stocks-page .top .brand b{font-size:12px}
  .stocks-page .top .brand small{font-size:7px}
 }
+/* Keep the single product-mode pill intrinsic on desktop; mobile gets its own full row. */
+.stocks-page .top>.product-mode-nav{display:flex;width:auto;max-width:100%;min-width:0;flex:0 0 auto;align-self:center}
+.stocks-page .top>.product-mode-nav>a{flex:0 0 auto;white-space:nowrap}
+@media(max-width:760px){
+ .stocks-page .top>.product-mode-nav{width:100%;flex:1 0 100%;align-self:stretch}
+}
