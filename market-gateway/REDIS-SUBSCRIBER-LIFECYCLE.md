@@ -1,0 +1,20 @@
+# Redis Subscriber Lifecycle Coordinator
+
+This module is an injected, provider-neutral lifecycle adapter. It deliberately does not import a Redis package, create a connection, or select a reconnect policy.
+
+## Contract
+
+- The selected Redis client owns connection establishment and bounded reconnect/backoff policy.
+- The host supplies `ensureSubscription`; it must be idempotent for the supplied connection generation and must match the selected client's auto-resubscribe behavior.
+- A ready event subscribes at most once for the current generation.
+- `end` invalidates the generation and immediately marks the feed unavailable through `markUnavailable`.
+- Dispatchers must use `dispatchIfCurrent(generation, fn)` or `isCurrentGeneration(generation)` to suppress late callbacks.
+- Subscription failure leaves the lifecycle degraded; the client/host decides when the next ready attempt occurs.
+- Shutdown removes only listeners installed by this module. It closes the Redis client only when `closeOwnedClient: true`.
+- This module does not perform source-sequence validation, snapshot recovery, auth, entitlement checks or fan-out; those remain separate contracts.
+
+## Required client-selection follow-up
+
+Before production wiring, document whether the chosen client automatically restores pattern subscriptions, its ready/reconnecting/end event semantics, TLS and ACL options, timeout behavior, retry ceiling, and shutdown semantics. Adapt `ensureSubscription` to that exact behavior and test it against the real client in an isolated integration environment.
+
+No package dependency, runtime configuration, Cloud Run networking, Secret Manager entry, production route or deployment is added here.
