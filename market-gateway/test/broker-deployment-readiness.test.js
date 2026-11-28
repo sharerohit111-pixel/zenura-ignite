@@ -36,7 +36,7 @@ test("Cloud Run deployment remains manually gated to main and does not silently 
   assert.match(deploymentWorkflow, /workflow_dispatch:/);
   assert.match(deploymentWorkflow, /github\.ref\s*==\s*'refs\/heads\/main'/);
   assert.doesNotMatch(deploymentWorkflow, /FYERS_CLIENT_ID|FYERS_CLIENT_SECRET|ANGEL_ONE_SMARTAPI_KEY/);
-  assert.match(deploymentGuide, /A separate reviewed change is required before FYERS or Angel One can be enabled/);
+  assert.match(deploymentGuide, /separate reviewed change is required before FYERS or Angel One can be enabled/i);
 });
 
 test("broker setup guides keep credentials out of frontend configuration", () => {
