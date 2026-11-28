@@ -55,6 +55,26 @@ async function api(path, options = {}) {
   }
   return payload;
 }
+window.ZENURA_START_BROKER_OAUTH = async function (provider) {
+  if (provider !== "fyers") throw new Error("This broker login is not available yet.");
+  const result = await api("/fyers/oauth/start", { method: "POST", body: "{}" });
+  const url = new URL(result.authorizationUrl);
+  if (url.protocol !== "https:" || url.hostname !== "api-t1.fyers.in"
+    || url.pathname !== "/api/v3/generate-authcode") {
+    throw new Error("The server did not return a valid FYERS authorization URL.");
+  }
+  window.location.assign(url.toString());
+};
+const fyersCallbackStatus = new URLSearchParams(window.location.search).get("fyers");
+if (fyersCallbackStatus) {
+  const heading = document.getElementById("connection-title");
+  const detail = document.getElementById("connection-sub");
+  if (heading) heading.textContent = fyersCallbackStatus === "connected" ? "FYERS AUTHORIZED" : "FYERS CONNECTION NOT COMPLETED";
+  if (detail) detail.textContent = fyersCallbackStatus === "connected"
+    ? "Your FYERS session was securely saved. The access token expires at 06:30 IST."
+    : "FYERS authorization could not be completed. Check server configuration and try again.";
+  window.history.replaceState({}, document.title, window.location.pathname + window.location.hash);
+}
 let authStateSequence = 0;
 let currentSession = null;
 async function refreshStatus(sequence = authStateSequence) {
