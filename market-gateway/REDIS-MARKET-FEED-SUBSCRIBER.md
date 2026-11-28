@@ -10,6 +10,9 @@ This is an isolated Redis pattern-subscriber adapter. It does not create or own 
 - Decodes and validates the instrument identifier from the channel.
 - Parses bounded JSON and requires the payload instrument ID to exactly match the channel.
 - Serializes message processing to preserve arrival order within this adapter.
+- Bounds queued plus active messages with configurable `maxPendingMessages` (default 1,000; hard maximum 10,000).
+- On queue overflow, immediately changes state to `degraded`, reports `market_feed_queue_overflow` through `onOverflow` (defaulting to `onError`), and refuses further dispatch. Already queued messages are skipped when they reach the head of the queue; the in-progress dispatch may finish.
+- A degraded bridge is not self-healing: the host must mark the feed stale, obtain an authoritative snapshot, then stop and construct a fresh bridge before resuming. Never silently drop overflowed ticks and continue presenting the feed as current. Wire `onOverflow: (error) => lifecycle.invalidate(error.code)` so the lifecycle generation is invalidated immediately; after snapshot recovery, construct a fresh bridge and establish a fresh subscription generation.
 - Reports rejected messages through an injected error callback; malformed messages are not dispatched.
 - Unsubscribes only its own pattern subscription and never closes the shared Redis client.
 - Does not trust channel names as authorization. Per-user access remains the responsibility of the authenticated fan-out module.
@@ -19,7 +22,7 @@ This is an isolated Redis pattern-subscriber adapter. It does not create or own 
 1. Create a dedicated Redis subscriber client with TLS, ACL credentials, network restrictions and reconnect policy supplied by the host.
 2. Instantiate this bridge once per gateway process, not once per WebSocket client.
 3. Connect `fanout.dispatch` to the authenticated fan-out instance and ensure revocation propagates across replicas.
-4. Add metrics and bounded back-pressure at the host queue; this adapter intentionally serializes processing and should be load-tested against expected tick rates.
+4. Wire `onOverflow` to the lifecycle coordinator so the affected feed becomes unavailable/stale and clients are forced through authoritative snapshot recovery. Export queue depth, rejected count and overflow count as metrics; load-test the configured queue bound against expected tick rates.
 5. The current adapter does not implement reconnect or resubscribe. The host must own Redis client reconnect detection, subscription restoration, duplicate-subscription prevention and shutdown ordering; add integration tests for disconnect/reconnect, missed-message gaps and resubscribe failure before runtime wiring.
 6. Keep vendor and exchange rights/regulatory gates closed until executed approvals explicitly cover S-TRADE paper trading and multi-user distribution.
 

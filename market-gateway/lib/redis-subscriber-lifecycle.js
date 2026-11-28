@@ -71,10 +71,23 @@ function createRedisSubscriberLifecycle({
   }
 
   function onReconnect() {
-    unavailable("reconnecting");
-    if (state !== "stopped" && state !== "unavailable") state = "reconnecting";
+    if (state === "stopped") return;
+    if (state !== "unavailable" && state !== "reconnecting") {
+      generation += 1;
+      subscribedGeneration = -1;
+      readyPromise = null;
+      try { markUnavailable("reconnecting", generation); } catch (error) { report(error); }
+    }
+    state = "reconnecting";
   }
-  function onEnd() { unavailable("end"); }
+  function onEnd() {
+    if (state === "stopped") return;
+    if (state === "reconnecting") {
+      state = "unavailable";
+      return;
+    }
+    unavailable("end");
+  }
   function onClientError(error) { report(error); }
 
   async function start() {
@@ -89,6 +102,16 @@ function createRedisSubscriberLifecycle({
     client.on("end", onEnd);
     client.on("error", onClientError);
     if (client.isReady === true) await onReady();
+    return true;
+  }
+
+  function invalidate(reason = "external-invalidation") {
+    if (state === "stopped" || state === "unavailable") return false;
+    if (state === "reconnecting") {
+      state = "unavailable";
+      return true;
+    }
+    unavailable(reason);
     return true;
   }
 
@@ -129,7 +152,7 @@ function createRedisSubscriberLifecycle({
     return Object.freeze({ state, generation, subscribedGeneration });
   }
 
-  return Object.freeze({ start, stop, onReady, isCurrentGeneration, dispatchIfCurrent, getStatus });
+  return Object.freeze({ start, stop, onReady, invalidate, isCurrentGeneration, dispatchIfCurrent, getStatus });
 }
 
 module.exports = { createRedisSubscriberLifecycle };

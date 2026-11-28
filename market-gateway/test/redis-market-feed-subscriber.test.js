@@ -18,7 +18,10 @@ function harness(overrides = {}) {
   };
   const delivered = [];
   const errors = [];
-  const fanout = { async dispatch(event) { delivered.push(event); return 1; }, ...overrides.fanout };
+  const fanout = { async dispatch(event) {
+    delivered.push(event);
+    return overrides.fanout?.dispatch ? overrides.fanout.dispatch(event) : 1;
+  } };
   const bridge = createRedisMarketFeedSubscriber({
     subscriber, fanout, onError: (error) => errors.push(error.code), ...overrides.options,
   });
@@ -115,5 +118,93 @@ test("subscriber preserves arrival order across a 250-message burst", async () =
   assert.deepEqual(order, Array.from({ length: 250 }, (_, sequence) => sequence));
   assert.equal(h.bridge.getStatus().accepted, 250);
   assert.equal(h.bridge.getStatus().rejected, 0);
+  assert.equal(h.bridge.getStatus().pendingMessages, 0);
   await h.bridge.stop();
+});
+
+
+test("bounded queue degrades the feed on overflow and stops queued delivery", async () => {
+  let releaseDispatch;
+  let dispatchStarted;
+  const started = new Promise((resolve) => { dispatchStarted = resolve; });
+  const gate = new Promise((resolve) => { releaseDispatch = resolve; });
+  const overflowErrors = [];
+  const h = harness({
+    fanout: { async dispatch(event) {
+      dispatchStarted();
+      await gate;
+      return event.sequence;
+    } },
+    options: {
+      maxPendingMessages: 2,
+      onOverflow(error) { overflowErrors.push(error.code); },
+    },
+  });
+  await h.bridge.start();
+
+  const first = h.emit(JSON.stringify({ instrumentId: "NSE:QUEUE", sequence: 1 }), "s-trade:market-data:NSE:QUEUE");
+  await started;
+  const second = h.emit(JSON.stringify({ instrumentId: "NSE:QUEUE", sequence: 2 }), "s-trade:market-data:NSE:QUEUE");
+  assert.equal(await h.emit(JSON.stringify({ instrumentId: "NSE:QUEUE", sequence: 3 }), "s-trade:market-data:NSE:QUEUE"), false);
+
+  assert.equal(h.bridge.getStatus().state, "degraded");
+  assert.equal(h.bridge.getStatus().pendingMessages, 2);
+  assert.equal(h.bridge.getStatus().overflowCount, 1);
+  assert.deepEqual(overflowErrors, ["market_feed_queue_overflow"]);
+
+  releaseDispatch();
+  assert.equal(await first, 1);
+  assert.equal(await second, false);
+  assert.deepEqual(h.delivered, [{ instrumentId: "NSE:QUEUE", sequence: 1 }]);
+  assert.equal(h.bridge.getStatus().pendingMessages, 0);
+  assert.equal(await h.bridge.stop(), true);
+  assert.deepEqual(h.calls.at(-1), ["unsubscribe", CHANNEL_PATTERN]);
+});
+
+test("rejects invalid pending queue bounds", () => {
+  assert.throws(() => harness({ options: { maxPendingMessages: 0 } }), TypeError);
+});
+
+
+test("queue overflow invalidates lifecycle generation and blocks stale dispatch", async () => {
+  const client = new EventEmitter();
+  client.isReady = false;
+  let unavailableReason;
+  const lifecycle = createRedisSubscriberLifecycle({
+    client,
+    ensureSubscription: async () => {},
+    markUnavailable: (reason) => { unavailableReason = reason; },
+  });
+  await lifecycle.start();
+  client.emit("ready");
+  await lifecycle.onReady();
+  const currentGeneration = lifecycle.getStatus().generation;
+
+  let releaseDispatch;
+  let started;
+  const dispatchStarted = new Promise((resolve) => { started = resolve; });
+  const gate = new Promise((resolve) => { releaseDispatch = resolve; });
+  const h = harness({
+    fanout: { async dispatch(event) {
+      dispatchStarted();
+      await gate;
+      return event.sequence;
+    } },
+    options: {
+      maxPendingMessages: 1,
+      onOverflow(error) { lifecycle.invalidate(error.code); },
+    },
+  });
+  await h.bridge.start();
+  const first = h.emit(JSON.stringify({ instrumentId: "NSE:STALE", sequence: 1 }), "s-trade:market-data:NSE:STALE");
+  await dispatchStarted;
+  assert.equal(await h.emit(JSON.stringify({ instrumentId: "NSE:STALE", sequence: 2 }), "s-trade:market-data:NSE:STALE"), false);
+
+  assert.equal(lifecycle.getStatus().state, "unavailable");
+  assert.equal(lifecycle.isCurrentGeneration(currentGeneration), false);
+  assert.equal(unavailableReason, "market_feed_queue_overflow");
+  releaseDispatch();
+  await first;
+  assert.equal(await h.bridge.stop(), true);
+  await lifecycle.stop();
 });
