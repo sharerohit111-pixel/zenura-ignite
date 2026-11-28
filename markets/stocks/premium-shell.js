@@ -43,7 +43,7 @@ document.querySelectorAll(".terminal-nav > a[data-terminal-page]").forEach(a=>{
  a.classList.add("terminal-nav-link");
 });
 const bottom=document.createElement("nav");bottom.className="app-bottom-nav";bottom.dataset.appBottomNav="";bottom.setAttribute("aria-label","Quick trading navigation");bottom.setAttribute("role","navigation");bottom.dataset.quickTradeNav="";
-const items=[["derivatives","Option Chain"],["support","Help & Support"],["positions","Live Pos. / P&L"],["watchlist","Quick Watchlist"]];
+const items=[["derivatives","Option Chain"],["positions","Live Pos. / P&L"],["watchlist","Quick Watchlist"],["support","Help & Support"]];
 items.forEach(([page,label])=>{
  const a=document.createElement("a");
  a.href="#"+page;
