@@ -185,6 +185,7 @@
   window.addEventListener("zenura-broker-connection-missing", open);
   window.addEventListener("zenura-fyers-connection-updated", refreshFyersStatus);
   window.addEventListener("zenura-angel-one-connection-updated", refreshAngelOneStatus);
+  window.addEventListener("zenura-market-auth-ready", refreshFyersStatus);
   window.addEventListener("zenura-market-auth-ready", refreshAngelOneStatus);
   window.addEventListener("zenura-market-auth-ready", (event) => {
     if (event.detail?.signedIn && status?.textContent?.includes("AUTHORIZED")) close();
