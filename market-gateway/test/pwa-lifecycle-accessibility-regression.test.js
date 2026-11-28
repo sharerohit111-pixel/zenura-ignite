@@ -19,7 +19,7 @@ test("Markets PWA manifest remains installable and scoped away from Crypto",()=>
 test("service worker cache generation is explicit and activation removes stale Markets generations",()=>{
  const sw=read("markets/service-worker.js");
  const cache=sw.match(/const CACHE_NAME="([^"]+)"/)?.[1];
- assert.equal(cache,"zenura-markets-shell-v14");
+ assert.equal(cache,"zenura-markets-shell-v15");
  assert.match(sw,/await self\.skipWaiting\(\)/);
  assert.match(sw,/await self\.clients\.claim\(\)/);
  assert.match(sw,/key\.startsWith\("zenura-markets-"\)&&key!==CACHE_NAME/);
@@ -72,4 +72,24 @@ test("paper terminal has separate navigation destinations and offline page routi
  assert.match(nav,/configurePortfolio/);
  assert.ok(sw.includes('"stocks/page-navigation.js"'));
  assert.match(nav,/data-settings-action/);
+});
+
+test("broken image artifacts at the mobile viewport bottom are removed without hiding the main page",()=>{
+ const guard=read("markets/bottom-artifact-guard.js");
+ const portal=read("markets/index.html");
+ const terminal=read("markets/stocks/index.html");
+ assert.match(portal,/bottom-artifact-guard\\.js/);
+ assert.match(terminal,/bottom-artifact-guard\\.js/);
+ assert.match(guard,/img\\.naturalWidth===0/);
+ assert.match(guard,/r\\.bottom>h-220/);
+ assert.match(guard,/zenura-empty-bottom-asset-wrap/);
+ assert.match(guard,/MutationObserver/);
+});
+
+test("PWA registration checks for updates on launch and when the app returns to foreground",()=>{
+ const registration=read("markets/pwa-register.js");
+ assert.match(registration,/updateViaCache:"none"/);
+ assert.match(registration,/registration\\.update\\(\\)/);
+ assert.match(registration,/controllerchange/);
+ assert.match(registration,/visibilitychange/);
 });
