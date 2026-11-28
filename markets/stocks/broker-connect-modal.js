@@ -54,8 +54,18 @@
         const existing = document.getElementById("upstox-connect");
         if (existing) existing.click();
         else feedback.textContent = "Upstox authorization control is not available on this page.";
+      } else if (providerButton.dataset.provider === "fyers") {
+        providerButton.disabled = true;
+        feedback.textContent = "Preparing secure FYERS authorization…";
+        Promise.resolve().then(() => {
+          if (typeof window.ZENURA_START_BROKER_OAUTH !== "function") throw new Error("Secure FYERS login is not ready on this page.");
+          return window.ZENURA_START_BROKER_OAUTH("fyers");
+        }).catch((error) => {
+          feedback.textContent = error?.message || "FYERS authorization could not be started.";
+          providerButton.disabled = false;
+        });
       } else {
-        feedback.textContent = providerButton.dataset.provider.toUpperCase().replace("_", " ") + " secure login integration is being completed. Demo / Replay remains available.";
+        feedback.textContent = "ANGEL ONE secure SmartAPI session integration is still in progress. Demo / Replay remains available.";
       }
     }
     if (target.closest("[data-demo-mode]")) {
