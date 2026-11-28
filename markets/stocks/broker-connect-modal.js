@@ -28,6 +28,15 @@
       button.type = "button";
       button.dataset.provider = p.id;
       card.append(head, button);
+      if (p.id === "fyers") {
+        const brokerStatus = el("small", "broker-connect-status", "Checking FYERS connection…");
+        brokerStatus.dataset.fyersStatus = "true";
+        const disconnect = el("button", "broker-connect-disconnect", "Disconnect FYERS");
+        disconnect.type = "button";
+        disconnect.dataset.fyersDisconnect = "true";
+        disconnect.hidden = true;
+        card.append(brokerStatus, disconnect);
+      }
       loginGrid.append(card);
 
       const account = el("article", "broker-account-card");
@@ -42,12 +51,45 @@
       accountGrid.append(account);
     });
   }
+  async function refreshFyersStatus() {
+    const statusNode = root.querySelector("[data-fyers-status]");
+    const disconnectNode = root.querySelector("[data-fyers-disconnect]");
+    if (!statusNode || typeof window.ZENURA_GET_BROKER_STATUS !== "function") {
+      if (statusNode) statusNode.textContent = "Secure login status unavailable until sign-in.";
+      return;
+    }
+    try {
+      const result = await window.ZENURA_GET_BROKER_STATUS("fyers");
+      statusNode.textContent = result.connected
+        ? "CONNECTED · expires " + new Date(result.expiresAt).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", dateStyle: "medium", timeStyle: "short" }) + " IST"
+        : "NOT CONNECTED";
+      disconnectNode.hidden = !result.connected;
+    } catch (_) {
+      statusNode.textContent = "Sign in to check FYERS connection.";
+      disconnectNode.hidden = true;
+    }
+  }
   function open() { root.hidden = false; document.body.classList.add("broker-connect-open"); }
   function close() { root.hidden = true; document.body.classList.remove("broker-connect-open"); }
   render();
   root.addEventListener("click", (event) => {
     const target = event.target;
     if (target.matches("[data-close-broker-modal]") || target === root) close();
+    const disconnectFyers = target.closest("[data-fyers-disconnect]");
+    if (disconnectFyers) {
+      disconnectFyers.disabled = true;
+      feedback.textContent = "Disconnecting FYERS…";
+      Promise.resolve().then(() => {
+        if (typeof window.ZENURA_DISCONNECT_BROKER !== "function") throw new Error("FYERS disconnect is not ready.");
+        return window.ZENURA_DISCONNECT_BROKER("fyers");
+      }).then(() => {
+        feedback.textContent = "FYERS disconnected from this app.";
+        refreshFyersStatus();
+      }).catch((error) => {
+        feedback.textContent = error?.message || "FYERS disconnect failed.";
+      }).finally(() => { disconnectFyers.disabled = false; });
+      return;
+    }
     const providerButton = target.closest("[data-provider]");
     if (providerButton) {
       if (providerButton.dataset.provider === "upstox") {
@@ -79,7 +121,7 @@
   window.ZENURA_BROKER_CONNECT_MODAL = Object.freeze({ open, close });
   window.addEventListener("zenura-broker-connection-ready", close);
   window.addEventListener("zenura-broker-connection-expired", open);
-  window.addEventListener("zenura-broker-connection-missing", open);
+  window.addEventListener("zenura-broker-connection-missing", open);\n  window.addEventListener("zenura-fyers-connection-updated", refreshFyersStatus);
   window.addEventListener("zenura-market-auth-ready", (event) => {
     if (event.detail?.signedIn && status?.textContent?.includes("AUTHORIZED")) close();
   });
