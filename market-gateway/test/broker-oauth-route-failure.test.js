@@ -530,8 +530,6 @@ test("Angel One invalid provider login response is scrubbed and never persisted"
 
 
 test("Angel One login scrubs credentials after provider network and secure-save failures", async () => {
-  const network = angelLoginHarness();
-  network.router.stack.find(layer => layer.route?.path === "/session").route.stack[0].handle;
   const networkRouter = createAngelOneRouter({
     auth: async () => ({ user: { id: "user-4", emailConfirmedAt: "2026-01-01" } }),
     serviceDb: {
