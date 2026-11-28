@@ -25,3 +25,12 @@ test("FYERS callback must be an exact clean HTTPS endpoint", () => {
   assert.equal(isValidFyersRedirectUri("https://gateway.example/fyers/oauth/callback?next=x"), false);
   assert.equal(isValidFyersRedirectUri("https://gateway.example/other"), false);
 });
+
+test("FYERS OAuth adapter clears the plaintext token response after encryption", () => {
+  const fs = require("node:fs");
+  const path = require("node:path");
+  const source = fs.readFileSync(path.join(__dirname, "../lib/fyers-oauth.js"), "utf8");
+  assert.match(source, /const encryptedAccessToken = encryptUpstoxToken\(tokenPayload\.access_token, encryptionKey\)/);
+  assert.match(source, /tokenPayload\.access_token = ""/);
+  assert.match(source, /access_token_ciphertext: encryptedAccessToken/);
+});
