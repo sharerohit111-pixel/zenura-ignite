@@ -60,6 +60,46 @@ function createFyersOAuthRouter({ auth, serviceDb, fetchProvider, readProviderJs
     }
   });
 
+  router.get("/connection", async (req, res) => {
+    try {
+      const { user } = await auth(req);
+      const { data, error } = await serviceDb.from("broker_connections")
+        .select("connection_status,token_expires_at,last_authenticated_at")
+        .eq("user_id", user.id).eq("broker_name", "fyers").maybeSingle();
+      if (error) throw Object.assign(new Error("FYERS connection status is unavailable."), { status: 503 });
+      const expiresAt = data?.token_expires_at ? Date.parse(data.token_expires_at) : null;
+      const connected = data?.connection_status === "connected" && Number.isFinite(expiresAt) && expiresAt > Date.now();
+      res.set("Cache-Control", "private, no-store").json({
+        connected,
+        status: connected ? "connected" : (data?.connection_status || "disconnected"),
+        expiresAt: connected ? expiresAt : null,
+        lastAuthenticatedAt: data?.last_authenticated_at || null
+      });
+    } catch (error) {
+      res.status(Number.isInteger(error.status) ? error.status : 500)
+        .json({ error: error.status ? error.message : "FYERS connection status could not be loaded." });
+    }
+  });
+
+  router.delete("/connection", async (req, res) => {
+    try {
+      const { user } = await auth(req);
+      const { error } = await serviceDb.from("broker_connections").update({
+        connection_status: "disconnected",
+        access_token_ciphertext: null,
+        refresh_token_ciphertext: null,
+        token_expires_at: null,
+        refresh_token_expires_at: null,
+        updated_at: new Date().toISOString()
+      }).eq("user_id", user.id).eq("broker_name", "fyers");
+      if (error) throw Object.assign(new Error("FYERS connection could not be disconnected."), { status: 503 });
+      res.set("Cache-Control", "no-store").json({ disconnected: true });
+    } catch (error) {
+      res.status(Number.isInteger(error.status) ? error.status : 500)
+        .json({ error: error.status ? error.message : "FYERS disconnect failed." });
+    }
+  });
+
   router.get("/oauth/callback", async (req, res) => {
     try {
       const code = req.query.auth_code;
