@@ -16,6 +16,12 @@ test("Angel One session response must contain JWT, refresh and feed tokens", () 
   assert.equal(isValidAngelOneLogin({ status: true, data: { jwtToken: "j", refreshToken: "r", feedToken: "f" } }), true);
   assert.equal(isValidAngelOneLogin({ status: true, data: { jwtToken: "j", refreshToken: "r" } }), false);
   assert.equal(isValidAngelOneLogin({ status: false, data: null }), false);
+  assert.equal(isValidAngelOneLogin({ status: true, data: {
+    jwtToken: "j".repeat(16385), refreshToken: "r", feedToken: "f"
+  } }), false);
+  assert.equal(isValidAngelOneLogin({ status: true, data: {
+    jwtToken: "j\\n", refreshToken: "r", feedToken: "f"
+  } }), false);
 });
 
 test("Angel One session expiry is midnight on the next India-local day", () => {
