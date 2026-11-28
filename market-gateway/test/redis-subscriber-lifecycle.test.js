@@ -135,3 +135,17 @@ test("shutdown drains an in-flight subscription before closing an owned client",
   assert.equal(quit, 1);
   assert.equal(h.lifecycle.getStatus().state, "stopped");
 });
+
+
+test("client error event is reported without shadowing subscription failure reporting", async () => {
+  const h = harness({
+    ensureSubscription: async () => { throw new Error("subscribe failed"); },
+  });
+  await h.lifecycle.start();
+  h.client.emit("error", new Error("client transport error"));
+  h.client.emit("ready");
+  await h.lifecycle.onReady();
+  assert.ok(h.calls.some((x) => x[0] === "error" && x[1] === "client transport error"));
+  assert.ok(h.calls.some((x) => x[0] === "error" && x[1] === "subscribe failed"));
+  assert.equal(h.lifecycle.getStatus().state, "degraded");
+});
