@@ -47,7 +47,7 @@ test("fetch handler fails closed for authorization, token URLs and non-allowlist
 
 test("offline navigation has deterministic cached-shell or 503 fallback",()=>{
  const sw=read("markets/service-worker.js");
- assert.match(sw,/caches\.match\(request\)\|\|await caches\.match\(new URL\("\.\/",BASE\)\.toString\(\)\)/);
+ assert.match(sw,/cache\.match\(request\)\|\|await cache\.match\(new URL\("\.\/",BASE\)\.toString\(\)\)/);
  assert.match(sw,/status:503/);
  assert.match(sw,/ZENURA IGNITE is offline/);
 });
