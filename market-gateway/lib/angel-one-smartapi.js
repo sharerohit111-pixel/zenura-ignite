@@ -58,7 +58,14 @@ function createAngelOneRouter({ auth, serviceDb, fetchProvider, readProviderJson
       // Scrub parsed request secrets immediately, including malformed requests, before returning.
       if (req.body && typeof req.body === "object") { req.body.pin = ""; req.body.totp = ""; }
       if (!credentials) return res.status(400).json({ error: "Enter a valid Client ID, 4–6 digit PIN and current 6-digit TOTP." });
-      const { data: rateRows, error: rateError } = await serviceDb.rpc("reserve_angel_one_login_attempt", { p_user_id: user.id });
+      let rateRows, rateError;
+      try {
+        ({ data: rateRows, error: rateError } = await serviceDb.rpc("reserve_angel_one_login_attempt", { p_user_id: user.id }));
+      } catch (error) {
+        credentials.pin = "";
+        credentials.totp = "";
+        throw error;
+      }
       const rate = Array.isArray(rateRows) ? rateRows[0] : rateRows;
       if (rateError || !rate) {
         credentials.pin = ""; credentials.totp = "";
