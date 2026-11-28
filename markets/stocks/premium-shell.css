@@ -283,3 +283,266 @@
 /* Five-item primary mobile navigation: Home, Option Chain, P&L, Watchlist, Help. */
 #zenura-quick-actions{grid-template-columns:repeat(5,minmax(0,1fr))!important}
 #zenura-quick-actions>a>span{font-size:clamp(7px,1.95vw,9px)!important;letter-spacing:-.15px}
+
+
+/* Single final Android dock contract: fixed to the visual viewport, never height-capped. */
+@supports (height: 100dvh){
+  .stocks-page.touch-terminal #zenura-quick-actions{
+    position:fixed!important;
+    inset:auto 0 0 0!important;
+    width:100vw!important;
+    height:auto!important;
+    min-height:68px!important;
+    max-height:none!important;
+    grid-template-columns:repeat(5,minmax(0,1fr))!important;
+    padding:6px max(5px,env(safe-area-inset-left)) calc(6px + env(safe-area-inset-bottom)) max(5px,env(safe-area-inset-right))!important;
+    box-sizing:border-box!important;
+    overflow:visible!important;
+    z-index:2147483647!important;
+    transform:translate3d(0,0,0)!important;
+    isolation:isolate!important;
+  }
+  .stocks-page.touch-terminal #zenura-quick-actions>a{
+    min-height:52px!important;
+    height:auto!important;
+    overflow:visible!important;
+  }
+  .stocks-page.touch-terminal{
+    padding-bottom:calc(82px + env(safe-area-inset-bottom))!important;
+  }
+}
+.stocks-page.touch-terminal #zenura-quick-actions>a>span{
+  display:block!important;
+  width:100%!important;
+  font-size:clamp(7px,2.05vw,9px)!important;
+  line-height:1.15!important;
+  text-align:center!important;
+}
+
+
+/* Form-control contrast repair: watchlist search and Futures selectors in both themes. */
+.stocks-page .search{
+  background:var(--app-raised)!important;
+  border:1px solid var(--app-line)!important;
+  color:var(--app-muted)!important;
+}
+.stocks-page .search input,
+.stocks-page .search input:focus,
+.stocks-page .search input:-webkit-autofill,
+.stocks-page .search input:-webkit-autofill:hover,
+.stocks-page .search input:-webkit-autofill:focus{
+  background:transparent!important;
+  color:var(--app-text)!important;
+  -webkit-text-fill-color:var(--app-text)!important;
+  caret-color:var(--app-accent-strong)!important;
+  opacity:1!important;
+}
+.stocks-page .search input::placeholder{
+  color:var(--app-muted)!important;
+  -webkit-text-fill-color:var(--app-muted)!important;
+  opacity:1!important;
+}
+.stocks-page .option-controls select,
+.stocks-page .option-controls input,
+.stocks-page .futures-margin-panel select,
+.stocks-page .futures-margin-panel input,
+.stocks-page .futures-order-panel select,
+.stocks-page .futures-order-panel input{
+  background:var(--app-raised)!important;
+  color:var(--app-text)!important;
+  -webkit-text-fill-color:var(--app-text)!important;
+  border:1px solid var(--app-line)!important;
+  color-scheme:light;
+}
+.stocks-page[data-app-theme="night"] .option-controls select,
+.stocks-page[data-app-theme="night"] .option-controls input,
+.stocks-page[data-app-theme="night"] .futures-margin-panel select,
+.stocks-page[data-app-theme="night"] .futures-margin-panel input,
+.stocks-page[data-app-theme="night"] .futures-order-panel select,
+.stocks-page[data-app-theme="night"] .futures-order-panel input{
+  color-scheme:dark;
+}
+.stocks-page .option-controls select option,
+.stocks-page .futures-margin-panel select option,
+.stocks-page .futures-order-panel select option{
+  background:var(--app-surface);
+  color:var(--app-text);
+}
+.stocks-page .search:focus-within,
+.stocks-page .option-controls select:focus-visible,
+.stocks-page .futures-margin-panel select:focus-visible,
+.stocks-page .futures-order-panel select:focus-visible{
+  outline:2px solid color-mix(in srgb,var(--app-accent) 65%,transparent);
+  outline-offset:2px;
+}
+
+
+/* Android touch dock: unconditional full-width fixed positioning.
+   Do not gate this on 100dvh support or JS inline styles (CSP blocks style attributes). */
+body.stocks-page.touch-terminal #zenura-quick-actions,
+body.stocks-page.touch-terminal nav#zenura-quick-actions.app-bottom-nav{
+  position:fixed!important;
+  inset:auto 0 0 0!important;
+  left:0!important;
+  right:0!important;
+  bottom:0!important;
+  width:100%!important;
+  max-width:none!important;
+  min-width:0!important;
+  height:calc(72px + env(safe-area-inset-bottom, 0px))!important;
+  min-height:calc(72px + env(safe-area-inset-bottom, 0px))!important;
+  max-height:none!important;
+  margin:0!important;
+  padding:6px max(8px,env(safe-area-inset-left, 0px)) calc(6px + env(safe-area-inset-bottom, 0px)) max(8px,env(safe-area-inset-right, 0px))!important;
+  box-sizing:border-box!important;
+  display:grid!important;
+  grid-template-columns:repeat(5,minmax(0,1fr))!important;
+  align-items:stretch!important;
+  gap:2px!important;
+  overflow:visible!important;
+  background:var(--app-surface,#fff)!important;
+  border:0!important;
+  border-top:1px solid var(--app-line,#dce5e3)!important;
+  border-radius:0!important;
+  box-shadow:0 -8px 28px rgba(0,0,0,.10)!important;
+  backdrop-filter:none!important;
+  -webkit-backdrop-filter:none!important;
+  transform:none!important;
+  filter:none!important;
+  opacity:1!important;
+  visibility:visible!important;
+  pointer-events:auto!important;
+  z-index:2147483647!important;
+  isolation:isolate!important;
+}
+body.stocks-page.touch-terminal #zenura-quick-actions>a{
+  display:flex!important;
+  min-width:0!important;
+  min-height:54px!important;
+  height:100%!important;
+  padding:2px 1px!important;
+  margin:0!important;
+  flex-direction:column!important;
+  align-items:center!important;
+  justify-content:center!important;
+  gap:4px!important;
+  overflow:visible!important;
+  white-space:nowrap!important;
+  text-decoration:none!important;
+}
+body.stocks-page.touch-terminal #zenura-quick-actions>a>svg{
+  display:block!important;
+  width:21px!important;
+  height:21px!important;
+  flex:0 0 21px!important;
+  overflow:visible!important;
+}
+body.stocks-page.touch-terminal #zenura-quick-actions>a>span{
+  display:block!important;
+  width:100%!important;
+  max-width:100%!important;
+  font-size:clamp(7px,2.05vw,9px)!important;
+  line-height:1.15!important;
+  text-align:center!important;
+  white-space:nowrap!important;
+  overflow:hidden!important;
+  text-overflow:ellipsis!important;
+}
+body.stocks-page.touch-terminal{
+  padding-bottom:calc(90px + env(safe-area-inset-bottom, 0px))!important;
+}
+
+
+/* FINAL ANDROID DOCK CONTRACT — keep the app canvas and dock painted to the
+   physical viewport edge. Safe-area padding belongs inside the dock exactly once. */
+html:has(body.stocks-page.touch-terminal){
+  background:var(--app-surface,#07111f)!important;
+  color-scheme:light;
+}
+html:has(body.stocks-page.touch-terminal[data-app-theme="night"]){
+  background:#101923!important;
+  color-scheme:dark;
+}
+body.stocks-page.touch-terminal{
+  min-height:100vh!important;
+  min-height:100dvh!important;
+  padding-bottom:calc(84px + env(safe-area-inset-bottom,0px))!important;
+  overscroll-behavior-y:none!important;
+}
+body.stocks-page.touch-terminal #zenura-quick-actions,
+body.stocks-page.touch-terminal nav#zenura-quick-actions.app-bottom-nav{
+  position:fixed!important;
+  inset:auto 0 0 0!important;
+  left:0!important;
+  right:0!important;
+  bottom:0!important;
+  width:100%!important;
+  height:calc(72px + env(safe-area-inset-bottom,0px))!important;
+  min-height:calc(72px + env(safe-area-inset-bottom,0px))!important;
+  max-height:none!important;
+  margin:0!important;
+  padding:6px max(8px,env(safe-area-inset-right,0px)) calc(6px + env(safe-area-inset-bottom,0px)) max(8px,env(safe-area-inset-left,0px))!important;
+  box-sizing:border-box!important;
+  display:grid!important;
+  grid-template-columns:repeat(5,minmax(0,1fr))!important;
+  align-items:stretch!important;
+  gap:2px!important;
+  overflow:visible!important;
+  background:var(--app-surface,#fff)!important;
+  background-image:none!important;
+  border:0!important;
+  border-top:1px solid var(--app-line,#dce5e3)!important;
+  border-radius:0!important;
+  box-shadow:0 -6px 18px rgba(0,0,0,.08)!important;
+  backdrop-filter:none!important;
+  -webkit-backdrop-filter:none!important;
+  transform:none!important;
+  filter:none!important;
+  opacity:1!important;
+  visibility:visible!important;
+  pointer-events:auto!important;
+  z-index:2147483647!important;
+  isolation:isolate!important;
+}
+body.stocks-page.touch-terminal #zenura-quick-actions::before,
+body.stocks-page.touch-terminal #zenura-quick-actions::after{
+  content:none!important;
+  display:none!important;
+}
+body.stocks-page.touch-terminal #zenura-quick-actions>a{
+  display:flex!important;
+  min-width:0!important;
+  min-height:54px!important;
+  height:100%!important;
+  margin:0!important;
+  padding:2px 1px!important;
+  flex-direction:column!important;
+  align-items:center!important;
+  justify-content:center!important;
+  gap:4px!important;
+  overflow:visible!important;
+  white-space:nowrap!important;
+}
+body.stocks-page.touch-terminal #zenura-quick-actions>a>svg{
+  display:block!important;
+  width:21px!important;
+  height:21px!important;
+  flex:0 0 21px!important;
+  overflow:visible!important;
+}
+body.stocks-page.touch-terminal #zenura-quick-actions>a>span{
+  display:block!important;
+  width:100%!important;
+  max-width:100%!important;
+  font-size:clamp(7px,2.05vw,9px)!important;
+  line-height:1.15!important;
+  text-align:center!important;
+  white-space:nowrap!important;
+  overflow:hidden!important;
+  text-overflow:ellipsis!important;
+}
+
+
+/* Hide only failed image elements that overlap the Android bottom dock. */
+.stocks-page.touch-terminal .zenura-broken-bottom-image,
+.stocks-page.touch-terminal .zenura-broken-bottom-image-wrap{display:none!important;visibility:hidden!important;}
