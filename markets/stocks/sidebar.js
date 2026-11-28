@@ -35,7 +35,7 @@ if(settings&&!settings.querySelector(".settings-feature-grid")){
  ["theme","Day / Night Theme","App की रोशनी और रंग बदलें"],
  ["language","हिंदी / English भाषा","ऐप की भाषा बदलें"],
  ["chart","Chart Settings","चार्ट प्रकार और indicators"],
- ["notifications","Notifications & Alerts","ब्राउज़र नोटिफिकेशन अनुमति"],
+ ["notifications","Notifications & Alerts","ब्राउज़र नोटिफिकेशन अनुमति · Alert Engine pending"],
  ["account","Account & Upstox Connection","अकाउंट और Upstox कनेक्शन"],
  ["security","Security & Logout","सुरक्षा और सुरक्षित साइन आउट"]
  ];
@@ -70,9 +70,9 @@ function runSetting(id){
  }
  if(id==="notifications"){
   if(!("Notification" in window)){status("इस ब्राउज़र में Notifications उपलब्ध नहीं हैं।");return}
-  if(Notification.permission==="granted"){status("Browser notifications की अनुमति पहले से चालू है।");return}
+  if(Notification.permission==="granted"){status("Browser notifications की अनुमति चालू है। Price Alert delivery के लिए Alert Engine अभी उपलब्ध नहीं है।");return}
   if(Notification.permission==="denied"){status("Notifications ब्राउज़र सेटिंग्स में Block हैं। साइट की अनुमति बदलें।");return}
-  Notification.requestPermission().then(p=>status(p==="granted"?"Browser notifications की अनुमति मिल गई।":p==="denied"?"Notifications की अनुमति अस्वीकार हुई।":"अनुमति अभी नहीं दी गई।")).catch(()=>status("Notification permission उपलब्ध नहीं हो सकी।"));
+  Notification.requestPermission().then(p=>status(p==="granted"?"Browser notifications की अनुमति मिल गई। Price Alert delivery के लिए Alert Engine अभी उपलब्ध नहीं है।":p==="denied"?"Notifications की अनुमति अस्वीकार हुई।":"अनुमति अभी नहीं दी गई।")).catch(()=>status("Notification permission उपलब्ध नहीं हो सकी।"));
  }
 }
 syncActive(location.hash.slice(1)||"dashboard");
