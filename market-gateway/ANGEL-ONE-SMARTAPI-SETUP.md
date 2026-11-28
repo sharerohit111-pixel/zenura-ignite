@@ -17,7 +17,7 @@ The gateway deliberately returns configuration unavailable until all required he
 
 - The login endpoint is rate-limited per authenticated user (five attempts per 15 minutes and at least one second between attempts, enforced by a shared Supabase database limiter across gateway instances).
 - Only the JWT, refresh token and feed token bundle is AES-256-GCM encrypted and persisted in the server-only `broker_connections` row.
-- The session expiry is recorded at 05:00 IST on the subsequent calendar day, consistent with Angel One SmartAPI's published session guidance; sessions can be invalidated earlier by logout or account credential changes. No automatic refresh is enabled in this initial adapter.
+- The session expiry is recorded at midnight IST on the subsequent calendar day, consistent with Angel One SmartAPI's current official documentation; sessions can be invalidated earlier by logout or account credential changes. No automatic refresh is enabled in this initial adapter.
 - Disconnect clears this user's Angel One encrypted session first, then attempts the provider logout endpoint. The response distinguishes confirmed from unconfirmed provider logout.
 - This integration is for account connection/session only. It does not submit real broker orders.
 - Demo / Replay remains independent and requires no Angel One credentials.
