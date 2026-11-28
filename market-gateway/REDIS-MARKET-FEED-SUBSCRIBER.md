@@ -20,7 +20,7 @@ This is an isolated Redis pattern-subscriber adapter. It does not create or own 
 2. Instantiate this bridge once per gateway process, not once per WebSocket client.
 3. Connect `fanout.dispatch` to the authenticated fan-out instance and ensure revocation propagates across replicas.
 4. Add metrics and bounded back-pressure at the host queue; this adapter intentionally serializes processing and should be load-tested against expected tick rates.
-5. Test Redis reconnect/resubscribe behavior and shutdown ordering before runtime wiring.
+5. The current adapter does not implement reconnect or resubscribe. The host must own Redis client reconnect detection, subscription restoration, duplicate-subscription prevention and shutdown ordering; add integration tests for disconnect/reconnect, missed-message gaps and resubscribe failure before runtime wiring.
 6. Keep vendor and exchange rights/regulatory gates closed until executed approvals explicitly cover S-TRADE paper trading and multi-user distribution.
 
 No current gateway route, UI, broker order flow, Supabase schema, Crypto code or production runtime is changed by this module.
