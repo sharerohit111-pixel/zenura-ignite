@@ -133,4 +133,36 @@ The 30-day educational-data framework and NISM simulation-lab exception must not
 - Permitted cache, retention, historical-data and derived-data behavior.
 - Contracted concurrent users, symbols, tick throughput and commercial limits.
 
+
+## 9. Official vendor screening — reviewed 2026-11-28
+
+The vendors below are technical candidates only. Their published standard terms do **not** establish permission for S-TRADE's public paper-trading simulator.
+
+### TrueData
+
+- Its Market Data API page describes WebSocket and REST access and lists NSE/BSE/MCX segments and option-chain/Greeks capabilities.
+- The same page says subscriber data must remain confined to the subscriber's own use and must not be shared, transmitted, redistributed or made available to third parties.
+- It expressly states that it does not provide market data for gaming, virtual trading or simulation usage under its stated standard terms.
+- It says redistribution, commercial display, enterprise-wide access or third-party use requires requisite stock-exchange approval/licensing.
+- Therefore, a normal API subscription or sandbox account is **not suitable evidence** for S-TRADE. Proceed only if TrueData and the relevant exchange(s) provide a signed, product-specific exception/permission that expressly covers this simulator and the proposed downstream user model.
+
+Official source: https://www.truedata.in/products/marketdataapi
+
+### Global Datafeeds (GFDL)
+
+- Its API page lists WebSocket, REST and other API options for real-time, historical, snapshot, delayed, EOD, option-chain and Greeks data.
+- The same page says its data is not provided for gaming, virtual trading or simulation applications under its stated terms, and asks such applicants to obtain NSE/SEBI approvals first.
+- Its purchase guidance says its standard APIs are for individual personal use; commercial use requires agreements with the respective exchanges and applicable fees.
+- Its terms also prohibit further redistribution without explicit written permission from GFDL.
+- Therefore, a normal GFDL API subscription is **not suitable evidence** for S-TRADE. Proceed only after obtaining written exchange approvals, a signed GFDL agreement, and written product-specific permission for paper trading, multi-user display and redistribution.
+
+Official sources:
+- https://globaldatafeeds.in/apis/
+- https://globaldatafeeds.in/terms-and-conditions/
+- https://globaldatafeeds.in/global-datafeeds-apis/global-datafeeds-apis/pricing-sales/who-can-purchase/
+
+### Vendor selection decision
+
+**Do not select either vendor yet.** Request a written response from each vendor and the relevant exchange(s) against the exact S-TRADE use case. If neither can lawfully license this use, evaluate an alternative product scope/data category only after qualified Indian securities counsel confirms it is permissible. Never try to bypass a prohibition by labelling the same simulator as education, delayed data, internal use or a private beta.
+
 **Current decision: PREPARE THE ISOLATED ENGINEERING PATH; KEEP LIVE DISTRIBUTION BLOCKED.**
