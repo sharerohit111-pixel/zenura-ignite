@@ -56,11 +56,19 @@ function createAngelOneRouter({ auth, serviceDb, fetchProvider, readProviderJson
       if (!apiKey || !encryptionKey || net.isIP(clientLocalIp) !== 4 || net.isIP(clientPublicIp) !== 4 || !/^(?:[0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$/.test(macAddress) || !["WEB", "MOBILE"].includes(sourceId)) return res.status(503).json({ error: "Angel One server configuration is incomplete. Configure API key, encryption key, local/public IPv4, MAC address and source ID." });
       const credentials = validateAngelOneCredentials(req.body);
       if (!credentials) return res.status(400).json({ error: "Enter a valid Client ID, 4–6 digit PIN and current 6-digit TOTP." });
+      // Remove sensitive values from the parsed request object before any awaited work.
+      if (req.body && typeof req.body === "object") { req.body.pin = ""; req.body.totp = ""; }
       const { data: rateRows, error: rateError } = await serviceDb.rpc("reserve_angel_one_login_attempt", { p_user_id: user.id });
       const rate = Array.isArray(rateRows) ? rateRows[0] : rateRows;
-      if (rateError || !rate) return res.status(503).json({ error: "Angel One login protection is temporarily unavailable." });
-      if (!rate.allowed) return res.status(429).set("Retry-After", String(rate.retry_after_seconds || 1))
-        .json({ error: "Too many Angel One login attempts. Wait before trying again." });
+      if (rateError || !rate) {
+        credentials.pin = ""; credentials.totp = "";
+        return res.status(503).json({ error: "Angel One login protection is temporarily unavailable." });
+      }
+      if (!rate.allowed) {
+        credentials.pin = ""; credentials.totp = "";
+        return res.status(429).set("Retry-After", String(rate.retry_after_seconds || 1))
+          .json({ error: "Too many Angel One login attempts. Wait before trying again." });
+      }
 
       let providerResponse, payload;
       try {
