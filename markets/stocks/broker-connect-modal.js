@@ -71,6 +71,7 @@
     }
   });
   window.ZENURA_BROKER_CONNECT_MODAL = Object.freeze({ open, close });
+  window.addEventListener("zenura-broker-connection-ready", close);
   window.addEventListener("zenura-broker-connection-expired", open);
   window.addEventListener("zenura-broker-connection-missing", open);
   window.addEventListener("zenura-market-auth-ready", (event) => {
