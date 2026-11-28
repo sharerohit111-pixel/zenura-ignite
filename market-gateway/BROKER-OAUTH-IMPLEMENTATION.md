@@ -1,22 +1,27 @@
 # Broker OAuth implementation contract
 
-This stage adds the provider flow registry and an HMAC-authenticated, short-lived, user-bound OAuth state primitive. State is valid for ten minutes and is bound to both broker and authenticated user. The host must additionally persist a one-time nonce/consume record to prevent replay across callback requests; this helper alone does not provide one-time consumption.
+This stage now includes the server-side provider wiring for FYERS v3 and Angel One SmartAPI, alongside the existing Upstox flow. It is still a draft integration: live market-data entitlements, broker order placement, hosted migration execution and production deployment are not enabled by this PR.
 
 ## Provider flow distinctions
-- Upstox: authorization-code flow. The existing gateway has an Upstox-specific token exchange and encrypted token storage.
-- FYERS v3: authorization-code flow. Current FYERS guidance for API trading from 1 April 2026 requires daily 2FA and says continuous refresh-token sessions are not supported; this adapter therefore requires daily reauthentication and does not assume refresh-token continuity.
-- Angel One SmartAPI: session authentication (client code, PIN/password and TOTP) rather than a generic browser OAuth callback. It must be implemented with a dedicated server-side session adapter and never by sending the user's TOTP or PIN through frontend logs.
+- Upstox: existing authorization-code flow and Upstox-specific token exchange/storage remain isolated.
+- FYERS v3: authorization-code flow. OAuth state is broker-bound, short-lived and atomically consumed once. The callback exchanges the code server-to-server and stores only an AES-256-GCM token envelope. Daily reauthentication is required; this adapter does not assume refresh-token continuity.
+- Angel One SmartAPI: dedicated authenticated session flow using Client ID, PIN and current TOTP. PIN/TOTP are cleared from parsed request data and local credential references; the encrypted JWT/refresh/feed token bundle is stored server-side. No TOTP generation or storage is implemented.
 
-## Required runtime wiring (not included in this contract module)
-- Derive user ID exclusively from verified Supabase JWT.
-- Create and persist a single-use state nonce with a unique constraint; callback must consume it atomically.
-- Validate exact registered redirect URI; never accept callback URL from request input.
-- Exchange code server-to-server with broker credentials stored in Secret Manager.
-- Encrypt access/refresh tokens with AES-256-GCM and key versioning; do not store plaintext tokens.
-- Store token expiry from provider response; do not infer a common SEBI expiry time.
-- Add per-user connection ownership checks and audit events without logging codes/tokens.
-- Add broker-specific rate limits and provider error redaction.
-- No live stream until user token and provider-specific entitlement policy have passed.
-- Do not use affiliate account-opening URLs as OAuth redirect URIs.
+## Security boundaries
+- User identity for start/status/disconnect comes only from verified Supabase JWT; callback ownership comes only from the consumed server-side state record.
+- Redirect URI is configured server-side and must be a clean HTTPS callback endpoint.
+- OAuth state is stored as a SHA-256 hash and consumed atomically with broker binding and expiry checks.
+- Broker tokens are encrypted with AES-256-GCM and stored in the server-only `broker_connections` table. Browser roles receive no table privileges; RLS is enabled and forced.
+- FYERS status and disconnect operations filter by both authenticated user ID and broker name.
+- Angel One login attempts are throttled per user in PostgreSQL; provider errors are redacted from responses.
+- No affiliate account-opening URLs are used as OAuth redirect URIs.
+- No live market-data stream or order placement is enabled by this integration.
 
-This is deliberately a small foundation stage. It does not claim to have completed live OAuth callbacks or connected broker sessions.
+## Required runtime configuration
+See `market-gateway/FYERS-OAUTH-SETUP.md` and `market-gateway/ANGEL-ONE-SMARTAPI-SETUP.md`. Keep credentials in server-side deployment secrets only. Do not place broker secrets in the static frontend.
+
+## Validation and release status
+- Deterministic Node tests cover state primitives, provider response validation, token expiry, connection ownership filters and credential scrubbing.
+- The disposable PostgreSQL migration workflow now checks broker table grants, forced RLS, OAuth broker binding, expiry and one-time state consumption.
+- Exact-head CI and migration smoke must pass before this work is considered ready.
+- Keep PR #328 Draft and unmerged. Do not run hosted migrations, create live broker sessions, place real orders, deploy to production or modify the Crypto folder.
