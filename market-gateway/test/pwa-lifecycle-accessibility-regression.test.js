@@ -19,7 +19,7 @@ test("Markets PWA manifest remains installable and scoped away from Crypto",()=>
 test("service worker cache generation is explicit and activation removes stale Markets generations",()=>{
  const sw=read("markets/service-worker.js");
  const cache=sw.match(/const CACHE_NAME="([^"]+)"/)?.[1];
- assert.equal(cache,"zenura-markets-shell-v17");
+ assert.equal(cache,"zenura-markets-shell-v18");
  assert.match(sw,/await self\.skipWaiting\(\)/);
  assert.match(sw,/await self\.clients\.claim\(\)/);
  assert.match(sw,/key\.startsWith\("zenura-markets-"\)&&key!==CACHE_NAME/);
@@ -91,4 +91,22 @@ test("paper terminal mobile bottom bar exposes the four requested functional sho
  assert.match(css,/visibility:visible!important/);
  assert.match(css,/env\(safe-area-inset-bottom\)/);
  assert.match(html,/<nav class="terminal-nav"/);
+});
+
+test("S-TRADE sidebar exposes exactly ten main destinations and six functional Settings actions",()=>{
+ const html=read("markets/stocks/index.html");
+ const sidebar=read("markets/stocks/sidebar.js");
+ const css=read("markets/stocks/sidebar.css");
+ const sw=read("markets/service-worker.js");
+ const expected=["Dashboard","Chart & Trade","Watchlist","Option Chain","Portfolio & Positions","Orders & Trade History","Virtual Wallet","P&L","Settings","Help & Support"];
+ for(const label of expected)assert.ok(sidebar.includes('"'+label+'"'),"missing sidebar destination: "+label);
+ for(const action of ["theme","language","chart","notifications","account","security"])assert.ok(sidebar.includes('["'+action+'"')||sidebar.includes('data-settings-feature="'+action+'"')||sidebar.includes('if(id==="'+action+'")'),"missing Settings action: "+action);
+ assert.match(html,/href="\.\/sidebar\.css"/);
+ assert.match(html,/src="\.\/sidebar\.js"/);
+ assert.match(sw,/"stocks\/sidebar\.css","stocks\/sidebar\.js"/);
+ assert.match(css,/width:min\(360px,70vw\)/);
+ assert.match(css,/\.sidebar-overlay/);
+ assert.match(css,/prefers-reduced-motion/);
+ assert.match(sidebar,/requestPermission\(\)/);
+ assert.match(sidebar,/email-sign-out/);
 });
