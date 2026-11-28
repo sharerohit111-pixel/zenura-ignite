@@ -121,7 +121,8 @@
   window.ZENURA_BROKER_CONNECT_MODAL = Object.freeze({ open, close });
   window.addEventListener("zenura-broker-connection-ready", close);
   window.addEventListener("zenura-broker-connection-expired", open);
-  window.addEventListener("zenura-broker-connection-missing", open);\n  window.addEventListener("zenura-fyers-connection-updated", refreshFyersStatus);
+  window.addEventListener("zenura-broker-connection-missing", open);
+  window.addEventListener("zenura-fyers-connection-updated", refreshFyersStatus);
   window.addEventListener("zenura-market-auth-ready", (event) => {
     if (event.detail?.signedIn && status?.textContent?.includes("AUTHORIZED")) close();
   });
