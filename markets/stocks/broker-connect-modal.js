@@ -4,9 +4,9 @@
   if (!root) return;
   const referralConfig = window.ZENURA_BROKER_REFERRALS || {};
   const providers = [
-    { id: "upstox", name: "Upstox", mark: "u", tag: "BROKER API", note: "Zero AMC and eligible brokerage offers*", referralUrl: referralConfig.upstox || "https://upstox.onelink.me/0H1s/5CAYMN" },
-    { id: "fyers", name: "FYERS", mark: "F", tag: "BROKER API", note: "Referral code FRN9GVV · Up to ₹2,000 FYERS Credits*", referralUrl: referralConfig.fyers || "https://fyers.onelink.me/cj1P/l3nujhwy" },
-    { id: "angel_one", name: "Angel One", mark: "A", tag: "SMARTAPI", note: "Free Demat account offer and other benefits*", referralUrl: referralConfig.angel_one || "https://angel-one.onelink.me/Wjgr/gw4o5lz2" }
+    { id: "upstox", name: "Upstox", mark: "u", tag: "BROKER API", note: "Free API access · brokerage charges apply*", referralUrl: referralConfig.upstox || "https://upstox.onelink.me/0H1s/5CAYMN" },
+    { id: "fyers", name: "FYERS", mark: "F", tag: "BROKER API", note: "Free Standard API access · Prime is optional*", referralUrl: referralConfig.fyers || "https://fyers.onelink.me/cj1P/l3nujhwy" },
+    { id: "angel_one", name: "Angel One", mark: "A", tag: "SMARTAPI", note: "Free SmartAPI access · brokerage charges apply*", referralUrl: referralConfig.angel_one || "https://angel-one.onelink.me/Wjgr/gw4o5lz2" }
   ];
   const feedback = root.querySelector("[data-broker-feedback]");
   const status = document.getElementById("connection-title");
@@ -54,7 +54,7 @@
       link.href = p.referralUrl;
       link.target = "_blank";
       link.rel = "noopener noreferrer sponsored";
-      account.append(link, el("small", "broker-affiliate-disclosure", "Referral link · S-TRADE may earn a commission*"));
+      account.append(link, el("small", "broker-affiliate-disclosure", "Referral link · S-TRADE may earn a commission. API access is subject to broker eligibility, rate limits and terms; brokerage and statutory charges are separate."));
       accountGrid.append(account);
     });
   }
