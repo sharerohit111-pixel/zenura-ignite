@@ -83,3 +83,28 @@
 /* Floating language control sits above the five-item mobile navigation. */
 .stocks-page .paper-language-toggle{right:14px!important;bottom:calc(78px + env(safe-area-inset-bottom))!important;z-index:45!important;background:var(--app-surface)!important;color:var(--app-accent-strong)!important;border:1px solid var(--app-line)!important;box-shadow:var(--app-shadow)!important}
 @media(min-width:900px){.stocks-page .paper-language-toggle{bottom:28px!important;right:28px!important}}
+
+/* Mobile polish: keep brand, product mode and theme control in a compact header. */
+.stocks-page .top .brand{order:1;flex:1 1 calc(100% - 64px);min-width:0;gap:11px}
+.stocks-page .top .brand>span:last-child{display:flex;flex-direction:column;align-items:flex-start;justify-content:center;min-width:0;line-height:1.2}
+.stocks-page .top .brand b{display:block;white-space:nowrap;line-height:1.2}
+.stocks-page .top .brand small{display:block;margin-top:4px;line-height:1.2;white-space:normal}
+.stocks-page .top .app-theme-switch{order:2;flex:0 0 42px;width:42px;height:42px;padding:0;margin-left:auto}
+.stocks-page .top .product-mode-nav{order:3;flex:1 0 100%;margin:0}
+.stocks-page .top .product-mode-nav a{display:inline-flex;align-items:center;justify-content:center;min-height:40px;padding:0 16px}
+.stocks-page .top .back{display:none!important}
+.stocks-page .terminal-nav{display:flex;flex-wrap:nowrap;max-width:100%;overflow-x:auto;overflow-y:hidden;scroll-snap-type:x proximity;touch-action:pan-x;overscroll-behavior-x:contain;padding:8px 2px 12px}
+.stocks-page .terminal-nav>a{flex:0 0 auto;scroll-snap-align:start}
+.stocks-page .terminal-nav:after{content:"";flex:0 0 8px}
+@media(max-width:760px){
+ .stocks-page .top{position:relative;display:flex;flex-wrap:wrap;align-items:center;gap:10px;min-height:0;padding:12px;margin:0 -4px 10px;border-radius:0 0 18px 18px}
+ .stocks-page .top .brand .logo{width:44px;height:44px;flex:0 0 44px}
+ .stocks-page .top .brand b{font-size:14px}
+ .stocks-page .top .brand small{font-size:8px;letter-spacing:.11em}
+ .stocks-page .terminal-nav{margin-left:-2px;margin-right:-2px}
+ .stocks-page .terminal-nav a{min-height:44px;padding:10px 13px;font-size:11px!important}
+}
+@media(max-width:360px){
+ .stocks-page .top .brand b{font-size:12px}
+ .stocks-page .top .brand small{font-size:7px}
+}
