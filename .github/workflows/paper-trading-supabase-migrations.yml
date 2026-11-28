@@ -187,6 +187,8 @@ jobs:
             echo "Applying $migration"
             psql -v ON_ERROR_STOP=1 -f "$migration"
           done
+      - name: Verify broker credential isolation and one-time OAuth state consumption
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/broker_oauth_security.sql
       - name: Exercise provider-account and per-user distributed quota boundaries
         run: psql -v ON_ERROR_STOP=1 -f supabase/tests/market_data_provider_quotas.sql
       - name: Verify bounded distributed quota bucket retention and active-window safety
@@ -1507,7 +1509,7 @@ jobs:
               'upstox_connection_controls','paper_market_stream_leases',
               'paper_market_worker_state','paper_margin_preview_limits',
               'paper_futures_positions','paper_futures_orders','paper_protective_orders',
-              'paper_chart_drawings','paper_chart_templates','paper_chart_preferences'
+              'paper_chart_drawings','paper_chart_templates','paper_chart_preferences','broker_connections','broker_oauth_states','angel_one_login_attempts'
             ];
           BEGIN
             FOREACH t IN ARRAY protected_tables LOOP
@@ -1758,7 +1760,8 @@ jobs:
               'upstox_connection_controls','paper_market_stream_leases',
               'paper_market_worker_state','paper_margin_preview_limits',
               'paper_futures_positions','paper_futures_orders','paper_protective_orders',
-              'paper_chart_drawings','paper_chart_templates','paper_chart_preferences'
+              'paper_chart_drawings','paper_chart_templates','paper_chart_preferences',
+              'broker_connections','broker_oauth_states','angel_one_login_attempts'
             ];
             table_name text;
           BEGIN
@@ -1768,7 +1771,7 @@ jobs:
               END IF;
             END LOOP;
             IF (SELECT count(*) FROM pg_tables
-                WHERE schemaname='public' AND tablename = ANY(expected_tables)) <> 18 THEN
+                WHERE schemaname='public' AND tablename = ANY(expected_tables)) <> 21 THEN
               RAISE EXCEPTION 'Unexpected public table count for migration schema';
             END IF;
             IF to_regprocedure('public.execute_paper_market_order(uuid,text,uuid,text,text,text,text,text,text,integer,bigint,bigint,bigint)') IS NULL

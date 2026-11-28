@@ -55,6 +55,44 @@ async function api(path, options = {}) {
   }
   return payload;
 }
+window.ZENURA_ANGEL_ONE_LOGIN = async function (credentials) {
+  return api("/angel-one/session", { method: "POST", body: JSON.stringify(credentials) });
+};
+window.ZENURA_ANGEL_ONE_STATUS = async function () {
+  return api("/angel-one/connection");
+};
+window.ZENURA_ANGEL_ONE_DISCONNECT = async function () {
+  return api("/angel-one/connection", { method: "DELETE" });
+};
+window.ZENURA_GET_BROKER_STATUS = async function (provider) {
+  if (provider !== "fyers") throw new Error("Broker status is not available.");
+  return api("/fyers/connection");
+};
+window.ZENURA_DISCONNECT_BROKER = async function (provider) {
+  if (provider !== "fyers") throw new Error("Broker disconnect is not available.");
+  return api("/fyers/connection", { method: "DELETE" });
+};
+window.ZENURA_START_BROKER_OAUTH = async function (provider) {
+  if (provider !== "fyers") throw new Error("This broker login is not available yet.");
+  const result = await api("/fyers/oauth/start", { method: "POST", body: "{}" });
+  const url = new URL(result.authorizationUrl);
+  if (url.protocol !== "https:" || url.hostname !== "api-t1.fyers.in"
+    || url.pathname !== "/api/v3/generate-authcode") {
+    throw new Error("The server did not return a valid FYERS authorization URL.");
+  }
+  window.location.assign(url.toString());
+};
+const fyersCallbackStatus = new URLSearchParams(window.location.search).get("fyers");
+if (fyersCallbackStatus) {
+  const heading = document.getElementById("connection-title");
+  const detail = document.getElementById("connection-sub");
+  if (heading) heading.textContent = fyersCallbackStatus === "connected" ? "FYERS AUTHORIZED" : "FYERS CONNECTION NOT COMPLETED";
+  if (detail) detail.textContent = fyersCallbackStatus === "connected"
+    ? "Your FYERS session was securely saved. Access token expires daily at 06:30 IST; daily 2FA is required."
+    : "FYERS authorization could not be completed. Check server configuration and try again.";
+  window.history.replaceState({}, document.title, window.location.pathname + window.location.hash);
+  window.dispatchEvent(new CustomEvent("zenura-fyers-connection-updated"));
+}
 let authStateSequence = 0;
 let currentSession = null;
 async function refreshStatus(sequence = authStateSequence) {

@@ -53,17 +53,17 @@ UPDATE public.paper_accounts SET cash_paise=starting_cash_paise,
 SELECT public.submit_paper_futures_limit_order(
  '$USER_ID','$ORDER_FILL','$IDEM_FILL','$FINGERPRINT_FILL',
  'NSE_FO|FUT_RACE_FILL','FUT_RACE_FILL','NSE','NSE_FO',current_date+5,
- 25,5,'BUY','DELIVERY',25,10000,100000,floor(extract(epoch from clock_timestamp())*1000)::bigint,floor(extract(epoch from clock_timestamp())*1000)::bigint,clock_timestamp()+interval '10 minutes'
+ 25,5,'BUY','DELIVERY',25,10000,100000,floor(extract(epoch from clock_timestamp())*1000)::bigint,floor(extract(epoch from clock_timestamp())*1000)::bigint,least(clock_timestamp()+interval '10 minutes', (((clock_timestamp() at time zone 'Asia/Kolkata')::date + 1)::timestamp at time zone 'Asia/Kolkata') - interval '1 second')
 );
 SELECT public.submit_paper_futures_limit_order(
  '$USER_ID','$ORDER_CANCEL','$IDEM_CANCEL','$FINGERPRINT_CANCEL',
  'NSE_FO|FUT_RACE_CANCEL','FUT_RACE_CANCEL','NSE','NSE_FO',current_date+5,
- 25,5,'BUY','DELIVERY',25,10000,100000,floor(extract(epoch from clock_timestamp())*1000)::bigint,floor(extract(epoch from clock_timestamp())*1000)::bigint,clock_timestamp()+interval '10 minutes'
+ 25,5,'BUY','DELIVERY',25,10000,100000,floor(extract(epoch from clock_timestamp())*1000)::bigint,floor(extract(epoch from clock_timestamp())*1000)::bigint,least(clock_timestamp()+interval '10 minutes', (((clock_timestamp() at time zone 'Asia/Kolkata')::date + 1)::timestamp at time zone 'Asia/Kolkata') - interval '1 second')
 );
 SELECT public.submit_paper_futures_limit_order(
  '$USER_ID','$ORDER_DUP','$IDEM_DUP','$FINGERPRINT_DUP',
  'NSE_FO|FUT_RACE_DUP','FUT_RACE_DUP','NSE','NSE_FO',current_date+5,
- 25,5,'BUY','DELIVERY',25,10000,100000,floor(extract(epoch from clock_timestamp())*1000)::bigint,floor(extract(epoch from clock_timestamp())*1000)::bigint,clock_timestamp()+interval '10 minutes'
+ 25,5,'BUY','DELIVERY',25,10000,100000,floor(extract(epoch from clock_timestamp())*1000)::bigint,floor(extract(epoch from clock_timestamp())*1000)::bigint,least(clock_timestamp()+interval '10 minutes', (((clock_timestamp() at time zone 'Asia/Kolkata')::date + 1)::timestamp at time zone 'Asia/Kolkata') - interval '1 second')
 );
 
 CREATE OR REPLACE FUNCTION public.test_delay_futures_limit_terminal_update()

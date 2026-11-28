@@ -1,0 +1,28 @@
+name: Broker Connect static regression checks
+
+on:
+  pull_request:
+    paths:
+      - "markets/stocks/index.html"
+      - "markets/stocks/broker-connect-modal.js"
+      - "markets/stocks/broker-referrals.js"
+      - "markets/stocks/connect.js"
+      - "markets/stocks/broker-connect-static.test.mjs"
+      - ".github/workflows/broker-connect-static-qa.yml"
+
+ # Isolated checks only; no browser credentials or live broker calls.
+permissions:
+  contents: read
+
+jobs:
+  broker-connect-static-qa:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check broker frontend JavaScript syntax
+        run: |
+          node --check markets/stocks/broker-connect-modal.js
+          node --check markets/stocks/broker-referrals.js
+          node --input-type=module --check < markets/stocks/connect.js
+      - name: Run isolated Broker Connect static regression tests
+        run: node --test markets/stocks/broker-connect-static.test.mjs

@@ -52,6 +52,8 @@ const {isUsableUpstoxTokenResponse}=require("../functions/lib/upstox-token-respo
 const {isUsableUpstoxOAuthCallback}=require("../functions/lib/upstox-oauth-callback-input");
 const {validateHttpsRedirectUri}=require("./lib/redirect-uri-policy");
 const {assertMarketDataRightsApproved,marketDataRightsApproval}=require("./lib/market-data-rights-gate");
+const {createFyersOAuthRouter}=require("./lib/fyers-oauth");
+const {createAngelOneRouter}=require("./lib/angel-one-smartapi");
 
 const PORT=Number(process.env.PORT||8080);
 const SUPABASE_URL=process.env.SUPABASE_URL;
@@ -175,6 +177,21 @@ async function getQuote(accessToken,instrumentKey){
   const quote=Object.values(payload?.data||{}).find(x=>x&&x.instrument_token===instrumentKey);
   return {quote,payload};
 }
+app.use("/fyers",createFyersOAuthRouter({
+  auth,serviceDb,fetchProvider,readProviderJson,appRedirectUri:VALID_APP_REDIRECT_URI||"https://zenuraignite.com/markets/stocks/",
+  clientId:process.env.FYERS_CLIENT_ID,clientSecret:process.env.FYERS_CLIENT_SECRET,
+  redirectUri:process.env.FYERS_REDIRECT_URI,
+  encryptionKey:process.env.BROKER_TOKEN_ENCRYPTION_KEY||ENC_KEY
+}));
+app.use("/angel-one",createAngelOneRouter({
+  auth,serviceDb,fetchProvider,readProviderJson,
+  apiKey:process.env.ANGEL_ONE_SMARTAPI_KEY,
+  encryptionKey:process.env.BROKER_TOKEN_ENCRYPTION_KEY||ENC_KEY,
+  clientLocalIp:process.env.ANGEL_ONE_CLIENT_LOCAL_IP,
+  clientPublicIp:process.env.ANGEL_ONE_CLIENT_PUBLIC_IP,
+  macAddress:process.env.ANGEL_ONE_MAC_ADDRESS,
+  sourceId:process.env.ANGEL_ONE_SOURCE_ID||"WEB"
+}));
 app.get("/health",(_req,res)=>res.json({
   ok:true,service:"zenura-supabase-market-gateway",authProvider:"supabase",
   feedProtocol:"upstox-v3",marketDataEnabled:!!marketDataRightsApproval(process.env),marketDataBlockReason:marketDataRightsApproval(process.env)?null:"written_provider_and_regulatory_approval_required",instrumentMasterLoaded:instrumentCache.length>0,

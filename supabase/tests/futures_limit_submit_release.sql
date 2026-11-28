@@ -41,7 +41,7 @@ BEGIN
     'abababab-abab-4bab-8bab-abababababab',repeat('c',64),
     'abababab-0000-4000-8000-000000000002',repeat('b',64),
     'NSE_FO|FUT_LIMIT_CLOSE','FUT_LIMIT_CLOSE','NSE','NSE_FO',current_date+5,
-    25,5,'SELL','DELIVERY',25,12000,0,null,floor(extract(epoch from clock_timestamp())*1000)::bigint,clock_timestamp()+interval '10 minutes'
+    25,5,'SELL','DELIVERY',25,12000,0,null,floor(extract(epoch from clock_timestamp())*1000)::bigint,clock_timestamp()+interval '2 minutes'
   );
   IF v_result->>'status'<>'PENDING'
      OR (v_result->>'reserved_close_quantity')::integer<>25
@@ -65,7 +65,7 @@ BEGIN
       'abababab-abab-4bab-8bab-abababababab',repeat('d',64),
       'abababab-0000-4000-8000-000000000003',repeat('c',64),
       'NSE_FO|FUT_LIMIT_CLOSE','FUT_LIMIT_CLOSE','NSE','NSE_FO',current_date+5,
-      25,5,'SELL','DELIVERY',50,12000,0,null,floor(extract(epoch from clock_timestamp())*1000)::bigint,clock_timestamp()+interval '10 minutes'
+      25,5,'SELL','DELIVERY',50,12000,0,null,floor(extract(epoch from clock_timestamp())*1000)::bigint,clock_timestamp()+interval '2 minutes'
     );
   EXCEPTION WHEN SQLSTATE '23514' THEN v_rejected:=true;
   END;
@@ -136,7 +136,7 @@ BEGIN
     'abababab-abab-4bab-8bab-abababababab',repeat('8',64),
     'abababab-0000-4000-8000-000000000007',repeat('1',64),
     'NSE_FO|FUT_LIMIT_OPEN','FUT_LIMIT_OPEN','NSE','NSE_FO',current_date+5,
-    25,5,'BUY','DELIVERY',25,10000,150000,floor(extract(epoch from clock_timestamp())*1000)::bigint,floor(extract(epoch from clock_timestamp())*1000)::bigint,clock_timestamp()+interval '10 minutes'
+    25,5,'BUY','DELIVERY',25,10000,150000,floor(extract(epoch from clock_timestamp())*1000)::bigint,floor(extract(epoch from clock_timestamp())*1000)::bigint,clock_timestamp()+interval '2 minutes'
   );
   SELECT reserved_margin_paise INTO v_reserved
     FROM public.paper_accounts
@@ -148,7 +148,7 @@ BEGIN
     'abababab-abab-4bab-8bab-abababababab',repeat('8',64),
     'abababab-0000-4000-8000-000000000007',repeat('1',64),
     'NSE_FO|FUT_LIMIT_OPEN','FUT_LIMIT_OPEN','NSE','NSE_FO',current_date+5,
-    25,5,'BUY','DELIVERY',25,10000,150000,floor(extract(epoch from clock_timestamp())*1000)::bigint,floor(extract(epoch from clock_timestamp())*1000)::bigint,clock_timestamp()+interval '10 minutes'
+    25,5,'BUY','DELIVERY',25,10000,150000,floor(extract(epoch from clock_timestamp())*1000)::bigint,floor(extract(epoch from clock_timestamp())*1000)::bigint,clock_timestamp()+interval '2 minutes'
   );
   IF (v_result->>'idempotent_replay')::boolean IS NOT TRUE THEN
     RAISE EXCEPTION 'Opening Futures LIMIT replay was not idempotent';
@@ -166,7 +166,7 @@ BEGIN
       'abababab-abab-4bab-8bab-abababababab',repeat('8',64),
       'abababab-0000-4000-8000-000000000007',repeat('2',64),
       'NSE_FO|FUT_LIMIT_OPEN','FUT_LIMIT_OPEN','NSE','NSE_FO',current_date+5,
-      25,5,'BUY','DELIVERY',25,10000,150000,floor(extract(epoch from clock_timestamp())*1000)::bigint,floor(extract(epoch from clock_timestamp())*1000)::bigint,clock_timestamp()+interval '10 minutes'
+      25,5,'BUY','DELIVERY',25,10000,150000,floor(extract(epoch from clock_timestamp())*1000)::bigint,floor(extract(epoch from clock_timestamp())*1000)::bigint,clock_timestamp()+interval '2 minutes'
     );
   EXCEPTION WHEN SQLSTATE '23505' THEN v_rejected:=true;
   END;
@@ -227,7 +227,7 @@ BEGIN
     'abababab-abab-4bab-8bab-abababababab',repeat('4',64),
     'abababab-0000-4000-8000-000000000009',repeat('4',64),
     'NSE_FO|FUT_LIMIT_NO_SESSION','FUT_LIMIT_NO_SESSION','NSE','NSE_FO',current_date+5,
-    25,5,'BUY','DELIVERY',25,10000,50000,floor(extract(epoch from clock_timestamp())*1000)::bigint,floor(extract(epoch from clock_timestamp())*1000)::bigint,clock_timestamp()+interval '10 minutes'
+    25,5,'BUY','DELIVERY',25,10000,50000,floor(extract(epoch from clock_timestamp())*1000)::bigint,floor(extract(epoch from clock_timestamp())*1000)::bigint,clock_timestamp()+interval '2 minutes'
   );
   INSERT INTO public.paper_exchange_sessions(
     exchange,session_date,is_trading_day,open_minute,close_minute,

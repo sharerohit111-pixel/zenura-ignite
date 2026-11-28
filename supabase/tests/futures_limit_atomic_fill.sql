@@ -40,7 +40,7 @@ BEGIN
     'cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd',repeat('a',64),
     'cdcdcdcd-0000-4000-8000-000000000001',repeat('a',64),
     'NSE_FO|FUT_LIMIT_FILL','FUT_LIMIT_FILL','NSE','NSE_FO',current_date+5,
-    25,5,'BUY','DELIVERY',25,10000,200000,floor(extract(epoch from clock_timestamp())*1000)::bigint,floor(extract(epoch from clock_timestamp())*1000)::bigint,clock_timestamp()+interval '10 minutes'
+    25,5,'BUY','DELIVERY',25,10000,200000,floor(extract(epoch from clock_timestamp())*1000)::bigint,floor(extract(epoch from clock_timestamp())*1000)::bigint,clock_timestamp()+interval '2 minutes'
   );
 
   -- First partial fill transfers 80000 paise to the position; account margin
@@ -126,7 +126,7 @@ BEGIN
     'cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd',repeat('b',64),
     'cdcdcdcd-0000-4000-8000-000000000002',repeat('b',64),
     'NSE_FO|FUT_LIMIT_FILL','FUT_LIMIT_FILL','NSE','NSE_FO',current_date+5,
-    25,5,'SELL','DELIVERY',25,9900,0,null,floor(extract(epoch from clock_timestamp())*1000)::bigint,clock_timestamp()+interval '10 minutes'
+    25,5,'SELL','DELIVERY',25,9900,0,null,floor(extract(epoch from clock_timestamp())*1000)::bigint,clock_timestamp()+interval '2 minutes'
   );
   v_rejected:=false;
   v_now:=floor(extract(epoch from clock_timestamp())*1000)::bigint;
