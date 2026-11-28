@@ -9,6 +9,7 @@ const html=fs.readFileSync(path.join(root,"markets/stocks/index.html"),"utf8");
 const shell=fs.readFileSync(path.join(root,"markets/stocks/premium-shell.js"),"utf8");
 const worker=fs.readFileSync(path.join(root,"markets/service-worker.js"),"utf8");
 const guard=fs.readFileSync(path.join(root,"markets/stocks/android-bottom-dock-guard.js"),"utf8");
+const manifest=JSON.parse(fs.readFileSync(path.join(root,"markets/manifest.webmanifest"),"utf8"));
 
 test("Android dock has one authoritative final viewport and safe-area contract",()=>{
  const start=css.lastIndexOf("/* FINAL ANDROID DOCK CONTRACT");
@@ -42,4 +43,14 @@ test("Android dock guard removes only broken images overlapping the bottom dock"
  assert.match(guard,/r\.bottom>h-190/);
  assert.match(guard,/zenura-broken-bottom-image/);
  assert.match(css,/zenura-broken-bottom-image-wrap\{display:none!important/);
+});
+
+
+test("installed app launches directly into the main Paper Trading dashboard",()=>{
+ assert.match(html,/<meta name="zenura-entry-redirect" content="stocks\/">);
+ assert.match(html,/<meta http-equiv="refresh" content="0;url=\.\/stocks\/">);
+ assert.match(html,/location\.replace\(new URL\("\.\/stocks\/",location\.href\)\.href\)/);
+ assert.equal(manifest.start_url,"./stocks/");
+ assert.equal(manifest.id,"./stocks/");
+ assert.match(worker,/zenura-markets-shell-v25/);
 });
