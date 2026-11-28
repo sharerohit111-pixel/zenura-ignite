@@ -32,7 +32,7 @@ function routeHandler(router, method, routePath) {
 
 function fyersHarness({ consume = { data: [{ user_id: "user-1" }], error: null },
   providerError = null, tokenPayload = { s: "ok", code: 200, access_token: "fyers-secret-token" },
-  saveError = null } = {}) {
+  saveError = null, encryptionKey = KEY } = {}) {
   const calls = { rpc: [], fetch: [], upsert: [] };
   const serviceDb = {
     async rpc(name, args) {
@@ -59,7 +59,7 @@ function fyersHarness({ consume = { data: [{ user_id: "user-1" }], error: null }
     appRedirectUri: "https://app.example/markets/stocks/",
     clientId: "client-id", clientSecret: "client-secret",
     redirectUri: "https://gateway.example/fyers/oauth/callback",
-    encryptionKey: KEY,
+    encryptionKey,
     logger: { error() {} }
   });
   return { router, calls, tokenPayload };
@@ -558,4 +558,39 @@ test("Angel One login scrubs credentials after provider network and secure-save 
   assert.equal(persistence.payload.data.refreshToken, "");
   assert.equal(persistence.payload.data.feedToken, "");
   assert.doesNotMatch(JSON.stringify(persistenceRes.body), /jwt-secret|refresh-secret|feed-secret/);
+});
+
+
+test("FYERS OAuth start stores only a SHA-256 state hash and returns the matching provider state", async () => {
+  const h = fyersStartHarness();
+  const res = response();
+  await routeHandler(h.router, "post", "/oauth/start")({ body: {} }, res);
+  assert.equal(res.statusCode, undefined);
+  assert.equal(h.calls.length, 1);
+  assert.equal(h.calls[0].rpc, "begin_broker_oauth_state");
+  const { p_state_hash: storedHash, p_expires_at: expiresAt, p_user_id: owner } = h.calls[0].args;
+  const authorizationUrl = new URL(res.body.authorizationUrl);
+  const state = authorizationUrl.searchParams.get("state");
+  assert.match(state, /^[a-f0-9]{64}$/);
+  assert.equal(storedHash, crypto.createHash("sha256").update(state).digest("hex"));
+  assert.notEqual(storedHash, state);
+  assert.equal(owner, "user-1");
+  assert.equal(h.calls[0].args.p_broker_name, "fyers");
+  assert.ok(Date.parse(expiresAt) > Date.now());
+  assert.ok(Date.parse(expiresAt) <= Date.now() + 10 * 60 * 1000 + 1000);
+  assert.equal(authorizationUrl.origin, "https://api-t1.fyers.in");
+  assert.equal(authorizationUrl.searchParams.get("redirect_uri"), "https://gateway.example/fyers/oauth/callback");
+  assert.equal(res.headers["Cache-Control"], "no-store");
+});
+
+test("FYERS callback clears provider access token when encryption fails", async () => {
+  const payload = { s: "ok", code: 200, access_token: "must-be-cleared" };
+  const h = fyersHarness({ tokenPayload: payload, encryptionKey: "invalid-key-material" });
+  const res = response();
+  await routeHandler(h.router, "get", "/oauth/callback")({ query: { auth_code: "code", state: "9".repeat(64) } }, res);
+  assert.equal(payload.access_token, "");
+  assert.equal(h.calls.upsert.length, 0);
+  assert.equal(new URL(res.redirectUrl).searchParams.get("fyers"), "error");
+  assert.equal(res.headers["Cache-Control"], "no-store");
+  assert.equal(res.headers["Referrer-Policy"], "no-referrer");
 });
