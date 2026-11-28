@@ -279,3 +279,7 @@
   -webkit-text-fill-color:#8da3b6!important;
   opacity:1!important;
 }
+
+/* Five-item primary mobile navigation: Home, Option Chain, P&L, Watchlist, Help. */
+#zenura-quick-actions{grid-template-columns:repeat(5,minmax(0,1fr))!important}
+#zenura-quick-actions>a>span{font-size:clamp(7px,1.95vw,9px)!important;letter-spacing:-.15px}
