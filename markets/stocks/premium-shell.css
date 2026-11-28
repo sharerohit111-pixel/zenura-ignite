@@ -252,3 +252,11 @@
 .stocks-page.touch-terminal #zenura-quick-actions>a>svg{display:block!important;width:21px!important;height:21px!important;max-width:21px!important;min-width:21px!important;overflow:visible!important;flex:none!important}
 .stocks-page.touch-terminal #zenura-quick-actions>a>span{display:block!important;max-width:100%!important;font-size:clamp(7px,2.15vw,9px)!important;line-height:1.15!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important}
 .stocks-page.touch-terminal{padding-bottom:calc(78px + env(safe-area-inset-bottom))!important}
+
+/* Route visibility must outrank touch-layout display overrides. The login form
+   is mounted inside .stock-hero, so hiding this section also removes the
+   sign-in panel when a user opens any other workspace page. */
+.stocks-page [data-page-hidden="true"],
+.stocks-page.touch-terminal [data-page-hidden="true"]{
+  display:none!important;
+}
