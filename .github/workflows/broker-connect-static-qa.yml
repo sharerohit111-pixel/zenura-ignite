@@ -10,6 +10,7 @@ on:
       - "markets/stocks/broker-connect-static.test.mjs"
       - ".github/workflows/broker-connect-static-qa.yml"
 
+ # Isolated checks only; no browser credentials or live broker calls.
 permissions:
   contents: read
 
