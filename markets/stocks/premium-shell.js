@@ -40,7 +40,7 @@ if(header&&!header.querySelector("[data-app-theme-toggle]")){
 document.querySelectorAll(".terminal-nav > a[data-terminal-page]").forEach(a=>{
  a.classList.add("terminal-nav-link");
 });
-const bottom=document.createElement("nav");bottom.className="app-bottom-nav";bottom.setAttribute("aria-label","Main navigation");
+const bottom=document.createElement("nav");bottom.className="app-bottom-nav";bottom.dataset.appBottomNav="";bottom.setAttribute("aria-label","Main navigation");bottom.setAttribute("role","navigation");
 const items=[["dashboard","Home"],["watchlist","Watchlist"],["chart","Trade"],["positions","Portfolio"],["settings","Profile"]];
 items.forEach(([page,label])=>{const a=document.createElement("a");a.href="#"+page;a.dataset.bottomPage=page;a.innerHTML=icons[pageIcons[page]]+"<span>"+label+"</span>";a.addEventListener("click",()=>{document.querySelector('[data-terminal-page="'+page+'"]')?.click();});bottom.append(a)});
 document.body.append(bottom);
