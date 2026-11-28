@@ -541,3 +541,8 @@ body.stocks-page.touch-terminal #zenura-quick-actions>a>span{
   overflow:hidden!important;
   text-overflow:ellipsis!important;
 }
+
+
+/* Hide only failed image elements that overlap the Android bottom dock. */
+.stocks-page.touch-terminal .zenura-broken-bottom-image,
+.stocks-page.touch-terminal .zenura-broken-bottom-image-wrap{display:none!important;visibility:hidden!important;}
