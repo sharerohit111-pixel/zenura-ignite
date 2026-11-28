@@ -14,7 +14,7 @@ const {chromium}=require("playwright");
    const responseHtml=await response.text();
    assert.equal(response.status(),200,"terminal HTML must be served successfully");
    assert.match(responseHtml,/data-terminal-page="dashboard"/,"served HTML must contain dashboard navigation");
-   await page.waitForSelector('nav.terminal-nav [data-terminal-page="dashboard"]',{timeout:10000}).catch(async error=>{
+   await page.waitForSelector('#zenura-sidebar-toggle',{timeout:10000}).catch(async error=>{
     const diagnostic=await page.evaluate(()=>({url:location.href,title:document.title,readyState:document.readyState,body:document.body?.innerHTML?.slice(0,5000),navCount:document.querySelectorAll("[data-terminal-page]").length}));
     throw new Error("Terminal navigation missing after valid HTML response: "+JSON.stringify({status:response.status(),url:response.url(),responseHasNav:/data-terminal-page="dashboard"/.test(responseHtml),diagnostic,errors})+"; "+error.message);
    });
@@ -49,6 +49,10 @@ const {chromium}=require("playwright");
     assert.equal(await page.locator("#zenura-sidebar").getAttribute("aria-hidden"),"true","drawer must close after navigation");
    }
    assert.equal(await page.locator("#zenura-quick-actions a").count(),4,"existing four-item bottom bar must remain intact");
+   await page.locator("#zenura-sidebar-toggle").click();
+   await page.locator("#zenura-sidebar [data-sidebar-page=\"orders\"]").click();
+   assert.equal(await page.locator("#paper-orders-workspace-body").isVisible(),true,"Orders & Trade History must show pending orders");
+   assert.equal(await page.locator("#paper-trades-workspace-body").isVisible(),true,"Orders & Trade History must show executed trades");
    await page.locator("nav.terminal-nav [data-terminal-page=\"settings\"]").click();
    assert.equal(await page.locator(".settings-feature").count(),6,"Settings must expose six requested controls");
    await page.locator("[data-settings-feature=\"theme\"]").click();
