@@ -83,7 +83,7 @@ test("paper terminal mobile bottom bar exposes the four requested functional sho
  for(const page of ["derivatives","positions","watchlist","support"])assert.ok(shell.includes('["'+page+'"'));
  assert.match(shell,/\["derivatives","Option Chain"\],\["positions","Live Pos\. \/ P&L"\],\["watchlist","Quick Watchlist"\],\["support","Help & Support"\]/);
  assert.match(nav,/support:\["\.support-page"\]/);
- assert.match(nav,/supportFooter/);
+ assert.match(nav,/pageRoot\.append\(support\)/);
  assert.match(nav,/support-save-draft/);
  assert.match(css,/\.stocks-page \.app-bottom-nav\{[\s\S]*?position:fixed!important/);
  assert.match(css,/grid-template-columns:repeat\(4,minmax\(0,1fr\)\)!important/);
