@@ -1,6 +1,6 @@
 (function(){
 "use strict";
-const body=document.body,header=document.querySelector(".top");
+const body=document.body,header=document.querySelector(".top"),pageRoot=document.querySelector("main.wrap");
 if(!header||document.getElementById("zenura-sidebar"))return;
 const icons={
 dashboard:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="8" height="8" rx="2"/><rect x="13" y="3" width="8" height="5" rx="2"/><rect x="13" y="10" width="8" height="11" rx="2"/><rect x="3" y="13" width="8" height="8" rx="2"/></svg>',
@@ -49,11 +49,21 @@ function navigate(id){
  syncActive(id);
 }
 function syncActive(id){drawer.querySelectorAll("[data-sidebar-page]").forEach(a=>{if(a.dataset.sidebarPage===id)a.setAttribute("aria-current","page");else a.removeAttribute("aria-current")})}
-function open(){overlay.hidden=false;requestAnimationFrame(()=>{drawer.classList.add("is-open");overlay.classList.add("is-visible")});drawer.setAttribute("aria-hidden","false");trigger.setAttribute("aria-expanded","true");trigger.setAttribute("aria-label","Close navigation");body.classList.add("sidebar-open");drawer.querySelector(".sidebar-close").focus()}
-function close(){drawer.classList.remove("is-open");overlay.classList.remove("is-visible");drawer.setAttribute("aria-hidden","true");trigger.setAttribute("aria-expanded","false");trigger.setAttribute("aria-label","Open navigation");body.classList.remove("sidebar-open");setTimeout(()=>{overlay.hidden=true},220);trigger.focus()}
+function open(){overlay.hidden=false;requestAnimationFrame(()=>{drawer.classList.add("is-open");overlay.classList.add("is-visible")});drawer.setAttribute("aria-hidden","false");trigger.setAttribute("aria-expanded","true");trigger.setAttribute("aria-label","Close navigation");body.classList.add("sidebar-open");if(pageRoot)pageRoot.inert=true;drawer.querySelector(".sidebar-close").focus()}
+function close(){drawer.classList.remove("is-open");overlay.classList.remove("is-visible");drawer.setAttribute("aria-hidden","true");trigger.setAttribute("aria-expanded","false");trigger.setAttribute("aria-label","Open navigation");body.classList.remove("sidebar-open");if(pageRoot)pageRoot.inert=false;setTimeout(()=>{overlay.hidden=true},220);trigger.focus()}
 trigger.addEventListener("click",()=>drawer.classList.contains("is-open")?close():open());
 drawer.querySelector(".sidebar-close").addEventListener("click",close);overlay.addEventListener("click",close);
-document.addEventListener("keydown",e=>{if(e.key==="Escape"&&drawer.classList.contains("is-open"))close()});
+document.addEventListener("keydown",e=>{
+ if(!drawer.classList.contains("is-open"))return;
+ if(e.key==="Escape"){e.preventDefault();close();return}
+ if(e.key!=="Tab")return;
+ const focusable=[...drawer.querySelectorAll('a[href],button:not([disabled]),[tabindex]:not([tabindex="-1"])')].filter(el=>!el.hidden);
+ if(!focusable.length){e.preventDefault();drawer.focus();return}
+ const first=focusable[0],last=focusable[focusable.length-1];
+ if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus()}
+ else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus()}
+ else if(!drawer.contains(document.activeElement)){e.preventDefault();first.focus()}
+});
 window.addEventListener("hashchange",()=>{const id=location.hash.slice(1)||"dashboard";syncActive(id);if(drawer.classList.contains("is-open"))close()});
 function status(message){const el=document.getElementById("settings-action-status");if(el)el.textContent=message}
 function runSetting(id){
