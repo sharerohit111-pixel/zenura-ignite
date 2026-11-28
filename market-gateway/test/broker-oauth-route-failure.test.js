@@ -218,3 +218,147 @@ test("Angel One disconnect safely clears an unreadable local token envelope with
   assert.equal(h.calls.some(x => x && x.fetch), false, "unreadable credentials must never reach provider logout");
   assert.doesNotMatch(JSON.stringify(res.body), /angel-jwt|angel-refresh|angel-feed/);
 });
+
+
+function fyersStartHarness({ authError = null, user = { id: "user-1", emailConfirmedAt: "2026-01-01" },
+  config = {}, rpcError = null, statusRow = null, statusError = null } = {}) {
+  const calls = [];
+  const serviceDb = {
+    async rpc(name, args) {
+      calls.push({ rpc: name, args });
+      return { data: null, error: rpcError };
+    },
+    from(table) {
+      assert.equal(table, "broker_connections");
+      const builder = {
+        select(columns) { calls.push({ select: columns }); return this; },
+        eq(field, value) { calls.push({ eq: [field, value] }); return this; },
+        async maybeSingle() { return { data: statusRow, error: statusError }; }
+      };
+      return builder;
+    }
+  };
+  const router = createFyersOAuthRouter({
+    auth: async () => {
+      if (authError) throw authError;
+      return { user };
+    },
+    serviceDb, fetchProvider: async () => { throw new Error("unexpected provider request"); },
+    readProviderJson: async () => ({}),
+    appRedirectUri: "https://app.example/markets/stocks/",
+    clientId: "client-id", clientSecret: "client-secret",
+    redirectUri: "https://gateway.example/fyers/oauth/callback",
+    encryptionKey: KEY, logger: { error() {} }, ...config
+  });
+  return { router, calls };
+}
+
+test("FYERS OAuth start enforces authenticated confirmed users and complete configuration", async () => {
+  const unauth = fyersStartHarness({ authError: new Error("not signed in") });
+  const unauthRes = response();
+  await routeHandler(unauth.router, "post", "/oauth/start")({ body: {} }, unauthRes);
+  assert.equal(unauthRes.statusCode, 500);
+  assert.equal(unauth.calls.length, 0);
+
+  const unconfirmed = fyersStartHarness({ user: { id: "user-1", emailConfirmedAt: null } });
+  const unconfirmedRes = response();
+  await routeHandler(unconfirmed.router, "post", "/oauth/start")({ body: {} }, unconfirmedRes);
+  assert.equal(unconfirmedRes.statusCode, 403);
+  assert.equal(unconfirmedRes.body.code, "email_not_confirmed");
+  assert.equal(unconfirmed.calls.length, 0);
+
+  const incomplete = fyersStartHarness({ config: { clientSecret: "" } });
+  const incompleteRes = response();
+  await routeHandler(incomplete.router, "post", "/oauth/start")({ body: {} }, incompleteRes);
+  assert.equal(incompleteRes.statusCode, 503);
+  assert.equal(incomplete.calls.length, 0);
+});
+
+test("FYERS OAuth start fails closed when durable state creation fails", async () => {
+  const h = fyersStartHarness({ rpcError: { code: "DB_UNAVAILABLE" } });
+  const res = response();
+  await routeHandler(h.router, "post", "/oauth/start")({ body: {} }, res);
+  assert.equal(res.statusCode, 503);
+  assert.equal(res.body.authorizationUrl, undefined);
+  assert.equal(h.calls.length, 1);
+  assert.equal(h.calls[0].rpc, "begin_broker_oauth_state");
+  assert.equal(h.calls[0].args.p_broker_name, "fyers");
+});
+
+test("FYERS connection status scopes database reads to the authenticated owner and broker", async () => {
+  const h = fyersStartHarness({
+    statusRow: { connection_status: "connected", token_expires_at: "2099-01-01T00:00:00.000Z", last_authenticated_at: "2026-11-28T00:00:00.000Z" }
+  });
+  const res = response();
+  await routeHandler(h.router, "get", "/connection")({}, res);
+  assert.equal(res.body.connected, true);
+  assert.ok(h.calls.some(x => x.eq?.[0] === "user_id" && x.eq[1] === "user-1"));
+  assert.ok(h.calls.some(x => x.eq?.[0] === "broker_name" && x.eq[1] === "fyers"));
+  assert.equal(res.body.accessToken, undefined);
+  assert.equal(res.headers["Cache-Control"], "private, no-store");
+});
+
+test("FYERS connection status reports database errors without exposing credentials", async () => {
+  const h = fyersStartHarness({ statusError: { code: "DB_READ_FAILED" } });
+  const res = response();
+  await routeHandler(h.router, "get", "/connection")({}, res);
+  assert.equal(res.statusCode, 503);
+  assert.equal(res.body.connected, undefined);
+  assert.doesNotMatch(JSON.stringify(res.body), /token|secret/i);
+});
+
+function angelStatusHarness({ authError = null, row = null, dbError = null } = {}) {
+  const calls = [];
+  const serviceDb = {
+    from(table) {
+      assert.equal(table, "broker_connections");
+      const builder = {
+        select(columns) { calls.push({ select: columns }); return this; },
+        eq(field, value) { calls.push({ eq: [field, value] }); return this; },
+        async maybeSingle() { return { data: row, error: dbError }; }
+      };
+      return builder;
+    }
+  };
+  const router = createAngelOneRouter({
+    auth: async () => {
+      if (authError) throw authError;
+      return { user: { id: "user-2", emailConfirmedAt: "2026-01-01" } };
+    },
+    serviceDb, fetchProvider: async () => { throw new Error("unexpected provider request"); },
+    readProviderJson: async () => ({}), encryptionKey: KEY,
+    apiKey: "api-key", clientLocalIp: "192.0.2.1", clientPublicIp: "198.51.100.1",
+    macAddress: "AA:BB:CC:DD:EE:FF", sourceId: "WEB", logger: { error() {} }
+  });
+  return { router, calls };
+}
+
+test("Angel One connection status scopes reads by authenticated user and hides expired account identity", async () => {
+  const h = angelStatusHarness({
+    row: { connection_status: "connected", token_expires_at: "2000-01-01T00:00:00.000Z", last_authenticated_at: "2026-11-28T00:00:00.000Z", provider_account_ref: "PRIVATE123" }
+  });
+  const res = response();
+  await routeHandler(h.router, "get", "/connection")({}, res);
+  assert.equal(res.body.connected, false);
+  assert.equal(res.body.status, "connected");
+  assert.equal(res.body.expiresAt, null);
+  assert.equal(res.body.account, null);
+  assert.ok(h.calls.some(x => x.eq?.[0] === "user_id" && x.eq[1] === "user-2"));
+  assert.ok(h.calls.some(x => x.eq?.[0] === "broker_name" && x.eq[1] === "angel_one"));
+  assert.doesNotMatch(JSON.stringify(res.body), /PRIVATE123|jwtToken|refreshToken|feedToken/);
+  assert.equal(res.headers["Cache-Control"], "private, no-store");
+});
+
+test("Angel One connection status fails closed for auth and database errors", async () => {
+  const unauth = angelStatusHarness({ authError: new Error("not signed in") });
+  const unauthRes = response();
+  await routeHandler(unauth.router, "get", "/connection")({}, unauthRes);
+  assert.equal(unauthRes.statusCode, 500);
+  assert.equal(unauth.calls.length, 0);
+
+  const dbFailure = angelStatusHarness({ dbError: { code: "DB_READ_FAILED" } });
+  const dbRes = response();
+  await routeHandler(dbFailure.router, "get", "/connection")({}, dbRes);
+  assert.equal(dbRes.statusCode, 503);
+  assert.equal(dbRes.body.connected, undefined);
+});
