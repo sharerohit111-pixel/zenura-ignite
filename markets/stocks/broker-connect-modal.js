@@ -28,6 +28,7 @@
       const button = el("button", "broker-connect-action", "Connect & Login");
       button.type = "button";
       button.dataset.provider = p.id;
+      if (p.id === "angel_one") button.hidden = true;
       card.append(head, button);
       if (p.id === "fyers") {
         const brokerStatus = el("small", "broker-connect-status", "Checking FYERS connection…");
