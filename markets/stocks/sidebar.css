@@ -31,3 +31,14 @@ body.sidebar-open{overflow:hidden}
 
 /* The six-card Settings module is the single settings surface; hide legacy duplicate rows. */
 .stocks-page .settings-page>.settings-row{display:none!important}
+
+
+/* Final mobile placement: keep the menu control at the far right of the header. */
+.stocks-page .top>.sidebar-toggle{order:99!important;margin-left:auto!important;flex:0 0 42px!important;align-self:center!important}
+@media(max-width:760px){
+ .stocks-page.touch-terminal .top>.sidebar-toggle{order:99!important;margin-left:auto!important}
+}
+
+/* The drawer always enters from the right edge. */
+.zenura-sidebar{right:0!important;left:auto!important;transform:translateX(105%)!important}
+.zenura-sidebar.is-open{transform:translateX(0)!important}
