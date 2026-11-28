@@ -53,7 +53,7 @@ async function verifyProductionWorkerCacheCleanup() {
       keys: await caches.keys(),
       controller: navigator.serviceWorker.controller?.scriptURL || null
     }));
-    assert.ok(activationInfo.keys.includes("zenura-markets-shell-v21"), "current v19 cache must be active: " + JSON.stringify(activationInfo));
+    assert.ok(activationInfo.keys.includes("zenura-markets-shell-v21"), "current v21 cache must be active: " + JSON.stringify(activationInfo));
     await pwaPage.reload({ waitUntil: "domcontentloaded" });
     await pwaPage.waitForFunction(() => !!navigator.serviceWorker.controller, null, { timeout: 15000 });
     const controlledWorker = await pwaPage.evaluate(() => navigator.serviceWorker.controller?.scriptURL || null);
