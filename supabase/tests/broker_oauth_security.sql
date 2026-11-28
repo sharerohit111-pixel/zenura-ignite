@@ -36,6 +36,8 @@ INSERT INTO public.broker_connections(
   '{"v":"v1","iv":"AAAAAAAAAAAAAAAA","tag":"AAAAAAAAAAAAAAAAAAAAAA==","data":"ciphertext"}'::jsonb,
   now()+interval '1 day'
 );
+INSERT INTO public.broker_oauth_states(state_hash,user_id,broker_name,expires_at,created_at)
+VALUES (repeat('c',64),'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa','fyers',now()-interval '1 day',now()-interval '2 days');
 SELECT public.begin_broker_oauth_state(
   repeat('a',64),'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa','fyers',now()+interval '5 minutes',now()
 );
@@ -47,6 +49,9 @@ DECLARE
   v_user uuid;
   v_count integer;
 BEGIN
+  IF EXISTS (SELECT 1 FROM public.broker_oauth_states WHERE state_hash=repeat('c',64)) THEN
+    RAISE EXCEPTION 'Expired OAuth state was not pruned when a new flow began';
+  END IF;
   SELECT user_id INTO v_user FROM public.consume_broker_oauth_state(repeat('a',64),'fyers',now());
   IF v_user <> 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' THEN
     RAISE EXCEPTION 'OAuth state did not resolve to its owning user';
