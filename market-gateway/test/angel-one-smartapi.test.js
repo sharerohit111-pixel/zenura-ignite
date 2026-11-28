@@ -37,6 +37,16 @@ test("Angel One adapter never persists or logs PIN and TOTP", () => {
   assert.match(source, /eq\("broker_name", "angel_one"\)/);
 });
 
+test("Angel One provider logout sends the required authenticated session headers", () => {
+  const fs = require("node:fs");
+  const path = require("node:path");
+  const source = fs.readFileSync(path.join(__dirname, "../lib/angel-one-smartapi.js"), "utf8");
+  assert.match(source, /Authorization: "Bearer " \+ session\.jwtToken/);
+  assert.match(source, /"x-api-key": apiKey/);
+  assert.match(source, /"x-client-code": data\.provider_account_ref/);
+  assert.match(source, /"x-feed-token": session\.feedToken/);
+});
+
 test("Angel One login limiter is database-backed and fails closed", () => {
   const fs = require("node:fs");
   const path = require("node:path");
