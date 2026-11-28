@@ -1,6 +1,6 @@
 "use strict";
 
-const express = require("express");
+const express = require("express");\nconst net = require("node:net");
 const { encryptUpstoxToken, decryptUpstoxToken } = require("./upstox-token-crypto");
 
 const LOGIN_URL = "https://apiconnect.angelone.in/rest/auth/angelbroking/user/v1/loginByPassword";
@@ -62,7 +62,7 @@ function createAngelOneRouter({ auth, serviceDb, fetchProvider, readProviderJson
     try {
       const { user } = await auth(req);
       if (!user.emailConfirmedAt) return res.status(403).json({ error: "Verify your Supabase email before connecting Angel One." });
-      if (!apiKey || !encryptionKey) return res.status(503).json({ error: "Angel One server configuration is incomplete." });
+      if (!apiKey || !encryptionKey || net.isIP(clientLocalIp) !== 4 || net.isIP(clientPublicIp) !== 4 || !/^(?:[0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$/.test(macAddress) || !["WEB", "MOBILE"].includes(sourceId)) return res.status(503).json({ error: "Angel One server configuration is incomplete. Configure API key, encryption key, local/public IPv4, MAC address and source ID." });
       const credentials = validateAngelOneCredentials(req.body);
       if (!credentials) return res.status(400).json({ error: "Enter a valid Client ID, 4–6 digit PIN and current 6-digit TOTP." });
       if (!checkRateLimit(user.id)) return res.status(429).set("Retry-After", "2").json({ error: "Too many Angel One login attempts. Wait before trying again." });
