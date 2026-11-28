@@ -29,9 +29,7 @@
   const support=document.createElement("section");
   support.className="panel support-page";
   support.innerHTML='<div class="panel-head"><div><small>ZENURA IGNITE ASSISTANCE</small><h2>Help, Support &amp; Suggestions</h2></div><span class="pill muted">PAPER TRADING</span></div><p class="portfolio-status">अपनी समस्या या सुझाव यहाँ लिखें। यह ड्राफ्ट इसी डिवाइस पर रहेगा; अभी सर्वर पर सबमिट नहीं होगा।</p><div class="settings-row"><div><b>Quick help</b><p>लॉगिन, Upstox कनेक्शन, वॉचलिस्ट और पेपर ऑर्डर से जुड़ी सहायता।</p></div></div><label class="support-message-label" for="support-suggestion">अपनी समस्या / सुझाव लिखें</label><textarea id="support-suggestion" rows="5" maxlength="2000" placeholder="यहाँ अपना संदेश लिखें…"></textarea><div class="support-actions"><button type="button" id="support-save-draft">ड्राफ्ट सेव करें</button><button type="button" id="support-copy-draft">कॉपी करें</button></div><p id="support-draft-status" class="portfolio-status" role="status">कोई ड्राफ्ट सेव नहीं है।</p>';
-  const supportFooter=document.querySelector("footer");
-  if(supportFooter)supportFooter.insertAdjacentElement("beforebegin",support);
-  else pageRoot.append(support);
+  pageRoot.append(support);
   const footer=document.querySelector("footer");
   if(footer)footer.insertAdjacentElement("beforebegin",settings);else pageRoot.append(settings);
   function setHidden(selector,hidden){document.querySelectorAll(selector).forEach(el=>el.dataset.pageHidden=String(hidden));}
@@ -102,7 +100,7 @@
     if(action==="theme")document.querySelector("[data-app-theme-toggle]")?.click();
     if(action==="account")document.querySelector("#upstox-connect")?.click();
   });
-  pageRoot.addEventListener("click",e=>{
+  support.addEventListener("click",e=>{
     const action=e.target.closest("#support-save-draft,#support-copy-draft")?.id;
     if(!action)return;
     const field=document.querySelector("#support-suggestion");
