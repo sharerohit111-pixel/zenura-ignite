@@ -130,12 +130,12 @@ test("FYERS callback stores only encrypted token material on successful exchange
   assert.notEqual(h.calls.upsert[0].row.access_token_ciphertext, "fyers-secret-token");
 });
 
-function angelDeleteHarness({ clearError = null, logoutError = null } = {}) {
+function angelDeleteHarness({ clearError = null, logoutError = null, invalidEnvelope = false } = {}) {
   const calls = [];
   const envelope = encryptUpstoxToken(JSON.stringify({
     jwtToken: "angel-jwt", refreshToken: "angel-refresh", feedToken: "angel-feed"
   }), KEY);
-  const row = { access_token_ciphertext: envelope, provider_account_ref: "AB1234" };
+  const row = { access_token_ciphertext: invalidEnvelope ? { v: 1, iv: "bad", tag: "bad", data: "bad" } : envelope, provider_account_ref: "AB1234" };
   const serviceDb = {
     from(table) {
       assert.equal(table, "broker_connections");
@@ -203,4 +203,18 @@ test("Angel One disconnect retains local disconnection when provider logout is u
   assert.equal(res.body.disconnected, true);
   assert.equal(res.body.providerRevocation, "unconfirmed");
   assert.ok(h.calls.some(x => x && x.update));
+});
+
+
+test("Angel One disconnect safely clears an unreadable local token envelope without provider logout", async () => {
+  const h = angelDeleteHarness({ invalidEnvelope: true });
+  const handler = routeHandler(h.router, "delete", "/connection");
+  const res = response();
+  await handler({}, res);
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.disconnected, true);
+  assert.equal(res.body.providerRevocation, "not_attempted");
+  assert.ok(h.calls.some(x => x && x.update), "local encrypted credentials are still cleared");
+  assert.equal(h.calls.some(x => x && x.fetch), false, "unreadable credentials must never reach provider logout");
+  assert.doesNotMatch(JSON.stringify(res.body), /angel-jwt|angel-refresh|angel-feed/);
 });
