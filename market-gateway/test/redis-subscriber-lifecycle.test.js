@@ -154,3 +154,22 @@ test("client error event is reported without shadowing subscription failure repo
   assert.ok(h.calls.some((x) => x[0] === "error" && x[1] === "subscribe failed"));
   assert.equal(h.lifecycle.getStatus().state, "degraded");
 });
+
+
+test("external overflow invalidation marks feed unavailable and invalidates generation once", async () => {
+  const h = harness();
+  await h.lifecycle.start();
+  h.client.emit("ready");
+  await h.lifecycle.onReady();
+  const current = h.lifecycle.getStatus().generation;
+
+  assert.equal(h.lifecycle.invalidate("market_feed_queue_overflow"), true);
+  assert.equal(h.lifecycle.getStatus().state, "unavailable");
+  assert.equal(h.lifecycle.getStatus().generation, current + 1);
+  assert.equal(h.lifecycle.isCurrentGeneration(current), false);
+  assert.equal(h.lifecycle.invalidate("market_feed_queue_overflow"), false);
+  assert.equal(h.lifecycle.getStatus().generation, current + 1);
+  assert.deepEqual(h.calls.filter((x) => x[0] === "unavailable").at(-1), [
+    "unavailable", "market_feed_queue_overflow", current + 1,
+  ]);
+});
