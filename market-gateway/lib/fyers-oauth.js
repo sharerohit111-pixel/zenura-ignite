@@ -22,7 +22,7 @@ function isValidFyersRedirectUri(value) {
 function isUsableFyersTokenResponse(payload) {
   return !!payload && payload.s === "ok" && Number(payload.code) === 200
     && typeof payload.access_token === "string" && payload.access_token.trim().length > 0
-    && payload.access_token.length <= 16384 && !/[\\u0000-\\u001f\\u007f]/.test(payload.access_token);
+    && payload.access_token.length <= 16384 && !/[\x00-\x1f\x7f]/.test(payload.access_token);
 }
 
 function createFyersOAuthRouter({ auth, serviceDb, fetchProvider, readProviderJson, appRedirectUri,
