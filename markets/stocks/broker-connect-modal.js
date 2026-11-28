@@ -94,9 +94,51 @@
       disconnect.hidden = true;
     }
   }
-  function open() { root.hidden = false; document.body.classList.add("broker-connect-open"); }
-  function close() { root.hidden = true; document.body.classList.remove("broker-connect-open"); }
+  let returnFocusTo = null;
+  function getFocusableElements() {
+    return Array.from(root.querySelectorAll(
+      'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])'
+    )).filter((element) => !element.hidden && element.getClientRects().length > 0);
+  }
+  function open() {
+    if (root.hidden) returnFocusTo = document.activeElement;
+    root.hidden = false;
+    document.body.classList.add("broker-connect-open");
+    root.querySelector("[data-close-broker-modal]")?.focus();
+  }
+  function close() {
+    if (root.hidden) return;
+    root.hidden = true;
+    document.body.classList.remove("broker-connect-open");
+    if (returnFocusTo?.isConnected) returnFocusTo.focus();
+    returnFocusTo = null;
+  }
+  document.addEventListener("keydown", (event) => {
+    if (root.hidden) return;
+    if (event.key === "Escape") {
+      event.preventDefault();
+      close();
+      return;
+    }
+    if (event.key !== "Tab") return;
+    const focusable = getFocusableElements();
+    if (!focusable.length) {
+      event.preventDefault();
+      return;
+    }
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (event.shiftKey && (document.activeElement === first || !root.contains(document.activeElement))) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && (document.activeElement === last || !root.contains(document.activeElement))) {
+      event.preventDefault();
+      first.focus();
+    }
+  });
   render();
+  document.body.classList.add("broker-connect-open");
+  root.querySelector("[data-close-broker-modal]")?.focus();
   refreshFyersStatus();
   refreshAngelOneStatus();
   root.addEventListener("click", (event) => {
