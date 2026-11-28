@@ -10,19 +10,19 @@ const {loadVerifiedExchangeSession}=require("./exchange-session-calendar");
 
 function createPaperIntradayLimitWorker({
   serviceDb,ensureInstrumentCache,getUpstoxAccessToken,fetchProvider,
-  readProviderJson,normalizeProviderQuote,loadSession=loadVerifiedExchangeSession
+  readProviderJson,normalizeProviderQuote,loadSession=loadVerifiedExchangeSession,now=()=>Date.now()
 }){
   if(!serviceDb||typeof serviceDb.rpc!=="function"||typeof serviceDb.from!=="function"
      ||typeof ensureInstrumentCache!=="function"||typeof getUpstoxAccessToken!=="function"
      ||typeof fetchProvider!=="function"||typeof readProviderJson!=="function"
-     ||typeof normalizeProviderQuote!=="function"||typeof loadSession!=="function"){
+     ||typeof normalizeProviderQuote!=="function"||typeof loadSession!=="function"||typeof now!=="function"){
     throw new TypeError("Intraday LIMIT worker dependencies are incomplete.");
   }
 
   return async function runPaperIntradayLimitWorker({maxOrders=50}={}){
     if(!Number.isInteger(maxOrders)||maxOrders<1||maxOrders>100)
       throw new TypeError("Intraday LIMIT worker batch size is invalid.");
-    const leaseToken=crypto.randomUUID(),leaseNow=Date.now();
+    const leaseToken=crypto.randomUUID(),leaseNow=now();
     const lease=await serviceDb.rpc("acquire_paper_market_worker_lease",{
       p_state_key:"paper_intraday_limit_orders",p_lease_token:leaseToken,
       p_now_ms:leaseNow,p_ttl_ms:240000
@@ -94,13 +94,13 @@ function createPaperIntradayLimitWorker({
           const sessionCache=new Map();
           for(const order of validOrders){
             if(!sessionCache.has(order.exchange))
-              sessionCache.set(order.exchange,await loadSession(serviceDb,order.exchange,Date.now()));
+              sessionCache.set(order.exchange,await loadSession(serviceDb,order.exchange,now()));
             const session=sessionCache.get(order.exchange);
             if(!session){summary.notEligible++;continue;}
             const entry=entries.find(item=>item?.instrument_token===order.instrument_key);
             let quote=null;
             try{quote=normalizeProviderQuote(entry,order.instrument_key,{maxAgeMs:15000});}catch(_){}
-            const nowMs=Date.now();
+            const nowMs=now();
             if(!isEligibleIntradayLimitOrder(order,quote,nowMs,session)){
               summary.notEligible++;continue;
             }
@@ -140,7 +140,7 @@ function createPaperIntradayLimitWorker({
       return summary;
     }finally{
       const released=await serviceDb.rpc("release_paper_market_worker_lease",{
-        p_state_key:"paper_intraday_limit_orders",p_lease_token:leaseToken,p_now_ms:Date.now()
+        p_state_key:"paper_intraday_limit_orders",p_lease_token:leaseToken,p_now_ms:now()
       });
       if(released?.error)console.warn("Intraday LIMIT worker lease release failed",{code:released.error.code||"unknown"});
     }
