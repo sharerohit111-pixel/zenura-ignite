@@ -11,7 +11,7 @@ const screens=["home","market","watchlists","charts","equity","futures","options
 test("Markets web app manifest is strict JSON and has a valid standalone scope",async()=>{
  const manifest=JSON.parse(await read("markets/manifest.webmanifest"));
  assert.equal(manifest.scope,"./");
- assert.equal(manifest.start_url,"./");
+ assert.equal(manifest.start_url,"./stocks/");
  assert.equal(manifest.display,"standalone");
  assert.ok(Array.isArray(manifest.icons)&&manifest.icons.length>0);
  assert.ok(Array.isArray(manifest.shortcuts));
@@ -24,7 +24,7 @@ test("Markets web app manifest is strict JSON and has a valid standalone scope",
 
 test("Markets service worker uses a new cache generation and precaches the canonical event ledger",async()=>{
  const sw=await read("markets/service-worker.js");
- assert.match(sw,/zenura-markets-shell-v26/);
+ assert.match(sw,/zenura-markets-shell-v28/);
  assert.match(sw,/"shared\/paper-demo-event-ledger\.mjs"/);
  assert.doesNotMatch(sw,/zenura-markets-shell-v9/);
 });
