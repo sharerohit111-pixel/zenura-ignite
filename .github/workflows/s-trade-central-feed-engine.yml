@@ -3,7 +3,7 @@ name: S-TRADE Central Feed Engine Checks
 on:
   pull_request:
     branches:
-      - feature/s-trade-redis-subscriber-bridge-clean3-2026-11-28
+      - feature/s-trade-central-feed-engine-clean-2026-11-28
     paths:
       - "market-gateway/lib/central-market-feed.js"
       - "market-gateway/lib/redis-market-feed-transport.js"
