@@ -10,8 +10,14 @@ const {chromium}=require("playwright");
    const page=await context.newPage();
    const errors=[];
    page.on("pageerror",error=>errors.push(error.message));
-   await page.goto("http://127.0.0.1:4173/markets/stocks/index.html",{waitUntil:"domcontentloaded",timeout:30000});
-   await page.waitForSelector('nav.terminal-nav [data-terminal-page="dashboard"]',{timeout:10000});
+   const response=await page.goto("http://127.0.0.1:4173/markets/stocks/index.html",{waitUntil:"domcontentloaded",timeout:30000});
+   const responseHtml=await response.text();
+   assert.equal(response.status(),200,"terminal HTML must be served successfully");
+   assert.match(responseHtml,/data-terminal-page="dashboard"/,"served HTML must contain dashboard navigation");
+   await page.waitForSelector('nav.terminal-nav [data-terminal-page="dashboard"]',{timeout:10000}).catch(async error=>{
+    const diagnostic=await page.evaluate(()=>({url:location.href,title:document.title,readyState:document.readyState,body:document.body?.innerHTML?.slice(0,5000),navCount:document.querySelectorAll("[data-terminal-page]").length}));
+    throw new Error("Terminal navigation missing after valid HTML response: "+JSON.stringify({status:response.status(),url:response.url(),responseHasNav:/data-terminal-page="dashboard"/.test(responseHtml),diagnostic,errors})+"; "+error.message);
+   });
    const routes=[
     ["dashboard",".dashboard-overview"],
     ["chart",".chart-panel"],
